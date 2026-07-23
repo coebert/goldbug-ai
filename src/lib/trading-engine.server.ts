@@ -6,6 +6,12 @@ import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import {
+  buildLearningContext,
+  formatLearningBlock,
+  reflectAndUpdateLessons,
+  type LearningContext,
+} from "./learning.server";
+import {
   getDailyCandles,
   getPriceOn,
   sma,
