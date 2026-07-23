@@ -1966,10 +1966,12 @@ export const runPortfolioOptimizer = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------------------
 
 type NewsReelInfluence = {
+  decision_id: string;
   portfolio_id: string;
   portfolio_name: string;
   run_date: string;
   sentiment: number | null;
+  rationale: string | null;
   actions: Array<{ action: string; symbol: string; qty?: number | null }>;
 };
 
