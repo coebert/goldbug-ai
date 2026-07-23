@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
+import { ModeBadge } from "@/components/mode-badge";
 import { AllPortfoliosChart } from "@/components/all-portfolios-chart";
 import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles } from "lucide-react";
@@ -171,17 +172,19 @@ function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; st
   return (
     <Card>
       <CardContent className="flex items-center justify-between gap-4 py-4">
-        <div>
-          <Link
-            to="/portfolio/$id"
-            params={{ id: portfolio.id }}
-            className="font-medium hover:underline"
-          >
-            {portfolio.name}
-          </Link>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/portfolio/$id"
+              params={{ id: portfolio.id }}
+              className="font-medium hover:underline"
+            >
+              {portfolio.name}
+            </Link>
+            <ModeBadge mode={portfolio.mode} size="sm" />
+          </div>
           <div className="text-xs text-muted-foreground">
-            {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} · {portfolio.risk_level} ·{" "}
-            {portfolio.mode}
+            {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} · {portfolio.risk_level} risk
             {portfolio.last_run_date && ` · last run ${portfolio.last_run_date}`}
           </div>
         </div>
