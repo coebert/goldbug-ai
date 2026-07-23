@@ -2137,6 +2137,8 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         source: r.source,
         headline: r.headline,
         url: r.url,
+        original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+        original_language: (r as { original_language?: string | null }).original_language ?? null,
         avg_sentiment: avg,
         decisions_count: rows.length,
         influences: rows.slice(0, 6),
