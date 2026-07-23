@@ -374,7 +374,7 @@ export async function getNewsForDate(
 ): Promise<NewsItem[]> {
   const { data: cached } = await supabaseAdmin
     .from("news_cache")
-    .select("news_date, source, headline, url, summary, original_headline, original_language")
+    .select("news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
     .eq("news_date", dateISO)
     .limit(max);
 
@@ -386,7 +386,12 @@ export async function getNewsForDate(
     summary: r.summary,
     original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
     original_language: (r as { original_language?: string | null }).original_language ?? null,
+    translation_confidence:
+      (r as { translation_confidence?: number | string | null }).translation_confidence == null
+        ? null
+        : Number((r as { translation_confidence: number | string }).translation_confidence),
   }));
+
 
   // Any cached non-English rows still missing a translation get repaired
   // in the background on every read. Bounded and fire-and-forget so it
