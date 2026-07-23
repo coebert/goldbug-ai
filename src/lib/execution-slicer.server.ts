@@ -188,20 +188,19 @@ export async function tickSlicer(portfolioId: string, ownerUserId: string) {
   const clean = validate("tickSlicer", TickInputSchema, { portfolioId, ownerUserId });
   await assertPortfolioOwnership("tickSlicer", clean.portfolioId, clean.ownerUserId);
 
-
   const now = new Date().toISOString();
   // Expire past-due slices
   await supabaseAdmin
     .from("pending_slices")
     .update({ status: "expired" } as unknown as never)
-    .eq("portfolio_id", portfolioId)
+    .eq("portfolio_id", clean.portfolioId)
     .eq("status", "active")
     .lt("expires_at", now);
 
   const { data } = await supabaseAdmin
     .from("pending_slices")
     .select("*")
-    .eq("portfolio_id", portfolioId)
+    .eq("portfolio_id", clean.portfolioId)
     .eq("status", "active")
     .lte("next_at", now)
     .order("next_at", { ascending: true });
