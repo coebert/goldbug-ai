@@ -244,7 +244,13 @@ function PortfolioPage() {
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={equityData}>
+                      <ComposedChart data={equityData}>
+                        <defs>
+                          <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.28} />
+                            <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.2} />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                         <YAxis
@@ -253,22 +259,71 @@ function PortfolioPage() {
                           tickFormatter={(v) => `${Number(v).toFixed(0)}`}
                         />
                         <Tooltip
-                          contentStyle={{
-                            background: "var(--card)",
-                            border: "1px solid var(--border)",
-                            borderRadius: 8,
+                          cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                          content={({ active, payload, label }) => {
+                            if (!active || !payload?.length) return null;
+                            const row = payload[0].payload as {
+                              value: number;
+                              peak: number;
+                              drawdown: number;
+                            };
+                            const pnlFromStart = row.value - startingCash;
+                            const pnlPctFromStart = startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
+                            return (
+                              <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
+                                <div className="mb-1 font-medium">{label}</div>
+                                <div className="tabular-nums">Value: {p.currency} {row.value.toFixed(2)}</div>
+                                <div className="tabular-nums text-muted-foreground">
+                                  vs start: {pnlFromStart >= 0 ? "+" : ""}
+                                  {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
+                                </div>
+                                <div className="tabular-nums text-muted-foreground">
+                                  Peak: {p.currency} {row.peak.toFixed(2)}
+                                </div>
+                                <div className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}>
+                                  Drawdown: {row.drawdown.toFixed(2)}%
+                                </div>
+                              </div>
+                            );
                           }}
-                          formatter={(v: number) => `${p.currency} ${Number(v).toFixed(2)}`}
                         />
-                        <ReferenceLine y={startingCash} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
+                        <ReferenceLine y={startingCash} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" label={{ value: "start", fill: "hsl(var(--muted-foreground))", fontSize: 10, position: "insideTopRight" }} />
+                        <Area
+                          type="monotone"
+                          dataKey="peak"
+                          stroke="none"
+                          fill="url(#ddFill)"
+                          fillOpacity={1}
+                          isAnimationActive={false}
+                          activeDot={false}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="value"
+                          stroke="none"
+                          fill="hsl(var(--card))"
+                          fillOpacity={1}
+                          isAnimationActive={false}
+                          activeDot={false}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="peak"
+                          stroke="hsl(var(--muted-foreground))"
+                          strokeWidth={1}
+                          strokeDasharray="2 3"
+                          dot={false}
+                          isAnimationActive={false}
+                        />
                         <Line
                           type="monotone"
                           dataKey="value"
-                          stroke="var(--primary)"
+                          stroke="hsl(var(--primary))"
                           strokeWidth={2}
                           dot={false}
+                          activeDot={{ r: 4 }}
                         />
-                      </LineChart>
+                      </ComposedChart>
                     </ResponsiveContainer>
                   )}
                 </CardContent>
