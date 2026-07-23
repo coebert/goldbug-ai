@@ -13,6 +13,8 @@ export type TradePoint = {
   fill_price: number;
   exit_price: number | null;
   forward_return_pct: number | null; // signed vs side
+  benchmark_return_pct: number | null; // SPY return over the same window (unsigned; long-only benchmark)
+  alpha_pct: number | null; // forward_return_pct - benchmark_return_pct
   news_score: number | null;
   regime: string | null;
   event_penalty: number; // 1.0 = none, <1 = penalty applied at execution
@@ -21,6 +23,7 @@ export type TradePoint = {
   signal_weights: Record<SignalKey, number>;
   signal_contrib: Record<SignalKey, number>; // return_pct * weight fraction
 };
+
 
 export type NewsBucket = {
   bucket: string; // e.g. "-1..-0.5"
@@ -49,10 +52,20 @@ export type AttributionDashboard = {
   overall: AttributionReport;
   trades: TradePoint[];
   cumulative_by_signal: Array<{ trade_date: string } & Record<SignalKey, number>>;
+  cumulative_alpha: Array<{ trade_date: string; strategy: number; benchmark: number; alpha: number }>;
+  alpha_summary: {
+    n: number;
+    avg_return_pct: number | null;
+    avg_benchmark_pct: number | null;
+    avg_alpha_pct: number | null;
+    alpha_win_rate: number | null; // share of trades where alpha > 0
+    hit_rate: number | null; // share where forward return > 0
+  };
   news_buckets: NewsBucket[];
   regime_breakdown: RegimeBreakdown[];
   penalty_breakdown: PenaltyBreakdown[];
 };
+
 
 // Parse the executed.reason string for event x0.75 / cooldown x0.5 / liquidity flags.
 function parsePenalty(reason: string): { event: number; cooldown: boolean; liquidity: boolean } {
@@ -151,6 +164,19 @@ export async function getAttributionDashboard(
         signedPct = (ex.side === "buy" ? r : -r) * 100;
       }
 
+      // Benchmark (SPY) return over the same [tradeDate, exitDate] window.
+      // Benchmark is long-only: we do NOT flip the sign for shorts — alpha
+      // for a short is measured against being long the market.
+      const [spyEntry, spyExit] = await Promise.all([
+        getPriceOn("SPY", tradeDate).catch(() => null),
+        getPriceOn("SPY", exitDate).catch(() => null),
+      ]);
+      let benchPct: number | null = null;
+      if (spyEntry != null && spyExit != null && spyEntry > 0) {
+        benchPct = ((spyExit - spyEntry) / spyEntry) * 100;
+      }
+      const alphaPct = signedPct != null && benchPct != null ? signedPct - benchPct : null;
+
       const pen = parsePenalty(ex.reason ?? "");
       const signalContrib: Record<SignalKey, number> = {
         sma_trend: 0, rsi: 0, price_change: 0, news_sentiment: 0, volatility: 0,
@@ -166,6 +192,8 @@ export async function getAttributionDashboard(
         fill_price: ex.price,
         exit_price: exit,
         forward_return_pct: signedPct,
+        benchmark_return_pct: benchPct,
+        alpha_pct: alphaPct,
         news_score: newsBySym.get(ex.symbol.toUpperCase()) ?? null,
         regime: regime?.regime ?? null,
         event_penalty: pen.event,
@@ -182,6 +210,7 @@ export async function getAttributionDashboard(
       });
     }
   }
+
 
   // Cumulative-by-signal time series (bucket per trade_date)
   const byDate = new Map<string, Record<SignalKey, number>>();
@@ -248,14 +277,48 @@ export async function getAttributionDashboard(
     })
     .filter((r) => r.n > 0);
 
+  // Cumulative alpha vs SPY (chronological)
+  const chrono = [...trades].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+  const alphaByDate = new Map<string, { strategy: number; benchmark: number; alpha: number }>();
+  for (const t of chrono) {
+    if (t.alpha_pct == null || t.forward_return_pct == null || t.benchmark_return_pct == null) continue;
+    const cur = alphaByDate.get(t.trade_date) ?? { strategy: 0, benchmark: 0, alpha: 0 };
+    cur.strategy += t.forward_return_pct;
+    cur.benchmark += t.benchmark_return_pct;
+    cur.alpha += t.alpha_pct;
+    alphaByDate.set(t.trade_date, cur);
+  }
+  const alphaDates = Array.from(alphaByDate.keys()).sort();
+  const runS = { strategy: 0, benchmark: 0, alpha: 0 };
+  const cumulative_alpha = alphaDates.map((date) => {
+    const day = alphaByDate.get(date)!;
+    runS.strategy += day.strategy;
+    runS.benchmark += day.benchmark;
+    runS.alpha += day.alpha;
+    return { trade_date: date, strategy: runS.strategy, benchmark: runS.benchmark, alpha: runS.alpha };
+  });
+
+  const scored = trades.filter((t) => t.alpha_pct != null && t.forward_return_pct != null && t.benchmark_return_pct != null);
+  const alpha_summary = {
+    n: scored.length,
+    avg_return_pct: mean(scored.map((t) => t.forward_return_pct as number)),
+    avg_benchmark_pct: mean(scored.map((t) => t.benchmark_return_pct as number)),
+    avg_alpha_pct: mean(scored.map((t) => t.alpha_pct as number)),
+    alpha_win_rate: scored.length ? scored.filter((t) => (t.alpha_pct as number) > 0).length / scored.length : null,
+    hit_rate: scored.length ? scored.filter((t) => (t.forward_return_pct as number) > 0).length / scored.length : null,
+  };
+
   return {
     window_days: windowDays,
     horizon_days: horizonDays,
     overall,
     trades: trades.sort((a, b) => b.trade_date.localeCompare(a.trade_date)),
     cumulative_by_signal,
+    cumulative_alpha,
+    alpha_summary,
     news_buckets,
     regime_breakdown,
     penalty_breakdown,
   };
 }
+
