@@ -535,14 +535,47 @@ export async function getNewsForDate(
 
 
   // Any cached non-English rows still missing a translation get repaired
-  // in the background on every read. Bounded and fire-and-forget so it
-  // never blocks the reel or the trading engine.
+  // synchronously. We used to `void` this as fire-and-forget, but on
+  // Cloudflare Workers background promises are cancelled the instant the
+  // response returns, so the LLM call never completed — cache stayed empty
+  // and non-English headlines were displayed raw. Awaiting keeps the fix
+  // durable; the pass is bounded (≤30 rows, one LLM call) so latency stays
+  // in the low-seconds range even on the worst day.
   const untranslatedCount = cachedItems.filter(
     (c) => !c.original_language && looksNonEnglish(c.headline),
   ).length;
   if (untranslatedCount > 0) {
-    void backfillTranslations(dateISO);
+    try {
+      await backfillTranslations(dateISO);
+      // Re-read so the caller sees the newly-translated rows.
+      const { data: refreshed } = await supabaseAdmin
+        .from("news_cache")
+        .select("news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
+        .eq("news_date", dateISO)
+        .limit(max);
+      if (refreshed && refreshed.length > 0) {
+        cachedItems.length = 0;
+        for (const r of refreshed) {
+          cachedItems.push({
+            date: r.news_date as string,
+            source: r.source,
+            headline: r.headline,
+            url: r.url,
+            summary: r.summary,
+            original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+            original_language: (r as { original_language?: string | null }).original_language ?? null,
+            translation_confidence:
+              (r as { translation_confidence?: number | string | null }).translation_confidence == null
+                ? null
+                : Number((r as { translation_confidence: number | string }).translation_confidence),
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("news: inline backfill failed", err instanceof Error ? err.message : String(err));
+    }
   }
+
 
   // Use existing cache when we're not forcing a refresh and it looks healthy.
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
