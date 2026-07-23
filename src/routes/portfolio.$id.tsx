@@ -248,6 +248,21 @@ function PortfolioPage() {
     });
   }, [equityData, benchQ.data, benchmark, startingCashForChart]);
 
+  const displayChartData = useMemo(() => {
+    if (compareMode === "raw" || startingCashForChart <= 0) return chartData;
+    const base = startingCashForChart;
+    return chartData.map((row) => {
+      const r = row as typeof row & { benchmark?: number | null };
+      return {
+        ...row,
+        value: ((row.value - base) / base) * 100,
+        peak: ((row.peak - base) / base) * 100,
+        drawdown: row.drawdown,
+        benchmark: r.benchmark != null ? ((r.benchmark - base) / base) * 100 : r.benchmark ?? null,
+      };
+    });
+  }, [chartData, compareMode, startingCashForChart]);
+
   const perfMetrics = useMemo(() => {
     const rows = chartData.filter((r) => Number.isFinite(r.value));
     if (rows.length < 2) return null;
