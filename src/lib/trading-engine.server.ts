@@ -486,6 +486,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         })),
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable.",
+        crossSectional: formatCrossSectionalBlock(rankMap),
         events,
         cooling: coolingSymbols,
         asOf,
