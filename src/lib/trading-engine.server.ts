@@ -262,6 +262,8 @@ HARD RULES YOU MUST NEVER BREAK:
 - Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
 - Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
+- ${cfg.atr_trailing_mult > 0 ? `An ATR trailing stop at ${cfg.atr_trailing_mult}×ATR below each position's high-water mark auto-sells on breach.` : "No ATR trailing stop configured."}
+- ${cfg.max_hold_days > 0 ? `Positions held longer than ${cfg.max_hold_days} days are auto-exited (time-based exit).` : "No time-based exit configured."}
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
 
@@ -507,33 +509,60 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
-  // ---- Auto-liquidation: stop-loss / take-profit BEFORE the AI runs ----
-  if (cfg.stop_loss_pct > 0 || cfg.take_profit_pct > 0) {
-    for (const [sym, h] of Array.from(holdingsByS.entries())) {
-      const price = priceMap.get(sym);
-      const qty = Number(h.quantity);
-      const cost = Number(h.avg_cost);
-      if (!price || !(qty > 0) || !(cost > 0)) continue;
-      const change = (price - cost) / cost;
-      let trigger: string | null = null;
-      if (cfg.stop_loss_pct > 0 && change <= -cfg.stop_loss_pct) {
-        trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(cfg.stop_loss_pct * 100).toFixed(1)}%)`;
-      } else if (cfg.take_profit_pct > 0 && change >= cfg.take_profit_pct) {
-        trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(cfg.take_profit_pct * 100).toFixed(1)}%)`;
+  // ---- Auto-liquidation: stop-loss / take-profit / ATR-trailing / max-hold BEFORE the AI runs ----
+  const atrPctBySymbol = new Map(features.map((f) => [f.symbol, f.atr_pct] as const));
+  const nowMs = Date.parse(asOf + "T00:00:00Z") || Date.now();
+  for (const [sym, h] of Array.from(holdingsByS.entries())) {
+    const price = priceMap.get(sym);
+    const qty = Number(h.quantity);
+    const cost = Number(h.avg_cost);
+    if (!price || !(qty > 0) || !(cost > 0)) continue;
+
+    // Refresh high-water mark BEFORE trailing-stop check
+    const prevHwm = Number((h as unknown as { high_water_mark?: number | null }).high_water_mark ?? cost);
+    const hwm = Math.max(prevHwm || cost, price);
+    (h as unknown as { high_water_mark: number }).high_water_mark = hwm;
+
+    const change = (price - cost) / cost;
+    let trigger: string | null = null;
+
+    if (cfg.stop_loss_pct > 0 && change <= -cfg.stop_loss_pct) {
+      trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(cfg.stop_loss_pct * 100).toFixed(1)}%)`;
+    } else if (cfg.take_profit_pct > 0 && change >= cfg.take_profit_pct) {
+      trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(cfg.take_profit_pct * 100).toFixed(1)}%)`;
+    } else if (cfg.atr_trailing_mult > 0) {
+      const atrPct = atrPctBySymbol.get(sym);
+      if (atrPct && atrPct > 0) {
+        const stopPrice = hwm * (1 - cfg.atr_trailing_mult * atrPct);
+        if (price <= stopPrice) {
+          const dropFromHwm = ((price - hwm) / hwm) * 100;
+          trigger = `ATR trailing stop (${dropFromHwm.toFixed(2)}% from high, ${cfg.atr_trailing_mult}×ATR=${(cfg.atr_trailing_mult * atrPct * 100).toFixed(2)}%)`;
+        }
       }
-      if (!trigger) continue;
-      const value = qty * price;
-      workingCash += value;
-      holdingsByS.delete(sym);
-      executed.push({
-        symbol: sym,
-        side: "sell",
-        quantity: qty,
-        price,
-        value,
-        reason: trigger,
-      });
     }
+
+    if (!trigger && cfg.max_hold_days > 0) {
+      const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
+      if (openedAt) {
+        const heldDays = Math.floor((nowMs - Date.parse(openedAt)) / 86_400_000);
+        if (heldDays >= cfg.max_hold_days) {
+          trigger = `max-hold reached (${heldDays}d ≥ ${cfg.max_hold_days}d)`;
+        }
+      }
+    }
+
+    if (!trigger) continue;
+    const value = qty * price;
+    workingCash += value;
+    holdingsByS.delete(sym);
+    executed.push({
+      symbol: sym,
+      side: "sell",
+      quantity: qty,
+      price,
+      value,
+      reason: trigger,
+    });
   }
 
   // Recompute per-asset-class exposure after auto-liquidation, based on live prices.
@@ -793,7 +822,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         const newQty = Number(cur.quantity) + qty;
         const newCost =
           (Number(cur.avg_cost) * Number(cur.quantity) + qty * fillPrice) / newQty;
-        holdingsByS.set(meta.symbol, { ...cur, quantity: newQty, avg_cost: newCost });
+        const curHwm = Number((cur as unknown as { high_water_mark?: number | null }).high_water_mark ?? Number(cur.avg_cost));
+        holdingsByS.set(meta.symbol, {
+          ...cur,
+          quantity: newQty,
+          avg_cost: newCost,
+          high_water_mark: Math.max(curHwm, fillPrice),
+        } as Holding);
       } else {
         holdingsByS.set(meta.symbol, {
           id: crypto.randomUUID(),
@@ -803,6 +838,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           quantity: qty,
           avg_cost: fillPrice,
           updated_at: new Date().toISOString(),
+          opened_at: new Date().toISOString(),
+          high_water_mark: fillPrice,
         } as Holding);
       }
       classExposure.set(
@@ -848,13 +885,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   await admin.from("holdings").delete().eq("portfolio_id", portfolioId);
   const holdingsRows = Array.from(holdingsByS.values())
     .filter((h) => Number(h.quantity) > 1e-8)
-    .map((h) => ({
-      portfolio_id: portfolioId,
-      symbol: h.symbol,
-      asset_class: h.asset_class,
-      quantity: Number(h.quantity),
-      avg_cost: Number(h.avg_cost),
-    }));
+    .map((h) => {
+      const hExt = h as unknown as { opened_at?: string | null; high_water_mark?: number | null };
+      return {
+        portfolio_id: portfolioId,
+        symbol: h.symbol,
+        asset_class: h.asset_class,
+        quantity: Number(h.quantity),
+        avg_cost: Number(h.avg_cost),
+        opened_at: hExt.opened_at ?? new Date().toISOString(),
+        high_water_mark: hExt.high_water_mark ?? Number(h.avg_cost),
+      };
+    });
   if (holdingsRows.length > 0) await admin.from("holdings").insert(holdingsRows);
 
   // Recompute portfolio value with latest holdings
@@ -910,6 +952,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         per_symbol_limit_pct: cfg.per_symbol_limit_pct,
         stop_loss_pct: cfg.stop_loss_pct,
         take_profit_pct: cfg.take_profit_pct,
+        atr_trailing_mult: cfg.atr_trailing_mult,
+        max_hold_days: cfg.max_hold_days,
         volatility_sizing: cfg.volatility_sizing,
         vol_target_pct: cfg.vol_target_pct,
       },

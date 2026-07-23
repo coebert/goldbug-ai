@@ -94,6 +94,8 @@ export type RiskConfig = {
   per_symbol_limit_pct: number | null; // if set, overrides base maxPositionPct
   stop_loss_pct: number; // 0 disables. Positive number, e.g. 0.10 = -10% from avg cost
   take_profit_pct: number; // 0 disables. e.g. 0.25 = +25% from avg cost
+  atr_trailing_mult: number; // 0 disables. e.g. 3 = trail stop 3×ATR below high-water mark
+  max_hold_days: number; // 0 disables. Force-exit positions held longer than N days
   volatility_sizing: boolean;
   vol_target_pct: number; // target daily volatility contribution per position (e.g. 0.015 = 1.5%)
   execution_params: Partial<ExecutionParamsConfig> | null;
@@ -105,6 +107,8 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   per_symbol_limit_pct: null,
   stop_loss_pct: 0.10,
   take_profit_pct: 0.25,
+  atr_trailing_mult: 3,
+  max_hold_days: 0,
   volatility_sizing: true,
   vol_target_pct: 0.015,
   execution_params: null,
@@ -134,6 +138,8 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   }
   if (Number.isFinite(Number(r.stop_loss_pct))) out.stop_loss_pct = Math.max(0, Math.min(0.9, Number(r.stop_loss_pct)));
   if (Number.isFinite(Number(r.take_profit_pct))) out.take_profit_pct = Math.max(0, Math.min(5, Number(r.take_profit_pct)));
+  if (Number.isFinite(Number(r.atr_trailing_mult))) out.atr_trailing_mult = Math.max(0, Math.min(10, Number(r.atr_trailing_mult)));
+  if (Number.isFinite(Number(r.max_hold_days))) out.max_hold_days = Math.max(0, Math.min(3650, Math.floor(Number(r.max_hold_days))));
   if (typeof r.volatility_sizing === "boolean") out.volatility_sizing = r.volatility_sizing;
   if (Number.isFinite(Number(r.vol_target_pct))) out.vol_target_pct = Math.max(0.001, Math.min(0.1, Number(r.vol_target_pct)));
   if (r.execution_params && typeof r.execution_params === "object") {

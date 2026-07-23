@@ -28,6 +28,8 @@ type RiskConfig = {
   per_symbol_limit_pct: number | null;
   stop_loss_pct: number;
   take_profit_pct: number;
+  atr_trailing_mult: number;
+  max_hold_days: number;
   volatility_sizing: boolean;
   vol_target_pct: number;
 };
@@ -37,6 +39,8 @@ const DEFAULTS: RiskConfig = {
   per_symbol_limit_pct: null,
   stop_loss_pct: 0.1,
   take_profit_pct: 0.25,
+  atr_trailing_mult: 3,
+  max_hold_days: 0,
   volatility_sizing: true,
   vol_target_pct: 0.015,
 };
@@ -53,6 +57,8 @@ function parseCfg(raw: unknown): RiskConfig {
       r.per_symbol_limit_pct == null ? null : Number(r.per_symbol_limit_pct),
     stop_loss_pct: Number(r.stop_loss_pct ?? DEFAULTS.stop_loss_pct),
     take_profit_pct: Number(r.take_profit_pct ?? DEFAULTS.take_profit_pct),
+    atr_trailing_mult: Number(r.atr_trailing_mult ?? DEFAULTS.atr_trailing_mult),
+    max_hold_days: Number(r.max_hold_days ?? DEFAULTS.max_hold_days),
     volatility_sizing:
       typeof r.volatility_sizing === "boolean"
         ? r.volatility_sizing
@@ -133,6 +139,8 @@ export function RiskControlsCard({
               </CardTitle>
               <CardDescription>
                 Stop-loss {(cfg.stop_loss_pct * 100).toFixed(0)}% · Take-profit {(cfg.take_profit_pct * 100).toFixed(0)}% ·{" "}
+                {cfg.atr_trailing_mult > 0 ? `trail ${cfg.atr_trailing_mult}×ATR · ` : ""}
+                {cfg.max_hold_days > 0 ? `max-hold ${cfg.max_hold_days}d · ` : ""}
                 {cfg.volatility_sizing ? `vol-target ${(cfg.vol_target_pct * 100).toFixed(2)}%/day` : "vol sizing off"}
               </CardDescription>
             </div>
@@ -222,7 +230,56 @@ export function RiskControlsCard({
                   <p className="mt-1 text-[11px] text-muted-foreground">Set 0 to disable.</p>
                 </div>
               </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs font-medium">ATR trailing stop</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      value={cfg.atr_trailing_mult}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          atr_trailing_mult: Math.max(0, Math.min(10, Number(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">× ATR below high-water mark → auto-sell</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Locks in gains as the price rises. Set 0 to disable. Typical: 2–3×.
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Max holding period</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={3650}
+                      step={1}
+                      value={cfg.max_hold_days}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          max_hold_days: Math.max(0, Math.min(3650, Math.floor(Number(e.target.value) || 0))),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">days → time-based exit</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Force-close stale positions. Set 0 to disable.
+                  </p>
+                </div>
+              </div>
             </div>
+
 
             <div>
               <h4 className="mb-2 text-sm font-medium">Per-asset-class limits</h4>

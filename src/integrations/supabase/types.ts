@@ -97,7 +97,9 @@ export type Database = {
         Row: {
           asset_class: Database["public"]["Enums"]["asset_class"]
           avg_cost: number
+          high_water_mark: number | null
           id: string
+          opened_at: string
           portfolio_id: string
           quantity: number
           symbol: string
@@ -106,7 +108,9 @@ export type Database = {
         Insert: {
           asset_class: Database["public"]["Enums"]["asset_class"]
           avg_cost?: number
+          high_water_mark?: number | null
           id?: string
+          opened_at?: string
           portfolio_id: string
           quantity?: number
           symbol: string
@@ -115,7 +119,9 @@ export type Database = {
         Update: {
           asset_class?: Database["public"]["Enums"]["asset_class"]
           avg_cost?: number
+          high_water_mark?: number | null
           id?: string
+          opened_at?: string
           portfolio_id?: string
           quantity?: number
           symbol?: string
