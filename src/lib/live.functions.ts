@@ -181,10 +181,10 @@ export async function runReconciliation(userId: string, portfolioId: string) {
   const [bal, pos, hold] = await Promise.all([
     adapter.getBalance(),
     adapter.getPositions(),
-    supabaseAdmin.from("holdings").select("symbol, quantity, avg_price").eq("portfolio_id", portfolioId),
+    supabaseAdmin.from("holdings").select("symbol, quantity, avg_cost").eq("portfolio_id", portfolioId),
   ]);
   const localPositions = (hold.data ?? []).map((h) => ({
-    symbol: h.symbol, quantity: Number(h.quantity), avgPrice: Number(h.avg_price),
+    symbol: h.symbol, quantity: Number(h.quantity), avgPrice: Number(h.avg_cost),
   }));
   const cashDrift = Math.abs(bal.cash - Number(p.data.current_cash ?? 0));
   const symDrift = detectPositionDrift(pos, localPositions);
