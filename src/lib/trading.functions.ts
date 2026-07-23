@@ -2166,7 +2166,8 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       return a.date < b.date ? 1 : -1;
     });
 
-    return { items: items.slice(0, 40), as_of: asOf.toISOString() };
+    const sliced = items.slice(0, limit);
+    return { items: sliced, as_of: asOf.toISOString(), has_more: items.length > limit, since_days: sinceDays, limit };
   });
 
 // ---------------------------------------------------------------------------
