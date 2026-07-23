@@ -590,6 +590,15 @@ function OrderPanel({
         {order.reason}
       </p>
 
+      {weights && (
+        <div className="mb-3">
+          <div className="mb-1.5 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+            <Activity className="h-3 w-3" /> Signal importance (AI-attributed)
+          </div>
+          <SignalImportance weights={weights} />
+        </div>
+      )}
+
       {signal && (
         <div className="mb-2">
           <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
@@ -598,6 +607,7 @@ function OrderPanel({
           <SignalBadges s={signal} />
         </div>
       )}
+
 
       {relatedNews.length > 0 && (
         <div className="mb-2">
