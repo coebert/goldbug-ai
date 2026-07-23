@@ -1,0 +1,1 @@
+ALTER TABLE public.portfolios ADD COLUMN IF NOT EXISTS hyperparams jsonb NOT NULL DEFAULT '{}'::jsonb;

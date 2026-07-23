@@ -42,6 +42,7 @@ import {
   upcomingEvents,
 } from "./portfolio-optimizer.server";
 import { computeAttribution, formatAttributionBlock } from "./attribution.server";
+import { getOrRefreshHyperparams, formatHyperparamBlock, type TunedHyperparams } from "./hyperparam-tuning.server";
 import {
   parseCircuit,
   evaluateBreaker,
@@ -198,6 +199,7 @@ async function callAiForDecision(args: {
   learning: LearningContext;
   attribution?: string | null;
   regimeNote?: string | null;
+  hyperparams?: TunedHyperparams | null;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
@@ -262,6 +264,7 @@ ${coolingBlock}
 ${formatLearningBlock(args.learning)}
 
 ${args.attribution ?? ""}
+${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 
 ${HISTORICAL_PLAYBOOK}
@@ -374,7 +377,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
 
-  const [rawNews, regime, learning, crossAsset, cooldowns, events, attribution] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, cooldowns, events, attribution, hyperparams] = await Promise.all([
     opts?.skipNews ? Promise.resolve([]) : getNewsForDate(asOf).catch(() => []),
     detectAndPersistRegime(asOf).catch((e) => {
       console.warn("Regime detection failed:", e);
@@ -395,6 +398,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
     upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)).catch(() => []),
     computeAttribution(portfolioId, asOf).catch(() => null),
+    getOrRefreshHyperparams(portfolioId, asOf).catch((e) => {
+      console.warn("Hyperparam tuning failed:", e);
+      return null as TunedHyperparams | null;
+    }),
   ]);
 
 
@@ -462,6 +469,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         learning,
         attribution: attribution ? formatAttributionBlock(attribution) : null,
         regimeNote: tightened.note,
+        hyperparams: hyperparams ?? null,
       });
 
 
@@ -630,10 +638,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           baseSize: spend,
           conviction: order.conviction,
           volPct: feat?.vol20d ?? null,
+          kellyCap: hyperparams?.kelly_cap ?? null,
         });
         if (convSpend < spend) {
           spend = convSpend;
-          sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}`);
+          sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}${hyperparams ? ` cap=${(hyperparams.kelly_cap * 100).toFixed(0)}%` : ""}`);
         }
       }
 
