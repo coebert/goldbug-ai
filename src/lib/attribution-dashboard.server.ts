@@ -13,6 +13,8 @@ export type TradePoint = {
   fill_price: number;
   exit_price: number | null;
   forward_return_pct: number | null; // signed vs side
+  benchmark_return_pct: number | null; // SPY return over the same window (unsigned; long-only benchmark)
+  alpha_pct: number | null; // forward_return_pct - benchmark_return_pct
   news_score: number | null;
   regime: string | null;
   event_penalty: number; // 1.0 = none, <1 = penalty applied at execution
@@ -21,6 +23,7 @@ export type TradePoint = {
   signal_weights: Record<SignalKey, number>;
   signal_contrib: Record<SignalKey, number>; // return_pct * weight fraction
 };
+
 
 export type NewsBucket = {
   bucket: string; // e.g. "-1..-0.5"
