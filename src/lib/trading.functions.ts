@@ -2023,7 +2023,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     );
     const { data: decisions } = await context.supabase
       .from("decisions")
-      .select("id, portfolio_id, run_date, raw")
+      .select("id, portfolio_id, run_date, rationale, raw")
       .gte("run_date", since)
       .order("run_date", { ascending: false })
       .limit(120);
