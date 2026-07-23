@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { GLOBAL_EVENTS } from "./global-events";
 
 const RiskEnum = z.enum(["conservative", "balanced", "aggressive"]);
 const AssetClassEnum = z.enum(["stock", "etf", "crypto", "commodity", "fx"]);
