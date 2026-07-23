@@ -86,7 +86,7 @@ function appCreds(env: BrokerEnv): { key: string; secret: string } {
 }
 
 export function getAuthorizeUrl(env: BrokerEnv): string {
-  const { key } = appCreds();
+  const { key } = appCreds(env);
   const u = new URL(`${AUTH_HOST[env]}/authorize`);
   u.searchParams.set("response_type", "code");
   u.searchParams.set("client_id", key);
@@ -104,7 +104,7 @@ interface SaxoTokenResponse {
 }
 
 async function tokenRequest(env: BrokerEnv, form: URLSearchParams): Promise<SaxoTokenResponse> {
-  const { key, secret } = appCreds();
+  const { key, secret } = appCreds(env);
   const basic = Buffer.from(`${key}:${secret}`).toString("base64");
   const res = await fetch(`${AUTH_HOST[env]}/token`, {
     method: "POST",
