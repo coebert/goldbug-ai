@@ -187,6 +187,7 @@ const RiskConfigSchema = z.object({
   max_hold_days: z.number().int().min(0).max(3650).default(0),
   volatility_sizing: z.boolean().default(true),
   vol_target_pct: z.number().min(0.001).max(0.1).default(0.015),
+  risk_level: z.number().int().min(1).max(5).optional(),
 });
 
 export const updateRiskConfig = createServerFn({ method: "POST" })

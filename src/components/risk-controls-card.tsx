@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { updateRiskConfig } from "@/lib/trading.functions";
@@ -34,6 +34,7 @@ type RiskConfig = {
   max_hold_days: number;
   volatility_sizing: boolean;
   vol_target_pct: number;
+  risk_level?: number;
 };
 
 const DEFAULTS: RiskConfig = {
@@ -50,6 +51,7 @@ const DEFAULTS: RiskConfig = {
 function parseCfg(raw: unknown): RiskConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULTS };
   const r = raw as Record<string, unknown>;
+  const lvl = r.risk_level == null ? undefined : Number(r.risk_level);
   return {
     asset_class_limits: {
       ...DEFAULTS.asset_class_limits,
@@ -66,8 +68,10 @@ function parseCfg(raw: unknown): RiskConfig {
         ? r.volatility_sizing
         : DEFAULTS.volatility_sizing,
     vol_target_pct: Number(r.vol_target_pct ?? DEFAULTS.vol_target_pct),
+    risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
   };
 }
+
 
 const CLASSES: { key: AssetClass; label: string }[] = [
   { key: "stock", label: "Stocks" },
@@ -215,18 +219,22 @@ export function RiskControlsCard({
 }) {
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
-  const [level, setLevel] = useState<number>(() => inferRiskLevel(initial));
+  const [level, setLevel] = useState<number>(
+    () => initial.risk_level ?? inferRiskLevel(initial),
+  );
   const [open, setOpen] = useState(true);
   const [lastChange, setLastChange] = useState<{
     fromName: string;
     toName: string;
     changes: FieldChange[];
   } | null>(null);
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const applyLevel = (lvl: number) => {
     const nextCfg: RiskConfig = {
       ...RISK_PRESETS[lvl].cfg,
       asset_class_limits: { ...RISK_PRESETS[lvl].cfg.asset_class_limits },
+      risk_level: lvl,
     };
     const changes = diffConfigs(cfg, nextCfg);
     setLastChange({
@@ -242,19 +250,45 @@ export function RiskControlsCard({
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
   const mut = useMutation({
-    mutationFn: () =>
+    mutationFn: (payload: RiskConfig) =>
       save({
         data: {
           portfolio_id: portfolioId,
-          risk_config: cfg,
+          risk_config: payload,
         },
       }),
     onSuccess: () => {
-      toast.success("Risk controls saved");
       qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
+  // Debounced auto-save: persist any change (slider or fine-tuning) so the
+  // exact profile is restored on next open — no explicit Save needed.
+  const isFirstRun = useRef(true);
+  const savedSnapshotRef = useRef<string>(JSON.stringify({ ...initial, risk_level: level }));
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    const payload: RiskConfig = { ...cfg, risk_level: level };
+    const serialized = JSON.stringify(payload);
+    if (serialized === savedSnapshotRef.current) return;
+    setAutoSaveState("saving");
+    const t = setTimeout(() => {
+      mut.mutate(payload, {
+        onSuccess: () => {
+          savedSnapshotRef.current = serialized;
+          setAutoSaveState("saved");
+        },
+        onError: () => setAutoSaveState("error"),
+      });
+    }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg, level]);
+
 
   const pctInput = (
     label: string,
@@ -562,18 +596,33 @@ export function RiskControlsCard({
               )}
             </div>
 
-            <div className="flex items-center gap-2 border-t border-border pt-4">
-              <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
-                {mut.isPending ? "Saving…" : "Save risk controls"}
+            <div className="flex items-center gap-3 border-t border-border pt-4">
+              <Button
+                onClick={() => mut.mutate({ ...cfg, risk_level: level })}
+                disabled={mut.isPending}
+              >
+                {mut.isPending ? "Saving…" : "Save now"}
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => setCfg({ ...DEFAULTS })}
+                onClick={() => {
+                  setCfg({ ...DEFAULTS });
+                  setLevel(3);
+                }}
                 disabled={mut.isPending}
               >
                 Reset to defaults
               </Button>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {autoSaveState === "saving" && "Saving changes…"}
+                {autoSaveState === "saved" && "Auto-saved — will be restored next time you open this portfolio."}
+                {autoSaveState === "error" && (
+                  <span className="text-destructive">Auto-save failed — click Save now.</span>
+                )}
+                {autoSaveState === "idle" && "Changes auto-save and persist across sessions."}
+              </span>
             </div>
+
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
