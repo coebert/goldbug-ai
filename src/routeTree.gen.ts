@@ -22,6 +22,7 @@ import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
+import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
@@ -95,6 +96,11 @@ const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
   path: '/attribution',
   getParentRoute: () => PortfolioIdRoute,
 } as any)
+const ApiPublicNewsPreviewRoute = ApiPublicNewsPreviewRouteImport.update({
+  id: '/api/public/news-preview',
+  path: '/api/public/news-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
   id: '/api/public/saxo/callback',
   path: '/api/public/saxo/callback',
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/api/public/news-preview'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/api/public/news-preview'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/api/public/news-preview'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
@@ -282,6 +294,7 @@ export interface RootRouteChildren {
   SaxoStatusRoute: typeof SaxoStatusRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
+  ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
   ApiPublicHooksDailySummaryRoute: typeof ApiPublicHooksDailySummaryRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
@@ -384,6 +397,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdAttributionRouteImport
       parentRoute: typeof PortfolioIdRoute
     }
+    '/api/public/news-preview': {
+      id: '/api/public/news-preview'
+      path: '/api/public/news-preview'
+      fullPath: '/api/public/news-preview'
+      preLoaderRoute: typeof ApiPublicNewsPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/saxo/callback': {
       id: '/api/public/saxo/callback'
       path: '/api/public/saxo/callback'
@@ -463,6 +483,7 @@ const rootRouteChildren: RootRouteChildren = {
   SaxoStatusRoute: SaxoStatusRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
+  ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
   ApiPublicHooksDailySummaryRoute: ApiPublicHooksDailySummaryRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
