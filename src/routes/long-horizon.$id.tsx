@@ -293,6 +293,13 @@ function LongHorizonPage() {
                           tickFormatter={(v) => `${Number(v).toFixed(0)}%`}
                         />
                         <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                        {eventsOn && (
+                          <EventOverlay
+                            domainDates={chartData.map((d) => String(d.date))}
+                            minSeverity={eventSev}
+                            labelPosition="insideTop"
+                          />
+                        )}
                         <Tooltip
                           cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
