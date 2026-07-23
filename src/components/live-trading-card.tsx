@@ -350,7 +350,7 @@ export function SaxoOAuthPanel() {
       <div className="flex items-center justify-between gap-2 py-1">
         {pillFor(env)}
         <Button size="sm" variant={ok ? "outline" : "default"} onClick={() => mStart.mutate(env)} disabled={mStart.isPending}>
-          {ok ? "Reconnect" : `Connect (${label})`}
+          {ok ? "Reconnect" : <>Connect ({label})</>}
         </Button>
       </div>
     );
