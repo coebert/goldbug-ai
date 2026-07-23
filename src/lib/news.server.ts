@@ -77,9 +77,13 @@ const TranslateSchema = z.object({
       i: z.number(),
       lang: z.string().nullable().optional(),
       translation: z.string().nullable().optional(),
+      // 0..1 self-reported confidence in the (detected language + translation).
+      // Nullable/optional because older prompts / non-conforming outputs may skip it.
+      confidence: z.number().nullable().optional(),
     }),
   ),
 });
+
 
 // Fast heuristic: skip translation when a headline is plainly ASCII/Latin
 // and does not obviously contain non-English words. We keep this permissive
