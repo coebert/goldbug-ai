@@ -118,6 +118,7 @@ export function NewsReel() {
   const [assetFilter, setAssetFilter] = useState<Set<string>>(new Set());
   const [riskFilter, setRiskFilter] = useState<Set<string>>(new Set());
   const [onlyCited, setOnlyCited] = useState(false);
+  const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => {
@@ -134,7 +135,7 @@ export function NewsReel() {
 
   const allItems = q.data?.items ?? [];
   const items = useMemo(() => {
-    return allItems.filter((it) => {
+    const filtered = allItems.filter((it) => {
       if (onlyCited && it.decisions_count === 0) return false;
       if (assetFilter.size > 0) {
         if (!it.asset_classes.some((c) => assetFilter.has(c))) return false;
@@ -144,7 +145,18 @@ export function NewsReel() {
       }
       return true;
     });
-  }, [allItems, assetFilter, riskFilter, onlyCited]);
+    if (sortMode === "reliability") {
+      // Composite trust score: credibility weighted 60%, recency 40%.
+      const score = (it: (typeof filtered)[number]) => {
+        const cred = credibilityFor(it.source).score;
+        const rec = recencyFor(it.date, now).score;
+        return cred * 0.6 + rec * 0.4;
+      };
+      return [...filtered].sort((a, b) => score(b) - score(a));
+    }
+    return filtered;
+  }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
+
 
   // Detect newly-arrived headlines that match current filters and carry a strong sentiment signal,
   // then flash-highlight them in the list and surface a toast notification.
@@ -359,9 +371,22 @@ export function NewsReel() {
               Clear
             </button>
           )}
-          <span className="ml-auto text-muted-foreground">
-            {items.length} of {allItems.length}
+          <span className="ml-auto flex items-center gap-2 text-muted-foreground">
+            <label className="flex items-center gap-1 text-[11px]">
+              <span className="uppercase tracking-wide">Sort:</span>
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as "latest" | "reliability")}
+                className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                title="Sort headlines by newest first, or by a composite of source credibility (60%) and recency (40%)."
+              >
+                <option value="latest">Latest</option>
+                <option value="reliability">Most reliable</option>
+              </select>
+            </label>
+            <span>{items.length} of {allItems.length}</span>
           </span>
+
         </div>
       </CardHeader>
       <CardContent>
