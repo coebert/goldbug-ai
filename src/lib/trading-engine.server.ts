@@ -38,6 +38,9 @@ import { getNewsForDate } from "./news.server";
 import {
   ensureSentimentScored,
   aggregatedSentimentForSymbol,
+  loadScoredNewsWindow,
+  computeSentimentMomentum,
+  type SentimentMomentum,
 } from "./sentiment.server";
 import {
   buildCorrelationMap,
