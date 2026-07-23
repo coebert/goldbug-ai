@@ -640,43 +640,159 @@ function BrokerBalancePreview(props: {
   const pending = data?.transactionsNotBooked ?? 0;
   const reserved = data?.reservedCash ?? 0;
 
+  // Flash a "Just updated" state briefly after each successful refresh, so the
+  // user gets an unambiguous success signal instead of just the spinner ending.
+  const [justUpdated, setJustUpdated] = useState(false);
+  useEffect(() => {
+    if (!data?.fetchedAt) return;
+    setJustUpdated(true);
+    const t = setTimeout(() => setJustUpdated(false), 2000);
+    return () => clearTimeout(t);
+  }, [data?.fetchedAt]);
+
+  // Classify the failure so we can show the right recovery UI. Auth-type
+  // errors need the user to reconnect Saxo; everything else is treated as a
+  // transient outage we can retry against.
+  const errLower = (error ?? "").toLowerCase();
+  const isAuthError =
+    !!error &&
+    /401|403|unauthorized|forbidden|token|invalid[_ ]?grant|reauth|expired/.test(
+      errLower,
+    );
+  const isTemporary = !!error && !isAuthError;
+
+  const buttonState: "idle" | "loading" | "success" | "error" = isFetching
+    ? "loading"
+    : error
+      ? "error"
+      : justUpdated
+        ? "success"
+        : "idle";
+
   return (
-    <div className={`rounded-md border p-3 ${emphasis}`}>
+    <div
+      className={`rounded-md border p-3 ${emphasis}`}
+      role="status"
+      aria-live="polite"
+      aria-busy={isFetching}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Starting cash from Saxo {env.toUpperCase()}
           </div>
           <div className="mt-0.5 text-lg font-semibold tabular-nums">
-            {isLoading ? "Loading…" : error ? "Unavailable" : headline}
+            {isLoading
+              ? "Loading…"
+              : error && !data
+                ? "Unavailable"
+                : headline}
           </div>
           {data && (
-            <div className="text-[11px] text-muted-foreground">
-              Account {data.accountId ?? "—"} · fetched{" "}
-              {new Date(data.fetchedAt).toLocaleTimeString()}
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span>
+                Account {data.accountId ?? "—"} · fetched{" "}
+                {new Date(data.fetchedAt).toLocaleTimeString()}
+              </span>
+              {justUpdated && (
+                <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/15 px-1 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-2.5 w-2.5" /> Just updated
+                </span>
+              )}
+              {error && data && (
+                <span className="inline-flex items-center gap-1 rounded-sm bg-amber-500/15 px-1 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="h-2.5 w-2.5" /> Stale
+                </span>
+              )}
             </div>
           )}
         </div>
         <Button
           type="button"
-          variant="outline"
+          variant={buttonState === "error" ? "destructive" : "outline"}
           size="sm"
           onClick={onRefresh}
           disabled={isFetching}
           className="h-7 gap-1 px-2 text-[11px]"
+          aria-label={
+            buttonState === "loading"
+              ? "Refreshing balance"
+              : buttonState === "error"
+                ? "Retry balance refresh"
+                : "Refresh balance"
+          }
         >
-          {isFetching ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+          {buttonState === "loading" ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Refreshing…
+            </>
+          ) : buttonState === "success" ? (
+            <>
+              <CheckCircle2 className="h-3 w-3" /> Updated
+            </>
+          ) : buttonState === "error" ? (
+            <>
+              <RefreshCw className="h-3 w-3" /> Retry
+            </>
           ) : (
-            <RefreshCw className="h-3 w-3" />
+            <>
+              <RefreshCw className="h-3 w-3" /> Refresh
+            </>
           )}
-          Refresh
         </Button>
       </div>
 
       {error && (
-        <div className="mt-2 text-[11px] text-destructive">
-          Couldn&apos;t read your Saxo {env.toUpperCase()} balance: {error}
+        <div
+          className={`mt-2 flex items-start gap-2 rounded border p-2 text-[11px] ${
+            isAuthError
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+          }`}
+          role="alert"
+        >
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div className="min-w-0 space-y-1.5">
+            <div className="font-medium">
+              {isAuthError
+                ? `Saxo ${env.toUpperCase()} needs to be reconnected`
+                : `Saxo ${env.toUpperCase()} is temporarily unavailable`}
+            </div>
+            <div className="break-words opacity-90">{error}</div>
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {isTemporary && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onRefresh}
+                  disabled={isFetching}
+                  className="h-6 gap-1 px-2 text-[11px]"
+                >
+                  {isFetching ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  Try again
+                </Button>
+              )}
+              {isAuthError && (
+                <Link
+                  to="/saxo-status"
+                  className="inline-flex items-center gap-1 rounded-sm border border-destructive/40 bg-background px-2 py-0.5 font-medium text-destructive hover:bg-destructive/10"
+                >
+                  Reconnect Saxo <ExternalLink className="h-3 w-3" />
+                </Link>
+              )}
+              {data && (
+                <span className="text-[10px] opacity-80">
+                  Showing last known balance from{" "}
+                  {new Date(data.fetchedAt).toLocaleTimeString()}.
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
