@@ -81,7 +81,7 @@ export async function enqueueSliceHandler(
   setStatus: StatusSetter,
 ): Promise<
   SlicerResult<
-    | { sliceId: string; sliceQty: number; slices: number }
+    | { sliceId: string; sliceQty: number; slices: number; reused?: true }
     | { skipped: true; reason: "below_threshold" }
   >
 > {
@@ -90,7 +90,9 @@ export async function enqueueSliceHandler(
 
   try {
     const { maybeSliceOrder } = await import("./execution-slicer.server");
-    const result = await maybeSliceOrder(full.data);
+    const result = (await maybeSliceOrder(full.data)) as
+      | null
+      | { sliceId: string; sliceQty: number; slices: number; reused?: true };
     if (result === null) return { ok: true, data: { skipped: true, reason: "below_threshold" } };
     return { ok: true, data: result };
   } catch (e) {
@@ -98,6 +100,7 @@ export async function enqueueSliceHandler(
     return classifyThrown(setStatus, e);
   }
 }
+
 
 // ---- tick ------------------------------------------------------------------
 
@@ -137,16 +140,26 @@ export async function recordFillHandler(
   data: unknown,
   userId: string,
   setStatus: StatusSetter,
-): Promise<SlicerResult<{ recorded: true }>> {
+): Promise<SlicerResult<{ recorded: true; duplicate?: boolean }>> {
   const full = FillInputSchema.safeParse({ ...(data as object), ownerUserId: userId });
   if (!full.success) return fail(setStatus, "invalid_input", "invalid fill input", zodIssues(full.error));
 
   try {
     const { recordSliceFill } = await import("./execution-slicer.server");
-    await recordSliceFill(full.data.sliceId, full.data.ownerUserId, full.data.filledQty, full.data.note);
-    return { ok: true, data: { recorded: true } };
+    const res = await recordSliceFill(
+      full.data.sliceId,
+      full.data.ownerUserId,
+      full.data.filledQty,
+      full.data.note,
+      full.data.idempotencyKey,
+    );
+    // Treat a duplicate as success — the requested effect is already applied.
+    const out: { recorded: true; duplicate?: boolean } = { recorded: true };
+    if (res && res.applied === false) out.duplicate = true;
+    return { ok: true, data: out };
   } catch (e) {
     if (e instanceof ZodError) return fail(setStatus, "invalid_input", "invalid fill input", zodIssues(e));
     return classifyThrown(setStatus, e);
   }
 }
+

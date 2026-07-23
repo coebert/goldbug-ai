@@ -169,6 +169,21 @@ export async function maybeSliceOrder(input: SliceInput) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + (clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
 
+  // Idempotency: if a slice with this (portfolio_id, idempotency_key) already
+  // exists, return it instead of inserting a duplicate row.
+  if (clean.idempotencyKey) {
+    const { data: existing } = await supabaseAdmin
+      .from("pending_slices")
+      .select("id, slice_qty, slice_count")
+      .eq("portfolio_id", clean.portfolioId)
+      .eq("idempotency_key", clean.idempotencyKey)
+      .maybeSingle();
+    if (existing) {
+      const row = existing as { id: string; slice_qty: number; slice_count: number };
+      return { sliceId: row.id, sliceQty: Number(row.slice_qty), slices: Number(row.slice_count), reused: true as const };
+    }
+  }
+
   const { data, error } = await supabaseAdmin
     .from("pending_slices")
     .insert({
@@ -185,15 +200,31 @@ export async function maybeSliceOrder(input: SliceInput) {
       next_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       status: "active",
+      idempotency_key: clean.idempotencyKey ?? null,
     } as unknown as never)
     .select("id")
     .single();
   if (error) {
+    // Unique-violation race: another concurrent request enqueued the same
+    // idempotency key between our lookup and insert. Re-read and return it.
+    if (clean.idempotencyKey && /duplicate key|unique/i.test(error.message ?? "")) {
+      const { data: raced } = await supabaseAdmin
+        .from("pending_slices")
+        .select("id, slice_qty, slice_count")
+        .eq("portfolio_id", clean.portfolioId)
+        .eq("idempotency_key", clean.idempotencyKey)
+        .maybeSingle();
+      if (raced) {
+        const row = raced as { id: string; slice_qty: number; slice_count: number };
+        return { sliceId: row.id, sliceQty: Number(row.slice_qty), slices: Number(row.slice_count), reused: true as const };
+      }
+    }
     console.warn("slicer insert failed", error);
     return null;
   }
   return { sliceId: (data as { id: string }).id, sliceQty, slices };
 }
+
 
 /**
  * Called at the top of each hourly cron. Marks expired slices, returns active
@@ -231,9 +262,10 @@ export async function recordSliceFill(
   ownerUserId: string,
   filledQty: number,
   note?: string,
-) {
+  idempotencyKey?: string,
+): Promise<{ applied: boolean; reason?: "duplicate" }> {
   const clean = validate("recordSliceFill", FillInputSchema, {
-    sliceId, ownerUserId, filledQty, note,
+    sliceId, ownerUserId, filledQty, note, idempotencyKey,
   });
   // Look up the slice to discover its portfolio, then prove ownership before
   // mutating. This blocks a caller from patching another user's slice by id.
@@ -250,13 +282,33 @@ export async function recordSliceFill(
   }
   if (!slice) {
     logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_not_found", sliceId: clean.sliceId, ownerUserId: clean.ownerUserId });
-    return;
+    return { applied: false, reason: "duplicate" };
   }
   const typed = slice as {
     portfolio_id: string; remaining_qty: number; slices_done: number; slice_count: number;
   };
   await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, clean.ownerUserId);
 
+  // Idempotency: attempt to log the fill first. A unique-index conflict on
+  // (slice_id, idempotency_key) means we already processed this exact fill,
+  // so skip the state mutation to avoid double-counting slices_done/qty.
+  if (clean.idempotencyKey) {
+    const { error: logErr } = await supabaseAdmin
+      .from("slice_fills")
+      .insert({
+        slice_id: clean.sliceId,
+        portfolio_id: typed.portfolio_id,
+        idempotency_key: clean.idempotencyKey,
+        filled_qty: clean.filledQty,
+        note: clean.note ?? null,
+      } as unknown as never);
+    if (logErr) {
+      if (/duplicate key|unique/i.test(logErr.message ?? "")) {
+        return { applied: false, reason: "duplicate" };
+      }
+      console.warn("slice_fills log insert failed", logErr);
+    }
+  }
 
   const remaining = Math.max(0, Number(typed.remaining_qty) - clean.filledQty);
   const done = Number(typed.slices_done) + 1;
@@ -276,4 +328,6 @@ export async function recordSliceFill(
     .update(patch as unknown as never)
     .eq("id", clean.sliceId)
     .eq("portfolio_id", typed.portfolio_id); // belt-and-braces scope
+  return { applied: true };
 }
+

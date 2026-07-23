@@ -47,9 +47,10 @@ export const enqueueSlice = createServerFn({ method: "POST" })
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
-  .handler(async ({ data, context }): Promise<SlicerResult<{
-    sliceId: string; sliceQty: number; slices: number;
-  } | { skipped: true; reason: "below_threshold" }>> => {
+  .handler(async ({ data, context }): Promise<SlicerResult<
+    | { sliceId: string; sliceQty: number; slices: number; reused?: true }
+    | { skipped: true; reason: "below_threshold" }
+  >> => {
     return enqueueSliceHandler(data, context.userId, setResponseStatus);
   });
 
@@ -75,9 +76,10 @@ export const recordFill = createServerFn({ method: "POST" })
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
-  .handler(async ({ data, context }): Promise<SlicerResult<{ recorded: true }>> => {
+  .handler(async ({ data, context }): Promise<SlicerResult<{ recorded: true; duplicate?: boolean }>> => {
     return recordFillHandler(data, context.userId, setResponseStatus);
   });
+
 
 // Re-export the schemas so component code has one import for both the
 // validator and the RPC call. Keeps client-side form validation in lockstep
