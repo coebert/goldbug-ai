@@ -180,6 +180,8 @@ const RiskConfigSchema = z.object({
   per_symbol_limit_pct: z.number().min(0).max(1).nullable().default(null),
   stop_loss_pct: z.number().min(0).max(0.9).default(0.1),
   take_profit_pct: z.number().min(0).max(5).default(0.25),
+  atr_trailing_mult: z.number().min(0).max(10).default(3),
+  max_hold_days: z.number().int().min(0).max(3650).default(0),
   volatility_sizing: z.boolean().default(true),
   vol_target_pct: z.number().min(0.001).max(0.1).default(0.015),
 });
