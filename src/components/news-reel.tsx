@@ -146,6 +146,62 @@ export function NewsReel() {
     });
   }, [allItems, assetFilter, riskFilter, onlyCited]);
 
+  // Detect newly-arrived headlines that match current filters and carry a strong sentiment signal,
+  // then flash-highlight them in the list and surface a toast notification.
+  useEffect(() => {
+    if (!q.data) return;
+    const currentIds = new Set(allItems.map((i) => i.id));
+    if (seenIdsRef.current === null) {
+      // First load — seed the seen set without notifying.
+      seenIdsRef.current = currentIds;
+      return;
+    }
+    const prevSeen = seenIdsRef.current;
+    const strongNew = allItems.filter((it) => {
+      if (prevSeen.has(it.id)) return false;
+      if (onlyCited && it.decisions_count === 0) return false;
+      if (assetFilter.size > 0 && !it.asset_classes.some((c) => assetFilter.has(c))) return false;
+      if (riskFilter.size > 0 && !it.risk_levels.some((r) => riskFilter.has(r))) return false;
+      const s = it.avg_sentiment;
+      return s != null && Math.abs(s) >= STRONG_SENTIMENT_THRESHOLD;
+    });
+    if (strongNew.length > 0) {
+      const ts = Date.now();
+      setHighlightIds((prev) => {
+        const next = new Map(prev);
+        strongNew.forEach((s) => next.set(s.id, ts));
+        return next;
+      });
+      const preview = strongNew.slice(0, 2).map((s) => s.headline).join(" • ");
+      const more = strongNew.length > 2 ? ` (+${strongNew.length - 2} more)` : "";
+      toast(
+        `${strongNew.length} new strong-signal headline${strongNew.length > 1 ? "s" : ""}`,
+        { description: preview + more, duration: 8000 },
+      );
+    }
+    seenIdsRef.current = currentIds;
+  }, [q.dataUpdatedAt, allItems, assetFilter, riskFilter, onlyCited, q.data]);
+
+  // Age out highlights so they don't linger forever.
+  useEffect(() => {
+    if (highlightIds.size === 0) return;
+    const id = window.setInterval(() => {
+      const cutoff = Date.now() - HIGHLIGHT_DURATION_MS;
+      setHighlightIds((prev) => {
+        let changed = false;
+        const next = new Map(prev);
+        for (const [k, t] of next) {
+          if (t < cutoff) { next.delete(k); changed = true; }
+        }
+        return changed ? next : prev;
+      });
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [highlightIds.size]);
+
+  const highlightCount = highlightIds.size;
+
+
   function toggle(set: Set<string>, val: string, setter: (s: Set<string>) => void) {
     const next = new Set(set);
     if (next.has(val)) next.delete(val); else next.add(val);
