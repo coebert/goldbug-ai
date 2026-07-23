@@ -2012,7 +2012,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     // 1. Recent global news (auth-readable cache).
     const { data: newsRows } = await context.supabase
       .from("news_cache")
-      .select("id, news_date, source, headline, url")
+      .select("id, news_date, source, headline, url, summary")
       .gte("news_date", since)
       .order("news_date", { ascending: false })
       .order("fetched_at", { ascending: false })
