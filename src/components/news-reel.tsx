@@ -135,7 +135,7 @@ export function NewsReel() {
 
   const allItems = q.data?.items ?? [];
   const items = useMemo(() => {
-    return allItems.filter((it) => {
+    const filtered = allItems.filter((it) => {
       if (onlyCited && it.decisions_count === 0) return false;
       if (assetFilter.size > 0) {
         if (!it.asset_classes.some((c) => assetFilter.has(c))) return false;
@@ -145,7 +145,18 @@ export function NewsReel() {
       }
       return true;
     });
-  }, [allItems, assetFilter, riskFilter, onlyCited]);
+    if (sortMode === "reliability") {
+      // Composite trust score: credibility weighted 60%, recency 40%.
+      const score = (it: (typeof filtered)[number]) => {
+        const cred = credibilityFor(it.source).score;
+        const rec = recencyFor(it.date, now).score;
+        return cred * 0.6 + rec * 0.4;
+      };
+      return [...filtered].sort((a, b) => score(b) - score(a));
+    }
+    return filtered;
+  }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
+
 
   // Detect newly-arrived headlines that match current filters and carry a strong sentiment signal,
   // then flash-highlight them in the list and surface a toast notification.
