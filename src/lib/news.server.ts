@@ -78,15 +78,21 @@ export async function getNewsForDate(
 
   const fresh = await fetchGdelt(dateISO, max);
   if (fresh.length > 0) {
-    await supabaseAdmin.from("news_cache").insert(
-      fresh.map((n) => ({
+    // Insert only rows that don't already exist to avoid duplicate-key errors.
+    const existingHeads = new Set((cached ?? []).map((c) => c.headline));
+    const rows = fresh
+      .filter((n) => !existingHeads.has(n.headline))
+      .map((n) => ({
         news_date: n.date,
         source: n.source,
         headline: n.headline,
         url: n.url,
         summary: n.summary,
-      })),
-    );
+      }));
+    if (rows.length > 0) {
+      await supabaseAdmin.from("news_cache").insert(rows);
+    }
   }
   return fresh;
 }
+
