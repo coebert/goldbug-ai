@@ -165,19 +165,28 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
             <ResponsiveContainer>
               <BarChart data={calibration}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
+                <XAxis
+                  dataKey="bucket"
+                  tick={{ fontSize: 11 }}
+                  label={{ value: "Order size bucket", position: "insideBottom", offset: -2, fontSize: 11 }}
+                />
                 <YAxis
                   yAxisId="left"
                   tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                   domain={[0, 1]}
                   tick={{ fontSize: 11 }}
+                  width={60}
+                  label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
                   tickFormatter={(v) => `${v.toFixed(1)}%`}
                   tick={{ fontSize: 11 }}
+                  width={68}
+                  label={{ value: "Avg fwd return (%)", angle: 90, position: "insideRight", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
                 />
+
                 <Tooltip
                   contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
                   formatter={(v: number, name) =>
