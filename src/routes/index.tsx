@@ -116,6 +116,10 @@ function Home() {
           </div>
         </div>
 
+        <div className="mb-6">
+          <AllPortfoliosChart />
+        </div>
+
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">
