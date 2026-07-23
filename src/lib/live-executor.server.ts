@@ -90,23 +90,28 @@ export async function routeOrdersToBroker(params: {
   for (const order of routable) {
     const clientOrderId = `aegis:${portfolio.id}:${asOf}:${order.symbol}:${order.side}`;
 
-    // Idempotency: if we already have a live_orders row for this key, skip.
-    const existing = await supabaseAdmin
-      .from("live_orders")
-      .select("id, status, broker_order_id, reject_reason")
-      .eq("portfolio_id", portfolio.id)
-      .eq("client_order_id", clientOrderId)
-      .maybeSingle();
-    if (existing.data) {
-      results.push({
-        symbol: order.symbol,
-        side: order.side,
-        quantity: order.quantity,
-        status: existing.data.status,
-        brokerOrderId: existing.data.broker_order_id ?? undefined,
-        skipped: "duplicate client_order_id",
-      });
-      continue;
+    // Idempotency: (portfolio_id, decision_id, symbol, side) uniquely identifies
+    // a routed order within a single tick. If already routed, skip.
+    if (decisionId) {
+      const existing = await supabaseAdmin
+        .from("live_orders")
+        .select("id, status, broker_order_id")
+        .eq("portfolio_id", portfolio.id)
+        .eq("decision_id", decisionId)
+        .eq("symbol", order.symbol)
+        .eq("side", order.side)
+        .maybeSingle();
+      if (existing.data) {
+        results.push({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: order.quantity,
+          status: existing.data.status,
+          brokerOrderId: existing.data.broker_order_id ?? undefined,
+          skipped: "already routed for this decision",
+        });
+        continue;
+      }
     }
 
     // Round quantity to a whole share (Saxo Stock/Etf orders reject fractional
@@ -132,7 +137,6 @@ export async function routeOrdersToBroker(params: {
         user_id: userId,
         decision_id: decisionId,
         broker: "saxo",
-        client_order_id: clientOrderId,
         symbol: order.symbol,
         side: order.side,
         quantity: qty,
@@ -142,6 +146,7 @@ export async function routeOrdersToBroker(params: {
       } as never)
       .select("id")
       .single();
+
 
     if (inserted.error || !inserted.data) {
       // If it fails on the unique client_order_id constraint, that's another
