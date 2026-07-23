@@ -654,6 +654,51 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          category: string
+          created_at: string
+          details: Json
+          id: string
+          portfolio_id: string | null
+          read_at: string | null
+          severity: string
+          slice_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          portfolio_id?: string | null
+          read_at?: string | null
+          severity?: string
+          slice_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          portfolio_id?: string | null
+          read_at?: string | null
+          severity?: string
+          slice_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pending_slices: {
         Row: {
           created_at: string
