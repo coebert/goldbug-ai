@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { getGlobalNewsReel } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, Newspaper, Pause, Play, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
+
+// Absolute sentiment threshold treated as a "strong" market-moving signal.
+const STRONG_SENTIMENT_THRESHOLD = 0.4;
+// How long a newly-arrived headline stays visually highlighted.
+const HIGHLIGHT_DURATION_MS = 45_000;
 
 function sentimentTone(v: number | null) {
   if (v == null) return { label: "unscored", cls: "text-muted-foreground bg-muted" };
