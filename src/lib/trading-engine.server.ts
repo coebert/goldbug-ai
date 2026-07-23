@@ -41,6 +41,14 @@ import {
   isSymbolCooling,
   upcomingEvents,
 } from "./portfolio-optimizer.server";
+import { computeAttribution, formatAttributionBlock } from "./attribution.server";
+import {
+  parseCircuit,
+  evaluateBreaker,
+  persistCircuit,
+  tightenForRegime,
+} from "./circuit-breaker.server";
+import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import {
   filterUniverse,
   findSymbol,
@@ -188,6 +196,8 @@ async function callAiForDecision(args: {
   asOf: string;
   regime: PersistedRegime;
   learning: LearningContext;
+  attribution?: string | null;
+  regimeNote?: string | null;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
@@ -250,6 +260,9 @@ ${eventsBlock}
 ${coolingBlock}
 
 ${formatLearningBlock(args.learning)}
+
+${args.attribution ?? ""}
+${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 
 ${HISTORICAL_PLAYBOOK}
 
@@ -353,9 +366,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }, 0);
   const totalValue = cash + holdingsValue;
 
+  // Circuit breaker: evaluate BEFORE spending on the AI call. If tripped,
+  // we still run auto-liquidation stops but skip the AI + any new buys.
+  const priorCircuit = parseCircuit(portfolio.circuit_breaker);
+  const circuit = await evaluateBreaker(portfolioId, asOf, priorCircuit).catch(() => priorCircuit);
+  const breakerTripped = circuit.paused;
+
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
 
-  const [rawNews, regime, learning, crossAsset, cooldowns, events] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, cooldowns, events, attribution] = await Promise.all([
     opts?.skipNews ? Promise.resolve([]) : getNewsForDate(asOf).catch(() => []),
     detectAndPersistRegime(asOf).catch((e) => {
       console.warn("Regime detection failed:", e);
@@ -375,7 +394,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     getCrossAssetSnapshot(asOf).catch(() => null),
     refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
     upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)).catch(() => []),
+    computeAttribution(portfolioId, asOf).catch(() => null),
   ]);
+
 
   // Score news sentiment (LLM pass, cached), then aggregate per-symbol
   const scoredNews = rawNews.length > 0
@@ -393,47 +414,60 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const coolingSymbols = features.filter((f) => f.cooling).map((f) => f.symbol);
 
-  const decision = await callAiForDecision({
-    portfolio,
-    holdings: holdings ?? [],
-    cashValue: cash,
-    totalValue,
-    features,
-    news: scoredNews.slice(0, 15).map((n) => ({
-      headline: n.headline,
-      source: n.source,
-      sentiment: n.sentiment,
-    })),
-    crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
-    events,
-    cooling: coolingSymbols,
-    asOf,
-    regime: regime ?? {
-      as_of: asOf,
-      regime: "bull_quiet",
-      previous_regime: null,
-      transitioned: false,
-      confidence: 0,
-      signals: {
-        spy_price: null, spy_sma50: null, spy_sma200: null,
-        spy_drawdown_pct: null, spy_return_30d: null, spy_vol_20d: null,
-        vix_level: null, gld_return_30d: null, tlt_return_30d: null,
-      },
-      notes: "regime detection unavailable",
-    },
-    learning,
-  });
-
-
-  // Execute orders through guardrails
+  // Regime-linked risk tightening: bear/crisis → tighter per-symbol cap and stop-loss.
   const risk = riskProfile(portfolio.risk_level);
-  const cfg = parseRiskConfig(portfolio.risk_config);
+  const baseCfg = parseRiskConfig(portfolio.risk_config);
+  const effectiveRegime = regime ?? {
+    as_of: asOf,
+    regime: "bull_quiet" as const,
+    previous_regime: null,
+    transitioned: false,
+    confidence: 0,
+    signals: {
+      spy_price: null, spy_sma50: null, spy_sma200: null,
+      spy_drawdown_pct: null, spy_return_30d: null, spy_vol_20d: null,
+      vix_level: null, gld_return_30d: null, tlt_return_30d: null,
+    },
+    notes: "regime detection unavailable",
+  };
+  const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
+  const cfg = tightened.cfg;
   const cashFloor = totalValue * risk.cashFloorPct;
-  const basePerSymbolPct = cfg.per_symbol_limit_pct ?? risk.maxPositionPct;
+  const basePerSymbolPct = tightened.per_symbol_effective_pct;
   const maxPosVal = totalValue * basePerSymbolPct;
+
+  // If circuit breaker is tripped, skip the AI call entirely.
+  const decision: DecisionOutput = breakerTripped
+    ? {
+        briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
+        rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
+        orders: [],
+      }
+    : await callAiForDecision({
+        portfolio,
+        holdings: holdings ?? [],
+        cashValue: cash,
+        totalValue,
+        features,
+        news: scoredNews.slice(0, 15).map((n) => ({
+          headline: n.headline,
+          source: n.source,
+          sentiment: n.sentiment,
+        })),
+        crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
+        events,
+        cooling: coolingSymbols,
+        asOf,
+        regime: effectiveRegime,
+        learning,
+        attribution: attribution ? formatAttributionBlock(attribution) : null,
+        regimeNote: tightened.note,
+      });
+
 
   // Feature lookup for later use (volatility sizing, asset class)
   const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
+
 
   let workingCash = cash;
   const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
@@ -685,14 +719,37 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      const qty = spend / price;
-      workingCash -= spend;
+
+      // Phase 5 — realistic execution (spread, slippage, commission, liquidity cap)
+      const featExec = featureBySymbol.get(meta.symbol);
+      const outcome = applyBuyExecution({
+        requestedSpend: spend,
+        price,
+        atrPct: featExec?.atr_pct ?? null,
+        adv20d: featExec?.adv_20d ?? null,
+      });
+      if (outcome.belowMinTrade || outcome.qty <= 0) {
+        executed.push({
+          symbol: meta.symbol,
+          side: "buy",
+          quantity: 0,
+          price,
+          value: 0,
+          reason: order.reason,
+          rejected: outcome.notes.join("; ") || "trade too small after execution costs",
+        });
+        continue;
+      }
+      if (outcome.liquidityCappedSpend != null) sizingNotes.push("liquidity 1% ADV");
+      const qty = outcome.qty;
+      const fillPrice = outcome.fillPrice;
+      workingCash -= outcome.effectiveSpend;
       if (isNewPosition) newPositions += 1;
       const cur = holdingsByS.get(meta.symbol);
       if (cur) {
         const newQty = Number(cur.quantity) + qty;
         const newCost =
-          (Number(cur.avg_cost) * Number(cur.quantity) + spend) / newQty;
+          (Number(cur.avg_cost) * Number(cur.quantity) + qty * fillPrice) / newQty;
         holdingsByS.set(meta.symbol, { ...cur, quantity: newQty, avg_cost: newCost });
       } else {
         holdingsByS.set(meta.symbol, {
@@ -701,22 +758,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           symbol: meta.symbol,
           asset_class: meta.asset_class,
           quantity: qty,
-          avg_cost: price,
+          avg_cost: fillPrice,
           updated_at: new Date().toISOString(),
         } as Holding);
       }
       classExposure.set(
         meta.asset_class,
-        (classExposure.get(meta.asset_class) ?? 0) + spend,
+        (classExposure.get(meta.asset_class) ?? 0) + outcome.effectiveSpend,
       );
       executed.push({
         symbol: meta.symbol,
         side: "buy",
         quantity: qty,
-        price,
-        value: spend,
+        price: fillPrice,
+        value: outcome.effectiveSpend,
         reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
       });
+
     }
   }
 
@@ -767,6 +825,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     .from("portfolios")
     .update({ current_cash: workingCash, last_run_date: asOf })
     .eq("id", portfolioId);
+
+  await persistCircuit(portfolioId, circuit).catch((e) =>
+    console.warn("Circuit persist skipped:", e),
+  );
+
 
   await admin.from("equity_snapshots").upsert(
     {
