@@ -99,12 +99,19 @@ export function NewsReel() {
   }, [refreshKey]);
   const refreshMs = REFRESH_OPTIONS.find((o) => o.key === refreshKey)?.ms ?? 5 * 60_000;
 
+  const [sinceDays, setSinceDays] = useState<number>(5);
+  const [limit, setLimit] = useState<number>(40);
   const q = useQuery({
-    queryKey: ["global-news-reel"],
-    queryFn: () => fetchReel(),
+    queryKey: ["global-news-reel", sinceDays, limit],
+    queryFn: () => fetchReel({ data: { sinceDays, limit } }),
     staleTime: refreshMs > 0 ? refreshMs : 5 * 60_000,
     refetchInterval: refreshMs > 0 ? refreshMs : false,
   });
+  const hasMore = q.data?.has_more ?? false;
+  const loadMore = () => {
+    setSinceDays((d) => Math.min(120, d + 10));
+    setLimit((l) => Math.min(400, l + 40));
+  };
 
   // "Now" tick so the "updated Xs ago" label stays live.
   const [now, setNow] = useState<number>(() => Date.now());
