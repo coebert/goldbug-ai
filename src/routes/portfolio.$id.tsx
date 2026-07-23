@@ -480,24 +480,79 @@ function SignalBadges({ s }: { s: SignalRow }) {
   );
 }
 
+const SIGNAL_LABELS: Array<{ key: keyof SignalWeights; label: string; color: string }> = [
+  { key: "sma_trend", label: "SMA trend", color: "bg-primary" },
+  { key: "rsi", label: "RSI", color: "bg-accent" },
+  { key: "price_change", label: "Price change", color: "bg-chart-3" },
+  { key: "news_sentiment", label: "News sentiment", color: "bg-chart-4" },
+  { key: "volatility", label: "Volatility", color: "bg-chart-5" },
+];
+
+function normalizeWeights(w: Partial<SignalWeights> | undefined): SignalWeights | null {
+  if (!w) return null;
+  const vals = SIGNAL_LABELS.map(({ key }) => Number(w[key] ?? 0));
+  const total = vals.reduce((a, b) => a + b, 0);
+  if (total <= 0) return null;
+  const scale = 100 / total;
+  return {
+    sma_trend: vals[0] * scale,
+    rsi: vals[1] * scale,
+    price_change: vals[2] * scale,
+    news_sentiment: vals[3] * scale,
+    volatility: vals[4] * scale,
+  };
+}
+
+function SignalImportance({ weights }: { weights: SignalWeights }) {
+  const ranked = [...SIGNAL_LABELS]
+    .map((s) => ({ ...s, value: weights[s.key] }))
+    .sort((a, b) => b.value - a.value);
+  return (
+    <div className="space-y-2">
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+        {ranked.map((s) => (
+          <div
+            key={s.key}
+            className={s.color}
+            style={{ width: `${Math.max(0, s.value)}%` }}
+            title={`${s.label}: ${s.value.toFixed(0)}%`}
+          />
+        ))}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:grid-cols-3">
+        {ranked.map((s) => (
+          <li key={s.key} className="flex items-center gap-1.5 tabular-nums">
+            <span className={`h-2 w-2 rounded-sm ${s.color}`} />
+            <span className="text-muted-foreground">{s.label}</span>
+            <span className="ml-auto font-medium">{s.value.toFixed(0)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function OrderPanel({
   order,
   signal,
   news,
   guardrails,
   currency,
+  weights,
 }: {
   order: ExecutedRow;
   signal?: SignalRow;
   news: NewsRow[];
   guardrails?: Guardrails;
   currency: string;
+  weights?: SignalWeights | null;
 }) {
   const approved = !order.rejected;
   const side = order.side;
   const relatedNews = signal
     ? news.filter((n) => keywordMatch(n.headline, signal.symbol, signal.name)).slice(0, 3)
     : [];
+
 
   return (
     <div className="rounded-lg border border-border bg-muted/10 p-3">
