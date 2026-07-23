@@ -285,15 +285,31 @@ function PortfolioPage() {
 
               <Card className="lg:col-span-2">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center justify-between gap-3">
+                  <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
                     <span>Equity curve</span>
-                    <EventOverlayControls
-                      domainDates={equityData.map((d) => d.date)}
-                      enabled={eventsOn}
-                      onToggle={setEventsOn}
-                      minSeverity={eventSev}
-                      onSeverityChange={setEventSev}
-                    />
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-normal text-muted-foreground">Benchmark</label>
+                      <select
+                        value={benchmark}
+                        onChange={(e) => setBenchmark(e.target.value)}
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs font-normal"
+                      >
+                        <option value="none">None</option>
+                        <option value="SPY">SPY (S&amp;P 500)</option>
+                        <option value="QQQ">QQQ (Nasdaq 100)</option>
+                        <option value="ACWI">ACWI (Global)</option>
+                        <option value="AGG">AGG (US Bonds)</option>
+                        <option value="GLD">GLD (Gold)</option>
+                        <option value="BTC-USD">BTC-USD</option>
+                      </select>
+                      <EventOverlayControls
+                        domainDates={equityData.map((d) => d.date)}
+                        enabled={eventsOn}
+                        onToggle={setEventsOn}
+                        minSeverity={eventSev}
+                        onSeverityChange={setEventSev}
+                      />
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="h-64">
