@@ -42,6 +42,7 @@ import { RiskControlsCard } from "@/components/risk-controls-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { RegimePanel } from "@/components/regime-panel";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
+import { eventsInRange, eventColor } from "@/lib/global-events";
 
 
 export const Route = createFileRoute("/portfolio/$id")({
