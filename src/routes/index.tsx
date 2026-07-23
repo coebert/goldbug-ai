@@ -108,17 +108,17 @@ function Home() {
     staleTime: 30_000,
   });
   const sparkByPortfolio = useMemo(() => {
-    const map: Record<string, number[]> = {};
+    const map: Record<string, { date: string; value: number }[]> = {};
     const series = equityQ.data?.series ?? [];
     const portfolios = equityQ.data?.portfolios ?? [];
     for (const p of portfolios) {
-      const vals: number[] = [];
+      const pts: { date: string; value: number }[] = [];
       for (const row of series) {
-        const v = Number((row as Record<string, unknown>)[p.id]);
-        if (Number.isFinite(v)) vals.push(v);
+        const r = row as Record<string, unknown>;
+        const v = Number(r[p.id]);
+        if (Number.isFinite(v)) pts.push({ date: String(r.date ?? ""), value: v });
       }
-      // keep last ~60 points for a legible mini chart
-      map[p.id] = vals.slice(-60);
+      map[p.id] = pts;
     }
     return map;
   }, [equityQ.data]);
@@ -204,7 +204,7 @@ function Home() {
               </Card>
             )}
             {q.data?.map((p) => (
-              <PortfolioRow key={p.id} portfolio={p} sparkValues={sparkByPortfolio[p.id] ?? []} />
+              <PortfolioRow key={p.id} portfolio={p} sparkSeries={sparkByPortfolio[p.id] ?? []} />
             ))}
           </div>
           <CreatePortfolioCard />
@@ -249,7 +249,32 @@ function NewHereBanner() {
   );
 }
 
-function PortfolioRow({ portfolio, sparkValues }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkValues: number[] }) {
+type SparkPoint = { date: string; value: number };
+type SparkRange = "1W" | "1M" | "3M" | "1Y" | "All";
+const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
+  { key: "1W", days: 7 },
+  { key: "1M", days: 30 },
+  { key: "3M", days: 90 },
+  { key: "1Y", days: 365 },
+  { key: "All", days: null },
+];
+
+function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[] }) {
+  const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
+  const sliced = useMemo(() => {
+    const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
+    if (!opt.days || sparkSeries.length === 0) return sparkSeries;
+    const cutoff = Date.now() - opt.days * 86_400_000;
+    const s = sparkSeries.filter((p) => {
+      const t = Date.parse(p.date);
+      return Number.isFinite(t) ? t >= cutoff : true;
+    });
+    return s.length >= 2 ? s : sparkSeries.slice(-2);
+  }, [sparkSeries, sparkRange]);
+  const values = sliced.map((p) => p.value);
+  const first = values[0];
+  const last = values[values.length - 1];
+  const rangePct = first != null && first > 0 && last != null ? ((last - first) / first) * 100 : null;
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const deleteMut = useMutation({
@@ -285,8 +310,31 @@ function PortfolioRow({ portfolio, sparkValues }: { portfolio: { id: string; nam
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="hidden sm:block" title="Recent equity trend">
-            <Sparkline values={sparkValues} width={120} height={36} />
+          <div className="hidden sm:flex flex-col items-end gap-1" title="Recent equity trend">
+            <Sparkline values={values} width={120} height={36} />
+            <div className="flex items-center gap-2">
+              {rangePct != null && (
+                <span className={`text-[10px] tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {rangePct >= 0 ? "+" : ""}{rangePct.toFixed(1)}%
+                </span>
+              )}
+              <div className="flex gap-0.5 rounded-md border border-border/60 p-0.5">
+                {SPARK_RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => setSparkRange(r.key)}
+                    className={`px-1.5 py-0.5 text-[10px] font-medium rounded-sm transition-colors ${
+                      sparkRange === r.key
+                        ? "bg-primary/20 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {r.key}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="text-right">
             <div className="text-sm font-medium">
