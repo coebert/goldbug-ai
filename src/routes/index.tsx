@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -7,8 +7,10 @@ import {
   listPortfolios,
   createPortfolio,
   deletePortfolio,
+  getAllPortfoliosEquity,
 } from "@/lib/trading.functions";
 import { activateLive, getSaxoOAuthStatus, previewBrokerBalance } from "@/lib/live.functions";
+import { Sparkline } from "@/components/sparkline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,11 +95,33 @@ function Home() {
   }, [navigate]);
 
   const list = useServerFn(listPortfolios);
+  const fetchEquity = useServerFn(getAllPortfoliosEquity);
   const q = useQuery({
     queryKey: ["portfolios"],
     queryFn: () => list(),
     enabled: !!session,
   });
+  const equityQ = useQuery({
+    queryKey: ["all-portfolios-equity"],
+    queryFn: () => fetchEquity(),
+    enabled: !!session,
+    staleTime: 30_000,
+  });
+  const sparkByPortfolio = useMemo(() => {
+    const map: Record<string, number[]> = {};
+    const series = equityQ.data?.series ?? [];
+    const portfolios = equityQ.data?.portfolios ?? [];
+    for (const p of portfolios) {
+      const vals: number[] = [];
+      for (const row of series) {
+        const v = Number((row as Record<string, unknown>)[p.id]);
+        if (Number.isFinite(v)) vals.push(v);
+      }
+      // keep last ~60 points for a legible mini chart
+      map[p.id] = vals.slice(-60);
+    }
+    return map;
+  }, [equityQ.data]);
 
   if (!ready || !session) {
     return (
@@ -180,7 +204,7 @@ function Home() {
               </Card>
             )}
             {q.data?.map((p) => (
-              <PortfolioRow key={p.id} portfolio={p} />
+              <PortfolioRow key={p.id} portfolio={p} sparkValues={sparkByPortfolio[p.id] ?? []} />
             ))}
           </div>
           <CreatePortfolioCard />
@@ -225,7 +249,7 @@ function NewHereBanner() {
   );
 }
 
-function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null } }) {
+function PortfolioRow({ portfolio, sparkValues }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkValues: number[] }) {
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const deleteMut = useMutation({
@@ -261,6 +285,9 @@ function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; st
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <div className="hidden sm:block" title="Recent equity trend">
+            <Sparkline values={sparkValues} width={120} height={36} />
+          </div>
           <div className="text-right">
             <div className="text-sm font-medium">
               {portfolio.currency} {Number(portfolio.current_cash).toFixed(2)}
