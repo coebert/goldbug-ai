@@ -242,7 +242,7 @@ export async function recordSliceFill(
   await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, clean.ownerUserId);
 
 
-  const remaining = Math.max(0, Number(typed.remaining_qty) - filledQty);
+  const remaining = Math.max(0, Number(typed.remaining_qty) - clean.filledQty);
   const done = Number(typed.slices_done) + 1;
   const status = remaining <= 1e-6 || done >= Number(typed.slice_count) ? "completed" : "active";
   const nextAt = status === "active"
@@ -252,12 +252,12 @@ export async function recordSliceFill(
     remaining_qty: remaining,
     slices_done: done,
     status,
-    notes: note ?? null,
+    notes: clean.note ?? null,
   };
   if (nextAt) patch.next_at = nextAt;
   await supabaseAdmin
     .from("pending_slices")
     .update(patch as unknown as never)
-    .eq("id", sliceId)
+    .eq("id", clean.sliceId)
     .eq("portfolio_id", typed.portfolio_id); // belt-and-braces scope
 }
