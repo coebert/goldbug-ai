@@ -219,18 +219,22 @@ export function RiskControlsCard({
 }) {
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
-  const [level, setLevel] = useState<number>(() => inferRiskLevel(initial));
+  const [level, setLevel] = useState<number>(
+    () => initial.risk_level ?? inferRiskLevel(initial),
+  );
   const [open, setOpen] = useState(true);
   const [lastChange, setLastChange] = useState<{
     fromName: string;
     toName: string;
     changes: FieldChange[];
   } | null>(null);
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const applyLevel = (lvl: number) => {
     const nextCfg: RiskConfig = {
       ...RISK_PRESETS[lvl].cfg,
       asset_class_limits: { ...RISK_PRESETS[lvl].cfg.asset_class_limits },
+      risk_level: lvl,
     };
     const changes = diffConfigs(cfg, nextCfg);
     setLastChange({
@@ -246,19 +250,45 @@ export function RiskControlsCard({
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
   const mut = useMutation({
-    mutationFn: () =>
+    mutationFn: (payload: RiskConfig) =>
       save({
         data: {
           portfolio_id: portfolioId,
-          risk_config: cfg,
+          risk_config: payload,
         },
       }),
     onSuccess: () => {
-      toast.success("Risk controls saved");
       qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
+  // Debounced auto-save: persist any change (slider or fine-tuning) so the
+  // exact profile is restored on next open — no explicit Save needed.
+  const isFirstRun = useRef(true);
+  const savedSnapshotRef = useRef<string>(JSON.stringify({ ...initial, risk_level: level }));
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    const payload: RiskConfig = { ...cfg, risk_level: level };
+    const serialized = JSON.stringify(payload);
+    if (serialized === savedSnapshotRef.current) return;
+    setAutoSaveState("saving");
+    const t = setTimeout(() => {
+      mut.mutate(payload, {
+        onSuccess: () => {
+          savedSnapshotRef.current = serialized;
+          setAutoSaveState("saved");
+        },
+        onError: () => setAutoSaveState("error"),
+      });
+    }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg, level]);
+
 
   const pctInput = (
     label: string,
