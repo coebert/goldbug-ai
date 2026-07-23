@@ -820,7 +820,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         const newQty = Number(cur.quantity) + qty;
         const newCost =
           (Number(cur.avg_cost) * Number(cur.quantity) + qty * fillPrice) / newQty;
-        holdingsByS.set(meta.symbol, { ...cur, quantity: newQty, avg_cost: newCost });
+        const curHwm = Number((cur as unknown as { high_water_mark?: number | null }).high_water_mark ?? Number(cur.avg_cost));
+        holdingsByS.set(meta.symbol, {
+          ...cur,
+          quantity: newQty,
+          avg_cost: newCost,
+          high_water_mark: Math.max(curHwm, fillPrice),
+        } as Holding);
       } else {
         holdingsByS.set(meta.symbol, {
           id: crypto.randomUUID(),
@@ -830,6 +836,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           quantity: qty,
           avg_cost: fillPrice,
           updated_at: new Date().toISOString(),
+          opened_at: new Date().toISOString(),
+          high_water_mark: fillPrice,
         } as Holding);
       }
       classExposure.set(
