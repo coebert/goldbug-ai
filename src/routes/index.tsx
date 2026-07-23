@@ -29,7 +29,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -103,9 +103,16 @@ function Home() {
               Create a portfolio, pick a risk level, run a backtest, then let the AI make daily decisions.
             </p>
           </div>
-          <Link to="/compare">
-            <Button variant="outline" size="sm">Compare</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/get-started">
+              <Button variant="secondary" size="sm">
+                <Sparkles className="mr-1 h-4 w-4" /> £1000 demo
+              </Button>
+            </Link>
+            <Link to="/compare">
+              <Button variant="outline" size="sm">Compare</Button>
+            </Link>
+          </div>
         </div>
 
 
@@ -113,9 +120,20 @@ function Home() {
           <div className="space-y-3">
             {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
             {q.data && q.data.length === 0 && (
-              <Card>
-                <CardContent className="py-10 text-center text-muted-foreground">
-                  No portfolios yet. Create one on the right to get started.
+              <Card className="border-primary/40 bg-primary/5">
+                <CardContent className="flex flex-col items-start gap-3 py-8 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 font-medium">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Start with a guided £1000 demo
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      A 3-step walkthrough that creates your first paper portfolio and runs the AI's first trades — no real money.
+                    </p>
+                  </div>
+                  <Link to="/get-started">
+                    <Button>Start demo</Button>
+                  </Link>
                 </CardContent>
               </Card>
             )}
