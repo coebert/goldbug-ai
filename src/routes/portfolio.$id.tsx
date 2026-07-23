@@ -21,7 +21,6 @@ import {
 import { toast } from "sonner";
 import {
   Line,
-  Line,
   Area,
   ComposedChart,
   XAxis,
