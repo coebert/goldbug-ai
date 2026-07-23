@@ -125,9 +125,16 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
               Cash-only, no leverage. AI trades are mirrored to your Saxo account after guardrail checks.
             </CardDescription>
           </div>
-          <Button variant="destructive" size="sm" onClick={() => mKill.mutate()} disabled={mKill.isPending}>
-            <ShieldOff className="h-4 w-4 mr-1" /> Kill-switch
-          </Button>
+          <div className="flex gap-2">
+            {isLive && paused && (
+              <Button variant="outline" size="sm" onClick={() => mResumeAll.mutate(promptReason("Resume all"))} disabled={mResumeAll.isPending}>
+                <PlayCircle className="h-4 w-4 mr-1" /> Resume all
+              </Button>
+            )}
+            <Button variant="destructive" size="sm" onClick={() => mKill.mutate(promptReason("Kill-switch"))} disabled={mKill.isPending}>
+              <ShieldOff className="h-4 w-4 mr-1" /> Kill-switch
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
