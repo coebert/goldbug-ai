@@ -629,6 +629,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_buckets: {
+        Row: {
+          key: string
+          refilled_at: string
+          tokens: number
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          refilled_at?: string
+          tokens: number
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          refilled_at?: string
+          tokens?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       saxo_instrument_cache: {
         Row: {
           asset_type: string
@@ -737,7 +758,19 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      consume_rate_limit: {
+        Args: {
+          _capacity: number
+          _cost?: number
+          _key: string
+          _refill_per_sec: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          retry_after: number
+        }[]
+      }
     }
     Enums: {
       asset_class: "stock" | "etf" | "crypto" | "commodity" | "fx"
