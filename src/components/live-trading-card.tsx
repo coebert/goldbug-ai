@@ -7,14 +7,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  activateLive, deactivateLive, pauseLive, killAllLive,
+  activateLive, deactivateLive, pauseLive, killAllLive, resumeAllLive, getAuditLog,
   pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio,
 } from "@/lib/live.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle } from "lucide-react";
+import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History } from "lucide-react";
 import { toast } from "sonner";
 
 export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
@@ -24,19 +24,37 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const deactivate = useServerFn(deactivateLive);
   const pause = useServerFn(pauseLive);
   const killAll = useServerFn(killAllLive);
+  const resumeAll = useServerFn(resumeAllLive);
+  const audit = useServerFn(getAuditLog);
   const ping = useServerFn(pingBroker);
   const syncBal = useServerFn(syncBrokerBalance);
   const reconcile = useServerFn(reconcilePortfolio);
 
   const [ackRisk, setAckRisk] = useState(false);
   const [targetEnv, setTargetEnv] = useState<"sim" | "prod">("sim");
+  const [showAudit, setShowAudit] = useState(false);
 
   const q = useQuery({
     queryKey: ["live-status", portfolioId],
     queryFn: () => status({ data: { portfolioId } }),
   });
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
+  const auditQ = useQuery({
+    queryKey: ["live-audit", portfolioId],
+    queryFn: () => audit({ data: { portfolioId, limit: 20 } }),
+    enabled: showAudit,
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
+    qc.invalidateQueries({ queryKey: ["live-audit", portfolioId] });
+  };
+
+  const promptReason = (label: string) => {
+    if (typeof window === "undefined") return undefined;
+    const r = window.prompt(`${label} — reason (optional, saved in audit log):`, "");
+    return r?.trim() || undefined;
+  };
 
   const mAct = useMutation({
     mutationFn: () => activate({ data: { portfolioId, targetEnv, useBrokerBalance: true, acknowledgeRisk: true } }),
@@ -44,18 +62,30 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
   const mDeact = useMutation({
-    mutationFn: () => deactivate({ data: { portfolioId } }),
-    onSuccess: () => { toast.success("Reverted to paper mode"); refresh(); },
+    mutationFn: (reason?: string) => deactivate({ data: { portfolioId, reason } }),
+    onSuccess: (r) => { toast.success(r.changed ? "Reverted to paper mode" : "Already in paper mode"); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mPause = useMutation({
-    mutationFn: (paused: boolean) => pause({ data: { portfolioId, paused } }),
+    mutationFn: (args: { paused: boolean; reason?: string }) => pause({ data: { portfolioId, paused: args.paused, reason: args.reason } }),
     onSuccess: (r) => { toast.success(r.paused ? "Paused live trading" : "Resumed live trading"); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mKill = useMutation({
-    mutationFn: () => killAll({}),
-    onSuccess: () => { toast.warning("Kill-switch engaged — all live portfolios paused"); refresh(); },
+    mutationFn: (reason?: string) => killAll({ data: { reason } }),
+    onSuccess: (r) => {
+      toast.warning(
+        r.updated > 0
+          ? `Kill-switch engaged — paused ${r.updated} portfolio${r.updated === 1 ? "" : "s"}`
+          : `Kill-switch confirmed — all ${r.total} already paused`,
+      );
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const mResumeAll = useMutation({
+    mutationFn: (reason?: string) => resumeAll({ data: { reason } }),
+    onSuccess: (r) => { toast.success(`Resumed ${r.resumed} of ${r.total} live portfolios`); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mPing = useMutation({
@@ -95,9 +125,16 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
               Cash-only, no leverage. AI trades are mirrored to your Saxo account after guardrail checks.
             </CardDescription>
           </div>
-          <Button variant="destructive" size="sm" onClick={() => mKill.mutate()} disabled={mKill.isPending}>
-            <ShieldOff className="h-4 w-4 mr-1" /> Kill-switch
-          </Button>
+          <div className="flex gap-2">
+            {isLive && paused && (
+              <Button variant="outline" size="sm" onClick={() => mResumeAll.mutate(promptReason("Resume all"))} disabled={mResumeAll.isPending}>
+                <PlayCircle className="h-4 w-4 mr-1" /> Resume all
+              </Button>
+            )}
+            <Button variant="destructive" size="sm" onClick={() => mKill.mutate(promptReason("Kill-switch"))} disabled={mKill.isPending}>
+              <ShieldOff className="h-4 w-4 mr-1" /> Kill-switch
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -122,7 +159,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
             Reconcile now
           </Button>
           {isLive && (
-            <Button size="sm" variant="outline" onClick={() => mPause.mutate(!paused)} disabled={mPause.isPending}>
+            <Button size="sm" variant="outline" onClick={() => mPause.mutate({ paused: !paused, reason: promptReason(paused ? "Resume" : "Pause") })} disabled={mPause.isPending}>
               {paused ? <><PlayCircle className="h-4 w-4 mr-1" /> Resume</> : <><PauseCircle className="h-4 w-4 mr-1" /> Pause</>}
             </Button>
           )}
@@ -176,7 +213,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
                 <> · since {new Date(s.portfolio.live_activated_at).toLocaleString()}</>
               )}
             </span>
-            <Button size="sm" variant="destructive" onClick={() => mDeact.mutate()} disabled={mDeact.isPending}>
+            <Button size="sm" variant="destructive" onClick={() => mDeact.mutate(promptReason("Revert to paper"))} disabled={mDeact.isPending}>
               Revert to paper
             </Button>
           </div>
@@ -198,6 +235,52 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
             }))} />
           </div>
         )}
+
+        <div className="pt-2 border-t border-border">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowAudit((v) => !v)}
+            className="text-xs"
+          >
+            <History className="h-3 w-3 mr-1" />
+            {showAudit ? "Hide" : "Show"} audit log
+          </Button>
+          {showAudit && (
+            <div className="mt-2 text-xs">
+              {auditQ.isLoading ? (
+                <div className="text-muted-foreground italic">Loading…</div>
+              ) : (auditQ.data?.entries.length ?? 0) === 0 ? (
+                <div className="text-muted-foreground italic">No control actions yet.</div>
+              ) : (
+                <ul className="space-y-1 max-h-56 overflow-auto font-mono">
+                  {auditQ.data!.entries.map((e) => {
+                    const req = (e.request ?? {}) as { reason?: string | null };
+                    const resp = (e.response ?? {}) as { updated?: number; already_paused?: number; noop?: boolean; changed?: boolean };
+                    const summary =
+                      e.method === "KILL_SWITCH"
+                        ? `paused ${resp.updated ?? 0} · ${resp.already_paused ?? 0} already`
+                        : e.method === "RESUME_ALL"
+                          ? `resumed ${(resp as { resumed?: number }).resumed ?? 0}`
+                          : resp.noop
+                            ? "noop"
+                            : "ok";
+                    return (
+                      <li key={e.id} className="flex flex-wrap gap-x-2">
+                        <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
+                        <Badge variant={e.method === "KILL_SWITCH" ? "destructive" : "outline"} className="text-[10px] px-1">
+                          {e.method}
+                        </Badge>
+                        <span>{summary}</span>
+                        {req.reason && <span className="text-muted-foreground italic">— {req.reason}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

@@ -1,5 +1,9 @@
 // Server functions for live trading control: activate/deactivate, kill-switch,
 // balance sync, ping, and manual reconciliation. All require an authenticated user.
+//
+// Every state transition (activate/deactivate/pause/resume/kill/resume-all) is
+// idempotent and written to `live_broker_log` with a synthetic method so the
+// full audit trail is queryable from one table.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -10,7 +14,40 @@ const activateSchema = z.object({
   targetEnv: z.enum(["sim", "prod"]),
   useBrokerBalance: z.boolean().default(true),
   acknowledgeRisk: z.literal(true),
+  reason: z.string().max(500).optional(),
 });
+
+// Shared audit-log writer for kill-switch / pause / activate events.
+// Uses supabaseAdmin so the entry persists even when the user's RLS view
+// couldn't insert (e.g. bulk kill across many portfolios).
+async function logAudit(params: {
+  userId: string;
+  portfolioId?: string | null;
+  action: string; // e.g. KILL_SWITCH, RESUME_ALL, PAUSE, ACTIVATE, DEACTIVATE
+  request: Record<string, unknown>;
+  response: Record<string, unknown>;
+  env?: string;
+  status?: number;
+  error?: string | null;
+}) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: params.portfolioId ?? null,
+      user_id: params.userId,
+      broker: "local",
+      env: params.env ?? "n/a",
+      method: params.action,
+      path: `/audit/${params.action.toLowerCase()}`,
+      status: params.status ?? 200,
+      request: params.request as never,
+      response: params.response as never,
+      error: params.error ?? null,
+    });
+  } catch (e) {
+    console.error("audit log write failed", params.action, e);
+  }
+}
 
 /** Activate live trading on a portfolio. Requires ping + optional balance read. */
 export const activateLive = createServerFn({ method: "POST" })
@@ -28,10 +65,18 @@ export const activateLive = createServerFn({ method: "POST" })
       envOverride: data.targetEnv === "prod" ? "live" : "sim",
     });
     const ping = await adapter.ping();
-    if (!ping.ok) throw new Error(`Broker ping failed: ${ping.reason ?? "unknown"}`);
+    if (!ping.ok) {
+      await logAudit({
+        userId, portfolioId: data.portfolioId, action: "ACTIVATE",
+        env: data.targetEnv, status: 502,
+        request: { targetEnv: data.targetEnv, reason: data.reason },
+        response: { ok: false }, error: `ping failed: ${ping.reason ?? "unknown"}`,
+      });
+      throw new Error(`Broker ping failed: ${ping.reason ?? "unknown"}`);
+    }
 
     let starting: number | undefined;
-    let brokerAccountId = ping.accountId;
+    const brokerAccountId = ping.accountId;
     if (data.useBrokerBalance) {
       const bal = await adapter.getBalance();
       starting = bal.cash;
@@ -49,51 +94,168 @@ export const activateLive = createServerFn({ method: "POST" })
     };
     const upd = await supabaseAdmin.from("portfolios").update(patch).eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
+    await logAudit({
+      userId, portfolioId: data.portfolioId, action: "ACTIVATE",
+      env: data.targetEnv,
+      request: { targetEnv: data.targetEnv, useBrokerBalance: data.useBrokerBalance, reason: data.reason ?? null },
+      response: { mode: patch.mode, startingCash: starting ?? null, brokerAccountId },
+    });
     return { ok: true, ping, startingCash: starting };
   });
 
+const reasonInput = z.object({ portfolioId: z.string().uuid(), reason: z.string().max(500).optional() });
+
 export const deactivateLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string }) =>
-    z.object({ portfolioId: z.string().uuid() }).parse(data))
+  .inputValidator((data: z.infer<typeof reasonInput>) => reasonInput.parse(data))
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
-      .select("id, user_id").eq("id", data.portfolioId).maybeSingle();
+      .select("id, user_id, mode").eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
+    const previousMode = own.data.mode;
+    // Idempotent: already paper → log noop, don't rewrite.
+    if (previousMode === "paper" || previousMode === "backtest") {
+      await logAudit({
+        userId: context.userId, portfolioId: data.portfolioId, action: "DEACTIVATE",
+        request: { reason: data.reason ?? null },
+        response: { noop: true, previousMode },
+      });
+      return { ok: true, changed: false };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const upd = await supabaseAdmin.from("portfolios").update({
       mode: "paper", live_paused: false,
     }).eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
-    return { ok: true };
+    await logAudit({
+      userId: context.userId, portfolioId: data.portfolioId, action: "DEACTIVATE",
+      request: { reason: data.reason ?? null },
+      response: { previousMode, newMode: "paper" },
+    });
+    return { ok: true, changed: true };
   });
+
+const pauseInput = z.object({
+  portfolioId: z.string().uuid(),
+  paused: z.boolean(),
+  reason: z.string().max(500).optional(),
+});
 
 export const pauseLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string; paused: boolean }) =>
-    z.object({ portfolioId: z.string().uuid(), paused: z.boolean() }).parse(data))
+  .inputValidator((data: z.infer<typeof pauseInput>) => pauseInput.parse(data))
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
-      .select("id, user_id").eq("id", data.portfolioId).maybeSingle();
+      .select("id, user_id, live_paused, mode").eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
+    const prevPaused = !!own.data.live_paused;
+    // Idempotent: same state → skip write, still log the request for audit.
+    if (prevPaused === data.paused) {
+      await logAudit({
+        userId: context.userId, portfolioId: data.portfolioId,
+        action: data.paused ? "PAUSE" : "RESUME",
+        request: { reason: data.reason ?? null },
+        response: { noop: true, paused: prevPaused },
+      });
+      return { ok: true, paused: prevPaused, changed: false };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const upd = await supabaseAdmin.from("portfolios").update({ live_paused: data.paused })
       .eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
-    return { ok: true, paused: data.paused };
+    await logAudit({
+      userId: context.userId, portfolioId: data.portfolioId,
+      action: data.paused ? "PAUSE" : "RESUME",
+      request: { reason: data.reason ?? null },
+      response: { paused: data.paused, previously: prevPaused },
+    });
+    return { ok: true, paused: data.paused, changed: true };
   });
 
-/** Global kill-switch — pause every live portfolio owned by the caller. */
+const bulkInput = z.object({ reason: z.string().max(500).optional() }).default({});
+
+/**
+ * Global kill-switch — pause every live portfolio owned by the caller.
+ * Idempotent: repeated calls succeed and are logged with `updated=0`.
+ */
 export const killAllLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((data: z.infer<typeof bulkInput>) => bulkInput.parse(data ?? {}))
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const upd = await supabaseAdmin.from("portfolios")
-      .update({ live_paused: true })
+    // Fetch current state so idempotent repeats and audit deltas are accurate.
+    const cur = await supabaseAdmin.from("portfolios")
+      .select("id, live_paused, mode")
       .in("mode", ["live_sim", "live_prod"])
       .eq("user_id", context.userId);
-    if (upd.error) throw new Error(upd.error.message);
-    return { ok: true };
+    if (cur.error) throw new Error(cur.error.message);
+    const rows = cur.data ?? [];
+    const toPause = rows.filter((r) => !r.live_paused).map((r) => r.id);
+    const alreadyPaused = rows.filter((r) => r.live_paused).map((r) => r.id);
+    if (toPause.length > 0) {
+      const upd = await supabaseAdmin.from("portfolios").update({ live_paused: true })
+        .in("id", toPause);
+      if (upd.error) throw new Error(upd.error.message);
+    }
+    await logAudit({
+      userId: context.userId, action: "KILL_SWITCH",
+      request: { reason: data.reason ?? null, requested: rows.length },
+      response: {
+        total_live: rows.length,
+        updated: toPause.length,
+        already_paused: alreadyPaused.length,
+        paused_ids: toPause,
+      },
+    });
+    return {
+      ok: true,
+      total: rows.length,
+      updated: toPause.length,
+      alreadyPaused: alreadyPaused.length,
+    };
+  });
+
+/** Global resume — inverse of the kill-switch. Also idempotent and audited. */
+export const resumeAllLive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: z.infer<typeof bulkInput>) => bulkInput.parse(data ?? {}))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const cur = await supabaseAdmin.from("portfolios")
+      .select("id, live_paused, mode")
+      .in("mode", ["live_sim", "live_prod"])
+      .eq("user_id", context.userId);
+    if (cur.error) throw new Error(cur.error.message);
+    const rows = cur.data ?? [];
+    const toResume = rows.filter((r) => r.live_paused).map((r) => r.id);
+    if (toResume.length > 0) {
+      const upd = await supabaseAdmin.from("portfolios").update({ live_paused: false })
+        .in("id", toResume);
+      if (upd.error) throw new Error(upd.error.message);
+    }
+    await logAudit({
+      userId: context.userId, action: "RESUME_ALL",
+      request: { reason: data.reason ?? null },
+      response: { total_live: rows.length, resumed: toResume.length, resumed_ids: toResume },
+    });
+    return { ok: true, total: rows.length, resumed: toResume.length };
+  });
+
+/** Fetch recent kill-switch / pause / resume audit entries for the caller. */
+export const getAuditLog = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { portfolioId?: string; limit?: number }) =>
+    z.object({ portfolioId: z.string().uuid().optional(), limit: z.number().int().min(1).max(100).default(20) }).parse(data ?? {}))
+  .handler(async ({ data, context }) => {
+    let q = context.supabase.from("live_broker_log")
+      .select("id, portfolio_id, created_at, method, request, response, status, error, env")
+      .in("method", ["KILL_SWITCH", "RESUME_ALL", "PAUSE", "RESUME", "ACTIVATE", "DEACTIVATE"])
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.portfolioId) q = q.eq("portfolio_id", data.portfolioId);
+    const r = await q;
+    if (r.error) throw new Error(r.error.message);
+    return { entries: r.data ?? [] };
   });
 
 export const pingBroker = createServerFn({ method: "POST" })
