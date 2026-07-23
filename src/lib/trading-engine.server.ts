@@ -952,6 +952,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         per_symbol_limit_pct: cfg.per_symbol_limit_pct,
         stop_loss_pct: cfg.stop_loss_pct,
         take_profit_pct: cfg.take_profit_pct,
+        atr_trailing_mult: cfg.atr_trailing_mult,
+        max_hold_days: cfg.max_hold_days,
         volatility_sizing: cfg.volatility_sizing,
         vol_target_pct: cfg.vol_target_pct,
       },
