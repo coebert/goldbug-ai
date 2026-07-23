@@ -63,11 +63,13 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           console.error("hourly-run: regime detection failed", e);
         }
 
-        // 3. Load paper portfolios
-        const { data: portfolios, error } = await supabaseAdmin
+        // 3. Load tickable portfolios: paper + non-paused live (sim & prod).
+        //    Paused live portfolios (kill-switch / manual pause) are skipped
+        //    so the AI does not act on them until the operator resumes.
+        const { data: allPortfolios, error } = await supabaseAdmin
           .from("portfolios")
-          .select("id, name, universe, mode")
-          .eq("mode", "paper");
+          .select("id, name, universe, mode, live_paused")
+          .in("mode", ["paper", "live_sim", "live_prod"]);
 
         if (error) {
           console.error("hourly-run: fetch portfolios failed", error);
@@ -76,6 +78,11 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
             headers: { "Content-Type": "application/json" },
           });
         }
+
+        const portfolios = (allPortfolios ?? []).filter(
+          (p) => !(p.mode !== "paper" && p.live_paused),
+        );
+        const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
 
         // 4. Refresh latest prices for the union of universe + held symbols
         const symbolSet = new Set<string>();
@@ -105,16 +112,16 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           }
         }
 
-        // 5. Run a tick per paper portfolio (sequential, gentle on gateway)
-        const results: Array<{ id: string; ok: boolean; error?: string; value?: number }> = [];
-        for (const p of portfolios ?? []) {
+        // 5. Run a tick per portfolio (sequential, gentle on gateway)
+        const results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number }> = [];
+        for (const p of portfolios) {
           try {
             const r = await runDailyTick(p.id, today);
-            results.push({ id: p.id, ok: true, value: r.totalValue });
+            results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`hourly-run: portfolio ${p.id} failed`, msg);
-            results.push({ id: p.id, ok: false, error: msg });
+            results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
           }
         }
 
@@ -127,7 +134,8 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           price_errors: priceRefresh.errors,
           symbols_watched: symbolSet.size,
           regime: regimeInfo,
-          portfolios: portfolios?.length ?? 0,
+          portfolios: portfolios.length,
+          skipped_paused: skippedPaused,
           results,
         });
       },
