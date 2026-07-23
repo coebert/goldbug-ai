@@ -29,7 +29,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   ssr: false,
