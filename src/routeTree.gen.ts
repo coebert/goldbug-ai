@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
+import { Route as LearnRouteImport } from './routes/learn'
 import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -34,6 +35,11 @@ const SaxoStatusRoute = SaxoStatusRouteImport.update({
 const SaxoReconnectRoute = SaxoReconnectRouteImport.update({
   id: '/saxo-reconnect',
   path: '/saxo-reconnect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnRoute = LearnRouteImport.update({
+  id: '/learn',
+  path: '/learn',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GetStartedRoute = GetStartedRouteImport.update({
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/long-horizon/$id'
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/long-horizon/$id'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/long-horizon/$id'
@@ -226,6 +238,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CompareRoute: typeof CompareRoute
   GetStartedRoute: typeof GetStartedRoute
+  LearnRoute: typeof LearnRoute
   SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       path: '/saxo-reconnect'
       fullPath: '/saxo-reconnect'
       preLoaderRoute: typeof SaxoReconnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/learn': {
+      id: '/learn'
+      path: '/learn'
+      fullPath: '/learn'
+      preLoaderRoute: typeof LearnRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/get-started': {
@@ -375,6 +395,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
   GetStartedRoute: GetStartedRoute,
+  LearnRoute: LearnRoute,
   SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
