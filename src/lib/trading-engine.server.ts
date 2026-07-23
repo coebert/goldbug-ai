@@ -22,6 +22,12 @@ import {
   parseRiskConfig,
   type UniverseSymbol,
 } from "./universe.server";
+import {
+  detectAndPersistRegime,
+  regimeDescription,
+  humanRegime,
+  type PersistedRegime,
+} from "./regime-detector.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -120,6 +126,7 @@ async function callAiForDecision(args: {
   features: Awaited<ReturnType<typeof buildCandidateFeatures>>;
   news: { headline: string; source: string | null }[];
   asOf: string;
+  regime: PersistedRegime;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
@@ -140,6 +147,14 @@ async function callAiForDecision(args: {
     .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}%`)
     .join(", ");
 
+  const r = args.regime;
+  const regimeBlock = `MACRO REGIME (auto-detected from SPY/VIX/GLD/TLT as of ${r.as_of}):
+- Current regime: ${humanRegime(r.regime)} (confidence ${(r.confidence * 100).toFixed(0)}%)
+- Previous stored regime: ${r.previous_regime ? humanRegime(r.previous_regime) : "n/a"}${r.transitioned ? " — REGIME TRANSITION DETECTED TODAY" : ""}
+- Signals: ${r.notes}
+- Prior playbook for this regime: ${regimeDescription(r.regime)}
+${r.transitioned ? "Because the regime just shifted, explicitly reassess existing holdings under the new prior and note it in the rationale." : "Bias posture toward the current regime's playbook."}`;
+
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
@@ -152,6 +167,8 @@ HARD RULES YOU MUST NEVER BREAK:
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
+
+${regimeBlock}
 
 ${HISTORICAL_PLAYBOOK}
 
@@ -173,8 +190,8 @@ ${args.news
   .join("\n")}
 
 Return:
-- briefing: 2-3 sentences on market context today.
-- rationale: 2-4 sentences explaining today's actions.
+- briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}).
+- rationale: 2-4 sentences explaining today's actions in light of the regime and priors.
 - orders: array of trades to place today. Each order has:
     symbol (must be from candidate list),
     side ("buy" or "sell"),
@@ -253,6 +270,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
   const news = opts?.skipNews ? [] : await getNewsForDate(asOf).catch(() => []);
+  const regime = await detectAndPersistRegime(asOf).catch((e) => {
+    console.warn("Regime detection failed:", e);
+    return null;
+  });
 
   const decision = await callAiForDecision({
     portfolio,
@@ -262,6 +283,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     features,
     news,
     asOf,
+    regime: regime ?? {
+      as_of: asOf,
+      regime: "bull_quiet",
+      previous_regime: null,
+      transitioned: false,
+      confidence: 0,
+      signals: {
+        spy_price: null, spy_sma50: null, spy_sma200: null,
+        spy_drawdown_pct: null, spy_return_30d: null, spy_vol_20d: null,
+        vix_level: null, gld_return_30d: null, tlt_return_30d: null,
+      },
+      notes: "regime detection unavailable",
+    },
   });
 
   // Execute orders through guardrails
@@ -571,7 +605,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         volatility_sizing: cfg.volatility_sizing,
         vol_target_pct: cfg.vol_target_pct,
       },
-
+      regime: regime ?? null,
     } as unknown as never,
   });
 

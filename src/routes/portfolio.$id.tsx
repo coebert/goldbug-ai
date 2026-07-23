@@ -40,6 +40,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
+import { RegimePanel } from "@/components/regime-panel";
 
 
 export const Route = createFileRoute("/portfolio/$id")({
@@ -365,6 +366,10 @@ function PortfolioPage() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+
+            <div className="mt-6">
+              <RegimePanel />
             </div>
 
             <Tabs defaultValue="journal" className="mt-6">
