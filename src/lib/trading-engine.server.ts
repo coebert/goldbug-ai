@@ -638,10 +638,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           baseSize: spend,
           conviction: order.conviction,
           volPct: feat?.vol20d ?? null,
+          kellyCap: hyperparams?.kelly_cap ?? null,
         });
         if (convSpend < spend) {
           spend = convSpend;
-          sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}`);
+          sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}${hyperparams ? ` cap=${(hyperparams.kelly_cap * 100).toFixed(0)}%` : ""}`);
         }
       }
 
