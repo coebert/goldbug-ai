@@ -378,7 +378,10 @@ function PortfolioPage() {
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="h-64">
+                <CardContent
+                  className="h-64"
+                  style={chartTheme.surface !== "transparent" ? { background: chartTheme.surface, borderRadius: 8 } : undefined}
+                >
                   {equityData.length < 2 ? (
                     <p className="pt-8 text-center text-sm text-muted-foreground">
                       Run a backtest or the daily AI to see the curve.
@@ -392,25 +395,25 @@ function PortfolioPage() {
                             <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
                           </linearGradient>
                           <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.35} />
-                            <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                            <stop offset="0%" stopColor={chartTheme.equity} stopOpacity={chartTheme.equityFillTop} />
+                            <stop offset="100%" stopColor={chartTheme.equity} stopOpacity={chartTheme.equityFillBottom} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.35} strokeDasharray="3 3" />
+                        <CartesianGrid stroke={chartTheme.axis} strokeOpacity={chartTheme.gridOpacity} strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                          stroke="hsl(var(--border))"
+                          tick={{ fontSize: 11, fill: chartTheme.axis }}
+                          stroke={chartTheme.axis}
                         />
                         <YAxis
                           domain={["auto", "auto"]}
                           width={64}
-                          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                          stroke="hsl(var(--border))"
+                          tick={{ fontSize: 11, fill: chartTheme.axis }}
+                          stroke={chartTheme.axis}
                           tickFormatter={(v) => `${p.currency}${Number(v).toFixed(0)}`}
                         />
                         <Tooltip
-                          cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                          cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
                             if (!active || !payload?.length) return null;
                             const row = payload[0].payload as {
@@ -431,7 +434,7 @@ function PortfolioPage() {
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
                                 <div className="mb-1 font-medium">{label}</div>
                                 <div className="tabular-nums">
-                                  <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: "#22d3ee" }} />
+                                  <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.equity }} />
                                   Portfolio: {p.currency} {row.value.toFixed(2)}
                                 </div>
                                 <div className="tabular-nums text-muted-foreground pl-3.5">
@@ -440,7 +443,7 @@ function PortfolioPage() {
                                 </div>
                                 {row.benchmark != null && (
                                   <div className="tabular-nums mt-1">
-                                    <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: "#f59e0b" }} />
+                                    <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.benchmark }} />
                                     {benchmark}: {p.currency} {row.benchmark.toFixed(2)}
                                     {benchPct != null && (
                                       <span className="text-muted-foreground"> ({benchPct >= 0 ? "+" : ""}{benchPct.toFixed(2)}%)</span>
@@ -466,7 +469,7 @@ function PortfolioPage() {
                             );
                           }}
                         />
-                        <ReferenceLine y={startingCash} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" label={{ value: "start", fill: "hsl(var(--muted-foreground))", fontSize: 10, position: "insideTopRight" }} />
+                        <ReferenceLine y={startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axis, fontSize: 10, position: "insideTopRight" }} />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={equityData.map((d) => d.date)}
@@ -495,7 +498,7 @@ function PortfolioPage() {
                         <Line
                           type="monotone"
                           dataKey="peak"
-                          stroke="hsl(var(--muted-foreground))"
+                          stroke={chartTheme.peak}
                           strokeWidth={1}
                           strokeDasharray="2 3"
                           dot={false}
@@ -505,30 +508,30 @@ function PortfolioPage() {
                           type="monotone"
                           dataKey="value"
                           name="Portfolio"
-                          stroke="#22d3ee"
-                          strokeWidth={2.5}
+                          stroke={chartTheme.equity}
+                          strokeWidth={chartTheme.strokeWidth}
                           dot={false}
-                          activeDot={{ r: 5, fill: "#22d3ee", stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                          activeDot={{ r: 5, fill: chartTheme.equity, stroke: "hsl(var(--background))", strokeWidth: 2 }}
                         />
                         {benchmark !== "none" && (
                           <Line
                             type="monotone"
                             dataKey="benchmark"
                             name={`${benchmark} (normalised)`}
-                            stroke="#f59e0b"
-                            strokeWidth={2}
+                            stroke={chartTheme.benchmark}
+                            strokeWidth={Math.max(2, chartTheme.strokeWidth - 0.5)}
                             strokeDasharray="4 3"
                             dot={false}
                             connectNulls
                             isAnimationActive={false}
-                            activeDot={{ r: 4, fill: "#f59e0b", stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                            activeDot={{ r: 4, fill: chartTheme.benchmark, stroke: "hsl(var(--background))", strokeWidth: 2 }}
                           />
                         )}
                         <Legend
                           verticalAlign="bottom"
                           height={24}
                           iconType="plainline"
-                          wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}
+                          wrapperStyle={{ fontSize: 11, color: chartTheme.axis }}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
