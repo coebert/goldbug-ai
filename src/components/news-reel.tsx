@@ -121,6 +121,7 @@ export function NewsReel() {
   const [onlyCited, setOnlyCited] = useState(false);
   const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [detailsId, setDetailsId] = useState<string | null>(null);
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
