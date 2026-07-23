@@ -52,6 +52,10 @@ import {
 } from "./portfolio-optimizer.server";
 import { computeAttribution, formatAttributionBlock } from "./attribution.server";
 import { getOrRefreshHyperparams, formatHyperparamBlock, type TunedHyperparams } from "./hyperparam-tuning.server";
+import { getOrWalkForward } from "./hyperparam-walkforward.server";
+import { logCounterfactual, evaluatePendingCounterfactuals } from "./counterfactuals.server";
+import { ensembleVote, scoreDisagreement } from "./ensemble.server";
+import { computeAndPersistCalibration, getLatestCalibration, formatCalibrationBlock } from "./calibration.server";
 import {
   parseCircuit,
   evaluateBreaker,
