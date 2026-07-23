@@ -74,7 +74,14 @@ import {
 } from "./regime-detector.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { cached } from "./market-context-cache.server";
+import { computePortfolioDrawdownSizing, grossExposureLimit } from "./portfolio-drawdown.server";
+import { computeRebalanceTrims } from "./rebalance-bands.server";
+import { refreshSectorScores, sectorSizeMultiplier, symbolSector } from "./sector-rotation.server";
+import { updateSignalPerformance } from "./signal-decay.server";
+import { checkOvernightGap } from "./overnight-gap.server";
 import type { Database } from "@/integrations/supabase/types";
+
+
 
 
 type Portfolio = Database["public"]["Tables"]["portfolios"]["Row"];
