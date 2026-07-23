@@ -721,6 +721,17 @@ export function NewsReel() {
                   <DialogDescription>
                     {item.source ? `${item.source} · ` : ""}{item.date} · {rec.ageLabel}
                   </DialogDescription>
+                  {item.original_language && item.original_headline && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <Badge
+                        variant="outline"
+                        className="mr-1.5 border-amber-500/50 bg-amber-500/10 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400"
+                      >
+                        Translated from {item.original_language}
+                      </Badge>
+                      <span className="italic">“{item.original_headline}”</span>
+                    </p>
+                  )}
                 </DialogHeader>
                 <div className="space-y-3 text-sm">
                   <div className="flex flex-wrap gap-1.5">
