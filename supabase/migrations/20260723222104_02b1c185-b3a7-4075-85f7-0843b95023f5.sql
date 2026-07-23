@@ -1,0 +1,1 @@
+ALTER TABLE public.news_cache ADD COLUMN IF NOT EXISTS translation_confidence numeric;

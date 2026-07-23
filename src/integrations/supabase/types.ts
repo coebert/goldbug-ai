@@ -619,6 +619,7 @@ export type Database = {
           source: string | null
           source_weight: number | null
           summary: string | null
+          translation_confidence: number | null
           url: string | null
         }
         Insert: {
@@ -633,6 +634,7 @@ export type Database = {
           source?: string | null
           source_weight?: number | null
           summary?: string | null
+          translation_confidence?: number | null
           url?: string | null
         }
         Update: {
@@ -647,6 +649,7 @@ export type Database = {
           source?: string | null
           source_weight?: number | null
           summary?: string | null
+          translation_confidence?: number | null
           url?: string | null
         }
         Relationships: []
