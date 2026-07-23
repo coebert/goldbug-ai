@@ -74,7 +74,14 @@ import {
 } from "./regime-detector.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { cached } from "./market-context-cache.server";
+import { computePortfolioDrawdownSizing, grossExposureLimit } from "./portfolio-drawdown.server";
+import { computeRebalanceTrims } from "./rebalance-bands.server";
+import { refreshSectorScores, sectorSizeMultiplier, symbolSector } from "./sector-rotation.server";
+import { updateSignalPerformance } from "./signal-decay.server";
+import { checkOvernightGap } from "./overnight-gap.server";
 import type { Database } from "@/integrations/supabase/types";
+
+
 
 
 type Portfolio = Database["public"]["Tables"]["portfolios"]["Row"];
@@ -406,7 +413,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
   const features = rawFeatures.map((f) => ({ ...f }));
 
-  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams, sectorScores, ddSizing] = await Promise.all([
     opts?.skipNews
       ? Promise.resolve([])
       : cached("news", asOf, () => getNewsForDate(asOf)).catch(() => []),
@@ -439,7 +446,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       console.warn("Hyperparam tuning failed:", e);
       return null as TunedHyperparams | null;
     }),
+    cached("sectorScores", asOf, () => refreshSectorScores(asOf)).catch((e) => {
+      console.warn("Sector rotation failed:", e);
+      return [] as Awaited<ReturnType<typeof refreshSectorScores>>;
+    }),
+    computePortfolioDrawdownSizing(portfolioId).catch(() => ({
+      peak_5d: null, current: null, drawdown_pct: 0, size_multiplier: 1, note: "dd calc failed",
+    })),
   ]);
+
 
 
   // Score news sentiment (LLM pass, cached), then aggregate per-symbol
@@ -738,11 +753,55 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         sizingNotes.push(`rank #${rankInfo.rank}/${rankInfo.universe_size} x0.5`);
       }
 
+      // Portfolio-level 5-day drawdown → shrink new buys
+      if (ddSizing.size_multiplier < 1) {
+        spend *= ddSizing.size_multiplier;
+        sizingNotes.push(`dd×${ddSizing.size_multiplier.toFixed(2)}`);
+      }
+
+      // Sector rotation size multiplier
+      const secMult = sectorSizeMultiplier(symbolSector(meta.symbol), sectorScores);
+      if (secMult.mult !== 1) {
+        spend *= secMult.mult;
+        sizingNotes.push(secMult.note);
+      }
+
+      // Overnight-gap guard: skip fresh buys when 1d move is > 2σ
+      const gap = await checkOvernightGap(meta.symbol, asOf).catch(() => null);
+      if (gap?.triggered) {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason, rejected: gap.note,
+        });
+        continue;
+      }
+
+      // Gross-exposure cap by regime (crisis/bear/correction)
+      const currentHoldingsValue = Array.from(holdingsByS.values()).reduce((s, h) => {
+        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        return s + p * Number(h.quantity);
+      }, 0);
+      const gross = grossExposureLimit(totalValue, currentHoldingsValue, effectiveRegime);
+      if (gross.target_pct < 1) {
+        if (gross.room <= 0) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason, rejected: gross.note,
+          });
+          continue;
+        }
+        if (spend > gross.room) {
+          spend = gross.room;
+          sizingNotes.push(`gross≤${(gross.target_pct * 100).toFixed(0)}%`);
+        }
+      }
+
       // Event penalty (symbol-specific and broad macro)
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
       if (evPenalty < 1) {
         spend *= evPenalty;
         sizingNotes.push(`event x${evPenalty.toFixed(2)}`);
+
       }
 
       // Enforce per-symbol position cap
@@ -882,9 +941,37 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   }
 
+  // ---- Rebalance-band trims: harvest overweight winners after buy pass ----
+  const trims = computeRebalanceTrims({
+    totalValue,
+    holdings: Array.from(holdingsByS.values()).map((h) => ({ symbol: h.symbol, quantity: Number(h.quantity) })),
+    priceMap,
+    targetPerSymbolPct: basePerSymbolPct,
+    bandPct: 0.25,
+  });
+  for (const t of trims) {
+    const cur = holdingsByS.get(t.symbol);
+    if (!cur) continue;
+    const qty = Math.min(Number(cur.quantity), t.qtyToTrim);
+    if (qty <= 0) continue;
+    const value = qty * t.price;
+    workingCash += value;
+    const remaining = Number(cur.quantity) - qty;
+    if (remaining <= 1e-8) holdingsByS.delete(t.symbol);
+    else holdingsByS.set(t.symbol, { ...cur, quantity: remaining });
+    executed.push({
+      symbol: t.symbol,
+      side: "sell",
+      quantity: qty,
+      price: t.price,
+      value,
+      reason: `rebalance-band trim: ${(t.currentPct * 100).toFixed(1)}% → target ${(t.targetPct * 100).toFixed(1)}%`,
+    });
+  }
 
 
   // Persist state
+
   const admin = supabaseAdmin;
   const executedAt = new Date().toISOString();
 
@@ -1014,6 +1101,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   reflectAndUpdateLessons(portfolioId, asOf, learning).catch((e) =>
     console.warn("Reflection skipped:", e),
   );
+
+  // Signal-decay tracker: refresh rolling 30d hit rates & edge bps by signal.
+  updateSignalPerformance(portfolioId, asOf).catch((e) =>
+    console.warn("Signal-decay update skipped:", e),
+  );
+
 
   return { decision, executed, totalValue: newTotal, cash: workingCash, routedOrders };
 }

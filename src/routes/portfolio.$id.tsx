@@ -49,6 +49,9 @@ import { Tooltip as UITooltip, TooltipContent as UITooltipContent, TooltipProvid
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
+import { SignalDecayCard } from "@/components/signal-decay-card";
+import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
+
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
@@ -893,7 +896,14 @@ function PortfolioPage() {
               <LearningPanel portfolioId={p.id} />
             </div>
 
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <SignalDecayCard portfolioId={p.id} />
+              <CorrelationHeatmapCard portfolioId={p.id} />
+            </div>
+
             <Tabs defaultValue="journal" className="mt-6">
+
               <TabsList>
                 <TabsTrigger value="journal">AI Journal ({decisions.length})</TabsTrigger>
                 <TabsTrigger value="trades">Trades ({trades.length})</TabsTrigger>

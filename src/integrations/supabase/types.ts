@@ -486,6 +486,81 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_slices: {
+        Row: {
+          created_at: string
+          decision_id: string | null
+          expires_at: string
+          id: string
+          limit_price: number | null
+          next_at: string
+          notes: string | null
+          portfolio_id: string
+          remaining_qty: number
+          side: string
+          slice_count: number
+          slice_qty: number
+          slices_done: number
+          status: string
+          symbol: string
+          total_qty: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          decision_id?: string | null
+          expires_at: string
+          id?: string
+          limit_price?: number | null
+          next_at?: string
+          notes?: string | null
+          portfolio_id: string
+          remaining_qty: number
+          side: string
+          slice_count?: number
+          slice_qty: number
+          slices_done?: number
+          status?: string
+          symbol: string
+          total_qty: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          decision_id?: string | null
+          expires_at?: string
+          id?: string
+          limit_price?: number | null
+          next_at?: string
+          notes?: string | null
+          portfolio_id?: string
+          remaining_qty?: number
+          side?: string
+          slice_count?: number
+          slice_qty?: number
+          slices_done?: number
+          status?: string
+          symbol?: string
+          total_qty?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_slices_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_slices_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_lessons: {
         Row: {
           as_of: string
@@ -751,6 +826,92 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sector_scores: {
+        Row: {
+          as_of: string
+          etf_symbol: string
+          id: string
+          momentum_30d: number | null
+          momentum_90d: number | null
+          rank: number | null
+          score: number | null
+          sector: string
+          updated_at: string
+        }
+        Insert: {
+          as_of: string
+          etf_symbol: string
+          id?: string
+          momentum_30d?: number | null
+          momentum_90d?: number | null
+          rank?: number | null
+          score?: number | null
+          sector: string
+          updated_at?: string
+        }
+        Update: {
+          as_of?: string
+          etf_symbol?: string
+          id?: string
+          momentum_30d?: number | null
+          momentum_90d?: number | null
+          rank?: number | null
+          score?: number | null
+          sector?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      signal_performance: {
+        Row: {
+          as_of: string
+          avg_edge_bps: number | null
+          hit_rate: number | null
+          hits: number
+          id: string
+          portfolio_id: string
+          samples: number
+          signal_name: string
+          updated_at: string
+          weight_avg: number | null
+          window_days: number
+        }
+        Insert: {
+          as_of: string
+          avg_edge_bps?: number | null
+          hit_rate?: number | null
+          hits?: number
+          id?: string
+          portfolio_id: string
+          samples?: number
+          signal_name: string
+          updated_at?: string
+          weight_avg?: number | null
+          window_days?: number
+        }
+        Update: {
+          as_of?: string
+          avg_edge_bps?: number | null
+          hit_rate?: number | null
+          hits?: number
+          id?: string
+          portfolio_id?: string
+          samples?: number
+          signal_name?: string
+          updated_at?: string
+          weight_avg?: number | null
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_performance_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trades: {
         Row: {
