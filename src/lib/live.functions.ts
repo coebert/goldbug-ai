@@ -37,17 +37,16 @@ export const activateLive = createServerFn({ method: "POST" })
       starting = bal.cash;
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const patch: Record<string, unknown> = {
-      mode: data.targetEnv === "prod" ? "live_prod" : "live_sim",
+    const patch = {
+      mode: (data.targetEnv === "prod" ? "live_prod" : "live_sim") as "live_prod" | "live_sim",
       broker: "saxo",
       broker_account_id: brokerAccountId ?? null,
       live_paused: false,
       live_activated_at: new Date().toISOString(),
+      ...(starting != null && starting > 0
+        ? { starting_cash: starting, current_cash: starting }
+        : {}),
     };
-    if (starting != null && starting > 0) {
-      patch.starting_cash = starting;
-      patch.current_cash = starting;
-    }
     const upd = await supabaseAdmin.from("portfolios").update(patch).eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
     return { ok: true, ping, startingCash: starting };
