@@ -288,3 +288,35 @@ export function dailyVolatility(closes: number[], period = 20): number | null {
   return Math.sqrt(variance);
 }
 
+
+/**
+ * Force a fresh Yahoo fetch and upsert of the most recent candles for each symbol.
+ * Used by the hourly monitor to keep today's close current between daily bars.
+ */
+export async function refreshLatestCandles(symbols: string[]): Promise<{ refreshed: number; errors: number }> {
+  let refreshed = 0;
+  let errors = 0;
+  for (const symbol of symbols) {
+    try {
+      const fresh = await fetchYahooDaily(symbol, 5);
+      if (fresh.length === 0) continue;
+      const rows = fresh.map((c) => ({
+        symbol,
+        price_date: c.date,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+      }));
+      await supabaseAdmin
+        .from("price_cache")
+        .upsert(rows, { onConflict: "symbol,price_date" });
+      refreshed++;
+    } catch (err) {
+      console.warn(`refreshLatestCandles: ${symbol} failed`, err);
+      errors++;
+    }
+  }
+  return { refreshed, errors };
+}
