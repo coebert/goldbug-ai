@@ -534,14 +534,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       news: news.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
-        max_position_pct: risk.maxPositionPct,
+        max_position_pct: basePerSymbolPct,
         cash_floor_pct: risk.cashFloorPct,
         max_new_positions_per_day: risk.maxNewPositionsPerDay,
         cash_floor_value: cashFloor,
         max_position_value: maxPosVal,
         starting_total_value: totalValue,
         starting_cash: cash,
+        asset_class_limits: cfg.asset_class_limits,
+        per_symbol_limit_pct: cfg.per_symbol_limit_pct,
+        stop_loss_pct: cfg.stop_loss_pct,
+        take_profit_pct: cfg.take_profit_pct,
+        volatility_sizing: cfg.volatility_sizing,
+        vol_target_pct: cfg.vol_target_pct,
       },
+
     } as unknown as never,
   });
 
