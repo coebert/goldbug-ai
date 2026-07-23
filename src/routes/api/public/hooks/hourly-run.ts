@@ -63,11 +63,13 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           console.error("hourly-run: regime detection failed", e);
         }
 
-        // 3. Load paper portfolios
-        const { data: portfolios, error } = await supabaseAdmin
+        // 3. Load tickable portfolios: paper + non-paused live (sim & prod).
+        //    Paused live portfolios (kill-switch / manual pause) are skipped
+        //    so the AI does not act on them until the operator resumes.
+        const { data: allPortfolios, error } = await supabaseAdmin
           .from("portfolios")
-          .select("id, name, universe, mode")
-          .eq("mode", "paper");
+          .select("id, name, universe, mode, live_paused")
+          .in("mode", ["paper", "live_sim", "live_prod"]);
 
         if (error) {
           console.error("hourly-run: fetch portfolios failed", error);
@@ -76,6 +78,11 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
             headers: { "Content-Type": "application/json" },
           });
         }
+
+        const portfolios = (allPortfolios ?? []).filter(
+          (p) => !(p.mode !== "paper" && p.live_paused),
+        );
+        const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
 
         // 4. Refresh latest prices for the union of universe + held symbols
         const symbolSet = new Set<string>();
