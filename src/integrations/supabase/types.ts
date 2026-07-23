@@ -196,6 +196,36 @@ export type Database = {
           },
         ]
       }
+      headline_translation_cache: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          expires_at: string
+          language: string | null
+          source_headline: string
+          translation: string | null
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          expires_at?: string
+          language?: string | null
+          source_headline: string
+          translation?: string | null
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          expires_at?: string
+          language?: string | null
+          source_headline?: string
+          translation?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       holdings: {
         Row: {
           asset_class: Database["public"]["Enums"]["asset_class"]
