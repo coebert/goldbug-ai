@@ -371,9 +371,22 @@ export function NewsReel() {
               Clear
             </button>
           )}
-          <span className="ml-auto text-muted-foreground">
-            {items.length} of {allItems.length}
+          <span className="ml-auto flex items-center gap-2 text-muted-foreground">
+            <label className="flex items-center gap-1 text-[11px]">
+              <span className="uppercase tracking-wide">Sort:</span>
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as "latest" | "reliability")}
+                className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                title="Sort headlines by newest first, or by a composite of source credibility (60%) and recency (40%)."
+              >
+                <option value="latest">Latest</option>
+                <option value="reliability">Most reliable</option>
+              </select>
+            </label>
+            <span>{items.length} of {allItems.length}</span>
           </span>
+
         </div>
       </CardHeader>
       <CardContent>
