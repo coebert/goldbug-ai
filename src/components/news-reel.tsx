@@ -14,6 +14,9 @@ function sentimentTone(v: number | null) {
   return { label: `neutral ${v >= 0 ? "+" : ""}${v.toFixed(2)}`, cls: "text-foreground bg-muted" };
 }
 
+const ASSET_CLASSES = ["stock", "etf", "crypto", "commodity", "fx"] as const;
+const RISK_LEVELS = ["conservative", "balanced", "aggressive"] as const;
+
 export function NewsReel() {
   const fetchReel = useServerFn(getGlobalNewsReel);
   const q = useQuery({
@@ -24,10 +27,32 @@ export function NewsReel() {
   });
 
   const [paused, setPaused] = useState(false);
+  const [assetFilter, setAssetFilter] = useState<Set<string>>(new Set());
+  const [riskFilter, setRiskFilter] = useState<Set<string>>(new Set());
+  const [onlyCited, setOnlyCited] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
 
-  const items = useMemo(() => q.data?.items ?? [], [q.data]);
+  const allItems = q.data?.items ?? [];
+  const items = useMemo(() => {
+    return allItems.filter((it) => {
+      if (onlyCited && it.decisions_count === 0) return false;
+      if (assetFilter.size > 0) {
+        if (!it.asset_classes.some((c) => assetFilter.has(c))) return false;
+      }
+      if (riskFilter.size > 0) {
+        if (!it.risk_levels.some((r) => riskFilter.has(r))) return false;
+      }
+      return true;
+    });
+  }, [allItems, assetFilter, riskFilter, onlyCited]);
+
+  function toggle(set: Set<string>, val: string, setter: (s: Set<string>) => void) {
+    const next = new Set(set);
+    if (next.has(val)) next.delete(val); else next.add(val);
+    setter(next);
+  }
+
 
   useEffect(() => {
     const el = scrollerRef.current;
