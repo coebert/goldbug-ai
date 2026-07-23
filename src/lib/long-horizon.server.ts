@@ -329,6 +329,36 @@ export async function runLongHorizonBacktest(opts: {
     return v;
   };
 
+  // Execute a sell of `qty` shares at raw price `p`. Applies slippage (fill
+  // below quote) and commission (deducted from proceeds). Returns proceeds
+  // net of costs, or null if trade notional falls below min_trade_value.
+  const sellShares = (sym: string, qty: number, p: number): number | null => {
+    const gross = qty * p;
+    if (gross < execution.min_trade_value) { skippedSmallTrades++; return null; }
+    const fill = p * (1 - slipRate);
+    const proceedsGross = qty * fill;
+    const commission = proceedsGross * commRate;
+    const net = proceedsGross - commission;
+    cash += net;
+    totalCostsPaid += (gross - net); // slippage + commission vs mid
+    tradeCount++;
+    return net;
+  };
+
+  // Execute a buy of shares given a `spend` budget in cash at raw price `p`.
+  // Returns shares acquired (avg cost includes slippage + commission), or null
+  // if trade notional falls below min_trade_value.
+  const buyShares = (sym: string, spend: number, p: number): { qty: number; effCost: number } | null => {
+    if (spend < execution.min_trade_value) { skippedSmallTrades++; return null; }
+    const fill = p * (1 + slipRate);
+    const perShareCost = fill * (1 + commRate); // commission baked into per-share cost
+    const qty = spend / perShareCost;
+    cash -= spend;
+    totalCostsPaid += spend - qty * p; // portion of spend that is cost vs mid
+    tradeCount++;
+    return { qty, effCost: perShareCost };
+  };
+
   for (const day of days) {
     // 1. Apply stop-loss / take-profit exits every day
     for (const [sym, h] of Array.from(holdings)) {
@@ -339,9 +369,8 @@ export async function runLongHorizonBacktest(opts: {
       const pnl = (p - h.avgCost) / h.avgCost;
       if ((rc.stop_loss_pct > 0 && pnl <= -rc.stop_loss_pct) ||
           (rc.take_profit_pct > 0 && pnl >= rc.take_profit_pct)) {
-        cash += h.qty * p;
-        holdings.delete(sym);
-        tradeCount++;
+        const ok = sellShares(sym, h.qty, p);
+        if (ok != null) holdings.delete(sym);
       }
     }
 
@@ -373,13 +402,11 @@ export async function runLongHorizonBacktest(opts: {
       for (const p of picks) {
         let w = baseW;
         if (rc.volatility_sizing && p.vol && p.vol > 0) {
-          // scale by vol_target / actual daily vol, capped at baseW
           const scaled = Math.min(baseW, rc.vol_target_pct / p.vol);
           w = Math.max(0.01, scaled);
         }
         rawWeights.set(p.sym.symbol, Math.min(w, perSymCap));
       }
-      // Enforce asset-class caps
       const classTotals: Partial<Record<AssetClass, number>> = {};
       for (const p of picks) {
         const w = rawWeights.get(p.sym.symbol) ?? 0;
@@ -396,7 +423,6 @@ export async function runLongHorizonBacktest(opts: {
           }
         }
       }
-      // Normalise to <= 1
       const sumW = Array.from(rawWeights.values()).reduce((a, b) => a + b, 0);
       if (sumW > 1) {
         for (const [k, v] of rawWeights) rawWeights.set(k, v / sumW);
@@ -409,9 +435,8 @@ export async function runLongHorizonBacktest(opts: {
           const s = uniData.find((u) => u.symbol === sym);
           const p = s ? priceOn(s, day) : null;
           if (p != null) {
-            cash += h.qty * p;
-            holdings.delete(sym);
-            tradeCount++;
+            const ok = sellShares(sym, h.qty, p);
+            if (ok != null) holdings.delete(sym);
           }
         }
       }
@@ -423,25 +448,23 @@ export async function runLongHorizonBacktest(opts: {
         const cur = holdings.get(p.sym.symbol);
         const curValue = (cur?.qty ?? 0) * p.price;
         const diff = targetValue - curValue;
-        if (Math.abs(diff) < totalValue2 * 0.005) continue; // ignore <0.5% drift
+        // ignore drift smaller than either 0.5% of portfolio or the min trade size
+        if (Math.abs(diff) < Math.max(totalValue2 * 0.005, execution.min_trade_value)) continue;
         if (diff > 0) {
-          // buy
           const spend = Math.min(diff, cash - cashFloor);
           if (spend <= 0) continue;
-          const qty = spend / p.price;
-          const newQty = (cur?.qty ?? 0) + qty;
-          const newCost = ((cur?.qty ?? 0) * (cur?.avgCost ?? 0) + qty * p.price) / newQty;
+          const res = buyShares(p.sym.symbol, spend, p.price);
+          if (!res) continue;
+          const newQty = (cur?.qty ?? 0) + res.qty;
+          const newCost = ((cur?.qty ?? 0) * (cur?.avgCost ?? 0) + res.qty * res.effCost) / newQty;
           holdings.set(p.sym.symbol, { qty: newQty, avgCost: newCost });
-          cash -= qty * p.price;
-          tradeCount++;
         } else if (cur) {
-          // sell partial
           const sellQty = Math.min(cur.qty, (-diff) / p.price);
-          cash += sellQty * p.price;
+          const ok = sellShares(p.sym.symbol, sellQty, p.price);
+          if (ok == null) continue;
           const remaining = cur.qty - sellQty;
           if (remaining <= 1e-9) holdings.delete(p.sym.symbol);
           else holdings.set(p.sym.symbol, { qty: remaining, avgCost: cur.avgCost });
-          tradeCount++;
         }
       }
     }
