@@ -245,6 +245,35 @@ export function RiskControlsCard({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="space-y-6">
+            <div className="rounded-md border border-border bg-muted/30 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="flex items-center gap-2 text-sm font-semibold">
+                  <Gauge className="h-4 w-4 text-primary" /> Risk level
+                </h4>
+                <span className="text-sm font-medium text-primary">
+                  {level}. {RISK_PRESETS[level].name}
+                </span>
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                {RISK_PRESETS[level].blurb} Moving the slider rewrites every detailed field
+                below — fine-tune afterwards if you want.
+              </p>
+              <Slider
+                min={1}
+                max={5}
+                step={1}
+                value={[level]}
+                onValueChange={(v) => applyLevel(v[0] ?? 3)}
+              />
+              <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+                <span>Low risk</span>
+                <span>Cautious</span>
+                <span>Balanced</span>
+                <span>Growth</span>
+                <span>High risk</span>
+              </div>
+            </div>
+
             <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
               <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
               <p className="mb-3 text-xs text-muted-foreground">
