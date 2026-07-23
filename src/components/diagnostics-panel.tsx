@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge, Globe2 } from "lucide-react";
 import { eventColor, type EventCategory } from "@/lib/global-events";
+import { Explain } from "@/components/explain";
 
 type Props = { portfolioId: string };
 
@@ -87,7 +88,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <MetricTile
           icon={<Target className="h-4 w-4" />}
-          label={`Win rate (${summary.horizonDays}d fwd)`}
+          label={<Explain term="conviction">{`Win rate (${summary.horizonDays}d fwd)`}</Explain>}
           value={summary.evaluatedOutcomes > 0 ? `${(summary.winRate * 100).toFixed(0)}%` : "—"}
           sub={`${summary.evaluatedOutcomes} evaluated`}
         />
@@ -100,7 +101,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
         />
         <MetricTile
           icon={<TrendingDown className="h-4 w-4" />}
-          label="Max drawdown"
+          label={<Explain term="max_drawdown">Max drawdown</Explain>}
           value={pct(summary.maxDrawdownPct)}
           sub={`current ${pct(summary.currentDrawdownPct)}`}
           tone={summary.maxDrawdownPct <= -10 ? "neg" : undefined}
