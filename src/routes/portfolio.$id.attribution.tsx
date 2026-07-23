@@ -24,7 +24,7 @@ import {
   Scatter,
 } from "recharts";
 
-export const Route = createFileRoute("/_authenticated/portfolio/$id/attribution")({
+export const Route = createFileRoute("/portfolio/$id/attribution")({
   head: () => ({
     meta: [
       { title: "Attribution Dashboard — Aegis" },
