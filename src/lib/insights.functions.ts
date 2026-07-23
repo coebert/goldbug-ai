@@ -128,3 +128,17 @@ export const getLearningDiagnostics = createServerFn({ method: "GET" })
       walk_forward: hpRows.data ?? [],
     };
   });
+
+export const getShadowVariantReport = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: p } = await context.supabase
+      .from("portfolios")
+      .select("id")
+      .eq("id", data.portfolioId)
+      .maybeSingle();
+    if (!p) return { variant_name: "contrarian_v1", samples: 0, avg_agreement: null, total_divergences: 0, recent: [] as never[] };
+    const { getShadowReport } = await import("./ab-testing.server");
+    return getShadowReport(data.portfolioId);
+  });
