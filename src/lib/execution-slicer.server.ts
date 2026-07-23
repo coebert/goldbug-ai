@@ -142,29 +142,30 @@ async function assertPortfolioOwnership(
  * skip slicing and return `null` so caller can route immediately.
  */
 export async function maybeSliceOrder(input: SliceInput) {
-  const notional = input.totalQty * input.priceHint;
+  const clean = validate("maybeSliceOrder", SliceInputSchema, input);
+  const notional = clean.totalQty * clean.priceHint;
   if (notional < LARGE_ORDER_USD) return null;
 
-  await assertPortfolioOwnership("maybeSliceOrder", input.portfolioId, input.ownerUserId);
+  await assertPortfolioOwnership("maybeSliceOrder", clean.portfolioId, clean.ownerUserId);
 
-  const slices = Math.max(2, Math.min(8, input.slices ?? DEFAULT_SLICES));
-  const sliceQty = Math.max(1, Math.floor((input.totalQty / slices) * 10_000) / 10_000);
+  const slices = clean.slices ?? DEFAULT_SLICES;
+  const sliceQty = Math.max(1, Math.floor((clean.totalQty / slices) * 10_000) / 10_000);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + (input.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
+  const expiresAt = new Date(now.getTime() + (clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
 
   const { data, error } = await supabaseAdmin
     .from("pending_slices")
     .insert({
-      portfolio_id: input.portfolioId,
-      decision_id: input.decisionId,
-      symbol: input.symbol,
-      side: input.side,
-      total_qty: input.totalQty,
-      remaining_qty: input.totalQty,
+      portfolio_id: clean.portfolioId,
+      decision_id: clean.decisionId,
+      symbol: clean.symbol,
+      side: clean.side,
+      total_qty: clean.totalQty,
+      remaining_qty: clean.totalQty,
       slice_qty: sliceQty,
       slice_count: slices,
       slices_done: 0,
-      limit_price: input.priceHint,
+      limit_price: clean.priceHint,
       next_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       status: "active",
@@ -184,7 +185,9 @@ export async function maybeSliceOrder(input: SliceInput) {
  * authenticated user id owning `portfolioId`.
  */
 export async function tickSlicer(portfolioId: string, ownerUserId: string) {
-  await assertPortfolioOwnership("tickSlicer", portfolioId, ownerUserId);
+  const clean = validate("tickSlicer", TickInputSchema, { portfolioId, ownerUserId });
+  await assertPortfolioOwnership("tickSlicer", clean.portfolioId, clean.ownerUserId);
+
 
   const now = new Date().toISOString();
   // Expire past-due slices
