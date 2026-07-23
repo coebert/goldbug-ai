@@ -14,6 +14,109 @@ export type Database = {
   }
   public: {
     Tables: {
+      calibration_snapshots: {
+        Row: {
+          as_of: string
+          avg_conviction: number | null
+          brier_score: number
+          created_at: string
+          global_size_mult: number
+          hit_rate: number | null
+          id: string
+          notes: string | null
+          portfolio_id: string
+          samples: number
+        }
+        Insert: {
+          as_of: string
+          avg_conviction?: number | null
+          brier_score: number
+          created_at?: string
+          global_size_mult?: number
+          hit_rate?: number | null
+          id?: string
+          notes?: string | null
+          portfolio_id: string
+          samples: number
+        }
+        Update: {
+          as_of?: string
+          avg_conviction?: number | null
+          brier_score?: number
+          created_at?: string
+          global_size_mult?: number
+          hit_rate?: number | null
+          id?: string
+          notes?: string | null
+          portfolio_id?: string
+          samples?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calibration_snapshots_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      counterfactuals: {
+        Row: {
+          as_of: string
+          block_category: string
+          block_reason: string
+          conviction: number | null
+          created_at: string
+          evaluated_at: string | null
+          forward_return_5d: number | null
+          hypothetical_price: number
+          hypothetical_spend: number | null
+          id: string
+          portfolio_id: string
+          side: string
+          symbol: string
+        }
+        Insert: {
+          as_of: string
+          block_category: string
+          block_reason: string
+          conviction?: number | null
+          created_at?: string
+          evaluated_at?: string | null
+          forward_return_5d?: number | null
+          hypothetical_price: number
+          hypothetical_spend?: number | null
+          id?: string
+          portfolio_id: string
+          side: string
+          symbol: string
+        }
+        Update: {
+          as_of?: string
+          block_category?: string
+          block_reason?: string
+          conviction?: number | null
+          created_at?: string
+          evaluated_at?: string | null
+          forward_return_5d?: number | null
+          hypothetical_price?: number
+          hypothetical_spend?: number | null
+          id?: string
+          portfolio_id?: string
+          side?: string
+          symbol?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counterfactuals_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decisions: {
         Row: {
           briefing: string
@@ -130,6 +233,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "holdings_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hyperparam_history: {
+        Row: {
+          created_at: string
+          id: string
+          kelly_cap: number
+          n_symbols: number
+          notes: string | null
+          oos_score: number | null
+          portfolio_id: string
+          rsi_period: number
+          sma_fast: number
+          sma_slow: number
+          train_score: number | null
+          tuned_at: string
+          window_days: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kelly_cap: number
+          n_symbols?: number
+          notes?: string | null
+          oos_score?: number | null
+          portfolio_id: string
+          rsi_period: number
+          sma_fast: number
+          sma_slow: number
+          train_score?: number | null
+          tuned_at: string
+          window_days?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kelly_cap?: number
+          n_symbols?: number
+          notes?: string | null
+          oos_score?: number | null
+          portfolio_id?: string
+          rsi_period?: number
+          sma_fast?: number
+          sma_slow?: number
+          train_score?: number | null
+          tuned_at?: string
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hyperparam_history_portfolio_id_fkey"
             columns: ["portfolio_id"]
             isOneToOne: false
             referencedRelation: "portfolios"

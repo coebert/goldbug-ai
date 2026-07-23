@@ -52,6 +52,10 @@ import {
 } from "./portfolio-optimizer.server";
 import { computeAttribution, formatAttributionBlock } from "./attribution.server";
 import { getOrRefreshHyperparams, formatHyperparamBlock, type TunedHyperparams } from "./hyperparam-tuning.server";
+import { getOrWalkForward } from "./hyperparam-walkforward.server";
+import { logCounterfactual, evaluatePendingCounterfactuals } from "./counterfactuals.server";
+import { ensembleVote, scoreDisagreement } from "./ensemble.server";
+import { computeAndPersistCalibration, getLatestCalibration, formatCalibrationBlock } from "./calibration.server";
 import {
   parseCircuit,
   evaluateBreaker,
@@ -224,6 +228,7 @@ async function callAiForDecision(args: {
   attribution?: string | null;
   regimeNote?: string | null;
   hyperparams?: TunedHyperparams | null;
+  calibrationBlock?: string | null;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
@@ -295,6 +300,7 @@ ${formatLearningBlock(args.learning)}
 
 ${args.attribution ?? ""}
 ${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
+${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 
 ${HISTORICAL_PLAYBOOK}
@@ -413,7 +419,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
   const features = rawFeatures.map((f) => ({ ...f }));
 
-  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams, sectorScores, ddSizing] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams, sectorScores, ddSizing, calibration, _cfEvalCount] = await Promise.all([
     opts?.skipNews
       ? Promise.resolve([])
       : cached("news", asOf, () => getNewsForDate(asOf)).catch(() => []),
@@ -442,9 +448,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)),
     ).catch(() => []),
     computeAttribution(portfolioId, asOf).catch(() => null),
-    getOrRefreshHyperparams(portfolioId, asOf).catch((e) => {
-      console.warn("Hyperparam tuning failed:", e);
-      return null as TunedHyperparams | null;
+    // F. Walk-forward tuner (30d train / 7d validate cadence, audit-logged).
+    getOrWalkForward(portfolioId, asOf).catch((e) => {
+      console.warn("Walk-forward tuning failed, falling back:", e);
+      return getOrRefreshHyperparams(portfolioId, asOf).catch(() => null as TunedHyperparams | null);
     }),
     cached("sectorScores", asOf, () => refreshSectorScores(asOf)).catch((e) => {
       console.warn("Sector rotation failed:", e);
@@ -453,6 +460,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     computePortfolioDrawdownSizing(portfolioId).catch(() => ({
       peak_5d: null, current: null, drawdown_pct: 0, size_multiplier: 1, note: "dd calc failed",
     })),
+    // K. Calibration (latest snapshot for prompt + sizing).
+    getLatestCalibration(portfolioId).catch(() => ({
+      brier_score: 0.25, samples: 0, hit_rate: null, avg_conviction: null,
+      global_size_mult: 1, notes: "unavailable",
+    })),
+    // G. Evaluate any counterfactuals whose 5d window has fully elapsed.
+    evaluatePendingCounterfactuals(asOf).catch(() => 0),
   ]);
 
 
@@ -536,6 +550,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         attribution: attribution ? formatAttributionBlock(attribution) : null,
         regimeNote: tightened.note,
         hyperparams: hyperparams ?? null,
+        calibrationBlock: formatCalibrationBlock(calibration),
       });
 
 
@@ -736,6 +751,28 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         if (convSpend < spend) {
           spend = convSpend;
           sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}${hyperparams ? ` cap=${(hyperparams.kelly_cap * 100).toFixed(0)}%` : ""}`);
+        }
+      }
+
+      // K. Global calibration multiplier — shrinks buys when AI conviction has been over-stated
+      if (calibration.global_size_mult !== 1) {
+        spend *= calibration.global_size_mult;
+        sizingNotes.push(`calib×${calibration.global_size_mult.toFixed(2)}`);
+      }
+
+      // J. Ensemble second opinion — halve on strong disagreement, log to journal
+      {
+        const feat = featureBySymbol.get(meta.symbol);
+        if (feat) {
+          const vote = ensembleVote({
+            symbol: feat.symbol, price: feat.price,
+            sma20: feat.sma20, sma50: feat.sma50, rsi14: feat.rsi14,
+            change5d: feat.change5d, change30d: feat.change30d,
+          });
+          if (scoreDisagreement(order.side, vote)) {
+            spend *= 0.5;
+            sizingNotes.push(`ensemble≠AI (${vote.side} ${vote.score.toFixed(2)}) x0.5`);
+          }
         }
       }
 
@@ -970,7 +1007,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }
 
 
+  // G. Log counterfactuals for rejected buys — later scored against 5d forward return.
+  {
+    const orderMeta = new Map(decision.orders.map((o) => [o.symbol, o] as const));
+    for (const t of executed) {
+      if (t.side !== "buy" || t.quantity > 0 || !t.rejected) continue;
+      const om = orderMeta.get(t.symbol);
+      logCounterfactual({
+        portfolioId,
+        asOf,
+        symbol: t.symbol,
+        side: "buy",
+        hypotheticalPrice: t.price || (priceMap.get(t.symbol) ?? 0),
+        blockReason: t.rejected,
+        conviction: typeof om?.conviction === "number" ? om.conviction : null,
+      }).catch(() => { /* ignore */ });
+    }
+  }
+
   // Persist state
+
 
   const admin = supabaseAdmin;
   const executedAt = new Date().toISOString();
@@ -1105,6 +1161,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Signal-decay tracker: refresh rolling 30d hit rates & edge bps by signal.
   updateSignalPerformance(portfolioId, asOf).catch((e) =>
     console.warn("Signal-decay update skipped:", e),
+  );
+
+  // K. Calibration loop: recompute Brier score & global sizing multiplier for next cycle.
+  computeAndPersistCalibration(portfolioId, asOf).catch((e) =>
+    console.warn("Calibration update skipped:", e),
   );
 
 

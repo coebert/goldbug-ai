@@ -50,6 +50,7 @@ import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
 import { SignalDecayCard } from "@/components/signal-decay-card";
+import { StressPanelCard } from "@/components/stress-panel-card";
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
@@ -900,6 +901,7 @@ function PortfolioPage() {
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <SignalDecayCard portfolioId={p.id} />
               <CorrelationHeatmapCard portfolioId={p.id} />
+              <StressPanelCard portfolioId={p.id} currency={p.currency} />
             </div>
 
             <Tabs defaultValue="journal" className="mt-6">
