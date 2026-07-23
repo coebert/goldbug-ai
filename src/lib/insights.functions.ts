@@ -60,3 +60,12 @@ export const getSectorScores = createServerFn({ method: "GET" })
       .limit(20);
     return latest ?? [];
   });
+
+export const getPortfolioStress = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { computePortfolioStress } = await import("./portfolio-stress.server");
+    const asOf = new Date().toISOString().slice(0, 10);
+    return computePortfolioStress(data.portfolioId, asOf);
+  });
