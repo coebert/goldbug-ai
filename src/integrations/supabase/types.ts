@@ -131,6 +131,244 @@ export type Database = {
           },
         ]
       }
+      live_broker_log: {
+        Row: {
+          broker: string
+          created_at: string
+          env: string
+          error: string | null
+          id: string
+          method: string
+          path: string
+          portfolio_id: string | null
+          request: Json | null
+          response: Json | null
+          status: number | null
+          user_id: string
+        }
+        Insert: {
+          broker?: string
+          created_at?: string
+          env?: string
+          error?: string | null
+          id?: string
+          method: string
+          path: string
+          portfolio_id?: string | null
+          request?: Json | null
+          response?: Json | null
+          status?: number | null
+          user_id: string
+        }
+        Update: {
+          broker?: string
+          created_at?: string
+          env?: string
+          error?: string | null
+          id?: string
+          method?: string
+          path?: string
+          portfolio_id?: string | null
+          request?: Json | null
+          response?: Json | null
+          status?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_broker_log_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_fills: {
+        Row: {
+          broker_fill_id: string | null
+          created_at: string
+          currency: string
+          fee: number
+          fill_price: number
+          filled_at: string
+          id: string
+          order_id: string
+          portfolio_id: string
+          quantity: number
+          side: string
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          broker_fill_id?: string | null
+          created_at?: string
+          currency?: string
+          fee?: number
+          fill_price: number
+          filled_at?: string
+          id?: string
+          order_id: string
+          portfolio_id: string
+          quantity: number
+          side: string
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          broker_fill_id?: string | null
+          created_at?: string
+          currency?: string
+          fee?: number
+          fill_price?: number
+          filled_at?: string
+          id?: string
+          order_id?: string
+          portfolio_id?: string
+          quantity?: number
+          side?: string
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_fills_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "live_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_fills_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_orders: {
+        Row: {
+          broker: string
+          broker_order_id: string | null
+          created_at: string
+          decision_id: string | null
+          id: string
+          limit_price: number | null
+          order_type: string
+          portfolio_id: string
+          quantity: number
+          reject_reason: string | null
+          side: string
+          status: string
+          submitted_at: string | null
+          symbol: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          broker?: string
+          broker_order_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          id?: string
+          limit_price?: number | null
+          order_type?: string
+          portfolio_id: string
+          quantity: number
+          reject_reason?: string | null
+          side: string
+          status?: string
+          submitted_at?: string | null
+          symbol: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          broker?: string
+          broker_order_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          id?: string
+          limit_price?: number | null
+          order_type?: string
+          portfolio_id?: string
+          quantity?: number
+          reject_reason?: string | null
+          side?: string
+          status?: string
+          submitted_at?: string | null
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_orders_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_orders_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_reconciliation: {
+        Row: {
+          as_of: string
+          broker_cash: number | null
+          broker_positions: Json | null
+          created_at: string
+          drift_flag: boolean
+          drift_notes: string | null
+          id: string
+          local_cash: number | null
+          local_positions: Json | null
+          portfolio_id: string
+          user_id: string
+        }
+        Insert: {
+          as_of?: string
+          broker_cash?: number | null
+          broker_positions?: Json | null
+          created_at?: string
+          drift_flag?: boolean
+          drift_notes?: string | null
+          id?: string
+          local_cash?: number | null
+          local_positions?: Json | null
+          portfolio_id: string
+          user_id: string
+        }
+        Update: {
+          as_of?: string
+          broker_cash?: number | null
+          broker_positions?: Json | null
+          created_at?: string
+          drift_flag?: boolean
+          drift_notes?: string | null
+          id?: string
+          local_cash?: number | null
+          local_positions?: Json | null
+          portfolio_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_reconciliation_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       market_regimes: {
         Row: {
           as_of: string
@@ -240,11 +478,15 @@ export type Database = {
       }
       portfolios: {
         Row: {
+          broker: string | null
+          broker_account_id: string | null
           created_at: string
           currency: string
           current_cash: number
           id: string
           last_run_date: string | null
+          live_activated_at: string | null
+          live_paused: boolean
           mode: Database["public"]["Enums"]["portfolio_mode"]
           name: string
           risk_config: Json
@@ -256,11 +498,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          broker?: string | null
+          broker_account_id?: string | null
           created_at?: string
           currency?: string
           current_cash?: number
           id?: string
           last_run_date?: string | null
+          live_activated_at?: string | null
+          live_paused?: boolean
           mode?: Database["public"]["Enums"]["portfolio_mode"]
           name?: string
           risk_config?: Json
@@ -272,11 +518,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          broker?: string | null
+          broker_account_id?: string | null
           created_at?: string
           currency?: string
           current_cash?: number
           id?: string
           last_run_date?: string | null
+          live_activated_at?: string | null
+          live_paused?: boolean
           mode?: Database["public"]["Enums"]["portfolio_mode"]
           name?: string
           risk_config?: Json
@@ -319,6 +569,42 @@ export type Database = {
           price_date?: string
           symbol?: string
           volume?: number | null
+        }
+        Relationships: []
+      }
+      saxo_instrument_cache: {
+        Row: {
+          asset_type: string
+          currency: string | null
+          env: string
+          exchange_id: string | null
+          raw: Json | null
+          refreshed_at: string
+          symbol: string
+          tick_size: number | null
+          uic: number
+        }
+        Insert: {
+          asset_type: string
+          currency?: string | null
+          env?: string
+          exchange_id?: string | null
+          raw?: Json | null
+          refreshed_at?: string
+          symbol: string
+          tick_size?: number | null
+          uic: number
+        }
+        Update: {
+          asset_type?: string
+          currency?: string | null
+          env?: string
+          exchange_id?: string | null
+          raw?: Json | null
+          refreshed_at?: string
+          symbol?: string
+          tick_size?: number | null
+          uic?: number
         }
         Relationships: []
       }
@@ -381,7 +667,7 @@ export type Database = {
     }
     Enums: {
       asset_class: "stock" | "etf" | "crypto" | "commodity" | "fx"
-      portfolio_mode: "backtest" | "paper"
+      portfolio_mode: "backtest" | "paper" | "live_sim" | "live_prod"
       portfolio_status: "active" | "paused" | "complete"
       risk_level: "conservative" | "balanced" | "aggressive"
       trade_side: "buy" | "sell"
@@ -513,7 +799,7 @@ export const Constants = {
   public: {
     Enums: {
       asset_class: ["stock", "etf", "crypto", "commodity", "fx"],
-      portfolio_mode: ["backtest", "paper"],
+      portfolio_mode: ["backtest", "paper", "live_sim", "live_prod"],
       portfolio_status: ["active", "paused", "complete"],
       risk_level: ["conservative", "balanced", "aggressive"],
       trade_side: ["buy", "sell"],
