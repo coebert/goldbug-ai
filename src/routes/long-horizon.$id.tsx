@@ -109,6 +109,7 @@ function LongHorizonPage() {
   const [focused, setFocused] = useState<string | null>(null);
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
+  const [chartRes, setChartRes] = useState<200 | 600 | 1500>(600);
 
   const runMut = useMutation({
     mutationFn: () =>
