@@ -2064,10 +2064,12 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         };
         if (typeof n.sentiment === "number") { bucket.sum += n.sentiment; bucket.n += 1; }
         bucket.rows.push({
+          decision_id: d.id,
           portfolio_id: d.portfolio_id,
           portfolio_name: name,
           run_date: d.run_date,
           sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
+          rationale: (d.rationale ?? null) as string | null,
           actions: trimmed,
         });
         if (p) {
