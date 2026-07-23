@@ -230,7 +230,56 @@ export function RiskControlsCard({
                   <p className="mt-1 text-[11px] text-muted-foreground">Set 0 to disable.</p>
                 </div>
               </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs font-medium">ATR trailing stop</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      value={cfg.atr_trailing_mult}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          atr_trailing_mult: Math.max(0, Math.min(10, Number(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">× ATR below high-water mark → auto-sell</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Locks in gains as the price rises. Set 0 to disable. Typical: 2–3×.
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Max holding period</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={3650}
+                      step={1}
+                      value={cfg.max_hold_days}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          max_hold_days: Math.max(0, Math.min(3650, Math.floor(Number(e.target.value) || 0))),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">days → time-based exit</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Force-close stale positions. Set 0 to disable.
+                  </p>
+                </div>
+              </div>
             </div>
+
 
             <div>
               <h4 className="mb-2 text-sm font-medium">Per-asset-class limits</h4>
