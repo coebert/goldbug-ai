@@ -37,6 +37,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { RiskControlsCard } from "@/components/risk-controls-card";
+
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
