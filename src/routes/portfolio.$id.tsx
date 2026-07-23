@@ -139,9 +139,10 @@ function PortfolioPage() {
         equityFillBottom: 0.05,
         benchmark: "#ffd257",
         drawdown: "#ff6b6b",
-        peak: "#e5e7eb",
+        peak: "#f8fafc",
         gridOpacity: 0.6,
-        axis: "#e5e7eb",
+        axis: "#f8fafc",
+        axisText: "#f8fafc",
         strokeWidth: 3,
         surface: "transparent",
       } as const;
@@ -156,23 +157,23 @@ function PortfolioPage() {
         peak: "#334155",
         gridOpacity: 0.35,
         axis: "#334155",
+        axisText: "#0f172a",
         strokeWidth: 2.5,
         surface: "#f8fafc",
       } as const;
     }
     if (chartContrast === "cb") {
       // Okabe–Ito palette: distinguishable across deuteranopia, protanopia, tritanopia.
-      // Portfolio = blue (#0072B2), Benchmark = orange (#E69F00),
-      // Drawdown = vermillion (#D55E00), Peak/axes = bluish-grey (#CFCFCF).
       return {
         equity: "#56B4E9",
         equityFillTop: 0.5,
         equityFillBottom: 0.05,
         benchmark: "#E69F00",
         drawdown: "#D55E00",
-        peak: "#CFCFCF",
+        peak: "#E8E8E8",
         gridOpacity: 0.55,
         axis: "#CFCFCF",
+        axisText: "#F1F1F1",
         strokeWidth: 3,
         surface: "transparent",
       } as const;
@@ -186,10 +187,12 @@ function PortfolioPage() {
       peak: "hsl(var(--muted-foreground))",
       gridOpacity: 0.35,
       axis: "hsl(var(--border))",
+      axisText: "hsl(var(--foreground))",
       strokeWidth: 2.5,
       surface: "transparent",
     } as const;
   }, [chartContrast]);
+
 
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
@@ -708,18 +711,19 @@ function PortfolioPage() {
                         <CartesianGrid stroke={chartTheme.axis} strokeOpacity={chartTheme.gridOpacity} strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: 11, fill: chartTheme.axis }}
+                          tick={{ fontSize: 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
-                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axis, fontSize: 12 }}
+                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
                         />
                         <YAxis
                           domain={["auto", "auto"]}
                           width={72}
-                          tick={{ fontSize: 11, fill: chartTheme.axis }}
+                          tick={{ fontSize: 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
                           tickFormatter={(v) => compareMode === "pct" ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%` : `${p.currency}${Number(v).toFixed(0)}`}
-                          label={{ value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axis, fontSize: 12 }}
+                          label={{ value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
                         />
+
 
                         <Tooltip
                           cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
@@ -790,7 +794,7 @@ function PortfolioPage() {
                             );
                           }}
                         />
-                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axis, fontSize: 10, position: "insideTopRight" }} />
+                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axisText, fontSize: 10, position: "insideTopRight" }} />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={equityData.map((d) => d.date)}
@@ -852,7 +856,7 @@ function PortfolioPage() {
                           verticalAlign="bottom"
                           height={24}
                           iconType="plainline"
-                          wrapperStyle={{ fontSize: 11, color: chartTheme.axis }}
+                          wrapperStyle={{ fontSize: 11, color: chartTheme.axisText }}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
