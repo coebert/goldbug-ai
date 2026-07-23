@@ -5,7 +5,7 @@ import { getGlobalNewsReel } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Newspaper, Pause, Play, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Newspaper, Pause, Play, RefreshCw } from "lucide-react";
 
 function sentimentTone(v: number | null) {
   if (v == null) return { label: "unscored", cls: "text-muted-foreground bg-muted" };
