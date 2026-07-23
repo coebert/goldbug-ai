@@ -308,7 +308,7 @@ function AttributionPage() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
                       "event_*" = pre-trade macro/earnings penalty severity; "cooldown" = post-loss halving; "liquidity" = trimmed to 1% of 20d ADV.
