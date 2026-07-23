@@ -36,7 +36,7 @@ const AllPortfoliosChart = lazy(() =>
   import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
 );
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/")({
