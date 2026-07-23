@@ -914,8 +914,8 @@ function PortfolioPage() {
                   <p className="text-sm text-muted-foreground">No trades yet.</p>
                 )}
                 {trades.length > 0 && (
-                  <div className="overflow-hidden rounded-lg border border-border">
-                    <table className="w-full text-sm">
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full min-w-[640px] text-sm">
                       <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                         <tr>
                           <th className="px-3 py-2 text-left">Date</th>

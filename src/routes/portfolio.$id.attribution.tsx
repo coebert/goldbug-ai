@@ -272,7 +272,7 @@ function AttributionPage() {
                     {data.regime_breakdown.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No regime-tagged trades.</p>
                     ) : (
-                      <table className="w-full text-sm">
+                      <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-sm">
                         <thead className="text-xs text-muted-foreground">
                           <tr><th className="text-left py-1">Regime</th><th className="text-right">n</th><th className="text-right">Avg return</th><th className="text-right">Win rate</th></tr>
                         </thead>
@@ -286,7 +286,7 @@ function AttributionPage() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     )}
                   </div>
                   <div>
@@ -294,7 +294,7 @@ function AttributionPage() {
                     {data.penalty_breakdown.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No penalty-tagged trades.</p>
                     ) : (
-                      <table className="w-full text-sm">
+                      <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-sm">
                         <thead className="text-xs text-muted-foreground">
                           <tr><th className="text-left py-1">Penalty</th><th className="text-right">n</th><th className="text-right">Avg return</th><th className="text-right">Win rate</th></tr>
                         </thead>
@@ -308,7 +308,7 @@ function AttributionPage() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
                       "event_*" = pre-trade macro/earnings penalty severity; "cooldown" = post-loss halving; "liquidity" = trimmed to 1% of 20d ADV.

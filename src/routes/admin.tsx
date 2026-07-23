@@ -212,15 +212,15 @@ function AdminPage() {
   void tick;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Admin — Broker & Routing Health</h1>
+    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold sm:text-2xl">Admin — Broker & Routing Health</h1>
           <p className="text-sm text-muted-foreground">
             Live SIM/PROD broker status, OAuth token countdown, last routed order, and alerts.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
           <Button variant="outline" size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
             <RefreshCw className={`mr-2 h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
@@ -228,6 +228,7 @@ function AdminPage() {
           </Button>
         </div>
       </div>
+
 
       {q.isLoading && <p className="text-sm text-muted-foreground">Pinging brokers…</p>}
       {q.error && <Alert variant="destructive"><AlertTitle>Failed to load</AlertTitle><AlertDescription>{(q.error as Error).message}</AlertDescription></Alert>}
