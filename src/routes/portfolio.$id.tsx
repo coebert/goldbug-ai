@@ -386,6 +386,7 @@ function PortfolioPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight">{p.name}</h1>
                   <ModeBadge mode={p.mode} />
+                  <LiveToggle portfolioId={p.id} mode={p.mode} livePaused={(p as { live_paused?: boolean | null }).live_paused} />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {p.currency} {startingCash.toFixed(0)} <Explain term="starting_pot">starting pot</Explain> · <Explain term="risk_level">{p.risk_level} risk</Explain>
