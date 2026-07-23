@@ -35,6 +35,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { CalendarClock, PlayCircle } from "lucide-react";
+import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
+import { eventsInRange, eventColor } from "@/lib/global-events";
 
 export const Route = createFileRoute("/long-horizon/$id")({
   ssr: false,
