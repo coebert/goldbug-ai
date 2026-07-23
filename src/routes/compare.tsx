@@ -465,11 +465,20 @@ function ComparePage() {
             )}
 
             {results && results.length > 0 && (
-              <TradeDivergenceCard
-                portfolioIds={results.map((r) => r.portfolio.id)}
-                names={results.map((r) => r.portfolio.name)}
-                colors={results.map((_, i) => COLORS[i % COLORS.length])}
-              />
+              <>
+                <TradeDivergenceCard
+                  portfolioIds={results.map((r) => r.portfolio.id)}
+                  names={results.map((r) => r.portfolio.name)}
+                  colors={results.map((_, i) => COLORS[i % COLORS.length])}
+                />
+                {results.length >= 2 && (
+                  <DivergenceNarrativesCard
+                    portfolioIds={results.map((r) => r.portfolio.id)}
+                    names={results.map((r) => r.portfolio.name)}
+                    colors={results.map((_, i) => COLORS[i % COLORS.length])}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
