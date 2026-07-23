@@ -169,3 +169,18 @@ export function pctChange(closes: number[], lookback: number): number | null {
   if (!then) return null;
   return (now - then) / then;
 }
+
+// Daily-return standard deviation over the last `period` days.
+export function dailyVolatility(closes: number[], period = 20): number | null {
+  if (closes.length < period + 1) return null;
+  const rets: number[] = [];
+  for (let i = closes.length - period; i < closes.length; i++) {
+    const prev = closes[i - 1];
+    if (prev > 0) rets.push((closes[i] - prev) / prev);
+  }
+  if (rets.length === 0) return null;
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / rets.length;
+  return Math.sqrt(variance);
+}
+

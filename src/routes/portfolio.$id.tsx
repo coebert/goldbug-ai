@@ -37,6 +37,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { RiskControlsCard } from "@/components/risk-controls-card";
+
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
@@ -215,7 +217,12 @@ function PortfolioPage() {
               </CardContent>
             </Card>
 
+            <div className="mb-6">
+              <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
+            </div>
+
             <div className="grid gap-4 lg:grid-cols-3">
+
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle className="text-base">Equity curve</CardTitle>

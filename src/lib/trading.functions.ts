@@ -94,6 +94,44 @@ export const deletePortfolio = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const RiskConfigSchema = z.object({
+  asset_class_limits: z
+    .object({
+      stock: z.number().min(0).max(1).optional(),
+      etf: z.number().min(0).max(1).optional(),
+      crypto: z.number().min(0).max(1).optional(),
+      commodity: z.number().min(0).max(1).optional(),
+      fx: z.number().min(0).max(1).optional(),
+    })
+    .partial()
+    .default({}),
+  per_symbol_limit_pct: z.number().min(0).max(1).nullable().default(null),
+  stop_loss_pct: z.number().min(0).max(0.9).default(0.1),
+  take_profit_pct: z.number().min(0).max(5).default(0.25),
+  volatility_sizing: z.boolean().default(true),
+  vol_target_pct: z.number().min(0.001).max(0.1).default(0.015),
+});
+
+export const updateRiskConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        portfolio_id: z.string().uuid(),
+        risk_config: RiskConfigSchema,
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("portfolios")
+      .update({ risk_config: data.risk_config })
+      .eq("id", data.portfolio_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
 export const resetPortfolio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))

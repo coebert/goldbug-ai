@@ -10,12 +10,20 @@ import {
   sma,
   rsi,
   pctChange,
+  dailyVolatility,
   type Candle,
 } from "./market-data.server";
 import { getNewsForDate } from "./news.server";
-import { filterUniverse, findSymbol, riskProfile, type UniverseSymbol } from "./universe.server";
+import {
+  filterUniverse,
+  findSymbol,
+  riskProfile,
+  parseRiskConfig,
+  type UniverseSymbol,
+} from "./universe.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
+
 
 type Portfolio = Database["public"]["Tables"]["portfolios"]["Row"];
 type Holding = Database["public"]["Tables"]["holdings"]["Row"];
@@ -58,6 +66,7 @@ async function buildCandidateFeatures(
     rsi14: number | null;
     change5d: number | null;
     change30d: number | null;
+    vol20d: number | null;
   }> = [];
   await Promise.all(
     candidates.map(async (c) => {
@@ -74,11 +83,13 @@ async function buildCandidateFeatures(
         rsi14: rsi(closes, 14),
         change5d: pctChange(closes, 5),
         change30d: pctChange(closes, 30),
+        vol20d: dailyVolatility(closes, 20),
       });
     }),
   );
   return rows;
 }
+
 
 export type ExecutedTrade = {
   symbol: string;
@@ -105,6 +116,8 @@ async function callAiForDecision(args: {
   const model = gateway("google/gemini-3.6-flash");
 
   const risk = riskProfile(args.portfolio.risk_level);
+  const cfg = parseRiskConfig(args.portfolio.risk_config);
+  const perSymbolCap = cfg.per_symbol_limit_pct ?? risk.maxPositionPct;
 
   const holdingsSummary = args.holdings.map((h) => ({
     symbol: h.symbol,
@@ -112,15 +125,24 @@ async function callAiForDecision(args: {
     avg_cost: Number(h.avg_cost),
   }));
 
+  const classLimitsStr = Object.entries(cfg.asset_class_limits)
+    .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}%`)
+    .join(", ");
+
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
 - Cash balance must never go negative.
-- No single position may exceed ${(risk.maxPositionPct * 100).toFixed(0)}% of portfolio value.
+- No single position may exceed ${(perSymbolCap * 100).toFixed(0)}% of portfolio value.
 - Keep at least ${(risk.cashFloorPct * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
+- Asset-class exposure caps: ${classLimitsStr}.
+- Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
+- Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
+${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.`;
+
 
   const user = `Date: ${args.asOf}
 Portfolio value: ${args.totalValue.toFixed(2)} ${args.portfolio.currency}
@@ -221,18 +243,63 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   // Execute orders through guardrails
   const risk = riskProfile(portfolio.risk_level);
+  const cfg = parseRiskConfig(portfolio.risk_config);
   const cashFloor = totalValue * risk.cashFloorPct;
-  const maxPosVal = totalValue * risk.maxPositionPct;
+  const basePerSymbolPct = cfg.per_symbol_limit_pct ?? risk.maxPositionPct;
+  const maxPosVal = totalValue * basePerSymbolPct;
+
+  // Feature lookup for later use (volatility sizing, asset class)
+  const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
 
   let workingCash = cash;
   const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
+  // ---- Auto-liquidation: stop-loss / take-profit BEFORE the AI runs ----
+  if (cfg.stop_loss_pct > 0 || cfg.take_profit_pct > 0) {
+    for (const [sym, h] of Array.from(holdingsByS.entries())) {
+      const price = priceMap.get(sym);
+      const qty = Number(h.quantity);
+      const cost = Number(h.avg_cost);
+      if (!price || !(qty > 0) || !(cost > 0)) continue;
+      const change = (price - cost) / cost;
+      let trigger: string | null = null;
+      if (cfg.stop_loss_pct > 0 && change <= -cfg.stop_loss_pct) {
+        trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(cfg.stop_loss_pct * 100).toFixed(1)}%)`;
+      } else if (cfg.take_profit_pct > 0 && change >= cfg.take_profit_pct) {
+        trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(cfg.take_profit_pct * 100).toFixed(1)}%)`;
+      }
+      if (!trigger) continue;
+      const value = qty * price;
+      workingCash += value;
+      holdingsByS.delete(sym);
+      executed.push({
+        symbol: sym,
+        side: "sell",
+        quantity: qty,
+        price,
+        value,
+        reason: trigger,
+      });
+    }
+  }
+
+  // Recompute per-asset-class exposure after auto-liquidation, based on live prices.
+  const classExposure = new Map<string, number>();
+  for (const h of holdingsByS.values()) {
+    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    classExposure.set(
+      h.asset_class,
+      (classExposure.get(h.asset_class) ?? 0) + price * Number(h.quantity),
+    );
+  }
+
   // Process sells first to free cash
   const sorted = [...decision.orders].sort((a) =>
     a.side === "sell" ? -1 : 1,
   );
+
 
   for (const order of sorted) {
     const sym = order.symbol.toUpperCase();
@@ -284,6 +351,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const remaining = Number(cur.quantity) - qty;
       if (remaining <= 1e-8) holdingsByS.delete(meta.symbol);
       else holdingsByS.set(meta.symbol, { ...cur, quantity: remaining });
+      classExposure.set(
+        meta.asset_class,
+        Math.max(0, (classExposure.get(meta.asset_class) ?? 0) - value),
+      );
       executed.push({
         symbol: meta.symbol,
         side: "sell",
@@ -309,12 +380,37 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
       const spendableCash = Math.max(0, workingCash - cashFloor);
       let spend = spendableCash * pct;
-      // Enforce max position size
+      // Enforce per-symbol position cap
       const existingVal = holdingsByS.get(meta.symbol)
         ? Number(holdingsByS.get(meta.symbol)!.quantity) * price
         : 0;
       const roomInPosition = Math.max(0, maxPosVal - existingVal);
       spend = Math.min(spend, roomInPosition);
+
+      // Enforce asset class exposure cap
+      const classCap = cfg.asset_class_limits[meta.asset_class];
+      let classRejected = false;
+      if (classCap != null) {
+        const classMax = totalValue * classCap;
+        const roomInClass = Math.max(0, classMax - (classExposure.get(meta.asset_class) ?? 0));
+        if (roomInClass <= 0) classRejected = true;
+        spend = Math.min(spend, roomInClass);
+      }
+
+      // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue
+      let volCapped = false;
+      if (cfg.volatility_sizing) {
+        const vol = featureBySymbol.get(meta.symbol)?.vol20d ?? null;
+        if (vol && vol > 0) {
+          const targetPositionVal = (cfg.vol_target_pct * totalValue) / vol;
+          const volRoom = Math.max(0, targetPositionVal - existingVal);
+          if (spend > volRoom) {
+            spend = volRoom;
+            volCapped = true;
+          }
+        }
+      }
+
       if (spend < 1) {
         executed.push({
           symbol: meta.symbol,
@@ -323,7 +419,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           price,
           value: 0,
           reason: order.reason,
-          rejected: "guardrails leave no room to buy",
+          rejected: classRejected
+            ? `asset-class cap reached for ${meta.asset_class}`
+            : volCapped
+              ? "volatility sizing leaves no room"
+              : "guardrails leave no room to buy",
         });
         continue;
       }
@@ -347,6 +447,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           updated_at: new Date().toISOString(),
         } as Holding);
       }
+      classExposure.set(
+        meta.asset_class,
+        (classExposure.get(meta.asset_class) ?? 0) + spend,
+      );
       executed.push({
         symbol: meta.symbol,
         side: "buy",
@@ -357,6 +461,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       });
     }
   }
+
 
   // Persist state
   const admin = supabaseAdmin;
@@ -429,14 +534,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       news: news.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
-        max_position_pct: risk.maxPositionPct,
+        max_position_pct: basePerSymbolPct,
         cash_floor_pct: risk.cashFloorPct,
         max_new_positions_per_day: risk.maxNewPositionsPerDay,
         cash_floor_value: cashFloor,
         max_position_value: maxPosVal,
         starting_total_value: totalValue,
         starting_cash: cash,
+        asset_class_limits: cfg.asset_class_limits,
+        per_symbol_limit_pct: cfg.per_symbol_limit_pct,
+        stop_loss_pct: cfg.stop_loss_pct,
+        take_profit_pct: cfg.take_profit_pct,
+        volatility_sizing: cfg.volatility_sizing,
+        vol_target_pct: cfg.vol_target_pct,
       },
+
     } as unknown as never,
   });
 

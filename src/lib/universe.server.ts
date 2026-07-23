@@ -72,3 +72,51 @@ export function riskProfile(level: Database["public"]["Enums"]["risk_level"]): R
       return { maxPositionPct: 0.15, cashFloorPct: 0.1, maxNewPositionsPerDay: 3 };
   }
 }
+
+// Advanced, user-configurable risk knobs stored on portfolios.risk_config
+export type RiskConfig = {
+  asset_class_limits: Partial<Record<AssetClass, number>>; // max % of portfolio value per class
+  per_symbol_limit_pct: number | null; // if set, overrides base maxPositionPct
+  stop_loss_pct: number; // 0 disables. Positive number, e.g. 0.10 = -10% from avg cost
+  take_profit_pct: number; // 0 disables. e.g. 0.25 = +25% from avg cost
+  volatility_sizing: boolean;
+  vol_target_pct: number; // target daily volatility contribution per position (e.g. 0.015 = 1.5%)
+};
+
+export const DEFAULT_RISK_CONFIG: RiskConfig = {
+  asset_class_limits: { stock: 0.6, etf: 0.8, crypto: 0.2, commodity: 0.3, fx: 0.3 },
+  per_symbol_limit_pct: null,
+  stop_loss_pct: 0.10,
+  take_profit_pct: 0.25,
+  volatility_sizing: true,
+  vol_target_pct: 0.015,
+};
+
+export function parseRiskConfig(raw: unknown): RiskConfig {
+  const base = { ...DEFAULT_RISK_CONFIG };
+  if (!raw || typeof raw !== "object") return base;
+  const r = raw as Record<string, unknown>;
+  const out: RiskConfig = { ...base };
+  if (r.asset_class_limits && typeof r.asset_class_limits === "object") {
+    const limits: Partial<Record<AssetClass, number>> = {};
+    for (const [k, v] of Object.entries(r.asset_class_limits as Record<string, unknown>)) {
+      const n = Number(v);
+      if (["stock", "etf", "crypto", "commodity", "fx"].includes(k) && Number.isFinite(n)) {
+        limits[k as AssetClass] = Math.max(0, Math.min(1, n));
+      }
+    }
+    out.asset_class_limits = { ...base.asset_class_limits, ...limits };
+  }
+  if (r.per_symbol_limit_pct === null || r.per_symbol_limit_pct === undefined) {
+    out.per_symbol_limit_pct = null;
+  } else {
+    const n = Number(r.per_symbol_limit_pct);
+    out.per_symbol_limit_pct = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+  }
+  if (Number.isFinite(Number(r.stop_loss_pct))) out.stop_loss_pct = Math.max(0, Math.min(0.9, Number(r.stop_loss_pct)));
+  if (Number.isFinite(Number(r.take_profit_pct))) out.take_profit_pct = Math.max(0, Math.min(5, Number(r.take_profit_pct)));
+  if (typeof r.volatility_sizing === "boolean") out.volatility_sizing = r.volatility_sizing;
+  if (Number.isFinite(Number(r.vol_target_pct))) out.vol_target_pct = Math.max(0.001, Math.min(0.1, Number(r.vol_target_pct)));
+  return out;
+}
+

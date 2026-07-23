@@ -173,6 +173,7 @@ export type Database = {
           last_run_date: string | null
           mode: Database["public"]["Enums"]["portfolio_mode"]
           name: string
+          risk_config: Json
           risk_level: Database["public"]["Enums"]["risk_level"]
           starting_cash: number
           status: Database["public"]["Enums"]["portfolio_status"]
@@ -188,6 +189,7 @@ export type Database = {
           last_run_date?: string | null
           mode?: Database["public"]["Enums"]["portfolio_mode"]
           name?: string
+          risk_config?: Json
           risk_level?: Database["public"]["Enums"]["risk_level"]
           starting_cash?: number
           status?: Database["public"]["Enums"]["portfolio_status"]
@@ -203,6 +205,7 @@ export type Database = {
           last_run_date?: string | null
           mode?: Database["public"]["Enums"]["portfolio_mode"]
           name?: string
+          risk_config?: Json
           risk_level?: Database["public"]["Enums"]["risk_level"]
           starting_cash?: number
           status?: Database["public"]["Enums"]["portfolio_status"]
