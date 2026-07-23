@@ -7,14 +7,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  activateLive, deactivateLive, pauseLive, killAllLive,
+  activateLive, deactivateLive, pauseLive, killAllLive, resumeAllLive, getAuditLog,
   pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio,
 } from "@/lib/live.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle } from "lucide-react";
+import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History } from "lucide-react";
 import { toast } from "sonner";
 
 export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
@@ -24,19 +24,37 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const deactivate = useServerFn(deactivateLive);
   const pause = useServerFn(pauseLive);
   const killAll = useServerFn(killAllLive);
+  const resumeAll = useServerFn(resumeAllLive);
+  const audit = useServerFn(getAuditLog);
   const ping = useServerFn(pingBroker);
   const syncBal = useServerFn(syncBrokerBalance);
   const reconcile = useServerFn(reconcilePortfolio);
 
   const [ackRisk, setAckRisk] = useState(false);
   const [targetEnv, setTargetEnv] = useState<"sim" | "prod">("sim");
+  const [showAudit, setShowAudit] = useState(false);
 
   const q = useQuery({
     queryKey: ["live-status", portfolioId],
     queryFn: () => status({ data: { portfolioId } }),
   });
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
+  const auditQ = useQuery({
+    queryKey: ["live-audit", portfolioId],
+    queryFn: () => audit({ data: { portfolioId, limit: 20 } }),
+    enabled: showAudit,
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
+    qc.invalidateQueries({ queryKey: ["live-audit", portfolioId] });
+  };
+
+  const promptReason = (label: string) => {
+    if (typeof window === "undefined") return undefined;
+    const r = window.prompt(`${label} — reason (optional, saved in audit log):`, "");
+    return r?.trim() || undefined;
+  };
 
   const mAct = useMutation({
     mutationFn: () => activate({ data: { portfolioId, targetEnv, useBrokerBalance: true, acknowledgeRisk: true } }),
@@ -44,18 +62,30 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
   const mDeact = useMutation({
-    mutationFn: () => deactivate({ data: { portfolioId } }),
-    onSuccess: () => { toast.success("Reverted to paper mode"); refresh(); },
+    mutationFn: (reason?: string) => deactivate({ data: { portfolioId, reason } }),
+    onSuccess: (r) => { toast.success(r.changed ? "Reverted to paper mode" : "Already in paper mode"); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mPause = useMutation({
-    mutationFn: (paused: boolean) => pause({ data: { portfolioId, paused } }),
+    mutationFn: (args: { paused: boolean; reason?: string }) => pause({ data: { portfolioId, paused: args.paused, reason: args.reason } }),
     onSuccess: (r) => { toast.success(r.paused ? "Paused live trading" : "Resumed live trading"); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mKill = useMutation({
-    mutationFn: () => killAll({}),
-    onSuccess: () => { toast.warning("Kill-switch engaged — all live portfolios paused"); refresh(); },
+    mutationFn: (reason?: string) => killAll({ data: { reason } }),
+    onSuccess: (r) => {
+      toast.warning(
+        r.updated > 0
+          ? `Kill-switch engaged — paused ${r.updated} portfolio${r.updated === 1 ? "" : "s"}`
+          : `Kill-switch confirmed — all ${r.total} already paused`,
+      );
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const mResumeAll = useMutation({
+    mutationFn: (reason?: string) => resumeAll({ data: { reason } }),
+    onSuccess: (r) => { toast.success(`Resumed ${r.resumed} of ${r.total} live portfolios`); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mPing = useMutation({
