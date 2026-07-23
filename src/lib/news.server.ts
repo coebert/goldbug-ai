@@ -87,10 +87,78 @@ function looksNonEnglish(s: string): boolean {
   return /[^\x00-\x7F]/.test(s);
 }
 
+// -------- Translation caching --------
+//
+// Translations are deterministic and stable, so we cache them at three
+// layers to keep API calls to a minimum on re-renders and refreshes:
+//
+//   1. Persistent DB cache — the news_cache row itself; once a headline is
+//      translated, `headline` holds English and `original_headline` /
+//      `original_language` are set. Every read path already prefers cached
+//      rows before hitting GDELT, so a translated row is never re-sent.
+//   2. In-memory per-worker LRU keyed by the source headline text — repeat
+//      appearances (same story, different day or source) skip the LLM
+//      entirely. Also used to hydrate freshly-fetched GDELT items from any
+//      prior translation of the same headline stored in news_cache.
+//   3. In-flight de-duplication on `backfillTranslations(dateISO)` so many
+//      concurrent renders sharing a request don't stampede the LLM.
+
+type TranslationCacheEntry = {
+  lang: string | null; // null = English (or unknown/no-translate)
+  translation: string | null; // null = no translation needed
+};
+
+const TRANSLATION_CACHE_MAX = 2000;
+const translationCache = new Map<string, TranslationCacheEntry>();
+
+function cacheGet(headline: string): TranslationCacheEntry | undefined {
+  const hit = translationCache.get(headline);
+  if (!hit) return undefined;
+  // LRU touch — reinserting moves it to newest position.
+  translationCache.delete(headline);
+  translationCache.set(headline, hit);
+  return hit;
+}
+
+function cacheSet(headline: string, entry: TranslationCacheEntry): void {
+  if (translationCache.has(headline)) translationCache.delete(headline);
+  translationCache.set(headline, entry);
+  if (translationCache.size > TRANSLATION_CACHE_MAX) {
+    // Evict oldest.
+    const oldest = translationCache.keys().next().value;
+    if (oldest !== undefined) translationCache.delete(oldest);
+  }
+}
+
+// Warm the in-memory cache from already-translated rows so repeated appearances
+// of the same source headline (across days/sources) skip the LLM.
+async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
+  const missing = originals.filter((h) => !translationCache.has(h));
+  if (missing.length === 0) return;
+  try {
+    const { data } = await supabaseAdmin
+      .from("news_cache")
+      .select("headline, original_headline, original_language")
+      .in("original_headline", missing)
+      .not("original_language", "is", null)
+      .limit(500);
+    for (const r of data ?? []) {
+      const orig = (r as { original_headline: string | null }).original_headline;
+      const lang = (r as { original_language: string | null }).original_language;
+      const translated = (r as { headline: string }).headline;
+      if (!orig || !lang || !translated) continue;
+      cacheSet(orig, { lang, translation: translated });
+    }
+  } catch (err) {
+    // Non-fatal — the cache just stays cold for these keys.
+    console.warn("news: cache hydrate failed", err instanceof Error ? err.message : String(err));
+  }
+}
+
 async function callTranslateLLM(
   headlines: { i: number; text: string }[],
-): Promise<Map<number, { lang: string | null; translation: string | null }>> {
-  const out = new Map<number, { lang: string | null; translation: string | null }>();
+): Promise<Map<number, TranslationCacheEntry>> {
+  const out = new Map<number, TranslationCacheEntry>();
   const key = process.env.LOVABLE_API_KEY;
   if (!key || headlines.length === 0) return out;
 
@@ -122,19 +190,60 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
   return out;
 }
 
+// Batch-translate with caching. Cached entries never hit the LLM;
+// remaining items are batched into a single gateway call.
+async function translateWithCache(
+  headlines: string[],
+): Promise<Map<string, TranslationCacheEntry>> {
+  const result = new Map<string, TranslationCacheEntry>();
+  if (headlines.length === 0) return result;
+
+  // De-duplicate identical inputs so a batch of repeats sends one call.
+  const uniq = Array.from(new Set(headlines));
+
+  // 1. Memory cache.
+  const stillMissing: string[] = [];
+  for (const h of uniq) {
+    const hit = cacheGet(h);
+    if (hit) result.set(h, hit);
+    else stillMissing.push(h);
+  }
+  if (stillMissing.length === 0) return result;
+
+  // 2. Try to hydrate from persistent cache (translations of the same
+  //    original headline previously stored on another date/source).
+  await hydrateFromDbByOriginal(stillMissing);
+  const truly: string[] = [];
+  for (const h of stillMissing) {
+    const hit = cacheGet(h);
+    if (hit) result.set(h, hit);
+    else truly.push(h);
+  }
+  if (truly.length === 0) return result;
+
+  // 3. LLM call for what's left, then persist in memory.
+  const numbered = truly.map((text, i) => ({ i, text }));
+  const byIndex = await callTranslateLLM(numbered);
+  for (let i = 0; i < truly.length; i++) {
+    const entry = byIndex.get(i);
+    if (!entry) continue;
+    cacheSet(truly[i], entry);
+    result.set(truly[i], entry);
+  }
+  return result;
+}
+
 async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
   if (items.length === 0) return items;
 
   // Only send candidates that plausibly aren't English. Keeps the prompt
   // small, cost low, and avoids spurious "translations" of English text.
-  const candidates = items
-    .map((it, i) => ({ i, text: it.headline }))
-    .filter((c) => looksNonEnglish(c.text));
+  const candidates = items.filter((it) => looksNonEnglish(it.headline));
   if (candidates.length === 0) return items;
 
-  const byIndex = await callTranslateLLM(candidates);
-  return items.map((it, i) => {
-    const t = byIndex.get(i);
+  const byOriginal = await translateWithCache(candidates.map((c) => c.headline));
+  return items.map((it) => {
+    const t = byOriginal.get(it.headline);
     if (!t) return it;
     const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
     if (isEnglish || !t.translation) return it;
@@ -150,51 +259,63 @@ async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
 // Repair pass: translate rows already cached with a null original_language
 // but a non-ASCII headline. Prior ingests (before translation shipped, or
 // during LLM outages) left these rows untranslated. Runs opportunistically —
-// bounded batch, best-effort, never throws.
-export async function backfillTranslations(
+// bounded batch, best-effort, never throws. De-duplicated per date so
+// concurrent renders don't stampede.
+const backfillInFlight = new Map<string, Promise<{ scanned: number; translated: number }>>();
+
+export function backfillTranslations(
   dateISO: string,
   max = 30,
 ): Promise<{ scanned: number; translated: number }> {
-  try {
-    const { data } = await supabaseAdmin
-      .from("news_cache")
-      .select("news_date, headline, original_language")
-      .eq("news_date", dateISO)
-      .is("original_language", null)
-      .limit(200);
-    const rows = (data ?? []).filter((r) => looksNonEnglish(r.headline as string)).slice(0, max);
-    if (rows.length === 0) return { scanned: 0, translated: 0 };
-
-    const byIndex = await callTranslateLLM(
-      rows.map((r, i) => ({ i, text: r.headline as string })),
-    );
-    let translated = 0;
-    for (let i = 0; i < rows.length; i++) {
-      const t = byIndex.get(i);
-      if (!t) continue;
-      const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
-      if (isEnglish || !t.translation) continue;
-      const originalHeadline = rows[i].headline as string;
-      const { error } = await supabaseAdmin
+  const existing = backfillInFlight.get(dateISO);
+  if (existing) return existing;
+  const p = (async () => {
+    try {
+      const { data } = await supabaseAdmin
         .from("news_cache")
-        .update({
-          headline: t.translation,
-          original_headline: originalHeadline,
-          original_language: t.lang,
-        } as never)
+        .select("news_date, headline, original_language")
         .eq("news_date", dateISO)
-        .eq("headline", originalHeadline);
-      if (!error) translated++;
+        .is("original_language", null)
+        .limit(200);
+      const rows = (data ?? [])
+        .filter((r) => looksNonEnglish(r.headline as string))
+        .slice(0, max);
+      if (rows.length === 0) return { scanned: 0, translated: 0 };
+
+      const byOriginal = await translateWithCache(rows.map((r) => r.headline as string));
+      let translated = 0;
+      for (const r of rows) {
+        const originalHeadline = r.headline as string;
+        const t = byOriginal.get(originalHeadline);
+        if (!t) continue;
+        const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
+        if (isEnglish || !t.translation) continue;
+        const { error } = await supabaseAdmin
+          .from("news_cache")
+          .update({
+            headline: t.translation,
+            original_headline: originalHeadline,
+            original_language: t.lang,
+          } as never)
+          .eq("news_date", dateISO)
+          .eq("headline", originalHeadline);
+        if (!error) translated++;
+      }
+      if (translated > 0) {
+        console.log(`news: backfilled ${translated}/${rows.length} translations for ${dateISO}`);
+      }
+      return { scanned: rows.length, translated };
+    } catch (err) {
+      console.warn("news: backfill threw", err instanceof Error ? err.message : String(err));
+      return { scanned: 0, translated: 0 };
+    } finally {
+      backfillInFlight.delete(dateISO);
     }
-    if (translated > 0) {
-      console.log(`news: backfilled ${translated}/${rows.length} translations for ${dateISO}`);
-    }
-    return { scanned: rows.length, translated };
-  } catch (err) {
-    console.warn("news: backfill threw", err instanceof Error ? err.message : String(err));
-    return { scanned: 0, translated: 0 };
-  }
+  })();
+  backfillInFlight.set(dateISO, p);
+  return p;
 }
+
 
 
 async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] | null> {
