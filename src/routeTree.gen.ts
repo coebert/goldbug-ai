@@ -13,6 +13,7 @@ import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
+import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 
 const CompareRoute = CompareRouteImport.update({
@@ -35,6 +36,11 @@ const PortfolioIdRoute = PortfolioIdRouteImport.update({
   path: '/portfolio/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
+  id: '/long-horizon/$id',
+  path: '/long-horizon/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
   id: '/api/public/hooks/daily-run',
   path: '/api/public/hooks/daily-run',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/compare'
+    | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
   fileRoutesByTo: FileRoutesByTo
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/compare'
+    | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
   id:
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/compare'
+    | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
   fileRoutesById: FileRoutesById
@@ -91,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   CompareRoute: typeof CompareRoute
+  LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
 }
@@ -125,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/long-horizon/$id': {
+      id: '/long-horizon/$id'
+      path: '/long-horizon/$id'
+      fullPath: '/long-horizon/$id'
+      preLoaderRoute: typeof LongHorizonIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/daily-run': {
       id: '/api/public/hooks/daily-run'
       path: '/api/public/hooks/daily-run'
@@ -139,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
+  LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
 }
