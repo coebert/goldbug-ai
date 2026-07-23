@@ -283,6 +283,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     console.warn("Regime detection failed:", e);
     return null;
   });
+  const learning = await buildLearningContext(portfolioId, asOf).catch((e) => {
+    console.warn("Learning context failed:", e);
+    return {
+      stats: {
+        window_days: 20, horizon_days: 5, evaluable: 0, wins: 0, losses: 0,
+        win_rate: null, avg_return_pct: null, best: null, worst: null,
+        per_symbol: [], per_side: { buy: { n: 0, win_rate: null }, sell: { n: 0, win_rate: null } },
+      },
+      lessons: [], lessons_as_of: null, samples: [],
+    } satisfies LearningContext;
+  });
 
   const decision = await callAiForDecision({
     portfolio,
@@ -305,6 +316,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       },
       notes: "regime detection unavailable",
     },
+    learning,
   });
 
   // Execute orders through guardrails
