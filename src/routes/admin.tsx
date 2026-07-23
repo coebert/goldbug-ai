@@ -13,6 +13,7 @@ import { AlertTriangle, CheckCircle2, Clock, PlayCircle, RefreshCw, ShieldAlert,
 import { SaxoOAuthPanel } from "@/components/live-trading-card";
 import { PushNotificationsCard } from "@/components/push-notifications-card";
 import { GlobalSignalDecayCard } from "@/components/global-signal-decay-card";
+import { SecurityAuditCard } from "@/components/security-audit-card";
 
 
 export const Route = createFileRoute("/admin")({
