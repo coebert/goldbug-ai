@@ -145,6 +145,45 @@ function AttributionPage() {
               </CardContent>
             </Card>
 
+            {/* Benchmark-relative attribution (alpha vs SPY) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Benchmark-relative attribution (alpha vs SPY)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                  <div><div className="text-xs text-muted-foreground">Trades scored</div><div className="text-lg font-semibold">{data.alpha_summary.n}</div></div>
+                  <div><div className="text-xs text-muted-foreground">Avg strategy return</div><div className={`text-lg font-semibold ${(data.alpha_summary.avg_return_pct ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>{fmtPct(data.alpha_summary.avg_return_pct)}</div></div>
+                  <div><div className="text-xs text-muted-foreground">Avg SPY return</div><div className="text-lg font-semibold">{fmtPct(data.alpha_summary.avg_benchmark_pct)}</div></div>
+                  <div><div className="text-xs text-muted-foreground">Avg alpha</div><div className={`text-lg font-semibold ${(data.alpha_summary.avg_alpha_pct ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>{fmtPct(data.alpha_summary.avg_alpha_pct)}</div></div>
+                  <div><div className="text-xs text-muted-foreground">Alpha win rate</div><div className="text-lg font-semibold">{fmtRate(data.alpha_summary.alpha_win_rate)}</div></div>
+                </div>
+                {data.cumulative_alpha.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Not enough scored trades to plot cumulative alpha yet.</p>
+                ) : (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={data.cumulative_alpha}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="trade_date" stroke="hsl(var(--muted-foreground))" label={{ value: "Trade date", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" label={{ value: "Cumulative return (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
+                        <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                        <Legend />
+                        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                        <Line type="monotone" dataKey="strategy" name="Strategy (sum of trade returns %)" stroke="#22d3ee" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="benchmark" name="SPY (same windows)" stroke="#94a3b8" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="alpha" name="Alpha (strategy − SPY)" stroke="#22c55e" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Alpha = trade forward return − SPY over the same {horizonDays}-day window (SPY is long-only; shorts are measured against being long the market). Positive alpha means the pick beat "just buy SPY".
+                </p>
+              </CardContent>
+            </Card>
+
+
             {/* Cumulative signal contribution over time */}
             <Card>
               <CardHeader>
