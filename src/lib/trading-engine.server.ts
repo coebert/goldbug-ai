@@ -28,13 +28,23 @@ import type { Database } from "@/integrations/supabase/types";
 type Portfolio = Database["public"]["Tables"]["portfolios"]["Row"];
 type Holding = Database["public"]["Tables"]["holdings"]["Row"];
 
+const SignalWeightsSchema = z.object({
+  sma_trend: z.number().min(0).max(100),
+  rsi: z.number().min(0).max(100),
+  price_change: z.number().min(0).max(100),
+  news_sentiment: z.number().min(0).max(100),
+  volatility: z.number().min(0).max(100),
+});
+
 const OrderSchema = z.object({
   symbol: z.string(),
   side: z.enum(["buy", "sell"]),
   // Percentage of current cash to allocate (for buys) OR percentage of holding to sell.
   percent: z.number(),
   reason: z.string(),
+  signal_weights: SignalWeightsSchema,
 });
+
 
 const DecisionSchema = z.object({
   briefing: z.string(),
