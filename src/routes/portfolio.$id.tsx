@@ -8,6 +8,7 @@ import {
   runOneDay,
   runBacktest,
   resetPortfolio,
+  getBenchmarkSeries,
 } from "@/lib/trading.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
@@ -85,6 +87,7 @@ function PortfolioPage() {
   const [days, setDays] = useState(7);
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
+  const [benchmark, setBenchmark] = useState<string>("SPY");
 
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
@@ -129,6 +132,43 @@ function PortfolioPage() {
       };
     });
   }, [equity]);
+
+  const benchFn = useServerFn(getBenchmarkSeries);
+  const fromDate = equityData[0]?.date;
+  const toDate = equityData[equityData.length - 1]?.date;
+  const benchQ = useQuery({
+    queryKey: ["benchmark", benchmark, fromDate, toDate],
+    queryFn: () => benchFn({ data: { symbol: benchmark, from: fromDate!, to: toDate! } }),
+    enabled: benchmark !== "none" && !!fromDate && !!toDate && equityData.length >= 2,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const startingCashForChart = Number(q.data?.portfolio?.starting_cash ?? 0);
+  const chartData = useMemo(() => {
+    if (benchmark === "none" || !benchQ.data?.series?.length) return equityData;
+    const bmap = new Map(benchQ.data.series.map((r) => [r.date, r.close]));
+    // Find first close on/before the first equity date to normalise
+    const dates = [...bmap.keys()].sort();
+    let base: number | null = null;
+    for (const d of dates) {
+      if (d <= equityData[0].date) base = bmap.get(d)!;
+      else break;
+    }
+    if (base == null) base = bmap.get(dates[0])!;
+    let lastBench: number | null = base;
+    return equityData.map((row) => {
+      // Latest close on/before this equity date
+      for (const d of dates) {
+        if (d <= row.date) lastBench = bmap.get(d)!;
+        else break;
+      }
+      const benchmark_value = lastBench != null && base != null
+        ? startingCashForChart * (lastBench / base)
+        : null;
+      return { ...row, benchmark: benchmark_value };
+    });
+  }, [equityData, benchQ.data, benchmark, startingCashForChart]);
+
 
   const p = q.data?.portfolio;
   const holdings = q.data?.holdings ?? [];
@@ -245,15 +285,31 @@ function PortfolioPage() {
 
               <Card className="lg:col-span-2">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center justify-between gap-3">
+                  <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
                     <span>Equity curve</span>
-                    <EventOverlayControls
-                      domainDates={equityData.map((d) => d.date)}
-                      enabled={eventsOn}
-                      onToggle={setEventsOn}
-                      minSeverity={eventSev}
-                      onSeverityChange={setEventSev}
-                    />
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-normal text-muted-foreground">Benchmark</label>
+                      <select
+                        value={benchmark}
+                        onChange={(e) => setBenchmark(e.target.value)}
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs font-normal"
+                      >
+                        <option value="none">None</option>
+                        <option value="SPY">SPY (S&amp;P 500)</option>
+                        <option value="QQQ">QQQ (Nasdaq 100)</option>
+                        <option value="ACWI">ACWI (Global)</option>
+                        <option value="AGG">AGG (US Bonds)</option>
+                        <option value="GLD">GLD (Gold)</option>
+                        <option value="BTC-USD">BTC-USD</option>
+                      </select>
+                      <EventOverlayControls
+                        domainDates={equityData.map((d) => d.date)}
+                        enabled={eventsOn}
+                        onToggle={setEventsOn}
+                        minSeverity={eventSev}
+                        onSeverityChange={setEventSev}
+                      />
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="h-64">
@@ -263,7 +319,7 @@ function PortfolioPage() {
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={equityData}>
+                      <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
                         <defs>
                           <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.28} />
@@ -295,21 +351,37 @@ function PortfolioPage() {
                               value: number;
                               peak: number;
                               drawdown: number;
+                              benchmark?: number | null;
                             };
                             const pnlFromStart = row.value - startingCash;
                             const pnlPctFromStart = startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
+                            const benchPct = row.benchmark != null && startingCash > 0
+                              ? ((row.benchmark - startingCash) / startingCash) * 100
+                              : null;
                             const active_events = eventsOn
                               ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
                               : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
                                 <div className="mb-1 font-medium">{label}</div>
-                                <div className="tabular-nums">Value: {p.currency} {row.value.toFixed(2)}</div>
-                                <div className="tabular-nums text-muted-foreground">
+                                <div className="tabular-nums">
+                                  <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: "#22d3ee" }} />
+                                  Portfolio: {p.currency} {row.value.toFixed(2)}
+                                </div>
+                                <div className="tabular-nums text-muted-foreground pl-3.5">
                                   vs start: {pnlFromStart >= 0 ? "+" : ""}
                                   {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
                                 </div>
-                                <div className="tabular-nums text-muted-foreground">
+                                {row.benchmark != null && (
+                                  <div className="tabular-nums mt-1">
+                                    <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: "#f59e0b" }} />
+                                    {benchmark}: {p.currency} {row.benchmark.toFixed(2)}
+                                    {benchPct != null && (
+                                      <span className="text-muted-foreground"> ({benchPct >= 0 ? "+" : ""}{benchPct.toFixed(2)}%)</span>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="tabular-nums text-muted-foreground mt-1">
                                   Peak: {p.currency} {row.peak.toFixed(2)}
                                 </div>
                                 <div className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}>
@@ -366,10 +438,31 @@ function PortfolioPage() {
                         <Line
                           type="monotone"
                           dataKey="value"
+                          name="Portfolio"
                           stroke="#22d3ee"
                           strokeWidth={2.5}
                           dot={false}
                           activeDot={{ r: 5, fill: "#22d3ee", stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                        />
+                        {benchmark !== "none" && (
+                          <Line
+                            type="monotone"
+                            dataKey="benchmark"
+                            name={`${benchmark} (normalised)`}
+                            stroke="#f59e0b"
+                            strokeWidth={2}
+                            strokeDasharray="4 3"
+                            dot={false}
+                            connectNulls
+                            isAnimationActive={false}
+                            activeDot={{ r: 4, fill: "#f59e0b", stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                          />
+                        )}
+                        <Legend
+                          verticalAlign="bottom"
+                          height={24}
+                          iconType="plainline"
+                          wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
