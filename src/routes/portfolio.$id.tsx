@@ -360,3 +360,355 @@ function PortfolioPage() {
     </div>
   );
 }
+
+type SignalRow = {
+  symbol: string;
+  name: string;
+  asset_class: string;
+  price: number;
+  sma20: number | null;
+  sma50: number | null;
+  rsi14: number | null;
+  change5d: number | null;
+  change30d: number | null;
+};
+
+type ExecutedRow = {
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  value: number;
+  reason: string;
+  rejected?: string;
+};
+
+type NewsRow = { headline: string; source: string | null };
+
+type Guardrails = {
+  risk_level: string;
+  max_position_pct: number;
+  cash_floor_pct: number;
+  max_new_positions_per_day: number;
+  cash_floor_value: number;
+  max_position_value: number;
+  starting_total_value: number;
+  starting_cash: number;
+};
+
+type DecisionRaw = {
+  orders?: unknown[];
+  executed?: ExecutedRow[];
+  signals?: SignalRow[];
+  news?: NewsRow[];
+  guardrails?: Guardrails;
+};
+
+function fmtNum(v: number | null | undefined, digits = 2) {
+  if (v == null || Number.isNaN(v)) return "—";
+  return Number(v).toFixed(digits);
+}
+
+function fmtPct(v: number | null | undefined) {
+  if (v == null || Number.isNaN(v)) return "—";
+  const s = v >= 0 ? "+" : "";
+  return `${s}${(v * 100).toFixed(1)}%`;
+}
+
+function keywordMatch(text: string, symbol: string, name: string) {
+  const t = text.toLowerCase();
+  if (t.includes(symbol.toLowerCase())) return true;
+  const first = name.split(/\s+/)[0]?.toLowerCase();
+  if (first && first.length > 3 && t.includes(first)) return true;
+  return false;
+}
+
+function SignalBadges({ s }: { s: SignalRow }) {
+  const trendUp = s.sma20 != null && s.sma50 != null && s.sma20 > s.sma50;
+  const rsi = s.rsi14;
+  return (
+    <div className="flex flex-wrap gap-1.5 text-xs">
+      <Badge variant="outline" className="tabular-nums">Px {fmtNum(s.price)}</Badge>
+      <Badge variant="outline" className="tabular-nums">
+        {trendUp ? <TrendingUp className="mr-1 h-3 w-3 text-primary" /> : <TrendingDown className="mr-1 h-3 w-3 text-destructive" />}
+        SMA20 {fmtNum(s.sma20)} / 50 {fmtNum(s.sma50)}
+      </Badge>
+      {rsi != null && (
+        <Badge
+          variant="outline"
+          className={
+            rsi >= 70
+              ? "text-destructive"
+              : rsi <= 30
+              ? "text-primary"
+              : ""
+          }
+        >
+          RSI {fmtNum(rsi, 0)}
+          {rsi >= 70 ? " · overbought" : rsi <= 30 ? " · oversold" : ""}
+        </Badge>
+      )}
+      <Badge variant="outline" className={s.change5d != null && s.change5d >= 0 ? "text-primary" : "text-destructive"}>
+        5d {fmtPct(s.change5d)}
+      </Badge>
+      <Badge variant="outline" className={s.change30d != null && s.change30d >= 0 ? "text-primary" : "text-destructive"}>
+        30d {fmtPct(s.change30d)}
+      </Badge>
+    </div>
+  );
+}
+
+function OrderPanel({
+  order,
+  signal,
+  news,
+  guardrails,
+  currency,
+}: {
+  order: ExecutedRow;
+  signal?: SignalRow;
+  news: NewsRow[];
+  guardrails?: Guardrails;
+  currency: string;
+}) {
+  const approved = !order.rejected;
+  const side = order.side;
+  const relatedNews = signal
+    ? news.filter((n) => keywordMatch(n.headline, signal.symbol, signal.name)).slice(0, 3)
+    : [];
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/10 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Badge
+            className={
+              side === "buy"
+                ? "bg-primary/15 text-primary hover:bg-primary/15"
+                : "bg-accent/15 text-accent hover:bg-accent/15"
+            }
+          >
+            {side.toUpperCase()}
+          </Badge>
+          <span className="font-medium">{order.symbol}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {order.quantity > 0
+              ? `${fmtNum(order.quantity, 4)} @ ${fmtNum(order.price)} = ${currency} ${fmtNum(order.value)}`
+              : `intended · ${currency} ${fmtNum(order.price)}`}
+          </span>
+        </div>
+        {approved ? (
+          <Badge variant="outline" className="border-primary/40 text-primary">
+            <ShieldCheck className="mr-1 h-3 w-3" /> Guardrails passed
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="border-destructive/40 text-destructive">
+            <ShieldAlert className="mr-1 h-3 w-3" /> Blocked · {order.rejected}
+          </Badge>
+        )}
+      </div>
+
+      <p className="mb-2 text-sm">
+        <span className="text-muted-foreground">AI reason: </span>
+        {order.reason}
+      </p>
+
+      {signal && (
+        <div className="mb-2">
+          <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+            <Activity className="h-3 w-3" /> Signals driving this call
+          </div>
+          <SignalBadges s={signal} />
+        </div>
+      )}
+
+      {relatedNews.length > 0 && (
+        <div className="mb-2">
+          <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+            <Newspaper className="h-3 w-3" /> Related headlines
+          </div>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            {relatedNews.map((n, i) => (
+              <li key={i}>
+                • {n.headline}
+                {n.source ? <span className="opacity-60"> — {n.source}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {guardrails && (
+        <div className="mt-2 rounded border border-border/60 bg-background/40 p-2 text-xs text-muted-foreground">
+          <div className="mb-1 font-medium text-foreground/80">Guardrail check</div>
+          {approved && side === "buy" && (
+            <ul className="space-y-0.5">
+              <li>
+                ✓ Cash floor respected — kept ≥ {currency} {fmtNum(guardrails.cash_floor_value)}
+                {" "}({(guardrails.cash_floor_pct * 100).toFixed(0)}% of portfolio)
+              </li>
+              <li>
+                ✓ Position ≤ {currency} {fmtNum(guardrails.max_position_value)} cap
+                {" "}({(guardrails.max_position_pct * 100).toFixed(0)}% max)
+              </li>
+              <li>✓ Within {guardrails.max_new_positions_per_day} new-position daily cap</li>
+              <li>✓ No leverage, no borrow, cash-funded</li>
+            </ul>
+          )}
+          {approved && side === "sell" && (
+            <ul className="space-y-0.5">
+              <li>✓ Held quantity available to sell</li>
+              <li>✓ Proceeds returned to cash (no shorting)</li>
+            </ul>
+          )}
+          {!approved && (
+            <p>
+              ✗ Rejected by guardrail: <span className="text-destructive">{order.rejected}</span>.
+              The AI's intent was recorded but no trade was placed.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DecisionCard({
+  decision,
+  currency,
+}: {
+  decision: {
+    id: string;
+    run_date: string;
+    briefing: string | null;
+    rationale: string | null;
+    portfolio_value: number | string | null;
+    raw: unknown;
+  };
+  currency: string;
+}) {
+  const raw = (decision.raw ?? {}) as DecisionRaw;
+  const executed = raw.executed ?? [];
+  const signals = raw.signals ?? [];
+  const news = raw.news ?? [];
+  const guardrails = raw.guardrails;
+  const signalBySymbol = new Map(signals.map((s) => [s.symbol, s]));
+  const approvedCount = executed.filter((e) => !e.rejected && e.quantity > 0).length;
+  const rejectedCount = executed.filter((e) => e.rejected).length;
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 py-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <div className="text-sm font-medium">{decision.run_date}</div>
+            <div className="text-xs text-muted-foreground">
+              {approvedCount} executed · {rejectedCount} blocked by guardrails
+            </div>
+          </div>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            Value: {currency} {Number(decision.portfolio_value ?? 0).toFixed(2)}
+          </span>
+        </div>
+
+        {guardrails && (
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            <Badge variant="secondary">{guardrails.risk_level}</Badge>
+            <Badge variant="outline">
+              Max position {(guardrails.max_position_pct * 100).toFixed(0)}%
+            </Badge>
+            <Badge variant="outline">
+              Cash floor {(guardrails.cash_floor_pct * 100).toFixed(0)}%
+            </Badge>
+            <Badge variant="outline">
+              ≤ {guardrails.max_new_positions_per_day} new/day
+            </Badge>
+            <Badge variant="outline">No leverage</Badge>
+          </div>
+        )}
+
+        {decision.briefing && (
+          <div>
+            <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+              Market briefing
+            </div>
+            <p className="text-sm text-muted-foreground">{decision.briefing}</p>
+          </div>
+        )}
+        {decision.rationale && (
+          <div>
+            <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+              Rationale
+            </div>
+            <p className="text-sm">{decision.rationale}</p>
+          </div>
+        )}
+
+        {executed.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Order-by-order breakdown
+            </div>
+            {executed.map((o, i) => (
+              <OrderPanel
+                key={i}
+                order={o}
+                signal={signalBySymbol.get(o.symbol.toUpperCase())}
+                news={news}
+                guardrails={guardrails}
+                currency={currency}
+              />
+            ))}
+          </div>
+        )}
+        {executed.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            AI chose to hold — no orders were proposed this tick.
+          </p>
+        )}
+
+        {(signals.length > 0 || news.length > 0) && (
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <ChevronDown className="h-3 w-3" />
+              Show all inputs the AI saw ({signals.length} candidates · {news.length} headlines)
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-3">
+              {signals.length > 0 && (
+                <div>
+                  <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+                    Candidate signals
+                  </div>
+                  <div className="space-y-1.5">
+                    {signals.map((s) => (
+                      <div key={s.symbol} className="flex flex-wrap items-center gap-2">
+                        <span className="w-16 shrink-0 text-xs font-medium">{s.symbol}</span>
+                        <SignalBadges s={s} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {news.length > 0 && (
+                <div>
+                  <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                    <Newspaper className="h-3 w-3" /> Headlines fed to the AI
+                  </div>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {news.map((n, i) => (
+                      <li key={i}>
+                        • {n.headline}
+                        {n.source ? <span className="opacity-60"> — {n.source}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
