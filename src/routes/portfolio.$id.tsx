@@ -862,6 +862,9 @@ function PortfolioPage() {
                 <TabsTrigger value="journal">AI Journal ({decisions.length})</TabsTrigger>
                 <TabsTrigger value="trades">Trades ({trades.length})</TabsTrigger>
                 <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
+                <TabsTrigger value="attribution" asChild>
+                  <Link to="/portfolio/$id/attribution" params={{ id: p.id }}>Attribution</Link>
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="diagnostics" className="space-y-4">
                 <DiagnosticsPanel portfolioId={p.id} />

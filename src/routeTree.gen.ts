@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
+import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
@@ -49,6 +50,11 @@ const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
   path: '/long-horizon/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
+  id: '/attribution',
+  path: '/attribution',
+  getParentRoute: () => PortfolioIdRoute,
+} as any)
 const ApiPublicHooksLiveReconcileRoute =
   ApiPublicHooksLiveReconcileRouteImport.update({
     id: '/api/public/hooks/live-reconcile',
@@ -72,7 +78,8 @@ export interface FileRoutesByFullPath {
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
-  '/portfolio/$id': typeof PortfolioIdRoute
+  '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
@@ -83,7 +90,8 @@ export interface FileRoutesByTo {
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
-  '/portfolio/$id': typeof PortfolioIdRoute
+  '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
@@ -95,7 +103,8 @@ export interface FileRoutesById {
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
-  '/portfolio/$id': typeof PortfolioIdRoute
+  '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/get-started'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/portfolio/$id/attribution'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/get-started'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/portfolio/$id/attribution'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/get-started'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/portfolio/$id/attribution'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
@@ -142,7 +154,7 @@ export interface RootRouteChildren {
   CompareRoute: typeof CompareRoute
   GetStartedRoute: typeof GetStartedRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
-  PortfolioIdRoute: typeof PortfolioIdRoute
+  PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
   ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
@@ -192,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LongHorizonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portfolio/$id/attribution': {
+      id: '/portfolio/$id/attribution'
+      path: '/attribution'
+      fullPath: '/portfolio/$id/attribution'
+      preLoaderRoute: typeof PortfolioIdAttributionRouteImport
+      parentRoute: typeof PortfolioIdRoute
+    }
     '/api/public/hooks/live-reconcile': {
       id: '/api/public/hooks/live-reconcile'
       path: '/api/public/hooks/live-reconcile'
@@ -216,13 +235,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PortfolioIdRouteChildren {
+  PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
+}
+
+const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
+  PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
+}
+
+const PortfolioIdRouteWithChildren = PortfolioIdRoute._addFileChildren(
+  PortfolioIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
   GetStartedRoute: GetStartedRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
-  PortfolioIdRoute: PortfolioIdRoute,
+  PortfolioIdRoute: PortfolioIdRouteWithChildren,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
   ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
