@@ -78,7 +78,7 @@ export function RiskControlsCard({
 }) {
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
@@ -143,35 +143,91 @@ export function RiskControlsCard({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="space-y-6">
-            <div>
-              <h4 className="mb-2 text-sm font-medium">Auto-liquidation</h4>
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
+              <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
               <p className="mb-3 text-xs text-muted-foreground">
-                Applied before the AI runs each day, based on % change from average cost. Set to 0 to disable.
+                These limits are checked before every order. Buys exceeding the max position size are rejected; positions breaching the stop-loss or take-profit are auto-sold before the AI runs.
               </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {pctInput(
-                  "Stop-loss",
-                  "auto-sell if a position drops this much",
-                  cfg.stop_loss_pct,
-                  (v) => setCfg((c) => ({ ...c, stop_loss_pct: v })),
-                  1,
-                  90,
-                )}
-                {pctInput(
-                  "Take-profit",
-                  "auto-sell if a position rises this much",
-                  cfg.take_profit_pct,
-                  (v) => setCfg((c) => ({ ...c, take_profit_pct: v })),
-                  1,
-                  500,
-                )}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <Label className="text-xs font-medium">Max position size</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={
+                        cfg.per_symbol_limit_pct == null
+                          ? ""
+                          : Number((cfg.per_symbol_limit_pct * 100).toFixed(0))
+                      }
+                      placeholder="default"
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCfg((cur) => ({
+                          ...cur,
+                          per_symbol_limit_pct:
+                            v === "" ? null : Math.max(0, Math.min(100, Number(v) || 0)) / 100,
+                        }));
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">% per asset</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Blank = risk-level default (conservative 10%, balanced 15%, aggressive 25%).
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Stop-loss</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={90}
+                      step={1}
+                      value={Number((cfg.stop_loss_pct * 100).toFixed(2))}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          stop_loss_pct: Math.max(0, Math.min(90, Number(e.target.value) || 0)) / 100,
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">% drop → auto-sell</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Set 0 to disable.</p>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Take-profit</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={500}
+                      step={1}
+                      value={Number((cfg.take_profit_pct * 100).toFixed(2))}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          take_profit_pct: Math.max(0, Math.min(500, Number(e.target.value) || 0)) / 100,
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">% gain → auto-sell</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Set 0 to disable.</p>
+                </div>
               </div>
             </div>
 
             <div>
-              <h4 className="mb-2 text-sm font-medium">Per-asset limits</h4>
+              <h4 className="mb-2 text-sm font-medium">Per-asset-class limits</h4>
               <p className="mb-3 text-xs text-muted-foreground">
-                Maximum share of portfolio value in each asset class. Buys that would exceed the cap are rejected.
+                Maximum share of portfolio value allowed in each asset class. Buys that would exceed the cap are rejected before execution.
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {CLASSES.map((c) => (
@@ -202,36 +258,6 @@ export function RiskControlsCard({
               </div>
             </div>
 
-            <div>
-              <h4 className="mb-2 text-sm font-medium">Per-symbol override</h4>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Overrides the risk-level default (conservative 10%, balanced 15%, aggressive 25%) for any single position. Leave blank to keep the default.
-              </p>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  className="w-24"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={
-                    cfg.per_symbol_limit_pct == null
-                      ? ""
-                      : Number((cfg.per_symbol_limit_pct * 100).toFixed(0))
-                  }
-                  placeholder="—"
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setCfg((cur) => ({
-                      ...cur,
-                      per_symbol_limit_pct:
-                        v === "" ? null : Math.max(0, Math.min(100, Number(v) || 0)) / 100,
-                    }));
-                  }}
-                />
-                <span className="text-xs text-muted-foreground">% max per single asset</span>
-              </div>
-            </div>
 
             <div>
               <h4 className="mb-2 text-sm font-medium">Volatility-based sizing</h4>
