@@ -1784,8 +1784,8 @@ export const runPortfolioOptimizer = createServerFn({ method: "POST" })
           risk_parity: [] as Array<{ symbol: string; delta_pct: number; delta_value: number }>,
           max_sharpe: [] as Array<{ symbol: string; delta_pct: number; delta_value: number }>,
         },
-        total_value: Number(portfolio.cash ?? portfolio.starting_cash ?? 0),
-        cash: Number(portfolio.cash ?? 0),
+        total_value: Number(portfolio.current_cash ?? portfolio.starting_cash ?? 0),
+        cash: Number(portfolio.current_cash ?? 0),
         empty: true,
         message: "Need at least 2 symbols (current holdings + extras) to optimise.",
       };
@@ -1859,11 +1859,11 @@ export const runPortfolioOptimizer = createServerFn({ method: "POST" })
     const heldByS = new Map<string, { qty: number; last: number }>();
     for (const h of holdings ?? []) {
       const sym = String(h.symbol).toUpperCase();
-      const last = lastCloseBySym.get(sym) ?? Number(h.current_price ?? 0);
+      const last = lastCloseBySym.get(sym) ?? 0;
       heldByS.set(sym, { qty: Number(h.quantity), last });
     }
     const heldValue = Array.from(heldByS.values()).reduce((a, b) => a + b.qty * b.last, 0);
-    const cash = Number(portfolio.cash ?? 0);
+    const cash = Number(portfolio.current_cash ?? 0);
     const totalValue = heldValue + cash;
     const investable = totalValue; // full rebalance target
     const current = validSymbols.map((s) => {
