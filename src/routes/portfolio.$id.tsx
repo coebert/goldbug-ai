@@ -905,6 +905,7 @@ function PortfolioPage() {
               <CorrelationHeatmapCard portfolioId={p.id} />
               <StressPanelCard portfolioId={p.id} currency={p.currency} />
               <LearningDiagnosticsCard portfolioId={p.id} />
+              <ShadowVariantCard portfolioId={p.id} />
             </div>
 
             <Tabs defaultValue="journal" className="mt-6">
