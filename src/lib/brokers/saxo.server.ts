@@ -150,12 +150,33 @@ export class SaxoAdapter implements BrokerAdapter {
 
   async getBalance(): Promise<BrokerBalance> {
     const bal = await this.req<{
-      CashBalance?: number; TotalValue?: number; Currency?: string;
+      CashBalance?: number;
+      TotalValue?: number;
+      Currency?: string;
+      CashAvailableForTrading?: number;
+      TransactionsNotBooked?: number;
+      UnrealizedMarginProfitLoss?: number;
+      UnrealizedPositionsValue?: number;
+      OpenPositionsCount?: number;
+      InitialMargin?: { CollateralAvailable?: number };
     }>("GET", "/port/v1/balances/me");
+    const cash = Number(bal.CashBalance ?? 0);
+    const cashAvailable =
+      bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : undefined;
+    const reservedCash =
+      cashAvailable != null ? Math.max(0, cash - cashAvailable) : undefined;
     return {
-      cash: Number(bal.CashBalance ?? 0),
+      cash,
       totalValue: Number(bal.TotalValue ?? bal.CashBalance ?? 0),
       currency: bal.Currency ?? "GBP",
+      cashAvailable,
+      transactionsNotBooked:
+        bal.TransactionsNotBooked != null ? Number(bal.TransactionsNotBooked) : undefined,
+      reservedCash,
+      unrealizedPnl:
+        bal.UnrealizedMarginProfitLoss != null
+          ? Number(bal.UnrealizedMarginProfitLoss)
+          : undefined,
     };
   }
 
