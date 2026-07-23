@@ -101,17 +101,29 @@ export async function enqueueSliceHandler(
 
 // ---- tick ------------------------------------------------------------------
 
+export interface SliceRow {
+  id: string;
+  symbol: string;
+  side: string;
+  slice_qty: number;
+  remaining_qty: number;
+  slices_done: number;
+  slice_count: number;
+  limit_price: number | null;
+  expires_at: string;
+}
+
 export async function tickSlicesHandler(
   data: unknown,
   userId: string,
   setStatus: StatusSetter,
-): Promise<SlicerResult<{ due: unknown }>> {
+): Promise<SlicerResult<{ due: SliceRow[] }>> {
   const full = TickInputSchema.safeParse({ ...(data as object), ownerUserId: userId });
   if (!full.success) return fail(setStatus, "invalid_input", "invalid tick input", zodIssues(full.error));
 
   try {
     const { tickSlicer } = await import("./execution-slicer.server");
-    const due = await tickSlicer(full.data.portfolioId, full.data.ownerUserId);
+    const due = (await tickSlicer(full.data.portfolioId, full.data.ownerUserId)) as SliceRow[];
     return { ok: true, data: { due } };
   } catch (e) {
     if (e instanceof ZodError) return fail(setStatus, "invalid_input", "invalid tick input", zodIssues(e));
