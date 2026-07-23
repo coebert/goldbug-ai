@@ -173,29 +173,34 @@ export async function getNewsForDate(
 ): Promise<NewsItem[]> {
   const { data: cached } = await supabaseAdmin
     .from("news_cache")
-    .select("news_date, source, headline, url, summary")
+    .select("news_date, source, headline, url, summary, original_headline, original_language")
     .eq("news_date", dateISO)
     .limit(max);
 
-  const cachedItems = (cached ?? []).map((r) => ({
+  const cachedItems: NewsItem[] = (cached ?? []).map((r) => ({
     date: r.news_date as string,
     source: r.source,
     headline: r.headline,
     url: r.url,
     summary: r.summary,
+    original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+    original_language: (r as { original_language?: string | null }).original_language ?? null,
   }));
 
   // Use existing cache when we're not forcing a refresh and it looks healthy.
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
 
-  const fresh = await fetchGdeltForDate(dateISO, max);
-  if (fresh === null) {
+  const gdelt = await fetchGdeltForDate(dateISO, max);
+  if (gdelt === null) {
     // Provider unavailable — preserve whatever cache we already have instead
     // of nuking it. Better a stale reel than an empty one.
     console.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (provider unavailable)`);
     return cachedItems;
   }
-  if (fresh.length === 0) return cachedItems;
+  if (gdelt.length === 0) return cachedItems;
+
+  // Translate before writing so the cache holds English + original metadata.
+  const fresh = await translateHeadlines(gdelt);
 
   // We have a real fresh set. Only NOW do we replace today's rows on
   // forceRefresh; otherwise merge (skip duplicates by headline).
@@ -203,16 +208,20 @@ export async function getNewsForDate(
     await supabaseAdmin.from("news_cache").delete().eq("news_date", dateISO);
   }
   const existingHeads = new Set(
-    opts?.forceRefresh ? [] : cachedItems.map((c) => c.headline),
+    opts?.forceRefresh
+      ? []
+      : cachedItems.flatMap((c) => [c.headline, c.original_headline ?? ""].filter(Boolean)),
   );
   const rows = fresh
-    .filter((n) => !existingHeads.has(n.headline))
+    .filter((n) => !existingHeads.has(n.headline) && !(n.original_headline && existingHeads.has(n.original_headline)))
     .map((n) => ({
       news_date: n.date,
       source: n.source,
       headline: n.headline,
       url: n.url,
       summary: n.summary,
+      original_headline: n.original_headline,
+      original_language: n.original_language,
     }));
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("news_cache").insert(rows);
