@@ -37,6 +37,7 @@ import {
 import { CalendarClock, PlayCircle } from "lucide-react";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
+import { lttb } from "@/lib/downsample";
 
 export const Route = createFileRoute("/long-horizon/$id")({
   ssr: false,
@@ -109,6 +110,7 @@ function LongHorizonPage() {
   const [focused, setFocused] = useState<string | null>(null);
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
+  const [chartRes, setChartRes] = useState<200 | 600 | 1500>(600);
 
   const runMut = useMutation({
     mutationFn: () =>
@@ -134,20 +136,31 @@ function LongHorizonPage() {
   const chartData = useMemo(() => {
     if (!result) return [];
     const start = result.starting_cash;
-    // Downsample very large curves so recharts stays responsive: keep ~600 points max.
-    const maxPoints = 600;
     const s0 = result.series[0]?.curve ?? [];
-    const step = Math.max(1, Math.floor(s0.length / maxPoints));
-    const dates = s0.filter((_, i) => i % step === 0 || i === s0.length - 1).map((p) => p.date);
-    return dates.map((d) => {
-      const row: Record<string, number | string> = { date: d };
-      for (const s of result.series) {
-        const pt = s.curve.find((p) => p.date === d);
-        if (pt) row[s.name] = ((pt.value - start) / start) * 100;
+    if (s0.length === 0) return [];
+
+    // Phase 9 — chart virtualization for long-horizon curves.
+    // 1. Downsample each series independently via LTTB so shape (drawdowns,
+    //    peaks) survives even at ~200 points across a 25-year window.
+    // 2. Build a date→value map per series (O(N)) and merge by union of dates
+    //    from the anchor series, replacing the previous O(N * series) find().
+    const anchor = lttb(
+      s0.map((p, i) => ({ x: i, y: p.value, date: p.date })),
+      chartRes,
+    );
+    const dates = anchor.map((p) => p.date);
+    const rows: Array<Record<string, number | string>> = dates.map((d) => ({ date: d }));
+
+    for (const s of result.series) {
+      const idx = new Map<string, number>();
+      for (const p of s.curve) idx.set(p.date, p.value);
+      for (let i = 0; i < dates.length; i++) {
+        const v = idx.get(dates[i]);
+        if (v !== undefined) rows[i][s.name] = ((v - start) / start) * 100;
       }
-      return row;
-    });
-  }, [result]);
+    }
+    return rows;
+  }, [result, chartRes]);
 
   if (!ready || !session) {
     return (
@@ -345,7 +358,7 @@ function LongHorizonPage() {
                     <CardDescription>
                       {result.from} → {result.to} · {result.rebalance} rebalance · {result.tradeCount} trades executed{result.skippedSmallTrades > 0 ? ` · ${result.skippedSmallTrades} skipped (< ${result.currency} ${result.execution.min_trade_value})` : ""} · costs paid ~{result.currency} {result.totalCostsPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({result.execution.commission_bps}bps comm / {result.execution.slippage_bps}bps slip) · click a legend item to isolate.
                     </CardDescription>
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                       <EventOverlayControls
                         domainDates={chartData.map((d) => String(d.date))}
                         enabled={eventsOn}
@@ -353,6 +366,19 @@ function LongHorizonPage() {
                         minSeverity={eventSev}
                         onSeverityChange={setEventSev}
                       />
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="mr-1">Chart resolution:</span>
+                        {[200, 600, 1500].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setChartRes(n as 200 | 600 | 1500)}
+                            className={`rounded border px-2 py-0.5 ${chartRes === n ? "border-primary bg-primary/10 text-foreground" : "border-border hover:bg-muted/50"}`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
