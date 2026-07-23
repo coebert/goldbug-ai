@@ -187,16 +187,22 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         const results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number; skipped?: string }> = [];
         for (const p of portfolios) {
           try {
-            const recent = await supabaseAdmin
-              .from("decisions")
-              .select("id")
-              .eq("portfolio_id", p.id)
-              .gte("created_at", hourStartIso)
-              .limit(1)
-              .maybeSingle();
-            if (recent.data) {
-              results.push({ id: p.id, mode: p.mode, ok: true, skipped: "already ticked this hour" });
-              continue;
+            // Cron runs skip portfolios already ticked in the current UTC hour
+            // to avoid duplicate AI calls when the schedule fires twice.
+            // Manual triggers intentionally bypass this so the operator can
+            // force a fresh decision cycle on demand.
+            if (!manualTrigger) {
+              const recent = await supabaseAdmin
+                .from("decisions")
+                .select("id")
+                .eq("portfolio_id", p.id)
+                .gte("created_at", hourStartIso)
+                .limit(1)
+                .maybeSingle();
+              if (recent.data) {
+                results.push({ id: p.id, mode: p.mode, ok: true, skipped: "already ticked this hour" });
+                continue;
+              }
             }
             const r = await runDailyTick(p.id, today);
             results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
@@ -206,6 +212,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
             results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
           }
         }
+
 
 
         return Response.json({
