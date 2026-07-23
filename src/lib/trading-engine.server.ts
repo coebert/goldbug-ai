@@ -951,7 +951,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     { onConflict: "portfolio_id,snapshot_date" },
   );
 
-  await admin.from("decisions").insert({
+  const decisionInsert = await admin.from("decisions").insert({
     portfolio_id: portfolioId,
     run_date: asOf,
     briefing: decision.briefing,
@@ -988,7 +988,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         lessons_as_of: learning.lessons_as_of,
       },
     } as unknown as never,
-  });
+  }).select("id").single();
+  const decisionId = decisionInsert.data?.id ?? null;
+
+  // Route to Saxo for live modes. Paper mode is a no-op inside the helper.
+  let routedOrders: unknown = null;
+  if (portfolio.mode === "live_sim" || portfolio.mode === "live_prod") {
+    try {
+      const { routeOrdersToBroker } = await import("@/lib/live-executor.server");
+      routedOrders = await routeOrdersToBroker({
+        portfolio: { id: portfolioId, mode: portfolio.mode, live_paused: portfolio.live_paused },
+        userId: portfolio.user_id,
+        asOf,
+        decisionId,
+        executed,
+      });
+    } catch (e) {
+      console.error("live routing failed", portfolioId, e);
+      routedOrders = { error: e instanceof Error ? e.message : String(e) };
+    }
+  }
 
   // Self-reflection: refresh distilled lessons periodically. Fire-and-forget so
   // reflection cost never blocks the tick; failures just skip this cycle.
@@ -996,8 +1015,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     console.warn("Reflection skipped:", e),
   );
 
-  return { decision, executed, totalValue: newTotal, cash: workingCash };
+  return { decision, executed, totalValue: newTotal, cash: workingCash, routedOrders };
 }
+
 
 // Snapshot the portfolio value on a date without calling the AI (for backtest fill-in).
 export async function snapshotPortfolio(portfolioId: string, asOf: string) {
