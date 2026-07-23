@@ -313,6 +313,7 @@ function CreatePortfolioCard() {
   const create = useServerFn(createPortfolio);
   const activate = useServerFn(activateLive);
   const saxoStatus = useServerFn(getSaxoOAuthStatus);
+  const previewBal = useServerFn(previewBrokerBalance);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -336,6 +337,13 @@ function CreatePortfolioCard() {
   const envKey = meta.targetEnv === "prod" ? "live" : "sim";
   const saxoEnvStatus = meta.targetEnv ? saxoQ.data?.[envKey] : null;
   const saxoReady = !!saxoEnvStatus && (saxoEnvStatus.connected || saxoEnvStatus.usingLegacyToken);
+
+  const balQ = useQuery({
+    queryKey: ["broker-balance-preview", meta.targetEnv],
+    queryFn: () => previewBal({ data: { env: meta.targetEnv === "prod" ? "live" : "sim" } }),
+    enabled: isLive && saxoReady,
+    staleTime: 30_000,
+  });
 
   const toggleClass = (c: string) =>
     setClasses((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
