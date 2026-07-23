@@ -677,6 +677,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         sizingNotes.push("cooldown x0.5");
       }
 
+      // Cross-sectional ranking guardrail: outside top quartile => halve size,
+      // outside universe entirely (should not happen) => leave alone.
+      const rankInfo = rankMap.get(meta.symbol) ?? null;
+      if (rankInfo && !rankInfo.top_quartile) {
+        spend *= 0.5;
+        sizingNotes.push(`rank #${rankInfo.rank}/${rankInfo.universe_size} x0.5`);
+      }
+
       // Event penalty (symbol-specific and broad macro)
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
       if (evPenalty < 1) {
