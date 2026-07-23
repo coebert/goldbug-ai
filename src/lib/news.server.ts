@@ -263,6 +263,16 @@ export async function getNewsForDate(
     original_language: (r as { original_language?: string | null }).original_language ?? null,
   }));
 
+  // Any cached non-English rows still missing a translation get repaired
+  // in the background on every read. Bounded and fire-and-forget so it
+  // never blocks the reel or the trading engine.
+  const untranslatedCount = cachedItems.filter(
+    (c) => !c.original_language && looksNonEnglish(c.headline),
+  ).length;
+  if (untranslatedCount > 0) {
+    void backfillTranslations(dateISO);
+  }
+
   // Use existing cache when we're not forcing a refresh and it looks healthy.
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
 
@@ -274,6 +284,7 @@ export async function getNewsForDate(
     return cachedItems;
   }
   if (gdelt.length === 0) return cachedItems;
+
 
   // Translate before writing so the cache holds English + original metadata.
   const fresh = await translateHeadlines(gdelt);
