@@ -1046,6 +1046,45 @@ export type Database = {
         }
         Relationships: []
       }
+      security_alert_settings: {
+        Row: {
+          cooldown_minutes: number
+          created_at: string
+          enabled: boolean
+          event_type: string
+          last_notified_at: string | null
+          last_notified_count: number | null
+          threshold: number
+          updated_at: string
+          user_id: string
+          window_minutes: number
+        }
+        Insert: {
+          cooldown_minutes?: number
+          created_at?: string
+          enabled?: boolean
+          event_type?: string
+          last_notified_at?: string | null
+          last_notified_count?: number | null
+          threshold?: number
+          updated_at?: string
+          user_id: string
+          window_minutes?: number
+        }
+        Update: {
+          cooldown_minutes?: number
+          created_at?: string
+          enabled?: boolean
+          event_type?: string
+          last_notified_at?: string | null
+          last_notified_count?: number | null
+          threshold?: number
+          updated_at?: string
+          user_id?: string
+          window_minutes?: number
+        }
+        Relationships: []
+      }
       security_audit_log: {
         Row: {
           actor_user_id: string | null
