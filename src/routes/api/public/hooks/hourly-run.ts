@@ -9,6 +9,14 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { checkRateLimit, tooManyRequests } = await import("@/lib/rate-limit.server");
+        const rl = await checkRateLimit(request, {
+          bucket: "hooks:hourly-run",
+          capacity: 10,
+          refillPerSec: 10 / 3600, // ~10 per hour per IP
+        });
+        if (!rl.allowed) return tooManyRequests(rl);
+
         const provided = request.headers.get("x-cron-secret") ?? request.headers.get("X-Cron-Secret");
         const expected = process.env.CRON_SECRET;
         if (!expected || provided !== expected) {
