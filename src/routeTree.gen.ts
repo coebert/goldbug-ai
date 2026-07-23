@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
+import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
 import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -28,6 +29,11 @@ import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/
 const SaxoStatusRoute = SaxoStatusRouteImport.update({
   id: '/saxo-status',
   path: '/saxo-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SaxoReconnectRoute = SaxoReconnectRouteImport.update({
+  id: '/saxo-reconnect',
+  path: '/saxo-reconnect',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GetStartedRoute = GetStartedRouteImport.update({
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/saxo-reconnect'
     | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/saxo-reconnect'
     | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/saxo-reconnect'
     | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CompareRoute: typeof CompareRoute
   GetStartedRoute: typeof GetStartedRoute
+  SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       path: '/saxo-status'
       fullPath: '/saxo-status'
       preLoaderRoute: typeof SaxoStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/saxo-reconnect': {
+      id: '/saxo-reconnect'
+      path: '/saxo-reconnect'
+      fullPath: '/saxo-reconnect'
+      preLoaderRoute: typeof SaxoReconnectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/get-started': {
@@ -355,6 +375,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
   GetStartedRoute: GetStartedRoute,
+  SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
