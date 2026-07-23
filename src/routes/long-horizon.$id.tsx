@@ -274,7 +274,7 @@ function LongHorizonPage() {
                     </CardDescription>
                     <div className="mt-2">
                       <EventOverlayControls
-                        domainDates={chartData.map((d) => d.date)}
+                        domainDates={chartData.map((d) => String(d.date))}
                         enabled={eventsOn}
                         onToggle={setEventsOn}
                         minSeverity={eventSev}
