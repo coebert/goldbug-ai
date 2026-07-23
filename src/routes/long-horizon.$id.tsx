@@ -272,6 +272,15 @@ function LongHorizonPage() {
                     <CardDescription>
                       {result.from} → {result.to} · {result.rebalance} rebalance · {result.tradeCount} trades executed · click a legend item to isolate.
                     </CardDescription>
+                    <div className="mt-2">
+                      <EventOverlayControls
+                        domainDates={chartData.map((d) => d.date)}
+                        enabled={eventsOn}
+                        onToggle={setEventsOn}
+                        minSeverity={eventSev}
+                        onSeverityChange={setEventSev}
+                      />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={360}>
