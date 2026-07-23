@@ -15,7 +15,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History } from "lucide-react";
+import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
