@@ -343,14 +343,14 @@ export function SaxoOAuthPanel() {
     return <StatusPill state="connected" label={`${env.toUpperCase()}: connected`} detail={`auto-refresh · expires in ${mins}m`} />;
   };
 
-  const row = (label: React.ReactNode, env: "sim" | "live") => {
+  const row = (label: "SIM" | "LIVE", env: "sim" | "live") => {
     const st = env === "sim" ? q.data?.sim : q.data?.live;
     const ok = !!st?.connected && !st?.usingLegacyToken;
     return (
-      <div className="flex items-center justify-between gap-2 py-1">
-        {pillFor(env)}
-        <Button size="sm" variant={ok ? "outline" : "default"} onClick={() => mStart.mutate(env)} disabled={mStart.isPending}>
-          {ok ? "Reconnect" : <>Connect ({label})</>}
+      <div className="flex flex-col gap-2 py-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">{pillFor(env)}</div>
+        <Button size="sm" className="w-full sm:w-auto" variant={ok ? "outline" : "default"} onClick={() => mStart.mutate(env)} disabled={mStart.isPending}>
+          {ok ? "Reconnect" : `Connect (${label})`}
         </Button>
       </div>
     );
@@ -358,14 +358,15 @@ export function SaxoOAuthPanel() {
 
   return (
     <div className="rounded-md border border-border p-3 space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-medium">Saxo broker connection</div>
         <Button size="sm" variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ["saxo-oauth-status"] })} disabled={q.isFetching}>
           <RefreshCw className={`h-3 w-3 mr-1 ${q.isFetching ? "animate-spin" : ""}`} /> Refresh
         </Button>
       </div>
-      {row(<Explain term="sim_vs_live">SIM</Explain>, "sim")}
-      {row(<Explain term="sim_vs_live">LIVE</Explain>, "live")}
+      {row("SIM", "sim")}
+      {row("LIVE", "live")}
+
       {q.data?.sim.usingLegacyToken && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
