@@ -1138,6 +1138,47 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }).select("id").single();
   const decisionId = decisionInsert.data?.id ?? null;
 
+  // Shadow variant B (fire-and-forget): runs an alternate prompt in the background
+  // so we can weekly-compare divergences without affecting live execution.
+  if (!breakerTripped) {
+    (async () => {
+      try {
+        const { runShadowVariant } = await import("./ab-testing.server");
+        await runShadowVariant({
+          portfolioId,
+          decisionId,
+          asOf,
+          primary: decision,
+          aiArgs: {
+            portfolio,
+            holdings: holdings ?? [],
+            cashValue: cash,
+            totalValue,
+            features,
+            news: scoredNews.slice(0, 15).map((n) => ({
+              headline: n.headline, source: n.source, sentiment: n.sentiment,
+            })),
+            crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
+            optionsBlock: options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable.",
+            crossSectional: formatCrossSectionalBlock(rankMap),
+            events,
+            cooling: coolingSymbols,
+            asOf,
+            regime: effectiveRegime,
+            learning,
+            attribution: attribution ? formatAttributionBlock(attribution) : null,
+            regimeNote: tightened.note,
+            hyperparams: hyperparams ?? null,
+            calibrationBlock: formatCalibrationBlock(calibration),
+          },
+        });
+      } catch (e) {
+        console.warn("Shadow variant skipped:", e);
+      }
+    })();
+  }
+
+
   // Route to Saxo for live modes. Paper mode is a no-op inside the helper.
   let routedOrders: unknown = null;
   if (portfolio.mode === "live_sim" || portfolio.mode === "live_prod") {
