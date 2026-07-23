@@ -293,56 +293,83 @@ function MiniList({ title, rows }: { title: string; rows: Array<{ key: string; t
   );
 }
 
+function StatusPill({
+  state,
+  label,
+  detail,
+}: {
+  state: "connected" | "disconnected" | "warning" | "error" | "loading";
+  label: string;
+  detail?: string;
+}) {
+  const map = {
+    connected: { icon: CheckCircle2, cls: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500" },
+    disconnected: { icon: XCircle, cls: "border-muted-foreground/40 bg-muted/40 text-muted-foreground" },
+    warning: { icon: AlertTriangle, cls: "border-amber-500/50 bg-amber-500/10 text-amber-500" },
+    error: { icon: XCircle, cls: "border-destructive/50 bg-destructive/10 text-destructive" },
+    loading: { icon: Loader2, cls: "border-border bg-muted/30 text-muted-foreground" },
+  } as const;
+  const { icon: Icon, cls } = map[state];
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${cls}`}>
+      <Icon className={`h-4 w-4 ${state === "loading" ? "animate-spin" : ""}`} />
+      <span className="font-medium">{label}</span>
+      {detail && <span className="text-xs opacity-80">· {detail}</span>}
+    </div>
+  );
+}
+
 function SaxoOAuthPanel() {
   const startFn = useServerFn(startSaxoOAuth);
   const statusFn = useServerFn(getSaxoOAuthStatus);
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["saxo-oauth-status"], queryFn: () => statusFn({}), refetchInterval: 60_000 });
+  const q = useQuery({ queryKey: ["saxo-oauth-status"], queryFn: () => statusFn({}), refetchInterval: 30_000 });
   const mStart = useMutation({
     mutationFn: (env: "sim" | "live") => startFn({ data: { env } }),
     onSuccess: (r) => { window.open(r.url, "_blank", "noopener"); toast.info("Complete the Saxo login in the new tab, then click Refresh."); },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const pillFor = (env: "sim" | "live") => {
+    if (q.isLoading) return <StatusPill state="loading" label={`${env.toUpperCase()}: checking…`} />;
+    if (q.error) return <StatusPill state="error" label={`${env.toUpperCase()}: error`} detail={(q.error as Error).message} />;
+    const st = env === "sim" ? q.data?.sim : q.data?.live;
+    const mins = st?.secondsUntilExpiry != null ? Math.max(0, Math.round(st.secondsUntilExpiry / 60)) : null;
+    if (!st?.connected && !st?.usingLegacyToken) return <StatusPill state="disconnected" label={`${env.toUpperCase()}: not connected`} detail="click Connect below" />;
+    if (st.usingLegacyToken) return <StatusPill state="warning" label={`${env.toUpperCase()}: legacy 24h token`} detail="reconnect for auto-refresh" />;
+    if ((st.secondsUntilExpiry ?? 0) <= 0) return <StatusPill state="error" label={`${env.toUpperCase()}: token expired`} detail="reconnect required" />;
+    if ((st.secondsUntilExpiry ?? 0) < 15 * 60) return <StatusPill state="warning" label={`${env.toUpperCase()}: connected`} detail={`expires in ${mins}m — auto-refresh pending`} />;
+    return <StatusPill state="connected" label={`${env.toUpperCase()}: connected`} detail={`auto-refresh · expires in ${mins}m`} />;
+  };
+
   const row = (label: string, env: "sim" | "live") => {
     const st = env === "sim" ? q.data?.sim : q.data?.live;
-    const mins = st?.secondsUntilExpiry != null ? Math.round(st.secondsUntilExpiry / 60) : null;
-    const ok = st?.connected && !st?.usingLegacyToken;
+    const ok = !!st?.connected && !st?.usingLegacyToken;
     return (
-      <div className="flex items-center justify-between gap-2 text-sm py-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{label}</span>
-          {ok ? (
-            <Badge variant="default">connected · auto-refresh</Badge>
-          ) : st?.usingLegacyToken ? (
-            <Badge variant="secondary">legacy 24h token</Badge>
-          ) : (
-            <Badge variant="outline">not connected</Badge>
-          )}
-          {mins != null && <span className="text-xs text-muted-foreground">expires in {mins}m</span>}
-        </div>
-        <Button size="sm" variant="outline" onClick={() => mStart.mutate(env)} disabled={mStart.isPending}>
-          {ok ? "Reconnect" : "Connect"}
+      <div className="flex items-center justify-between gap-2 py-1">
+        {pillFor(env)}
+        <Button size="sm" variant={ok ? "outline" : "default"} onClick={() => mStart.mutate(env)} disabled={mStart.isPending}>
+          {ok ? "Reconnect" : `Connect (${label})`}
         </Button>
       </div>
     );
   };
 
   return (
-    <div className="rounded-md border border-border p-3 space-y-1">
-      <div className="text-sm font-medium mb-1">Saxo OAuth (auto-refresh)</div>
-      {row("SIM", "sim")}
-      {row("LIVE", "live")}
-      <div className="flex justify-end pt-1">
-        <Button size="sm" variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ["saxo-oauth-status"] })}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+    <div className="rounded-md border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">Saxo broker connection</div>
+        <Button size="sm" variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ["saxo-oauth-status"] })} disabled={q.isFetching}>
+          <RefreshCw className={`h-3 w-3 mr-1 ${q.isFetching ? "animate-spin" : ""}`} /> Refresh
         </Button>
       </div>
+      {row("SIM", "sim")}
+      {row("LIVE", "live")}
       {q.data?.sim.usingLegacyToken && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Currently using the 24-hour developer token. Click <b>Connect</b> to switch to OAuth with auto-refresh.
+            Currently using the 24-hour developer token. Click <b>Connect (SIM)</b> above to switch to OAuth with auto-refresh.
           </AlertDescription>
         </Alert>
       )}
