@@ -40,7 +40,7 @@ export function AllPortfoliosChart() {
     staleTime: 30_000,
   });
 
-  const { series, portfolios, currency, totalNow, startingTotal } = useMemo(() => {
+  const { series, portfolios, currency, totalNow, startingTotal, yDomain, pctDomain } = useMemo(() => {
     const all = q.data?.series ?? [];
     const p = q.data?.portfolios ?? [];
     const c = q.data?.currency ?? "GBP";
@@ -51,16 +51,36 @@ export function AllPortfoliosChart() {
       s = all.filter((r: any) => new Date(r.date).getTime() >= cutoff);
       if (s.length === 0) s = all.slice(-1);
     }
-    const last = s[s.length - 1];
     const first = s[0];
+    const last = s[s.length - 1];
+    const start = first ? Number(first.total) : 0;
+    // annotate with pct change vs window start
+    s = s.map((r: any) => ({
+      ...r,
+      pct: start > 0 ? ((Number(r.total) - start) / start) * 100 : 0,
+    }));
+    const totals = s.map((r: any) => Number(r.total)).filter((n: number) => Number.isFinite(n));
+    let lo = Math.min(...totals);
+    let hi = Math.max(...totals);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+      lo = 0; hi = 1;
+    }
+    const pad = Math.max((hi - lo) * 0.1, hi * 0.005, 1);
+    const yLo = Math.max(0, lo - pad);
+    const yHi = hi + pad;
+    const pctLo = start > 0 ? ((yLo - start) / start) * 100 : 0;
+    const pctHi = start > 0 ? ((yHi - start) / start) * 100 : 0;
     return {
       series: s,
       portfolios: p,
       currency: c,
       totalNow: last ? Number(last.total) : 0,
-      startingTotal: first ? Number(first.total) : 0,
+      startingTotal: start,
+      yDomain: [yLo, yHi] as [number, number],
+      pctDomain: [pctLo, pctHi] as [number, number],
     };
   }, [q.data, range]);
+
 
   const pnl = totalNow - startingTotal;
   const pnlPct = startingTotal > 0 ? (pnl / startingTotal) * 100 : 0;
