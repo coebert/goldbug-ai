@@ -321,9 +321,11 @@ export function backfillTranslations(
             headline: t.translation,
             original_headline: originalHeadline,
             original_language: t.lang,
+            translation_confidence: t.confidence,
           } as never)
           .eq("news_date", dateISO)
           .eq("headline", originalHeadline);
+
         if (!error) translated++;
       }
       if (translated > 0) {
