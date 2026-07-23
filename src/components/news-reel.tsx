@@ -114,6 +114,14 @@ export function NewsReel() {
     setSinceDays((d) => Math.min(120, d + 10));
     setLimit((l) => Math.min(400, l + 40));
   };
+  // Infinite scroll sentinel: observed by an IntersectionObserver rooted on
+  // the reel's scroll container. When it enters the viewport we auto-request
+  // the next page, provided we're not already fetching and more data exists.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const isFetching = q.isFetching;
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
 
   // "Now" tick so the "updated Xs ago" label stays live.
   const [now, setNow] = useState<number>(() => Date.now());
