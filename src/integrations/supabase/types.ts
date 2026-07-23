@@ -717,7 +717,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      portfolio_latest_totals: {
+        Row: {
+          cash: number | null
+          holdings_value: number | null
+          portfolio_id: string | null
+          snapshot_date: string | null
+          total_value: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equity_snapshots_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       [_ in never]: never
