@@ -177,6 +177,8 @@ ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility 
 
 ${regimeBlock}
 
+${formatLearningBlock(args.learning)}
+
 ${HISTORICAL_PLAYBOOK}
 
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.`;
