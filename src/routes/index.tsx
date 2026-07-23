@@ -310,8 +310,31 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="hidden sm:block" title="Recent equity trend">
-            <Sparkline values={sparkValues} width={120} height={36} />
+          <div className="hidden sm:flex flex-col items-end gap-1" title="Recent equity trend">
+            <Sparkline values={values} width={120} height={36} />
+            <div className="flex items-center gap-2">
+              {rangePct != null && (
+                <span className={`text-[10px] tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {rangePct >= 0 ? "+" : ""}{rangePct.toFixed(1)}%
+                </span>
+              )}
+              <div className="flex gap-0.5 rounded-md border border-border/60 p-0.5">
+                {SPARK_RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => setSparkRange(r.key)}
+                    className={`px-1.5 py-0.5 text-[10px] font-medium rounded-sm transition-colors ${
+                      sparkRange === r.key
+                        ? "bg-primary/20 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {r.key}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="text-right">
             <div className="text-sm font-medium">
