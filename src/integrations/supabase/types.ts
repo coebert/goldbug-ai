@@ -1022,6 +1022,66 @@ export type Database = {
         }
         Relationships: []
       }
+      shadow_decisions: {
+        Row: {
+          agreement: number | null
+          created_at: string
+          decision_id: string | null
+          divergences: Json
+          id: string
+          portfolio_id: string
+          primary_order_count: number
+          primary_summary: Json
+          run_date: string
+          shadow_order_count: number
+          shadow_summary: Json
+          variant_name: string
+        }
+        Insert: {
+          agreement?: number | null
+          created_at?: string
+          decision_id?: string | null
+          divergences?: Json
+          id?: string
+          portfolio_id: string
+          primary_order_count?: number
+          primary_summary: Json
+          run_date: string
+          shadow_order_count?: number
+          shadow_summary: Json
+          variant_name?: string
+        }
+        Update: {
+          agreement?: number | null
+          created_at?: string
+          decision_id?: string | null
+          divergences?: Json
+          id?: string
+          portfolio_id?: string
+          primary_order_count?: number
+          primary_summary?: Json
+          run_date?: string
+          shadow_order_count?: number
+          shadow_summary?: Json
+          variant_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shadow_decisions_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shadow_decisions_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signal_performance: {
         Row: {
           as_of: string
