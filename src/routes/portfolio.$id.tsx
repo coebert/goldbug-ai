@@ -992,7 +992,8 @@ function PortfolioPage() {
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">{t.reason}</td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
