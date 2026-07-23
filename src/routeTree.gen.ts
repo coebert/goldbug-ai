@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
+import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 
@@ -48,6 +49,12 @@ const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
   path: '/long-horizon/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksLiveReconcileRoute =
+  ApiPublicHooksLiveReconcileRouteImport.update({
+    id: '/api/public/hooks/live-reconcile',
+    path: '/api/public/hooks/live-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksHourlyRunRoute = ApiPublicHooksHourlyRunRouteImport.update({
   id: '/api/public/hooks/hourly-run',
   path: '/api/public/hooks/hourly-run',
@@ -68,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
+  '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +86,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
+  '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +98,7 @@ export interface FileRoutesById {
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
+  '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +111,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
+    | '/api/public/hooks/live-reconcile'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +122,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
+    | '/api/public/hooks/live-reconcile'
   id:
     | '__root__'
     | '/'
@@ -121,6 +133,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
+    | '/api/public/hooks/live-reconcile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +145,7 @@ export interface RootRouteChildren {
   PortfolioIdRoute: typeof PortfolioIdRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
+  ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -178,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LongHorizonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/live-reconcile': {
+      id: '/api/public/hooks/live-reconcile'
+      path: '/api/public/hooks/live-reconcile'
+      fullPath: '/api/public/hooks/live-reconcile'
+      preLoaderRoute: typeof ApiPublicHooksLiveReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/hourly-run': {
       id: '/api/public/hooks/hourly-run'
       path: '/api/public/hooks/hourly-run'
@@ -204,6 +225,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortfolioIdRoute: PortfolioIdRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
+  ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
