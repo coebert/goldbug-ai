@@ -856,7 +856,7 @@ function PortfolioPage() {
                           verticalAlign="bottom"
                           height={24}
                           iconType="plainline"
-                          wrapperStyle={{ fontSize: 11, color: chartTheme.axis }}
+                          wrapperStyle={{ fontSize: 11, color: chartTheme.axisText }}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
