@@ -6,7 +6,8 @@ import { getGlobalNewsReel } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
 
 // Absolute sentiment threshold treated as a "strong" market-moving signal.
 const STRONG_SENTIMENT_THRESHOLD = 0.4;
@@ -120,6 +121,7 @@ export function NewsReel() {
   const [onlyCited, setOnlyCited] = useState(false);
   const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [detailsId, setDetailsId] = useState<string | null>(null);
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -500,6 +502,17 @@ export function NewsReel() {
                               Search news
                             </a>
                           )}
+                          {cited && (
+                            <button
+                              type="button"
+                              onClick={() => setDetailsId(item.id)}
+                              className="inline-flex items-center gap-1 rounded-sm border border-primary/40 bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10"
+                              title="Explain sentiment, reliability, and excerpt context before opening the source"
+                            >
+                              <Info className="h-3 w-3" />
+                              View details
+                            </button>
+                          )}
                         </div>
                         <p className={`mt-1.5 text-xs ${cited ? "text-foreground/80" : "text-muted-foreground"}`}>
                           <span className={`mr-1 font-semibold ${cited ? "text-primary" : "text-muted-foreground"}`}>
@@ -666,6 +679,122 @@ export function NewsReel() {
           </div>
         )}
       </CardContent>
+      <Dialog open={detailsId !== null} onOpenChange={(o) => !o && setDetailsId(null)}>
+        <DialogContent className="max-w-lg">
+          {(() => {
+            const item = allItems.find((i) => i.id === detailsId);
+            if (!item) return null;
+            const tone = sentimentTone(item.avg_sentiment);
+            const cred = credibilityFor(item.source);
+            const rec = recencyFor(item.date, now);
+            const reliability = Math.round(cred.score * 0.6 + rec.score * 0.4);
+            const s = item.avg_sentiment;
+            const sentimentStrength =
+              s == null ? "unscored"
+              : Math.abs(s) >= STRONG_SENTIMENT_THRESHOLD ? "strong"
+              : Math.abs(s) >= 0.15 ? "moderate"
+              : "weak";
+            const totalImpact = item.influences.reduce(
+              (acc, inf) => acc + (inf.impact_pct ?? 0),
+              0,
+            );
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-base leading-snug">{item.headline}</DialogTitle>
+                  <DialogDescription>
+                    {item.source ? `${item.source} · ` : ""}{item.date} · {rec.ageLabel}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 text-sm">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className={`border-transparent ${tone.cls}`}>{tone.label}</Badge>
+                    <Badge variant="outline" className={`border-transparent ${cred.cls}`}>{cred.label} · {cred.tier}</Badge>
+                    <Badge variant="outline" className={`border-transparent ${rec.cls}`}>{rec.label}</Badge>
+                    <Badge variant="outline" className="border-transparent bg-primary/10 text-primary">
+                      Reliability {reliability}
+                    </Badge>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/30 p-3 text-xs leading-relaxed">
+                    <div className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-foreground/70">
+                      Sentiment & reliability
+                    </div>
+                    <p className="text-muted-foreground">
+                      This headline reads as a <span className="font-semibold text-foreground">{sentimentStrength}</span>{" "}
+                      {s == null ? "" : s > 0 ? "bullish" : s < 0 ? "bearish" : "neutral"} signal
+                      {s != null && ` (score ${s >= 0 ? "+" : ""}${s.toFixed(2)})`}. Source credibility is{" "}
+                      <span className="font-semibold text-foreground">{cred.tier}</span> ({cred.score}/100) and the story is{" "}
+                      <span className="font-semibold text-foreground">{rec.ageLabel}</span>. Overall reliability blends
+                      credibility (60%) and recency (40%) into a composite score of{" "}
+                      <span className="font-semibold text-foreground">{reliability}/100</span>.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-primary/30 bg-primary/[0.04] p-3 text-xs leading-relaxed">
+                    <div className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-primary">
+                      Excerpt context
+                    </div>
+                    {item.excerpt ? (
+                      <blockquote className="border-l-2 border-primary/40 pl-2 italic text-muted-foreground">
+                        “{item.excerpt}”
+                      </blockquote>
+                    ) : (
+                      <p className="italic text-muted-foreground">
+                        No excerpt was captured — the AI note below summarises how this headline was interpreted.
+                      </p>
+                    )}
+                    <p className="mt-2 text-muted-foreground">
+                      <span className="mr-1 font-semibold text-foreground/80">AI note:</span>
+                      {item.note}
+                    </p>
+                  </div>
+                  {item.influences.length > 0 && (
+                    <div className="rounded-md border border-border bg-card/40 p-3 text-xs">
+                      <div className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-foreground/70">
+                        Influenced {item.influences.length} decision{item.influences.length === 1 ? "" : "s"}
+                        {totalImpact > 0 ? ` · ${totalImpact.toFixed(1)}% total impact` : ""}
+                      </div>
+                      <ul className="space-y-1 text-muted-foreground">
+                        {item.influences.slice(0, 4).map((inf, i) => (
+                          <li key={i} className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-foreground">{inf.portfolio_name}</span>
+                            <span>· {inf.run_date}</span>
+                            {inf.actions.length > 0 && (
+                              <span className="text-foreground">
+                                · {inf.actions.map((a) => `${a.action} ${a.symbol}`).join(", ")}
+                              </span>
+                            )}
+                            {inf.impact_pct != null && (
+                              <span className="ml-auto text-primary">{inf.impact_pct.toFixed(1)}%</span>
+                            )}
+                          </li>
+                        ))}
+                        {item.influences.length > 4 && (
+                          <li className="italic">+ {item.influences.length - 4} more…</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                  <Button variant="ghost" size="sm" onClick={() => setDetailsId(null)}>
+                    Close
+                  </Button>
+                  <Button asChild size="sm">
+                    <a
+                      href={item.url ?? `https://www.google.com/search?q=${encodeURIComponent(item.headline)}&tbm=nws`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                      {item.url ? "Open source article" : "Search source"}
+                    </a>
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
