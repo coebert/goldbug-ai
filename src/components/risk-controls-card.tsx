@@ -596,18 +596,33 @@ export function RiskControlsCard({
               )}
             </div>
 
-            <div className="flex items-center gap-2 border-t border-border pt-4">
-              <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
-                {mut.isPending ? "Saving…" : "Save risk controls"}
+            <div className="flex items-center gap-3 border-t border-border pt-4">
+              <Button
+                onClick={() => mut.mutate({ ...cfg, risk_level: level })}
+                disabled={mut.isPending}
+              >
+                {mut.isPending ? "Saving…" : "Save now"}
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => setCfg({ ...DEFAULTS })}
+                onClick={() => {
+                  setCfg({ ...DEFAULTS });
+                  setLevel(3);
+                }}
                 disabled={mut.isPending}
               >
                 Reset to defaults
               </Button>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {autoSaveState === "saving" && "Saving changes…"}
+                {autoSaveState === "saved" && "Auto-saved — will be restored next time you open this portfolio."}
+                {autoSaveState === "error" && (
+                  <span className="text-destructive">Auto-save failed — click Save now.</span>
+                )}
+                {autoSaveState === "idle" && "Changes auto-save and persist across sessions."}
+              </span>
             </div>
+
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
