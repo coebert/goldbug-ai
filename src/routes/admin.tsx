@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
 import { SaxoOAuthPanel } from "@/components/live-trading-card";
 import { PushNotificationsCard } from "@/components/push-notifications-card";
+import { GlobalSignalDecayCard } from "@/components/global-signal-decay-card";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
