@@ -23,6 +23,7 @@ import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.re
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
+import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
@@ -99,6 +100,12 @@ const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
   path: '/api/public/saxo/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksTranslationRefreshRoute =
+  ApiPublicHooksTranslationRefreshRouteImport.update({
+    id: '/api/public/hooks/translation-refresh',
+    path: '/api/public/hooks/translation-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksSaxoRefreshRoute =
   ApiPublicHooksSaxoRefreshRouteImport.update({
     id: '/api/public/hooks/saxo-refresh',
@@ -147,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
+  '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -168,6 +176,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
+  '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRoutesById {
@@ -190,6 +199,7 @@ export interface FileRoutesById {
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
+  '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRouteTypes {
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/saxo-refresh'
+    | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/saxo-refresh'
+    | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
   id:
     | '__root__'
@@ -255,6 +267,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/saxo-refresh'
+    | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
   fileRoutesById: FileRoutesById
 }
@@ -274,6 +287,7 @@ export interface RootRouteChildren {
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
   ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
   ApiPublicHooksSaxoRefreshRoute: typeof ApiPublicHooksSaxoRefreshRoute
+  ApiPublicHooksTranslationRefreshRoute: typeof ApiPublicHooksTranslationRefreshRoute
   ApiPublicSaxoCallbackRoute: typeof ApiPublicSaxoCallbackRoute
 }
 
@@ -377,6 +391,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSaxoCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/translation-refresh': {
+      id: '/api/public/hooks/translation-refresh'
+      path: '/api/public/hooks/translation-refresh'
+      fullPath: '/api/public/hooks/translation-refresh'
+      preLoaderRoute: typeof ApiPublicHooksTranslationRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/saxo-refresh': {
       id: '/api/public/hooks/saxo-refresh'
       path: '/api/public/hooks/saxo-refresh'
@@ -447,6 +468,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
   ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
   ApiPublicHooksSaxoRefreshRoute: ApiPublicHooksSaxoRefreshRoute,
+  ApiPublicHooksTranslationRefreshRoute: ApiPublicHooksTranslationRefreshRoute,
   ApiPublicSaxoCallbackRoute: ApiPublicSaxoCallbackRoute,
 }
 export const routeTree = rootRouteImport
