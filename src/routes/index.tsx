@@ -477,11 +477,7 @@ function CreatePortfolioCard() {
             <div className="mb-1 font-medium">Saxo {meta.targetEnv?.toUpperCase()} connection</div>
             {saxoQ.isLoading ? (
               <span className="text-muted-foreground">Checking…</span>
-            ) : saxoReady ? (
-              <span className="text-emerald-600 dark:text-emerald-400">
-                ✓ Connected — starting cash will be read from your Saxo {meta.targetEnv?.toUpperCase()} balance.
-              </span>
-            ) : (
+            ) : !saxoReady ? (
               <div className="space-y-2">
                 <span className="text-destructive">
                   Not connected. You must link your Saxo {meta.targetEnv?.toUpperCase()} account before creating this portfolio.
@@ -489,6 +485,22 @@ function CreatePortfolioCard() {
                 <Link to="/saxo-status" className="inline-flex items-center gap-1 text-primary hover:underline">
                   Open Saxo connection page <ExternalLink className="h-3 w-3" />
                 </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  ✓ Connected to Saxo {meta.targetEnv?.toUpperCase()}
+                </span>
+                <BrokerBalancePreview
+                  env={meta.targetEnv === "prod" ? "live" : "sim"}
+                  isRealMoney={mode === "live_prod"}
+                  data={balQ.data}
+                  isLoading={balQ.isLoading}
+                  isFetching={balQ.isFetching}
+                  error={balQ.error instanceof Error ? balQ.error.message : balQ.error ? String(balQ.error) : null}
+                  onRefresh={() => balQ.refetch()}
+                  fmt={fmtMoney}
+                />
               </div>
             )}
           </div>
