@@ -181,7 +181,7 @@ describe("recordFillHandler", () => {
     serverImpl.recordSliceFill.mockResolvedValue(undefined);
     const r = (await recordFillHandler(valid, U_ALICE, setStatus)) as OkResult<{ recorded: true }>;
     expect(r).toEqual({ ok: true, data: { recorded: true } });
-    expect(serverImpl.recordSliceFill).toHaveBeenCalledWith(SLICE_A, U_ALICE, 3, "partial");
+    expect(serverImpl.recordSliceFill).toHaveBeenCalledWith(SLICE_A, U_ALICE, 3, "partial", undefined);
   });
 
   it("accepts filledQty=0 (NON_NEG) but rejects negative fills", async () => {
