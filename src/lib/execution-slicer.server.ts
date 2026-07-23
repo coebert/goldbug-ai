@@ -71,7 +71,7 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
         portfolio_id: portfolioId,
         slice_id: sliceId,
         actor_user_id: actor,
-        details: context as Record<string, unknown>,
+        details: JSON.parse(JSON.stringify(context)),
       });
     } catch (e) {
       console.warn(
