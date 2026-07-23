@@ -38,6 +38,9 @@ const AllPortfoliosChart = lazy(() =>
 const NewsReel = lazy(() =>
   import("@/components/news-reel").then((m) => ({ default: m.NewsReel })),
 );
+const DecisionNewsBreakdown = lazy(() =>
+  import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
+);
 
 import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
