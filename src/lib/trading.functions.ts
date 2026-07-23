@@ -1971,6 +1971,9 @@ type NewsReelInfluence = {
   portfolio_name: string;
   run_date: string;
   sentiment: number | null;
+  source_weight: number | null;
+  impact: number | null;
+  impact_pct: number | null;
   rationale: string | null;
   actions: Array<{ action: string; symbol: string; qty?: number | null }>;
 };
