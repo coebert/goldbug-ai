@@ -351,21 +351,37 @@ function PortfolioPage() {
                               value: number;
                               peak: number;
                               drawdown: number;
+                              benchmark?: number | null;
                             };
                             const pnlFromStart = row.value - startingCash;
                             const pnlPctFromStart = startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
+                            const benchPct = row.benchmark != null && startingCash > 0
+                              ? ((row.benchmark - startingCash) / startingCash) * 100
+                              : null;
                             const active_events = eventsOn
                               ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
                               : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
                                 <div className="mb-1 font-medium">{label}</div>
-                                <div className="tabular-nums">Value: {p.currency} {row.value.toFixed(2)}</div>
-                                <div className="tabular-nums text-muted-foreground">
+                                <div className="tabular-nums">
+                                  <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: "#22d3ee" }} />
+                                  Portfolio: {p.currency} {row.value.toFixed(2)}
+                                </div>
+                                <div className="tabular-nums text-muted-foreground pl-3.5">
                                   vs start: {pnlFromStart >= 0 ? "+" : ""}
                                   {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
                                 </div>
-                                <div className="tabular-nums text-muted-foreground">
+                                {row.benchmark != null && (
+                                  <div className="tabular-nums mt-1">
+                                    <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: "#f59e0b" }} />
+                                    {benchmark}: {p.currency} {row.benchmark.toFixed(2)}
+                                    {benchPct != null && (
+                                      <span className="text-muted-foreground"> ({benchPct >= 0 ? "+" : ""}{benchPct.toFixed(2)}%)</span>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="tabular-nums text-muted-foreground mt-1">
                                   Peak: {p.currency} {row.peak.toFixed(2)}
                                 </div>
                                 <div className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}>
