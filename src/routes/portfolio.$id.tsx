@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 
 
 export const Route = createFileRoute("/portfolio/$id")({
@@ -302,7 +303,11 @@ function PortfolioPage() {
               <TabsList>
                 <TabsTrigger value="journal">AI Journal ({decisions.length})</TabsTrigger>
                 <TabsTrigger value="trades">Trades ({trades.length})</TabsTrigger>
+                <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
               </TabsList>
+              <TabsContent value="diagnostics" className="space-y-4">
+                <DiagnosticsPanel portfolioId={p.id} />
+              </TabsContent>
               <TabsContent value="journal" className="space-y-4">
                 {decisions.length === 0 && (
                   <p className="text-sm text-muted-foreground">
