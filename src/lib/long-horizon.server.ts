@@ -82,12 +82,19 @@ export type SeriesResult = {
   metrics: Metrics;
 };
 
+export type ExecutionCosts = {
+  commission_bps: number;   // per side, in basis points of notional
+  slippage_bps: number;     // per side, price impact in basis points
+  min_trade_value: number;  // trades below this notional are skipped
+};
+
 export type LongHorizonResult = {
   from: string;
   to: string;
   starting_cash: number;
   currency: string;
   rebalance: "monthly" | "quarterly";
+  execution: ExecutionCosts;
   series: SeriesResult[];
   regimes: Array<{
     key: string;
@@ -98,6 +105,8 @@ export type LongHorizonResult = {
     rows: Array<{ seriesKey: string; name: string; metrics: Metrics }>;
   }>;
   tradeCount: number;
+  skippedSmallTrades: number;
+  totalCostsPaid: number;
 };
 
 function computeMetrics(curve: CurvePoint[]): Metrics {
