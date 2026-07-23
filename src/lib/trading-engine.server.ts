@@ -419,7 +419,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
   const features = rawFeatures.map((f) => ({ ...f }));
 
-  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams, sectorScores, ddSizing] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams, sectorScores, ddSizing, calibration, _cfEvalCount] = await Promise.all([
     opts?.skipNews
       ? Promise.resolve([])
       : cached("news", asOf, () => getNewsForDate(asOf)).catch(() => []),
@@ -448,9 +448,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)),
     ).catch(() => []),
     computeAttribution(portfolioId, asOf).catch(() => null),
-    getOrRefreshHyperparams(portfolioId, asOf).catch((e) => {
-      console.warn("Hyperparam tuning failed:", e);
-      return null as TunedHyperparams | null;
+    // F. Walk-forward tuner (30d train / 7d validate cadence, audit-logged).
+    getOrWalkForward(portfolioId, asOf).catch((e) => {
+      console.warn("Walk-forward tuning failed, falling back:", e);
+      return getOrRefreshHyperparams(portfolioId, asOf).catch(() => null as TunedHyperparams | null);
     }),
     cached("sectorScores", asOf, () => refreshSectorScores(asOf)).catch((e) => {
       console.warn("Sector rotation failed:", e);
@@ -459,6 +460,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     computePortfolioDrawdownSizing(portfolioId).catch(() => ({
       peak_5d: null, current: null, drawdown_pct: 0, size_multiplier: 1, note: "dd calc failed",
     })),
+    // K. Calibration (latest snapshot for prompt + sizing).
+    getLatestCalibration(portfolioId).catch(() => ({
+      brier_score: 0.25, samples: 0, hit_rate: null, avg_conviction: null,
+      global_size_mult: 1, notes: "unavailable",
+    })),
+    // G. Evaluate any counterfactuals whose 5d window has fully elapsed.
+    evaluatePendingCounterfactuals(asOf).catch(() => 0),
   ]);
 
 
