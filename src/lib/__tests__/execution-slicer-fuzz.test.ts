@@ -252,19 +252,25 @@ describe("execution-slicer server: logging is never skipped on invalid input", (
 
         await Promise.all([
           maybeSliceOrder(garbage as never).catch(() => null),
-          tickSlicer(garbage as never).catch(() => null),
-          recordSliceFill(garbage as never).catch(() => null),
+          tickSlicer(garbage as never, garbage as never).catch(() => null),
+          recordSliceFill(
+            garbage as never,
+            garbage as never,
+            garbage as never,
+            garbage as never,
+          ).catch(() => null),
         ]);
 
         // DB was never touched — validation rejected first.
         expect(fromMock).not.toHaveBeenCalled();
 
         // Every rejection emitted a structured SECURITY warning.
-        const securityCalls = warnSpy.mock.calls.filter((call) =>
+        const securityCalls = warnSpy.mock.calls.filter((call: unknown[]) =>
           String(call[0] ?? "").includes("SECURITY:pending_slices"),
         );
         expect(securityCalls.length).toBeGreaterThan(0);
       }),
+
       { numRuns: 50 },
     );
   });
