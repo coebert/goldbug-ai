@@ -80,9 +80,9 @@ function AuthPage() {
             <TrendingUp className="h-6 w-6" />
             <span className="font-semibold">Aegis</span>
           </div>
-          <CardTitle>{mode === "signin" ? "Sign in" : "Create your account"}</CardTitle>
+          <CardTitle>Sign in</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Give an AI a virtual £1000 pot and see how it performs.
+            Private instance. Sign-ups are disabled.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
