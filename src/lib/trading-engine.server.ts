@@ -340,6 +340,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const remaining = Number(cur.quantity) - qty;
       if (remaining <= 1e-8) holdingsByS.delete(meta.symbol);
       else holdingsByS.set(meta.symbol, { ...cur, quantity: remaining });
+      classExposure.set(
+        meta.asset_class,
+        Math.max(0, (classExposure.get(meta.asset_class) ?? 0) - value),
+      );
       executed.push({
         symbol: meta.symbol,
         side: "sell",
@@ -365,12 +369,37 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
       const spendableCash = Math.max(0, workingCash - cashFloor);
       let spend = spendableCash * pct;
-      // Enforce max position size
+      // Enforce per-symbol position cap
       const existingVal = holdingsByS.get(meta.symbol)
         ? Number(holdingsByS.get(meta.symbol)!.quantity) * price
         : 0;
       const roomInPosition = Math.max(0, maxPosVal - existingVal);
       spend = Math.min(spend, roomInPosition);
+
+      // Enforce asset class exposure cap
+      const classCap = cfg.asset_class_limits[meta.asset_class];
+      let classRejected = false;
+      if (classCap != null) {
+        const classMax = totalValue * classCap;
+        const roomInClass = Math.max(0, classMax - (classExposure.get(meta.asset_class) ?? 0));
+        if (roomInClass <= 0) classRejected = true;
+        spend = Math.min(spend, roomInClass);
+      }
+
+      // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue
+      let volCapped = false;
+      if (cfg.volatility_sizing) {
+        const vol = featureBySymbol.get(meta.symbol)?.vol20d ?? null;
+        if (vol && vol > 0) {
+          const targetPositionVal = (cfg.vol_target_pct * totalValue) / vol;
+          const volRoom = Math.max(0, targetPositionVal - existingVal);
+          if (spend > volRoom) {
+            spend = volRoom;
+            volCapped = true;
+          }
+        }
+      }
+
       if (spend < 1) {
         executed.push({
           symbol: meta.symbol,
@@ -379,7 +408,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           price,
           value: 0,
           reason: order.reason,
-          rejected: "guardrails leave no room to buy",
+          rejected: classRejected
+            ? `asset-class cap reached for ${meta.asset_class}`
+            : volCapped
+              ? "volatility sizing leaves no room"
+              : "guardrails leave no room to buy",
         });
         continue;
       }
@@ -403,6 +436,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           updated_at: new Date().toISOString(),
         } as Holding);
       }
+      classExposure.set(
+        meta.asset_class,
+        (classExposure.get(meta.asset_class) ?? 0) + spend,
+      );
       executed.push({
         symbol: meta.symbol,
         side: "buy",
@@ -413,6 +450,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       });
     }
   }
+
 
   // Persist state
   const admin = supabaseAdmin;
