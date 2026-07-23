@@ -286,7 +286,7 @@ function AttributionPage() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     )}
                   </div>
                   <div>
