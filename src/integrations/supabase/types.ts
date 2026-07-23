@@ -523,6 +523,7 @@ export type Database = {
           created_at: string
           currency: string
           current_cash: number
+          hyperparams: Json
           id: string
           last_run_date: string | null
           live_activated_at: string | null
@@ -545,6 +546,7 @@ export type Database = {
           created_at?: string
           currency?: string
           current_cash?: number
+          hyperparams?: Json
           id?: string
           last_run_date?: string | null
           live_activated_at?: string | null
@@ -567,6 +569,7 @@ export type Database = {
           created_at?: string
           currency?: string
           current_cash?: number
+          hyperparams?: Json
           id?: string
           last_run_date?: string | null
           live_activated_at?: string | null
