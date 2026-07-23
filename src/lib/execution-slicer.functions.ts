@@ -116,7 +116,7 @@ export const tickSlices = createServerFn({ method: "POST" })
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
-  .handler(async ({ data, context }): Promise<SlicerResult<{ due: Array<Record<string, unknown>> }>> => {
+  .handler(async ({ data, context }) => {
     const full = TickInputSchema.safeParse({ ...data, ownerUserId: context.userId });
     if (!full.success) return fail("invalid_input", "invalid tick input", zodIssues(full.error));
 
