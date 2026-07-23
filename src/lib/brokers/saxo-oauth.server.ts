@@ -64,12 +64,22 @@ export function verifyState(state: string): { env: BrokerEnv } | null {
   return { env };
 }
 
-function appCreds(): { key: string; secret: string } {
-  const key = process.env.SAXO_APP_KEY;
-  const secret = process.env.SAXO_APP_SECRET;
+function appCreds(env: BrokerEnv): { key: string; secret: string } {
+  // Saxo issues SEPARATE app credentials for SIM and LIVE (different auth hosts,
+  // different client_id namespaces). Prefer per-env secrets; fall back to the
+  // generic SAXO_APP_KEY/SECRET (kept for SIM back-compat).
+  const key =
+    env === "live"
+      ? process.env.SAXO_APP_KEY_LIVE ?? process.env.SAXO_APP_KEY
+      : process.env.SAXO_APP_KEY_SIM ?? process.env.SAXO_APP_KEY;
+  const secret =
+    env === "live"
+      ? process.env.SAXO_APP_SECRET_LIVE ?? process.env.SAXO_APP_SECRET
+      : process.env.SAXO_APP_SECRET_SIM ?? process.env.SAXO_APP_SECRET;
   if (!key || !secret) {
+    const suffix = env === "live" ? "_LIVE" : "_SIM";
     throw new Error(
-      "SAXO_APP_KEY / SAXO_APP_SECRET not configured. Register an OpenAPI app in Saxo Developer Portal and save both secrets.",
+      `SAXO_APP_KEY${suffix} / SAXO_APP_SECRET${suffix} not configured. Register a ${env.toUpperCase()} app in the Saxo Developer Portal and save both secrets.`,
     );
   }
   return { key, secret };
