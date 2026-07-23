@@ -133,6 +133,7 @@ async function callAiForDecision(args: {
   news: { headline: string; source: string | null }[];
   asOf: string;
   regime: PersistedRegime;
+  learning: LearningContext;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
