@@ -272,7 +272,7 @@ function AttributionPage() {
                     {data.regime_breakdown.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No regime-tagged trades.</p>
                     ) : (
-                      <table className="w-full text-sm">
+                      <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-sm">
                         <thead className="text-xs text-muted-foreground">
                           <tr><th className="text-left py-1">Regime</th><th className="text-right">n</th><th className="text-right">Avg return</th><th className="text-right">Win rate</th></tr>
                         </thead>
