@@ -34,7 +34,7 @@ export function CorrelationHeatmapCard({ portfolioId }: { portfolioId: string })
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Grid3x3 className="h-4 w-4" /> Correlation & exposure heatmap
-          <Explain term="volatility" />
+          <Explain term="volatility">?</Explain>
         </CardTitle>
       </CardHeader>
       <CardContent>
