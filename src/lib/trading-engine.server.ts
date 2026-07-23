@@ -229,7 +229,9 @@ async function callAiForDecision(args: {
   regimeNote?: string | null;
   hyperparams?: TunedHyperparams | null;
   calibrationBlock?: string | null;
+  variantSuffix?: string | null;
 }): Promise<DecisionOutput> {
+
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
   const gateway = createLovableAiGatewayProvider(key);
