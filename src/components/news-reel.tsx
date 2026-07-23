@@ -137,28 +137,46 @@ export function NewsReel() {
               Live headlines the AI has been reading, with a note on how each shaped its recent trading decisions.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setPaused((p) => !p)}
-              aria-label={paused ? "Resume scrolling" : "Pause scrolling"}
-              title={paused ? "Resume scrolling" : "Pause scrolling"}
-            >
-              {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => q.refetch()}
-              disabled={q.isFetching}
-              aria-label="Refresh news"
-              title="Refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
-            </Button>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-1">
+              <select
+                value={refreshKey}
+                onChange={(e) => setRefreshKey(e.target.value as RefreshKey)}
+                className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                aria-label="Refresh frequency"
+                title="How often the reel auto-refreshes"
+              >
+                {REFRESH_OPTIONS.map((o) => (
+                  <option key={o.key} value={o.key}>Every {o.label}</option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setPaused((p) => !p)}
+                aria-label={paused ? "Resume scrolling" : "Pause scrolling"}
+                title={paused ? "Resume scrolling" : "Pause scrolling"}
+              >
+                {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => q.refetch()}
+                disabled={q.isFetching}
+                aria-label="Refresh news"
+                title="Refresh now"
+              >
+                <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+            <div className="text-[10px] text-muted-foreground" title={lastUpdated ? new Date(lastUpdated).toLocaleString() : "Not yet loaded"}>
+              {q.isFetching ? "Refreshing…" : `Updated ${formatAgo(lastUpdated, now)}`}
+              {refreshMs === 0 ? " · auto-refresh off" : ""}
+            </div>
           </div>
         </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
           <span className="text-muted-foreground uppercase tracking-wide">Asset:</span>
           {ASSET_CLASSES.map((c) => {
