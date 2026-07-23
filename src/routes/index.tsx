@@ -29,7 +29,9 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
-import { AllPortfoliosChart } from "@/components/all-portfolios-chart";
+const AllPortfoliosChart = lazy(() =>
+  import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
+);
 import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X } from "lucide-react";
 import { Explain } from "@/components/explain";
