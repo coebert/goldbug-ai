@@ -218,6 +218,11 @@ function PortfolioPage() {
                 >
                   <RotateCcw className="mr-1 h-4 w-4" /> Reset
                 </Button>
+                <Link to="/long-horizon/$id" params={{ id }}>
+                  <Button variant="outline">
+                    <CalendarClock className="mr-1 h-4 w-4" /> Long-horizon backtest
+                  </Button>
+                </Link>
                 {(runDay.isPending || runBt.isPending) && (
                   <span className="text-xs text-muted-foreground">
                     Fetching prices, reading news, asking the AI…
