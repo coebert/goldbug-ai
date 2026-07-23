@@ -403,13 +403,28 @@ type Guardrails = {
   starting_cash: number;
 };
 
+type SignalWeights = {
+  sma_trend: number;
+  rsi: number;
+  price_change: number;
+  news_sentiment: number;
+  volatility: number;
+};
+
+type AiOrder = {
+  symbol?: string;
+  side?: "buy" | "sell";
+  signal_weights?: Partial<SignalWeights>;
+};
+
 type DecisionRaw = {
-  orders?: unknown[];
+  orders?: AiOrder[];
   executed?: ExecutedRow[];
   signals?: SignalRow[];
   news?: NewsRow[];
   guardrails?: Guardrails;
 };
+
 
 function fmtNum(v: number | null | undefined, digits = 2) {
   if (v == null || Number.isNaN(v)) return "—";
