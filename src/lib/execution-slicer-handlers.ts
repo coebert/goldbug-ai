@@ -81,7 +81,7 @@ export async function enqueueSliceHandler(
   setStatus: StatusSetter,
 ): Promise<
   SlicerResult<
-    | { sliceId: string; sliceQty: number; slices: number }
+    | { sliceId: string; sliceQty: number; slices: number; reused?: true }
     | { skipped: true; reason: "below_threshold" }
   >
 > {
@@ -90,7 +90,9 @@ export async function enqueueSliceHandler(
 
   try {
     const { maybeSliceOrder } = await import("./execution-slicer.server");
-    const result = await maybeSliceOrder(full.data);
+    const result = (await maybeSliceOrder(full.data)) as
+      | null
+      | { sliceId: string; sliceQty: number; slices: number; reused?: true };
     if (result === null) return { ok: true, data: { skipped: true, reason: "below_threshold" } };
     return { ok: true, data: result };
   } catch (e) {
@@ -98,6 +100,7 @@ export async function enqueueSliceHandler(
     return classifyThrown(setStatus, e);
   }
 }
+
 
 // ---- tick ------------------------------------------------------------------
 
