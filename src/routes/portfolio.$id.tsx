@@ -274,12 +274,18 @@ function PortfolioPage() {
                             <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.2} />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.35} strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                          stroke="hsl(var(--border))"
+                        />
                         <YAxis
                           domain={["auto", "auto"]}
-                          tick={{ fontSize: 11 }}
-                          tickFormatter={(v) => `${Number(v).toFixed(0)}`}
+                          width={64}
+                          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                          stroke="hsl(var(--border))"
+                          tickFormatter={(v) => `${p.currency}${Number(v).toFixed(0)}`}
                         />
                         <Tooltip
                           cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
