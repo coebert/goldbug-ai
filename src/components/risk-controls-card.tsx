@@ -169,7 +169,16 @@ export function RiskControlsCard({
 }) {
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
+  const [level, setLevel] = useState<number>(() => inferRiskLevel(initial));
   const [open, setOpen] = useState(true);
+
+  const applyLevel = (lvl: number) => {
+    setLevel(lvl);
+    setCfg({
+      ...RISK_PRESETS[lvl].cfg,
+      asset_class_limits: { ...RISK_PRESETS[lvl].cfg.asset_class_limits },
+    });
+  };
 
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
