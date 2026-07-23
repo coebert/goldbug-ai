@@ -1297,3 +1297,25 @@ export const getPortfolioLearning = createServerFn({ method: "GET" })
     const ctx = await buildLearningContext(data.portfolio_id, asOf);
     return { as_of: asOf, ...ctx };
   });
+
+export const getBenchmarkSeries = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      symbol: z.string().min(1).max(12),
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { getDailyCandlesRange } = await import("./market-data.server");
+    try {
+      const candles = await getDailyCandlesRange(data.symbol, data.from, data.to);
+      return {
+        symbol: data.symbol,
+        series: candles.map((c) => ({ date: c.date, close: Number(c.close) })),
+      };
+    } catch (err) {
+      return { symbol: data.symbol, series: [] as { date: string; close: number }[], error: err instanceof Error ? err.message : "failed" };
+    }
+  });
