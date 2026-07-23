@@ -18,9 +18,29 @@ import {
   rsi,
   pctChange,
   dailyVolatility,
-  type Candle,
 } from "./market-data.server";
+import {
+  macd,
+  bollingerWidth,
+  atrPct,
+  averageDailyVolume,
+  volumeWeightedMomentum,
+  weeklySnapshot,
+} from "./signals-extended.server";
+import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
 import { getNewsForDate } from "./news.server";
+import {
+  ensureSentimentScored,
+  aggregatedSentimentForSymbol,
+} from "./sentiment.server";
+import {
+  buildCorrelationMap,
+  correlatedClusterAllowance,
+  convictionSizedSpend,
+  refreshCooldownsFromRecentTrades,
+  isSymbolCooling,
+  upcomingEvents,
+} from "./portfolio-optimizer.server";
 import {
   filterUniverse,
   findSymbol,
@@ -52,8 +72,9 @@ const SignalWeightsSchema = z.object({
 const OrderSchema = z.object({
   symbol: z.string(),
   side: z.enum(["buy", "sell"]),
-  // Percentage of current cash to allocate (for buys) OR percentage of holding to sell.
   percent: z.number(),
+  // 0..1 model confidence in this specific call (used for Kelly-capped sizing)
+  conviction: z.number().min(0).max(1).optional(),
   reason: z.string(),
   signal_weights: SignalWeightsSchema,
 });
@@ -66,6 +87,7 @@ const DecisionSchema = z.object({
 });
 
 export type DecisionOutput = z.infer<typeof DecisionSchema>;
+
 
 function classesFromUniverse(u: unknown): Database["public"]["Enums"]["asset_class"][] {
   if (!Array.isArray(u)) return ["stock", "etf", "crypto", "commodity", "fx"];
@@ -90,12 +112,27 @@ async function buildCandidateFeatures(
     change5d: number | null;
     change30d: number | null;
     vol20d: number | null;
+    macd_hist: number | null;
+    macd_bull_cross: boolean;
+    macd_bear_cross: boolean;
+    bb_width: number | null;
+    atr_pct: number | null;
+    adv_20d: number | null;
+    vw_momentum_10d: number | null;
+    weekly_trend_up: boolean;
+    weekly_rsi14: number | null;
+    // Sentiment / cooldown are filled in later once news + cooldowns load
+    news_score: number | null;
+    news_contributors: number;
+    cooling: boolean;
   }> = [];
   await Promise.all(
     candidates.map(async (c) => {
-      const candles = await getDailyCandles(c.symbol, 90, asOf);
+      const candles = await getDailyCandles(c.symbol, 260, asOf);
       if (candles.length < 5) return;
       const closes = candles.map((k) => k.close);
+      const m = macd(closes);
+      const wk = weeklySnapshot(candles);
       rows.push({
         symbol: c.symbol,
         name: c.name,
@@ -107,11 +144,25 @@ async function buildCandidateFeatures(
         change5d: pctChange(closes, 5),
         change30d: pctChange(closes, 30),
         vol20d: dailyVolatility(closes, 20),
+        macd_hist: m ? m.histogram : null,
+        macd_bull_cross: m ? m.bullish_cross : false,
+        macd_bear_cross: m ? m.bearish_cross : false,
+        bb_width: bollingerWidth(closes, 20),
+        atr_pct: atrPct(candles, 14),
+        adv_20d: averageDailyVolume(candles, 20),
+        vw_momentum_10d: volumeWeightedMomentum(candles, 10),
+        weekly_trend_up: wk?.weekly_trend_up ?? false,
+        weekly_rsi14: wk?.weekly_rsi14 ?? null,
+        news_score: null,
+        news_contributors: 0,
+        cooling: false,
       });
     }),
   );
   return rows;
 }
+
+
 
 
 export type ExecutedTrade = {
@@ -130,7 +181,10 @@ async function callAiForDecision(args: {
   cashValue: number;
   totalValue: number;
   features: Awaited<ReturnType<typeof buildCandidateFeatures>>;
-  news: { headline: string; source: string | null }[];
+  news: Array<{ headline: string; source: string | null; sentiment: number | null }>;
+  crossAsset: string; // preformatted block
+  events: Array<{ event_date: string; kind: string; symbol: string | null; title: string; impact: string }>;
+  cooling: string[];
   asOf: string;
   regime: PersistedRegime;
   learning: LearningContext;
@@ -162,6 +216,18 @@ async function callAiForDecision(args: {
 - Prior playbook for this regime: ${regimeDescription(r.regime)}
 ${r.transitioned ? "Because the regime just shifted, explicitly reassess existing holdings under the new prior and note it in the rationale." : "Bias posture toward the current regime's playbook."}`;
 
+  const eventsBlock =
+    args.events.length > 0
+      ? `UPCOMING KNOWN EVENTS (within 3 days) — reduce position size into these:\n${args.events
+          .map((e) => `- ${e.event_date} [${e.impact}] ${e.kind}${e.symbol ? ` ${e.symbol}` : ""}: ${e.title}`)
+          .join("\n")}`
+      : "UPCOMING KNOWN EVENTS: none tracked in the next 3 days.";
+
+  const coolingBlock =
+    args.cooling.length > 0
+      ? `LOSS COOLDOWN active for: ${args.cooling.join(", ")}. Any BUY on these will be automatically halved by guardrails; consider skipping.`
+      : "";
+
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
@@ -170,6 +236,7 @@ HARD RULES YOU MUST NEVER BREAK:
 - Keep at least ${(risk.cashFloorPct * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
 - Asset-class exposure caps: ${classLimitsStr}.
+- Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
 - Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
@@ -177,11 +244,17 @@ ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility 
 
 ${regimeBlock}
 
+${args.crossAsset}
+
+${eventsBlock}
+${coolingBlock}
+
 ${formatLearningBlock(args.learning)}
 
 ${HISTORICAL_PLAYBOOK}
 
-Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.`;
+Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
+Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.`;
 
 
   const user = `Date: ${args.asOf}
@@ -189,31 +262,33 @@ Portfolio value: ${args.totalValue.toFixed(2)} ${args.portfolio.currency}
 Cash: ${args.cashValue.toFixed(2)} ${args.portfolio.currency}
 Current holdings: ${JSON.stringify(holdingsSummary)}
 
-Candidate assets (technicals):
+Candidate assets (extended technicals, sentiment, cooldown flag):
 ${JSON.stringify(args.features, null, 2)}
 
-Recent headlines:
+Recent headlines (sentiment -1 bearish .. +1 bullish, LLM-scored):
 ${args.news
-  .slice(0, 12)
-  .map((n, i) => `${i + 1}. [${n.source ?? "news"}] ${n.headline}`)
+  .slice(0, 15)
+  .map(
+    (n, i) =>
+      `${i + 1}. [${n.source ?? "news"}] (sent ${n.sentiment == null ? "?" : n.sentiment.toFixed(2)}) ${n.headline}`,
+  )
   .join("\n")}
 
 Return:
-- briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}).
-- rationale: 2-4 sentences explaining today's actions in light of the regime and priors.
+- briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}, and cross-asset posture).
+- rationale: 2-4 sentences explaining today's actions in light of the regime, cross-asset, and priors.
 - orders: array of trades to place today. Each order has:
     symbol (must be from candidate list),
     side ("buy" or "sell"),
     percent (for BUY: % of current cash to spend, 1-100; for SELL: % of the held quantity to sell, 1-100),
-    reason (one sentence),
-    signal_weights: an object attributing this decision across five feature groups. Each value is 0-100
-      and the FIVE VALUES MUST SUM TO 100. Use larger weights for the features that most drove the call.
-      Keys:
-        sma_trend       — moving-average trend (price vs SMA20/SMA50, SMA20 vs SMA50)
-        rsi             — RSI-14 momentum / overbought / oversold
-        price_change    — recent price change (5d / 30d)
-        news_sentiment  — tone and relevance of the provided headlines for this symbol
-        volatility      — 20-day realised volatility of the asset
+    conviction: 0..1 (how sure you are). Higher conviction => guardrails allow larger Kelly-capped sizing.
+    reason (one sentence citing the strongest 1-2 features),
+    signal_weights: attribute the decision across five feature buckets, summing to 100:
+      sma_trend       — MA trend AND MACD histogram / crosses (grouped)
+      rsi             — daily RSI-14 AND weekly RSI alignment
+      price_change    — recent price change (5d/30d) AND volume-weighted momentum
+      news_sentiment  — weighted LLM sentiment for this symbol
+      volatility      — 20d vol, ATR%, Bollinger width
 If no action is warranted, return an empty orders array.`;
 
 
@@ -227,6 +302,7 @@ If no action is warranted, return an empty orders array.`;
     return output;
   } catch (error) {
     if (NoObjectGeneratedError.isInstance(error)) {
+
       return {
         briefing: "AI response could not be parsed; taking no action today.",
         rationale: error.text?.slice(0, 500) ?? "Parse error",
@@ -278,22 +354,44 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const totalValue = cash + holdingsValue;
 
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
-  const news = opts?.skipNews ? [] : await getNewsForDate(asOf).catch(() => []);
-  const regime = await detectAndPersistRegime(asOf).catch((e) => {
-    console.warn("Regime detection failed:", e);
-    return null;
-  });
-  const learning = await buildLearningContext(portfolioId, asOf).catch((e) => {
-    console.warn("Learning context failed:", e);
-    return {
-      stats: {
-        window_days: 20, horizon_days: 5, evaluable: 0, wins: 0, losses: 0,
-        win_rate: null, avg_return_pct: null, best: null, worst: null,
-        per_symbol: [], per_side: { buy: { n: 0, win_rate: null }, sell: { n: 0, win_rate: null } },
-      },
-      lessons: [], lessons_as_of: null, samples: [],
-    } satisfies LearningContext;
-  });
+
+  const [rawNews, regime, learning, crossAsset, cooldowns, events] = await Promise.all([
+    opts?.skipNews ? Promise.resolve([]) : getNewsForDate(asOf).catch(() => []),
+    detectAndPersistRegime(asOf).catch((e) => {
+      console.warn("Regime detection failed:", e);
+      return null;
+    }),
+    buildLearningContext(portfolioId, asOf).catch((e) => {
+      console.warn("Learning context failed:", e);
+      return {
+        stats: {
+          window_days: 20, horizon_days: 5, evaluable: 0, wins: 0, losses: 0,
+          win_rate: null, avg_return_pct: null, best: null, worst: null,
+          per_symbol: [], per_side: { buy: { n: 0, win_rate: null }, sell: { n: 0, win_rate: null } },
+        },
+        lessons: [], lessons_as_of: null, samples: [],
+      } satisfies LearningContext;
+    }),
+    getCrossAssetSnapshot(asOf).catch(() => null),
+    refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
+    upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)).catch(() => []),
+  ]);
+
+  // Score news sentiment (LLM pass, cached), then aggregate per-symbol
+  const scoredNews = rawNews.length > 0
+    ? await ensureSentimentScored(asOf, rawNews).catch(() => rawNews.map((n) => ({
+        ...n, sentiment: null, entities: [] as string[], source_weight: 0.4,
+      })))
+    : [];
+
+  for (const f of features) {
+    const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
+    f.news_score = agg.contributors > 0 ? Number(agg.score.toFixed(3)) : null;
+    f.news_contributors = agg.contributors;
+    f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
+  }
+
+  const coolingSymbols = features.filter((f) => f.cooling).map((f) => f.symbol);
 
   const decision = await callAiForDecision({
     portfolio,
@@ -301,7 +399,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     cashValue: cash,
     totalValue,
     features,
-    news,
+    news: scoredNews.slice(0, 15).map((n) => ({
+      headline: n.headline,
+      source: n.source,
+      sentiment: n.sentiment,
+    })),
+    crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
+    events,
+    cooling: coolingSymbols,
     asOf,
     regime: regime ?? {
       as_of: asOf,
@@ -318,6 +423,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     },
     learning,
   });
+
 
   // Execute orders through guardrails
   const risk = riskProfile(portfolio.risk_level);
@@ -372,6 +478,29 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       (classExposure.get(h.asset_class) ?? 0) + price * Number(h.quantity),
     );
   }
+
+  // Build correlation map covering current holdings + candidate buys
+  const buySymbols = decision.orders
+    .filter((o) => o.side === "buy")
+    .map((o) => o.symbol.toUpperCase())
+    .filter((s) => !!findSymbol(s));
+  const corrSymbols = Array.from(new Set([...holdingsByS.keys(), ...buySymbols]));
+  const corrMap = corrSymbols.length > 1
+    ? await buildCorrelationMap(corrSymbols, asOf).catch(() => new Map<string, Map<string, number>>())
+    : new Map<string, Map<string, number>>();
+
+  // High-impact events touching a symbol => size penalty
+  const eventPenaltyBySymbol = new Map<string, number>();
+  for (const ev of events) {
+    if (!ev.symbol) continue;
+    const key = ev.symbol.toUpperCase();
+    const penalty = ev.impact === "high" ? 0.5 : ev.impact === "medium" ? 0.75 : 0.9;
+    eventPenaltyBySymbol.set(key, Math.min(eventPenaltyBySymbol.get(key) ?? 1, penalty));
+  }
+  // Broad macro event within window applies a mild across-the-board penalty
+  const macroPenalty = events.some((e) => !e.symbol && (e.impact === "high" || e.impact === "medium"))
+    ? 0.85
+    : 1;
 
   // Process sells first to free cash
   const sorted = [...decision.orders].sort((a) =>
@@ -458,6 +587,35 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
       const spendableCash = Math.max(0, workingCash - cashFloor);
       let spend = spendableCash * pct;
+      const sizingNotes: string[] = [];
+
+      // Conviction-weighted Kelly cap (only shrinks; never grows above requested %)
+      if (typeof order.conviction === "number") {
+        const feat = featureBySymbol.get(meta.symbol);
+        const convSpend = convictionSizedSpend({
+          baseSize: spend,
+          conviction: order.conviction,
+          volPct: feat?.vol20d ?? null,
+        });
+        if (convSpend < spend) {
+          spend = convSpend;
+          sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}`);
+        }
+      }
+
+      // Loss cooldown: halve size while cooling
+      if (isSymbolCooling(cooldowns, meta.symbol, asOf)) {
+        spend *= 0.5;
+        sizingNotes.push("cooldown x0.5");
+      }
+
+      // Event penalty (symbol-specific and broad macro)
+      const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
+      if (evPenalty < 1) {
+        spend *= evPenalty;
+        sizingNotes.push(`event x${evPenalty.toFixed(2)}`);
+      }
+
       // Enforce per-symbol position cap
       const existingVal = holdingsByS.get(meta.symbol)
         ? Number(holdingsByS.get(meta.symbol)!.quantity) * price
@@ -489,6 +647,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
+      // Portfolio-level correlated cluster cap
+      let corrCapped = false;
+      const existingExposureBySymbol = new Map<string, number>();
+      for (const h of holdingsByS.values()) {
+        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        existingExposureBySymbol.set(h.symbol, p * Number(h.quantity));
+      }
+      const corrRes = correlatedClusterAllowance({
+        symbol: meta.symbol,
+        spend,
+        totalValue,
+        existingExposureBySymbol,
+        corr: corrMap,
+      });
+      if (corrRes.allowed < spend) {
+        spend = corrRes.allowed;
+        corrCapped = true;
+        sizingNotes.push(`corr-cluster ${(corrRes.clusterExposurePct * 100).toFixed(0)}%`);
+      }
+
       if (spend < 1) {
         executed.push({
           symbol: meta.symbol,
@@ -499,9 +677,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           reason: order.reason,
           rejected: classRejected
             ? `asset-class cap reached for ${meta.asset_class}`
-            : volCapped
-              ? "volatility sizing leaves no room"
-              : "guardrails leave no room to buy",
+            : corrCapped
+              ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
+              : volCapped
+                ? "volatility sizing leaves no room"
+                : "guardrails leave no room to buy",
         });
         continue;
       }
@@ -535,10 +715,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         quantity: qty,
         price,
         value: spend,
-        reason: order.reason,
+        reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
       });
     }
   }
+
 
 
   // Persist state
@@ -609,7 +790,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       orders: decision.orders,
       executed,
       signals: features,
-      news: news.slice(0, 12),
+      news: scoredNews.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
         max_position_pct: basePerSymbolPct,
