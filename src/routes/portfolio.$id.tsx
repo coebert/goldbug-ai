@@ -368,6 +368,10 @@ function PortfolioPage() {
               </Card>
             </div>
 
+            <div className="mt-6">
+              <RegimePanel />
+            </div>
+
             <Tabs defaultValue="journal" className="mt-6">
               <TabsList>
                 <TabsTrigger value="journal">AI Journal ({decisions.length})</TabsTrigger>
