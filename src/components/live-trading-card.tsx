@@ -213,7 +213,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
                 <> · since {new Date(s.portfolio.live_activated_at).toLocaleString()}</>
               )}
             </span>
-            <Button size="sm" variant="destructive" onClick={() => mDeact.mutate()} disabled={mDeact.isPending}>
+            <Button size="sm" variant="destructive" onClick={() => mDeact.mutate(promptReason("Revert to paper"))} disabled={mDeact.isPending}>
               Revert to paper
             </Button>
           </div>
