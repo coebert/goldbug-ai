@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
+import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
@@ -56,6 +57,11 @@ const PortfolioIdReportRoute = PortfolioIdReportRouteImport.update({
   path: '/report',
   getParentRoute: () => PortfolioIdRoute,
 } as any)
+const PortfolioIdOptimizerRoute = PortfolioIdOptimizerRouteImport.update({
+  id: '/optimizer',
+  path: '/optimizer',
+  getParentRoute: () => PortfolioIdRoute,
+} as any)
 const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
   id: '/attribution',
   path: '/attribution',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
+  '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
+  '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
+  '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/portfolio/$id/attribution'
+    | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/portfolio/$id/attribution'
+    | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/portfolio/$id/attribution'
+    | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
@@ -223,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdReportRouteImport
       parentRoute: typeof PortfolioIdRoute
     }
+    '/portfolio/$id/optimizer': {
+      id: '/portfolio/$id/optimizer'
+      path: '/optimizer'
+      fullPath: '/portfolio/$id/optimizer'
+      preLoaderRoute: typeof PortfolioIdOptimizerRouteImport
+      parentRoute: typeof PortfolioIdRoute
+    }
     '/portfolio/$id/attribution': {
       id: '/portfolio/$id/attribution'
       path: '/attribution'
@@ -256,11 +275,13 @@ declare module '@tanstack/react-router' {
 
 interface PortfolioIdRouteChildren {
   PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
+  PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
   PortfolioIdReportRoute: typeof PortfolioIdReportRoute
 }
 
 const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
   PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
+  PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
   PortfolioIdReportRoute: PortfolioIdReportRoute,
 }
 
