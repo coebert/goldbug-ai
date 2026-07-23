@@ -4,6 +4,7 @@
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import {
   getDailyCandles,
   getPriceOn,
@@ -151,6 +152,9 @@ HARD RULES YOU MUST NEVER BREAK:
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
+
+${HISTORICAL_PLAYBOOK}
+
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.`;
 
 
