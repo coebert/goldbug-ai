@@ -1754,14 +1754,14 @@ export const runPortfolioOptimizer = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: portfolio, error: pErr } = await context.supabase
       .from("portfolios")
-      .select("id,name,currency,starting_cash,risk_level,cash")
+      .select("id,name,currency,starting_cash,risk_level,current_cash")
       .eq("id", data.portfolio_id)
       .single();
     if (pErr || !portfolio) throw new Error(pErr?.message ?? "Portfolio not found");
 
     const { data: holdings } = await context.supabase
       .from("holdings")
-      .select("symbol, quantity, avg_cost, current_price")
+      .select("symbol, quantity, avg_cost")
       .eq("portfolio_id", data.portfolio_id);
 
     const heldSymbols = (holdings ?? []).map((h) => String(h.symbol).toUpperCase());
