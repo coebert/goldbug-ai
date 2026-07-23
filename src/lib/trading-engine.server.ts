@@ -409,44 +409,60 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const coolingSymbols = features.filter((f) => f.cooling).map((f) => f.symbol);
 
-  const decision = await callAiForDecision({
-    portfolio,
-    holdings: holdings ?? [],
-    cashValue: cash,
-    totalValue,
-    features,
-    news: scoredNews.slice(0, 15).map((n) => ({
-      headline: n.headline,
-      source: n.source,
-      sentiment: n.sentiment,
-    })),
-    crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
-    events,
-    cooling: coolingSymbols,
-    asOf,
-    regime: regime ?? {
-      as_of: asOf,
-      regime: "bull_quiet",
-      previous_regime: null,
-      transitioned: false,
-      confidence: 0,
-      signals: {
-        spy_price: null, spy_sma50: null, spy_sma200: null,
-        spy_drawdown_pct: null, spy_return_30d: null, spy_vol_20d: null,
-        vix_level: null, gld_return_30d: null, tlt_return_30d: null,
-      },
-      notes: "regime detection unavailable",
-    },
-    learning,
-  });
-
-
-  // Execute orders through guardrails
+  // Regime-linked risk tightening: bear/crisis → tighter per-symbol cap and stop-loss.
   const risk = riskProfile(portfolio.risk_level);
-  const cfg = parseRiskConfig(portfolio.risk_config);
+  const baseCfg = parseRiskConfig(portfolio.risk_config);
+  const effectiveRegime = regime ?? {
+    as_of: asOf,
+    regime: "bull_quiet" as const,
+    previous_regime: null,
+    transitioned: false,
+    confidence: 0,
+    signals: {
+      spy_price: null, spy_sma50: null, spy_sma200: null,
+      spy_drawdown_pct: null, spy_return_30d: null, spy_vol_20d: null,
+      vix_level: null, gld_return_30d: null, tlt_return_30d: null,
+    },
+    notes: "regime detection unavailable",
+  };
+  const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
+  const cfg = tightened.cfg;
   const cashFloor = totalValue * risk.cashFloorPct;
-  const basePerSymbolPct = cfg.per_symbol_limit_pct ?? risk.maxPositionPct;
+  const basePerSymbolPct = tightened.per_symbol_effective_pct;
   const maxPosVal = totalValue * basePerSymbolPct;
+
+  // If circuit breaker is tripped, skip the AI call entirely.
+  const decision: DecisionOutput = breakerTripped
+    ? {
+        briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
+        rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
+        orders: [],
+      }
+    : await callAiForDecision({
+        portfolio,
+        holdings: holdings ?? [],
+        cashValue: cash,
+        totalValue,
+        features,
+        news: scoredNews.slice(0, 15).map((n) => ({
+          headline: n.headline,
+          source: n.source,
+          sentiment: n.sentiment,
+        })),
+        crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
+        events,
+        cooling: coolingSymbols,
+        asOf,
+        regime: effectiveRegime,
+        learning,
+        attribution: attribution ? formatAttributionBlock(attribution) : null,
+        regimeNote: tightened.note,
+      });
+
+
+  // Feature lookup for later use (volatility sizing, asset class)
+  const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
+
 
   // Feature lookup for later use (volatility sizing, asset class)
   const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
