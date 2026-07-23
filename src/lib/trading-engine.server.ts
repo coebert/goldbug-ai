@@ -232,18 +232,63 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   // Execute orders through guardrails
   const risk = riskProfile(portfolio.risk_level);
+  const cfg = parseRiskConfig(portfolio.risk_config);
   const cashFloor = totalValue * risk.cashFloorPct;
-  const maxPosVal = totalValue * risk.maxPositionPct;
+  const basePerSymbolPct = cfg.per_symbol_limit_pct ?? risk.maxPositionPct;
+  const maxPosVal = totalValue * basePerSymbolPct;
+
+  // Feature lookup for later use (volatility sizing, asset class)
+  const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
 
   let workingCash = cash;
   const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
+  // ---- Auto-liquidation: stop-loss / take-profit BEFORE the AI runs ----
+  if (cfg.stop_loss_pct > 0 || cfg.take_profit_pct > 0) {
+    for (const [sym, h] of Array.from(holdingsByS.entries())) {
+      const price = priceMap.get(sym);
+      const qty = Number(h.quantity);
+      const cost = Number(h.avg_cost);
+      if (!price || !(qty > 0) || !(cost > 0)) continue;
+      const change = (price - cost) / cost;
+      let trigger: string | null = null;
+      if (cfg.stop_loss_pct > 0 && change <= -cfg.stop_loss_pct) {
+        trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(cfg.stop_loss_pct * 100).toFixed(1)}%)`;
+      } else if (cfg.take_profit_pct > 0 && change >= cfg.take_profit_pct) {
+        trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(cfg.take_profit_pct * 100).toFixed(1)}%)`;
+      }
+      if (!trigger) continue;
+      const value = qty * price;
+      workingCash += value;
+      holdingsByS.delete(sym);
+      executed.push({
+        symbol: sym,
+        side: "sell",
+        quantity: qty,
+        price,
+        value,
+        reason: trigger,
+      });
+    }
+  }
+
+  // Recompute per-asset-class exposure after auto-liquidation, based on live prices.
+  const classExposure = new Map<string, number>();
+  for (const h of holdingsByS.values()) {
+    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    classExposure.set(
+      h.asset_class,
+      (classExposure.get(h.asset_class) ?? 0) + price * Number(h.quantity),
+    );
+  }
+
   // Process sells first to free cash
   const sorted = [...decision.orders].sort((a) =>
     a.side === "sell" ? -1 : 1,
   );
+
 
   for (const order of sorted) {
     const sym = order.symbol.toUpperCase();
