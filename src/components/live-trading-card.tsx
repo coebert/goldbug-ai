@@ -235,6 +235,52 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
             }))} />
           </div>
         )}
+
+        <div className="pt-2 border-t border-border">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowAudit((v) => !v)}
+            className="text-xs"
+          >
+            <History className="h-3 w-3 mr-1" />
+            {showAudit ? "Hide" : "Show"} audit log
+          </Button>
+          {showAudit && (
+            <div className="mt-2 text-xs">
+              {auditQ.isLoading ? (
+                <div className="text-muted-foreground italic">Loading…</div>
+              ) : (auditQ.data?.entries.length ?? 0) === 0 ? (
+                <div className="text-muted-foreground italic">No control actions yet.</div>
+              ) : (
+                <ul className="space-y-1 max-h-56 overflow-auto font-mono">
+                  {auditQ.data!.entries.map((e) => {
+                    const req = (e.request ?? {}) as { reason?: string | null };
+                    const resp = (e.response ?? {}) as { updated?: number; already_paused?: number; noop?: boolean; changed?: boolean };
+                    const summary =
+                      e.method === "KILL_SWITCH"
+                        ? `paused ${resp.updated ?? 0} · ${resp.already_paused ?? 0} already`
+                        : e.method === "RESUME_ALL"
+                          ? `resumed ${(resp as { resumed?: number }).resumed ?? 0}`
+                          : resp.noop
+                            ? "noop"
+                            : "ok";
+                    return (
+                      <li key={e.id} className="flex flex-wrap gap-x-2">
+                        <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
+                        <Badge variant={e.method === "KILL_SWITCH" ? "destructive" : "outline"} className="text-[10px] px-1">
+                          {e.method}
+                        </Badge>
+                        <span>{summary}</span>
+                        {req.reason && <span className="text-muted-foreground italic">— {req.reason}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
