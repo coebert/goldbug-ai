@@ -64,27 +64,30 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     const list = portfolios ?? [];
     if (list.length === 0) return { portfolios: [], series: [], currency: "GBP" as string };
 
-    const perPortfolio = await Promise.all(
-      list.map(async (p) => {
-        const { data: eq } = await context.supabase
-          .from("equity_snapshots")
-          .select("snapshot_date,total_value")
-          .eq("portfolio_id", p.id)
-          .order("snapshot_date", { ascending: true });
-        const rows = (eq ?? []).map((e) => ({
-          date: e.snapshot_date as string,
-          value: Number(e.total_value),
-        }));
-        return {
-          id: p.id as string,
-          name: p.name as string,
-          currency: p.currency as string,
-          starting_cash: Number(p.starting_cash),
-          current_cash: Number(p.current_cash),
-          series: rows,
-        };
-      }),
-    );
+    // Phase 8 — one query for all portfolios instead of N (uses new
+    // (portfolio_id, snapshot_date DESC) index).
+    const ids = list.map((p) => p.id);
+    const { data: allEq } = await context.supabase
+      .from("equity_snapshots")
+      .select("portfolio_id,snapshot_date,total_value")
+      .in("portfolio_id", ids)
+      .order("snapshot_date", { ascending: true });
+
+    const byPortfolio = new Map<string, Array<{ date: string; value: number }>>();
+    for (const e of allEq ?? []) {
+      const arr = byPortfolio.get(e.portfolio_id as string) ?? [];
+      arr.push({ date: e.snapshot_date as string, value: Number(e.total_value) });
+      byPortfolio.set(e.portfolio_id as string, arr);
+    }
+
+    const perPortfolio = list.map((p) => ({
+      id: p.id as string,
+      name: p.name as string,
+      currency: p.currency as string,
+      starting_cash: Number(p.starting_cash),
+      current_cash: Number(p.current_cash),
+      series: byPortfolio.get(p.id as string) ?? [],
+    }));
 
     const today = new Date().toISOString().slice(0, 10);
     const allDates = new Set<string>();
