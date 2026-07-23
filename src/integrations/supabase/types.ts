@@ -200,6 +200,44 @@ export type Database = {
         }
         Relationships: []
       }
+      portfolio_lessons: {
+        Row: {
+          as_of: string
+          created_at: string
+          id: string
+          lessons: Json
+          portfolio_id: string
+          stats: Json
+          window_days: number
+        }
+        Insert: {
+          as_of: string
+          created_at?: string
+          id?: string
+          lessons?: Json
+          portfolio_id: string
+          stats?: Json
+          window_days?: number
+        }
+        Update: {
+          as_of?: string
+          created_at?: string
+          id?: string
+          lessons?: Json
+          portfolio_id?: string
+          stats?: Json
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_lessons_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolios: {
         Row: {
           created_at: string
