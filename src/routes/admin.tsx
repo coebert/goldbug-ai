@@ -232,6 +232,19 @@ function AdminPage() {
       {q.isLoading && <p className="text-sm text-muted-foreground">Pinging brokers…</p>}
       {q.error && <Alert variant="destructive"><AlertTitle>Failed to load</AlertTitle><AlertDescription>{(q.error as Error).message}</AlertDescription></Alert>}
 
+      <Card className="border-primary/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Radio className="h-4 w-4 text-primary" /> Broker connection — Connect your Saxo account
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SaxoOAuthPanel />
+        </CardContent>
+      </Card>
+
+
+
       {s && (
         <>
           {alerts.length > 0 ? (
