@@ -207,13 +207,15 @@ export function NewsReel() {
               </Button>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="outline"
                 onClick={() => q.refetch()}
                 disabled={q.isFetching}
-                aria-label="Refresh news"
-                title="Refresh now"
+                aria-label="Refresh news now"
+                title="Fetch the latest headlines immediately"
+                className="h-8 gap-1.5 px-2 text-xs"
               >
-                <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} />
+                {q.isFetching ? "Refreshing…" : "Refresh now"}
               </Button>
             </div>
             <div className="text-[10px] text-muted-foreground" title={lastUpdated ? new Date(lastUpdated).toLocaleString() : "Not yet loaded"}>
