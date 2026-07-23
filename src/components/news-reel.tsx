@@ -243,6 +243,17 @@ export function NewsReel() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
+              {highlightCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHighlightIds(new Map())}
+                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/50 bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary shadow-sm transition-colors hover:bg-primary/25"
+                  title={`Clear ${highlightCount} new strong-signal highlight${highlightCount > 1 ? "s" : ""}`}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {highlightCount} new
+                </button>
+              )}
             </CardTitle>
             <CardDescription>
               Live headlines the AI has been reading, with a note on how each shaped its recent trading decisions.
