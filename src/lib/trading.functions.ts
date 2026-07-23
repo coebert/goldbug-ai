@@ -345,6 +345,144 @@ export const getComparison = createServerFn({ method: "POST" })
     return { results };
   });
 
+// Trade-by-trade comparison across multiple portfolios over a window.
+// Returns per-portfolio decision rows so the client can pivot by (date, symbol)
+// and highlight divergences (buy/sell/blocked/skipped + signal weights).
+export const getTradeComparison = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        portfolio_ids: z.array(z.string().uuid()).min(1).max(6),
+        from: z.string().optional(),
+        to: z.string().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: portfolios, error } = await context.supabase
+      .from("portfolios")
+      .select("id, name, risk_level, currency, starting_cash")
+      .in("id", data.portfolio_ids);
+    if (error) throw new Error(error.message);
+
+    const results = await Promise.all(
+      (portfolios ?? []).map(async (p) => {
+        let q = context.supabase
+          .from("decisions")
+          .select("run_date, rationale, portfolio_value, raw")
+          .eq("portfolio_id", p.id)
+          .order("run_date", { ascending: true });
+        if (data.from) q = q.gte("run_date", data.from);
+        if (data.to) q = q.lte("run_date", data.to);
+        const { data: decs } = await q;
+
+        type Row = {
+          date: string;
+          symbol: string;
+          side: "buy" | "sell";
+          intent_pct: number | null;
+          executed_qty: number;
+          executed_value: number;
+          price: number;
+          rejected: string | null;
+          reason: string;
+          signal_weights: Record<string, number> | null;
+          signals: Record<string, number | null> | null;
+          asset_class: string | null;
+        };
+        const rows: Row[] = [];
+        for (const d of decs ?? []) {
+          const raw = (d.raw ?? {}) as {
+            orders?: Array<{
+              symbol?: string;
+              side?: string;
+              percent?: number;
+              reason?: string;
+              signal_weights?: Record<string, number>;
+            }>;
+            executed?: Array<{
+              symbol?: string;
+              side?: string;
+              quantity?: number;
+              value?: number;
+              price?: number;
+              reason?: string;
+              rejected?: string | null;
+            }>;
+            signals?: Array<{
+              symbol: string;
+              asset_class?: string;
+              sma20?: number | null;
+              sma50?: number | null;
+              rsi14?: number | null;
+              change5d?: number | null;
+              change30d?: number | null;
+              vol20d?: number | null;
+              price?: number | null;
+            }>;
+          };
+          const sigBySym = new Map(
+            (raw.signals ?? []).map((s) => [s.symbol.toUpperCase(), s] as const),
+          );
+          const intentBySym = new Map(
+            (raw.orders ?? [])
+              .filter((o) => o.symbol)
+              .map(
+                (o) =>
+                  [
+                    (o.symbol ?? "").toUpperCase() + "|" + (o.side ?? ""),
+                    o,
+                  ] as const,
+              ),
+          );
+          for (const ex of raw.executed ?? []) {
+            const sym = (ex.symbol ?? "").toUpperCase();
+            if (!sym) continue;
+            const side = (ex.side === "sell" ? "sell" : "buy") as "buy" | "sell";
+            const intent = intentBySym.get(sym + "|" + side);
+            const sig = sigBySym.get(sym);
+            rows.push({
+              date: d.run_date as string,
+              symbol: sym,
+              side,
+              intent_pct: intent?.percent ?? null,
+              executed_qty: Number(ex.quantity ?? 0),
+              executed_value: Number(ex.value ?? 0),
+              price: Number(ex.price ?? 0),
+              rejected: ex.rejected ?? null,
+              reason: String(ex.reason ?? intent?.reason ?? ""),
+              signal_weights: intent?.signal_weights ?? null,
+              signals: sig
+                ? {
+                    sma20: sig.sma20 ?? null,
+                    sma50: sig.sma50 ?? null,
+                    rsi14: sig.rsi14 ?? null,
+                    change5d: sig.change5d ?? null,
+                    change30d: sig.change30d ?? null,
+                    vol20d: sig.vol20d ?? null,
+                  }
+                : null,
+              asset_class: sig?.asset_class ?? null,
+            });
+          }
+        }
+
+        return {
+          portfolio: {
+            id: p.id,
+            name: p.name,
+            risk_level: p.risk_level,
+            currency: p.currency,
+            starting_cash: Number(p.starting_cash),
+          },
+          rows,
+        };
+      }),
+    );
+    return { results };
+  });
+
 export const runBacktestMany = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
