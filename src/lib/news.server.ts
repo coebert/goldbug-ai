@@ -1,9 +1,8 @@
 // Lightweight global news fetcher using GDELT DOC API (free, no key).
 // Caches results by date in news_cache.
 
-import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 
@@ -178,21 +177,51 @@ async function callTranslateLLM(
   const key = process.env.LOVABLE_API_KEY;
   if (!key || headlines.length === 0) return out;
 
-  const gateway = createLovableAiGatewayProvider(key);
-  const model = gateway("google/gemini-3.6-flash");
+  const prompt = `For each numbered headline below, detect its language and, if it is NOT English, translate it into natural English. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese", "Macedonian"). When the headline is already in English, set lang to "English" and translation to null. Also return a "confidence" number between 0 and 1 (1 = certain, 0 = guessing). Never invent facts — translate only.
 
-  const prompt = `For each numbered headline below, detect its language and, if it is NOT English, translate it into natural English. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese", "Macedonian"). When the headline is already in English, set lang to "English" and translation to null. Also return a "confidence" number between 0 and 1 representing how confident you are in the language detection AND the accuracy of the translation combined (1 = certain, 0.5 = unsure, 0 = guessing). Never invent facts — translate only.
+Reply with a single JSON object of the exact shape:
+{"results":[{"i":<number>,"lang":"<language>","translation":"<english or null>","confidence":<0..1>}]}
 
 Headlines:
 ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
 
   try {
-    const { output } = await generateText({
-      model,
-      prompt,
-      output: Output.object({ schema: TranslateSchema }),
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Lovable-API-Key": key,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
     });
-    for (const r of output.results) {
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn(`news: translate LLM http ${res.status}: ${body.slice(0, 200)}`);
+      return out;
+    }
+    const json = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = json.choices?.[0]?.message?.content ?? "";
+    // Some gateways wrap JSON in ```json fences; strip them defensively.
+    const cleaned = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "").trim();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.warn(`news: translate LLM non-JSON reply: ${cleaned.slice(0, 200)}`);
+      return out;
+    }
+    const validated = TranslateSchema.safeParse(parsed);
+    if (!validated.success) {
+      console.warn(`news: translate LLM schema mismatch: ${JSON.stringify(parsed).slice(0, 200)}`);
+      return out;
+    }
+    for (const r of validated.data.results) {
       const rawConf = r.confidence;
       const conf =
         typeof rawConf === "number" && Number.isFinite(rawConf)
@@ -205,13 +234,11 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
       });
     }
   } catch (err) {
-    if (!NoObjectGeneratedError.isInstance(err)) {
-      console.warn("news: translate LLM failed", err instanceof Error ? err.message : String(err));
-    }
+    console.warn("news: translate LLM failed", err instanceof Error ? err.message : String(err));
   }
   return out;
-
 }
+
 
 // Batch-translate with caching. Cached entries never hit the LLM;
 // remaining items are batched into a single gateway call.
