@@ -9,6 +9,8 @@ export type NewsItem = {
   headline: string;
   url: string | null;
   summary: string | null;
+  original_headline: string | null;
+  original_language: string | null;
 };
 
 type GdeltArticle = {
