@@ -164,10 +164,11 @@ async function loadRow(env: BrokerEnv): Promise<TokenRow | null> {
 }
 
 async function refreshRow(row: TokenRow): Promise<TokenRow> {
+  // NOTE: Saxo's refresh_token grant does NOT accept redirect_uri and rejects
+  // it on some tenants. Only grant_type + refresh_token are required.
   const form = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: row.refresh_token,
-    redirect_uri: redirectUri(),
   });
   const tok = await tokenRequest(row.env, form);
   await persist(row.env, tok);
@@ -177,9 +178,24 @@ async function refreshRow(row: TokenRow): Promise<TokenRow> {
 }
 
 /**
- * Return a valid access token for the given env. Refreshes proactively if the
- * current one is within REFRESH_SKEW_MS of expiry. Falls back to the legacy
- * SAXO_ACCESS_TOKEN env var if no OAuth row exists yet (backward compat).
+ * Force a refresh of the stored tokens for this env, regardless of remaining
+ * lifetime on the current access token. Used by the hourly cron to roll the
+ * refresh-token window forward before it lapses (Saxo's refresh tokens can be
+ * as short as 60 minutes — waiting for the access token to hit 5-min skew
+ * means we miss the refresh window entirely). Returns null when there is no
+ * OAuth row to refresh (legacy access-token mode).
+ */
+export async function forceRefreshTokens(env: BrokerEnv): Promise<{ refreshed: boolean; reason?: string }> {
+  const row = await loadRow(env);
+  if (!row) return { refreshed: false, reason: "no oauth row" };
+  await refreshRow(row);
+  return { refreshed: true };
+}
+
+/**
+ * Return a valid access token for the given env. Refreshes proactively when
+ * either the access token OR the refresh token is nearing expiry. Falls back
+ * to the legacy SAXO_ACCESS_TOKEN env var if no OAuth row exists yet.
  */
 export async function getAccessToken(env: BrokerEnv): Promise<string> {
   const row = await loadRow(env);
@@ -190,11 +206,21 @@ export async function getAccessToken(env: BrokerEnv): Promise<string> {
       `No Saxo OAuth token stored for env=${env}. Connect the account via the Saxo OAuth flow first.`,
     );
   }
-  const expiresMs = new Date(row.expires_at).getTime();
-  if (expiresMs - Date.now() > REFRESH_SKEW_MS) return row.access_token;
+  const now = Date.now();
+  const accessLeftMs = new Date(row.expires_at).getTime() - now;
+  const refreshLeftMs = row.refresh_expires_at
+    ? new Date(row.refresh_expires_at).getTime() - now
+    : Infinity;
+  // Roll forward if either window is closing. Refresh tokens on Saxo can be
+  // ~1h, so we must not wait for the access token's 5-min skew — we'd miss the
+  // refresh window entirely. Refresh when refresh token has <15 min left OR
+  // when access token has <5 min left.
+  const needRefresh = accessLeftMs < REFRESH_SKEW_MS || refreshLeftMs < 15 * 60 * 1000;
+  if (!needRefresh) return row.access_token;
   const fresh = await refreshRow(row);
   return fresh.access_token;
 }
+
 
 export interface OAuthStatus {
   env: BrokerEnv;
