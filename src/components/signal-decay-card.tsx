@@ -28,7 +28,7 @@ export function SignalDecayCard({ portfolioId }: { portfolioId: string }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Activity className="h-4 w-4" /> Signal decay (30d)
-          <Explain term="signals-panel">?</Explain>
+          <Explain term="signal_importance">?</Explain>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
