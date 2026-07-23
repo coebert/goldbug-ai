@@ -52,10 +52,20 @@ export type AttributionDashboard = {
   overall: AttributionReport;
   trades: TradePoint[];
   cumulative_by_signal: Array<{ trade_date: string } & Record<SignalKey, number>>;
+  cumulative_alpha: Array<{ trade_date: string; strategy: number; benchmark: number; alpha: number }>;
+  alpha_summary: {
+    n: number;
+    avg_return_pct: number | null;
+    avg_benchmark_pct: number | null;
+    avg_alpha_pct: number | null;
+    alpha_win_rate: number | null; // share of trades where alpha > 0
+    hit_rate: number | null; // share where forward return > 0
+  };
   news_buckets: NewsBucket[];
   regime_breakdown: RegimeBreakdown[];
   penalty_breakdown: PenaltyBreakdown[];
 };
+
 
 // Parse the executed.reason string for event x0.75 / cooldown x0.5 / liquidity flags.
 function parsePenalty(reason: string): { event: number; cooldown: boolean; liquidity: boolean } {
