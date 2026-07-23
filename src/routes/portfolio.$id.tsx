@@ -590,36 +590,48 @@ function PortfolioPage() {
                               drawdown: number;
                               benchmark?: number | null;
                             };
-                            const pnlFromStart = row.value - startingCash;
-                            const pnlPctFromStart = startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
-                            const benchPct = row.benchmark != null && startingCash > 0
-                              ? ((row.benchmark - startingCash) / startingCash) * 100
-                              : null;
+                            const isPct = compareMode === "pct";
+                            const fmtVal = (v: number) => isPct
+                              ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
+                              : `${p.currency} ${v.toFixed(2)}`;
+                            const pnlFromStart = isPct ? row.value : row.value - startingCash;
+                            const pnlPctFromStart = isPct
+                              ? row.value
+                              : startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
+                            const benchPct = row.benchmark == null
+                              ? null
+                              : isPct
+                                ? row.benchmark
+                                : startingCash > 0 ? ((row.benchmark - startingCash) / startingCash) * 100 : null;
                             const active_events = eventsOn
                               ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
                               : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
-                                <div className="mb-1 font-medium">{label}</div>
+                                <div className="mb-1 font-medium">
+                                  {label} <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">{isPct ? "% vs start" : "value"}</span>
+                                </div>
                                 <div className="tabular-nums">
                                   <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.equity }} />
-                                  Portfolio: {p.currency} {row.value.toFixed(2)}
+                                  Portfolio: {fmtVal(row.value)}
                                 </div>
-                                <div className="tabular-nums text-muted-foreground pl-3.5">
-                                  vs start: {pnlFromStart >= 0 ? "+" : ""}
-                                  {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
-                                </div>
+                                {!isPct && (
+                                  <div className="tabular-nums text-muted-foreground pl-3.5">
+                                    vs start: {pnlFromStart >= 0 ? "+" : ""}
+                                    {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
+                                  </div>
+                                )}
                                 {row.benchmark != null && (
                                   <div className="tabular-nums mt-1">
                                     <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.benchmark }} />
-                                    {benchmark}: {p.currency} {row.benchmark.toFixed(2)}
-                                    {benchPct != null && (
+                                    {benchmark}: {fmtVal(row.benchmark)}
+                                    {!isPct && benchPct != null && (
                                       <span className="text-muted-foreground"> ({benchPct >= 0 ? "+" : ""}{benchPct.toFixed(2)}%)</span>
                                     )}
                                   </div>
                                 )}
                                 <div className="tabular-nums text-muted-foreground mt-1">
-                                  Peak: {p.currency} {row.peak.toFixed(2)}
+                                  Peak: {fmtVal(row.peak)}
                                 </div>
                                 <div className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}>
                                   Drawdown: {row.drawdown.toFixed(2)}%
