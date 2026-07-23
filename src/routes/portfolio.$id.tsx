@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { RegimePanel } from "@/components/regime-panel";
+import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 
 
 export const Route = createFileRoute("/portfolio/$id")({
