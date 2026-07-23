@@ -9,9 +9,9 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") ?? request.headers.get("Apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
-        if (!expected || apikey !== expected) {
+        const provided = request.headers.get("x-cron-secret") ?? request.headers.get("X-Cron-Secret");
+        const expected = process.env.CRON_SECRET;
+        if (!expected || provided !== expected) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
