@@ -28,13 +28,23 @@ import type { Database } from "@/integrations/supabase/types";
 type Portfolio = Database["public"]["Tables"]["portfolios"]["Row"];
 type Holding = Database["public"]["Tables"]["holdings"]["Row"];
 
+const SignalWeightsSchema = z.object({
+  sma_trend: z.number().min(0).max(100),
+  rsi: z.number().min(0).max(100),
+  price_change: z.number().min(0).max(100),
+  news_sentiment: z.number().min(0).max(100),
+  volatility: z.number().min(0).max(100),
+});
+
 const OrderSchema = z.object({
   symbol: z.string(),
   side: z.enum(["buy", "sell"]),
   // Percentage of current cash to allocate (for buys) OR percentage of holding to sell.
   percent: z.number(),
   reason: z.string(),
+  signal_weights: SignalWeightsSchema,
 });
+
 
 const DecisionSchema = z.object({
   briefing: z.string(),
@@ -165,8 +175,17 @@ Return:
     symbol (must be from candidate list),
     side ("buy" or "sell"),
     percent (for BUY: % of current cash to spend, 1-100; for SELL: % of the held quantity to sell, 1-100),
-    reason (one sentence).
+    reason (one sentence),
+    signal_weights: an object attributing this decision across five feature groups. Each value is 0-100
+      and the FIVE VALUES MUST SUM TO 100. Use larger weights for the features that most drove the call.
+      Keys:
+        sma_trend       — moving-average trend (price vs SMA20/SMA50, SMA20 vs SMA50)
+        rsi             — RSI-14 momentum / overbought / oversold
+        price_change    — recent price change (5d / 30d)
+        news_sentiment  — tone and relevance of the provided headlines for this symbol
+        volatility      — 20-day realised volatility of the asset
 If no action is warranted, return an empty orders array.`;
+
 
   try {
     const { output } = await generateText({
