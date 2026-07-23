@@ -826,6 +826,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     .update({ current_cash: workingCash, last_run_date: asOf })
     .eq("id", portfolioId);
 
+  await persistCircuit(portfolioId, circuit).catch((e) =>
+    console.warn("Circuit persist skipped:", e),
+  );
+
+
   await admin.from("equity_snapshots").upsert(
     {
       portfolio_id: portfolioId,
