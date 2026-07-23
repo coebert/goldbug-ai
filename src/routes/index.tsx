@@ -95,11 +95,33 @@ function Home() {
   }, [navigate]);
 
   const list = useServerFn(listPortfolios);
+  const fetchEquity = useServerFn(getAllPortfoliosEquity);
   const q = useQuery({
     queryKey: ["portfolios"],
     queryFn: () => list(),
     enabled: !!session,
   });
+  const equityQ = useQuery({
+    queryKey: ["all-portfolios-equity"],
+    queryFn: () => fetchEquity(),
+    enabled: !!session,
+    staleTime: 30_000,
+  });
+  const sparkByPortfolio = useMemo(() => {
+    const map: Record<string, number[]> = {};
+    const series = equityQ.data?.series ?? [];
+    const portfolios = equityQ.data?.portfolios ?? [];
+    for (const p of portfolios) {
+      const vals: number[] = [];
+      for (const row of series) {
+        const v = Number((row as Record<string, unknown>)[p.id]);
+        if (Number.isFinite(v)) vals.push(v);
+      }
+      // keep last ~60 points for a legible mini chart
+      map[p.id] = vals.slice(-60);
+    }
+    return map;
+  }, [equityQ.data]);
 
   if (!ready || !session) {
     return (
