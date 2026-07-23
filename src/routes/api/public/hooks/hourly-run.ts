@@ -35,8 +35,12 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         const today = new Date().toISOString().slice(0, 10);
 
         // 1. Refresh news (bust today's cache so hourly runs see new headlines)
+        //    and clear the in-memory market-context cache so downstream ticks
+        //    pick up the fresh news + regime for this hour.
         let newsCount = 0;
         try {
+          const { invalidateContextCache } = await import("@/lib/market-context-cache.server");
+          invalidateContextCache();
           const items = await getNewsForDate(today, 15, { forceRefresh: true });
           newsCount = items.length;
         } catch (e) {

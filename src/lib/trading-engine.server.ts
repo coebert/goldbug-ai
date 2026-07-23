@@ -70,6 +70,7 @@ import {
   type PersistedRegime,
 } from "./regime-detector.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { cached } from "./market-context-cache.server";
 import type { Database } from "@/integrations/supabase/types";
 
 
@@ -392,11 +393,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const circuit = await evaluateBreaker(portfolioId, asOf, priorCircuit).catch(() => priorCircuit);
   const breakerTripped = circuit.paused;
 
-  const features = await buildCandidateFeatures(candidateSymbols, asOf);
+  const universeKey = candidateSymbols.map((c) => c.symbol).sort().join(",");
+  // Clone: features are per-portfolio-mutated below (news_score, cooling, rank_info),
+  // but the raw technicals only need to be computed once per hour per universe.
+  const rawFeatures = await cached("features", `${asOf}:${universeKey}`, () =>
+    buildCandidateFeatures(candidateSymbols, asOf),
+  );
+  const features = rawFeatures.map((f) => ({ ...f }));
 
   const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams] = await Promise.all([
-    opts?.skipNews ? Promise.resolve([]) : getNewsForDate(asOf).catch(() => []),
-    detectAndPersistRegime(asOf).catch((e) => {
+    opts?.skipNews
+      ? Promise.resolve([])
+      : cached("news", asOf, () => getNewsForDate(asOf)).catch(() => []),
+    cached("regime", asOf, () => detectAndPersistRegime(asOf)).catch((e) => {
       console.warn("Regime detection failed:", e);
       return null;
     }),
@@ -411,13 +420,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         lessons: [], lessons_as_of: null, lessons_regime: null, per_regime_stats: [], current_regime: null, samples: [],
       } satisfies LearningContext;
     }),
-    getCrossAssetSnapshot(asOf).catch(() => null),
-    getOptionsSnapshot(asOf).catch((e) => {
+    cached("crossAsset", asOf, () => getCrossAssetSnapshot(asOf)).catch(() => null),
+    cached("options", asOf, () => getOptionsSnapshot(asOf)).catch((e) => {
       console.warn("Options snapshot failed:", e);
       return null;
     }),
     refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
-    upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)).catch(() => []),
+    cached("events", `${asOf}:${universeKey}`, () =>
+      upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)),
+    ).catch(() => []),
     computeAttribution(portfolioId, asOf).catch(() => null),
     getOrRefreshHyperparams(portfolioId, asOf).catch((e) => {
       console.warn("Hyperparam tuning failed:", e);
@@ -428,7 +439,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   // Score news sentiment (LLM pass, cached), then aggregate per-symbol
   const scoredNews = rawNews.length > 0
-    ? await ensureSentimentScored(asOf, rawNews).catch(() => rawNews.map((n) => ({
+    ? await cached("scoredNews", asOf, () =>
+        ensureSentimentScored(asOf, rawNews),
+      ).catch(() => rawNews.map((n) => ({
         ...n, sentiment: null, entities: [] as string[], source_weight: 0.4,
       })))
     : [];
