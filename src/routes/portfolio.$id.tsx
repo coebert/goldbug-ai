@@ -109,14 +109,21 @@ function PortfolioPage() {
   });
 
   const equity = q.data?.equity ?? [];
-  const equityData = useMemo(
-    () =>
-      equity.map((e) => ({
+  const equityData = useMemo(() => {
+    let peak = -Infinity;
+    return equity.map((e) => {
+      const value = Number(e.total_value);
+      peak = Math.max(peak, value);
+      const drawdown = peak > 0 ? ((value - peak) / peak) * 100 : 0;
+      return {
         date: e.snapshot_date as string,
-        value: Number(e.total_value),
-      })),
-    [equity],
-  );
+        value,
+        peak,
+        drawdown, // negative or zero
+        underwater: value < peak ? value : null, // for area shading
+      };
+    });
+  }, [equity]);
 
   const p = q.data?.portfolio;
   const holdings = q.data?.holdings ?? [];
