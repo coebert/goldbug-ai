@@ -451,10 +451,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       })))
     : [];
 
+  // Rolling 8-day window of scored headlines for momentum. Cheap: reads cache only.
+  const scoredWindow = await cached("scoredWindow", asOf, () =>
+    loadScoredNewsWindow(asOf, 8),
+  ).catch(() => [] as Awaited<ReturnType<typeof loadScoredNewsWindow>>);
+
   for (const f of features) {
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
     f.news_score = agg.contributors > 0 ? Number(agg.score.toFixed(3)) : null;
     f.news_contributors = agg.contributors;
+    f.news_momentum = computeSentimentMomentum(f.symbol, f.name, scoredWindow, asOf);
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
   }
 
