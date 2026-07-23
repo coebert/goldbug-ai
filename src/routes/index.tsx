@@ -603,6 +603,10 @@ function BrokerBalancePreview(props: {
         accountId: string | null;
         currency: string;
         cash: number;
+        cashAvailable: number | null;
+        transactionsNotBooked: number | null;
+        reservedCash: number | null;
+        unrealizedPnl: number | null;
         positionsValue: number;
         totalValue: number;
         positionsCount: number;
@@ -619,7 +623,16 @@ function BrokerBalancePreview(props: {
   const emphasis = isRealMoney
     ? "border-destructive/40 bg-destructive/5"
     : "border-border bg-muted/30";
-  const headline = data ? fmt(data.cash, data.currency) : "—";
+  // The starting pot is the immediately-available cash when Saxo reports it;
+  // otherwise fall back to the raw CashBalance.
+  const startingPot = data
+    ? data.cashAvailable != null
+      ? data.cashAvailable
+      : data.cash
+    : 0;
+  const headline = data ? fmt(startingPot, data.currency) : "—";
+  const pending = data?.transactionsNotBooked ?? 0;
+  const reserved = data?.reservedCash ?? 0;
 
   return (
     <div className={`rounded-md border p-3 ${emphasis}`}>
@@ -662,28 +675,115 @@ function BrokerBalancePreview(props: {
       )}
 
       {data && (
-        <div className="mt-3 space-y-1 text-[11px]">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Cash (used as starting pot)</span>
-            <span className="font-medium tabular-nums">{fmt(data.cash, data.currency)}</span>
+        <div className="mt-3 space-y-2 text-[11px]">
+          <div className="rounded border border-border/60 bg-background/40 p-2">
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Cash breakdown
+            </div>
+            <div className="space-y-1">
+              <Row
+                label="Available / settled"
+                hint="Free to trade right now — this is your starting pot"
+                value={fmt(data.cashAvailable ?? data.cash, data.currency)}
+                emphasise
+              />
+              {data.cashAvailable != null && (
+                <Row
+                  label="Reserved (open orders / margin)"
+                  hint="Held against working orders or collateral — not usable"
+                  value={fmt(reserved, data.currency)}
+                  muted={reserved === 0}
+                />
+              )}
+              <Row
+                label="Pending / unsettled"
+                hint="Booked transactions still settling (typically T+2)"
+                value={fmt(pending, data.currency)}
+                muted={pending === 0}
+              />
+              <div className="flex items-center justify-between border-t border-border/60 pt-1">
+                <span className="text-muted-foreground">Total cash on account</span>
+                <span className="font-medium tabular-nums">
+                  {fmt(data.cash, data.currency)}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">
-              Existing positions ({data.positionsCount})
-            </span>
-            <span className="tabular-nums">{fmt(data.positionsValue, data.currency)}</span>
+
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">
+                Existing positions ({data.positionsCount})
+              </span>
+              <span className="tabular-nums">
+                {fmt(data.positionsValue, data.currency)}
+              </span>
+            </div>
+            {data.unrealizedPnl != null && data.unrealizedPnl !== 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Unrealised P&amp;L</span>
+                <span
+                  className={`tabular-nums ${
+                    data.unrealizedPnl >= 0 ? "text-emerald-500" : "text-destructive"
+                  }`}
+                >
+                  {fmt(data.unrealizedPnl, data.currency)}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-border/60 pt-1">
+              <span className="text-muted-foreground">Total account value</span>
+              <span className="tabular-nums">{fmt(data.totalValue, data.currency)}</span>
+            </div>
           </div>
-          <div className="flex items-center justify-between border-t border-border/60 pt-1">
-            <span className="text-muted-foreground">Total account value</span>
-            <span className="tabular-nums">{fmt(data.totalValue, data.currency)}</span>
-          </div>
+
           <p className="pt-1 text-muted-foreground">
-            Only the <span className="font-medium">cash</span> line becomes this
-            portfolio&apos;s starting pot. Existing positions on your Saxo{" "}
-            {env.toUpperCase()} account are left untouched — Aegis will not sell them.
+            Only the <span className="font-medium">available / settled</span> cash
+            becomes this portfolio&apos;s starting pot
+            {data.cashAvailable == null && data.transactionsNotBooked == null
+              ? " (Saxo didn't report a settled breakdown for this account, so the full cash balance is used)"
+              : ""}
+            . Existing positions on your Saxo {env.toUpperCase()} account are left
+            untouched — Aegis will not sell them.
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function Row(props: {
+  label: string;
+  hint?: string;
+  value: string;
+  emphasise?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <div
+          className={
+            props.emphasise
+              ? "font-medium"
+              : props.muted
+                ? "text-muted-foreground"
+                : ""
+          }
+        >
+          {props.label}
+        </div>
+        {props.hint && (
+          <div className="text-[10px] text-muted-foreground">{props.hint}</div>
+        )}
+      </div>
+      <span
+        className={`tabular-nums ${props.emphasise ? "font-semibold" : ""} ${
+          props.muted ? "text-muted-foreground" : ""
+        }`}
+      >
+        {props.value}
+      </span>
     </div>
   );
 }
