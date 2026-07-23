@@ -78,7 +78,7 @@ export function RiskControlsCard({
 }) {
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
