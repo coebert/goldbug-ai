@@ -181,7 +181,10 @@ async function callAiForDecision(args: {
   cashValue: number;
   totalValue: number;
   features: Awaited<ReturnType<typeof buildCandidateFeatures>>;
-  news: { headline: string; source: string | null }[];
+  news: Array<{ headline: string; source: string | null; sentiment: number | null }>;
+  crossAsset: string; // preformatted block
+  events: Array<{ event_date: string; kind: string; symbol: string | null; title: string; impact: string }>;
+  cooling: string[];
   asOf: string;
   regime: PersistedRegime;
   learning: LearningContext;
@@ -213,6 +216,18 @@ async function callAiForDecision(args: {
 - Prior playbook for this regime: ${regimeDescription(r.regime)}
 ${r.transitioned ? "Because the regime just shifted, explicitly reassess existing holdings under the new prior and note it in the rationale." : "Bias posture toward the current regime's playbook."}`;
 
+  const eventsBlock =
+    args.events.length > 0
+      ? `UPCOMING KNOWN EVENTS (within 3 days) — reduce position size into these:\n${args.events
+          .map((e) => `- ${e.event_date} [${e.impact}] ${e.kind}${e.symbol ? ` ${e.symbol}` : ""}: ${e.title}`)
+          .join("\n")}`
+      : "UPCOMING KNOWN EVENTS: none tracked in the next 3 days.";
+
+  const coolingBlock =
+    args.cooling.length > 0
+      ? `LOSS COOLDOWN active for: ${args.cooling.join(", ")}. Any BUY on these will be automatically halved by guardrails; consider skipping.`
+      : "";
+
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
@@ -221,6 +236,7 @@ HARD RULES YOU MUST NEVER BREAK:
 - Keep at least ${(risk.cashFloorPct * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
 - Asset-class exposure caps: ${classLimitsStr}.
+- Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
 - Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
@@ -228,11 +244,17 @@ ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility 
 
 ${regimeBlock}
 
+${args.crossAsset}
+
+${eventsBlock}
+${coolingBlock}
+
 ${formatLearningBlock(args.learning)}
 
 ${HISTORICAL_PLAYBOOK}
 
-Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.`;
+Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
+Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.`;
 
 
   const user = `Date: ${args.asOf}
@@ -240,31 +262,33 @@ Portfolio value: ${args.totalValue.toFixed(2)} ${args.portfolio.currency}
 Cash: ${args.cashValue.toFixed(2)} ${args.portfolio.currency}
 Current holdings: ${JSON.stringify(holdingsSummary)}
 
-Candidate assets (technicals):
+Candidate assets (extended technicals, sentiment, cooldown flag):
 ${JSON.stringify(args.features, null, 2)}
 
-Recent headlines:
+Recent headlines (sentiment -1 bearish .. +1 bullish, LLM-scored):
 ${args.news
-  .slice(0, 12)
-  .map((n, i) => `${i + 1}. [${n.source ?? "news"}] ${n.headline}`)
+  .slice(0, 15)
+  .map(
+    (n, i) =>
+      `${i + 1}. [${n.source ?? "news"}] (sent ${n.sentiment == null ? "?" : n.sentiment.toFixed(2)}) ${n.headline}`,
+  )
   .join("\n")}
 
 Return:
-- briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}).
-- rationale: 2-4 sentences explaining today's actions in light of the regime and priors.
+- briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}, and cross-asset posture).
+- rationale: 2-4 sentences explaining today's actions in light of the regime, cross-asset, and priors.
 - orders: array of trades to place today. Each order has:
     symbol (must be from candidate list),
     side ("buy" or "sell"),
     percent (for BUY: % of current cash to spend, 1-100; for SELL: % of the held quantity to sell, 1-100),
-    reason (one sentence),
-    signal_weights: an object attributing this decision across five feature groups. Each value is 0-100
-      and the FIVE VALUES MUST SUM TO 100. Use larger weights for the features that most drove the call.
-      Keys:
-        sma_trend       — moving-average trend (price vs SMA20/SMA50, SMA20 vs SMA50)
-        rsi             — RSI-14 momentum / overbought / oversold
-        price_change    — recent price change (5d / 30d)
-        news_sentiment  — tone and relevance of the provided headlines for this symbol
-        volatility      — 20-day realised volatility of the asset
+    conviction: 0..1 (how sure you are). Higher conviction => guardrails allow larger Kelly-capped sizing.
+    reason (one sentence citing the strongest 1-2 features),
+    signal_weights: attribute the decision across five feature buckets, summing to 100:
+      sma_trend       — MA trend AND MACD histogram / crosses (grouped)
+      rsi             — daily RSI-14 AND weekly RSI alignment
+      price_change    — recent price change (5d/30d) AND volume-weighted momentum
+      news_sentiment  — weighted LLM sentiment for this symbol
+      volatility      — 20d vol, ATR%, Bollinger width
 If no action is warranted, return an empty orders array.`;
 
 
@@ -278,6 +302,7 @@ If no action is warranted, return an empty orders array.`;
     return output;
   } catch (error) {
     if (NoObjectGeneratedError.isInstance(error)) {
+
       return {
         briefing: "AI response could not be parsed; taking no action today.",
         rationale: error.text?.slice(0, 500) ?? "Parse error",
