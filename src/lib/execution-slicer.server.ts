@@ -10,23 +10,57 @@
 // does not own. Never expose these helpers to unauthenticated code paths.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { z } from "zod";
 
 const DEFAULT_SLICE_TTL_MIN = 90; // 90 minutes total window
 const DEFAULT_SLICES = 4;
 const LARGE_ORDER_USD = 5_000;
 
-export type SliceInput = {
-  portfolioId: string;
-  /** auth.uid() of the caller. Required — used to prove ownership of `portfolioId`. */
-  ownerUserId: string;
-  decisionId: string | null;
-  symbol: string;
-  side: "buy" | "sell";
-  totalQty: number;
-  priceHint: number;
-  slices?: number;
-  ttlMinutes?: number;
-};
+// ----------------------------------------------------------------------------
+// Input validation (zod). Every public helper runs its arguments through these
+// before touching supabaseAdmin. Rejecting garbage inputs up-front removes a
+// whole class of "portfolio_not_found" / "slice_lookup_failed" noise from the
+// SECURITY:pending_slices logs and keeps unexpected-access warnings unambiguous.
+// ----------------------------------------------------------------------------
+
+const UUID = z.string().trim().uuid();
+const SYMBOL = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  // Common Yahoo/Saxo symbol shapes: AAPL, BRK.B, RDS-A, ES=F, BTC-USD.
+  .regex(/^[A-Za-z0-9._:=/-]+$/, "invalid symbol");
+const SIDE = z.enum(["buy", "sell"]);
+const POSITIVE = z.number().finite().positive();
+const NON_NEG = z.number().finite().nonnegative();
+
+const SliceInputSchema = z.object({
+  portfolioId: UUID,
+  ownerUserId: UUID,
+  decisionId: UUID.nullable(),
+  symbol: SYMBOL,
+  side: SIDE,
+  totalQty: POSITIVE.max(1e9),
+  priceHint: POSITIVE.max(1e9),
+  slices: z.number().int().min(2).max(8).optional(),
+  ttlMinutes: z.number().int().min(1).max(24 * 60).optional(),
+});
+
+const FillInputSchema = z.object({
+  sliceId: UUID,
+  ownerUserId: UUID,
+  filledQty: NON_NEG.max(1e9),
+  note: z.string().trim().max(500).optional(),
+});
+
+const TickInputSchema = z.object({
+  portfolioId: UUID,
+  ownerUserId: UUID,
+});
+
+export type SliceInput = z.input<typeof SliceInputSchema>;
+
 
 class PendingSliceAccessError extends Error {
   constructor(message: string, public readonly context: Record<string, unknown>) {
