@@ -211,3 +211,126 @@ export function aggregatedSentimentForSymbol(
   }
   return { score: denom > 0 ? num / denom : 0, contributors };
 }
+
+type ScoredCacheRow = {
+  news_date: string;
+  source: string | null;
+  headline: string;
+  sentiment: number | null;
+  entities: string[];
+  source_weight: number;
+};
+
+/**
+ * Load already-scored news across a rolling lookback window for momentum
+ * calculations. We only take rows that already have a sentiment score —
+ * momentum should not trigger fresh LLM scoring of historical days.
+ */
+export async function loadScoredNewsWindow(
+  asOfISO: string,
+  lookbackDays: number,
+): Promise<ScoredCacheRow[]> {
+  const end = new Date(asOfISO + "T00:00:00Z");
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - lookbackDays);
+  const startISO = start.toISOString().slice(0, 10);
+  const { data } = await supabaseAdmin
+    .from("news_cache")
+    .select("news_date, source, headline, sentiment, entities, source_weight")
+    .gte("news_date", startISO)
+    .lte("news_date", asOfISO)
+    .not("sentiment", "is", null)
+    .limit(2000);
+  return (data ?? []).map((r) => ({
+    news_date: r.news_date as string,
+    source: (r.source as string | null) ?? null,
+    headline: r.headline as string,
+    sentiment: r.sentiment == null ? null : Number(r.sentiment),
+    entities: Array.isArray(r.entities) ? (r.entities as string[]) : [],
+    source_weight: r.source_weight == null ? 0.4 : Number(r.source_weight),
+  }));
+}
+
+export type SentimentMomentum = {
+  today: number | null;
+  avg_3d: number | null;
+  avg_7d: number | null;
+  delta_3d: number | null; // today - avg_7d (short-term surge vs baseline)
+  delta_7d: number | null; // avg_3d - avg_7d (medium-term drift)
+  accel: number | null; // delta_3d - delta_7d (acceleration)
+  contributors_7d: number;
+};
+
+function addDaysISO(iso: string, delta: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function mean(vals: number[]): number | null {
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+/**
+ * Compute sentiment momentum for a symbol from the scored-news window.
+ * Groups by date, aggregates per-symbol daily sentiment with the same
+ * weighted method as spot sentiment, then diffs short vs long averages.
+ */
+export function computeSentimentMomentum(
+  symbol: string,
+  name: string,
+  scoredWindow: ScoredCacheRow[],
+  asOfISO: string,
+): SentimentMomentum {
+  const byDate = new Map<string, ScoredCacheRow[]>();
+  for (const r of scoredWindow) {
+    const arr = byDate.get(r.news_date) ?? [];
+    arr.push(r);
+    byDate.set(r.news_date, arr);
+  }
+
+  const perDay: Array<{ date: string; score: number; contributors: number }> = [];
+  for (let i = 0; i < 8; i++) {
+    const date = addDaysISO(asOfISO, -i);
+    const items = byDate.get(date);
+    if (!items || items.length === 0) continue;
+    const enriched = items.map((r) => ({
+      headline: r.headline,
+      source: r.source,
+      sentiment: r.sentiment,
+      entities: r.entities,
+      source_weight: r.source_weight,
+      date: r.news_date,
+    }));
+    const agg = aggregatedSentimentForSymbol(symbol, name, enriched, date);
+    if (agg.contributors > 0) perDay.push({ date, score: agg.score, contributors: agg.contributors });
+  }
+
+  if (perDay.length === 0) {
+    return {
+      today: null, avg_3d: null, avg_7d: null,
+      delta_3d: null, delta_7d: null, accel: null, contributors_7d: 0,
+    };
+  }
+
+  const today = perDay.find((d) => d.date === asOfISO)?.score ?? null;
+  const last3 = perDay.filter((d) => d.date >= addDaysISO(asOfISO, -2)).map((d) => d.score);
+  const last7 = perDay.filter((d) => d.date >= addDaysISO(asOfISO, -6)).map((d) => d.score);
+  const avg3 = mean(last3);
+  const avg7 = mean(last7);
+  const delta3 = today != null && avg7 != null ? Number((today - avg7).toFixed(3)) : null;
+  const delta7 = avg3 != null && avg7 != null ? Number((avg3 - avg7).toFixed(3)) : null;
+  const accel = delta3 != null && delta7 != null ? Number((delta3 - delta7).toFixed(3)) : null;
+  const contributors_7d = perDay.reduce((s, d) => s + d.contributors, 0);
+
+  return {
+    today: today == null ? null : Number(today.toFixed(3)),
+    avg_3d: avg3 == null ? null : Number(avg3.toFixed(3)),
+    avg_7d: avg7 == null ? null : Number(avg7.toFixed(3)),
+    delta_3d: delta3,
+    delta_7d: delta7,
+    accel,
+    contributors_7d,
+  };
+}
