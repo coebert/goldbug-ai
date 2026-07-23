@@ -88,10 +88,10 @@ function PortfolioPage() {
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
   const [benchmark, setBenchmark] = useState<string>("SPY");
-  const [chartContrast, setChartContrast] = useState<"standard" | "high" | "light">(() => {
+  const [chartContrast, setChartContrast] = useState<"standard" | "high" | "light" | "cb">(() => {
     if (typeof window === "undefined") return "standard";
     const v = window.localStorage.getItem("aegis.chartContrast");
-    return v === "high" || v === "light" ? v : "standard";
+    return v === "high" || v === "light" || v === "cb" ? v : "standard";
   });
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -105,6 +105,7 @@ function PortfolioPage() {
         equityFillTop: 0.55,
         equityFillBottom: 0.05,
         benchmark: "#ffd257",
+        drawdown: "#ff6b6b",
         peak: "#e5e7eb",
         gridOpacity: 0.6,
         axis: "#e5e7eb",
@@ -118,6 +119,7 @@ function PortfolioPage() {
         equityFillTop: 0.35,
         equityFillBottom: 0,
         benchmark: "#b45309",
+        drawdown: "#b91c1c",
         peak: "#334155",
         gridOpacity: 0.35,
         axis: "#334155",
@@ -125,11 +127,29 @@ function PortfolioPage() {
         surface: "#f8fafc",
       } as const;
     }
+    if (chartContrast === "cb") {
+      // Okabe–Ito palette: distinguishable across deuteranopia, protanopia, tritanopia.
+      // Portfolio = blue (#0072B2), Benchmark = orange (#E69F00),
+      // Drawdown = vermillion (#D55E00), Peak/axes = bluish-grey (#CFCFCF).
+      return {
+        equity: "#56B4E9",
+        equityFillTop: 0.5,
+        equityFillBottom: 0.05,
+        benchmark: "#E69F00",
+        drawdown: "#D55E00",
+        peak: "#CFCFCF",
+        gridOpacity: 0.55,
+        axis: "#CFCFCF",
+        strokeWidth: 3,
+        surface: "transparent",
+      } as const;
+    }
     return {
       equity: "#22d3ee",
       equityFillTop: 0.35,
       equityFillBottom: 0,
       benchmark: "#f59e0b",
+      drawdown: "hsl(var(--destructive))",
       peak: "hsl(var(--muted-foreground))",
       gridOpacity: 0.35,
       axis: "hsl(var(--border))",
@@ -352,7 +372,7 @@ function PortfolioPage() {
                         <option value="BTC-USD">BTC-USD</option>
                       </select>
                       <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
-                        {(["standard", "high", "light"] as const).map((mode) => (
+                        {(["standard", "high", "light", "cb"] as const).map((mode) => (
                           <button
                             key={mode}
                             type="button"
@@ -362,9 +382,10 @@ function PortfolioPage() {
                                 ? "bg-primary text-primary-foreground"
                                 : "bg-background text-muted-foreground hover:text-foreground"
                             }`}
-                            title={`${mode} contrast`}
+                            title={mode === "cb" ? "Colorblind-safe palette (Okabe–Ito)" : `${mode} contrast`}
+                            aria-label={mode === "cb" ? "Colorblind-safe palette" : `${mode} contrast`}
                           >
-                            {mode}
+                            {mode === "cb" ? "Colorblind" : mode}
                           </button>
                         ))}
                       </div>
@@ -391,8 +412,8 @@ function PortfolioPage() {
                       <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
                         <defs>
                           <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.28} />
-                            <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
+                            <stop offset="0%" stopColor={chartTheme.drawdown} stopOpacity={0.28} />
+                            <stop offset="100%" stopColor={chartTheme.drawdown} stopOpacity={0.02} />
                           </linearGradient>
                           <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor={chartTheme.equity} stopOpacity={chartTheme.equityFillTop} />
