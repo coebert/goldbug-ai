@@ -920,6 +920,24 @@ export type Database = {
         }
         Relationships: []
       }
+      run_locks: {
+        Row: {
+          acquired_at: string
+          name: string
+          owner: string | null
+        }
+        Insert: {
+          acquired_at?: string
+          name: string
+          owner?: string | null
+        }
+        Update: {
+          acquired_at?: string
+          name?: string
+          owner?: string | null
+        }
+        Relationships: []
+      }
       saxo_instrument_cache: {
         Row: {
           asset_type: string
