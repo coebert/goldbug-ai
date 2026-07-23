@@ -438,10 +438,31 @@ function PortfolioPage() {
                         <Line
                           type="monotone"
                           dataKey="value"
+                          name="Portfolio"
                           stroke="#22d3ee"
                           strokeWidth={2.5}
                           dot={false}
                           activeDot={{ r: 5, fill: "#22d3ee", stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                        />
+                        {benchmark !== "none" && (
+                          <Line
+                            type="monotone"
+                            dataKey="benchmark"
+                            name={`${benchmark} (normalised)`}
+                            stroke="#f59e0b"
+                            strokeWidth={2}
+                            strokeDasharray="4 3"
+                            dot={false}
+                            connectNulls
+                            isAnimationActive={false}
+                            activeDot={{ r: 4, fill: "#f59e0b", stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                          />
+                        )}
+                        <Legend
+                          verticalAlign="bottom"
+                          height={24}
+                          iconType="plainline"
+                          wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
