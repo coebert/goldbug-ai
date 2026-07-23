@@ -227,3 +227,82 @@ describe("recordFillHandler", () => {
     expect(statusCalls).toEqual([500]);
   });
 });
+
+// ---- idempotency ----------------------------------------------------------
+describe("idempotency keys", () => {
+  const enqueueValid = {
+    portfolioId: PF_ALICE,
+    decisionId: DECISION_A,
+    symbol: "AAPL",
+    side: "buy" as const,
+    totalQty: 40,
+    priceHint: 190.5,
+    slices: 4,
+    ttlMinutes: 60,
+    idempotencyKey: "dec-2026-01-15-aapl-buy",
+  };
+
+  it("forwards idempotencyKey through enqueueSliceHandler and returns { reused } on repeat", async () => {
+    // First call inserts a fresh slice.
+    serverImpl.maybeSliceOrder.mockResolvedValueOnce({ sliceId: SLICE_A, sliceQty: 10, slices: 4 });
+    // Second call with the same key returns the existing row.
+    serverImpl.maybeSliceOrder.mockResolvedValueOnce({ sliceId: SLICE_A, sliceQty: 10, slices: 4, reused: true });
+
+    const first = (await enqueueSliceHandler(enqueueValid, U_ALICE, setStatus)) as OkResult<{ sliceId: string; reused?: true }>;
+    const second = (await enqueueSliceHandler(enqueueValid, U_ALICE, setStatus)) as OkResult<{ sliceId: string; reused?: true }>;
+
+    expect(first.data.sliceId).toBe(SLICE_A);
+    expect(first.data.reused).toBeUndefined();
+    expect(second.data.sliceId).toBe(SLICE_A);
+    expect(second.data.reused).toBe(true);
+    expect(serverImpl.maybeSliceOrder).toHaveBeenCalledTimes(2);
+    for (const call of serverImpl.maybeSliceOrder.mock.calls) {
+      expect(call[0]).toMatchObject({ idempotencyKey: "dec-2026-01-15-aapl-buy" });
+    }
+    expect(statusCalls).toEqual([]);
+  });
+
+  it("rejects a too-short idempotencyKey at the schema boundary", async () => {
+    const r = (await enqueueSliceHandler({ ...enqueueValid, idempotencyKey: "abc" }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.ok).toBe(false);
+    expect(r.error.code).toBe("invalid_input");
+    expect(r.error.issues?.[0]?.path).toBe("idempotencyKey");
+    expect(serverImpl.maybeSliceOrder).not.toHaveBeenCalled();
+    expect(statusCalls).toEqual([400]);
+  });
+
+  it("forwards idempotencyKey through recordFillHandler and flags duplicates as ok + duplicate", async () => {
+    const fillValid = {
+      sliceId: SLICE_A,
+      filledQty: 10,
+      idempotencyKey: "fill-2026-01-15-aapl-t1",
+    };
+    // First fill applies.
+    serverImpl.recordSliceFill.mockResolvedValueOnce({ applied: true } as never);
+    // Second fill is a duplicate.
+    serverImpl.recordSliceFill.mockResolvedValueOnce({ applied: false, reason: "duplicate" } as never);
+
+    const first = (await recordFillHandler(fillValid, U_ALICE, setStatus)) as OkResult<{ recorded: true; duplicate?: boolean }>;
+    const second = (await recordFillHandler(fillValid, U_ALICE, setStatus)) as OkResult<{ recorded: true; duplicate?: boolean }>;
+
+    expect(first.data).toEqual({ recorded: true });
+    expect(second.data).toEqual({ recorded: true, duplicate: true });
+    for (const call of serverImpl.recordSliceFill.mock.calls) {
+      expect(call[4]).toBe("fill-2026-01-15-aapl-t1");
+    }
+    expect(statusCalls).toEqual([]);
+  });
+
+  it("rejects an idempotencyKey with disallowed characters", async () => {
+    const r = (await recordFillHandler(
+      { sliceId: SLICE_A, filledQty: 10, idempotencyKey: "bad key with spaces!" },
+      U_ALICE,
+      setStatus,
+    )) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
+    expect(r.error.issues?.[0]?.path).toBe("idempotencyKey");
+    expect(serverImpl.recordSliceFill).not.toHaveBeenCalled();
+    expect(statusCalls).toEqual([400]);
+  });
+});
+
