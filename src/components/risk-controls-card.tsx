@@ -13,13 +13,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ChevronDown, ShieldCheck } from "lucide-react";
+import { ChevronDown, ShieldCheck, Gauge } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
@@ -76,6 +77,89 @@ const CLASSES: { key: AssetClass; label: string }[] = [
   { key: "fx", label: "FX" },
 ];
 
+// Simple 1..5 risk-level presets. Moving the slider rewrites every detailed
+// field below so the two views stay in sync.
+const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfig }> = {
+  1: {
+    name: "Low risk",
+    blurb: "Capital preservation. Tight stops, small positions, mostly ETFs.",
+    cfg: {
+      asset_class_limits: { stock: 0.3, etf: 0.9, crypto: 0.02, commodity: 0.15, fx: 0.15 },
+      per_symbol_limit_pct: 0.05,
+      stop_loss_pct: 0.05,
+      take_profit_pct: 0.15,
+      atr_trailing_mult: 2,
+      max_hold_days: 60,
+      volatility_sizing: true,
+      vol_target_pct: 0.007,
+    },
+  },
+  2: {
+    name: "Cautious",
+    blurb: "Slow and steady growth with limited crypto/commodity exposure.",
+    cfg: {
+      asset_class_limits: { stock: 0.5, etf: 0.85, crypto: 0.05, commodity: 0.2, fx: 0.2 },
+      per_symbol_limit_pct: 0.08,
+      stop_loss_pct: 0.07,
+      take_profit_pct: 0.2,
+      atr_trailing_mult: 2.5,
+      max_hold_days: 90,
+      volatility_sizing: true,
+      vol_target_pct: 0.01,
+    },
+  },
+  3: {
+    name: "Balanced",
+    blurb: "Default mix — moderate stops, diversified caps.",
+    cfg: { ...DEFAULTS },
+  },
+  4: {
+    name: "Growth",
+    blurb: "Larger positions, wider stops, more crypto/commodity room.",
+    cfg: {
+      asset_class_limits: { stock: 0.75, etf: 0.75, crypto: 0.3, commodity: 0.4, fx: 0.4 },
+      per_symbol_limit_pct: 0.2,
+      stop_loss_pct: 0.15,
+      take_profit_pct: 0.4,
+      atr_trailing_mult: 4,
+      max_hold_days: 0,
+      volatility_sizing: true,
+      vol_target_pct: 0.02,
+    },
+  },
+  5: {
+    name: "High risk",
+    blurb: "Aggressive concentration, wide stops, run winners hard.",
+    cfg: {
+      asset_class_limits: { stock: 0.9, etf: 0.6, crypto: 0.5, commodity: 0.5, fx: 0.5 },
+      per_symbol_limit_pct: 0.35,
+      stop_loss_pct: 0.25,
+      take_profit_pct: 0.75,
+      atr_trailing_mult: 5,
+      max_hold_days: 0,
+      volatility_sizing: false,
+      vol_target_pct: 0.03,
+    },
+  },
+};
+
+function inferRiskLevel(cfg: RiskConfig): number {
+  // Match by nearest stop_loss + per_symbol_limit — good enough for slider sync.
+  let best = 3;
+  let bestDist = Infinity;
+  for (const [lvl, p] of Object.entries(RISK_PRESETS)) {
+    const d =
+      Math.abs(p.cfg.stop_loss_pct - cfg.stop_loss_pct) +
+      Math.abs((p.cfg.per_symbol_limit_pct ?? 0.15) - (cfg.per_symbol_limit_pct ?? 0.15)) +
+      Math.abs(p.cfg.take_profit_pct - cfg.take_profit_pct) * 0.5;
+    if (d < bestDist) {
+      bestDist = d;
+      best = Number(lvl);
+    }
+  }
+  return best;
+}
+
 export function RiskControlsCard({
   portfolioId,
   riskConfig,
@@ -85,7 +169,16 @@ export function RiskControlsCard({
 }) {
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
+  const [level, setLevel] = useState<number>(() => inferRiskLevel(initial));
   const [open, setOpen] = useState(true);
+
+  const applyLevel = (lvl: number) => {
+    setLevel(lvl);
+    setCfg({
+      ...RISK_PRESETS[lvl].cfg,
+      asset_class_limits: { ...RISK_PRESETS[lvl].cfg.asset_class_limits },
+    });
+  };
 
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
@@ -152,6 +245,35 @@ export function RiskControlsCard({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="space-y-6">
+            <div className="rounded-md border border-border bg-muted/30 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="flex items-center gap-2 text-sm font-semibold">
+                  <Gauge className="h-4 w-4 text-primary" /> Risk level
+                </h4>
+                <span className="text-sm font-medium text-primary">
+                  {level}. {RISK_PRESETS[level].name}
+                </span>
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                {RISK_PRESETS[level].blurb} Moving the slider rewrites every detailed field
+                below — fine-tune afterwards if you want.
+              </p>
+              <Slider
+                min={1}
+                max={5}
+                step={1}
+                value={[level]}
+                onValueChange={(v) => applyLevel(v[0] ?? 3)}
+              />
+              <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+                <span>Low risk</span>
+                <span>Cautious</span>
+                <span>Balanced</span>
+                <span>Growth</span>
+                <span>High risk</span>
+              </div>
+            </div>
+
             <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
               <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
               <p className="mb-3 text-xs text-muted-foreground">
