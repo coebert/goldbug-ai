@@ -435,6 +435,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
   }
 
+  // Cross-sectional ranking across today's universe (momentum + trend + quality + low-vol)
+  const rankMap = computeCrossSectionalRanks(features);
+  for (const f of features) f.rank_info = rankMap.get(f.symbol) ?? null;
+
   const coolingSymbols = features.filter((f) => f.cooling).map((f) => f.symbol);
 
   // Regime-linked risk tightening: bear/crisis → tighter per-symbol cap and stop-loss.
