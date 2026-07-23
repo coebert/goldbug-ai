@@ -381,7 +381,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
 
-  const [rawNews, regime, learning, crossAsset, cooldowns, events, attribution, hyperparams] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams] = await Promise.all([
     opts?.skipNews ? Promise.resolve([]) : getNewsForDate(asOf).catch(() => []),
     detectAndPersistRegime(asOf).catch((e) => {
       console.warn("Regime detection failed:", e);
@@ -399,6 +399,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       } satisfies LearningContext;
     }),
     getCrossAssetSnapshot(asOf).catch(() => null),
+    getOptionsSnapshot(asOf).catch((e) => {
+      console.warn("Options snapshot failed:", e);
+      return null;
+    }),
     refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
     upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)).catch(() => []),
     computeAttribution(portfolioId, asOf).catch(() => null),
