@@ -307,6 +307,9 @@ function LongHorizonPage() {
                             const sorted = [...payload].sort(
                               (a, b) => Number(b.value ?? 0) - Number(a.value ?? 0),
                             );
+                            const active_events = eventsOn
+                              ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
+                              : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
                                 <div className="mb-1 font-medium">{label}</div>
@@ -320,6 +323,15 @@ function LongHorizonPage() {
                                     </div>
                                   );
                                 })}
+                                {active_events.length > 0 && (
+                                  <div className="mt-1 border-t border-border/60 pt-1">
+                                    {active_events.map((e) => (
+                                      <div key={e.id} style={{ color: eventColor(e.category) }} className="font-medium">
+                                        ● {e.label}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           }}
