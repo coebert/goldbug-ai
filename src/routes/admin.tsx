@@ -1,16 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { getAdminHealth, type AdminHealthSnapshot, type BrokerEnvHealth } from "@/lib/admin.functions";
+import { triggerHourlyRunNow } from "@/lib/trading.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, PlayCircle, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
 import { SaxoOAuthPanel } from "@/components/live-trading-card";
 import { PushNotificationsCard } from "@/components/push-notifications-card";
 import { GlobalSignalDecayCard } from "@/components/global-signal-decay-card";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
