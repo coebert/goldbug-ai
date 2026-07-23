@@ -220,8 +220,12 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           portfolios: portfolios.length,
           skipped_paused: skippedPaused,
           saxo_refresh: saxoRefresh,
+          triggered_by: manualTrigger ? "manual" : "cron",
           results,
         });
+        } finally {
+          await lock.release();
+        }
       },
     },
   },
