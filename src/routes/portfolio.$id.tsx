@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
-  LineChart,
+  Line,
   Line,
   Area,
   ComposedChart,
