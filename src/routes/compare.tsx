@@ -34,7 +34,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { GitCompareArrows, PlayCircle, RefreshCw } from "lucide-react";
+import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/compare")({
   ssr: false,
