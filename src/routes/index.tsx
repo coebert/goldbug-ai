@@ -402,10 +402,22 @@ function CreatePortfolioCard() {
     (isLive && !saxoReady) ||
     (mode === "live_prod" && !ackRisk);
 
+  const fmtMoney = (n: number, ccy: string) => {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(n);
+    } catch {
+      return `${ccy} ${n.toFixed(2)}`;
+    }
+  };
+
   const onSubmit = () => {
     if (mode === "live_prod") {
+      const bal = balQ.data;
+      const amountLine = bal
+        ? `\n\nStarting cash: ${fmtMoney(bal.cash, bal.currency)} (from Saxo LIVE account ${bal.accountId ?? "—"}).`
+        : `\n\nStarting cash will be read from your Saxo LIVE balance.`;
       const ok = window.confirm(
-        `Create "${name}" and start trading REAL MONEY on your Saxo LIVE account?\n\nStarting cash will be read from your Saxo LIVE balance. The AI will place real orders on every hourly cycle. You can pause or revert at any time.`,
+        `Create "${name}" and start trading REAL MONEY on your Saxo LIVE account?${amountLine}\n\nThe AI will place real orders on every hourly cycle. You can pause or revert at any time.`,
       );
       if (!ok) return;
     }
