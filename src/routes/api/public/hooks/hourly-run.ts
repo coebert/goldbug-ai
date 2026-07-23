@@ -112,16 +112,16 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           }
         }
 
-        // 5. Run a tick per paper portfolio (sequential, gentle on gateway)
-        const results: Array<{ id: string; ok: boolean; error?: string; value?: number }> = [];
-        for (const p of portfolios ?? []) {
+        // 5. Run a tick per portfolio (sequential, gentle on gateway)
+        const results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number }> = [];
+        for (const p of portfolios) {
           try {
             const r = await runDailyTick(p.id, today);
-            results.push({ id: p.id, ok: true, value: r.totalValue });
+            results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`hourly-run: portfolio ${p.id} failed`, msg);
-            results.push({ id: p.id, ok: false, error: msg });
+            results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
           }
         }
 
@@ -134,7 +134,8 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           price_errors: priceRefresh.errors,
           symbols_watched: symbolSet.size,
           regime: regimeInfo,
-          portfolios: portfolios?.length ?? 0,
+          portfolios: portfolios.length,
+          skipped_paused: skippedPaused,
           results,
         });
       },
