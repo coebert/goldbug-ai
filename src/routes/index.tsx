@@ -198,7 +198,7 @@ function NewHereBanner() {
   );
 }
 
-function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; last_run_date: string | null } }) {
+function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null } }) {
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const deleteMut = useMutation({
@@ -226,6 +226,7 @@ function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; st
               {portfolio.name}
             </Link>
             <ModeBadge mode={portfolio.mode} size="sm" />
+            <LiveToggle portfolioId={portfolio.id} mode={portfolio.mode} livePaused={portfolio.live_paused} size="sm" />
           </div>
           <div className="text-xs text-muted-foreground">
             {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} · {portfolio.risk_level} risk
