@@ -210,7 +210,7 @@ export type ExecutedTrade = {
   rejected?: string;
 };
 
-async function callAiForDecision(args: {
+export async function callAiForDecision(args: {
   portfolio: Portfolio;
   holdings: Holding[];
   cashValue: number;
@@ -229,7 +229,9 @@ async function callAiForDecision(args: {
   regimeNote?: string | null;
   hyperparams?: TunedHyperparams | null;
   calibrationBlock?: string | null;
+  variantSuffix?: string | null;
 }): Promise<DecisionOutput> {
+
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
   const gateway = createLovableAiGatewayProvider(key);
@@ -306,7 +308,9 @@ ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 ${HISTORICAL_PLAYBOOK}
 
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
-Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.`;
+Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
+${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== END VARIANT ===` : ""}`;
+
 
 
   const user = `Date: ${args.asOf}
@@ -1133,6 +1137,47 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     } as unknown as never,
   }).select("id").single();
   const decisionId = decisionInsert.data?.id ?? null;
+
+  // Shadow variant B (fire-and-forget): runs an alternate prompt in the background
+  // so we can weekly-compare divergences without affecting live execution.
+  if (!breakerTripped) {
+    (async () => {
+      try {
+        const { runShadowVariant } = await import("./ab-testing.server");
+        await runShadowVariant({
+          portfolioId,
+          decisionId,
+          asOf,
+          primary: decision,
+          aiArgs: {
+            portfolio,
+            holdings: holdings ?? [],
+            cashValue: cash,
+            totalValue,
+            features,
+            news: scoredNews.slice(0, 15).map((n) => ({
+              headline: n.headline, source: n.source, sentiment: n.sentiment,
+            })),
+            crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
+            optionsBlock: options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable.",
+            crossSectional: formatCrossSectionalBlock(rankMap),
+            events,
+            cooling: coolingSymbols,
+            asOf,
+            regime: effectiveRegime,
+            learning,
+            attribution: attribution ? formatAttributionBlock(attribution) : null,
+            regimeNote: tightened.note,
+            hyperparams: hyperparams ?? null,
+            calibrationBlock: formatCalibrationBlock(calibration),
+          },
+        });
+      } catch (e) {
+        console.warn("Shadow variant skipped:", e);
+      }
+    })();
+  }
+
 
   // Route to Saxo for live modes. Paper mode is a no-op inside the helper.
   let routedOrders: unknown = null;
