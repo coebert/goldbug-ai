@@ -379,10 +379,22 @@ function PortfolioPage() {
           <>
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight">{p.name}</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-semibold tracking-tight">{p.name}</h1>
+                  <ModeBadge mode={p.mode} />
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  {p.currency} {startingCash.toFixed(0)} starting · {p.risk_level} risk · {p.mode}
+                  {p.currency} {startingCash.toFixed(0)} starting · {p.risk_level} risk
                 </p>
+                {p.mode === "live_prod" ? (
+                  <p className="mt-1 text-xs font-medium text-destructive">
+                    ⚠ Real money — approved orders route to your live broker account.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    No real money at risk — {p.mode === "live_sim" ? "paper-traded against live prices." : "historical backtest only."}
+                  </p>
+                )}
               </div>
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-semibold tabular-nums">
