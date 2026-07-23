@@ -31,7 +31,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity } from "lucide-react";
+import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -218,6 +218,11 @@ function PortfolioPage() {
                 >
                   <RotateCcw className="mr-1 h-4 w-4" /> Reset
                 </Button>
+                <Link to="/long-horizon/$id" params={{ id }}>
+                  <Button variant="outline">
+                    <CalendarClock className="mr-1 h-4 w-4" /> Long-horizon backtest
+                  </Button>
+                </Link>
                 {(runDay.isPending || runBt.isPending) && (
                   <span className="text-xs text-muted-foreground">
                     Fetching prices, reading news, asking the AI…

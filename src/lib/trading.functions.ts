@@ -891,3 +891,42 @@ export const getDiagnostics = createServerFn({ method: "POST" })
       rolling,
     };
   });
+
+// ---------- Long-horizon backtest (rule-based, 10-50 years) ----------
+
+export const runLongHorizonBacktest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        portfolio_id: z.string().uuid(),
+        from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        rebalance: z.enum(["monthly", "quarterly"]).default("monthly"),
+        top_k: z.number().int().min(2).max(12).default(6),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: p, error } = await context.supabase
+      .from("portfolios")
+      .select("id, starting_cash, currency, risk_level, risk_config")
+      .eq("id", data.portfolio_id)
+      .single();
+    if (error || !p) throw new Error("Portfolio not found");
+    const { runLongHorizonBacktest: run, LONG_HORIZON_UNIVERSE } = await import(
+      "./long-horizon.server"
+    );
+    const result = await run({
+      from: data.from,
+      to: data.to,
+      startingCash: Number(p.starting_cash),
+      currency: p.currency ?? "GBP",
+      riskLevel: p.risk_level ?? "balanced",
+      riskConfig: p.risk_config,
+      universe: LONG_HORIZON_UNIVERSE,
+      rebalance: data.rebalance,
+      topK: data.top_k,
+    });
+    return result;
+  });
