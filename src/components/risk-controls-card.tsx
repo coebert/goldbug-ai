@@ -139,6 +139,8 @@ export function RiskControlsCard({
               </CardTitle>
               <CardDescription>
                 Stop-loss {(cfg.stop_loss_pct * 100).toFixed(0)}% · Take-profit {(cfg.take_profit_pct * 100).toFixed(0)}% ·{" "}
+                {cfg.atr_trailing_mult > 0 ? `trail ${cfg.atr_trailing_mult}×ATR · ` : ""}
+                {cfg.max_hold_days > 0 ? `max-hold ${cfg.max_hold_days}d · ` : ""}
                 {cfg.volatility_sizing ? `vol-target ${(cfg.vol_target_pct * 100).toFixed(2)}%/day` : "vol sizing off"}
               </CardDescription>
             </div>
