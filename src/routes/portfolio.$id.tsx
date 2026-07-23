@@ -418,13 +418,22 @@ function PortfolioPage() {
 
             <Card className="mb-6">
               <CardContent className="flex flex-wrap items-center gap-3 py-4">
-                <Button
-                  onClick={() => runDay.mutate()}
-                  disabled={runDay.isPending || runBt.isPending}
-                >
-                  <Zap className="mr-1 h-4 w-4" />
-                  {runDay.isPending ? "Running…" : "Run one day now"}
-                </Button>
+                <UITooltipProvider delayDuration={100}>
+                  <UITooltip>
+                    <UITooltipTrigger asChild>
+                      <Button
+                        onClick={() => runDay.mutate()}
+                        disabled={runDay.isPending || runBt.isPending}
+                      >
+                        <Zap className="mr-1 h-4 w-4" />
+                        {runDay.isPending ? "Running…" : "Run one day now"}
+                      </Button>
+                    </UITooltipTrigger>
+                    <UITooltipContent className="max-w-xs">
+                      Manually triggers ONE AI decision cycle right now (fetches latest prices + news, asks the AI, applies guardrails, records any resulting trades). Same thing the hourly cron does when the portfolio is Active — use this to test or force a run without waiting for the next hour. Doesn't touch real money unless the portfolio is in Real money mode.
+                    </UITooltipContent>
+                  </UITooltip>
+                </UITooltipProvider>
                 <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5">
                   <span className="text-xs text-muted-foreground">Backtest days:</span>
                   <div className="w-32">
