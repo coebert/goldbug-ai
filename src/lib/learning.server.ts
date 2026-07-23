@@ -53,13 +53,37 @@ export async function computeRecentOutcomes(
   since.setDate(since.getDate() - Math.ceil(windowDays * 1.7));
   const sinceStr = since.toISOString().slice(0, 10);
 
-  const { data: trades } = await supabaseAdmin
-    .from("trades")
-    .select("symbol, side, price, trade_date, reason")
-    .eq("portfolio_id", portfolioId)
-    .gte("trade_date", sinceStr)
-    .lte("trade_date", asOf)
-    .order("trade_date", { ascending: true });
+  const [{ data: trades }, { data: regimeRows }] = await Promise.all([
+    supabaseAdmin
+      .from("trades")
+      .select("symbol, side, price, trade_date, reason")
+      .eq("portfolio_id", portfolioId)
+      .gte("trade_date", sinceStr)
+      .lte("trade_date", asOf)
+      .order("trade_date", { ascending: true }),
+    supabaseAdmin
+      .from("market_regimes")
+      .select("as_of, regime")
+      .gte("as_of", sinceStr)
+      .lte("as_of", asOf)
+      .order("as_of", { ascending: true }),
+  ]);
+
+  // Build a step-function of regime by date; each trade_date snaps to the
+  // most-recent regime observation on or before it.
+  const regimeSeries: { d: string; r: string }[] = (regimeRows ?? []).map((row) => ({
+    d: row.as_of as string,
+    r: row.regime as string,
+  }));
+  function regimeFor(dateStr: string): string | null {
+    if (regimeSeries.length === 0) return null;
+    let match: string | null = null;
+    for (const p of regimeSeries) {
+      if (p.d <= dateStr) match = p.r;
+      else break;
+    }
+    return match;
+  }
 
   const samples: LearningContext["samples"] = [];
   for (const t of trades ?? []) {
