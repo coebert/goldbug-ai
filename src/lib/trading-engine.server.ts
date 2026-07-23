@@ -627,8 +627,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         vol_target_pct: cfg.vol_target_pct,
       },
       regime: regime ?? null,
+      learning: {
+        stats: learning.stats,
+        lessons: learning.lessons,
+        lessons_as_of: learning.lessons_as_of,
+      },
     } as unknown as never,
   });
+
+  // Self-reflection: refresh distilled lessons periodically. Fire-and-forget so
+  // reflection cost never blocks the tick; failures just skip this cycle.
+  reflectAndUpdateLessons(portfolioId, asOf, learning).catch((e) =>
+    console.warn("Reflection skipped:", e),
+  );
 
   return { decision, executed, totalValue: newTotal, cash: workingCash };
 }
