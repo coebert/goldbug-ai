@@ -893,10 +893,18 @@ function PortfolioPage() {
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <RegimePanel />
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <RegimePanel />
               <LearningPanel portfolioId={p.id} />
             </div>
 
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <SignalDecayCard portfolioId={p.id} />
+              <CorrelationHeatmapCard portfolioId={p.id} />
+            </div>
+
             <Tabs defaultValue="journal" className="mt-6">
+
               <TabsList>
                 <TabsTrigger value="journal">AI Journal ({decisions.length})</TabsTrigger>
                 <TabsTrigger value="trades">Trades ({trades.length})</TabsTrigger>
