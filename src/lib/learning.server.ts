@@ -26,6 +26,9 @@ export type LearningContext = {
   stats: LearningStats;
   lessons: string[];
   lessons_as_of: string | null;
+  lessons_regime: string | null; // which regime these lessons were authored under (null = general)
+  per_regime_stats: { regime: string; n: number; win_rate: number; avg_return_pct: number }[];
+  current_regime: string | null;
   samples: {
     symbol: string;
     side: "buy" | "sell";
@@ -35,6 +38,7 @@ export type LearningContext = {
     return_pct: number;
     outcome: "win" | "loss";
     reason: string | null;
+    regime: string | null;
   }[];
 };
 
