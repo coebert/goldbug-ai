@@ -113,6 +113,7 @@ export async function computeRecentOutcomes(
       return_pct: signed * 100,
       outcome: signed >= 0 ? "win" : "loss",
       reason: t.reason ?? null,
+      regime: regimeFor(t.trade_date),
     });
   }
 
