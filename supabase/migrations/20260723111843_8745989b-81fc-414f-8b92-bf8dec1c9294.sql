@@ -1,0 +1,3 @@
+ALTER TABLE public.holdings
+  ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS high_water_mark NUMERIC;
