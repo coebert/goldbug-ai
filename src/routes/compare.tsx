@@ -8,6 +8,7 @@ import {
   getComparison,
   getTradeComparison,
   runBacktestMany,
+  getDivergenceNarratives,
 } from "@/lib/trading.functions";
 import { Button } from "@/components/ui/button";
 import {
