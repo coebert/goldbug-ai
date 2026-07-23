@@ -233,7 +233,7 @@ export const calibrateExecution = createServerFn({ method: "POST" })
     const symbols = filterUniverse(classes as Parameters<typeof filterUniverse>[0]).map((u) => u.symbol);
     if (!symbols.length) throw new Error("Portfolio universe is empty");
 
-    const summary = await run(symbols, { windowDays: data.window_days });
+    const summary = await run(symbols, { lookbackDays: data.window_days });
 
     if (data.apply) {
       const cfg = parseRiskConfig(p.risk_config);
