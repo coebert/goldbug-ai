@@ -32,7 +32,8 @@ export function Sparkline({ values, width = 120, height = 36, className }: Spark
   const first = clean[0];
   const last = clean[clean.length - 1];
   const up = last >= first;
-  const stroke = up ? "hsl(var(--primary))" : "hsl(var(--destructive))";
+  // Light, high-contrast tones that pop against the dark card background
+  const stroke = up ? "#4ade80" : "#f87171"; // emerald-400 / red-400
   const areaId = `spark-${up ? "up" : "dn"}-${clean.length}`;
   const pathD = `M${points.join(" L")}`;
   const areaD = `${pathD} L${width},${height} L0,${height} Z`;
