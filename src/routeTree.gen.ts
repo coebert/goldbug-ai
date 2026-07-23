@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
+import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 
 const GetStartedRoute = GetStartedRouteImport.update({
@@ -47,6 +48,11 @@ const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
   path: '/long-horizon/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksHourlyRunRoute = ApiPublicHooksHourlyRunRouteImport.update({
+  id: '/api/public/hooks/hourly-run',
+  path: '/api/public/hooks/hourly-run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
   id: '/api/public/hooks/daily-run',
   path: '/api/public/hooks/daily-run',
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
+  '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
+  '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
+  '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
+    | '/api/public/hooks/hourly-run'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
+    | '/api/public/hooks/hourly-run'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
+    | '/api/public/hooks/hourly-run'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
+  ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LongHorizonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/hourly-run': {
+      id: '/api/public/hooks/hourly-run'
+      path: '/api/public/hooks/hourly-run'
+      fullPath: '/api/public/hooks/hourly-run'
+      preLoaderRoute: typeof ApiPublicHooksHourlyRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/daily-run': {
       id: '/api/public/hooks/daily-run'
       path: '/api/public/hooks/daily-run'
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
+  ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
