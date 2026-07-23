@@ -235,9 +235,15 @@ function SaxoStatusPage() {
     }
   };
 
+  if (!ready || !session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader email={user?.email} />
+      <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
