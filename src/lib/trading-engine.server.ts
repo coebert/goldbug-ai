@@ -467,6 +467,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         learning,
         attribution: attribution ? formatAttributionBlock(attribution) : null,
         regimeNote: tightened.note,
+        hyperparams: hyperparams ?? null,
       });
 
 
