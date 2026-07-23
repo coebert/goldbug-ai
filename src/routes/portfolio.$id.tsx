@@ -382,9 +382,10 @@ function PortfolioPage() {
                                 ? "bg-primary text-primary-foreground"
                                 : "bg-background text-muted-foreground hover:text-foreground"
                             }`}
-                            title={`${mode} contrast`}
+                            title={mode === "cb" ? "Colorblind-safe palette (Okabe–Ito)" : `${mode} contrast`}
+                            aria-label={mode === "cb" ? "Colorblind-safe palette" : `${mode} contrast`}
                           >
-                            {mode}
+                            {mode === "cb" ? "Colorblind" : mode}
                           </button>
                         ))}
                       </div>
