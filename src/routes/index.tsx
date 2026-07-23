@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
+import { AllPortfoliosChart } from "@/components/all-portfolios-chart";
 import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles } from "lucide-react";
 
@@ -113,6 +114,10 @@ function Home() {
               <Button variant="outline" size="sm">Compare</Button>
             </Link>
           </div>
+        </div>
+
+        <div className="mb-6">
+          <AllPortfoliosChart />
         </div>
 
 
