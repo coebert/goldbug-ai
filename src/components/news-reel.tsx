@@ -128,6 +128,9 @@ export function NewsReel() {
   };
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  // Track which headline IDs we've already seen so we can highlight & notify on genuinely new ones.
+  const seenIdsRef = useRef<Set<string> | null>(null);
+  const [highlightIds, setHighlightIds] = useState<Map<string, number>>(new Map());
 
   const allItems = q.data?.items ?? [];
   const items = useMemo(() => {
