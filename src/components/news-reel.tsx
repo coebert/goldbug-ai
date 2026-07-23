@@ -729,6 +729,21 @@ export function NewsReel() {
                 );
               })}
             </ul>
+            {/* Infinite-scroll sentinel — observed to auto-load older events. */}
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                aria-hidden="true"
+                className="h-8 w-full"
+              />
+            )}
+            {(q.isFetching || !hasMore) && allItems.length > 0 && (
+              <div className="py-2 text-center text-[11px] italic text-muted-foreground">
+                {q.isFetching
+                  ? "Loading older events…"
+                  : "No older cached events"}
+              </div>
+            )}
           </div>
         )}
         {!q.isLoading && allItems.length > 0 && (
@@ -736,21 +751,21 @@ export function NewsReel() {
             <span>
               Showing {allItems.length} headline{allItems.length === 1 ? "" : "s"} from the last {sinceDays} day{sinceDays === 1 ? "" : "s"}
             </span>
-            {hasMore ? (
+            {hasMore && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={loadMore}
                 disabled={q.isFetching}
                 className="h-7 text-xs"
+                title="Older events also auto-load as you scroll to the bottom of the reel"
               >
                 {q.isFetching ? "Loading…" : "Load more"}
               </Button>
-            ) : (
-              <span className="italic">No older cached events</span>
             )}
           </div>
         )}
+
       </CardContent>
       <Dialog open={detailsId !== null} onOpenChange={(o) => !o && setDetailsId(null)}>
         <DialogContent className="max-w-lg">
