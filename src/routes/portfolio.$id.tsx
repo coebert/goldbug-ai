@@ -296,25 +296,14 @@ function PortfolioPage() {
                 <TabsTrigger value="journal">AI Journal ({decisions.length})</TabsTrigger>
                 <TabsTrigger value="trades">Trades ({trades.length})</TabsTrigger>
               </TabsList>
-              <TabsContent value="journal" className="space-y-3">
+              <TabsContent value="journal" className="space-y-4">
                 {decisions.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No AI decisions yet. Run one day or a backtest to see the AI's reasoning here.
                   </p>
                 )}
                 {decisions.map((d) => (
-                  <Card key={d.id}>
-                    <CardContent className="py-4">
-                      <div className="mb-2 flex items-baseline justify-between">
-                        <span className="text-sm font-medium">{d.run_date}</span>
-                        <span className="text-xs text-muted-foreground">
-                          Value: {p.currency} {Number(d.portfolio_value ?? 0).toFixed(2)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{d.briefing}</p>
-                      <p className="mt-2 text-sm">{d.rationale}</p>
-                    </CardContent>
-                  </Card>
+                  <DecisionCard key={d.id} decision={d} currency={p.currency} />
                 ))}
               </TabsContent>
               <TabsContent value="trades">
