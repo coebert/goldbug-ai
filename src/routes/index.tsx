@@ -1,24 +1,296 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  listPortfolios,
+  createPortfolio,
+  deletePortfolio,
+} from "@/lib/trading.functions";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AppHeader } from "@/components/app-header";
+import { toast } from "sonner";
+import { Trash2, PlayCircle, PlusCircle } from "lucide-react";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  ssr: false,
+  head: () => ({
+    meta: [
+      { title: "Aegis — Your AI Paper Portfolios" },
+      {
+        name: "description",
+        content: "Manage AI-driven paper trading portfolios. Backtest, run daily, watch results.",
+      },
+    ],
+  }),
+  component: Home,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+const RISK_LABELS: Record<string, string> = {
+  conservative: "Conservative — max 10% per asset, 20% cash floor",
+  balanced: "Balanced — max 15% per asset, 10% cash floor",
+  aggressive: "Aggressive — max 25% per asset, no cash floor",
+};
+
+const CLASS_LABELS: Record<string, string> = {
+  stock: "Individual stocks (US + UK/EU)",
+  etf: "ETFs (index funds)",
+  crypto: "Crypto (BTC, ETH, SOL)",
+  commodity: "Commodities (gold, silver, oil)",
+  fx: "FX (GBP/USD, EUR/USD)",
+};
+
+function Home() {
+  const navigate = useNavigate();
+  const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setReady(true);
+      if (!data.session) navigate({ to: "/auth" });
+    });
+    const { data } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s);
+      if (!s) navigate({ to: "/auth" });
+    });
+    return () => data.subscription.unsubscribe();
+  }, [navigate]);
+
+  const list = useServerFn(listPortfolios);
+  const q = useQuery({
+    queryKey: ["portfolios"],
+    queryFn: () => list(),
+    enabled: !!session,
+  });
+
+  if (!ready || !session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-screen">
+      <AppHeader email={session.user.email} />
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">Your Portfolios</h1>
+          <p className="text-sm text-muted-foreground">
+            Create a portfolio, pick a risk level, run a backtest, then let the AI make daily decisions.
+          </p>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+          <div className="space-y-3">
+            {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
+            {q.data && q.data.length === 0 && (
+              <Card>
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  No portfolios yet. Create one on the right to get started.
+                </CardContent>
+              </Card>
+            )}
+            {q.data?.map((p) => (
+              <PortfolioRow key={p.id} portfolio={p} />
+            ))}
+          </div>
+          <CreatePortfolioCard />
+        </div>
+      </main>
     </div>
+  );
+}
+
+function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; last_run_date: string | null } }) {
+  const del = useServerFn(deletePortfolio);
+  const qc = useQueryClient();
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => del({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Portfolio deleted");
+      qc.invalidateQueries({ queryKey: ["portfolios"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const pnl = Number(portfolio.current_cash) - Number(portfolio.starting_cash);
+  const pnlPct = (pnl / Number(portfolio.starting_cash)) * 100;
+
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between gap-4 py-4">
+        <div>
+          <Link
+            to="/portfolio/$id"
+            params={{ id: portfolio.id }}
+            className="font-medium hover:underline"
+          >
+            {portfolio.name}
+          </Link>
+          <div className="text-xs text-muted-foreground">
+            {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} · {portfolio.risk_level} ·{" "}
+            {portfolio.mode}
+            {portfolio.last_run_date && ` · last run ${portfolio.last_run_date}`}
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-sm font-medium">
+              {portfolio.currency} {Number(portfolio.current_cash).toFixed(2)}
+            </div>
+            <div className={`text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
+              (cash-only) {pnl >= 0 ? "+" : ""}
+              {pnlPct.toFixed(2)}%
+            </div>
+          </div>
+          <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
+            <Button size="sm" variant="outline">
+              <PlayCircle className="mr-1 h-4 w-4" /> Open
+            </Button>
+          </Link>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => {
+              if (confirm("Delete this portfolio?")) deleteMut.mutate(portfolio.id);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreatePortfolioCard() {
+  const create = useServerFn(createPortfolio);
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [name, setName] = useState("My Portfolio");
+  const [cash, setCash] = useState(1000);
+  const [currency, setCurrency] = useState<"GBP" | "USD" | "EUR">("GBP");
+  const [risk, setRisk] = useState<"conservative" | "balanced" | "aggressive">("balanced");
+  const [classes, setClasses] = useState<string[]>(["stock", "etf", "crypto", "commodity", "fx"]);
+
+  const toggleClass = (c: string) =>
+    setClasses((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+
+  const mut = useMutation({
+    mutationFn: () =>
+      create({
+        data: {
+          name,
+          starting_cash: cash,
+          currency,
+          risk_level: risk,
+          universe: classes as ("stock" | "etf" | "crypto" | "commodity" | "fx")[],
+          mode: "backtest",
+        },
+      }),
+    onSuccess: (r) => {
+      toast.success("Portfolio created");
+      qc.invalidateQueries({ queryKey: ["portfolios"] });
+      navigate({ to: "/portfolio/$id", params: { id: r.id } });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <PlusCircle className="h-4 w-4 text-primary" /> New portfolio
+        </CardTitle>
+        <CardDescription>Set it up, then run a backtest to see how the AI performs.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label htmlFor="name">Name</Label>
+          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="grid grid-cols-[1fr_100px] gap-2">
+          <div>
+            <Label htmlFor="cash">Starting pot</Label>
+            <Input
+              id="cash"
+              type="number"
+              min={10}
+              max={1_000_000}
+              value={cash}
+              onChange={(e) => setCash(Math.max(10, Number(e.target.value) || 0))}
+            />
+          </div>
+          <div>
+            <Label>Currency</Label>
+            <Select value={currency} onValueChange={(v) => setCurrency(v as typeof currency)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="GBP">GBP</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="EUR">EUR</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label>Risk level</Label>
+          <div className="mt-2 space-y-2">
+            <Slider
+              value={[risk === "conservative" ? 0 : risk === "balanced" ? 1 : 2]}
+              onValueChange={([v]) => setRisk(v === 0 ? "conservative" : v === 1 ? "balanced" : "aggressive")}
+              min={0}
+              max={2}
+              step={1}
+            />
+            <p className="text-xs text-muted-foreground">{RISK_LABELS[risk]}</p>
+          </div>
+        </div>
+        <div>
+          <Label>Asset universe</Label>
+          <div className="mt-2 space-y-2">
+            {Object.entries(CLASS_LABELS).map(([c, label]) => (
+              <label key={c} className="flex cursor-pointer items-center gap-2 text-sm">
+                <Checkbox
+                  checked={classes.includes(c)}
+                  onCheckedChange={() => toggleClass(c)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <Button
+          className="w-full"
+          disabled={mut.isPending || classes.length === 0}
+          onClick={() => mut.mutate()}
+        >
+          {mut.isPending ? "Creating…" : "Create portfolio"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
