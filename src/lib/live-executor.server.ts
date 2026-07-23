@@ -59,15 +59,21 @@ export async function routeOrdersToBroker(params: {
       await supabaseAdmin.from("live_broker_log").insert({
         portfolio_id: portfolio.id,
         user_id: userId,
-        decision_id: decisionId,
-        event: "ROUTE_SKIPPED_PAPER_ONLY",
-        detail: { reason: "LIVE_SIM_PAPER_ONLY env flag active", as_of: asOf },
+        broker: "saxo",
+        env: "sim",
+        method: "ROUTE_SKIPPED_PAPER_ONLY",
+        path: "/route/paper-only",
+        status: 0,
+        request: { asOf, decisionId, count: routable.length } as never,
+        response: null,
+        error: "LIVE_SIM_PAPER_ONLY env flag active",
       });
     } catch {
       // best-effort log only
     }
     return results;
   }
+
 
 
   const routable = executed.filter(
