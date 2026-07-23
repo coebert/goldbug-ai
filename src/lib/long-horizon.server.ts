@@ -481,10 +481,15 @@ export async function runLongHorizonBacktest(opts: {
     const startDay = days.find((d) => weightedSymbols.some((ws) => ws.sym.byDate.has(d) || priceOn(ws.sym, d) != null))
       ?? days[0];
     // Compute how many units per symbol we'd hold if we invested startingCash at startDay by weight.
+    // Apply one-time entry costs (slippage + commission) so buy-and-hold benchmarks
+    // are compared on the same execution basis as the active strategy.
     const units = new Map<string, number>();
     for (const ws of weightedSymbols) {
       const p0 = priceOn(ws.sym, startDay);
-      if (p0 && p0 > 0) units.set(ws.sym.symbol, (opts.startingCash * ws.weight) / p0);
+      if (p0 && p0 > 0) {
+        const entryFill = p0 * (1 + slipRate) * (1 + commRate);
+        units.set(ws.sym.symbol, (opts.startingCash * ws.weight) / entryFill);
+      }
     }
     const curve: CurvePoint[] = [];
     for (const d of days) {
