@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAllPortfoliosEquity } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Area,
   CartesianGrid,
@@ -15,10 +16,24 @@ import {
   YAxis,
 } from "recharts";
 
-const LINE_COLORS = ["#22d3ee", "#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c"];
+const LINE_COLORS = ["#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c", "#60a5fa"];
+const TOTAL_COLOR = "#22d3ee";
+const AXIS_COLOR = "hsl(var(--foreground))";
+const GRID_COLOR = "hsl(var(--foreground))";
+
+type Range = "7d" | "30d" | "90d" | "1y" | "all";
+
+const RANGE_OPTS: { value: Range; label: string; days: number | null }[] = [
+  { value: "7d", label: "7D", days: 7 },
+  { value: "30d", label: "30D", days: 30 },
+  { value: "90d", label: "90D", days: 90 },
+  { value: "1y", label: "1Y", days: 365 },
+  { value: "all", label: "All", days: null },
+];
 
 export function AllPortfoliosChart() {
   const fetchAll = useServerFn(getAllPortfoliosEquity);
+  const [range, setRange] = useState<Range>("all");
   const q = useQuery({
     queryKey: ["all-portfolios-equity"],
     queryFn: () => fetchAll(),
@@ -26,9 +41,16 @@ export function AllPortfoliosChart() {
   });
 
   const { series, portfolios, currency, totalNow, startingTotal } = useMemo(() => {
-    const s = q.data?.series ?? [];
+    const all = q.data?.series ?? [];
     const p = q.data?.portfolios ?? [];
     const c = q.data?.currency ?? "GBP";
+    const opt = RANGE_OPTS.find((r) => r.value === range)!;
+    let s = all;
+    if (opt.days && all.length > 0) {
+      const cutoff = Date.now() - opt.days * 86_400_000;
+      s = all.filter((r: any) => new Date(r.date).getTime() >= cutoff);
+      if (s.length === 0) s = all.slice(-1);
+    }
     const last = s[s.length - 1];
     const first = s[0];
     return {
@@ -38,7 +60,7 @@ export function AllPortfoliosChart() {
       totalNow: last ? Number(last.total) : 0,
       startingTotal: first ? Number(first.total) : 0,
     };
-  }, [q.data]);
+  }, [q.data, range]);
 
   const pnl = totalNow - startingTotal;
   const pnlPct = startingTotal > 0 ? (pnl / startingTotal) * 100 : 0;
@@ -50,11 +72,28 @@ export function AllPortfoliosChart() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Total portfolio value over time</CardTitle>
-        <CardDescription>
-          Combined value across all your portfolios. Each portfolio's value is forward-filled
-          between snapshots.
-        </CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Total portfolio value over time</CardTitle>
+            <CardDescription>
+              Combined value across all your portfolios. Each portfolio's value is forward-filled
+              between snapshots.
+            </CardDescription>
+          </div>
+          <ToggleGroup
+            type="single"
+            size="sm"
+            value={range}
+            onValueChange={(v) => v && setRange(v as Range)}
+            className="shrink-0"
+          >
+            {RANGE_OPTS.map((r) => (
+              <ToggleGroupItem key={r.value} value={r.value} className="px-2.5 text-xs">
+                {r.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="mb-3 flex flex-wrap items-baseline gap-x-6 gap-y-1">
@@ -65,35 +104,39 @@ export function AllPortfoliosChart() {
             <div className={`text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
               {pnl >= 0 ? "+" : ""}
               {currency} {pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}
-              {pnlPct.toFixed(2)}%) vs first snapshot
+              {pnlPct.toFixed(2)}%) over {RANGE_OPTS.find((r) => r.value === range)!.label}
             </div>
           </div>
         </div>
-        <div className="h-[300px] w-full">
+        <div className="h-[320px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={series} margin={{ top: 8, right: 16, bottom: 24, left: 8 }}>
+            <ComposedChart data={series} margin={{ top: 8, right: 16, bottom: 28, left: 12 }}>
               <defs>
                 <linearGradient id="totalArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                  <stop offset="0%" stopColor={TOTAL_COLOR} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={TOTAL_COLOR} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeOpacity={0.15} strokeDasharray="3 3" />
+              <CartesianGrid stroke={GRID_COLOR} strokeOpacity={0.18} strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                stroke="hsl(var(--muted-foreground))"
-                label={{ value: "Date", position: "insideBottom", offset: -2, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                stroke={AXIS_COLOR}
+                strokeOpacity={0.6}
+                minTickGap={40}
+                label={{ value: "Date", position: "insideBottom", offset: -6, fill: AXIS_COLOR, fontSize: 12 }}
               />
               <YAxis
                 width={72}
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                stroke="hsl(var(--muted-foreground))"
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                stroke={AXIS_COLOR}
+                strokeOpacity={0.6}
                 tickFormatter={(v) => fmt(Number(v))}
-                label={{ value: `Total value (${currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                domain={["auto", "auto"]}
+                label={{ value: `Total value (${currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: AXIS_COLOR, fontSize: 12 }}
               />
               <Tooltip
-                cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                cursor={{ stroke: AXIS_COLOR, strokeOpacity: 0.4, strokeDasharray: "3 3" }}
                 content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null;
                   const row = payload[0].payload as Record<string, number | string>;
@@ -114,12 +157,12 @@ export function AllPortfoliosChart() {
                   );
                 }}
               />
-              <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
+              <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12, color: AXIS_COLOR }} />
               <Area
                 type="monotone"
                 dataKey="total"
                 name="Total"
-                stroke="#22d3ee"
+                stroke={TOTAL_COLOR}
                 strokeWidth={2.5}
                 fill="url(#totalArea)"
                 isAnimationActive={false}
@@ -131,7 +174,7 @@ export function AllPortfoliosChart() {
                   dataKey={p.id}
                   name={p.name}
                   stroke={LINE_COLORS[i % LINE_COLORS.length]}
-                  strokeWidth={1.5}
+                  strokeWidth={1.75}
                   strokeDasharray="4 3"
                   dot={false}
                   isAnimationActive={false}
