@@ -464,9 +464,6 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
 
 
-  // Feature lookup for later use (volatility sizing, asset class)
-  const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
-
   let workingCash = cash;
   const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
   const executed: ExecutedTrade[] = [];
