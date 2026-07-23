@@ -2265,22 +2265,36 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       body: JSON.stringify({ manual: true, triggered_at: new Date().toISOString() }),
     });
     const text = await res.text();
-    let payload: Record<string, unknown> | string | null = null;
-    try {
-      const parsed = JSON.parse(text);
-      payload = (parsed && typeof parsed === "object") ? (parsed as Record<string, unknown>) : String(parsed);
-    } catch { payload = text; }
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(text); } catch { parsed = null; }
+    const obj = (parsed && typeof parsed === "object") ? (parsed as Record<string, unknown>) : {};
     if (!res.ok) {
-      const msg =
-        payload && typeof payload === "object" && "error" in payload
-          ? String((payload as { error: unknown }).error)
-          : `Hourly run failed with status ${res.status}`;
-      throw new Error(msg);
+      const errMsg = typeof obj.error === "string" ? obj.error : `Hourly run failed with status ${res.status}`;
+      throw new Error(errMsg);
     }
+    const num = (v: unknown) => (typeof v === "number" ? v : null);
+    const str = (v: unknown) => (typeof v === "string" ? v : null);
+    const arr = Array.isArray(obj.results) ? obj.results as Array<Record<string, unknown>> : [];
+    const results = arr.map((r) => ({
+      id: str(r.id) ?? "",
+      mode: str(r.mode) ?? "",
+      ok: r.ok === true,
+      value: num(r.value),
+      skipped: str(r.skipped),
+      error: str(r.error),
+    }));
     return {
       ok: true,
       duration_ms: Date.now() - started,
-      result: payload,
+      hour_utc: str(obj.hour_utc),
+      date: str(obj.date),
+      news_headlines: num(obj.news_headlines),
+      prices_refreshed: num(obj.prices_refreshed),
+      symbols_watched: num(obj.symbols_watched),
+      portfolios: num(obj.portfolios),
+      skipped_paused: num(obj.skipped_paused),
+      results,
     };
   });
+
 
