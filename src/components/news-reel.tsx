@@ -6,7 +6,8 @@ import { getGlobalNewsReel } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
 
 // Absolute sentiment threshold treated as a "strong" market-moving signal.
 const STRONG_SENTIMENT_THRESHOLD = 0.4;
