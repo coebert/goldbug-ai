@@ -413,9 +413,15 @@ function CreatePortfolioCard() {
   const onSubmit = () => {
     if (mode === "live_prod") {
       const bal = balQ.data;
+      const pot = bal ? (bal.cashAvailable ?? bal.cash) : null;
+      const pending = bal?.transactionsNotBooked ?? 0;
+      const reserved = bal?.reservedCash ?? 0;
       const amountLine = bal
-        ? `\n\nStarting cash: ${fmtMoney(bal.cash, bal.currency)} (from Saxo LIVE account ${bal.accountId ?? "—"}).`
-        : `\n\nStarting cash will be read from your Saxo LIVE balance.`;
+        ? `\n\nStarting cash (available/settled): ${fmtMoney(pot ?? 0, bal.currency)}` +
+          (pending ? `\nPending / unsettled (excluded): ${fmtMoney(pending, bal.currency)}` : "") +
+          (reserved ? `\nReserved by open orders (excluded): ${fmtMoney(reserved, bal.currency)}` : "") +
+          `\nFrom Saxo LIVE account ${bal.accountId ?? "—"}.`
+        : `\n\nStarting cash will be read from your Saxo LIVE available balance.`;
       const ok = window.confirm(
         `Create "${name}" and start trading REAL MONEY on your Saxo LIVE account?${amountLine}\n\nThe AI will place real orders on every hourly cycle. You can pause or revert at any time.`,
       );
