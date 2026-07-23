@@ -1,14 +1,16 @@
-// Integration tests for the authenticated server-function wrappers in
-// `execution-slicer.functions.ts`. These verify that every path returns the
-// structured discriminated-union response — `{ ok: true, data }` on success
-// and `{ ok: false, error: { code, message, issues? } }` on any failure —
-// across invalid inputs, ownership mismatches, missing rows, and unexpected
-// throws from the underlying server helpers.
+// Integration tests for the pure handler bodies backing the authenticated
+// server-function wrappers in `execution-slicer.functions.ts`. Each RPC
+// wrapper is a thin delegate around one of these handlers, so exercising
+// them here covers the full validation → server-helper → response-shape
+// path without going through the TanStack Start RPC transform (which the
+// Vite plugin rewrites and would otherwise be unreachable from a unit
+// test).
 //
-// We stub `createServerFn` so the builder chain composes a plain async
-// function `(payload) => handler({ data: validated, context })`, injecting a
-// trusted `context.userId` the way `requireSupabaseAuth` would in production.
-// The dynamic import of `./execution-slicer.server` is mocked per test.
+// We assert that every code path returns the discriminated-union response:
+//   - `{ ok: true, data }` for successful and skipped operations
+//   - `{ ok: false, error: { code, message, issues? } }` for schema
+//     failures, ownership mismatches, missing rows, and unexpected throws
+// and that the recorded HTTP status matches the error taxonomy.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const U_ALICE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -16,67 +18,26 @@ const PF_ALICE = "11111111-1111-4111-8111-111111111111";
 const SLICE_A = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const DECISION_A = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
-// Response-status recorder: the fail() helper calls setResponseStatus so the
-// HTTP layer surfaces 4xx/5xx alongside the JSON body.
-const statusCalls: number[] = [];
-
-vi.mock("@tanstack/react-start/server", () => ({
-  setResponseStatus: (code: number) => {
-    statusCalls.push(code);
-  },
-}));
-
-// Minimal createServerFn stub: preserves the .middleware/.inputValidator/
-// .handler chain and returns a callable that mimics the RPC entry point.
-vi.mock("@tanstack/react-start", () => {
-  function make(): any {
-    let validator: ((raw: unknown) => unknown) | null = null;
-    let handler: ((args: { data: unknown; context: unknown }) => unknown) | null = null;
-    const api: any = {
-      middleware() { return api; },
-      inputValidator(fn: (raw: unknown) => unknown) { validator = fn; return api; },
-      handler(fn: (args: { data: unknown; context: unknown }) => unknown) {
-        handler = fn;
-        return async (payload: { data?: unknown } = {}) => {
-          if (!handler) throw new Error("handler missing");
-          let data: unknown = payload?.data;
-          if (validator) {
-            try { data = validator(data); }
-            catch (err) { throw err; }
-          }
-          return handler({ data, context: { userId: U_ALICE, supabase: null } });
-        };
-      },
-    };
-    return api;
-  }
-  return { createServerFn: (_opts?: unknown) => make() };
-});
-
-// Middleware is inert in tests — auth context is injected by our stub above.
-vi.mock("@/integrations/supabase/auth-middleware", () => ({
-  requireSupabaseAuth: {},
-}));
-
-// Per-test overrides of the underlying slicer helpers.
+// Per-test overrides of the underlying slicer helpers — the handlers reach
+// them via `await import("./execution-slicer.server")`.
 const serverImpl = {
   maybeSliceOrder: vi.fn<(input: unknown) => Promise<unknown>>(),
   tickSlicer: vi.fn<(portfolioId: string, userId: string) => Promise<unknown>>(),
   recordSliceFill: vi.fn<(sliceId: string, userId: string, qty: number, note?: string) => Promise<void>>(),
 };
-
 vi.mock("../execution-slicer.server", () => serverImpl);
 
-// Load AFTER mocks so the module picks up the stubbed createServerFn.
-const mod = await import("../execution-slicer.functions");
-const { enqueueSlice, tickSlices, recordFill } = mod;
+import {
+  enqueueSliceHandler,
+  tickSlicesHandler,
+  recordFillHandler,
+} from "../execution-slicer-handlers";
 
 type ErrResult = { ok: false; error: { code: string; message: string; issues?: Array<{ path: string; message: string }> } };
 type OkResult<T> = { ok: true; data: T };
 
-function isErr(r: unknown): r is ErrResult {
-  return !!r && typeof r === "object" && (r as { ok?: boolean }).ok === false;
-}
+const statusCalls: number[] = [];
+const setStatus = (code: number) => { statusCalls.push(code); };
 
 beforeEach(() => {
   statusCalls.length = 0;
@@ -86,8 +47,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.clearAllMocks());
 
-// ---- enqueueSlice ----------------------------------------------------------
-describe("enqueueSlice", () => {
+// ---- enqueueSliceHandler --------------------------------------------------
+describe("enqueueSliceHandler", () => {
   const valid = {
     portfolioId: PF_ALICE,
     decisionId: DECISION_A,
@@ -99,143 +60,169 @@ describe("enqueueSlice", () => {
     ttlMinutes: 60,
   };
 
-  it("returns { ok: true, data } for a queued slice", async () => {
+  it("returns { ok: true, data } for a queued slice and injects the trusted userId", async () => {
     serverImpl.maybeSliceOrder.mockResolvedValue({ sliceId: SLICE_A, sliceQty: 10, slices: 4 });
-    const r = (await enqueueSlice({ data: valid })) as OkResult<{ sliceId: string }>;
+    const r = (await enqueueSliceHandler(valid, U_ALICE, setStatus)) as OkResult<{ sliceId: string }>;
     expect(r.ok).toBe(true);
     expect(r.data).toEqual({ sliceId: SLICE_A, sliceQty: 10, slices: 4 });
-    // Server helper receives the injected trusted user id, not the client's.
     expect(serverImpl.maybeSliceOrder).toHaveBeenCalledWith(
       expect.objectContaining({ ownerUserId: U_ALICE, portfolioId: PF_ALICE }),
     );
     expect(statusCalls).toEqual([]);
   });
 
+  it("ignores a client-supplied ownerUserId and uses the trusted context userId", async () => {
+    serverImpl.maybeSliceOrder.mockResolvedValue({ sliceId: SLICE_A, sliceQty: 10, slices: 4 });
+    const spoof = { ...valid, ownerUserId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" };
+    await enqueueSliceHandler(spoof, U_ALICE, setStatus);
+    expect(serverImpl.maybeSliceOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerUserId: U_ALICE }),
+    );
+  });
+
   it("returns { ok: true, data: { skipped } } when helper returns null (below threshold)", async () => {
     serverImpl.maybeSliceOrder.mockResolvedValue(null);
-    const r = await enqueueSlice({ data: valid });
+    const r = await enqueueSliceHandler(valid, U_ALICE, setStatus);
     expect(r).toEqual({ ok: true, data: { skipped: true, reason: "below_threshold" } });
   });
 
-  it("rejects an invalid symbol before hitting the server helper", async () => {
-    await expect(enqueueSlice({ data: { ...valid, symbol: "bad symbol!" } })).rejects.toBeTruthy();
+  it("rejects an invalid symbol with { ok:false, code: invalid_input } and status 400", async () => {
+    const r = (await enqueueSliceHandler({ ...valid, symbol: "bad symbol!" }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.ok).toBe(false);
+    expect(r.error.code).toBe("invalid_input");
+    expect(r.error.issues?.[0]?.path).toBe("symbol");
+    expect(statusCalls).toEqual([400]);
     expect(serverImpl.maybeSliceOrder).not.toHaveBeenCalled();
   });
 
-  it("rejects a non-uuid portfolioId at the input-validator boundary", async () => {
-    await expect(enqueueSlice({ data: { ...valid, portfolioId: "not-a-uuid" } })).rejects.toBeTruthy();
-    expect(serverImpl.maybeSliceOrder).not.toHaveBeenCalled();
+  it("rejects a non-uuid portfolioId at the schema boundary", async () => {
+    const r = (await enqueueSliceHandler({ ...valid, portfolioId: "not-a-uuid" }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
+    expect(r.error.issues?.some((i) => i.path === "portfolioId")).toBe(true);
   });
 
   it("rejects negative quantities", async () => {
-    await expect(enqueueSlice({ data: { ...valid, totalQty: -5 } })).rejects.toBeTruthy();
+    const r = (await enqueueSliceHandler({ ...valid, totalQty: -5 }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
   });
 
-  it("maps ownership-mismatch throws to { ok:false, code: ownership_mismatch }", async () => {
+  it("rejects slices outside [2, 8]", async () => {
+    const r = (await enqueueSliceHandler({ ...valid, slices: 99 }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
+  });
+
+  it("maps ownership-mismatch throws to { ok:false, code: ownership_mismatch } / 403", async () => {
     serverImpl.maybeSliceOrder.mockRejectedValue(new Error("SECURITY:pending_slices ownership mismatch"));
-    const r = (await enqueueSlice({ data: valid })) as ErrResult;
-    expect(isErr(r)).toBe(true);
+    const r = (await enqueueSliceHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("ownership_mismatch");
     expect(statusCalls).toEqual([403]);
   });
 
-  it("maps portfolio_not_found throws to { ok:false, code: not_found }", async () => {
+  it("maps portfolio_not_found throws to { ok:false, code: not_found } / 404", async () => {
     serverImpl.maybeSliceOrder.mockRejectedValue(new Error("portfolio_not_found"));
-    const r = (await enqueueSlice({ data: valid })) as ErrResult;
+    const r = (await enqueueSliceHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("not_found");
     expect(statusCalls).toEqual([404]);
   });
 
-  it("classifies unknown throws as internal_error", async () => {
+  it("classifies unknown throws as internal_error / 500", async () => {
     serverImpl.maybeSliceOrder.mockRejectedValue(new Error("db exploded"));
-    const r = (await enqueueSlice({ data: valid })) as ErrResult;
+    const r = (await enqueueSliceHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("internal_error");
     expect(r.error.message).toMatch(/slicer/i);
     expect(statusCalls).toEqual([500]);
   });
 });
 
-// ---- tickSlices ------------------------------------------------------------
-describe("tickSlices", () => {
+// ---- tickSlicesHandler ----------------------------------------------------
+describe("tickSlicesHandler", () => {
   const valid = { portfolioId: PF_ALICE };
 
   it("returns { ok: true, data: { due } } on success", async () => {
-    serverImpl.tickSlicer.mockResolvedValue([{ sliceId: SLICE_A, sliceQty: 5 }]);
-    const r = (await tickSlices({ data: valid })) as OkResult<{ due: unknown[] }>;
+    serverImpl.tickSlicer.mockResolvedValue([{ id: SLICE_A, symbol: "AAPL", side: "buy", slice_qty: 5, remaining_qty: 5, slices_done: 0, slice_count: 4, limit_price: null, expires_at: new Date().toISOString() }]);
+    const r = (await tickSlicesHandler(valid, U_ALICE, setStatus)) as OkResult<{ due: unknown[] }>;
     expect(r.ok).toBe(true);
     expect(r.data.due).toHaveLength(1);
     expect(serverImpl.tickSlicer).toHaveBeenCalledWith(PF_ALICE, U_ALICE);
   });
 
-  it("rejects a missing portfolioId at the validator", async () => {
-    await expect(tickSlices({ data: {} as any })).rejects.toBeTruthy();
+  it("rejects a missing portfolioId as invalid_input / 400", async () => {
+    const r = (await tickSlicesHandler({}, U_ALICE, setStatus)) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
+    expect(statusCalls).toEqual([400]);
     expect(serverImpl.tickSlicer).not.toHaveBeenCalled();
   });
 
   it("rejects a non-uuid portfolioId", async () => {
-    await expect(tickSlices({ data: { portfolioId: "nope" } as any })).rejects.toBeTruthy();
+    const r = (await tickSlicesHandler({ portfolioId: "nope" }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
   });
 
-  it("maps ownership mismatches to a structured 403 response", async () => {
+  it("maps ownership mismatches to a structured 403", async () => {
     serverImpl.tickSlicer.mockRejectedValue(new Error("ownership mismatch for portfolio"));
-    const r = (await tickSlices({ data: valid })) as ErrResult;
+    const r = (await tickSlicesHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("ownership_mismatch");
     expect(statusCalls).toEqual([403]);
   });
 
   it("maps unknown throws to internal_error / 500", async () => {
     serverImpl.tickSlicer.mockRejectedValue(new Error("network wedged"));
-    const r = (await tickSlices({ data: valid })) as ErrResult;
+    const r = (await tickSlicesHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("internal_error");
     expect(statusCalls).toEqual([500]);
   });
 });
 
-// ---- recordFill ------------------------------------------------------------
-describe("recordFill", () => {
+// ---- recordFillHandler ----------------------------------------------------
+describe("recordFillHandler", () => {
   const valid = { sliceId: SLICE_A, filledQty: 3, note: "partial" };
 
   it("returns { ok: true, data: { recorded: true } } on success", async () => {
     serverImpl.recordSliceFill.mockResolvedValue(undefined);
-    const r = (await recordFill({ data: valid })) as OkResult<{ recorded: true }>;
+    const r = (await recordFillHandler(valid, U_ALICE, setStatus)) as OkResult<{ recorded: true }>;
     expect(r).toEqual({ ok: true, data: { recorded: true } });
     expect(serverImpl.recordSliceFill).toHaveBeenCalledWith(SLICE_A, U_ALICE, 3, "partial");
   });
 
   it("accepts filledQty=0 (NON_NEG) but rejects negative fills", async () => {
     serverImpl.recordSliceFill.mockResolvedValue(undefined);
-    const zero = (await recordFill({ data: { ...valid, filledQty: 0 } })) as OkResult<unknown>;
+    const zero = (await recordFillHandler({ ...valid, filledQty: 0 }, U_ALICE, setStatus)) as OkResult<unknown>;
     expect(zero.ok).toBe(true);
-    await expect(recordFill({ data: { ...valid, filledQty: -1 } })).rejects.toBeTruthy();
+
+    const neg = (await recordFillHandler({ ...valid, filledQty: -1 }, U_ALICE, setStatus)) as ErrResult;
+    expect(neg.error.code).toBe("invalid_input");
   });
 
   it("rejects an over-length note", async () => {
     const bigNote = "x".repeat(501);
-    await expect(recordFill({ data: { ...valid, note: bigNote } })).rejects.toBeTruthy();
+    const r = (await recordFillHandler({ ...valid, note: bigNote }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
     expect(serverImpl.recordSliceFill).not.toHaveBeenCalled();
   });
 
   it("rejects a non-uuid sliceId", async () => {
-    await expect(recordFill({ data: { ...valid, sliceId: "not-uuid" } })).rejects.toBeTruthy();
+    const r = (await recordFillHandler({ ...valid, sliceId: "not-uuid" }, U_ALICE, setStatus)) as ErrResult;
+    expect(r.error.code).toBe("invalid_input");
+    expect(r.error.issues?.some((i) => i.path === "sliceId")).toBe(true);
   });
 
-  it("maps slice-not-found throws to { ok:false, code: not_found }", async () => {
+  it("maps slice-not-found throws to { ok:false, code: not_found } / 404", async () => {
     serverImpl.recordSliceFill.mockRejectedValue(new Error("slice lookup failed"));
-    const r = (await recordFill({ data: valid })) as ErrResult;
+    const r = (await recordFillHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("not_found");
     expect(statusCalls).toEqual([404]);
   });
 
   it("maps ownership mismatches to 403", async () => {
     serverImpl.recordSliceFill.mockRejectedValue(new Error("ownership mismatch"));
-    const r = (await recordFill({ data: valid })) as ErrResult;
+    const r = (await recordFillHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("ownership_mismatch");
     expect(statusCalls).toEqual([403]);
   });
 
-  it("wraps unexpected throws as internal_error", async () => {
+  it("wraps unexpected throws as internal_error / 500", async () => {
     serverImpl.recordSliceFill.mockRejectedValue(new Error("kaboom"));
-    const r = (await recordFill({ data: valid })) as ErrResult;
+    const r = (await recordFillHandler(valid, U_ALICE, setStatus)) as ErrResult;
     expect(r.error.code).toBe("internal_error");
     expect(statusCalls).toEqual([500]);
   });
