@@ -711,18 +711,19 @@ function PortfolioPage() {
                         <CartesianGrid stroke={chartTheme.axis} strokeOpacity={chartTheme.gridOpacity} strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: 11, fill: chartTheme.axis }}
+                          tick={{ fontSize: 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
-                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axis, fontSize: 12 }}
+                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
                         />
                         <YAxis
                           domain={["auto", "auto"]}
                           width={72}
-                          tick={{ fontSize: 11, fill: chartTheme.axis }}
+                          tick={{ fontSize: 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
                           tickFormatter={(v) => compareMode === "pct" ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%` : `${p.currency}${Number(v).toFixed(0)}`}
-                          label={{ value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axis, fontSize: 12 }}
+                          label={{ value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
                         />
+
 
                         <Tooltip
                           cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
