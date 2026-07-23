@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
+import { SaxoOAuthPanel } from "@/components/live-trading-card";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
