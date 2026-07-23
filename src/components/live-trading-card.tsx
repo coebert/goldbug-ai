@@ -159,7 +159,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
             Reconcile now
           </Button>
           {isLive && (
-            <Button size="sm" variant="outline" onClick={() => mPause.mutate(!paused)} disabled={mPause.isPending}>
+            <Button size="sm" variant="outline" onClick={() => mPause.mutate({ paused: !paused, reason: promptReason(paused ? "Resume" : "Pause") })} disabled={mPause.isPending}>
               {paused ? <><PlayCircle className="h-4 w-4 mr-1" /> Resume</> : <><PauseCircle className="h-4 w-4 mr-1" /> Pause</>}
             </Button>
           )}
