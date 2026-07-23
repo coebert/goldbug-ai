@@ -164,6 +164,19 @@ export async function getAttributionDashboard(
         signedPct = (ex.side === "buy" ? r : -r) * 100;
       }
 
+      // Benchmark (SPY) return over the same [tradeDate, exitDate] window.
+      // Benchmark is long-only: we do NOT flip the sign for shorts — alpha
+      // for a short is measured against being long the market.
+      const [spyEntry, spyExit] = await Promise.all([
+        getPriceOn("SPY", tradeDate).catch(() => null),
+        getPriceOn("SPY", exitDate).catch(() => null),
+      ]);
+      let benchPct: number | null = null;
+      if (spyEntry != null && spyExit != null && spyEntry > 0) {
+        benchPct = ((spyExit - spyEntry) / spyEntry) * 100;
+      }
+      const alphaPct = signedPct != null && benchPct != null ? signedPct - benchPct : null;
+
       const pen = parsePenalty(ex.reason ?? "");
       const signalContrib: Record<SignalKey, number> = {
         sma_trend: 0, rsi: 0, price_change: 0, news_sentiment: 0, volatility: 0,
@@ -179,6 +192,8 @@ export async function getAttributionDashboard(
         fill_price: ex.price,
         exit_price: exit,
         forward_return_pct: signedPct,
+        benchmark_return_pct: benchPct,
+        alpha_pct: alphaPct,
         news_score: newsBySym.get(ex.symbol.toUpperCase()) ?? null,
         regime: regime?.regime ?? null,
         event_penalty: pen.event,
@@ -195,6 +210,7 @@ export async function getAttributionDashboard(
       });
     }
   }
+
 
   // Cumulative-by-signal time series (bucket per trade_date)
   const byDate = new Map<string, Record<SignalKey, number>>();
