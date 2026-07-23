@@ -38,6 +38,9 @@ import { getNewsForDate } from "./news.server";
 import {
   ensureSentimentScored,
   aggregatedSentimentForSymbol,
+  loadScoredNewsWindow,
+  computeSentimentMomentum,
+  type SentimentMomentum,
 } from "./sentiment.server";
 import {
   buildCorrelationMap,
@@ -140,6 +143,7 @@ async function buildCandidateFeatures(
     // Sentiment / cooldown are filled in later once news + cooldowns load
     news_score: number | null;
     news_contributors: number;
+    news_momentum: SentimentMomentum | null;
     cooling: boolean;
     // Cross-sectional rank across today's universe (filled in later)
     rank_info: RankInfo | null;
@@ -173,6 +177,7 @@ async function buildCandidateFeatures(
         weekly_rsi14: wk?.weekly_rsi14 ?? null,
         news_score: null,
         news_contributors: 0,
+        news_momentum: null,
         cooling: false,
         rank_info: null,
       });
@@ -321,7 +326,7 @@ Return:
       sma_trend       — MA trend AND MACD histogram / crosses (grouped)
       rsi             — daily RSI-14 AND weekly RSI alignment
       price_change    — recent price change (5d/30d) AND volume-weighted momentum
-      news_sentiment  — weighted LLM sentiment for this symbol
+      news_sentiment  — weighted LLM sentiment for this symbol, INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL or skip.
       volatility      — 20d vol, ATR%, Bollinger width
 If no action is warranted, return an empty orders array.`;
 
@@ -446,10 +451,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       })))
     : [];
 
+  // Rolling 8-day window of scored headlines for momentum. Cheap: reads cache only.
+  const scoredWindow = await cached("scoredWindow", asOf, () =>
+    loadScoredNewsWindow(asOf, 8),
+  ).catch(() => [] as Awaited<ReturnType<typeof loadScoredNewsWindow>>);
+
   for (const f of features) {
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
     f.news_score = agg.contributors > 0 ? Number(agg.score.toFixed(3)) : null;
     f.news_contributors = agg.contributors;
+    f.news_momentum = computeSentimentMomentum(f.symbol, f.name, scoredWindow, asOf);
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
   }
 
