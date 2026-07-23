@@ -466,6 +466,60 @@ function PortfolioPage() {
                     </div>
                   </CardTitle>
                 </CardHeader>
+                {perfMetrics && (
+                  <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
+                    <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <span>Performance vs {benchmark === "none" ? "benchmark" : benchmark}</span>
+                      {perfMetrics.correlation != null && (
+                        <span className="tabular-nums">
+                          Correlation: <span className="font-medium text-foreground">{perfMetrics.correlation.toFixed(2)}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
+                      {([
+                        { label: "Total return", key: "totalReturn", suffix: "%", signed: true },
+                        { label: "Annualized return", key: "annReturn", suffix: "%", signed: true },
+                        { label: "Volatility (ann.)", key: "annVol", suffix: "%", signed: false },
+                        { label: "Max drawdown", key: "maxDrawdown", suffix: "%", signed: false, negative: true },
+                        { label: "Return / Vol", key: "rvr", suffix: "", signed: true, derived: true },
+                      ] as const).map((m) => {
+                        const fmt = (v: number | null | undefined) => {
+                          if (v == null || !Number.isFinite(v)) return "—";
+                          const s = m.signed && v > 0 ? "+" : "";
+                          return `${s}${v.toFixed(2)}${m.suffix}`;
+                        };
+                        const derived = (obj: { annReturn: number; annVol: number } | null) =>
+                          obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
+                        const pv = m.derived ? derived(perfMetrics.port) : (perfMetrics.port as Record<string, number>)[m.key];
+                        const bv = m.derived
+                          ? derived(perfMetrics.bench)
+                          : perfMetrics.bench
+                            ? (perfMetrics.bench as Record<string, number>)[m.key]
+                            : null;
+                        const color = (v: number | null) => {
+                          if (v == null) return "text-muted-foreground";
+                          if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
+                          if (!m.signed) return "text-foreground";
+                          return v >= 0 ? "text-primary" : "text-destructive";
+                        };
+                        return (
+                          <div key={m.label} className="min-w-0">
+                            <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
+                            <div className={`tabular-nums font-medium ${color(pv as number | null)}`}>
+                              {fmt(pv as number | null)}
+                            </div>
+                            {perfMetrics.bench && (
+                              <div className="tabular-nums text-[11px] text-muted-foreground">
+                                {benchmark}: <span className={color(bv as number | null)}>{fmt(bv as number | null)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <CardContent
                   className="h-64"
                   style={chartTheme.surface !== "transparent" ? { background: chartTheme.surface, borderRadius: 8 } : undefined}
