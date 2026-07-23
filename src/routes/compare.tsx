@@ -29,6 +29,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { GitCompareArrows, PlayCircle, RefreshCw } from "lucide-react";
@@ -104,23 +105,37 @@ function ComparePage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 6 ? prev : [...prev, id],
     );
 
-  const chartData = useMemo(() => {
-    if (!results || results.length === 0) return [];
-    // Normalise to % return from starting cash so different starting pots compare fairly
+  const [focused, setFocused] = useState<string | null>(null);
+
+  const { chartData, drawdownData } = useMemo(() => {
+    if (!results || results.length === 0) return { chartData: [], drawdownData: [] };
     const dateSet = new Set<string>();
     results.forEach((r) => r.series.forEach((s) => dateSet.add(s.snapshot_date)));
     const dates = Array.from(dateSet).sort();
-    return dates.map((d) => {
+
+    // Track running peak per portfolio for drawdown
+    const peaks: Record<string, number> = {};
+    const chart: Record<string, number | string>[] = [];
+    const dd: Record<string, number | string>[] = [];
+    for (const d of dates) {
       const row: Record<string, number | string> = { date: d };
-      results.forEach((r) => {
+      const ddRow: Record<string, number | string> = { date: d };
+      for (const r of results) {
         const point = r.series.find((s) => s.snapshot_date === d);
         if (point) {
-          row[r.portfolio.name] =
-            ((point.total_value - r.portfolio.starting_cash) / r.portfolio.starting_cash) * 100;
+          const pct = ((point.total_value - r.portfolio.starting_cash) / r.portfolio.starting_cash) * 100;
+          row[r.portfolio.name] = pct;
+          peaks[r.portfolio.name] = Math.max(peaks[r.portfolio.name] ?? -Infinity, point.total_value);
+          const drawdownPct = peaks[r.portfolio.name] > 0
+            ? ((point.total_value - peaks[r.portfolio.name]) / peaks[r.portfolio.name]) * 100
+            : 0;
+          ddRow[r.portfolio.name] = drawdownPct;
         }
-      });
-      return row;
-    });
+      }
+      chart.push(row);
+      dd.push(ddRow);
+    }
+    return { chartData: chart, drawdownData: dd };
   }, [results]);
 
   if (!ready || !session) {
@@ -227,9 +242,16 @@ function ComparePage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Equity curves (% return)</CardTitle>
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span>Equity curves (% return)</span>
+                  {focused && (
+                    <Button variant="ghost" size="sm" onClick={() => setFocused(null)}>
+                      Show all
+                    </Button>
+                  )}
+                </CardTitle>
                 <CardDescription>
-                  Normalised to starting pot so different amounts compare directly.
+                  Normalised to starting pot. Click a legend item to isolate one line; click again to reset.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -244,38 +266,132 @@ function ComparePage() {
                   </div>
                 )}
                 {results && chartData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                      <YAxis
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={11}
-                        tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: 6,
-                          fontSize: 12,
-                        }}
-                        formatter={(v: number) => `${v.toFixed(2)}%`}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      {results.map((r, i) => (
-                        <Line
-                          key={r.portfolio.id}
-                          type="monotone"
-                          dataKey={r.portfolio.name}
-                          stroke={COLORS[i % COLORS.length]}
-                          strokeWidth={2}
-                          dot={false}
-                          connectNulls
+                  <>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                        <YAxis
+                          stroke="hsl(var(--muted-foreground))"
+                          fontSize={11}
+                          tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
                         />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
+                        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                        <Tooltip
+                          cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                          content={({ active, payload, label }) => {
+                            if (!active || !payload?.length) return null;
+                            const sorted = [...payload].sort(
+                              (a, b) => Number(b.value ?? 0) - Number(a.value ?? 0),
+                            );
+                            return (
+                              <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
+                                <div className="mb-1 font-medium">{label}</div>
+                                {sorted.map((pt) => {
+                                  const val = Number(pt.value ?? 0);
+                                  return (
+                                    <div
+                                      key={String(pt.dataKey)}
+                                      className="flex items-center gap-2 tabular-nums"
+                                    >
+                                      <span
+                                        className="inline-block h-2 w-2 rounded-sm"
+                                        style={{ background: pt.color }}
+                                      />
+                                      <span className="flex-1">{pt.dataKey}</span>
+                                      <span className={val >= 0 ? "text-primary" : "text-destructive"}>
+                                        {val >= 0 ? "+" : ""}
+                                        {val.toFixed(2)}%
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
+                          onClick={(o) => {
+                            const dk = (o as { dataKey?: unknown }).dataKey;
+                            const key = typeof dk === "string" ? dk : String(dk ?? "");
+                            setFocused((prev) => (prev === key ? null : key));
+                          }}
+                          formatter={(value) => (
+                            <span
+                              style={{
+                                opacity: !focused || focused === value ? 1 : 0.35,
+                                textDecoration: focused === value ? "underline" : "none",
+                              }}
+                            >
+                              {value}
+                            </span>
+                          )}
+                        />
+                        {results.map((r, i) => {
+                          const isDim = focused !== null && focused !== r.portfolio.name;
+                          return (
+                            <Line
+                              key={r.portfolio.id}
+                              type="monotone"
+                              dataKey={r.portfolio.name}
+                              stroke={COLORS[i % COLORS.length]}
+                              strokeWidth={focused === r.portfolio.name ? 3 : 2}
+                              strokeOpacity={isDim ? 0.15 : 1}
+                              dot={false}
+                              activeDot={isDim ? false : { r: 4 }}
+                              connectNulls
+                              isAnimationActive={false}
+                            />
+                          );
+                        })}
+                      </LineChart>
+                    </ResponsiveContainer>
+
+                    <div className="mt-6">
+                      <div className="mb-2 text-xs font-medium text-muted-foreground">
+                        Drawdown (% below running peak)
+                      </div>
+                      <ResponsiveContainer width="100%" height={180}>
+                        <LineChart data={drawdownData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                          <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                          <YAxis
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={11}
+                            tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                          />
+                          <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                          <Tooltip
+                            cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                            contentStyle={{
+                              background: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: 6,
+                              fontSize: 12,
+                            }}
+                            formatter={(v: number) => `${Number(v).toFixed(2)}%`}
+                          />
+                          {results.map((r, i) => {
+                            const isDim = focused !== null && focused !== r.portfolio.name;
+                            return (
+                              <Line
+                                key={r.portfolio.id}
+                                type="monotone"
+                                dataKey={r.portfolio.name}
+                                stroke={COLORS[i % COLORS.length]}
+                                strokeWidth={focused === r.portfolio.name ? 2.5 : 1.5}
+                                strokeOpacity={isDim ? 0.12 : 0.9}
+                                dot={false}
+                                connectNulls
+                                isAnimationActive={false}
+                              />
+                            );
+                          })}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
