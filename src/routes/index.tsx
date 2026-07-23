@@ -204,7 +204,7 @@ function Home() {
               </Card>
             )}
             {q.data?.map((p) => (
-              <PortfolioRow key={p.id} portfolio={p} sparkValues={sparkByPortfolio[p.id] ?? []} />
+              <PortfolioRow key={p.id} portfolio={p} sparkSeries={sparkByPortfolio[p.id] ?? []} />
             ))}
           </div>
           <CreatePortfolioCard />
