@@ -169,6 +169,21 @@ export async function maybeSliceOrder(input: SliceInput) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + (clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
 
+  // Idempotency: if a slice with this (portfolio_id, idempotency_key) already
+  // exists, return it instead of inserting a duplicate row.
+  if (clean.idempotencyKey) {
+    const { data: existing } = await supabaseAdmin
+      .from("pending_slices")
+      .select("id, slice_qty, slice_count")
+      .eq("portfolio_id", clean.portfolioId)
+      .eq("idempotency_key", clean.idempotencyKey)
+      .maybeSingle();
+    if (existing) {
+      const row = existing as { id: string; slice_qty: number; slice_count: number };
+      return { sliceId: row.id, sliceQty: Number(row.slice_qty), slices: Number(row.slice_count), reused: true as const };
+    }
+  }
+
   const { data, error } = await supabaseAdmin
     .from("pending_slices")
     .insert({
@@ -185,15 +200,31 @@ export async function maybeSliceOrder(input: SliceInput) {
       next_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       status: "active",
+      idempotency_key: clean.idempotencyKey ?? null,
     } as unknown as never)
     .select("id")
     .single();
   if (error) {
+    // Unique-violation race: another concurrent request enqueued the same
+    // idempotency key between our lookup and insert. Re-read and return it.
+    if (clean.idempotencyKey && /duplicate key|unique/i.test(error.message ?? "")) {
+      const { data: raced } = await supabaseAdmin
+        .from("pending_slices")
+        .select("id, slice_qty, slice_count")
+        .eq("portfolio_id", clean.portfolioId)
+        .eq("idempotency_key", clean.idempotencyKey)
+        .maybeSingle();
+      if (raced) {
+        const row = raced as { id: string; slice_qty: number; slice_count: number };
+        return { sliceId: row.id, sliceQty: Number(row.slice_qty), slices: Number(row.slice_count), reused: true as const };
+      }
+    }
     console.warn("slicer insert failed", error);
     return null;
   }
   return { sliceId: (data as { id: string }).id, sliceQty, slices };
 }
+
 
 /**
  * Called at the top of each hourly cron. Marks expired slices, returns active
