@@ -387,13 +387,24 @@ export function NewsReel() {
                 const cred = credibilityFor(item.source);
                 const rec = recencyFor(item.date, now);
                 const cited = item.decisions_count > 0;
+                const isNew = highlightIds.has(item.id);
                 return (
                   <li
                     key={`${item.id}-${idx}`}
-                    className={`rounded-md border p-3 transition-colors ${
-                      cited ? "border-primary/40 bg-primary/[0.04]" : "border-border bg-card/40"
+                    className={`relative rounded-md border p-3 transition-colors ${
+                      isNew
+                        ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)] ring-2 ring-primary/40 animate-pulse"
+                        : cited
+                        ? "border-primary/40 bg-primary/[0.04]"
+                        : "border-border bg-card/40"
                     }`}
                   >
+                    {isNew && (
+                      <span className="absolute -top-2 left-3 inline-flex items-center gap-1 rounded-full border border-primary/60 bg-primary px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground shadow">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        New signal
+                      </span>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
