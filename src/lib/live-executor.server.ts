@@ -48,6 +48,34 @@ export async function routeOrdersToBroker(params: {
   if (portfolio.mode !== "live_sim" && portfolio.mode !== "live_prod") return results;
   if (portfolio.live_paused) return results;
 
+  // Global kill-switch: when LIVE_SIM_PAPER_ONLY is truthy, live_sim portfolios
+  // stay fully paper-traded and never touch the broker adapter, regardless of
+  // how they're marked. live_prod is unaffected.
+  const paperOnlyFlag = (process.env.LIVE_SIM_PAPER_ONLY ?? "").toLowerCase();
+  const paperOnly = paperOnlyFlag === "1" || paperOnlyFlag === "true" || paperOnlyFlag === "yes";
+  if (paperOnly && portfolio.mode === "live_sim") {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: "sim",
+        method: "ROUTE_SKIPPED_PAPER_ONLY",
+        path: "/route/paper-only",
+        status: 0,
+        request: { asOf, decisionId, count: executed.length } as never,
+        response: null,
+        error: "LIVE_SIM_PAPER_ONLY env flag active",
+      });
+    } catch {
+      // best-effort log only
+    }
+    return results;
+  }
+
+
+
   const routable = executed.filter(
     (e) => !e.rejected && e.quantity > 0 && Number.isFinite(e.quantity) && Number.isFinite(e.price),
   );
