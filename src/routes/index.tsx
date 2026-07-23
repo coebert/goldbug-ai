@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -29,7 +29,9 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
-import { AllPortfoliosChart } from "@/components/all-portfolios-chart";
+const AllPortfoliosChart = lazy(() =>
+  import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
+);
 import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X } from "lucide-react";
 import { Explain } from "@/components/explain";
@@ -121,7 +123,9 @@ function Home() {
         <NewHereBanner />
 
         <div className="mb-6">
-          <AllPortfoliosChart />
+          <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+            <AllPortfoliosChart />
+          </Suspense>
         </div>
 
 
