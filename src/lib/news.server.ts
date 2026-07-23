@@ -114,7 +114,9 @@ export function looksNonEnglish(s: string): boolean {
 type TranslationCacheEntry = {
   lang: string | null; // null = English (or unknown/no-translate)
   translation: string | null; // null = no translation needed
+  confidence: number | null; // 0..1, null when unknown or no translation
 };
+
 
 const TRANSLATION_CACHE_MAX = 2000;
 const translationCache = new Map<string, TranslationCacheEntry>();
