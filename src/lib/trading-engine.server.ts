@@ -394,9 +394,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const breakerTripped = circuit.paused;
 
   const universeKey = candidateSymbols.map((c) => c.symbol).sort().join(",");
-  const features = await cached("features", `${asOf}:${universeKey}`, () =>
+  // Clone: features are per-portfolio-mutated below (news_score, cooling, rank_info),
+  // but the raw technicals only need to be computed once per hour per universe.
+  const rawFeatures = await cached("features", `${asOf}:${universeKey}`, () =>
     buildCandidateFeatures(candidateSymbols, asOf),
   );
+  const features = rawFeatures.map((f) => ({ ...f }));
 
   const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams] = await Promise.all([
     opts?.skipNews
