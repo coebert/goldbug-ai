@@ -79,7 +79,9 @@ export const activateLive = createServerFn({ method: "POST" })
     const brokerAccountId = ping.accountId;
     if (data.useBrokerBalance) {
       const bal = await adapter.getBalance();
-      starting = bal.cash;
+      // Use the available/settled cash as the starting pot when Saxo reports it,
+      // so pending/unsettled or reserved funds are not double-counted.
+      starting = bal.cashAvailable ?? bal.cash;
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const patch = {
