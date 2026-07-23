@@ -413,7 +413,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
   const features = rawFeatures.map((f) => ({ ...f }));
 
-  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, options, cooldowns, events, attribution, hyperparams, sectorScores, ddSizing] = await Promise.all([
     opts?.skipNews
       ? Promise.resolve([])
       : cached("news", asOf, () => getNewsForDate(asOf)).catch(() => []),
@@ -446,7 +446,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       console.warn("Hyperparam tuning failed:", e);
       return null as TunedHyperparams | null;
     }),
+    cached("sectorScores", asOf, () => refreshSectorScores(asOf)).catch((e) => {
+      console.warn("Sector rotation failed:", e);
+      return [] as Awaited<ReturnType<typeof refreshSectorScores>>;
+    }),
+    computePortfolioDrawdownSizing(portfolioId).catch(() => ({
+      peak_5d: null, current: null, drawdown_pct: 0, size_multiplier: 1, note: "dd calc failed",
+    })),
   ]);
+
 
 
   // Score news sentiment (LLM pass, cached), then aggregate per-symbol
