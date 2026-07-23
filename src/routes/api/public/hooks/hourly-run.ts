@@ -192,6 +192,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           regime: regimeInfo,
           portfolios: portfolios.length,
           skipped_paused: skippedPaused,
+          saxo_refresh: saxoRefresh,
           results,
         });
       },
