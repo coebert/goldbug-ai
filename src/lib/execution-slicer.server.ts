@@ -54,7 +54,34 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
     "SECURITY:pending_slices unexpected access attempt",
     JSON.stringify({ at: new Date().toISOString(), ...context }),
   );
+  // Fire-and-forget persistence to the security audit log so admins can
+  // review the event via the UI. We never await this and never let a
+  // persistence failure mask the original access-control decision.
+  void (async () => {
+    try {
+      const op = typeof context.op === "string" ? context.op : null;
+      const reason = typeof context.reason === "string" ? context.reason : null;
+      const portfolioId = typeof context.portfolioId === "string" ? context.portfolioId : null;
+      const sliceId = typeof context.sliceId === "string" ? context.sliceId : null;
+      const actor = typeof context.ownerUserId === "string" ? context.ownerUserId : null;
+      await supabaseAdmin.from("security_audit_log").insert({
+        event: "pending_slices",
+        op,
+        reason,
+        portfolio_id: portfolioId,
+        slice_id: sliceId,
+        actor_user_id: actor,
+        details: context as Record<string, unknown>,
+      });
+    } catch (e) {
+      console.warn(
+        "SECURITY:pending_slices audit persist failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  })();
 }
+
 
 /**
  * Run `input` through `schema` and throw a `PendingSliceAccessError` with a
