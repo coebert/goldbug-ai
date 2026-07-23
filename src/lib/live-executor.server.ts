@@ -1,0 +1,218 @@
+// Routes AI-executed orders to the Saxo broker adapter for live_sim / live_prod
+// portfolios. Idempotent via a deterministic client_order_id keyed on
+// (portfolio_id, trade_date, symbol, side). Never called for paper mode.
+//
+// This runs AFTER the simulator has already updated local holdings/cash, so
+// the local state is a best-effort mirror and the nightly reconciliation cron
+// squares it against actual broker positions.
+
+import type { BrokerOrderResult } from "@/lib/brokers/adapter";
+
+export interface ExecutedOrderLike {
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  reason?: string;
+  rejected?: string;
+}
+
+export interface RouteResult {
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  status: string;
+  brokerOrderId?: string;
+  reason?: string;
+  skipped?: string;
+}
+
+/**
+ * Submit each executed order to the Saxo broker.
+ * @param portfolio  the portfolio row (mode must be live_sim or live_prod)
+ * @param userId     owner user id (for broker log + RLS-safe inserts)
+ * @param asOf       ISO date string used in the client_order_id
+ * @param decisionId decisions.id row this batch belongs to (nullable)
+ * @param executed   executed[] array from trading-engine
+ */
+export async function routeOrdersToBroker(params: {
+  portfolio: { id: string; mode: string; live_paused?: boolean | null };
+  userId: string;
+  asOf: string;
+  decisionId: string | null;
+  executed: ExecutedOrderLike[];
+}): Promise<RouteResult[]> {
+  const { portfolio, userId, asOf, decisionId, executed } = params;
+  const results: RouteResult[] = [];
+
+  if (portfolio.mode !== "live_sim" && portfolio.mode !== "live_prod") return results;
+  if (portfolio.live_paused) return results;
+
+  const routable = executed.filter(
+    (e) => !e.rejected && e.quantity > 0 && Number.isFinite(e.quantity) && Number.isFinite(e.price),
+  );
+  if (routable.length === 0) return results;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  let adapter: import("@/lib/brokers/saxo.server").SaxoAdapter;
+  try {
+    const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
+    adapter = buildSaxoAdapter({
+      userId,
+      portfolioId: portfolio.id,
+      envOverride: portfolio.mode === "live_prod" ? "live" : "sim",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Adapter unavailable (missing SAXO_ACCESS_TOKEN etc.). Record once and bail.
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "ROUTE_SKIPPED",
+      path: "/route/adapter-unavailable",
+      status: 503,
+      request: { asOf, count: routable.length } as never,
+      response: null,
+      error: msg,
+    });
+    return routable.map((e) => ({
+      symbol: e.symbol,
+      side: e.side,
+      quantity: e.quantity,
+      status: "skipped",
+      skipped: msg,
+    }));
+  }
+
+  for (const order of routable) {
+    const clientOrderId = `aegis:${portfolio.id}:${asOf}:${order.symbol}:${order.side}`;
+
+    // Idempotency: if we already have a live_orders row for this key, skip.
+    const existing = await supabaseAdmin
+      .from("live_orders")
+      .select("id, status, broker_order_id, reject_reason")
+      .eq("portfolio_id", portfolio.id)
+      .eq("client_order_id", clientOrderId)
+      .maybeSingle();
+    if (existing.data) {
+      results.push({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: order.quantity,
+        status: existing.data.status,
+        brokerOrderId: existing.data.broker_order_id ?? undefined,
+        skipped: "duplicate client_order_id",
+      });
+      continue;
+    }
+
+    // Round quantity to a whole share (Saxo Stock/Etf orders reject fractional
+    // Amount). Skip if this rounds to zero.
+    const qty = Math.floor(order.quantity);
+    if (qty <= 0) {
+      results.push({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: order.quantity,
+        status: "skipped",
+        skipped: "quantity < 1 whole share",
+      });
+      continue;
+    }
+
+    // Insert pending order row first so we always have an audit trail even
+    // if the broker call throws.
+    const inserted = await supabaseAdmin
+      .from("live_orders")
+      .insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        decision_id: decisionId,
+        broker: "saxo",
+        client_order_id: clientOrderId,
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        order_type: "market",
+        status: "pending",
+        submitted_at: new Date().toISOString(),
+      } as never)
+      .select("id")
+      .single();
+
+    if (inserted.error || !inserted.data) {
+      // If it fails on the unique client_order_id constraint, that's another
+      // instance already racing — treat as duplicate and move on.
+      results.push({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        status: "skipped",
+        skipped: inserted.error?.message ?? "insert failed",
+      });
+      continue;
+    }
+    const liveOrderId = inserted.data.id as string;
+
+    let brokerRes: BrokerOrderResult;
+    try {
+      brokerRes = await adapter.placeOrder({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        orderType: "market",
+        clientOrderId,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await supabaseAdmin
+        .from("live_orders")
+        .update({ status: "error", reject_reason: msg.slice(0, 500) })
+        .eq("id", liveOrderId);
+      results.push({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        status: "error",
+        reason: msg,
+      });
+      continue;
+    }
+
+    await supabaseAdmin
+      .from("live_orders")
+      .update({
+        status: brokerRes.status,
+        broker_order_id: brokerRes.brokerOrderId || null,
+        reject_reason: brokerRes.reason ?? null,
+      })
+      .eq("id", liveOrderId);
+
+    if (brokerRes.status === "filled" && brokerRes.filledQuantity && brokerRes.avgFillPrice) {
+      await supabaseAdmin.from("live_fills").insert({
+        order_id: liveOrderId,
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        symbol: order.symbol,
+        side: order.side,
+        quantity: brokerRes.filledQuantity,
+        fill_price: brokerRes.avgFillPrice,
+        broker_fill_id: brokerRes.brokerOrderId || null,
+      } as never);
+    }
+
+    results.push({
+      symbol: order.symbol,
+      side: order.side,
+      quantity: qty,
+      status: brokerRes.status,
+      brokerOrderId: brokerRes.brokerOrderId,
+      reason: brokerRes.reason,
+    });
+  }
+
+  return results;
+}
