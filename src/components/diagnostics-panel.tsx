@@ -216,8 +216,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
           <CardTitle className="text-base">Outcome by dominant signal</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-hidden rounded-md border border-border">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full min-w-[420px] text-sm">
               <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Top signal</th>
