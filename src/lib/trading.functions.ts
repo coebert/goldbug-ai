@@ -991,6 +991,9 @@ export const runLongHorizonBacktest = createServerFn({ method: "POST" })
         to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         rebalance: z.enum(["monthly", "quarterly"]).default("monthly"),
         top_k: z.number().int().min(2).max(12).default(6),
+        commission_bps: z.number().min(0).max(500).default(5),
+        slippage_bps: z.number().min(0).max(500).default(10),
+        min_trade_value: z.number().min(0).max(100000).default(25),
       })
       .parse(i),
   )
@@ -1014,6 +1017,11 @@ export const runLongHorizonBacktest = createServerFn({ method: "POST" })
       universe: LONG_HORIZON_UNIVERSE,
       rebalance: data.rebalance,
       topK: data.top_k,
+      execution: {
+        commission_bps: data.commission_bps,
+        slippage_bps: data.slippage_bps,
+        min_trade_value: data.min_trade_value,
+      },
     });
     return result;
   });
