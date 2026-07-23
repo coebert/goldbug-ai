@@ -874,6 +874,9 @@ function PortfolioPage() {
                 <TabsTrigger value="report" asChild>
                   <Link to="/portfolio/$id/report" params={{ id: p.id }}>Report</Link>
                 </TabsTrigger>
+                <TabsTrigger value="optimizer" asChild>
+                  <Link to="/portfolio/$id/optimizer" params={{ id: p.id }}>Optimizer</Link>
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="diagnostics" className="space-y-4">
                 <DiagnosticsPanel portfolioId={p.id} />
