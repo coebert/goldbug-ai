@@ -335,9 +335,17 @@ export function NewsReel() {
                               <span className="truncate">· {item.source}</span>
                             )
                           )}
-                          <Badge variant="outline" className={`ml-auto border-transparent ${tone.cls}`}>
-                            {tone.label}
-                          </Badge>
+                          <div className="ml-auto flex flex-wrap items-center gap-1">
+                            <Badge variant="outline" className={`border-transparent ${cred.cls}`} title={`Source reliability tier: ${cred.tier}`}>
+                              {cred.label}
+                            </Badge>
+                            <Badge variant="outline" className={`border-transparent ${rec.cls}`} title={`Published ${rec.ageLabel}`}>
+                              {rec.label} · {rec.ageLabel}
+                            </Badge>
+                            <Badge variant="outline" className={`border-transparent ${tone.cls}`}>
+                              {tone.label}
+                            </Badge>
+                          </div>
                         </div>
                         <p className="text-sm font-medium leading-snug text-foreground">
                           {item.url ? (
