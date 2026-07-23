@@ -343,7 +343,7 @@ function LongHorizonPage() {
                       )}
                     </CardTitle>
                     <CardDescription>
-                      {result.from} → {result.to} · {result.rebalance} rebalance · {result.tradeCount} trades executed · click a legend item to isolate.
+                      {result.from} → {result.to} · {result.rebalance} rebalance · {result.tradeCount} trades executed{result.skippedSmallTrades > 0 ? ` · ${result.skippedSmallTrades} skipped (< ${result.currency} ${result.execution.min_trade_value})` : ""} · costs paid ~{result.currency} {result.totalCostsPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({result.execution.commission_bps}bps comm / {result.execution.slippage_bps}bps slip) · click a legend item to isolate.
                     </CardDescription>
                     <div className="mt-2">
                       <EventOverlayControls
