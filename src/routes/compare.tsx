@@ -8,6 +8,7 @@ import {
   getComparison,
   getTradeComparison,
   runBacktestMany,
+  getDivergenceNarratives,
 } from "@/lib/trading.functions";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +34,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { GitCompareArrows, PlayCircle, RefreshCw } from "lucide-react";
+import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/compare")({
   ssr: false,
@@ -464,11 +465,20 @@ function ComparePage() {
             )}
 
             {results && results.length > 0 && (
-              <TradeDivergenceCard
-                portfolioIds={results.map((r) => r.portfolio.id)}
-                names={results.map((r) => r.portfolio.name)}
-                colors={results.map((_, i) => COLORS[i % COLORS.length])}
-              />
+              <>
+                <TradeDivergenceCard
+                  portfolioIds={results.map((r) => r.portfolio.id)}
+                  names={results.map((r) => r.portfolio.name)}
+                  colors={results.map((_, i) => COLORS[i % COLORS.length])}
+                />
+                {results.length >= 2 && (
+                  <DivergenceNarrativesCard
+                    portfolioIds={results.map((r) => r.portfolio.id)}
+                    names={results.map((r) => r.portfolio.name)}
+                    colors={results.map((_, i) => COLORS[i % COLORS.length])}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
@@ -674,5 +684,119 @@ function TradeCell({ cell }: { cell: DivergenceRow | null }) {
         )}
       </div>
     </div>
+  );
+}
+
+type NarrativeEvent = Awaited<ReturnType<typeof getDivergenceNarratives>>["events"][number];
+
+function DivergenceNarrativesCard({
+  portfolioIds,
+  names,
+  colors,
+}: {
+  portfolioIds: string[];
+  names: string[];
+  colors: string[];
+}) {
+  const fetchNarr = useServerFn(getDivergenceNarratives);
+  const [events, setEvents] = useState<NarrativeEvent[] | null>(null);
+
+  const mut = useMutation({
+    mutationFn: () => fetchNarr({ data: { portfolio_ids: portfolioIds, limit: 5 } }),
+    onSuccess: (r) => {
+      setEvents(r.events);
+      if (r.events.length === 0) toast.info("No divergent events found across these portfolios.");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to generate narratives"),
+  });
+
+  const actionTone = (a: string) =>
+    a === "buy"
+      ? "text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
+      : a === "sell"
+        ? "text-rose-400 border-rose-500/40 bg-rose-500/10"
+        : a === "blocked"
+          ? "text-amber-400 border-amber-500/40 bg-amber-500/10"
+          : "text-muted-foreground border-border bg-muted/30";
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Top 5 divergence narratives
+        </CardTitle>
+        <CardDescription>
+          Plain-English explanations of the biggest disagreements between the selected portfolios — what changed,
+          which priors and signals drove each side's decision, and which guardrails stepped in.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">
+            Uses Aegis AI to summarise the highest-impact (date × symbol) events where portfolios acted differently.
+          </div>
+          <Button size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
+            {mut.isPending ? (
+              <>
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Generating…
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-1 h-3.5 w-3.5" /> {events ? "Regenerate" : "Generate narratives"}
+              </>
+            )}
+          </Button>
+        </div>
+        {!events && !mut.isPending && (
+          <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">
+            Click Generate to have Aegis explain the top divergences.
+          </div>
+        )}
+        {events && events.length === 0 && (
+          <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">
+            No divergent trades found in this window — these portfolios agreed on every action.
+          </div>
+        )}
+        {events && events.length > 0 && (
+          <ol className="space-y-3">
+            {events.map((ev) => (
+              <li key={`${ev.date}|${ev.symbol}`} className="rounded-md border border-border bg-card/50 p-3">
+                <div className="mb-2 flex flex-wrap items-baseline gap-2">
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                    #{ev.rank}
+                  </span>
+                  <span className="font-medium">{ev.symbol}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{ev.date}</span>
+                </div>
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {ev.portfolios.map((p, i) => (
+                    <span
+                      key={`${p.name}-${i}`}
+                      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] ${actionTone(p.action)}`}
+                    >
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ background: colors[names.indexOf(p.name)] ?? "#888" }}
+                      />
+                      <span className="font-medium">{p.name}</span>
+                      <span className="uppercase opacity-80">{p.action}</span>
+                      {p.executed_value > 0 && (
+                        <span className="tabular-nums opacity-70">
+                          · {p.executed_value.toFixed(0)}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
+                  {ev.narrative}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   );
 }
