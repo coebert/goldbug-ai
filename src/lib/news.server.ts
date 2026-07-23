@@ -15,7 +15,9 @@ export type NewsItem = {
   summary: string | null;
   original_headline: string | null;
   original_language: string | null;
+  translation_confidence: number | null; // 0..1, null when not translated
 };
+
 
 type GdeltArticle = {
   title?: string;
