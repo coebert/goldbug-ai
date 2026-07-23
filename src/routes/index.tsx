@@ -29,6 +29,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
+import { LiveToggle } from "@/components/live-toggle";
 const AllPortfoliosChart = lazy(() =>
   import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
 );
