@@ -8,6 +8,8 @@ import {
   createPortfolio,
   deletePortfolio,
 } from "@/lib/trading.functions";
+import { activateLive, getSaxoOAuthStatus } from "@/lib/live.functions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -34,7 +36,7 @@ const AllPortfoliosChart = lazy(() =>
   import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
 );
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/")({
@@ -113,6 +115,11 @@ function Home() {
             <Link to="/get-started">
               <Button variant="secondary" size="sm">
                 <Sparkles className="mr-1 h-4 w-4" /> £1000 demo
+              </Button>
+            </Link>
+            <Link to="/saxo-status">
+              <Button variant="outline" size="sm" title="Connect your Saxo account to trade real money">
+                <Banknote className="mr-1 h-4 w-4" /> Real money setup
               </Button>
             </Link>
             <Link to="/compare">
@@ -263,22 +270,83 @@ function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; st
   );
 }
 
+type PortfolioMode = "backtest" | "live_sim" | "live_prod";
+
+const MODE_META: Record<PortfolioMode, {
+  label: string;
+  short: string;
+  icon: typeof FlaskConical;
+  blurb: string;
+  cta: string;
+  needsSaxo: boolean;
+  targetEnv?: "sim" | "prod";
+}> = {
+  backtest: {
+    label: "Backtest",
+    short: "Simulated cash",
+    icon: FlaskConical,
+    blurb: "Run the AI over historical prices with virtual money. Nothing hits your broker.",
+    cta: "Create backtest portfolio",
+    needsSaxo: false,
+  },
+  live_sim: {
+    label: "Live paper (Saxo SIM)",
+    short: "Simulated cash on Saxo",
+    icon: Beaker,
+    blurb: "Route AI orders through Saxo's SIM environment. Starting cash is read from your Saxo SIM balance. No real money at risk.",
+    cta: "Create & activate on Saxo SIM",
+    needsSaxo: true,
+    targetEnv: "sim",
+  },
+  live_prod: {
+    label: "Real money (Saxo LIVE)",
+    short: "Real cash on Saxo",
+    icon: Banknote,
+    blurb: "The AI will place real orders on your live Saxo account. Starting cash is taken from your Saxo LIVE balance. Cash-only, no leverage, guardrails enforced.",
+    cta: "Create & go live with real money",
+    needsSaxo: true,
+    targetEnv: "prod",
+  },
+};
+
 function CreatePortfolioCard() {
   const create = useServerFn(createPortfolio);
+  const activate = useServerFn(activateLive);
+  const saxoStatus = useServerFn(getSaxoOAuthStatus);
   const qc = useQueryClient();
   const navigate = useNavigate();
+
+  const [mode, setMode] = useState<PortfolioMode>("backtest");
   const [name, setName] = useState("My Portfolio");
   const [cash, setCash] = useState(1000);
   const [currency, setCurrency] = useState<"GBP" | "USD" | "EUR">("GBP");
   const [risk, setRisk] = useState<"conservative" | "balanced" | "aggressive">("balanced");
   const [classes, setClasses] = useState<string[]>(["stock", "etf", "crypto", "commodity", "fx"]);
+  const [ackRisk, setAckRisk] = useState(false);
+
+  const meta = MODE_META[mode];
+  const isLive = mode !== "backtest";
+
+  const saxoQ = useQuery({
+    queryKey: ["saxo-oauth-status"],
+    queryFn: () => saxoStatus({}),
+    refetchInterval: 30_000,
+  });
+
+  const envKey = meta.targetEnv === "prod" ? "live" : "sim";
+  const saxoEnvStatus = meta.targetEnv ? saxoQ.data?.[envKey] : null;
+  const saxoReady = !!saxoEnvStatus && (saxoEnvStatus.connected || saxoEnvStatus.usingLegacyToken);
 
   const toggleClass = (c: string) =>
     setClasses((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
   const mut = useMutation({
-    mutationFn: () =>
-      create({
+    mutationFn: async () => {
+      // Portfolios are always created in backtest mode server-side, then
+      // "activated" onto the broker for live_sim / live_prod. This mirrors the
+      // manual flow on the portfolio detail page but bundles it into a single
+      // click so users don't have to hunt for the live-trading card afterwards.
+      const created = await create({
         data: {
           name,
           starting_cash: cash,
@@ -287,14 +355,54 @@ function CreatePortfolioCard() {
           universe: classes as ("stock" | "etf" | "crypto" | "commodity" | "fx")[],
           mode: "backtest",
         },
-      }),
+      });
+      if (meta.targetEnv) {
+        try {
+          await activate({
+            data: {
+              portfolioId: created.id,
+              targetEnv: meta.targetEnv,
+              useBrokerBalance: true,
+              acknowledgeRisk: true,
+            },
+          });
+        } catch (e) {
+          toast.error(
+            `Portfolio created, but activating on Saxo ${meta.targetEnv.toUpperCase()} failed: ${e instanceof Error ? e.message : "unknown error"}. You can retry from the portfolio page.`,
+          );
+        }
+      }
+      return created;
+    },
     onSuccess: (r) => {
-      toast.success("Portfolio created");
+      toast.success(
+        mode === "live_prod"
+          ? "Real-money portfolio created — trading is now live on Saxo."
+          : mode === "live_sim"
+            ? "Portfolio created and activated on Saxo SIM."
+            : "Portfolio created.",
+      );
       qc.invalidateQueries({ queryKey: ["portfolios"] });
       navigate({ to: "/portfolio/$id", params: { id: r.id } });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
+  const disabled =
+    mut.isPending ||
+    classes.length === 0 ||
+    (isLive && !saxoReady) ||
+    (mode === "live_prod" && !ackRisk);
+
+  const onSubmit = () => {
+    if (mode === "live_prod") {
+      const ok = window.confirm(
+        `Create "${name}" and start trading REAL MONEY on your Saxo LIVE account?\n\nStarting cash will be read from your Saxo LIVE balance. The AI will place real orders on every hourly cycle. You can pause or revert at any time.`,
+      );
+      if (!ok) return;
+    }
+    mut.mutate();
+  };
 
   return (
     <Card>
@@ -302,22 +410,103 @@ function CreatePortfolioCard() {
         <CardTitle className="flex items-center gap-2 text-base">
           <PlusCircle className="h-4 w-4 text-primary" /> New portfolio
         </CardTitle>
-        <CardDescription>Set it up, then run a backtest to see how the AI performs.</CardDescription>
+        <CardDescription>Pick what kind of money to trade with, then set it up.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Mode picker — first choice so users see there IS a real-money path. */}
+        <div>
+          <Label>Money type</Label>
+          <div className="mt-2 grid gap-2">
+            {(Object.keys(MODE_META) as PortfolioMode[]).map((k) => {
+              const m = MODE_META[k];
+              const Icon = m.icon;
+              const active = mode === k;
+              const isReal = k === "live_prod";
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setMode(k)}
+                  className={
+                    "flex items-start gap-3 rounded-md border p-3 text-left transition-colors " +
+                    (active
+                      ? isReal
+                        ? "border-destructive/70 bg-destructive/10"
+                        : "border-primary bg-primary/10"
+                      : "border-border hover:bg-muted/50")
+                  }
+                >
+                  <Icon
+                    className={
+                      "mt-0.5 h-4 w-4 shrink-0 " +
+                      (isReal ? "text-destructive" : active ? "text-primary" : "text-muted-foreground")
+                    }
+                  />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{m.label}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{m.blurb}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {isLive && (
+          <div className="rounded-md border border-border p-3 text-xs">
+            <div className="mb-1 font-medium">Saxo {meta.targetEnv?.toUpperCase()} connection</div>
+            {saxoQ.isLoading ? (
+              <span className="text-muted-foreground">Checking…</span>
+            ) : saxoReady ? (
+              <span className="text-emerald-600 dark:text-emerald-400">
+                ✓ Connected — starting cash will be read from your Saxo {meta.targetEnv?.toUpperCase()} balance.
+              </span>
+            ) : (
+              <div className="space-y-2">
+                <span className="text-destructive">
+                  Not connected. You must link your Saxo {meta.targetEnv?.toUpperCase()} account before creating this portfolio.
+                </span>
+                <Link to="/saxo-status" className="inline-flex items-center gap-1 text-primary hover:underline">
+                  Open Saxo connection page <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode === "live_prod" && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Real money — read this</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>Once created, the AI will place real orders on your Saxo LIVE account every hour. Cash-only, no leverage. You can pause or revert to paper at any time from the portfolio page.</p>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={ackRisk} onCheckedChange={(v) => setAckRisk(v === true)} />
+                <span>I understand this trades real money and I accept the risks.</span>
+              </label>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div>
           <Label htmlFor="name">Name</Label>
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="grid grid-cols-[1fr_100px] gap-2">
           <div>
-            <Label htmlFor="cash"><Explain term="starting_pot">Starting pot</Explain></Label>
+            <Label htmlFor="cash">
+              <Explain term="starting_pot">Starting pot</Explain>
+              {isLive && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">(overridden by Saxo balance)</span>
+              )}
+            </Label>
             <Input
               id="cash"
               type="number"
               min={10}
               max={1_000_000}
               value={cash}
+              disabled={isLive}
               onChange={(e) => setCash(Math.max(10, Number(e.target.value) || 0))}
             />
           </div>
@@ -362,12 +551,14 @@ function CreatePortfolioCard() {
         </div>
         <Button
           className="w-full"
-          disabled={mut.isPending || classes.length === 0}
-          onClick={() => mut.mutate()}
+          variant={mode === "live_prod" ? "destructive" : "default"}
+          disabled={disabled}
+          onClick={onSubmit}
         >
-          {mut.isPending ? "Creating…" : "Create portfolio"}
+          {mut.isPending ? "Creating…" : meta.cta}
         </Button>
       </CardContent>
     </Card>
   );
 }
+
