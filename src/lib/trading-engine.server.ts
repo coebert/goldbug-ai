@@ -22,6 +22,12 @@ import {
   parseRiskConfig,
   type UniverseSymbol,
 } from "./universe.server";
+import {
+  detectAndPersistRegime,
+  regimeDescription,
+  humanRegime,
+  type PersistedRegime,
+} from "./regime-detector.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
 
