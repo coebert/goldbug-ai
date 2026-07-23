@@ -312,8 +312,9 @@ function ComparePage() {
                         />
                         <Legend
                           wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
-                          onClick={(o: { dataKey?: string | number }) => {
-                            const key = String(o.dataKey ?? "");
+                          onClick={(o) => {
+                            const dk = (o as { dataKey?: unknown }).dataKey;
+                            const key = typeof dk === "string" ? dk : String(dk ?? "");
                             setFocused((prev) => (prev === key ? null : key));
                           }}
                           formatter={(value) => (
