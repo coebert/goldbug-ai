@@ -131,6 +131,42 @@ export type Database = {
           },
         ]
       }
+      market_regimes: {
+        Row: {
+          as_of: string
+          confidence: number
+          created_at: string
+          id: string
+          notes: string | null
+          previous_regime: string | null
+          regime: string
+          signals: Json
+          transitioned: boolean
+        }
+        Insert: {
+          as_of: string
+          confidence?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          previous_regime?: string | null
+          regime: string
+          signals?: Json
+          transitioned?: boolean
+        }
+        Update: {
+          as_of?: string
+          confidence?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          previous_regime?: string | null
+          regime?: string
+          signals?: Json
+          transitioned?: boolean
+        }
+        Relationships: []
+      }
       news_cache: {
         Row: {
           fetched_at: string
