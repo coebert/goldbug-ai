@@ -261,6 +261,9 @@ ${coolingBlock}
 
 ${formatLearningBlock(args.learning)}
 
+${args.attribution ?? ""}
+${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
+
 ${HISTORICAL_PLAYBOOK}
 
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
