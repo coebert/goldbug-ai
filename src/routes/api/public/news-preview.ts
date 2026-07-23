@@ -32,9 +32,9 @@ export const Route = createFileRoute("/api/public/news-preview")({
         const { data, error } = await supabaseAdmin
           .from("news_cache")
           .select(
-            "date, source, headline, url, original_headline, original_language, translation_confidence",
+            "news_date, source, headline, url, original_headline, original_language, translation_confidence",
           )
-          .order("date", { ascending: false })
+          .order("news_date", { ascending: false })
           .limit(limit);
 
         if (error) {
@@ -45,7 +45,7 @@ export const Route = createFileRoute("/api/public/news-preview")({
         }
 
         const items = (data ?? []).map((row) => ({
-          date: row.date,
+          date: row.news_date,
           source: row.source,
           headline: row.headline,
           url: row.url,
