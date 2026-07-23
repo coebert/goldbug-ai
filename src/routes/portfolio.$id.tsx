@@ -449,9 +449,23 @@ function PortfolioPage() {
               </CardContent>
             </Card>
 
+            {(() => {
+              const cb = p.circuit_breaker as { paused?: boolean; reason?: string; tripped_at?: string } | null;
+              if (!cb?.paused) return null;
+              return (
+                <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+                  <div className="font-medium text-destructive">Circuit breaker active — AI paused</div>
+                  <div className="mt-1 text-muted-foreground">
+                    {cb.reason ?? "Auto-paused"}{cb.tripped_at ? ` (since ${cb.tripped_at.slice(0, 10)})` : ""}. Stop-loss/take-profit still enforced. Adjust risk controls or clear the breaker to resume new trades.
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="mb-6">
               <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
             </div>
+
 
             <div className="mb-6">
               <LiveTradingCard portfolioId={id} />
