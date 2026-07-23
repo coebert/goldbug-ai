@@ -2010,20 +2010,28 @@ function toExcerpt(raw: string | null | undefined, maxChars = 240): string | nul
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ items: NewsReelItem[]; as_of: string }> => {
+  .inputValidator((input: { sinceDays?: number; limit?: number } | undefined) => {
+    const s = Math.max(1, Math.min(120, Math.round(Number(input?.sinceDays ?? 5))));
+    const l = Math.max(10, Math.min(400, Math.round(Number(input?.limit ?? 40))));
+    return { sinceDays: s, limit: l };
+  })
+  .handler(async ({ context, data }): Promise<{ items: NewsReelItem[]; as_of: string; has_more: boolean; since_days: number; limit: number }> => {
+    const { sinceDays, limit } = data;
     const asOf = new Date();
-    const since = new Date(asOf.getTime() - 5 * 86_400_000).toISOString().slice(0, 10);
+    const since = new Date(asOf.getTime() - sinceDays * 86_400_000).toISOString().slice(0, 10);
 
-    // 1. Recent global news (auth-readable cache).
+    // 1. Recent global news (auth-readable cache). Fetch limit+1 to detect has_more.
+    const fetchCap = Math.min(500, limit + 60);
     const { data: newsRows } = await context.supabase
       .from("news_cache")
       .select("id, news_date, source, headline, url, summary, original_headline, original_language")
       .gte("news_date", since)
       .order("news_date", { ascending: false })
       .order("fetched_at", { ascending: false })
-      .limit(60);
+      .limit(fetchCap);
     const news = newsRows ?? [];
-    if (news.length === 0) return { items: [], as_of: asOf.toISOString() };
+    if (news.length === 0) return { items: [], as_of: asOf.toISOString(), has_more: false, since_days: sinceDays, limit };
+
 
     // 2. Recent decisions across the user's own portfolios.
     const { data: portfolios } = await context.supabase
@@ -2158,7 +2166,8 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       return a.date < b.date ? 1 : -1;
     });
 
-    return { items: items.slice(0, 40), as_of: asOf.toISOString() };
+    const sliced = items.slice(0, limit);
+    return { items: sliced, as_of: asOf.toISOString(), has_more: items.length > limit, since_days: sinceDays, limit };
   });
 
 // ---------------------------------------------------------------------------
