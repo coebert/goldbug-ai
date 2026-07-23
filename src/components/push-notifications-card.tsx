@@ -83,9 +83,13 @@ export function PushNotificationsCard() {
       const perm = await Notification.requestPermission();
       setPermission(perm);
       if (perm !== "granted") throw new Error("Notification permission denied");
+      const keyBytes = urlBase64ToUint8Array(publicKey);
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
+        applicationServerKey: keyBytes.buffer.slice(
+          keyBytes.byteOffset,
+          keyBytes.byteOffset + keyBytes.byteLength,
+        ) as ArrayBuffer,
       });
       const json = sub.toJSON() as { endpoint: string; keys?: { p256dh?: string; auth?: string } };
       const p256dh = json.keys?.p256dh ?? bufferToBase64Url(sub.getKey("p256dh"));

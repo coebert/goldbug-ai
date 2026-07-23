@@ -25,6 +25,7 @@ import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
+import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/public/hooks/daily-summary'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 
 const SaxoStatusRoute = SaxoStatusRouteImport.update({
@@ -108,6 +109,12 @@ const ApiPublicHooksHourlyRunRoute = ApiPublicHooksHourlyRunRouteImport.update({
   path: '/api/public/hooks/hourly-run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksDailySummaryRoute =
+  ApiPublicHooksDailySummaryRouteImport.update({
+    id: '/api/public/hooks/daily-summary',
+    path: '/api/public/hooks/daily-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
   id: '/api/public/hooks/daily-run',
   path: '/api/public/hooks/daily-run',
@@ -129,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
+  '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
@@ -148,6 +156,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
+  '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
@@ -168,6 +177,7 @@ export interface FileRoutesById {
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
+  '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
     | '/api/public/hooks/daily-run'
+    | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/saxo/callback'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
     | '/api/public/hooks/daily-run'
+    | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/saxo/callback'
@@ -227,6 +239,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
     | '/api/public/hooks/daily-run'
+    | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/saxo/callback'
@@ -244,6 +257,7 @@ export interface RootRouteChildren {
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
+  ApiPublicHooksDailySummaryRoute: typeof ApiPublicHooksDailySummaryRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
   ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
   ApiPublicSaxoCallbackRoute: typeof ApiPublicSaxoCallbackRoute
@@ -363,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksHourlyRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/daily-summary': {
+      id: '/api/public/hooks/daily-summary'
+      path: '/api/public/hooks/daily-summary'
+      fullPath: '/api/public/hooks/daily-summary'
+      preLoaderRoute: typeof ApiPublicHooksDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/daily-run': {
       id: '/api/public/hooks/daily-run'
       path: '/api/public/hooks/daily-run'
@@ -401,6 +422,7 @@ const rootRouteChildren: RootRouteChildren = {
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
+  ApiPublicHooksDailySummaryRoute: ApiPublicHooksDailySummaryRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
   ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
   ApiPublicSaxoCallbackRoute: ApiPublicSaxoCallbackRoute,
