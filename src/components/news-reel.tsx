@@ -404,10 +404,12 @@ export function NewsReel() {
         ) : (
           <div
             ref={scrollerRef}
-            className="relative h-80 overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_8%,black_92%,transparent)]"
+            className="relative h-80 overflow-y-auto overscroll-contain pr-1 [mask-image:linear-gradient(to_bottom,transparent,black_4%,black_96%,transparent)] scrollbar-thin"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
+            onTouchStart={() => setPaused(true)}
           >
+
             <ul className="space-y-3 pr-2">
               {loop.map((item, idx) => {
                 const tone = sentimentTone(item.avg_sentiment);
