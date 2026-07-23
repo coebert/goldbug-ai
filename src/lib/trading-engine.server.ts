@@ -719,14 +719,37 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      const qty = spend / price;
-      workingCash -= spend;
+
+      // Phase 5 — realistic execution (spread, slippage, commission, liquidity cap)
+      const featExec = featureBySymbol.get(meta.symbol);
+      const outcome = applyBuyExecution({
+        requestedSpend: spend,
+        price,
+        atrPct: featExec?.atr_pct ?? null,
+        adv20d: featExec?.adv_20d ?? null,
+      });
+      if (outcome.belowMinTrade || outcome.qty <= 0) {
+        executed.push({
+          symbol: meta.symbol,
+          side: "buy",
+          quantity: 0,
+          price,
+          value: 0,
+          reason: order.reason,
+          rejected: outcome.notes.join("; ") || "trade too small after execution costs",
+        });
+        continue;
+      }
+      if (outcome.liquidityCappedSpend != null) sizingNotes.push("liquidity 1% ADV");
+      const qty = outcome.qty;
+      const fillPrice = outcome.fillPrice;
+      workingCash -= outcome.effectiveSpend;
       if (isNewPosition) newPositions += 1;
       const cur = holdingsByS.get(meta.symbol);
       if (cur) {
         const newQty = Number(cur.quantity) + qty;
         const newCost =
-          (Number(cur.avg_cost) * Number(cur.quantity) + spend) / newQty;
+          (Number(cur.avg_cost) * Number(cur.quantity) + qty * fillPrice) / newQty;
         holdingsByS.set(meta.symbol, { ...cur, quantity: newQty, avg_cost: newCost });
       } else {
         holdingsByS.set(meta.symbol, {
@@ -735,22 +758,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           symbol: meta.symbol,
           asset_class: meta.asset_class,
           quantity: qty,
-          avg_cost: price,
+          avg_cost: fillPrice,
           updated_at: new Date().toISOString(),
         } as Holding);
       }
       classExposure.set(
         meta.asset_class,
-        (classExposure.get(meta.asset_class) ?? 0) + spend,
+        (classExposure.get(meta.asset_class) ?? 0) + outcome.effectiveSpend,
       );
       executed.push({
         symbol: meta.symbol,
         side: "buy",
         quantity: qty,
-        price,
-        value: spend,
+        price: fillPrice,
+        value: outcome.effectiveSpend,
         reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
       });
+
     }
   }
 
