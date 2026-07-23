@@ -270,6 +270,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
   const news = opts?.skipNews ? [] : await getNewsForDate(asOf).catch(() => []);
+  const regime = await detectAndPersistRegime(asOf).catch((e) => {
+    console.warn("Regime detection failed:", e);
+    return null;
+  });
 
   const decision = await callAiForDecision({
     portfolio,
@@ -279,6 +283,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     features,
     news,
     asOf,
+    regime: regime ?? {
+      as_of: asOf,
+      regime: "bull_quiet",
+      previous_regime: null,
+      transitioned: false,
+      confidence: 0,
+      signals: {
+        spy_price: null, spy_sma50: null, spy_sma200: null,
+        spy_drawdown_pct: null, spy_return_30d: null, spy_vol_20d: null,
+        vix_level: null, gld_return_30d: null, tlt_return_30d: null,
+      },
+      notes: "regime detection unavailable",
+    },
   });
 
   // Execute orders through guardrails
