@@ -479,6 +479,29 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     );
   }
 
+  // Build correlation map covering current holdings + candidate buys
+  const buySymbols = decision.orders
+    .filter((o) => o.side === "buy")
+    .map((o) => o.symbol.toUpperCase())
+    .filter((s) => !!findSymbol(s));
+  const corrSymbols = Array.from(new Set([...holdingsByS.keys(), ...buySymbols]));
+  const corrMap = corrSymbols.length > 1
+    ? await buildCorrelationMap(corrSymbols, asOf).catch(() => new Map<string, Map<string, number>>())
+    : new Map<string, Map<string, number>>();
+
+  // High-impact events touching a symbol => size penalty
+  const eventPenaltyBySymbol = new Map<string, number>();
+  for (const ev of events) {
+    if (!ev.symbol) continue;
+    const key = ev.symbol.toUpperCase();
+    const penalty = ev.impact === "high" ? 0.5 : ev.impact === "medium" ? 0.75 : 0.9;
+    eventPenaltyBySymbol.set(key, Math.min(eventPenaltyBySymbol.get(key) ?? 1, penalty));
+  }
+  // Broad macro event within window applies a mild across-the-board penalty
+  const macroPenalty = events.some((e) => !e.symbol && (e.impact === "high" || e.impact === "medium"))
+    ? 0.85
+    : 1;
+
   // Process sells first to free cash
   const sorted = [...decision.orders].sort((a) =>
     a.side === "sell" ? -1 : 1,
@@ -564,6 +587,35 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
       const spendableCash = Math.max(0, workingCash - cashFloor);
       let spend = spendableCash * pct;
+      const sizingNotes: string[] = [];
+
+      // Conviction-weighted Kelly cap (only shrinks; never grows above requested %)
+      if (typeof order.conviction === "number") {
+        const feat = featureBySymbol.get(meta.symbol);
+        const convSpend = convictionSizedSpend({
+          baseSize: spend,
+          conviction: order.conviction,
+          volPct: feat?.vol20d ?? null,
+        });
+        if (convSpend < spend) {
+          spend = convSpend;
+          sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}`);
+        }
+      }
+
+      // Loss cooldown: halve size while cooling
+      if (isSymbolCooling(cooldowns, meta.symbol, asOf)) {
+        spend *= 0.5;
+        sizingNotes.push("cooldown x0.5");
+      }
+
+      // Event penalty (symbol-specific and broad macro)
+      const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
+      if (evPenalty < 1) {
+        spend *= evPenalty;
+        sizingNotes.push(`event x${evPenalty.toFixed(2)}`);
+      }
+
       // Enforce per-symbol position cap
       const existingVal = holdingsByS.get(meta.symbol)
         ? Number(holdingsByS.get(meta.symbol)!.quantity) * price
@@ -595,6 +647,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
+      // Portfolio-level correlated cluster cap
+      let corrCapped = false;
+      const existingExposureBySymbol = new Map<string, number>();
+      for (const h of holdingsByS.values()) {
+        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        existingExposureBySymbol.set(h.symbol, p * Number(h.quantity));
+      }
+      const corrRes = correlatedClusterAllowance({
+        symbol: meta.symbol,
+        spend,
+        totalValue,
+        existingExposureBySymbol,
+        corr: corrMap,
+      });
+      if (corrRes.allowed < spend) {
+        spend = corrRes.allowed;
+        corrCapped = true;
+        sizingNotes.push(`corr-cluster ${(corrRes.clusterExposurePct * 100).toFixed(0)}%`);
+      }
+
       if (spend < 1) {
         executed.push({
           symbol: meta.symbol,
@@ -605,9 +677,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           reason: order.reason,
           rejected: classRejected
             ? `asset-class cap reached for ${meta.asset_class}`
-            : volCapped
-              ? "volatility sizing leaves no room"
-              : "guardrails leave no room to buy",
+            : corrCapped
+              ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
+              : volCapped
+                ? "volatility sizing leaves no room"
+                : "guardrails leave no room to buy",
         });
         continue;
       }
@@ -641,10 +715,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         quantity: qty,
         price,
         value: spend,
-        reason: order.reason,
+        reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
       });
     }
   }
+
 
 
   // Persist state
