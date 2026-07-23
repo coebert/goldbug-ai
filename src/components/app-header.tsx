@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Shield, GitCompare, Sparkles } from "lucide-react";
+import { TrendingUp, Shield, GitCompare, Sparkles, Plug } from "lucide-react";
 
 export function AppHeader({ email }: { email?: string | null }) {
   return (
