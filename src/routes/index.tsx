@@ -149,6 +149,12 @@ function Home() {
           </Suspense>
         </div>
 
+        <div className="mb-6">
+          <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
+            <DecisionNewsBreakdown />
+          </Suspense>
+        </div>
+
 
 
 
