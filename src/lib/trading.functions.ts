@@ -203,6 +203,68 @@ export const updateRiskConfig = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// -----------------------------------------------------------------------
+// Execution calibration — estimates spread / slippage / commission from
+// recent OHLCV and updates portfolios.risk_config.execution_params.
+// -----------------------------------------------------------------------
+export const calibrateExecution = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        portfolio_id: z.string().uuid(),
+        window_days: z.number().int().min(20).max(365).default(90),
+        apply: z.boolean().default(true),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: p, error } = await context.supabase
+      .from("portfolios")
+      .select("id, universe, risk_config")
+      .eq("id", data.portfolio_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!p) throw new Error("Portfolio not found");
+
+    const { filterUniverse, parseRiskConfig } = await import("./universe.server");
+    const { calibrateExecution: run } = await import("./execution-calibration.server");
+    const classes = Array.isArray(p.universe) ? (p.universe as string[]) : [];
+    const symbols = filterUniverse(classes as Parameters<typeof filterUniverse>[0]).map((u) => u.symbol);
+    if (!symbols.length) throw new Error("Portfolio universe is empty");
+
+    const summary = await run(symbols, { lookbackDays: data.window_days });
+
+    if (data.apply) {
+      const cfg = parseRiskConfig(p.risk_config);
+      const nextCfg = {
+        ...cfg,
+        execution_params: {
+          slippage_bps: summary.recommended.slippage_bps,
+          commission_bps: summary.recommended.commission_bps,
+          spread_atr_frac: summary.recommended.spread_atr_frac,
+          adv_participation: summary.recommended.adv_participation,
+          min_trade_value: summary.recommended.min_trade_value,
+        },
+        execution_calibration: {
+          as_of: summary.as_of,
+          window_days: summary.window_days,
+          n_symbols: summary.n_symbols,
+          notes: summary.notes,
+        },
+      };
+      const { error: upErr } = await context.supabase
+        .from("portfolios")
+        .update({ risk_config: nextCfg })
+        .eq("id", data.portfolio_id);
+      if (upErr) throw new Error(upErr.message);
+    }
+
+    return summary;
+  });
+
+
+
 
 export const resetPortfolio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

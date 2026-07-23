@@ -74,6 +74,21 @@ export function riskProfile(level: Database["public"]["Enums"]["risk_level"]): R
 }
 
 // Advanced, user-configurable risk knobs stored on portfolios.risk_config
+export type ExecutionParamsConfig = {
+  slippage_bps: number;
+  commission_bps: number;
+  spread_atr_frac: number;
+  adv_participation: number;
+  min_trade_value: number;
+};
+
+export type ExecutionCalibrationMeta = {
+  as_of: string;
+  window_days: number;
+  n_symbols: number;
+  notes: string[];
+};
+
 export type RiskConfig = {
   asset_class_limits: Partial<Record<AssetClass, number>>; // max % of portfolio value per class
   per_symbol_limit_pct: number | null; // if set, overrides base maxPositionPct
@@ -81,6 +96,8 @@ export type RiskConfig = {
   take_profit_pct: number; // 0 disables. e.g. 0.25 = +25% from avg cost
   volatility_sizing: boolean;
   vol_target_pct: number; // target daily volatility contribution per position (e.g. 0.015 = 1.5%)
+  execution_params: Partial<ExecutionParamsConfig> | null;
+  execution_calibration: ExecutionCalibrationMeta | null;
 };
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = {
@@ -90,6 +107,8 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   take_profit_pct: 0.25,
   volatility_sizing: true,
   vol_target_pct: 0.015,
+  execution_params: null,
+  execution_calibration: null,
 };
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
@@ -117,6 +136,31 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   if (Number.isFinite(Number(r.take_profit_pct))) out.take_profit_pct = Math.max(0, Math.min(5, Number(r.take_profit_pct)));
   if (typeof r.volatility_sizing === "boolean") out.volatility_sizing = r.volatility_sizing;
   if (Number.isFinite(Number(r.vol_target_pct))) out.vol_target_pct = Math.max(0.001, Math.min(0.1, Number(r.vol_target_pct)));
+  if (r.execution_params && typeof r.execution_params === "object") {
+    const e = r.execution_params as Record<string, unknown>;
+    const ep: Partial<ExecutionParamsConfig> = {};
+    const num = (k: keyof ExecutionParamsConfig, min: number, max: number) => {
+      const n = Number(e[k]);
+      if (Number.isFinite(n)) ep[k] = Math.max(min, Math.min(max, n));
+    };
+    num("slippage_bps", 0, 500);
+    num("commission_bps", 0, 500);
+    num("spread_atr_frac", 0, 2);
+    num("adv_participation", 0, 0.5);
+    num("min_trade_value", 0, 10_000);
+    out.execution_params = ep;
+  }
+  if (r.execution_calibration && typeof r.execution_calibration === "object") {
+    const c = r.execution_calibration as Record<string, unknown>;
+    const notes = Array.isArray(c.notes) ? (c.notes as unknown[]).filter((x): x is string => typeof x === "string") : [];
+    out.execution_calibration = {
+      as_of: String(c.as_of ?? ""),
+      window_days: Number(c.window_days ?? 0),
+      n_symbols: Number(c.n_symbols ?? 0),
+      notes,
+    };
+  }
   return out;
 }
+
 

@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
@@ -462,8 +463,13 @@ function PortfolioPage() {
               );
             })()}
 
-            <div className="mb-6">
+            <div className="mb-6 space-y-4">
               <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
+              <ExecutionCalibrationCard
+                portfolioId={id}
+                execParams={(p.risk_config as { execution_params?: Parameters<typeof ExecutionCalibrationCard>[0]["execParams"] } | null)?.execution_params ?? null}
+                calibration={(p.risk_config as { execution_calibration?: Parameters<typeof ExecutionCalibrationCard>[0]["calibration"] } | null)?.execution_calibration ?? null}
+              />
             </div>
 
 
