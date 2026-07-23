@@ -18,7 +18,8 @@ import {
 
 const LINE_COLORS = ["#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c", "#60a5fa"];
 const TOTAL_COLOR = "#22d3ee";
-const AXIS_COLOR = "hsl(var(--foreground))";
+const AXIS_COLOR = "oklch(0.96 0.01 90)";
+const AXIS_MUTED = "oklch(0.96 0.01 90 / 0.7)";
 const GRID_COLOR = "hsl(var(--foreground))";
 
 type Range = "7d" | "30d" | "90d" | "1y" | "all";
