@@ -49,6 +49,8 @@ import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
+import { Explain, ExplainIcon } from "@/components/explain";
+import type { TermId } from "@/lib/glossary";
 
 
 export const Route = createFileRoute("/portfolio/$id")({
@@ -571,10 +573,10 @@ function PortfolioPage() {
                 {perfMetrics && (
                   <div className="mx-6 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {([
-                      { label: "CAGR", value: perfMetrics.port.annReturn, suffix: "%", signed: true, negative: false },
-                      { label: "Volatility (ann.)", value: perfMetrics.port.annVol, suffix: "%", signed: false, negative: false },
-                      { label: `Sharpe (rf=${riskFreeRate}%)`, value: perfMetrics.port.annVol > 0 ? (perfMetrics.port.annReturn - riskFreeRate) / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
-                      { label: "Max drawdown", value: perfMetrics.port.maxDrawdown, suffix: "%", signed: false, negative: true },
+                      { label: "CAGR", term: "cagr" as TermId, value: perfMetrics.port.annReturn, suffix: "%", signed: true, negative: false },
+                      { label: "Volatility (ann.)", term: "volatility" as TermId, value: perfMetrics.port.annVol, suffix: "%", signed: false, negative: false },
+                      { label: `Sharpe (rf=${riskFreeRate}%)`, term: "sharpe" as TermId, value: perfMetrics.port.annVol > 0 ? (perfMetrics.port.annReturn - riskFreeRate) / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
+                      { label: "Max drawdown", term: "max_drawdown" as TermId, value: perfMetrics.port.maxDrawdown, suffix: "%", signed: false, negative: true },
                     ] as const).map((m) => {
                       const bv = m.label === "CAGR" ? perfMetrics.bench?.annReturn
                         : m.label === "Volatility (ann.)" ? perfMetrics.bench?.annVol
@@ -594,7 +596,10 @@ function PortfolioPage() {
                       };
                       return (
                         <div key={m.label} className="rounded-md border border-border/70 bg-muted/30 p-3">
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
+                          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            <span>{m.label}</span>
+                            <ExplainIcon term={m.term} />
+                          </div>
                           <div className={`tabular-nums text-xl font-semibold ${color(m.value)}`}>{fmt(m.value)}</div>
                           {perfMetrics.bench && (
                             <div className="tabular-nums text-[11px] text-muted-foreground">
