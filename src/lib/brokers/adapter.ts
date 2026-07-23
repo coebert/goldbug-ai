@@ -6,6 +6,14 @@ export interface BrokerBalance {
   cash: number;
   currency: string;
   totalValue: number;
+  /** Cash immediately available for trading (settled, unencumbered). */
+  cashAvailable?: number;
+  /** Transactions booked but not yet settled (e.g. T+2 unsettled proceeds). */
+  transactionsNotBooked?: number;
+  /** Cash reserved by open orders / margin collateral, unavailable to trade now. */
+  reservedCash?: number;
+  /** Unrealised P&L on open positions (informational). */
+  unrealizedPnl?: number;
 }
 
 export interface BrokerPosition {
