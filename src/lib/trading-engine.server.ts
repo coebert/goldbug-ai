@@ -10,12 +10,20 @@ import {
   sma,
   rsi,
   pctChange,
+  dailyVolatility,
   type Candle,
 } from "./market-data.server";
 import { getNewsForDate } from "./news.server";
-import { filterUniverse, findSymbol, riskProfile, type UniverseSymbol } from "./universe.server";
+import {
+  filterUniverse,
+  findSymbol,
+  riskProfile,
+  parseRiskConfig,
+  type UniverseSymbol,
+} from "./universe.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
+
 
 type Portfolio = Database["public"]["Tables"]["portfolios"]["Row"];
 type Holding = Database["public"]["Tables"]["holdings"]["Row"];
