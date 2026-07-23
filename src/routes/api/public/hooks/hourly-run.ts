@@ -23,7 +23,14 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
         const { getNewsForDate } = await import("@/lib/news.server");
         const { refreshLatestCandles } = await import("@/lib/market-data.server");
-        const { filterUniverse, classesFromUniverse } = await import("@/lib/universe.server");
+        const { filterUniverse } = await import("@/lib/universe.server");
+        const classesFromUniverse = (u: unknown): Array<"stock" | "etf" | "crypto" | "commodity" | "fx"> => {
+          const all = ["stock", "etf", "crypto", "commodity", "fx"] as const;
+          if (!Array.isArray(u)) return [...all];
+          return u.filter((x): x is (typeof all)[number] =>
+            typeof x === "string" && (all as readonly string[]).includes(x),
+          );
+        };
 
         const today = new Date().toISOString().slice(0, 10);
 
