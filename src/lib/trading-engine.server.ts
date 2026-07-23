@@ -941,9 +941,37 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   }
 
+  // ---- Rebalance-band trims: harvest overweight winners after buy pass ----
+  const trims = computeRebalanceTrims({
+    totalValue,
+    holdings: Array.from(holdingsByS.values()).map((h) => ({ symbol: h.symbol, quantity: Number(h.quantity) })),
+    priceMap,
+    targetPerSymbolPct: basePerSymbolPct,
+    bandPct: 0.25,
+  });
+  for (const t of trims) {
+    const cur = holdingsByS.get(t.symbol);
+    if (!cur) continue;
+    const qty = Math.min(Number(cur.quantity), t.qtyToTrim);
+    if (qty <= 0) continue;
+    const value = qty * t.price;
+    workingCash += value;
+    const remaining = Number(cur.quantity) - qty;
+    if (remaining <= 1e-8) holdingsByS.delete(t.symbol);
+    else holdingsByS.set(t.symbol, { ...cur, quantity: remaining });
+    executed.push({
+      symbol: t.symbol,
+      side: "sell",
+      quantity: qty,
+      price: t.price,
+      value,
+      reason: `rebalance-band trim: ${(t.currentPct * 100).toFixed(1)}% → target ${(t.targetPct * 100).toFixed(1)}%`,
+    });
+  }
 
 
   // Persist state
+
   const admin = supabaseAdmin;
   const executedAt = new Date().toISOString();
 
