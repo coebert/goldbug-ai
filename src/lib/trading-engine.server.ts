@@ -199,6 +199,7 @@ async function callAiForDecision(args: {
   learning: LearningContext;
   attribution?: string | null;
   regimeNote?: string | null;
+  hyperparams?: TunedHyperparams | null;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
