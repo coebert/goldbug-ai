@@ -422,7 +422,22 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     rationale: decision.rationale,
     model: "google/gemini-3.6-flash",
     portfolio_value: newTotal,
-    raw: { orders: decision.orders, executed } as unknown as never,
+    raw: {
+      orders: decision.orders,
+      executed,
+      signals: features,
+      news: news.slice(0, 12),
+      guardrails: {
+        risk_level: portfolio.risk_level,
+        max_position_pct: risk.maxPositionPct,
+        cash_floor_pct: risk.cashFloorPct,
+        max_new_positions_per_day: risk.maxNewPositionsPerDay,
+        cash_floor_value: cashFloor,
+        max_position_value: maxPosVal,
+        starting_total_value: totalValue,
+        starting_cash: cash,
+      },
+    } as unknown as never,
   });
 
   return { decision, executed, totalValue: newTotal, cash: workingCash };
