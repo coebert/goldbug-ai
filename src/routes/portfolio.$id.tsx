@@ -238,6 +238,73 @@ function PortfolioPage() {
     });
   }, [equityData, benchQ.data, benchmark, startingCashForChart]);
 
+  const perfMetrics = useMemo(() => {
+    const rows = chartData.filter((r) => Number.isFinite(r.value));
+    if (rows.length < 2) return null;
+    const portVals = rows.map((r) => r.value);
+    const benchVals = rows.map((r) => (r as { benchmark?: number | null }).benchmark ?? null);
+    const hasBench = benchmark !== "none" && benchVals.every((v) => v != null && Number.isFinite(v));
+
+    const dailyReturns = (vals: number[]) => {
+      const out: number[] = [];
+      for (let i = 1; i < vals.length; i++) {
+        const prev = vals[i - 1];
+        if (prev > 0) out.push(vals[i] / prev - 1);
+      }
+      return out;
+    };
+    const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+    const stdev = (xs: number[]) => {
+      if (xs.length < 2) return 0;
+      const m = mean(xs);
+      const v = xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1);
+      return Math.sqrt(v);
+    };
+    const maxDD = (vals: number[]) => {
+      let peak = -Infinity;
+      let worst = 0;
+      for (const v of vals) {
+        peak = Math.max(peak, v);
+        if (peak > 0) worst = Math.min(worst, (v - peak) / peak);
+      }
+      return worst * 100; // negative %
+    };
+    const compute = (vals: number[]) => {
+      const rets = dailyReturns(vals);
+      const totalReturn = vals[0] > 0 ? (vals[vals.length - 1] / vals[0] - 1) * 100 : 0;
+      const years = Math.max(rets.length / 252, 1 / 252);
+      const growth = vals[0] > 0 ? vals[vals.length - 1] / vals[0] : 1;
+      const annReturn = (Math.pow(growth, 1 / years) - 1) * 100;
+      const annVol = stdev(rets) * Math.sqrt(252) * 100;
+      return { totalReturn, annReturn, annVol, maxDrawdown: maxDD(vals), rets };
+    };
+    const port = compute(portVals);
+    const bench = hasBench ? compute(benchVals as number[]) : null;
+
+    let correlation: number | null = null;
+    if (bench) {
+      const n = Math.min(port.rets.length, bench.rets.length);
+      if (n >= 2) {
+        const a = port.rets.slice(-n);
+        const b = bench.rets.slice(-n);
+        const ma = mean(a);
+        const mb = mean(b);
+        let num = 0;
+        let da = 0;
+        let db = 0;
+        for (let i = 0; i < n; i++) {
+          num += (a[i] - ma) * (b[i] - mb);
+          da += (a[i] - ma) ** 2;
+          db += (b[i] - mb) ** 2;
+        }
+        const denom = Math.sqrt(da * db);
+        correlation = denom > 0 ? num / denom : null;
+      }
+    }
+    return { port, bench, correlation };
+  }, [chartData, benchmark]);
+
+
 
   const p = q.data?.portfolio;
   const holdings = q.data?.holdings ?? [];
@@ -399,6 +466,61 @@ function PortfolioPage() {
                     </div>
                   </CardTitle>
                 </CardHeader>
+                {perfMetrics && (
+                  <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
+                    <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <span>Performance vs {benchmark === "none" ? "benchmark" : benchmark}</span>
+                      {perfMetrics.correlation != null && (
+                        <span className="tabular-nums">
+                          Correlation: <span className="font-medium text-foreground">{perfMetrics.correlation.toFixed(2)}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
+                      {([
+                        { label: "Total return", key: "totalReturn", suffix: "%", signed: true, negative: false, derived: false },
+                        { label: "Annualized return", key: "annReturn", suffix: "%", signed: true, negative: false, derived: false },
+                        { label: "Volatility (ann.)", key: "annVol", suffix: "%", signed: false, negative: false, derived: false },
+                        { label: "Max drawdown", key: "maxDrawdown", suffix: "%", signed: false, negative: true, derived: false },
+                        { label: "Return / Vol", key: "rvr", suffix: "", signed: true, negative: false, derived: true },
+                      ] as const).map((m) => {
+                        const fmt = (v: number | null | undefined) => {
+                          if (v == null || !Number.isFinite(v)) return "—";
+                          const s = m.signed && v > 0 ? "+" : "";
+                          return `${s}${v.toFixed(2)}${m.suffix}`;
+                        };
+                        const derived = (obj: { annReturn: number; annVol: number } | null) =>
+                          obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
+                        const pick = (obj: typeof perfMetrics.port | null) => {
+                          if (!obj) return null;
+                          const v = (obj as unknown as Record<string, unknown>)[m.key];
+                          return typeof v === "number" ? v : null;
+                        };
+                        const pv = m.derived ? derived(perfMetrics.port) : pick(perfMetrics.port);
+                        const bv = m.derived ? derived(perfMetrics.bench) : pick(perfMetrics.bench);
+                        const color = (v: number | null) => {
+                          if (v == null) return "text-muted-foreground";
+                          if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
+                          if (!m.signed) return "text-foreground";
+                          return v >= 0 ? "text-primary" : "text-destructive";
+                        };
+                        return (
+                          <div key={m.label} className="min-w-0">
+                            <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
+                            <div className={`tabular-nums font-medium ${color(pv)}`}>
+                              {fmt(pv)}
+                            </div>
+                            {perfMetrics.bench && (
+                              <div className="tabular-nums text-[11px] text-muted-foreground">
+                                {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <CardContent
                   className="h-64"
                   style={chartTheme.surface !== "transparent" ? { background: chartTheme.surface, borderRadius: 8 } : undefined}
