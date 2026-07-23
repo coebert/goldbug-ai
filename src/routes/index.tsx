@@ -108,17 +108,17 @@ function Home() {
     staleTime: 30_000,
   });
   const sparkByPortfolio = useMemo(() => {
-    const map: Record<string, number[]> = {};
+    const map: Record<string, { date: string; value: number }[]> = {};
     const series = equityQ.data?.series ?? [];
     const portfolios = equityQ.data?.portfolios ?? [];
     for (const p of portfolios) {
-      const vals: number[] = [];
+      const pts: { date: string; value: number }[] = [];
       for (const row of series) {
-        const v = Number((row as Record<string, unknown>)[p.id]);
-        if (Number.isFinite(v)) vals.push(v);
+        const r = row as Record<string, unknown>;
+        const v = Number(r[p.id]);
+        if (Number.isFinite(v)) pts.push({ date: String(r.date ?? ""), value: v });
       }
-      // keep last ~60 points for a legible mini chart
-      map[p.id] = vals.slice(-60);
+      map[p.id] = pts;
     }
     return map;
   }, [equityQ.data]);
