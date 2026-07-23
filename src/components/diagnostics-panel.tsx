@@ -424,7 +424,7 @@ function MetricTile({
   tone,
 }: {
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
   value: string;
   sub?: string;
   tone?: "pos" | "neg";
