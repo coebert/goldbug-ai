@@ -44,6 +44,8 @@ import { RiskControlsCard } from "@/components/risk-controls-card";
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
+import { LiveToggle } from "@/components/live-toggle";
+import { Tooltip as UITooltip, TooltipContent as UITooltipContent, TooltipProvider as UITooltipProvider, TooltipTrigger as UITooltipTrigger } from "@/components/ui/tooltip";
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
