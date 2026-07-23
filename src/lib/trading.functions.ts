@@ -50,6 +50,77 @@ export const listPortfolios = createServerFn({ method: "GET" })
     return data;
   });
 
+// Combined equity across all of the user's portfolios.
+// Returns per-portfolio series plus a merged "total" series summing each
+// portfolio's latest-known value (forward-filled) at every date on the axis.
+export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: portfolios, error } = await context.supabase
+      .from("portfolios")
+      .select("id,name,currency,starting_cash,current_cash,created_at")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const list = portfolios ?? [];
+    if (list.length === 0) return { portfolios: [], series: [], currency: "GBP" as string };
+
+    const perPortfolio = await Promise.all(
+      list.map(async (p) => {
+        const { data: eq } = await context.supabase
+          .from("equity_snapshots")
+          .select("snapshot_date,total_value")
+          .eq("portfolio_id", p.id)
+          .order("snapshot_date", { ascending: true });
+        const rows = (eq ?? []).map((e) => ({
+          date: e.snapshot_date as string,
+          value: Number(e.total_value),
+        }));
+        return {
+          id: p.id as string,
+          name: p.name as string,
+          currency: p.currency as string,
+          starting_cash: Number(p.starting_cash),
+          current_cash: Number(p.current_cash),
+          series: rows,
+        };
+      }),
+    );
+
+    const today = new Date().toISOString().slice(0, 10);
+    const allDates = new Set<string>();
+    for (const p of perPortfolio) {
+      if (p.series.length === 0) allDates.add(today);
+      else for (const r of p.series) allDates.add(r.date);
+    }
+    const dates = [...allDates].sort();
+
+    const series = dates.map((d) => {
+      let total = 0;
+      const perId: Record<string, number> = {};
+      for (const p of perPortfolio) {
+        let v = p.starting_cash;
+        if (p.series.length === 0) {
+          v = p.current_cash;
+        } else {
+          for (const r of p.series) {
+            if (r.date <= d) v = r.value;
+            else break;
+          }
+        }
+        perId[p.id] = v;
+        total += v;
+      }
+      return { date: d, total, ...perId } as Record<string, string | number>;
+    });
+
+    const currency = perPortfolio[0]?.currency ?? "GBP";
+    return {
+      portfolios: perPortfolio.map((p) => ({ id: p.id, name: p.name, currency: p.currency })),
+      series,
+      currency,
+    };
+  });
+
 export const getPortfolio = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
