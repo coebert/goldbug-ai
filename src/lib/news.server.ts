@@ -275,7 +275,9 @@ export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]>
       headline: t.translation,
       original_headline: it.headline,
       original_language: t.lang,
+      translation_confidence: t.confidence,
     };
+
   });
 }
 
