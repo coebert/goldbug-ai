@@ -212,3 +212,155 @@ export const runBacktest = createServerFn({ method: "POST" })
     }
     return { ok: true, days: dates.length, finalValue: lastTotal };
   });
+
+// ---------- Comparison ----------
+
+function computeMetrics(equity: { snapshot_date: string; total_value: number }[], startingCash: number) {
+  if (equity.length === 0) {
+    return {
+      totalReturnPct: 0,
+      maxDrawdownPct: 0,
+      sharpe: 0,
+      volatilityPct: 0,
+      bestDayPct: 0,
+      worstDayPct: 0,
+      days: 0,
+    };
+  }
+  const values = equity.map((e) => Number(e.total_value));
+  const finalValue = values[values.length - 1];
+  const totalReturnPct = ((finalValue - startingCash) / startingCash) * 100;
+
+  // Max drawdown
+  let peak = values[0];
+  let maxDD = 0;
+  for (const v of values) {
+    if (v > peak) peak = v;
+    const dd = (v - peak) / peak;
+    if (dd < maxDD) maxDD = dd;
+  }
+
+  // Daily returns based on previous close
+  const rets: number[] = [];
+  let prev = startingCash;
+  for (const v of values) {
+    if (prev > 0) rets.push((v - prev) / prev);
+    prev = v;
+  }
+  const mean = rets.reduce((a, b) => a + b, 0) / (rets.length || 1);
+  const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length || 1);
+  const std = Math.sqrt(variance);
+  // Annualise assuming ~252 trading days
+  const sharpe = std > 0 ? (mean / std) * Math.sqrt(252) : 0;
+  const volatilityPct = std * Math.sqrt(252) * 100;
+  const best = rets.length ? Math.max(...rets) : 0;
+  const worst = rets.length ? Math.min(...rets) : 0;
+
+  return {
+    totalReturnPct,
+    maxDrawdownPct: maxDD * 100,
+    sharpe,
+    volatilityPct,
+    bestDayPct: best * 100,
+    worstDayPct: worst * 100,
+    days: values.length,
+  };
+}
+
+export const getComparison = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ portfolio_ids: z.array(z.string().uuid()).min(1).max(6) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: portfolios, error } = await context.supabase
+      .from("portfolios")
+      .select("*")
+      .in("id", data.portfolio_ids);
+    if (error) throw new Error(error.message);
+    const results = await Promise.all(
+      (portfolios ?? []).map(async (p) => {
+        const { data: equity } = await context.supabase
+          .from("equity_snapshots")
+          .select("snapshot_date,total_value")
+          .eq("portfolio_id", p.id)
+          .order("snapshot_date", { ascending: true });
+        const series = (equity ?? []).map((e) => ({
+          snapshot_date: e.snapshot_date as string,
+          total_value: Number(e.total_value),
+        }));
+        return {
+          portfolio: {
+            id: p.id,
+            name: p.name,
+            currency: p.currency,
+            risk_level: p.risk_level,
+            universe: p.universe,
+            starting_cash: Number(p.starting_cash),
+            mode: p.mode,
+          },
+          series,
+          metrics: computeMetrics(series, Number(p.starting_cash)),
+        };
+      }),
+    );
+    return { results };
+  });
+
+export const runBacktestMany = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        portfolio_ids: z.array(z.string().uuid()).min(1).max(6),
+        days: z.number().int().min(3).max(30).default(10),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: owned } = await context.supabase
+      .from("portfolios")
+      .select("id")
+      .in("id", data.portfolio_ids);
+    const ids = (owned ?? []).map((o) => o.id);
+    const { runDailyTick, snapshotPortfolio } = await import("./trading-engine.server");
+
+    // Build shared trading-day list
+    const dates: string[] = [];
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const cursor = new Date(today);
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    while (dates.length < data.days) {
+      const dow = cursor.getUTCDay();
+      if (dow !== 0 && dow !== 6) dates.unshift(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+      if (dates.length > 60) break;
+    }
+
+    for (const id of ids) {
+      const { data: p } = await context.supabase
+        .from("portfolios")
+        .select("starting_cash")
+        .eq("id", id)
+        .single();
+      if (!p) continue;
+      await context.supabase.from("holdings").delete().eq("portfolio_id", id);
+      await context.supabase.from("trades").delete().eq("portfolio_id", id);
+      await context.supabase.from("decisions").delete().eq("portfolio_id", id);
+      await context.supabase.from("equity_snapshots").delete().eq("portfolio_id", id);
+      await context.supabase
+        .from("portfolios")
+        .update({ current_cash: p.starting_cash, last_run_date: null })
+        .eq("id", id);
+      for (const d of dates) {
+        try {
+          await runDailyTick(id, d, { skipNews: true });
+        } catch (err) {
+          console.error(`backtest ${id} ${d} failed`, err);
+          await snapshotPortfolio(id, d).catch(() => {});
+        }
+      }
+    }
+    return { ok: true, ran: ids.length, days: dates.length };
+  });
