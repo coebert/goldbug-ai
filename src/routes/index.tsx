@@ -117,6 +117,11 @@ function Home() {
                 <Sparkles className="mr-1 h-4 w-4" /> £1000 demo
               </Button>
             </Link>
+            <Link to="/saxo-status">
+              <Button variant="outline" size="sm" title="Connect your Saxo account to trade real money">
+                <Banknote className="mr-1 h-4 w-4" /> Real money setup
+              </Button>
+            </Link>
             <Link to="/compare">
               <Button variant="outline" size="sm">Compare</Button>
             </Link>
