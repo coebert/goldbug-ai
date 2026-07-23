@@ -550,6 +550,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         attribution: attribution ? formatAttributionBlock(attribution) : null,
         regimeNote: tightened.note,
         hyperparams: hyperparams ?? null,
+        calibrationBlock: formatCalibrationBlock(calibration),
       });
 
 
