@@ -305,7 +305,7 @@ function CreatePortfolioCard() {
         </div>
         <div className="grid grid-cols-[1fr_100px] gap-2">
           <div>
-            <Label htmlFor="cash">Starting pot</Label>
+            <Label htmlFor="cash"><Explain term="starting_pot">Starting pot</Explain></Label>
             <Input
               id="cash"
               type="number"
@@ -328,7 +328,7 @@ function CreatePortfolioCard() {
           </div>
         </div>
         <div>
-          <Label>Risk level</Label>
+          <Label><Explain term="risk_level">Risk level</Explain></Label>
           <div className="mt-2 space-y-2">
             <Slider
               value={[risk === "conservative" ? 0 : risk === "balanced" ? 1 : 2]}
@@ -341,7 +341,7 @@ function CreatePortfolioCard() {
           </div>
         </div>
         <div>
-          <Label>Asset universe</Label>
+          <Label><Explain term="universe">Asset universe</Explain></Label>
           <div className="mt-2 space-y-2">
             {Object.entries(CLASS_LABELS).map(([c, label]) => (
               <label key={c} className="flex cursor-pointer items-center gap-2 text-sm">
