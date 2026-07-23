@@ -18,8 +18,17 @@ export const Route = createFileRoute("/api/public/hooks/daily-run")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { runDailyTick } = await import("@/lib/trading-engine.server");
+        const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
 
         const today = new Date().toISOString().slice(0, 10);
+
+        // Always refresh macro regime once per day, even if no portfolios are due.
+        let regimeInfo: unknown = null;
+        try {
+          regimeInfo = await detectAndPersistRegime(today);
+        } catch (e) {
+          console.error("daily-run: regime detection failed", e);
+        }
         const { data: portfolios, error } = await supabaseAdmin
           .from("portfolios")
           .select("id, name, last_run_date, mode")
