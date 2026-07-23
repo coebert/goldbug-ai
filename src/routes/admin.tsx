@@ -327,6 +327,8 @@ function AdminPage() {
 
       <SecurityAuditCard />
 
+      <TranslationQualityCard />
+
 
 
 
