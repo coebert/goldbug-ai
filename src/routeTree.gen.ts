@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
+import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -28,35 +29,49 @@ const PortfolioIdRoute = PortfolioIdRouteImport.update({
   path: '/portfolio/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
+  id: '/api/public/hooks/daily-run',
+  path: '/api/public/hooks/daily-run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/portfolio/$id': typeof PortfolioIdRoute
+  '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/portfolio/$id': typeof PortfolioIdRoute
+  '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/portfolio/$id': typeof PortfolioIdRoute
+  '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/portfolio/$id'
+  fullPaths: '/' | '/auth' | '/portfolio/$id' | '/api/public/hooks/daily-run'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/portfolio/$id'
-  id: '__root__' | '/' | '/auth' | '/portfolio/$id'
+  to: '/' | '/auth' | '/portfolio/$id' | '/api/public/hooks/daily-run'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/portfolio/$id'
+    | '/api/public/hooks/daily-run'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   PortfolioIdRoute: typeof PortfolioIdRoute
+  ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +97,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/daily-run': {
+      id: '/api/public/hooks/daily-run'
+      path: '/api/public/hooks/daily-run'
+      fullPath: '/api/public/hooks/daily-run'
+      preLoaderRoute: typeof ApiPublicHooksDailyRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +111,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   PortfolioIdRoute: PortfolioIdRoute,
+  ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
