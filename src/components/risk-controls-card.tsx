@@ -28,6 +28,8 @@ type RiskConfig = {
   per_symbol_limit_pct: number | null;
   stop_loss_pct: number;
   take_profit_pct: number;
+  atr_trailing_mult: number;
+  max_hold_days: number;
   volatility_sizing: boolean;
   vol_target_pct: number;
 };
@@ -37,6 +39,8 @@ const DEFAULTS: RiskConfig = {
   per_symbol_limit_pct: null,
   stop_loss_pct: 0.1,
   take_profit_pct: 0.25,
+  atr_trailing_mult: 3,
+  max_hold_days: 0,
   volatility_sizing: true,
   vol_target_pct: 0.015,
 };
@@ -53,6 +57,8 @@ function parseCfg(raw: unknown): RiskConfig {
       r.per_symbol_limit_pct == null ? null : Number(r.per_symbol_limit_pct),
     stop_loss_pct: Number(r.stop_loss_pct ?? DEFAULTS.stop_loss_pct),
     take_profit_pct: Number(r.take_profit_pct ?? DEFAULTS.take_profit_pct),
+    atr_trailing_mult: Number(r.atr_trailing_mult ?? DEFAULTS.atr_trailing_mult),
+    max_hold_days: Number(r.max_hold_days ?? DEFAULTS.max_hold_days),
     volatility_sizing:
       typeof r.volatility_sizing === "boolean"
         ? r.volatility_sizing
