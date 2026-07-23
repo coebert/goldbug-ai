@@ -753,11 +753,55 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         sizingNotes.push(`rank #${rankInfo.rank}/${rankInfo.universe_size} x0.5`);
       }
 
+      // Portfolio-level 5-day drawdown → shrink new buys
+      if (ddSizing.size_multiplier < 1) {
+        spend *= ddSizing.size_multiplier;
+        sizingNotes.push(`dd×${ddSizing.size_multiplier.toFixed(2)}`);
+      }
+
+      // Sector rotation size multiplier
+      const secMult = sectorSizeMultiplier(symbolSector(meta.symbol), sectorScores);
+      if (secMult.mult !== 1) {
+        spend *= secMult.mult;
+        sizingNotes.push(secMult.note);
+      }
+
+      // Overnight-gap guard: skip fresh buys when 1d move is > 2σ
+      const gap = await checkOvernightGap(meta.symbol, asOf).catch(() => null);
+      if (gap?.triggered) {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason, rejected: gap.note,
+        });
+        continue;
+      }
+
+      // Gross-exposure cap by regime (crisis/bear/correction)
+      const currentHoldingsValue = Array.from(holdingsByS.values()).reduce((s, h) => {
+        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        return s + p * Number(h.quantity);
+      }, 0);
+      const gross = grossExposureLimit(totalValue, currentHoldingsValue, effectiveRegime);
+      if (gross.target_pct < 1) {
+        if (gross.room <= 0) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason, rejected: gross.note,
+          });
+          continue;
+        }
+        if (spend > gross.room) {
+          spend = gross.room;
+          sizingNotes.push(`gross≤${(gross.target_pct * 100).toFixed(0)}%`);
+        }
+      }
+
       // Event penalty (symbol-specific and broad macro)
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
       if (evPenalty < 1) {
         spend *= evPenalty;
         sizingNotes.push(`event x${evPenalty.toFixed(2)}`);
+
       }
 
       // Enforce per-symbol position cap
