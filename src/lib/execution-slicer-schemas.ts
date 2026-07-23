@@ -30,6 +30,13 @@ export const NON_NEG = z.number().finite().nonnegative();
 export const SLICE_COUNT = z.number().int().min(2).max(8);
 export const TTL_MINUTES = z.number().int().min(1).max(24 * 60);
 
+export const IDEMPOTENCY_KEY = z
+  .string()
+  .trim()
+  .min(8)
+  .max(128)
+  .regex(/^[A-Za-z0-9._:-]+$/, "invalid idempotency key");
+
 export const SliceInputSchema = z.object({
   portfolioId: UUID,
   ownerUserId: UUID,
@@ -40,6 +47,7 @@ export const SliceInputSchema = z.object({
   priceHint: POSITIVE.max(1e9),
   slices: SLICE_COUNT.optional(),
   ttlMinutes: TTL_MINUTES.optional(),
+  idempotencyKey: IDEMPOTENCY_KEY.optional(),
 });
 
 export const FillInputSchema = z.object({
@@ -47,7 +55,9 @@ export const FillInputSchema = z.object({
   ownerUserId: UUID,
   filledQty: NON_NEG.max(1e9),
   note: z.string().trim().max(500).optional(),
+  idempotencyKey: IDEMPOTENCY_KEY.optional(),
 });
+
 
 export const TickInputSchema = z.object({
   portfolioId: UUID,
