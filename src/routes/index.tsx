@@ -285,6 +285,9 @@ function PortfolioRow({ portfolio, sparkValues }: { portfolio: { id: string; nam
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <div className="hidden sm:block" title="Recent equity trend">
+            <Sparkline values={sparkValues} width={120} height={36} />
+          </div>
           <div className="text-right">
             <div className="text-sm font-medium">
               {portfolio.currency} {Number(portfolio.current_cash).toFixed(2)}
