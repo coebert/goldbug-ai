@@ -790,7 +790,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       orders: decision.orders,
       executed,
       signals: features,
-      news: news.slice(0, 12),
+      news: scoredNews.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
         max_position_pct: basePerSymbolPct,
