@@ -735,6 +735,7 @@ export type Database = {
           decision_id: string | null
           expires_at: string
           id: string
+          idempotency_key: string | null
           limit_price: number | null
           next_at: string
           notes: string | null
@@ -754,6 +755,7 @@ export type Database = {
           decision_id?: string | null
           expires_at: string
           id?: string
+          idempotency_key?: string | null
           limit_price?: number | null
           next_at?: string
           notes?: string | null
@@ -773,6 +775,7 @@ export type Database = {
           decision_id?: string | null
           expires_at?: string
           id?: string
+          idempotency_key?: string | null
           limit_price?: number | null
           next_at?: string
           notes?: string | null
@@ -1305,6 +1308,51 @@ export type Database = {
             columns: ["portfolio_id"]
             isOneToOne: false
             referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slice_fills: {
+        Row: {
+          created_at: string
+          filled_qty: number
+          id: string
+          idempotency_key: string
+          note: string | null
+          portfolio_id: string
+          slice_id: string
+        }
+        Insert: {
+          created_at?: string
+          filled_qty: number
+          id?: string
+          idempotency_key: string
+          note?: string | null
+          portfolio_id: string
+          slice_id: string
+        }
+        Update: {
+          created_at?: string
+          filled_qty?: number
+          id?: string
+          idempotency_key?: string
+          note?: string | null
+          portfolio_id?: string
+          slice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slice_fills_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slice_fills_slice_id_fkey"
+            columns: ["slice_id"]
+            isOneToOne: false
+            referencedRelation: "pending_slices"
             referencedColumns: ["id"]
           },
         ]
