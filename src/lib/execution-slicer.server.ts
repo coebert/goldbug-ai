@@ -262,9 +262,10 @@ export async function recordSliceFill(
   ownerUserId: string,
   filledQty: number,
   note?: string,
-) {
+  idempotencyKey?: string,
+): Promise<{ applied: boolean; reason?: "duplicate" }> {
   const clean = validate("recordSliceFill", FillInputSchema, {
-    sliceId, ownerUserId, filledQty, note,
+    sliceId, ownerUserId, filledQty, note, idempotencyKey,
   });
   // Look up the slice to discover its portfolio, then prove ownership before
   // mutating. This blocks a caller from patching another user's slice by id.
@@ -281,13 +282,33 @@ export async function recordSliceFill(
   }
   if (!slice) {
     logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_not_found", sliceId: clean.sliceId, ownerUserId: clean.ownerUserId });
-    return;
+    return { applied: false, reason: "duplicate" };
   }
   const typed = slice as {
     portfolio_id: string; remaining_qty: number; slices_done: number; slice_count: number;
   };
   await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, clean.ownerUserId);
 
+  // Idempotency: attempt to log the fill first. A unique-index conflict on
+  // (slice_id, idempotency_key) means we already processed this exact fill,
+  // so skip the state mutation to avoid double-counting slices_done/qty.
+  if (clean.idempotencyKey) {
+    const { error: logErr } = await supabaseAdmin
+      .from("slice_fills")
+      .insert({
+        slice_id: clean.sliceId,
+        portfolio_id: typed.portfolio_id,
+        idempotency_key: clean.idempotencyKey,
+        filled_qty: clean.filledQty,
+        note: clean.note ?? null,
+      } as unknown as never);
+    if (logErr) {
+      if (/duplicate key|unique/i.test(logErr.message ?? "")) {
+        return { applied: false, reason: "duplicate" };
+      }
+      console.warn("slice_fills log insert failed", logErr);
+    }
+  }
 
   const remaining = Math.max(0, Number(typed.remaining_qty) - clean.filledQty);
   const done = Number(typed.slices_done) + 1;
@@ -307,4 +328,6 @@ export async function recordSliceFill(
     .update(patch as unknown as never)
     .eq("id", clean.sliceId)
     .eq("portfolio_id", typed.portfolio_id); // belt-and-braces scope
+  return { applied: true };
 }
+
