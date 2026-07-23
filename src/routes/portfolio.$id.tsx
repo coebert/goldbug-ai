@@ -343,7 +343,7 @@ function PortfolioPage() {
                           type="monotone"
                           dataKey="value"
                           stroke="none"
-                          fill="hsl(var(--card))"
+                          fill="url(#equityFill)"
                           fillOpacity={1}
                           isAnimationActive={false}
                           activeDot={false}
@@ -360,10 +360,10 @@ function PortfolioPage() {
                         <Line
                           type="monotone"
                           dataKey="value"
-                          stroke="hsl(var(--primary))"
-                          strokeWidth={2}
+                          stroke="#22d3ee"
+                          strokeWidth={2.5}
                           dot={false}
-                          activeDot={{ r: 4 }}
+                          activeDot={{ r: 5, fill: "#22d3ee", stroke: "hsl(var(--background))", strokeWidth: 2 }}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
