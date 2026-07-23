@@ -143,6 +143,7 @@ async function buildCandidateFeatures(
     // Sentiment / cooldown are filled in later once news + cooldowns load
     news_score: number | null;
     news_contributors: number;
+    news_momentum: SentimentMomentum | null;
     cooling: boolean;
     // Cross-sectional rank across today's universe (filled in later)
     rank_info: RankInfo | null;
