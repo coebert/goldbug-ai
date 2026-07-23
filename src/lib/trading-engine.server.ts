@@ -41,6 +41,14 @@ import {
   isSymbolCooling,
   upcomingEvents,
 } from "./portfolio-optimizer.server";
+import { computeAttribution, formatAttributionBlock } from "./attribution.server";
+import {
+  parseCircuit,
+  evaluateBreaker,
+  persistCircuit,
+  tightenForRegime,
+} from "./circuit-breaker.server";
+import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import {
   filterUniverse,
   findSymbol,
