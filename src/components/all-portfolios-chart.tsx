@@ -180,8 +180,14 @@ export function AllPortfoliosChart() {
                       <div className="mb-1 font-medium">{String(label)}</div>
                       <div className="mb-1 flex justify-between gap-4">
                         <span className="text-muted-foreground">Total</span>
-                        <span className="font-medium">{currency} {Number(row.total).toFixed(2)}</span>
+                        <span className="font-medium">
+                          {currency} {Number(row.total).toFixed(2)}
+                          <span className={`ml-2 ${Number(row.pct) >= 0 ? "text-primary" : "text-destructive"}`}>
+                            ({Number(row.pct) >= 0 ? "+" : ""}{Number(row.pct).toFixed(2)}%)
+                          </span>
+                        </span>
                       </div>
+
                       {portfolios.map((p, i) => (
                         <div key={p.id} className="flex justify-between gap-4">
                           <span style={{ color: LINE_COLORS[i % LINE_COLORS.length] }}>{p.name}</span>
