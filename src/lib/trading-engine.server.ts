@@ -6,6 +6,12 @@ import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import {
+  buildLearningContext,
+  formatLearningBlock,
+  reflectAndUpdateLessons,
+  type LearningContext,
+} from "./learning.server";
+import {
   getDailyCandles,
   getPriceOn,
   sma,
@@ -127,6 +133,7 @@ async function callAiForDecision(args: {
   news: { headline: string; source: string | null }[];
   asOf: string;
   regime: PersistedRegime;
+  learning: LearningContext;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
@@ -169,6 +176,8 @@ ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility 
 - Only trade the provided symbols.
 
 ${regimeBlock}
+
+${formatLearningBlock(args.learning)}
 
 ${HISTORICAL_PLAYBOOK}
 
@@ -274,6 +283,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     console.warn("Regime detection failed:", e);
     return null;
   });
+  const learning = await buildLearningContext(portfolioId, asOf).catch((e) => {
+    console.warn("Learning context failed:", e);
+    return {
+      stats: {
+        window_days: 20, horizon_days: 5, evaluable: 0, wins: 0, losses: 0,
+        win_rate: null, avg_return_pct: null, best: null, worst: null,
+        per_symbol: [], per_side: { buy: { n: 0, win_rate: null }, sell: { n: 0, win_rate: null } },
+      },
+      lessons: [], lessons_as_of: null, samples: [],
+    } satisfies LearningContext;
+  });
 
   const decision = await callAiForDecision({
     portfolio,
@@ -296,6 +316,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       },
       notes: "regime detection unavailable",
     },
+    learning,
   });
 
   // Execute orders through guardrails
@@ -606,8 +627,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         vol_target_pct: cfg.vol_target_pct,
       },
       regime: regime ?? null,
+      learning: {
+        stats: learning.stats,
+        lessons: learning.lessons,
+        lessons_as_of: learning.lessons_as_of,
+      },
     } as unknown as never,
   });
+
+  // Self-reflection: refresh distilled lessons periodically. Fire-and-forget so
+  // reflection cost never blocks the tick; failures just skip this cycle.
+  reflectAndUpdateLessons(portfolioId, asOf, learning).catch((e) =>
+    console.warn("Reflection skipped:", e),
+  );
 
   return { decision, executed, totalValue: newTotal, cash: workingCash };
 }

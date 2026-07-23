@@ -1279,3 +1279,21 @@ Avoid jargon dumps. Do not repeat the raw JSON. Do not give investment advice.`;
     }));
     return { events };
   });
+
+export const getPortfolioLearning = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ portfolio_id: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: owned } = await context.supabase
+      .from("portfolios")
+      .select("id, last_run_date")
+      .eq("id", data.portfolio_id)
+      .single();
+    if (!owned) throw new Error("Portfolio not found");
+    const asOf = owned.last_run_date ?? new Date().toISOString().slice(0, 10);
+    const { buildLearningContext } = await import("./learning.server");
+    const ctx = await buildLearningContext(data.portfolio_id, asOf);
+    return { as_of: asOf, ...ctx };
+  });
