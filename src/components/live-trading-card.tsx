@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   activateLive, deactivateLive, pauseLive, killAllLive, resumeAllLive, getAuditLog,
   pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio,
+  startSaxoOAuth, getSaxoOAuthStatus,
 } from "@/lib/live.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -138,15 +139,8 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!s?.hasToken && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>SAXO_ACCESS_TOKEN missing</AlertTitle>
-            <AlertDescription>
-              Add a 24-hour developer token in project secrets (SAXO_ACCESS_TOKEN, plus optional SAXO_ENV=sim|live and SAXO_ACCOUNT_KEY).
-            </AlertDescription>
-          </Alert>
-        )}
+        <SaxoOAuthPanel />
+
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => mPing.mutate()} disabled={mPing.isPending || !s?.hasToken}>
@@ -295,6 +289,63 @@ function MiniList({ title, rows }: { title: string; rows: Array<{ key: string; t
           <li className="text-muted-foreground italic">none</li>
         ) : rows.map((r) => <li key={r.key} className="font-mono">{r.text}</li>)}
       </ul>
+    </div>
+  );
+}
+
+function SaxoOAuthPanel() {
+  const startFn = useServerFn(startSaxoOAuth);
+  const statusFn = useServerFn(getSaxoOAuthStatus);
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["saxo-oauth-status"], queryFn: () => statusFn({}), refetchInterval: 60_000 });
+  const mStart = useMutation({
+    mutationFn: (env: "sim" | "live") => startFn({ data: { env } }),
+    onSuccess: (r) => { window.open(r.url, "_blank", "noopener"); toast.info("Complete the Saxo login in the new tab, then click Refresh."); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const row = (label: string, env: "sim" | "live") => {
+    const st = env === "sim" ? q.data?.sim : q.data?.live;
+    const mins = st?.secondsUntilExpiry != null ? Math.round(st.secondsUntilExpiry / 60) : null;
+    const ok = st?.connected && !st?.usingLegacyToken;
+    return (
+      <div className="flex items-center justify-between gap-2 text-sm py-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{label}</span>
+          {ok ? (
+            <Badge variant="default">connected · auto-refresh</Badge>
+          ) : st?.usingLegacyToken ? (
+            <Badge variant="secondary">legacy 24h token</Badge>
+          ) : (
+            <Badge variant="outline">not connected</Badge>
+          )}
+          {mins != null && <span className="text-xs text-muted-foreground">expires in {mins}m</span>}
+        </div>
+        <Button size="sm" variant="outline" onClick={() => mStart.mutate(env)} disabled={mStart.isPending}>
+          {ok ? "Reconnect" : "Connect"}
+        </Button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="rounded-md border border-border p-3 space-y-1">
+      <div className="text-sm font-medium mb-1">Saxo OAuth (auto-refresh)</div>
+      {row("SIM", "sim")}
+      {row("LIVE", "live")}
+      <div className="flex justify-end pt-1">
+        <Button size="sm" variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ["saxo-oauth-status"] })}>
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+        </Button>
+      </div>
+      {q.data?.sim.usingLegacyToken && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Currently using the 24-hour developer token. Click <b>Connect</b> to switch to OAuth with auto-refresh.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
