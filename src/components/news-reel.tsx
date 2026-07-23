@@ -502,6 +502,17 @@ export function NewsReel() {
                               Search news
                             </a>
                           )}
+                          {cited && (
+                            <button
+                              type="button"
+                              onClick={() => setDetailsId(item.id)}
+                              className="inline-flex items-center gap-1 rounded-sm border border-primary/40 bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10"
+                              title="Explain sentiment, reliability, and excerpt context before opening the source"
+                            >
+                              <Info className="h-3 w-3" />
+                              View details
+                            </button>
+                          )}
                         </div>
                         <p className={`mt-1.5 text-xs ${cited ? "text-foreground/80" : "text-muted-foreground"}`}>
                           <span className={`mr-1 font-semibold ${cited ? "text-primary" : "text-muted-foreground"}`}>
