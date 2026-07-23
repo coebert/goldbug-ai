@@ -16,6 +16,7 @@ import { GlobalSignalDecayCard } from "@/components/global-signal-decay-card";
 import { SecurityAuditCard } from "@/components/security-audit-card";
 import { SecurityAlertSettingsCard } from "@/components/security-alert-settings-card";
 import { NotificationsPanel } from "@/components/notifications-panel";
+import { TranslationQualityCard } from "@/components/translation-quality-card";
 
 
 export const Route = createFileRoute("/admin")({
@@ -325,6 +326,8 @@ function AdminPage() {
       <NotificationsPanel />
 
       <SecurityAuditCard />
+
+      <TranslationQualityCard />
 
 
 
