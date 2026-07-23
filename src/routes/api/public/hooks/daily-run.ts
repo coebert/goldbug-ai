@@ -62,6 +62,7 @@ export const Route = createFileRoute("/api/public/hooks/daily-run")({
           date: today,
           total: portfolios?.length ?? 0,
           ran: results.length,
+          regime: regimeInfo,
           results,
         });
       },
