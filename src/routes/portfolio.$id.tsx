@@ -654,14 +654,17 @@ function PortfolioPage() {
                           dataKey="date"
                           tick={{ fontSize: 11, fill: chartTheme.axis }}
                           stroke={chartTheme.axis}
+                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axis, fontSize: 12 }}
                         />
                         <YAxis
                           domain={["auto", "auto"]}
-                          width={64}
+                          width={72}
                           tick={{ fontSize: 11, fill: chartTheme.axis }}
                           stroke={chartTheme.axis}
                           tickFormatter={(v) => compareMode === "pct" ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%` : `${p.currency}${Number(v).toFixed(0)}`}
+                          label={{ value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axis, fontSize: 12 }}
                         />
+
                         <Tooltip
                           cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
