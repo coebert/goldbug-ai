@@ -394,7 +394,7 @@ function PortfolioPage() {
                   </p>
                 ) : (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    This portfolio uses <span className="font-medium text-foreground">pretend money</span> — nothing you do here touches your bank or Saxo account. {p.mode === "live_sim" ? <><(<Explain term="live_sim">paper-traded against live prices</Explain>)</> : <>(<Explain term="backtest">historical backtest only</Explain>)</>}
+                    This portfolio uses <span className="font-medium text-foreground">pretend money</span> — nothing you do here touches your bank or Saxo account. {p.mode === "live_sim" ? <>(<Explain term="live_sim">paper-traded against live prices</Explain>)</> : <>(<Explain term="backtest">historical backtest only</Explain>)</>}
                   </p>
                 )}
               </div>
