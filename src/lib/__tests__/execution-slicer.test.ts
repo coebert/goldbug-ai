@@ -114,8 +114,8 @@ describe("pending_slices ownership enforcement", () => {
     const { maybeSliceOrder } = await import("../execution-slicer.server");
     await expect(
       maybeSliceOrder({
-        portfolioId: "pf-alice",
-        ownerUserId: "user-bob", // attacker
+        portfolioId: PF_ALICE,
+        ownerUserId: U_BOB, // attacker
         decisionId: null,
         symbol: "AAPL",
         side: "buy",
@@ -131,29 +131,90 @@ describe("pending_slices ownership enforcement", () => {
 
   it("blocks tickSlicer cross-portfolio access and skips updates", async () => {
     const { tickSlicer } = await import("../execution-slicer.server");
-    await expect(tickSlicer("pf-alice", "user-bob")).rejects.toThrow(/ownership mismatch/);
+    await expect(tickSlicer(PF_ALICE, U_BOB)).rejects.toThrow(/ownership mismatch/);
     expect(updates).toHaveLength(0);
     expect(securityWarnings()[0][1]).toContain("ownership_mismatch");
   });
 
   it("blocks recordSliceFill when caller does not own the slice's portfolio", async () => {
     const { recordSliceFill } = await import("../execution-slicer.server");
-    await expect(recordSliceFill("slice-alice", "user-bob", 5)).rejects.toThrow(/ownership mismatch/);
-    // No update to pending_slices should have been issued.
+    await expect(recordSliceFill(SLICE_A, U_BOB, 5)).rejects.toThrow(/ownership mismatch/);
     expect(updates.filter((u) => u.table === "pending_slices")).toHaveLength(0);
     expect(securityWarnings()[0][1]).toContain("ownership_mismatch");
   });
 
-  it("logs and rejects missing identifiers without touching the DB", async () => {
-    const { tickSlicer } = await import("../execution-slicer.server");
-    await expect(tickSlicer("", "user-alice")).rejects.toThrow(/missing/);
-    expect(updates).toHaveLength(0);
-    expect(securityWarnings()[0][1]).toContain("missing_ids");
-  });
-
   it("allows the legitimate owner through tickSlicer without emitting warnings", async () => {
     const { tickSlicer } = await import("../execution-slicer.server");
-    await expect(tickSlicer("pf-alice", "user-alice")).resolves.toBeDefined();
+    await expect(tickSlicer(PF_ALICE, U_ALICE)).resolves.toBeDefined();
     expect(securityWarnings()).toHaveLength(0);
   });
 });
+
+describe("pending_slices input validation", () => {
+  it("rejects empty portfolioId before any DB call and logs validation_failed", async () => {
+    const { tickSlicer } = await import("../execution-slicer.server");
+    await expect(tickSlicer("", U_ALICE)).rejects.toThrow(/invalid input for tickSlicer/);
+    expect(updates).toHaveLength(0);
+    expect(securityWarnings()[0][1]).toContain("validation_failed");
+  });
+
+  it("rejects non-UUID portfolio_id in maybeSliceOrder", async () => {
+    const { maybeSliceOrder } = await import("../execution-slicer.server");
+    await expect(
+      maybeSliceOrder({
+        portfolioId: "not-a-uuid",
+        ownerUserId: U_ALICE,
+        decisionId: null,
+        symbol: "AAPL",
+        side: "buy",
+        totalQty: 100,
+        priceHint: 100,
+      }),
+    ).rejects.toThrow(/invalid input/);
+    expect(inserts).toHaveLength(0);
+    expect(securityWarnings()[0][1]).toContain("validation_failed");
+  });
+
+  it("rejects unsafe symbol characters (injection-shaped strings)", async () => {
+    const { maybeSliceOrder } = await import("../execution-slicer.server");
+    await expect(
+      maybeSliceOrder({
+        portfolioId: PF_ALICE,
+        ownerUserId: U_ALICE,
+        decisionId: null,
+        symbol: "AAPL'; DROP TABLE pending_slices;--",
+        side: "buy",
+        totalQty: 100,
+        priceHint: 100,
+      }),
+    ).rejects.toThrow(/invalid input/);
+    expect(inserts).toHaveLength(0);
+    expect(securityWarnings()[0][1]).toContain("validation_failed");
+  });
+
+  it("rejects negative filledQty in recordSliceFill", async () => {
+    const { recordSliceFill } = await import("../execution-slicer.server");
+    await expect(recordSliceFill(SLICE_A, U_ALICE, -1)).rejects.toThrow(/invalid input/);
+    expect(updates.filter((u) => u.table === "pending_slices")).toHaveLength(0);
+    expect(securityWarnings()[0][1]).toContain("validation_failed");
+  });
+
+  it("clamps slices to the allowed range via schema", async () => {
+    const { maybeSliceOrder } = await import("../execution-slicer.server");
+    // 99 slices is well outside [2, 8]
+    await expect(
+      maybeSliceOrder({
+        portfolioId: PF_ALICE,
+        ownerUserId: U_ALICE,
+        decisionId: null,
+        symbol: "AAPL",
+        side: "buy",
+        totalQty: 100,
+        priceHint: 100,
+        slices: 99,
+      }),
+    ).rejects.toThrow(/invalid input/);
+    expect(inserts).toHaveLength(0);
+  });
+});
+
