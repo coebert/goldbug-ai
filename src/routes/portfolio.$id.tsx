@@ -386,15 +386,15 @@ function PortfolioPage() {
                   <ModeBadge mode={p.mode} />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {p.currency} {startingCash.toFixed(0)} starting · {p.risk_level} risk
+                  {p.currency} {startingCash.toFixed(0)} <Explain term="starting_pot">starting pot</Explain> · <Explain term="risk_level">{p.risk_level} risk</Explain>
                 </p>
                 {p.mode === "live_prod" ? (
                   <p className="mt-1 text-xs font-medium text-destructive">
-                    ⚠ Real money — approved orders route to your live broker account.
+                    ⚠ <Explain term="live_prod">Real money</Explain> — approved orders route to your live broker account.
                   </p>
                 ) : (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    No real money at risk — {p.mode === "live_sim" ? "paper-traded against live prices." : "historical backtest only."}
+                    This portfolio uses <span className="font-medium text-foreground">pretend money</span> — nothing you do here touches your bank or Saxo account. {p.mode === "live_sim" ? <><(<Explain term="live_sim">paper-traded against live prices</Explain>)</> : <>(<Explain term="backtest">historical backtest only</Explain>)</>}
                   </p>
                 )}
               </div>
