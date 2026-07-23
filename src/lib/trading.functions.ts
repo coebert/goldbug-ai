@@ -1985,10 +1985,23 @@ type NewsReelItem = {
   decisions_count: number;
   influences: NewsReelInfluence[];
   note: string;
+  excerpt: string | null;
   asset_classes: string[];
   risk_levels: string[];
   symbols: string[];
 };
+
+// Trim a source summary to a short quotable citation snippet.
+function toExcerpt(raw: string | null | undefined, maxChars = 240): string | null {
+  if (!raw) return null;
+  const cleaned = String(raw).replace(/\s+/g, " ").trim();
+  if (!cleaned) return null;
+  if (cleaned.length <= maxChars) return cleaned;
+  const slice = cleaned.slice(0, maxChars);
+  const lastStop = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("? "), slice.lastIndexOf("! "));
+  const cut = lastStop > 120 ? lastStop + 1 : slice.lastIndexOf(" ");
+  return (cut > 80 ? slice.slice(0, cut) : slice).trim() + "…";
+}
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
