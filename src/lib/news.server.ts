@@ -148,7 +148,7 @@ async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
   try {
     const { data } = await supabaseAdmin
       .from("news_cache")
-      .select("headline, original_headline, original_language")
+      .select("headline, original_headline, original_language, translation_confidence")
       .in("original_headline", missing)
       .not("original_language", "is", null)
       .limit(500);
@@ -156,9 +156,15 @@ async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
       const orig = (r as { original_headline: string | null }).original_headline;
       const lang = (r as { original_language: string | null }).original_language;
       const translated = (r as { headline: string }).headline;
+      const conf = (r as { translation_confidence?: number | string | null }).translation_confidence;
       if (!orig || !lang || !translated) continue;
-      cacheSet(orig, { lang, translation: translated });
+      cacheSet(orig, {
+        lang,
+        translation: translated,
+        confidence: conf == null ? null : Number(conf),
+      });
     }
+
   } catch (err) {
     // Non-fatal — the cache just stays cold for these keys.
     console.warn("news: cache hydrate failed", err instanceof Error ? err.message : String(err));
