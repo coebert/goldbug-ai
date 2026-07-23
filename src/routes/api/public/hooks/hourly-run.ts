@@ -112,10 +112,29 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           }
         }
 
-        // 5. Run a tick per portfolio (sequential, gentle on gateway)
-        const results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number }> = [];
+        // 5. Run a tick per portfolio (sequential, gentle on gateway).
+        //    Hook-level idempotency: if a decision row already exists for this
+        //    portfolio in the current UTC hour, skip — the previous call did
+        //    the AI + routing already, and the live_orders unique index would
+        //    have blocked duplicates anyway. This just avoids the wasted AI
+        //    round-trip when the CRON fires more than once per hour.
+        const hourStartUtc = new Date();
+        hourStartUtc.setUTCMinutes(0, 0, 0);
+        const hourStartIso = hourStartUtc.toISOString();
+        const results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number; skipped?: string }> = [];
         for (const p of portfolios) {
           try {
+            const recent = await supabaseAdmin
+              .from("decisions")
+              .select("id")
+              .eq("portfolio_id", p.id)
+              .gte("created_at", hourStartIso)
+              .limit(1)
+              .maybeSingle();
+            if (recent.data) {
+              results.push({ id: p.id, mode: p.mode, ok: true, skipped: "already ticked this hour" });
+              continue;
+            }
             const r = await runDailyTick(p.id, today);
             results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
           } catch (err) {
@@ -124,6 +143,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
             results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
           }
         }
+
 
         return Response.json({
           success: true,

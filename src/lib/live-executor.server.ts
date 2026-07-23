@@ -87,32 +87,14 @@ export async function routeOrdersToBroker(params: {
     }));
   }
 
-  for (const order of routable) {
-    const clientOrderId = `aegis:${portfolio.id}:${asOf}:${order.symbol}:${order.side}`;
+  // Hour-bucketed idempotency key. Repeated CRON firings within the same UTC
+  // hour collapse to the same key per (portfolio, symbol, side), and the
+  // UNIQUE index on live_orders.client_order_id prevents duplicate rows even
+  // under concurrent invocation.
+  const hourBucket = new Date().toISOString().slice(0, 13); // e.g. "2026-07-23T14"
 
-    // Idempotency: (portfolio_id, decision_id, symbol, side) uniquely identifies
-    // a routed order within a single tick. If already routed, skip.
-    if (decisionId) {
-      const existing = await supabaseAdmin
-        .from("live_orders")
-        .select("id, status, broker_order_id")
-        .eq("portfolio_id", portfolio.id)
-        .eq("decision_id", decisionId)
-        .eq("symbol", order.symbol)
-        .eq("side", order.side)
-        .maybeSingle();
-      if (existing.data) {
-        results.push({
-          symbol: order.symbol,
-          side: order.side,
-          quantity: order.quantity,
-          status: existing.data.status,
-          brokerOrderId: existing.data.broker_order_id ?? undefined,
-          skipped: "already routed for this decision",
-        });
-        continue;
-      }
-    }
+  for (const order of routable) {
+    const clientOrderId = `aegis:${portfolio.id}:${hourBucket}:${order.symbol}:${order.side}`;
 
     // Round quantity to a whole share (Saxo Stock/Etf orders reject fractional
     // Amount). Skip if this rounds to zero.
@@ -128,8 +110,9 @@ export async function routeOrdersToBroker(params: {
       continue;
     }
 
-    // Insert pending order row first so we always have an audit trail even
-    // if the broker call throws.
+    // Insert-first: DB unique index on client_order_id is the source of truth
+    // for idempotency. On unique violation (23505) we look up the winner and
+    // report it — no broker call is made for the duplicate.
     const inserted = await supabaseAdmin
       .from("live_orders")
       .insert({
@@ -137,6 +120,7 @@ export async function routeOrdersToBroker(params: {
         user_id: userId,
         decision_id: decisionId,
         broker: "saxo",
+        client_order_id: clientOrderId,
         symbol: order.symbol,
         side: order.side,
         quantity: qty,
@@ -147,20 +131,35 @@ export async function routeOrdersToBroker(params: {
       .select("id")
       .single();
 
-
     if (inserted.error || !inserted.data) {
-      // If it fails on the unique client_order_id constraint, that's another
-      // instance already racing — treat as duplicate and move on.
+      const isDuplicate = inserted.error?.code === "23505";
+      if (isDuplicate) {
+        const existing = await supabaseAdmin
+          .from("live_orders")
+          .select("id, status, broker_order_id")
+          .eq("client_order_id" as never, clientOrderId as never)
+          .maybeSingle();
+        results.push({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: qty,
+          status: existing.data?.status ?? "duplicate",
+          brokerOrderId: existing.data?.broker_order_id ?? undefined,
+          skipped: "duplicate client_order_id (already routed this hour)",
+        });
+        continue;
+      }
       results.push({
         symbol: order.symbol,
         side: order.side,
         quantity: qty,
-        status: "skipped",
-        skipped: inserted.error?.message ?? "insert failed",
+        status: "error",
+        reason: inserted.error?.message ?? "insert failed",
       });
       continue;
     }
     const liveOrderId = inserted.data.id as string;
+
 
     let brokerRes: BrokerOrderResult;
     try {
