@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 
 
 export const Route = createFileRoute("/portfolio/$id")({
