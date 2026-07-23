@@ -1984,6 +1984,8 @@ type NewsReelItem = {
   source: string | null;
   headline: string;
   url: string | null;
+  original_headline: string | null;
+  original_language: string | null;
   avg_sentiment: number | null;
   decisions_count: number;
   influences: NewsReelInfluence[];
