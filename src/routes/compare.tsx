@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   listPortfolios,
   getComparison,
+  getTradeComparison,
   runBacktestMany,
 } from "@/lib/trading.functions";
 import { Button } from "@/components/ui/button";
@@ -461,9 +462,217 @@ function ComparePage() {
                 </CardContent>
               </Card>
             )}
+
+            {results && results.length > 0 && (
+              <TradeDivergenceCard
+                portfolioIds={results.map((r) => r.portfolio.id)}
+                names={results.map((r) => r.portfolio.name)}
+                colors={results.map((_, i) => COLORS[i % COLORS.length])}
+              />
+            )}
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+type DivergenceRow = Awaited<ReturnType<typeof getTradeComparison>>["results"][number]["rows"][number];
+
+function TradeDivergenceCard({
+  portfolioIds,
+  names,
+  colors,
+}: {
+  portfolioIds: string[];
+  names: string[];
+  colors: string[];
+}) {
+  const fetchCmp = useServerFn(getTradeComparison);
+  const [onlyDiverged, setOnlyDiverged] = useState(true);
+
+  const q = useQuery({
+    queryKey: ["trade-comparison", portfolioIds.join(",")],
+    queryFn: () => fetchCmp({ data: { portfolio_ids: portfolioIds } }),
+  });
+
+  const grid = useMemo(() => {
+    const results = q.data?.results ?? [];
+    // key = date|symbol -> per-portfolio cell
+    const map = new Map<string, { date: string; symbol: string; cells: (DivergenceRow | null)[] }>();
+    results.forEach((r, idx) => {
+      for (const row of r.rows) {
+        const key = `${row.date}|${row.symbol}`;
+        let entry = map.get(key);
+        if (!entry) {
+          entry = { date: row.date, symbol: row.symbol, cells: results.map(() => null) };
+          map.set(key, entry);
+        }
+        entry.cells[idx] = row;
+      }
+    });
+    const all = Array.from(map.values()).sort(
+      (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.symbol.localeCompare(b.symbol)),
+    );
+    const isDiverged = (cells: (DivergenceRow | null)[]) => {
+      const sigs = cells.map((c) => {
+        if (!c) return "none";
+        if (c.rejected) return "blocked";
+        return c.side === "buy" ? "buy" : "sell";
+      });
+      return new Set(sigs).size > 1;
+    };
+    const filtered = onlyDiverged ? all.filter((r) => isDiverged(r.cells)) : all;
+    return { rows: filtered, total: all.length, divergedCount: all.filter((r) => isDiverged(r.cells)).length };
+  }, [q.data, onlyDiverged]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Trade-by-trade divergence</CardTitle>
+        <CardDescription>
+          Where portfolios acted differently on the same symbol/day — buys, sells, guardrail blocks, or no-ops.
+          Hover any cell to see reason, signals and importance weights.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+          <div>
+            {q.isLoading
+              ? "Loading trades…"
+              : `${grid.divergedCount} diverged / ${grid.total} total (symbol × day) events`}
+          </div>
+          <label className="flex cursor-pointer items-center gap-2">
+            <Checkbox
+              checked={onlyDiverged}
+              onCheckedChange={(v) => setOnlyDiverged(Boolean(v))}
+            />
+            Show only diverged rows
+          </label>
+        </div>
+        {!q.isLoading && grid.rows.length === 0 && (
+          <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">
+            {q.data ? "No matching trade events." : "No decisions yet."}
+          </div>
+        )}
+        {grid.rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-left uppercase text-muted-foreground">
+                  <th className="py-2 pr-3">Date</th>
+                  <th className="py-2 pr-3">Symbol</th>
+                  {names.map((n, i) => (
+                    <th key={n} className="py-2 pr-3">
+                      <span
+                        className="mr-1 inline-block h-2 w-2 rounded-full align-middle"
+                        style={{ background: colors[i] }}
+                      />
+                      {n}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {grid.rows.map((r) => (
+                  <tr key={`${r.date}|${r.symbol}`} className="border-b border-border/50 align-top">
+                    <td className="py-2 pr-3 tabular-nums text-muted-foreground">{r.date}</td>
+                    <td className="py-2 pr-3 font-medium">{r.symbol}</td>
+                    {r.cells.map((cell, i) => (
+                      <td key={i} className="py-2 pr-3">
+                        <TradeCell cell={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TradeCell({ cell }: { cell: DivergenceRow | null }) {
+  if (!cell) {
+    return <span className="text-muted-foreground/60">—</span>;
+  }
+  const blocked = !!cell.rejected;
+  const isBuy = cell.side === "buy";
+  const tone = blocked
+    ? "bg-amber-500/15 text-amber-400 border-amber-500/40"
+    : isBuy
+      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+      : "bg-rose-500/15 text-rose-400 border-rose-500/40";
+  const label = blocked ? "BLOCKED" : isBuy ? "BUY" : "SELL";
+  const topWeights = cell.signal_weights
+    ? Object.entries(cell.signal_weights)
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, 3)
+    : [];
+  const fmt = (n: number | null | undefined, digits = 2) =>
+    n == null || Number.isNaN(n) ? "—" : Number(n).toFixed(digits);
+  return (
+    <div className="group relative inline-block">
+      <div className={`inline-flex flex-col rounded-md border px-2 py-1 ${tone}`}>
+        <span className="text-[10px] font-semibold leading-tight">{label}</span>
+        {!blocked && cell.executed_value > 0 && (
+          <span className="text-[10px] font-normal opacity-80 tabular-nums">
+            {cell.executed_value.toFixed(0)} @ {cell.price.toFixed(2)}
+          </span>
+        )}
+        {blocked && (
+          <span className="text-[10px] font-normal opacity-80">
+            {cell.rejected!.slice(0, 22)}
+          </span>
+        )}
+      </div>
+      <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-72 rounded-md border border-border bg-card p-2 text-[11px] shadow-xl group-hover:block">
+        <div className="mb-1 font-medium">
+          {label} {cell.symbol}
+          {cell.intent_pct != null && (
+            <span className="ml-1 text-muted-foreground">
+              (intent {cell.intent_pct.toFixed(0)}%)
+            </span>
+          )}
+        </div>
+        {cell.reason && (
+          <div className="mb-1 text-muted-foreground">{cell.reason}</div>
+        )}
+        {blocked && (
+          <div className="mb-1 text-amber-400">Guardrail: {cell.rejected}</div>
+        )}
+        {cell.signals && (
+          <div className="mb-1 grid grid-cols-3 gap-x-2 gap-y-0.5 tabular-nums text-muted-foreground">
+            <div>RSI {fmt(cell.signals.rsi14, 1)}</div>
+            <div>SMA20 {fmt(cell.signals.sma20)}</div>
+            <div>SMA50 {fmt(cell.signals.sma50)}</div>
+            <div>5d {fmt((cell.signals.change5d ?? 0) * 100, 1)}%</div>
+            <div>30d {fmt((cell.signals.change30d ?? 0) * 100, 1)}%</div>
+            <div>Vol {fmt((cell.signals.vol20d ?? 0) * 100, 2)}%</div>
+          </div>
+        )}
+        {topWeights.length > 0 && (
+          <div className="mt-1 border-t border-border/60 pt-1">
+            <div className="mb-0.5 text-[10px] uppercase text-muted-foreground">
+              Signal weights
+            </div>
+            {topWeights.map(([k, v]) => (
+              <div key={k} className="flex items-center gap-1">
+                <span className="w-24 capitalize">{k.replace(/_/g, " ")}</span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded bg-muted">
+                  <div
+                    className="h-full bg-primary"
+                    style={{ width: `${Math.min(100, Number(v))}%` }}
+                  />
+                </div>
+                <span className="w-8 text-right tabular-nums">{Number(v).toFixed(0)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
