@@ -326,7 +326,7 @@ Return:
       sma_trend       — MA trend AND MACD histogram / crosses (grouped)
       rsi             — daily RSI-14 AND weekly RSI alignment
       price_change    — recent price change (5d/30d) AND volume-weighted momentum
-      news_sentiment  — weighted LLM sentiment for this symbol
+      news_sentiment  — weighted LLM sentiment for this symbol, INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL or skip.
       volatility      — 20d vol, ATR%, Bollinger width
 If no action is warranted, return an empty orders array.`;
 
