@@ -443,6 +443,10 @@ function PortfolioPage() {
               <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
             </div>
 
+            <div className="mb-6">
+              <LiveTradingCard portfolioId={id} />
+            </div>
+
             <div className="grid gap-4 lg:grid-cols-3">
 
               <Card className="lg:col-span-2">
