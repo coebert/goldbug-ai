@@ -412,8 +412,8 @@ function PortfolioPage() {
                       <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
                         <defs>
                           <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.28} />
-                            <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
+                            <stop offset="0%" stopColor={chartTheme.drawdown} stopOpacity={0.28} />
+                            <stop offset="100%" stopColor={chartTheme.drawdown} stopOpacity={0.02} />
                           </linearGradient>
                           <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor={chartTheme.equity} stopOpacity={chartTheme.equityFillTop} />
