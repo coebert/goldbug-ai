@@ -267,13 +267,13 @@ function safeJson(text: string): unknown {
   try { return JSON.parse(text); } catch { return { raw: text.slice(0, 500) }; }
 }
 
-export function buildSaxoAdapter(opts: {
+export async function buildSaxoAdapter(opts: {
   userId: string; portfolioId?: string | null; envOverride?: BrokerEnv;
-}): SaxoAdapter {
-  const token = process.env.SAXO_ACCESS_TOKEN;
-  if (!token) throw new Error("SAXO_ACCESS_TOKEN is not configured. Add it in project secrets.");
+}): Promise<SaxoAdapter> {
   const env = (opts.envOverride ?? (process.env.SAXO_ENV as BrokerEnv) ?? "sim");
   if (env !== "sim" && env !== "live") throw new Error(`Invalid SAXO_ENV=${env}`);
+  const { getAccessToken } = await import("./saxo-oauth.server");
+  const token = await getAccessToken(env);
   return new SaxoAdapter({
     env, token, userId: opts.userId, portfolioId: opts.portfolioId ?? null,
     accountKey: process.env.SAXO_ACCOUNT_KEY, clientKey: process.env.SAXO_CLIENT_KEY,
