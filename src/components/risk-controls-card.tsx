@@ -160,6 +160,52 @@ function inferRiskLevel(cfg: RiskConfig): number {
   return best;
 }
 
+type FieldChange = { label: string; from: string; to: string };
+
+const CLASS_LABEL: Record<AssetClass, string> = {
+  stock: "Stocks cap",
+  etf: "ETFs cap",
+  crypto: "Crypto cap",
+  commodity: "Commodities cap",
+  fx: "FX cap",
+};
+
+const fmtPct = (v: number | null | undefined, digits = 0) =>
+  v == null ? "default" : `${(v * 100).toFixed(digits)}%`;
+
+function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
+  const out: FieldChange[] = [];
+  const push = (label: string, from: string, to: string) => {
+    if (from !== to) out.push({ label, from, to });
+  };
+  push("Max position size", fmtPct(prev.per_symbol_limit_pct), fmtPct(next.per_symbol_limit_pct));
+  push("Stop-loss", fmtPct(prev.stop_loss_pct), fmtPct(next.stop_loss_pct));
+  push("Take-profit", fmtPct(prev.take_profit_pct), fmtPct(next.take_profit_pct));
+  push(
+    "ATR trailing stop",
+    prev.atr_trailing_mult ? `${prev.atr_trailing_mult}× ATR` : "off",
+    next.atr_trailing_mult ? `${next.atr_trailing_mult}× ATR` : "off",
+  );
+  push(
+    "Max holding period",
+    prev.max_hold_days ? `${prev.max_hold_days}d` : "no limit",
+    next.max_hold_days ? `${next.max_hold_days}d` : "no limit",
+  );
+  push(
+    "Volatility sizing",
+    prev.volatility_sizing ? `on (target ${fmtPct(prev.vol_target_pct, 2)}/day)` : "off",
+    next.volatility_sizing ? `on (target ${fmtPct(next.vol_target_pct, 2)}/day)` : "off",
+  );
+  for (const c of CLASSES) {
+    push(
+      CLASS_LABEL[c.key],
+      fmtPct(prev.asset_class_limits[c.key] ?? 0),
+      fmtPct(next.asset_class_limits[c.key] ?? 0),
+    );
+  }
+  return out;
+}
+
 export function RiskControlsCard({
   portfolioId,
   riskConfig,
@@ -171,14 +217,27 @@ export function RiskControlsCard({
   const [cfg, setCfg] = useState<RiskConfig>(initial);
   const [level, setLevel] = useState<number>(() => inferRiskLevel(initial));
   const [open, setOpen] = useState(true);
+  const [lastChange, setLastChange] = useState<{
+    fromName: string;
+    toName: string;
+    changes: FieldChange[];
+  } | null>(null);
 
   const applyLevel = (lvl: number) => {
-    setLevel(lvl);
-    setCfg({
+    const nextCfg: RiskConfig = {
       ...RISK_PRESETS[lvl].cfg,
       asset_class_limits: { ...RISK_PRESETS[lvl].cfg.asset_class_limits },
+    };
+    const changes = diffConfigs(cfg, nextCfg);
+    setLastChange({
+      fromName: RISK_PRESETS[level].name,
+      toName: RISK_PRESETS[lvl].name,
+      changes,
     });
+    setLevel(lvl);
+    setCfg(nextCfg);
   };
+
 
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
@@ -272,7 +331,45 @@ export function RiskControlsCard({
                 <span>Growth</span>
                 <span>High risk</span>
               </div>
+              {lastChange && (
+                <div className="mt-4 rounded-md border border-primary/30 bg-background/60 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold">
+                      Changes from{" "}
+                      <span className="text-muted-foreground">{lastChange.fromName}</span> →{" "}
+                      <span className="text-primary">{lastChange.toName}</span>
+                    </p>
+                    <button
+                      type="button"
+                      className="text-[11px] text-muted-foreground hover:text-foreground"
+                      onClick={() => setLastChange(null)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  {lastChange.changes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No parameters changed — your detailed settings already match this preset.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1 text-xs">
+                      {lastChange.changes.map((c) => (
+                        <li key={c.label} className="flex flex-wrap items-center gap-x-2">
+                          <span className="font-medium">{c.label}:</span>
+                          <span className="text-muted-foreground line-through">{c.from}</span>
+                          <span aria-hidden>→</span>
+                          <span className="tabular-nums text-primary">{c.to}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Save below to apply, or fine-tune any field manually.
+                  </p>
+                </div>
+              )}
             </div>
+
 
             <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
               <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
