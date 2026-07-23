@@ -88,5 +88,3 @@ export {
   FillInputSchema,
 } from "./execution-slicer-schemas";
 
-// Alias to match the ZodError type-only import in typecheck-strict envs.
-export type { z };
