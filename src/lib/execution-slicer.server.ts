@@ -77,6 +77,26 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
   );
 }
 
+/**
+ * Run `input` through `schema` and throw a `PendingSliceAccessError` with a
+ * `validation_failed` warning on any issue. Keeps unexpected-access logs
+ * unambiguous: malformed inputs never reach the DB lookup layer.
+ */
+function validate<T>(op: string, schema: z.ZodType<T>, input: unknown): T {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => ({
+      path: i.path.join("."),
+      code: i.code,
+      message: i.message,
+    }));
+    logUnexpectedAccess({ op, reason: "validation_failed", issues });
+    throw new PendingSliceAccessError(`pending_slices: invalid input for ${op}`, { op, issues });
+  }
+  return parsed.data;
+}
+
+
 async function assertPortfolioOwnership(
   op: string,
   portfolioId: string,
