@@ -73,6 +73,15 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
         actor_user_id: actor,
         details: JSON.parse(JSON.stringify(context)),
       });
+      // Threshold-based notifications (push). Never let a notify failure
+      // mask the original security signal.
+      const { maybeNotifySecurityEvent } = await import("@/lib/security-alerts.server");
+      maybeNotifySecurityEvent({
+        actorUserId: actor,
+        event: "pending_slices",
+        reason,
+        portfolioId,
+      });
     } catch (e) {
       console.warn(
         "SECURITY:pending_slices audit persist failed",
@@ -81,6 +90,7 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
     }
   })();
 }
+
 
 
 /**
