@@ -74,6 +74,14 @@ export function NewsReel() {
   const [assetFilter, setAssetFilter] = useState<Set<string>>(new Set());
   const [riskFilter, setRiskFilter] = useState<Set<string>>(new Set());
   const [onlyCited, setOnlyCited] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
 
