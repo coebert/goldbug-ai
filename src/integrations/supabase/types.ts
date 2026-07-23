@@ -1040,6 +1040,42 @@ export type Database = {
         }
         Relationships: []
       }
+      security_audit_log: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          details: Json
+          event: string
+          id: string
+          op: string | null
+          portfolio_id: string | null
+          reason: string | null
+          slice_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          details?: Json
+          event: string
+          id?: string
+          op?: string | null
+          portfolio_id?: string | null
+          reason?: string | null
+          slice_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          details?: Json
+          event?: string
+          id?: string
+          op?: string | null
+          portfolio_id?: string | null
+          reason?: string | null
+          slice_id?: string | null
+        }
+        Relationships: []
+      }
       shadow_decisions: {
         Row: {
           agreement: number | null
