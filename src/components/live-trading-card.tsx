@@ -343,7 +343,7 @@ export function SaxoOAuthPanel() {
     return <StatusPill state="connected" label={`${env.toUpperCase()}: connected`} detail={`auto-refresh · expires in ${mins}m`} />;
   };
 
-  const row = (label: string, env: "sim" | "live") => {
+  const row = (label: React.ReactNode, env: "sim" | "live") => {
     const st = env === "sim" ? q.data?.sim : q.data?.live;
     const ok = !!st?.connected && !st?.usingLegacyToken;
     return (
