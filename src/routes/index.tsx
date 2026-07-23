@@ -10,7 +10,6 @@ import {
 } from "@/lib/trading.functions";
 import { activateLive, getSaxoOAuthStatus } from "@/lib/live.functions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, FlaskConical, Beaker, Banknote, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
