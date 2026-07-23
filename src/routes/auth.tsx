@@ -80,9 +80,9 @@ function AuthPage() {
             <TrendingUp className="h-6 w-6" />
             <span className="font-semibold">Aegis</span>
           </div>
-          <CardTitle>{mode === "signin" ? "Sign in" : "Create your account"}</CardTitle>
+          <CardTitle>Sign in</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Give an AI a virtual £1000 pot and see how it performs.
+            Private instance. Sign-ups are disabled.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -124,18 +124,9 @@ function AuthPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {mode === "signin" ? "Sign in" : "Create account"}
+              Sign in
             </Button>
           </form>
-          <button
-            type="button"
-            className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          >
-            {mode === "signin"
-              ? "Don't have an account? Create one"
-              : "Already have an account? Sign in"}
-          </button>
         </CardContent>
       </Card>
     </div>
