@@ -131,6 +131,32 @@ export function NewsReel() {
   }, []);
   const lastUpdated = q.dataUpdatedAt || null;
 
+  // Wire the sentinel to an IntersectionObserver whose root is the reel's
+  // scroll container. As soon as the sentinel is visible (near the bottom)
+  // and we're not mid-fetch, expand the window. Re-runs when hasMore or
+  // fetching state changes so we don't fire while a load is in-flight and
+  // rebind cleanly once new data arrives.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = scrollerRef.current;
+    if (!sentinel || !root) return;
+    if (!hasMore || isFetching) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            loadMoreRef.current();
+            break;
+          }
+        }
+      },
+      { root, rootMargin: "160px 0px", threshold: 0 },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [hasMore, isFetching]);
+
+
 
   const [paused, setPaused] = useState(false);
   const [assetFilter, setAssetFilter] = useState<Set<string>>(new Set());
