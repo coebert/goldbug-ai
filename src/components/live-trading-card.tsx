@@ -319,7 +319,7 @@ function StatusPill({
   );
 }
 
-function SaxoOAuthPanel() {
+export function SaxoOAuthPanel() {
   const startFn = useServerFn(startSaxoOAuth);
   const statusFn = useServerFn(getSaxoOAuthStatus);
   const qc = useQueryClient();

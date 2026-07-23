@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
+import { SaxoOAuthPanel } from "@/components/live-trading-card";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -230,6 +231,19 @@ function AdminPage() {
 
       {q.isLoading && <p className="text-sm text-muted-foreground">Pinging brokers…</p>}
       {q.error && <Alert variant="destructive"><AlertTitle>Failed to load</AlertTitle><AlertDescription>{(q.error as Error).message}</AlertDescription></Alert>}
+
+      <Card className="border-primary/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Radio className="h-4 w-4 text-primary" /> Broker connection — Connect your Saxo account
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SaxoOAuthPanel />
+        </CardContent>
+      </Card>
+
+
 
       {s && (
         <>
