@@ -176,28 +176,68 @@ export async function computeRecentOutcomes(
   };
 }
 
-async function fetchLatestLessons(portfolioId: string) {
+async function fetchLatestLessons(portfolioId: string, currentRegime: string | null) {
+  // Prefer lessons authored under the same regime; fall back to general (regime IS NULL).
+  async function grab(regime: string | null) {
+    const q = supabaseAdmin
+      .from("portfolio_lessons")
+      .select("as_of, lessons, regime")
+      .eq("portfolio_id", portfolioId)
+      .order("as_of", { ascending: false })
+      .limit(1);
+    const { data } = await (regime == null ? q.is("regime", null) : q.eq("regime", regime)).maybeSingle();
+    if (!data) return null;
+    const raw = (data.lessons as unknown) ?? [];
+    const lessons = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : [];
+    if (!lessons.length) return null;
+    return { lessons, as_of: (data.as_of as string | undefined) ?? null, regime: (data.regime as string | null) ?? null };
+  }
+  const scoped = currentRegime ? await grab(currentRegime) : null;
+  const general = scoped ? null : await grab(null);
+  const hit = scoped ?? general;
+  return {
+    lessons: hit?.lessons ?? [],
+    lessons_as_of: hit?.as_of ?? null,
+    lessons_regime: hit?.regime ?? null,
+  };
+}
+
+async function currentRegimeFor(asOf: string): Promise<string | null> {
   const { data } = await supabaseAdmin
-    .from("portfolio_lessons")
-    .select("as_of, lessons")
-    .eq("portfolio_id", portfolioId)
+    .from("market_regimes")
+    .select("regime")
+    .lte("as_of", asOf)
     .order("as_of", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const raw = (data?.lessons as unknown) ?? [];
-  const lessons = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : [];
-  return { lessons, lessons_as_of: (data?.as_of as string | undefined) ?? null };
+  return (data?.regime as string | null) ?? null;
 }
 
 export async function buildLearningContext(
   portfolioId: string,
   asOf: string,
 ): Promise<LearningContext> {
-  const [{ stats, samples }, { lessons, lessons_as_of }] = await Promise.all([
+  const current_regime = await currentRegimeFor(asOf);
+  const [{ stats, samples }, lessonHit] = await Promise.all([
     computeRecentOutcomes(portfolioId, asOf),
-    fetchLatestLessons(portfolioId),
+    fetchLatestLessons(portfolioId, current_regime),
   ]);
-  return { stats, samples, lessons, lessons_as_of };
+  // Per-regime rolling stats from the same sample window.
+  const buckets = new Map<string, LearningContext["samples"]>();
+  for (const s of samples) {
+    if (!s.regime) continue;
+    if (!buckets.has(s.regime)) buckets.set(s.regime, []);
+    buckets.get(s.regime)!.push(s);
+  }
+  const per_regime_stats = Array.from(buckets.entries())
+    .map(([regime, arr]) => ({
+      regime,
+      n: arr.length,
+      win_rate: arr.filter((x) => x.outcome === "win").length / arr.length,
+      avg_return_pct: arr.reduce((a, b) => a + b.return_pct, 0) / arr.length,
+    }))
+    .sort((a, b) => b.n - a.n);
+  return { stats, samples, ...lessonHit, per_regime_stats, current_regime };
 }
 
 export function formatLearningBlock(ctx: LearningContext): string {
