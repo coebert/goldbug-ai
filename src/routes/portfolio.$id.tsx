@@ -88,10 +88,10 @@ function PortfolioPage() {
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
   const [benchmark, setBenchmark] = useState<string>("SPY");
-  const [chartContrast, setChartContrast] = useState<"standard" | "high" | "light">(() => {
+  const [chartContrast, setChartContrast] = useState<"standard" | "high" | "light" | "cb">(() => {
     if (typeof window === "undefined") return "standard";
     const v = window.localStorage.getItem("aegis.chartContrast");
-    return v === "high" || v === "light" ? v : "standard";
+    return v === "high" || v === "light" || v === "cb" ? v : "standard";
   });
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -105,6 +105,7 @@ function PortfolioPage() {
         equityFillTop: 0.55,
         equityFillBottom: 0.05,
         benchmark: "#ffd257",
+        drawdown: "#ff6b6b",
         peak: "#e5e7eb",
         gridOpacity: 0.6,
         axis: "#e5e7eb",
@@ -118,6 +119,7 @@ function PortfolioPage() {
         equityFillTop: 0.35,
         equityFillBottom: 0,
         benchmark: "#b45309",
+        drawdown: "#b91c1c",
         peak: "#334155",
         gridOpacity: 0.35,
         axis: "#334155",
@@ -125,11 +127,29 @@ function PortfolioPage() {
         surface: "#f8fafc",
       } as const;
     }
+    if (chartContrast === "cb") {
+      // Okabe–Ito palette: distinguishable across deuteranopia, protanopia, tritanopia.
+      // Portfolio = blue (#0072B2), Benchmark = orange (#E69F00),
+      // Drawdown = vermillion (#D55E00), Peak/axes = bluish-grey (#CFCFCF).
+      return {
+        equity: "#56B4E9",
+        equityFillTop: 0.5,
+        equityFillBottom: 0.05,
+        benchmark: "#E69F00",
+        drawdown: "#D55E00",
+        peak: "#CFCFCF",
+        gridOpacity: 0.55,
+        axis: "#CFCFCF",
+        strokeWidth: 3,
+        surface: "transparent",
+      } as const;
+    }
     return {
       equity: "#22d3ee",
       equityFillTop: 0.35,
       equityFillBottom: 0,
       benchmark: "#f59e0b",
+      drawdown: "hsl(var(--destructive))",
       peak: "hsl(var(--muted-foreground))",
       gridOpacity: 0.35,
       axis: "hsl(var(--border))",
