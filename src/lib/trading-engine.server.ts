@@ -193,6 +193,7 @@ async function callAiForDecision(args: {
   features: Awaited<ReturnType<typeof buildCandidateFeatures>>;
   news: Array<{ headline: string; source: string | null; sentiment: number | null }>;
   crossAsset: string; // preformatted block
+  optionsBlock: string; // preformatted options-implied block
   events: Array<{ event_date: string; kind: string; symbol: string | null; title: string; impact: string }>;
   cooling: string[];
   asOf: string;
