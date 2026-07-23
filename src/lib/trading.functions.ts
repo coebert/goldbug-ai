@@ -2237,3 +2237,47 @@ export const getDecisionNewsBreakdown = createServerFn({ method: "GET" })
 
     return { items, as_of: asOf.toISOString() };
   });
+
+// Manually trigger the full hourly cycle (news refresh, regime detection,
+// price refresh, per-portfolio tick + routing). This mirrors the pg_cron
+// call to /api/public/hooks/hourly-run by POSTing to that same endpoint
+// with the server-side CRON_SECRET so all shared logic stays in one place.
+export const triggerHourlyRunNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+      throw new Error(
+        "Manual trigger unavailable: CRON_SECRET is not configured on the server.",
+      );
+    }
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const req = getRequest();
+    const origin = new URL(req.url).origin;
+    const url = `${origin}/api/public/hooks/hourly-run`;
+    const started = Date.now();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cron-secret": secret,
+      },
+      body: JSON.stringify({ manual: true, triggered_at: new Date().toISOString() }),
+    });
+    const text = await res.text();
+    let payload: unknown = null;
+    try { payload = JSON.parse(text); } catch { payload = text; }
+    if (!res.ok) {
+      const msg =
+        payload && typeof payload === "object" && "error" in payload
+          ? String((payload as { error: unknown }).error)
+          : `Hourly run failed with status ${res.status}`;
+      throw new Error(msg);
+    }
+    return {
+      ok: true,
+      duration_ms: Date.now() - started,
+      result: payload,
+    };
+  });
+
