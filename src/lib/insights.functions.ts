@@ -4,6 +4,40 @@ import { z } from "zod";
 
 const IdSchema = z.object({ portfolioId: z.string().uuid() });
 
+export const getGlobalSignalDecay = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: rows } = await context.supabase
+      .from("signal_performance")
+      .select("portfolio_id, signal_name, samples, hits, hit_rate, avg_edge_bps, weight_avg, as_of")
+      .order("as_of", { ascending: false })
+      .limit(2000);
+    const latest = new Map<string, NonNullable<typeof rows>[number]>();
+    for (const r of rows ?? []) {
+      const key = `${r.portfolio_id}|${r.signal_name}`;
+      if (!latest.has(key)) latest.set(key, r);
+    }
+    const agg = new Map<string, { samples: number; hits: number; edgeSum: number; weightSum: number; portfolios: Set<string> }>();
+    for (const r of latest.values()) {
+      const cur = agg.get(r.signal_name) ?? { samples: 0, hits: 0, edgeSum: 0, weightSum: 0, portfolios: new Set<string>() };
+      const n = Number(r.samples) || 0;
+      cur.samples += n;
+      cur.hits += Number(r.hits) || 0;
+      cur.edgeSum += (Number(r.avg_edge_bps) || 0) * n;
+      cur.weightSum += (Number(r.weight_avg) || 0) * n;
+      cur.portfolios.add(r.portfolio_id);
+      agg.set(r.signal_name, cur);
+    }
+    return Array.from(agg.entries()).map(([signal_name, v]) => ({
+      signal_name,
+      samples: v.samples,
+      hit_rate: v.samples > 0 ? v.hits / v.samples : null,
+      avg_edge_bps: v.samples > 0 ? v.edgeSum / v.samples : null,
+      weight_avg: v.samples > 0 ? v.weightSum / v.samples : null,
+      portfolio_count: v.portfolios.size,
+    })).sort((a, b) => (b.avg_edge_bps ?? -Infinity) - (a.avg_edge_bps ?? -Infinity));
+  });
+
 export const getSignalPerformance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => IdSchema.parse(input))
