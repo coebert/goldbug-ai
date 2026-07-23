@@ -48,7 +48,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
   }
   if (!data) return null;
 
-  const { summary, calibration, perSignal, weightDrift, behavior, flags, rolling } = data;
+  const { summary, calibration, perSignal, weightDrift, behavior, flags, rolling, eventImpact } = data;
 
   return (
     <div className="space-y-4">
