@@ -87,6 +87,7 @@ function PortfolioPage() {
   const [days, setDays] = useState(7);
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
+  const [benchmark, setBenchmark] = useState<string>("SPY");
 
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
