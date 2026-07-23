@@ -133,7 +133,10 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                     domain={[0, 1]}
                     tick={{ fontSize: 11 }}
+                    width={64}
+                    label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
                   />
+
                   <ReferenceLine y={0.5} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
                   <Tooltip
                     formatter={(v: number) => `${(v * 100).toFixed(0)}%`}
