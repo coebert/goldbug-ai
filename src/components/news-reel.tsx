@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { getGlobalNewsReel } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TranslationBadge } from "@/components/translation-badge";
+
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
@@ -487,20 +489,12 @@ export function NewsReel() {
                             item.headline
                           )}
                         </p>
-                        {item.original_language && item.original_headline && (
-                          <p
-                            className="mt-1 text-[11px] text-muted-foreground"
-                            title={`Original ${item.original_language} headline: ${item.original_headline}`}
-                          >
-                            <Badge
-                              variant="outline"
-                              className="mr-1.5 border-amber-500/50 bg-amber-500/10 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400"
-                            >
-                              Translated from {item.original_language}
-                            </Badge>
-                            <span className="italic">“{item.original_headline}”</span>
-                          </p>
-                        )}
+                        <TranslationBadge
+                          originalLanguage={item.original_language}
+                          originalHeadline={item.original_headline}
+                          className="mt-1"
+                        />
+
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           {item.url ? (
                             <a
@@ -748,17 +742,12 @@ export function NewsReel() {
                   <DialogDescription>
                     {item.source ? `${item.source} · ` : ""}{item.date} · {rec.ageLabel}
                   </DialogDescription>
-                  {item.original_language && item.original_headline && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      <Badge
-                        variant="outline"
-                        className="mr-1.5 border-amber-500/50 bg-amber-500/10 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400"
-                      >
-                        Translated from {item.original_language}
-                      </Badge>
-                      <span className="italic">“{item.original_headline}”</span>
-                    </p>
-                  )}
+                  <TranslationBadge
+                    originalLanguage={item.original_language}
+                    originalHeadline={item.original_headline}
+                    className="mt-2"
+                  />
+
                 </DialogHeader>
                 <div className="space-y-3 text-sm">
                   <div className="flex flex-wrap gap-1.5">

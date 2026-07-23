@@ -81,7 +81,7 @@ const TranslateSchema = z.object({
 // and does not obviously contain non-English words. We keep this permissive
 // (any non-ASCII char routes through the LLM) so accented Latin scripts and
 // mixed-script headlines still get language-detected.
-function looksNonEnglish(s: string): boolean {
+export function looksNonEnglish(s: string): boolean {
   // Any char outside basic ASCII printable + common punctuation triggers
   // translation. Cheap, safe over-approximation.
   return /[^\x00-\x7F]/.test(s);
@@ -233,7 +233,7 @@ async function translateWithCache(
   return result;
 }
 
-async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
+export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
   if (items.length === 0) return items;
 
   // Only send candidates that plausibly aren't English. Keeps the prompt
