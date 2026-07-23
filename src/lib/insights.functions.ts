@@ -91,9 +91,9 @@ export const getLearningDiagnostics = createServerFn({ method: "GET" })
         .limit(200),
       context.supabase
         .from("hyperparam_history")
-        .select("run_date, validation_score, hyperparams")
+        .select("tuned_at, oos_score, train_score, sma_fast, sma_slow, rsi_period, kelly_cap")
         .eq("portfolio_id", data.portfolioId)
-        .order("run_date", { ascending: false })
+        .order("tuned_at", { ascending: false })
         .limit(5),
     ]);
 

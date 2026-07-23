@@ -121,8 +121,8 @@ export function LearningDiagnosticsCard({ portfolioId }: { portfolioId: string }
                 <div className="space-y-1">
                   {wf.map((r, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{String(r.run_date).slice(0, 10)}</span>
-                      <span className="font-mono">score {r.validation_score == null ? "—" : Number(r.validation_score).toFixed(3)}</span>
+                      <span className="text-muted-foreground">{String(r.tuned_at).slice(0, 10)}</span>
+                      <span className="font-mono">oos {r.oos_score == null ? "—" : Number(r.oos_score).toFixed(3)} · sma {r.sma_fast}/{r.sma_slow} · kelly {Number(r.kelly_cap).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
