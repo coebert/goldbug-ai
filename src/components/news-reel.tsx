@@ -345,23 +345,83 @@ export function NewsReel() {
                           </span>
                           {item.note}
                         </p>
-                        {cited && item.influences.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {item.influences.slice(0, 4).map((inf, i) => (
-                              <span
-                                key={i}
-                                className="rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        {cited && item.influences.length > 0 && (() => {
+                          const isOpen = expanded.has(item.id);
+                          return (
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(item.id)}
+                                className="inline-flex items-center gap-1 rounded-sm border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10"
+                                aria-expanded={isOpen}
                               >
-                                {inf.portfolio_name} · {inf.run_date}
-                                {inf.actions.length > 0 && (
-                                  <span className="ml-1 text-foreground">
-                                    {inf.actions.map((a) => `${a.action} ${a.symbol}`).join(", ")}
-                                  </span>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                                {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                {isOpen ? "Hide" : "Show"} {item.influences.length} influenced decision{item.influences.length === 1 ? "" : "s"}
+                              </button>
+                              {isOpen ? (
+                                <ul className="mt-2 space-y-2 border-l-2 border-primary/30 pl-3">
+                                  {item.influences.map((inf, i) => {
+                                    const infTone = sentimentTone(inf.sentiment);
+                                    return (
+                                      <li key={`${inf.decision_id}-${i}`} className="rounded-sm bg-background/60 p-2 text-[11px]">
+                                        <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                                          <span className="font-semibold text-foreground">{inf.portfolio_name}</span>
+                                          <span className="text-muted-foreground">· run {inf.run_date}</span>
+                                          <Badge variant="outline" className={`ml-auto border-transparent text-[10px] ${infTone.cls}`}>
+                                            {infTone.label}
+                                          </Badge>
+                                        </div>
+                                        {inf.actions.length > 0 ? (
+                                          <div className="mb-1 flex flex-wrap gap-1">
+                                            {inf.actions.map((a, j) => {
+                                              const isBuy = a.action.toUpperCase().startsWith("BUY");
+                                              const isSell = a.action.toUpperCase().startsWith("SELL");
+                                              const cls = isBuy
+                                                ? "border-primary/50 bg-primary/10 text-primary"
+                                                : isSell
+                                                ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                                : "border-border bg-muted text-foreground";
+                                              return (
+                                                <span key={j} className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
+                                                  {a.action} {a.symbol}
+                                                  {a.qty != null ? ` × ${a.qty}` : ""}
+                                                </span>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <div className="mb-1 text-[10px] italic text-muted-foreground">HOLD — no trades executed</div>
+                                        )}
+                                        {inf.rationale && (
+                                          <p className="text-[11px] leading-snug text-muted-foreground">
+                                            <span className="font-semibold text-foreground/80">Rationale: </span>
+                                            {inf.rationale}
+                                          </p>
+                                        )}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              ) : (
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {item.influences.slice(0, 4).map((inf, i) => (
+                                    <span
+                                      key={i}
+                                      className="rounded-sm border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                    >
+                                      {inf.portfolio_name} · {inf.run_date}
+                                      {inf.actions.length > 0 && (
+                                        <span className="ml-1 text-foreground">
+                                          {inf.actions.map((a) => `${a.action} ${a.symbol}`).join(", ")}
+                                        </span>
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </li>
