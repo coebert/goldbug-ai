@@ -318,6 +318,9 @@ function AdminPage() {
 
       <GlobalSignalDecayCard />
 
+      <SecurityAuditCard />
+
+
 
 
 
