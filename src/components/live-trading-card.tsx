@@ -190,7 +190,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
             }))} />
             <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
               key: f.id,
-              text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.price).toFixed(2)}`,
+              text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
             }))} />
             <MiniList title="Reconciliation" rows={s.reconciliation.map((r) => ({
               key: r.id,
