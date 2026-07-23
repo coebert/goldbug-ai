@@ -264,6 +264,7 @@ ${coolingBlock}
 ${formatLearningBlock(args.learning)}
 
 ${args.attribution ?? ""}
+${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 
 ${HISTORICAL_PLAYBOOK}
