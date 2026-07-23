@@ -4,6 +4,7 @@
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import {
   getDailyCandles,
   getPriceOn,
