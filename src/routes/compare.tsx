@@ -35,6 +35,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2 } from "lucide-react";
+import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/compare")({
   ssr: false,
@@ -429,10 +430,10 @@ function ComparePage() {
                         <th className="py-2 pr-3">Portfolio</th>
                         <th className="py-2 pr-3">Risk</th>
                         <th className="py-2 pr-3 text-right">Days</th>
-                        <th className="py-2 pr-3 text-right">Return</th>
-                        <th className="py-2 pr-3 text-right">Max DD</th>
-                        <th className="py-2 pr-3 text-right">Sharpe</th>
-                        <th className="py-2 pr-3 text-right">Vol</th>
+                        <th className="py-2 pr-3 text-right"><Explain term="pnl">Return</Explain></th>
+                        <th className="py-2 pr-3 text-right"><Explain term="max_drawdown">Max DD</Explain></th>
+                        <th className="py-2 pr-3 text-right"><Explain term="sharpe">Sharpe</Explain></th>
+                        <th className="py-2 pr-3 text-right"><Explain term="volatility">Vol</Explain></th>
                         <th className="py-2 pr-3 text-right">Best day</th>
                         <th className="py-2 pr-3 text-right">Worst day</th>
                       </tr>

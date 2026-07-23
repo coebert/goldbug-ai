@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Explain } from "@/components/explain";
 
 export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const qc = useQueryClient();
@@ -133,7 +134,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
               </Button>
             )}
             <Button variant="destructive" size="sm" onClick={() => mKill.mutate(promptReason("Kill-switch"))} disabled={mKill.isPending}>
-              <ShieldOff className="h-4 w-4 mr-1" /> Kill-switch
+              <ShieldOff className="h-4 w-4 mr-1" /> <Explain term="kill_switch">Kill-switch</Explain>
             </Button>
           </div>
         </div>
@@ -342,14 +343,14 @@ export function SaxoOAuthPanel() {
     return <StatusPill state="connected" label={`${env.toUpperCase()}: connected`} detail={`auto-refresh · expires in ${mins}m`} />;
   };
 
-  const row = (label: string, env: "sim" | "live") => {
+  const row = (label: React.ReactNode, env: "sim" | "live") => {
     const st = env === "sim" ? q.data?.sim : q.data?.live;
     const ok = !!st?.connected && !st?.usingLegacyToken;
     return (
       <div className="flex items-center justify-between gap-2 py-1">
         {pillFor(env)}
         <Button size="sm" variant={ok ? "outline" : "default"} onClick={() => mStart.mutate(env)} disabled={mStart.isPending}>
-          {ok ? "Reconnect" : `Connect (${label})`}
+          {ok ? "Reconnect" : <>Connect ({label})</>}
         </Button>
       </div>
     );
@@ -363,8 +364,8 @@ export function SaxoOAuthPanel() {
           <RefreshCw className={`h-3 w-3 mr-1 ${q.isFetching ? "animate-spin" : ""}`} /> Refresh
         </Button>
       </div>
-      {row("SIM", "sim")}
-      {row("LIVE", "live")}
+      {row(<Explain term="sim_vs_live">SIM</Explain>, "sim")}
+      {row(<Explain term="sim_vs_live">LIVE</Explain>, "live")}
       {q.data?.sim.usingLegacyToken && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />

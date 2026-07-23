@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { ChevronDown, ShieldCheck } from "lucide-react";
+import { Explain } from "@/components/explain";
 
 type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
 
@@ -158,7 +159,7 @@ export function RiskControlsCard({
               </p>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <Label className="text-xs font-medium">Max position size</Label>
+                  <Label className="text-xs font-medium"><Explain term="max_position">Max position size</Explain></Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
                       type="number"
@@ -188,7 +189,7 @@ export function RiskControlsCard({
                   </p>
                 </div>
                 <div>
-                  <Label className="text-xs font-medium">Stop-loss</Label>
+                  <Label className="text-xs font-medium"><Explain term="stop_loss">Stop-loss</Explain></Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
                       type="number"
@@ -209,7 +210,7 @@ export function RiskControlsCard({
                   <p className="mt-1 text-[11px] text-muted-foreground">Set 0 to disable.</p>
                 </div>
                 <div>
-                  <Label className="text-xs font-medium">Take-profit</Label>
+                  <Label className="text-xs font-medium"><Explain term="take_profit">Take-profit</Explain></Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
                       type="number"
@@ -232,7 +233,7 @@ export function RiskControlsCard({
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-xs font-medium">ATR trailing stop</Label>
+                  <Label className="text-xs font-medium"><Explain term="atr">ATR trailing stop</Explain></Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
                       type="number"
@@ -317,7 +318,7 @@ export function RiskControlsCard({
 
 
             <div>
-              <h4 className="mb-2 text-sm font-medium">Volatility-based sizing</h4>
+              <h4 className="mb-2 text-sm font-medium"><Explain term="inverse_vol_sizing">Volatility-based sizing</Explain></h4>
               <p className="mb-3 text-xs text-muted-foreground">
                 Caps the size of each new buy so its 20-day volatility contributes roughly the target daily risk to the portfolio. Choppy assets get smaller positions.
               </p>

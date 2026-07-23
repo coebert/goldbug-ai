@@ -35,6 +35,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { CalendarClock, PlayCircle } from "lucide-react";
+import { Explain } from "@/components/explain";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { lttb } from "@/lib/downsample";
@@ -262,7 +263,7 @@ function LongHorizonPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label htmlFor="comm" className="text-xs">Commission (bps)</Label>
+                    <Label htmlFor="comm" className="text-xs"><Explain term="transaction_cost">Commission (bps)</Explain></Label>
                     <Input
                       id="comm"
                       type="number"
@@ -274,7 +275,7 @@ function LongHorizonPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="slip" className="text-xs">Slippage (bps)</Label>
+                    <Label htmlFor="slip" className="text-xs"><Explain term="slippage">Slippage (bps)</Explain></Label>
                     <Input
                       id="slip"
                       type="number"
@@ -490,10 +491,10 @@ function LongHorizonPage() {
                           <th className="py-2 pr-4 text-left">Strategy</th>
                           <th className="py-2 pr-4 text-right">Final</th>
                           <th className="py-2 pr-4 text-right">Total return</th>
-                          <th className="py-2 pr-4 text-right">CAGR</th>
-                          <th className="py-2 pr-4 text-right">Max drawdown</th>
-                          <th className="py-2 pr-4 text-right">Sharpe</th>
-                          <th className="py-2 pr-4 text-right">Volatility</th>
+                          <th className="py-2 pr-4 text-right"><Explain term="cagr">CAGR</Explain></th>
+                          <th className="py-2 pr-4 text-right"><Explain term="max_drawdown">Max drawdown</Explain></th>
+                          <th className="py-2 pr-4 text-right"><Explain term="sharpe">Sharpe</Explain></th>
+                          <th className="py-2 pr-4 text-right"><Explain term="volatility">Volatility</Explain></th>
                         </tr>
                       </thead>
                       <tbody className="tabular-nums">
@@ -518,7 +519,7 @@ function LongHorizonPage() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Regime-specific results</CardTitle>
+                    <CardTitle className="text-base"><Explain term="regime">Regime-specific results</Explain></CardTitle>
                     <CardDescription>
                       Same strategy sliced into notable historical regimes from the playbook. "—" means insufficient data in that window.
                     </CardDescription>
