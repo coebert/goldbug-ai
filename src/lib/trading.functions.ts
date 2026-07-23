@@ -2269,6 +2269,17 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
     try { parsed = JSON.parse(text); } catch { parsed = null; }
     const obj = (parsed && typeof parsed === "object") ? (parsed as Record<string, unknown>) : {};
     if (!res.ok) {
+      if (res.status === 409) {
+        const msg =
+          typeof obj.message === "string"
+            ? obj.message
+            : "An hourly run is already in progress. Please wait for it to finish before triggering another.";
+        const err = new Error(msg) as Error & { code?: string; heldBy?: string | null; ageMs?: number | null };
+        err.code = "run_in_progress";
+        err.heldBy = typeof obj.held_by === "string" ? obj.held_by : null;
+        err.ageMs = typeof obj.age_ms === "number" ? obj.age_ms : null;
+        throw err;
+      }
       const errMsg = typeof obj.error === "string" ? obj.error : `Hourly run failed with status ${res.status}`;
       throw new Error(errMsg);
     }
