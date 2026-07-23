@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { getGlobalNewsReel } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, Newspaper, Pause, Play, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
+
+// Absolute sentiment threshold treated as a "strong" market-moving signal.
+const STRONG_SENTIMENT_THRESHOLD = 0.4;
+// How long a newly-arrived headline stays visually highlighted.
+const HIGHLIGHT_DURATION_MS = 45_000;
 
 function sentimentTone(v: number | null) {
   if (v == null) return { label: "unscored", cls: "text-muted-foreground bg-muted" };
@@ -122,6 +128,9 @@ export function NewsReel() {
   };
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  // Track which headline IDs we've already seen so we can highlight & notify on genuinely new ones.
+  const seenIdsRef = useRef<Set<string> | null>(null);
+  const [highlightIds, setHighlightIds] = useState<Map<string, number>>(new Map());
 
   const allItems = q.data?.items ?? [];
   const items = useMemo(() => {
@@ -136,6 +145,62 @@ export function NewsReel() {
       return true;
     });
   }, [allItems, assetFilter, riskFilter, onlyCited]);
+
+  // Detect newly-arrived headlines that match current filters and carry a strong sentiment signal,
+  // then flash-highlight them in the list and surface a toast notification.
+  useEffect(() => {
+    if (!q.data) return;
+    const currentIds = new Set(allItems.map((i) => i.id));
+    if (seenIdsRef.current === null) {
+      // First load — seed the seen set without notifying.
+      seenIdsRef.current = currentIds;
+      return;
+    }
+    const prevSeen = seenIdsRef.current;
+    const strongNew = allItems.filter((it) => {
+      if (prevSeen.has(it.id)) return false;
+      if (onlyCited && it.decisions_count === 0) return false;
+      if (assetFilter.size > 0 && !it.asset_classes.some((c) => assetFilter.has(c))) return false;
+      if (riskFilter.size > 0 && !it.risk_levels.some((r) => riskFilter.has(r))) return false;
+      const s = it.avg_sentiment;
+      return s != null && Math.abs(s) >= STRONG_SENTIMENT_THRESHOLD;
+    });
+    if (strongNew.length > 0) {
+      const ts = Date.now();
+      setHighlightIds((prev) => {
+        const next = new Map(prev);
+        strongNew.forEach((s) => next.set(s.id, ts));
+        return next;
+      });
+      const preview = strongNew.slice(0, 2).map((s) => s.headline).join(" • ");
+      const more = strongNew.length > 2 ? ` (+${strongNew.length - 2} more)` : "";
+      toast(
+        `${strongNew.length} new strong-signal headline${strongNew.length > 1 ? "s" : ""}`,
+        { description: preview + more, duration: 8000 },
+      );
+    }
+    seenIdsRef.current = currentIds;
+  }, [q.dataUpdatedAt, allItems, assetFilter, riskFilter, onlyCited, q.data]);
+
+  // Age out highlights so they don't linger forever.
+  useEffect(() => {
+    if (highlightIds.size === 0) return;
+    const id = window.setInterval(() => {
+      const cutoff = Date.now() - HIGHLIGHT_DURATION_MS;
+      setHighlightIds((prev) => {
+        let changed = false;
+        const next = new Map(prev);
+        for (const [k, t] of next) {
+          if (t < cutoff) { next.delete(k); changed = true; }
+        }
+        return changed ? next : prev;
+      });
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [highlightIds.size]);
+
+  const highlightCount = highlightIds.size;
+
 
   function toggle(set: Set<string>, val: string, setter: (s: Set<string>) => void) {
     const next = new Set(set);
@@ -178,6 +243,17 @@ export function NewsReel() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
+              {highlightCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHighlightIds(new Map())}
+                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-primary/50 bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary shadow-sm transition-colors hover:bg-primary/25"
+                  title={`Clear ${highlightCount} new strong-signal highlight${highlightCount > 1 ? "s" : ""}`}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {highlightCount} new
+                </button>
+              )}
             </CardTitle>
             <CardDescription>
               Live headlines the AI has been reading, with a note on how each shaped its recent trading decisions.
@@ -311,13 +387,24 @@ export function NewsReel() {
                 const cred = credibilityFor(item.source);
                 const rec = recencyFor(item.date, now);
                 const cited = item.decisions_count > 0;
+                const isNew = highlightIds.has(item.id);
                 return (
                   <li
                     key={`${item.id}-${idx}`}
-                    className={`rounded-md border p-3 transition-colors ${
-                      cited ? "border-primary/40 bg-primary/[0.04]" : "border-border bg-card/40"
+                    className={`relative rounded-md border p-3 transition-colors ${
+                      isNew
+                        ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)] ring-2 ring-primary/40 animate-pulse"
+                        : cited
+                        ? "border-primary/40 bg-primary/[0.04]"
+                        : "border-border bg-card/40"
                     }`}
                   >
+                    {isNew && (
+                      <span className="absolute -top-2 left-3 inline-flex items-center gap-1 rounded-full border border-primary/60 bg-primary px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground shadow">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        New signal
+                      </span>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
