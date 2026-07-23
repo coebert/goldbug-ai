@@ -893,10 +893,9 @@ function PortfolioPage() {
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <RegimePanel />
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              <RegimePanel />
               <LearningPanel portfolioId={p.id} />
             </div>
+
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <SignalDecayCard portfolioId={p.id} />
