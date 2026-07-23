@@ -238,6 +238,73 @@ function PortfolioPage() {
     });
   }, [equityData, benchQ.data, benchmark, startingCashForChart]);
 
+  const perfMetrics = useMemo(() => {
+    const rows = chartData.filter((r) => Number.isFinite(r.value));
+    if (rows.length < 2) return null;
+    const portVals = rows.map((r) => r.value);
+    const benchVals = rows.map((r) => (r as { benchmark?: number | null }).benchmark ?? null);
+    const hasBench = benchmark !== "none" && benchVals.every((v) => v != null && Number.isFinite(v));
+
+    const dailyReturns = (vals: number[]) => {
+      const out: number[] = [];
+      for (let i = 1; i < vals.length; i++) {
+        const prev = vals[i - 1];
+        if (prev > 0) out.push(vals[i] / prev - 1);
+      }
+      return out;
+    };
+    const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+    const stdev = (xs: number[]) => {
+      if (xs.length < 2) return 0;
+      const m = mean(xs);
+      const v = xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1);
+      return Math.sqrt(v);
+    };
+    const maxDD = (vals: number[]) => {
+      let peak = -Infinity;
+      let worst = 0;
+      for (const v of vals) {
+        peak = Math.max(peak, v);
+        if (peak > 0) worst = Math.min(worst, (v - peak) / peak);
+      }
+      return worst * 100; // negative %
+    };
+    const compute = (vals: number[]) => {
+      const rets = dailyReturns(vals);
+      const totalReturn = vals[0] > 0 ? (vals[vals.length - 1] / vals[0] - 1) * 100 : 0;
+      const years = Math.max(rets.length / 252, 1 / 252);
+      const growth = vals[0] > 0 ? vals[vals.length - 1] / vals[0] : 1;
+      const annReturn = (Math.pow(growth, 1 / years) - 1) * 100;
+      const annVol = stdev(rets) * Math.sqrt(252) * 100;
+      return { totalReturn, annReturn, annVol, maxDrawdown: maxDD(vals), rets };
+    };
+    const port = compute(portVals);
+    const bench = hasBench ? compute(benchVals as number[]) : null;
+
+    let correlation: number | null = null;
+    if (bench) {
+      const n = Math.min(port.rets.length, bench.rets.length);
+      if (n >= 2) {
+        const a = port.rets.slice(-n);
+        const b = bench.rets.slice(-n);
+        const ma = mean(a);
+        const mb = mean(b);
+        let num = 0;
+        let da = 0;
+        let db = 0;
+        for (let i = 0; i < n; i++) {
+          num += (a[i] - ma) * (b[i] - mb);
+          da += (a[i] - ma) ** 2;
+          db += (b[i] - mb) ** 2;
+        }
+        const denom = Math.sqrt(da * db);
+        correlation = denom > 0 ? num / denom : null;
+      }
+    }
+    return { port, bench, correlation };
+  }, [chartData, benchmark]);
+
+
 
   const p = q.data?.portfolio;
   const holdings = q.data?.holdings ?? [];
