@@ -77,6 +77,89 @@ const CLASSES: { key: AssetClass; label: string }[] = [
   { key: "fx", label: "FX" },
 ];
 
+// Simple 1..5 risk-level presets. Moving the slider rewrites every detailed
+// field below so the two views stay in sync.
+const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfig }> = {
+  1: {
+    name: "Low risk",
+    blurb: "Capital preservation. Tight stops, small positions, mostly ETFs.",
+    cfg: {
+      asset_class_limits: { stock: 0.3, etf: 0.9, crypto: 0.02, commodity: 0.15, fx: 0.15 },
+      per_symbol_limit_pct: 0.05,
+      stop_loss_pct: 0.05,
+      take_profit_pct: 0.15,
+      atr_trailing_mult: 2,
+      max_hold_days: 60,
+      volatility_sizing: true,
+      vol_target_pct: 0.007,
+    },
+  },
+  2: {
+    name: "Cautious",
+    blurb: "Slow and steady growth with limited crypto/commodity exposure.",
+    cfg: {
+      asset_class_limits: { stock: 0.5, etf: 0.85, crypto: 0.05, commodity: 0.2, fx: 0.2 },
+      per_symbol_limit_pct: 0.08,
+      stop_loss_pct: 0.07,
+      take_profit_pct: 0.2,
+      atr_trailing_mult: 2.5,
+      max_hold_days: 90,
+      volatility_sizing: true,
+      vol_target_pct: 0.01,
+    },
+  },
+  3: {
+    name: "Balanced",
+    blurb: "Default mix — moderate stops, diversified caps.",
+    cfg: { ...DEFAULTS },
+  },
+  4: {
+    name: "Growth",
+    blurb: "Larger positions, wider stops, more crypto/commodity room.",
+    cfg: {
+      asset_class_limits: { stock: 0.75, etf: 0.75, crypto: 0.3, commodity: 0.4, fx: 0.4 },
+      per_symbol_limit_pct: 0.2,
+      stop_loss_pct: 0.15,
+      take_profit_pct: 0.4,
+      atr_trailing_mult: 4,
+      max_hold_days: 0,
+      volatility_sizing: true,
+      vol_target_pct: 0.02,
+    },
+  },
+  5: {
+    name: "High risk",
+    blurb: "Aggressive concentration, wide stops, run winners hard.",
+    cfg: {
+      asset_class_limits: { stock: 0.9, etf: 0.6, crypto: 0.5, commodity: 0.5, fx: 0.5 },
+      per_symbol_limit_pct: 0.35,
+      stop_loss_pct: 0.25,
+      take_profit_pct: 0.75,
+      atr_trailing_mult: 5,
+      max_hold_days: 0,
+      volatility_sizing: false,
+      vol_target_pct: 0.03,
+    },
+  },
+};
+
+function inferRiskLevel(cfg: RiskConfig): number {
+  // Match by nearest stop_loss + per_symbol_limit — good enough for slider sync.
+  let best = 3;
+  let bestDist = Infinity;
+  for (const [lvl, p] of Object.entries(RISK_PRESETS)) {
+    const d =
+      Math.abs(p.cfg.stop_loss_pct - cfg.stop_loss_pct) +
+      Math.abs((p.cfg.per_symbol_limit_pct ?? 0.15) - (cfg.per_symbol_limit_pct ?? 0.15)) +
+      Math.abs(p.cfg.take_profit_pct - cfg.take_profit_pct) * 0.5;
+    if (d < bestDist) {
+      bestDist = d;
+      best = Number(lvl);
+    }
+  }
+  return best;
+}
+
 export function RiskControlsCard({
   portfolioId,
   riskConfig,
