@@ -395,6 +395,20 @@ export function NewsReel() {
                           </span>
                           {item.note}
                         </p>
+                        {item.excerpt && (
+                          <blockquote
+                            className="mt-1.5 border-l-2 border-primary/40 bg-muted/30 px-2 py-1 text-[11px] italic text-muted-foreground"
+                            title={item.source ? `Excerpt from ${item.source}` : "Source excerpt"}
+                          >
+                            <span className="mr-1 not-italic font-semibold uppercase tracking-wide text-[10px] text-foreground/70">
+                              Cited excerpt:
+                            </span>
+                            “{item.excerpt}”
+                            {item.source && (
+                              <span className="ml-1 not-italic text-[10px] text-muted-foreground">— {item.source}</span>
+                            )}
+                          </blockquote>
+                        )}
                         {cited && item.influences.length > 0 && (() => {
                           const isOpen = expanded.has(item.id);
                           return (
