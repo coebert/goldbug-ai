@@ -31,7 +31,8 @@ import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
 import { AllPortfoliosChart } from "@/components/all-portfolios-chart";
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X } from "lucide-react";
+import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -117,9 +118,12 @@ function Home() {
           </div>
         </div>
 
+        <NewHereBanner />
+
         <div className="mb-6">
           <AllPortfoliosChart />
         </div>
+
 
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -150,6 +154,41 @@ function Home() {
           <CreatePortfolioCard />
         </div>
       </main>
+    </div>
+  );
+}
+
+function NewHereBanner() {
+  const [hidden, setHidden] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("aegis.hideNewHereBanner") === "1";
+  });
+  if (hidden) return null;
+  return (
+    <div className="mb-6 flex items-start justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="text-sm">
+          <div className="font-medium">New to trading? Read this first.</div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Anything with a dotted underline in the app opens a plain-English explanation. Or open the full guide.
+          </p>
+          <Link to="/learn" className="mt-1 inline-block text-xs font-medium text-primary hover:underline">
+            Open the Learn page →
+          </Link>
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={() => {
+          window.localStorage.setItem("aegis.hideNewHereBanner", "1");
+          setHidden(true);
+        }}
+        className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -266,7 +305,7 @@ function CreatePortfolioCard() {
         </div>
         <div className="grid grid-cols-[1fr_100px] gap-2">
           <div>
-            <Label htmlFor="cash">Starting pot</Label>
+            <Label htmlFor="cash"><Explain term="starting_pot">Starting pot</Explain></Label>
             <Input
               id="cash"
               type="number"
@@ -289,7 +328,7 @@ function CreatePortfolioCard() {
           </div>
         </div>
         <div>
-          <Label>Risk level</Label>
+          <Label><Explain term="risk_level">Risk level</Explain></Label>
           <div className="mt-2 space-y-2">
             <Slider
               value={[risk === "conservative" ? 0 : risk === "balanced" ? 1 : 2]}
@@ -302,7 +341,7 @@ function CreatePortfolioCard() {
           </div>
         </div>
         <div>
-          <Label>Asset universe</Label>
+          <Label><Explain term="universe">Asset universe</Explain></Label>
           <div className="mt-2 space-y-2">
             {Object.entries(CLASS_LABELS).map(([c, label]) => (
               <label key={c} className="flex cursor-pointer items-center gap-2 text-sm">

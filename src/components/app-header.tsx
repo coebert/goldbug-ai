@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Shield, GitCompare, Sparkles, Plug } from "lucide-react";
+import { TrendingUp, Shield, GitCompare, Sparkles, Plug, BookOpen } from "lucide-react";
 
 export function AppHeader({ email }: { email?: string | null }) {
   return (
@@ -19,6 +19,13 @@ export function AppHeader({ email }: { email?: string | null }) {
           >
             <Sparkles className="h-4 w-4" />
             <span className="hidden sm:inline">Get started</span>
+          </Link>
+          <Link
+            to="/learn"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-muted [&.active]:text-foreground"
+          >
+            <BookOpen className="h-4 w-4" />
+            <span className="hidden sm:inline">Learn</span>
           </Link>
           <Link
             to="/compare"
