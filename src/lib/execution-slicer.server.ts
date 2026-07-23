@@ -216,27 +216,31 @@ export async function recordSliceFill(
   filledQty: number,
   note?: string,
 ) {
+  const clean = validate("recordSliceFill", FillInputSchema, {
+    sliceId, ownerUserId, filledQty, note,
+  });
   // Look up the slice to discover its portfolio, then prove ownership before
   // mutating. This blocks a caller from patching another user's slice by id.
   const { data: slice, error: sliceErr } = await supabaseAdmin
     .from("pending_slices")
     .select("id, portfolio_id, remaining_qty, slices_done, slice_count")
-    .eq("id", sliceId)
+    .eq("id", clean.sliceId)
     .maybeSingle();
   if (sliceErr) {
-    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_lookup_failed", sliceId, error: sliceErr.message });
+    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_lookup_failed", sliceId: clean.sliceId, error: sliceErr.message });
     throw new PendingSliceAccessError("pending_slices: slice lookup failed", {
-      sliceId, error: sliceErr.message,
+      sliceId: clean.sliceId, error: sliceErr.message,
     });
   }
   if (!slice) {
-    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_not_found", sliceId, ownerUserId });
+    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_not_found", sliceId: clean.sliceId, ownerUserId: clean.ownerUserId });
     return;
   }
   const typed = slice as {
     portfolio_id: string; remaining_qty: number; slices_done: number; slice_count: number;
   };
-  await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, ownerUserId);
+  await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, clean.ownerUserId);
+
 
   const remaining = Math.max(0, Number(typed.remaining_qty) - filledQty);
   const done = Number(typed.slices_done) + 1;
