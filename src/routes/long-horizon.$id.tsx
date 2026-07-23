@@ -358,7 +358,7 @@ function LongHorizonPage() {
                     <CardDescription>
                       {result.from} → {result.to} · {result.rebalance} rebalance · {result.tradeCount} trades executed{result.skippedSmallTrades > 0 ? ` · ${result.skippedSmallTrades} skipped (< ${result.currency} ${result.execution.min_trade_value})` : ""} · costs paid ~{result.currency} {result.totalCostsPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({result.execution.commission_bps}bps comm / {result.execution.slippage_bps}bps slip) · click a legend item to isolate.
                     </CardDescription>
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                       <EventOverlayControls
                         domainDates={chartData.map((d) => String(d.date))}
                         enabled={eventsOn}
@@ -366,6 +366,19 @@ function LongHorizonPage() {
                         minSeverity={eventSev}
                         onSeverityChange={setEventSev}
                       />
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="mr-1">Chart resolution:</span>
+                        {[200, 600, 1500].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setChartRes(n as 200 | 600 | 1500)}
+                            className={`rounded border px-2 py-0.5 ${chartRes === n ? "border-primary bg-primary/10 text-foreground" : "border-border hover:bg-muted/50"}`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
