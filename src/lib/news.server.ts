@@ -42,10 +42,82 @@ async function parseGdeltResponse(res: Response, dateISO: string): Promise<NewsI
         headline: a.title!,
         url: a.url ?? null,
         summary: null,
+        original_headline: null,
+        original_language: null,
       }));
   } catch (err) {
     console.error("news: gdelt JSON parse failed", err);
     return null;
+  }
+}
+
+// Batch-translate non-English headlines to English via the Lovable AI Gateway.
+// The model both detects the language and returns the English translation in a
+// single call. English headlines are left untouched (original_language stays
+// null). Failures degrade to the original headlines rather than blocking the
+// ingest pipeline — a stale-but-untranslated reel beats an empty one.
+async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
+  if (items.length === 0) return items;
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) return items;
+
+  // Ask the model to classify + translate every headline in one JSON payload.
+  // Keeping the schema shallow avoids Gemini's "too many states" rejections.
+  const numbered = items.map((it, i) => `${i}. ${it.headline}`).join("\n");
+  const system =
+    'You are a translator. For each numbered headline, detect its language and, if it is not English, translate it to natural English. Reply with STRICT JSON of the form {"results":[{"i":0,"lang":"English","translation":null}, ...]}. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese"). When the headline is already in English, set lang to "English" and translation to null. Never invent facts — translate only.';
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Lovable-API-Key": key,
+        "X-Lovable-AIG-SDK": "fetch",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3.6-flash",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: numbered },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`news: translate request failed ${res.status}`);
+      return items;
+    }
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const raw = json.choices?.[0]?.message?.content ?? "";
+    const parsed = JSON.parse(raw) as {
+      results?: Array<{ i?: number; lang?: string | null; translation?: string | null }>;
+    };
+    const byIndex = new Map<number, { lang: string | null; translation: string | null }>();
+    for (const r of parsed.results ?? []) {
+      if (typeof r.i === "number") {
+        byIndex.set(r.i, {
+          lang: (r.lang ?? "").trim() || null,
+          translation: (r.translation ?? "")?.toString().trim() || null,
+        });
+      }
+    }
+    return items.map((it, i) => {
+      const t = byIndex.get(i);
+      if (!t) return it;
+      const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
+      if (isEnglish || !t.translation) return it;
+      return {
+        ...it,
+        headline: t.translation,
+        original_headline: it.headline,
+        original_language: t.lang,
+      };
+    });
+  } catch (err) {
+    console.warn("news: translate threw", err instanceof Error ? err.message : String(err));
+    return items;
   }
 }
 
