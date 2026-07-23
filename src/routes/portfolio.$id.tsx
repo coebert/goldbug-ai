@@ -109,6 +109,16 @@ function PortfolioPage() {
       window.localStorage.setItem("aegis.chartContrast", chartContrast);
     }
   }, [chartContrast]);
+  const [riskFreeRate, setRiskFreeRate] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    const v = Number(window.localStorage.getItem("aegis.riskFreeRate"));
+    return Number.isFinite(v) ? v : 0;
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("aegis.riskFreeRate", String(riskFreeRate));
+    }
+  }, [riskFreeRate]);
   const chartTheme = useMemo(() => {
     if (chartContrast === "high") {
       return {
@@ -486,6 +496,18 @@ function PortfolioPage() {
                           </button>
                         ))}
                       </div>
+                      <label className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground" title="Annual risk-free rate used in Sharpe ratio">
+                        <span>Rf</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={riskFreeRate}
+                          onChange={(e) => setRiskFreeRate(Number(e.target.value) || 0)}
+                          className="w-14 bg-transparent text-foreground tabular-nums outline-none"
+                          aria-label="Risk-free rate (annual %)"
+                        />
+                        <span>%</span>
+                      </label>
                       <div className="inline-flex overflow-hidden rounded-md border border-border text-xs" role="group" aria-label="Benchmark compare mode">
                         {(["raw", "pct"] as const).map((mode) => (
                           <button
@@ -518,17 +540,17 @@ function PortfolioPage() {
                     {([
                       { label: "CAGR", value: perfMetrics.port.annReturn, suffix: "%", signed: true, negative: false },
                       { label: "Volatility (ann.)", value: perfMetrics.port.annVol, suffix: "%", signed: false, negative: false },
-                      { label: "Sharpe (rf=0)", value: perfMetrics.port.annVol > 0 ? perfMetrics.port.annReturn / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
+                      { label: `Sharpe (rf=${riskFreeRate}%)`, value: perfMetrics.port.annVol > 0 ? (perfMetrics.port.annReturn - riskFreeRate) / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
                       { label: "Max drawdown", value: perfMetrics.port.maxDrawdown, suffix: "%", signed: false, negative: true },
                     ] as const).map((m) => {
                       const bv = m.label === "CAGR" ? perfMetrics.bench?.annReturn
                         : m.label === "Volatility (ann.)" ? perfMetrics.bench?.annVol
                         : m.label === "Max drawdown" ? perfMetrics.bench?.maxDrawdown
-                        : (perfMetrics.bench && perfMetrics.bench.annVol > 0 ? perfMetrics.bench.annReturn / perfMetrics.bench.annVol : null);
+                        : (perfMetrics.bench && perfMetrics.bench.annVol > 0 ? (perfMetrics.bench.annReturn - riskFreeRate) / perfMetrics.bench.annVol : null);
                       const fmt = (v: number | null | undefined) => {
                         if (v == null || !Number.isFinite(v)) return "—";
                         const s = m.signed && v > 0 ? "+" : "";
-                        const d = m.label === "Sharpe (rf=0)" ? 2 : 2;
+                        const d = 2;
                         return `${s}${v.toFixed(d)}${m.suffix}`;
                       };
                       const color = (v: number | null | undefined) => {
