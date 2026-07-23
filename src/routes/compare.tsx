@@ -29,6 +29,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { GitCompareArrows, PlayCircle, RefreshCw } from "lucide-react";
