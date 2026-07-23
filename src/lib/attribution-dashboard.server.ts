@@ -277,14 +277,48 @@ export async function getAttributionDashboard(
     })
     .filter((r) => r.n > 0);
 
+  // Cumulative alpha vs SPY (chronological)
+  const chrono = [...trades].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+  const alphaByDate = new Map<string, { strategy: number; benchmark: number; alpha: number }>();
+  for (const t of chrono) {
+    if (t.alpha_pct == null || t.forward_return_pct == null || t.benchmark_return_pct == null) continue;
+    const cur = alphaByDate.get(t.trade_date) ?? { strategy: 0, benchmark: 0, alpha: 0 };
+    cur.strategy += t.forward_return_pct;
+    cur.benchmark += t.benchmark_return_pct;
+    cur.alpha += t.alpha_pct;
+    alphaByDate.set(t.trade_date, cur);
+  }
+  const alphaDates = Array.from(alphaByDate.keys()).sort();
+  const runS = { strategy: 0, benchmark: 0, alpha: 0 };
+  const cumulative_alpha = alphaDates.map((date) => {
+    const day = alphaByDate.get(date)!;
+    runS.strategy += day.strategy;
+    runS.benchmark += day.benchmark;
+    runS.alpha += day.alpha;
+    return { trade_date: date, strategy: runS.strategy, benchmark: runS.benchmark, alpha: runS.alpha };
+  });
+
+  const scored = trades.filter((t) => t.alpha_pct != null && t.forward_return_pct != null && t.benchmark_return_pct != null);
+  const alpha_summary = {
+    n: scored.length,
+    avg_return_pct: mean(scored.map((t) => t.forward_return_pct as number)),
+    avg_benchmark_pct: mean(scored.map((t) => t.benchmark_return_pct as number)),
+    avg_alpha_pct: mean(scored.map((t) => t.alpha_pct as number)),
+    alpha_win_rate: scored.length ? scored.filter((t) => (t.alpha_pct as number) > 0).length / scored.length : null,
+    hit_rate: scored.length ? scored.filter((t) => (t.forward_return_pct as number) > 0).length / scored.length : null,
+  };
+
   return {
     window_days: windowDays,
     horizon_days: horizonDays,
     overall,
     trades: trades.sort((a, b) => b.trade_date.localeCompare(a.trade_date)),
     cumulative_by_signal,
+    cumulative_alpha,
+    alpha_summary,
     news_buckets,
     regime_breakdown,
     penalty_breakdown,
   };
 }
+
