@@ -29,6 +29,11 @@ import {
 } from "./signals-extended.server";
 import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
+import {
+  computeCrossSectionalRanks,
+  formatCrossSectionalBlock,
+  type RankInfo,
+} from "./cross-sectional-ranking.server";
 import { getNewsForDate } from "./news.server";
 import {
   ensureSentimentScored,
