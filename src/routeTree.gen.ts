@@ -18,6 +18,7 @@ import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
+import { Route as AuthenticatedPortfolioIdAttributionRouteImport } from './routes/_authenticated.portfolio.$id.attribution'
 
 const GetStartedRoute = GetStartedRouteImport.update({
   id: '/get-started',
@@ -65,6 +66,12 @@ const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
   path: '/api/public/hooks/daily-run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedPortfolioIdAttributionRoute =
+  AuthenticatedPortfolioIdAttributionRouteImport.update({
+    id: '/_authenticated/portfolio/$id/attribution',
+    path: '/portfolio/$id/attribution',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/get-started': typeof GetStartedRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
+  '/portfolio/$id/attribution': typeof AuthenticatedPortfolioIdAttributionRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
@@ -84,6 +92,7 @@ export interface FileRoutesByTo {
   '/get-started': typeof GetStartedRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
+  '/portfolio/$id/attribution': typeof AuthenticatedPortfolioIdAttributionRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
@@ -96,6 +105,7 @@ export interface FileRoutesById {
   '/get-started': typeof GetStartedRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRoute
+  '/_authenticated/portfolio/$id/attribution': typeof AuthenticatedPortfolioIdAttributionRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/get-started'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/portfolio/$id/attribution'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/get-started'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/portfolio/$id/attribution'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
@@ -131,6 +143,7 @@ export interface FileRouteTypes {
     | '/get-started'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/_authenticated/portfolio/$id/attribution'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
@@ -143,6 +156,7 @@ export interface RootRouteChildren {
   GetStartedRoute: typeof GetStartedRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRoute
+  AuthenticatedPortfolioIdAttributionRoute: typeof AuthenticatedPortfolioIdAttributionRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
   ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
@@ -213,6 +227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksDailyRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/portfolio/$id/attribution': {
+      id: '/_authenticated/portfolio/$id/attribution'
+      path: '/portfolio/$id/attribution'
+      fullPath: '/portfolio/$id/attribution'
+      preLoaderRoute: typeof AuthenticatedPortfolioIdAttributionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -223,6 +244,8 @@ const rootRouteChildren: RootRouteChildren = {
   GetStartedRoute: GetStartedRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRoute,
+  AuthenticatedPortfolioIdAttributionRoute:
+    AuthenticatedPortfolioIdAttributionRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
   ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
