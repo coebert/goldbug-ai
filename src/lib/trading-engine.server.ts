@@ -1163,6 +1163,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     console.warn("Signal-decay update skipped:", e),
   );
 
+  // K. Calibration loop: recompute Brier score & global sizing multiplier for next cycle.
+  computeAndPersistCalibration(portfolioId, asOf).catch((e) =>
+    console.warn("Calibration update skipped:", e),
+  );
+
 
   return { decision, executed, totalValue: newTotal, cash: workingCash, routedOrders };
 }
