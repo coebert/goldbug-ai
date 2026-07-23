@@ -1966,10 +1966,12 @@ export const runPortfolioOptimizer = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------------------
 
 type NewsReelInfluence = {
+  decision_id: string;
   portfolio_id: string;
   portfolio_name: string;
   run_date: string;
   sentiment: number | null;
+  rationale: string | null;
   actions: Array<{ action: string; symbol: string; qty?: number | null }>;
 };
 
@@ -2021,7 +2023,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     );
     const { data: decisions } = await context.supabase
       .from("decisions")
-      .select("id, portfolio_id, run_date, raw")
+      .select("id, portfolio_id, run_date, rationale, raw")
       .gte("run_date", since)
       .order("run_date", { ascending: false })
       .limit(120);
@@ -2062,10 +2064,12 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         };
         if (typeof n.sentiment === "number") { bucket.sum += n.sentiment; bucket.n += 1; }
         bucket.rows.push({
+          decision_id: d.id,
           portfolio_id: d.portfolio_id,
           portfolio_name: name,
           run_date: d.run_date,
           sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
+          rationale: (d.rationale ?? null) as string | null,
           actions: trimmed,
         });
         if (p) {
