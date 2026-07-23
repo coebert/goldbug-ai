@@ -210,7 +210,7 @@ export type ExecutedTrade = {
   rejected?: string;
 };
 
-async function callAiForDecision(args: {
+export async function callAiForDecision(args: {
   portfolio: Portfolio;
   holdings: Holding[];
   cashValue: number;
