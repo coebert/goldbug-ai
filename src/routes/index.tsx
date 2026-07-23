@@ -249,7 +249,32 @@ function NewHereBanner() {
   );
 }
 
-function PortfolioRow({ portfolio, sparkValues }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkValues: number[] }) {
+type SparkPoint = { date: string; value: number };
+type SparkRange = "1W" | "1M" | "3M" | "1Y" | "All";
+const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
+  { key: "1W", days: 7 },
+  { key: "1M", days: 30 },
+  { key: "3M", days: 90 },
+  { key: "1Y", days: 365 },
+  { key: "All", days: null },
+];
+
+function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[] }) {
+  const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
+  const sliced = useMemo(() => {
+    const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
+    if (!opt.days || sparkSeries.length === 0) return sparkSeries;
+    const cutoff = Date.now() - opt.days * 86_400_000;
+    const s = sparkSeries.filter((p) => {
+      const t = Date.parse(p.date);
+      return Number.isFinite(t) ? t >= cutoff : true;
+    });
+    return s.length >= 2 ? s : sparkSeries.slice(-2);
+  }, [sparkSeries, sparkRange]);
+  const values = sliced.map((p) => p.value);
+  const first = values[0];
+  const last = values[values.length - 1];
+  const rangePct = first != null && first > 0 && last != null ? ((last - first) / first) * 100 : null;
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const deleteMut = useMutation({
