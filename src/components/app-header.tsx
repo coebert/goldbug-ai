@@ -28,6 +28,13 @@ export function AppHeader({ email }: { email?: string | null }) {
             <span className="hidden sm:inline">Compare</span>
           </Link>
           <Link
+            to="/saxo-status"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-muted [&.active]:text-foreground"
+          >
+            <Plug className="h-4 w-4" />
+            <span className="hidden sm:inline">Saxo</span>
+          </Link>
+          <Link
             to="/admin"
             className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 font-medium text-primary hover:bg-primary/20 [&.active]:bg-primary [&.active]:text-primary-foreground"
           >
