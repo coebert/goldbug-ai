@@ -496,6 +496,18 @@ function PortfolioPage() {
                           </button>
                         ))}
                       </div>
+                      <label className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground" title="Annual risk-free rate used in Sharpe ratio">
+                        <span>Rf</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={riskFreeRate}
+                          onChange={(e) => setRiskFreeRate(Number(e.target.value) || 0)}
+                          className="w-14 bg-transparent text-foreground tabular-nums outline-none"
+                          aria-label="Risk-free rate (annual %)"
+                        />
+                        <span>%</span>
+                      </label>
                       <div className="inline-flex overflow-hidden rounded-md border border-border text-xs" role="group" aria-label="Benchmark compare mode">
                         {(["raw", "pct"] as const).map((mode) => (
                           <button
