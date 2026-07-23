@@ -115,14 +115,79 @@ export function NewsReel() {
             </Button>
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="text-muted-foreground uppercase tracking-wide">Asset:</span>
+          {ASSET_CLASSES.map((c) => {
+            const active = assetFilter.has(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => toggle(assetFilter, c, setAssetFilter)}
+                className={`rounded-full border px-2 py-0.5 transition-colors ${
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {c}
+              </button>
+            );
+          })}
+          <span className="ml-2 text-muted-foreground uppercase tracking-wide">Risk:</span>
+          {RISK_LEVELS.map((r) => {
+            const active = riskFilter.has(r);
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => toggle(riskFilter, r, setRiskFilter)}
+                className={`rounded-full border px-2 py-0.5 transition-colors ${
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {r}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setOnlyCited((v) => !v)}
+            className={`ml-2 rounded-full border px-2 py-0.5 transition-colors ${
+              onlyCited
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            title="Only show headlines the AI has cited in a decision"
+          >
+            Cited only
+          </button>
+          {(assetFilter.size > 0 || riskFilter.size > 0 || onlyCited) && (
+            <button
+              type="button"
+              onClick={() => { setAssetFilter(new Set()); setRiskFilter(new Set()); setOnlyCited(false); }}
+              className="ml-1 text-muted-foreground underline hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+          <span className="ml-auto text-muted-foreground">
+            {items.length} of {allItems.length}
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         {q.isLoading ? (
           <div className="h-72 animate-pulse rounded-md bg-muted/40" />
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No recent headlines cached yet. The next hourly run will populate this feed.
+            {allItems.length === 0
+              ? "No recent headlines cached yet. The next hourly run will populate this feed."
+              : "No headlines match the current filters."}
           </p>
+
         ) : (
           <div
             ref={scrollerRef}
