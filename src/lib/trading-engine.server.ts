@@ -18,9 +18,29 @@ import {
   rsi,
   pctChange,
   dailyVolatility,
-  type Candle,
 } from "./market-data.server";
+import {
+  macd,
+  bollingerWidth,
+  atrPct,
+  averageDailyVolume,
+  volumeWeightedMomentum,
+  weeklySnapshot,
+} from "./signals-extended.server";
+import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
 import { getNewsForDate } from "./news.server";
+import {
+  ensureSentimentScored,
+  aggregatedSentimentForSymbol,
+} from "./sentiment.server";
+import {
+  buildCorrelationMap,
+  correlatedClusterAllowance,
+  convictionSizedSpend,
+  refreshCooldownsFromRecentTrades,
+  isSymbolCooling,
+  upcomingEvents,
+} from "./portfolio-optimizer.server";
 import {
   filterUniverse,
   findSymbol,
@@ -52,8 +72,9 @@ const SignalWeightsSchema = z.object({
 const OrderSchema = z.object({
   symbol: z.string(),
   side: z.enum(["buy", "sell"]),
-  // Percentage of current cash to allocate (for buys) OR percentage of holding to sell.
   percent: z.number(),
+  // 0..1 model confidence in this specific call (used for Kelly-capped sizing)
+  conviction: z.number().min(0).max(1).optional(),
   reason: z.string(),
   signal_weights: SignalWeightsSchema,
 });
@@ -66,6 +87,7 @@ const DecisionSchema = z.object({
 });
 
 export type DecisionOutput = z.infer<typeof DecisionSchema>;
+
 
 function classesFromUniverse(u: unknown): Database["public"]["Enums"]["asset_class"][] {
   if (!Array.isArray(u)) return ["stock", "etf", "crypto", "commodity", "fx"];
