@@ -254,11 +254,19 @@ export async function runLongHorizonBacktest(opts: {
   universe: Array<{ symbol: string; asset_class: AssetClass }>;
   rebalance?: "monthly" | "quarterly";
   topK?: number;
+  execution?: Partial<ExecutionCosts>;
 }): Promise<LongHorizonResult> {
   const rebalance = opts.rebalance ?? "monthly";
   const topK = opts.topK ?? 6;
   const rp = riskProfile(opts.riskLevel);
   const rc: RiskConfig = parseRiskConfig(opts.riskConfig);
+  const execution: ExecutionCosts = {
+    commission_bps: Math.max(0, opts.execution?.commission_bps ?? 5),
+    slippage_bps: Math.max(0, opts.execution?.slippage_bps ?? 10),
+    min_trade_value: Math.max(0, opts.execution?.min_trade_value ?? 25),
+  };
+  const commRate = execution.commission_bps / 10_000;
+  const slipRate = execution.slippage_bps / 10_000;
 
   const [uniData, benchData] = await Promise.all([
     loadUniverseData(opts.universe, opts.from, opts.to),
@@ -281,9 +289,12 @@ export async function runLongHorizonBacktest(opts: {
       starting_cash: opts.startingCash,
       currency: opts.currency,
       rebalance,
+      execution,
       series: [],
       regimes: [],
       tradeCount: 0,
+      skippedSmallTrades: 0,
+      totalCostsPaid: 0,
     };
   }
 
@@ -292,6 +303,8 @@ export async function runLongHorizonBacktest(opts: {
   const holdings = new Map<string, { qty: number; avgCost: number }>();
   const strategyCurve: CurvePoint[] = [];
   let tradeCount = 0;
+  let skippedSmallTrades = 0;
+  let totalCostsPaid = 0;
   let prevDay: string | null = null;
 
   const priceOn = (sym: SymbolData, date: string): number | null => {
