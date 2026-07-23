@@ -288,6 +288,39 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
     return { balance: bal, positions: pos };
   });
 
+/**
+ * Preview the cash + position breakdown Saxo would use as the starting pot
+ * for a new live portfolio. Does NOT touch any portfolio row — pure read.
+ * Used by the "New portfolio" card before the user confirms real-money mode.
+ */
+export const previewBrokerBalance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { env: "sim" | "live" }) =>
+    z.object({ env: z.enum(["sim", "live"]) }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
+    const adapter = await buildSaxoAdapter({
+      userId: context.userId, portfolioId: null, envOverride: data.env,
+    });
+    const ping = await adapter.ping();
+    if (!ping.ok) throw new Error(`Broker ping failed: ${ping.reason ?? "unknown"}`);
+    const [bal, pos] = await Promise.all([adapter.getBalance(), adapter.getPositions()]);
+    const positionsValue = pos.reduce(
+      (s, p) => s + Number(p.marketPrice ?? 0) * Number(p.quantity ?? 0),
+      0,
+    );
+    return {
+      env: data.env,
+      accountId: ping.accountId ?? null,
+      currency: bal.currency,
+      cash: bal.cash,
+      positionsValue,
+      totalValue: bal.totalValue,
+      positionsCount: pos.length,
+      fetchedAt: new Date().toISOString(),
+    };
+  });
+
 export const getLiveStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { portfolioId: string }) =>
