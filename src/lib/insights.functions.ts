@@ -69,3 +69,62 @@ export const getPortfolioStress = createServerFn({ method: "GET" })
     const asOf = new Date().toISOString().slice(0, 10);
     return computePortfolioStress(data.portfolioId, asOf);
   });
+
+export const getLearningDiagnostics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const [calib, cfRows, hpRows] = await Promise.all([
+      context.supabase
+        .from("calibration_snapshots")
+        .select("brier_score, samples, hit_rate, avg_conviction, global_size_mult, notes, as_of")
+        .eq("portfolio_id", data.portfolioId)
+        .order("as_of", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      context.supabase
+        .from("counterfactuals")
+        .select("id, symbol, block_category, block_reason, forward_return_5d, evaluated_at, as_of")
+        .eq("portfolio_id", data.portfolioId)
+        .not("forward_return_5d", "is", null)
+        .order("as_of", { ascending: false })
+        .limit(200),
+      context.supabase
+        .from("hyperparam_history")
+        .select("run_date, validation_score, hyperparams")
+        .eq("portfolio_id", data.portfolioId)
+        .order("run_date", { ascending: false })
+        .limit(5),
+    ]);
+
+    const cfs = cfRows.data ?? [];
+    const evaluated = cfs.length;
+    const rets = cfs.map((c) => Number(c.forward_return_5d) || 0);
+    const avgRegret = evaluated ? rets.reduce((a, b) => a + b, 0) / evaluated : null;
+    const costlyBlocks = cfs.filter((c) => (Number(c.forward_return_5d) || 0) > 0.02).length;
+    const savedBlocks = cfs.filter((c) => (Number(c.forward_return_5d) || 0) < -0.02).length;
+    const byCategory = new Map<string, { n: number; sum: number }>();
+    for (const c of cfs) {
+      const k = (c.block_category as string) || "other";
+      const cur = byCategory.get(k) ?? { n: 0, sum: 0 };
+      cur.n++;
+      cur.sum += Number(c.forward_return_5d) || 0;
+      byCategory.set(k, cur);
+    }
+
+    return {
+      calibration: calib.data ?? null,
+      counterfactuals: {
+        evaluated,
+        avg_regret_5d: avgRegret,
+        costly_blocks: costlyBlocks,
+        saved_blocks: savedBlocks,
+        by_category: Array.from(byCategory.entries()).map(([category, v]) => ({
+          category,
+          n: v.n,
+          avg_return_5d: v.n ? v.sum / v.n : 0,
+        })),
+      },
+      walk_forward: hpRows.data ?? [],
+    };
+  });
