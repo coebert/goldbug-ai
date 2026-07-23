@@ -66,6 +66,7 @@ async function buildCandidateFeatures(
     rsi14: number | null;
     change5d: number | null;
     change30d: number | null;
+    vol20d: number | null;
   }> = [];
   await Promise.all(
     candidates.map(async (c) => {
@@ -82,11 +83,13 @@ async function buildCandidateFeatures(
         rsi14: rsi(closes, 14),
         change5d: pctChange(closes, 5),
         change30d: pctChange(closes, 30),
+        vol20d: dailyVolatility(closes, 20),
       });
     }),
   );
   return rows;
 }
+
 
 export type ExecutedTrade = {
   symbol: string;
