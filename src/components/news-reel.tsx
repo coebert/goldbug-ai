@@ -426,14 +426,45 @@ export function NewsReel() {
                                 <ul className="mt-2 space-y-2 border-l-2 border-primary/30 pl-3">
                                   {item.influences.map((inf, i) => {
                                     const infTone = sentimentTone(inf.sentiment);
+                                    const pct = inf.impact_pct;
+                                    const barPct = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+                                    const impactCls =
+                                      pct == null ? "text-muted-foreground bg-muted"
+                                      : pct >= 30 ? "text-primary bg-primary/10"
+                                      : pct >= 10 ? "text-foreground bg-muted"
+                                      : "text-muted-foreground bg-muted";
                                     return (
                                       <li key={`${inf.decision_id}-${i}`} className="rounded-sm bg-background/60 p-2 text-[11px]">
                                         <div className="mb-1 flex flex-wrap items-center gap-1.5">
                                           <span className="font-semibold text-foreground">{inf.portfolio_name}</span>
                                           <span className="text-muted-foreground">· run {inf.run_date}</span>
-                                          <Badge variant="outline" className={`ml-auto border-transparent text-[10px] ${infTone.cls}`}>
+                                          <Badge
+                                            variant="outline"
+                                            className={`ml-auto border-transparent text-[10px] ${impactCls}`}
+                                            title={
+                                              pct == null
+                                                ? "Contribution weight not available for this decision"
+                                                : `Contributed ${pct.toFixed(1)}% of this decision's news-weighted signal (|sentiment| × source weight)`
+                                            }
+                                          >
+                                            Impact {pct == null ? "n/a" : `${pct.toFixed(1)}%`}
+                                          </Badge>
+                                          <Badge variant="outline" className={`border-transparent text-[10px] ${infTone.cls}`}>
                                             {infTone.label}
                                           </Badge>
+                                        </div>
+                                        <div
+                                          className="mb-1.5 h-1 w-full overflow-hidden rounded-sm bg-muted"
+                                          title={
+                                            inf.source_weight != null && inf.sentiment != null
+                                              ? `sentiment ${inf.sentiment >= 0 ? "+" : ""}${inf.sentiment.toFixed(2)} × source weight ${inf.source_weight.toFixed(2)}`
+                                              : "contribution weight"
+                                          }
+                                        >
+                                          <div
+                                            className={`h-full ${pct != null && pct >= 30 ? "bg-primary" : "bg-primary/60"}`}
+                                            style={{ width: `${barPct}%` }}
+                                          />
                                         </div>
                                         {inf.actions.length > 0 ? (
                                           <div className="mb-1 flex flex-wrap gap-1">
