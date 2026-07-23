@@ -242,6 +242,73 @@ function LongHorizonPage() {
                 />
               </div>
 
+              <div className="rounded-md border border-border/60 p-2 space-y-2">
+                <div className="text-xs font-medium text-foreground">Execution realism</div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Model realistic fills: commission and slippage per side (in basis points, 100 bps = 1%) and a minimum trade notional. Applied to every strategy trade and to the initial benchmark buy.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="comm" className="text-xs">Commission (bps)</Label>
+                    <Input
+                      id="comm"
+                      type="number"
+                      min={0}
+                      max={500}
+                      step={1}
+                      value={commissionBps}
+                      onChange={(e) => setCommissionBps(Math.max(0, Math.min(500, Number(e.target.value) || 0)))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="slip" className="text-xs">Slippage (bps)</Label>
+                    <Input
+                      id="slip"
+                      type="number"
+                      min={0}
+                      max={500}
+                      step={1}
+                      value={slippageBps}
+                      onChange={(e) => setSlippageBps(Math.max(0, Math.min(500, Number(e.target.value) || 0)))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="mintrade" className="text-xs">
+                    Min trade size ({portfolio?.currency ?? "GBP"})
+                  </Label>
+                  <Input
+                    id="mintrade"
+                    type="number"
+                    min={0}
+                    max={100000}
+                    step={5}
+                    value={minTradeValue}
+                    onChange={(e) => setMinTradeValue(Math.max(0, Math.min(100000, Number(e.target.value) || 0)))}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {[
+                    { label: "Frictionless", c: 0, s: 0, m: 0 },
+                    { label: "Discount broker", c: 5, s: 10, m: 25 },
+                    { label: "Retail (typical)", c: 10, s: 20, m: 50 },
+                    { label: "High friction", c: 25, s: 50, m: 100 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      className="rounded-sm border border-border/60 px-1.5 py-0.5 text-[10px] hover:bg-muted/40"
+                      onClick={() => {
+                        setCommissionBps(preset.c);
+                        setSlippageBps(preset.s);
+                        setMinTradeValue(preset.m);
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <Button className="w-full" disabled={runMut.isPending} onClick={() => runMut.mutate()}>
                 <PlayCircle className="mr-2 h-4 w-4" />
                 {runMut.isPending ? "Running…" : "Run backtest"}
