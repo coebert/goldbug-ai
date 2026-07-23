@@ -15,7 +15,8 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge } from "lucide-react";
+import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge, Globe2 } from "lucide-react";
+import { eventColor, type EventCategory } from "@/lib/global-events";
 
 type Props = { portfolioId: string };
 
