@@ -35,6 +35,10 @@ import { LiveToggle } from "@/components/live-toggle";
 const AllPortfoliosChart = lazy(() =>
   import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
 );
+const NewsReel = lazy(() =>
+  import("@/components/news-reel").then((m) => ({ default: m.NewsReel })),
+);
+
 import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Explain } from "@/components/explain";
@@ -135,6 +139,13 @@ function Home() {
             <AllPortfoliosChart />
           </Suspense>
         </div>
+
+        <div className="mb-6">
+          <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
+            <NewsReel />
+          </Suspense>
+        </div>
+
 
 
 

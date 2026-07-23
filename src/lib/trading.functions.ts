@@ -1959,3 +1959,130 @@ export const runPortfolioOptimizer = createServerFn({ method: "POST" })
       empty: false,
     };
   });
+
+// ---------------------------------------------------------------------------
+// Global news reel — recent world-events headlines plus a note explaining how
+// the AI used each one in its recent decisions.
+// ---------------------------------------------------------------------------
+
+type NewsReelInfluence = {
+  portfolio_id: string;
+  portfolio_name: string;
+  run_date: string;
+  sentiment: number | null;
+  actions: Array<{ action: string; symbol: string; qty?: number | null }>;
+};
+
+type NewsReelItem = {
+  id: string;
+  date: string;
+  source: string | null;
+  headline: string;
+  url: string | null;
+  avg_sentiment: number | null;
+  decisions_count: number;
+  influences: NewsReelInfluence[];
+  note: string;
+};
+
+export const getGlobalNewsReel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ items: NewsReelItem[]; as_of: string }> => {
+    const asOf = new Date();
+    const since = new Date(asOf.getTime() - 5 * 86_400_000).toISOString().slice(0, 10);
+
+    // 1. Recent global news (auth-readable cache).
+    const { data: newsRows } = await context.supabase
+      .from("news_cache")
+      .select("id, news_date, source, headline, url")
+      .gte("news_date", since)
+      .order("news_date", { ascending: false })
+      .order("fetched_at", { ascending: false })
+      .limit(60);
+    const news = newsRows ?? [];
+    if (news.length === 0) return { items: [], as_of: asOf.toISOString() };
+
+    // 2. Recent decisions across the user's own portfolios.
+    const { data: portfolios } = await context.supabase
+      .from("portfolios")
+      .select("id, name");
+    const pMap = new Map((portfolios ?? []).map((p) => [p.id, p.name]));
+    const { data: decisions } = await context.supabase
+      .from("decisions")
+      .select("id, portfolio_id, run_date, raw")
+      .gte("run_date", since)
+      .order("run_date", { ascending: false })
+      .limit(120);
+
+    // 3. Build headline -> influences lookup.
+    const infl = new Map<string, { sum: number; n: number; rows: NewsReelInfluence[] }>();
+    for (const d of decisions ?? []) {
+      const name = pMap.get(d.portfolio_id) ?? "Portfolio";
+      const raw = (d.raw ?? {}) as {
+        news?: Array<{ headline?: string; sentiment?: number | null }>;
+        executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+        orders?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+      };
+      const usedNews = raw.news ?? [];
+      if (usedNews.length === 0) continue;
+      const acts = (raw.executed && raw.executed.length > 0 ? raw.executed : raw.orders) ?? [];
+      const trimmed = acts
+        .filter((a) => a && a.action && a.symbol && a.action !== "HOLD")
+        .slice(0, 4)
+        .map((a) => ({ action: String(a.action), symbol: String(a.symbol), qty: a.qty ?? null }));
+      for (const n of usedNews) {
+        const head = (n.headline ?? "").trim();
+        if (!head) continue;
+        const bucket = infl.get(head) ?? { sum: 0, n: 0, rows: [] };
+        if (typeof n.sentiment === "number") { bucket.sum += n.sentiment; bucket.n += 1; }
+        bucket.rows.push({
+          portfolio_id: d.portfolio_id,
+          portfolio_name: name,
+          run_date: d.run_date,
+          sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
+          actions: trimmed,
+        });
+        infl.set(head, bucket);
+      }
+    }
+
+    // 4. Assemble reel items with a plain-English note per headline.
+    const items: NewsReelItem[] = news.map((r) => {
+      const bucket = infl.get(r.headline.trim());
+      const rows = bucket?.rows ?? [];
+      const avg = bucket && bucket.n > 0 ? bucket.sum / bucket.n : null;
+      let note: string;
+      if (rows.length === 0) {
+        note = "Logged in the AI's briefing pool; no active decision has cited it yet.";
+      } else {
+        const tone = avg == null ? "neutral" : avg > 0.15 ? "bullish" : avg < -0.15 ? "bearish" : "neutral";
+        const acts = rows.flatMap((x) => x.actions);
+        const actSummary = acts.length === 0
+          ? "reinforced a HOLD across affected positions"
+          : Array.from(new Set(acts.map((a) => `${a.action} ${a.symbol}`))).slice(0, 3).join(", ");
+        const portfolioNames = Array.from(new Set(rows.map((r) => r.portfolio_name))).slice(0, 3).join(", ");
+        note = `Scored ${tone}${avg != null ? ` (${avg >= 0 ? "+" : ""}${avg.toFixed(2)})` : ""} and fed into ${rows.length} decision${rows.length === 1 ? "" : "s"} on ${portfolioNames} — ${actSummary}.`;
+      }
+      return {
+        id: r.id,
+        date: r.news_date,
+        source: r.source,
+        headline: r.headline,
+        url: r.url,
+        avg_sentiment: avg,
+        decisions_count: rows.length,
+        influences: rows.slice(0, 6),
+        note,
+      };
+    });
+
+    // Sort: cited items first, then newest.
+    items.sort((a, b) => {
+      if ((b.decisions_count > 0 ? 1 : 0) !== (a.decisions_count > 0 ? 1 : 0)) {
+        return (b.decisions_count > 0 ? 1 : 0) - (a.decisions_count > 0 ? 1 : 0);
+      }
+      return a.date < b.date ? 1 : -1;
+    });
+
+    return { items: items.slice(0, 40), as_of: asOf.toISOString() };
+  });
