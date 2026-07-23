@@ -88,6 +88,16 @@ function PortfolioPage() {
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
   const [benchmark, setBenchmark] = useState<string>("SPY");
+  const [compareMode, setCompareMode] = useState<"raw" | "pct">(() => {
+    if (typeof window === "undefined") return "raw";
+    const v = window.localStorage.getItem("aegis.compareMode");
+    return v === "pct" ? "pct" : "raw";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("aegis.compareMode", compareMode);
+    }
+  }, [compareMode]);
   const [chartContrast, setChartContrast] = useState<"standard" | "high" | "light" | "cb">(() => {
     if (typeof window === "undefined") return "standard";
     const v = window.localStorage.getItem("aegis.chartContrast");
