@@ -369,6 +369,39 @@ export type Database = {
           },
         ]
       }
+      market_events: {
+        Row: {
+          created_at: string
+          event_date: string
+          id: string
+          impact: string
+          kind: string
+          notes: string | null
+          symbol: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          event_date: string
+          id?: string
+          impact?: string
+          kind: string
+          notes?: string | null
+          symbol?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          event_date?: string
+          id?: string
+          impact?: string
+          kind?: string
+          notes?: string | null
+          symbol?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       market_regimes: {
         Row: {
           as_of: string
@@ -407,32 +440,38 @@ export type Database = {
       }
       news_cache: {
         Row: {
+          entities: Json | null
           fetched_at: string
           headline: string
           id: string
           news_date: string
           sentiment: string | null
           source: string | null
+          source_weight: number | null
           summary: string | null
           url: string | null
         }
         Insert: {
+          entities?: Json | null
           fetched_at?: string
           headline: string
           id?: string
           news_date: string
           sentiment?: string | null
           source?: string | null
+          source_weight?: number | null
           summary?: string | null
           url?: string | null
         }
         Update: {
+          entities?: Json | null
           fetched_at?: string
           headline?: string
           id?: string
           news_date?: string
           sentiment?: string | null
           source?: string | null
+          source_weight?: number | null
           summary?: string | null
           url?: string | null
         }
@@ -480,6 +519,7 @@ export type Database = {
         Row: {
           broker: string | null
           broker_account_id: string | null
+          circuit_breaker: Json
           created_at: string
           currency: string
           current_cash: number
@@ -487,6 +527,7 @@ export type Database = {
           last_run_date: string | null
           live_activated_at: string | null
           live_paused: boolean
+          loss_cooldowns: Json
           mode: Database["public"]["Enums"]["portfolio_mode"]
           name: string
           risk_config: Json
@@ -500,6 +541,7 @@ export type Database = {
         Insert: {
           broker?: string | null
           broker_account_id?: string | null
+          circuit_breaker?: Json
           created_at?: string
           currency?: string
           current_cash?: number
@@ -507,6 +549,7 @@ export type Database = {
           last_run_date?: string | null
           live_activated_at?: string | null
           live_paused?: boolean
+          loss_cooldowns?: Json
           mode?: Database["public"]["Enums"]["portfolio_mode"]
           name?: string
           risk_config?: Json
@@ -520,6 +563,7 @@ export type Database = {
         Update: {
           broker?: string | null
           broker_account_id?: string | null
+          circuit_breaker?: Json
           created_at?: string
           currency?: string
           current_cash?: number
@@ -527,6 +571,7 @@ export type Database = {
           last_run_date?: string | null
           live_activated_at?: string | null
           live_paused?: boolean
+          loss_cooldowns?: Json
           mode?: Database["public"]["Enums"]["portfolio_mode"]
           name?: string
           risk_config?: Json
