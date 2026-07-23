@@ -236,6 +236,112 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
         </CardContent>
       </Card>
 
+      {/* Event impact */}
+      {eventImpact && eventImpact.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Globe2 className="h-4 w-4" />
+              Feature importance & calibration by global event
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Trades placed inside major event windows vs calm periods. Compare which signals dominated the AI's
+              rationale and whether conviction matched outcomes.
+            </p>
+            <div className="overflow-hidden rounded-md border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Period</th>
+                    <th className="px-3 py-2 text-right">N</th>
+                    <th className="px-3 py-2 text-right">Win rate</th>
+                    <th className="px-3 py-2 text-right">Avg return</th>
+                    <th className="px-3 py-2 text-right">Avg conv.</th>
+                    <th className="px-3 py-2 text-left">Top signal</th>
+                    <th className="px-3 py-2 text-left w-[38%]">Feature importance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eventImpact.map((e) => {
+                    const isCalm = e.id === "__calm";
+                    const color = isCalm
+                      ? "hsl(var(--muted-foreground))"
+                      : eventColor(e.category as EventCategory);
+                    const winPct = (e.winRate * 100).toFixed(0);
+                    const avgRet = (e.avgReturn * 100).toFixed(2);
+                    return (
+                      <tr key={e.id} className="border-t border-border align-top">
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block h-2 w-2 rounded-sm shrink-0"
+                              style={{ background: color }}
+                            />
+                            <div>
+                              <div className="font-medium">{e.label}</div>
+                              {!isCalm && (
+                                <div className="text-[10px] text-muted-foreground">
+                                  {e.start} → {e.end}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">{e.n}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{winPct}%</td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums ${
+                            e.avgReturn >= 0 ? "text-emerald-400" : "text-rose-400"
+                          }`}
+                        >
+                          {avgRet}%
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                          {(e.avgConviction * 100).toFixed(0)}%
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {SIGNAL_LABELS[e.topSignal] ?? e.topSignal}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex h-2 w-full overflow-hidden rounded bg-muted/30">
+                            {(Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).map((k, i) => {
+                              const v = Math.max(0, Number(e.weights[k] ?? 0));
+                              const palette = [
+                                "hsl(var(--primary))",
+                                "hsl(var(--chart-2, 173 58% 39%))",
+                                "hsl(43 90% 55%)",
+                                "hsl(280 70% 62%)",
+                                "hsl(0 84% 60%)",
+                              ];
+                              return (
+                                <div
+                                  key={k}
+                                  style={{ width: `${Math.min(100, v)}%`, background: palette[i % palette.length] }}
+                                  title={`${SIGNAL_LABELS[k]}: ${v.toFixed(0)}%`}
+                                />
+                              );
+                            })}
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground tabular-nums">
+                            {(Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).map((k) => (
+                              <span key={k}>
+                                {SIGNAL_LABELS[k]}: {Math.max(0, Number(e.weights[k] ?? 0)).toFixed(0)}%
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Behavior drift */}
       <Card>
         <CardHeader>
