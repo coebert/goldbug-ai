@@ -2026,7 +2026,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     const fetchCap = Math.min(500, limit + 60);
     const { data: newsRows } = await context.supabase
       .from("news_cache")
-      .select("id, news_date, source, headline, url, summary, original_headline, original_language")
+      .select("id, news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
       .gte("news_date", since)
       .order("news_date", { ascending: false })
       .order("fetched_at", { ascending: false })
@@ -2149,6 +2149,11 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         url: r.url,
         original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
         original_language: (r as { original_language?: string | null }).original_language ?? null,
+        translation_confidence: (() => {
+          const c = (r as { translation_confidence?: number | string | null }).translation_confidence;
+          return c == null ? null : Number(c);
+        })(),
+
         avg_sentiment: avg,
         decisions_count: rows.length,
         influences: rows.slice(0, 6),
