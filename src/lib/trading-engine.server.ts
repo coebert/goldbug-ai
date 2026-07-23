@@ -147,6 +147,14 @@ async function callAiForDecision(args: {
     .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}%`)
     .join(", ");
 
+  const r = args.regime;
+  const regimeBlock = `MACRO REGIME (auto-detected from SPY/VIX/GLD/TLT as of ${r.as_of}):
+- Current regime: ${humanRegime(r.regime)} (confidence ${(r.confidence * 100).toFixed(0)}%)
+- Previous stored regime: ${r.previous_regime ? humanRegime(r.previous_regime) : "n/a"}${r.transitioned ? " — REGIME TRANSITION DETECTED TODAY" : ""}
+- Signals: ${r.notes}
+- Prior playbook for this regime: ${regimeDescription(r.regime)}
+${r.transitioned ? "Because the regime just shifted, explicitly reassess existing holdings under the new prior and note it in the rationale." : "Bias posture toward the current regime's playbook."}`;
+
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
@@ -159,6 +167,8 @@ HARD RULES YOU MUST NEVER BREAK:
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
+
+${regimeBlock}
 
 ${HISTORICAL_PLAYBOOK}
 
@@ -180,8 +190,8 @@ ${args.news
   .join("\n")}
 
 Return:
-- briefing: 2-3 sentences on market context today.
-- rationale: 2-4 sentences explaining today's actions.
+- briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}).
+- rationale: 2-4 sentences explaining today's actions in light of the regime and priors.
 - orders: array of trades to place today. Each order has:
     symbol (must be from candidate list),
     side ("buy" or "sell"),
