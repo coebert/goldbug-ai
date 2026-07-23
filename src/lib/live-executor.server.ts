@@ -64,7 +64,7 @@ export async function routeOrdersToBroker(params: {
         method: "ROUTE_SKIPPED_PAPER_ONLY",
         path: "/route/paper-only",
         status: 0,
-        request: { asOf, decisionId, count: routable.length } as never,
+        request: { asOf, decisionId, count: executed.length } as never,
         response: null,
         error: "LIVE_SIM_PAPER_ONLY env flag active",
       });
