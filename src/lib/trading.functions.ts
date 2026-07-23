@@ -2265,8 +2265,11 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       body: JSON.stringify({ manual: true, triggered_at: new Date().toISOString() }),
     });
     const text = await res.text();
-    let payload: unknown = null;
-    try { payload = JSON.parse(text); } catch { payload = text; }
+    let payload: Record<string, unknown> | string | null = null;
+    try {
+      const parsed = JSON.parse(text);
+      payload = (parsed && typeof parsed === "object") ? (parsed as Record<string, unknown>) : String(parsed);
+    } catch { payload = text; }
     if (!res.ok) {
       const msg =
         payload && typeof payload === "object" && "error" in payload
