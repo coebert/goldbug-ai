@@ -331,7 +331,10 @@ function AttributionPage() {
                       <th className="text-left pr-2">Symbol</th>
                       <th className="text-left pr-2">Side</th>
                       <th className="text-right pr-2">Fwd return</th>
+                      <th className="text-right pr-2">SPY</th>
+                      <th className="text-right pr-2">Alpha</th>
                       <th className="text-right pr-2">News</th>
+
                       <th className="text-left pr-2">Regime</th>
                       <th className="text-left pr-2">Penalties</th>
                       <th className="text-left">Top signal contrib</th>
