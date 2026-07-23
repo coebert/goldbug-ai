@@ -353,9 +353,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }, 0);
   const totalValue = cash + holdingsValue;
 
+  // Circuit breaker: evaluate BEFORE spending on the AI call. If tripped,
+  // we still run auto-liquidation stops but skip the AI + any new buys.
+  const priorCircuit = parseCircuit(portfolio.circuit_breaker);
+  const circuit = await evaluateBreaker(portfolioId, asOf, priorCircuit).catch(() => priorCircuit);
+  const breakerTripped = circuit.paused;
+
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
 
-  const [rawNews, regime, learning, crossAsset, cooldowns, events] = await Promise.all([
+  const [rawNews, regime, learning, crossAsset, cooldowns, events, attribution] = await Promise.all([
     opts?.skipNews ? Promise.resolve([]) : getNewsForDate(asOf).catch(() => []),
     detectAndPersistRegime(asOf).catch((e) => {
       console.warn("Regime detection failed:", e);
@@ -375,7 +381,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     getCrossAssetSnapshot(asOf).catch(() => null),
     refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
     upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)).catch(() => []),
+    computeAttribution(portfolioId, asOf).catch(() => null),
   ]);
+
 
   // Score news sentiment (LLM pass, cached), then aggregate per-symbol
   const scoredNews = rawNews.length > 0
