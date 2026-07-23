@@ -351,6 +351,23 @@ function PortfolioPage() {
                         <option value="GLD">GLD (Gold)</option>
                         <option value="BTC-USD">BTC-USD</option>
                       </select>
+                      <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+                        {(["standard", "high", "light"] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setChartContrast(mode)}
+                            className={`px-2 py-1 font-normal capitalize transition-colors ${
+                              chartContrast === mode
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-background text-muted-foreground hover:text-foreground"
+                            }`}
+                            title={`${mode} contrast`}
+                          >
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
                       <EventOverlayControls
                         domainDates={equityData.map((d) => d.date)}
                         enabled={eventsOn}
