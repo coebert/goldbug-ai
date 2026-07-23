@@ -519,6 +519,34 @@ export function NewsReel() {
                             {item.source && (
                               <span className="ml-1 not-italic text-[10px] text-muted-foreground">— {item.source}</span>
                             )}
+                            <span className="mt-1 flex items-center gap-2 not-italic">
+                              {item.url ? (
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="inline-flex items-center gap-1 rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+                                  title={item.source ? `Open the original article at ${item.source}` : "Open the original article"}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  View source
+                                </a>
+                              ) : (
+                                <a
+                                  href={`https://www.google.com/search?q=${encodeURIComponent(item.headline)}&tbm=nws`}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="inline-flex items-center gap-1 rounded-sm border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                                  title="No direct URL available — search this headline on Google News"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Search source
+                                </a>
+                              )}
+                              <span className="text-[10px] not-italic text-muted-foreground">
+                                Open the original article to verify this excerpt.
+                              </span>
+                            </span>
                           </blockquote>
                         )}
                         {cited && item.influences.length > 0 && (() => {
