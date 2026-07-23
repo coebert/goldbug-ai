@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   activateLive, deactivateLive, pauseLive, killAllLive, resumeAllLive, getAuditLog,
   pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio,
+  startSaxoOAuth, getSaxoOAuthStatus,
 } from "@/lib/live.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
