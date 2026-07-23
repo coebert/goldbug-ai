@@ -136,15 +136,17 @@ export function convictionSizedSpend(args: {
   conviction: number;
   edge?: number;
   volPct?: number | null; // 20d daily vol
+  kellyCap?: number | null; // tuned per portfolio; defaults to 0.25 for safety
 }): number {
   const conviction = Math.max(0, Math.min(1, args.conviction));
   const edge = args.edge ?? 0.02;
   const vol = args.volPct && args.volPct > 0 ? args.volPct : 0.02;
+  const cap = args.kellyCap && args.kellyCap > 0 ? Math.min(0.5, args.kellyCap) : 0.25;
   const rawKelly = (edge * conviction) / (vol * vol);
-  const kelly = Math.max(0, Math.min(0.25, rawKelly));
+  const kelly = Math.max(0, Math.min(cap, rawKelly));
   // Blend: at low conviction shrink base size aggressively; at high conviction allow full base.
   const scale = 0.25 + 0.75 * conviction;
-  const kellyBudget = args.baseSize * (kelly / 0.25); // normalize so kelly=0.25 => baseSize
+  const kellyBudget = args.baseSize * (kelly / cap); // normalize so kelly=cap => baseSize
   return Math.min(args.baseSize, Math.max(kellyBudget, args.baseSize * scale * 0.5));
 }
 
