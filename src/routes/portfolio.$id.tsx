@@ -44,6 +44,7 @@ import { RiskControlsCard } from "@/components/risk-controls-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
+import { LiveTradingCard } from "@/components/live-trading-card";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 
@@ -440,6 +441,10 @@ function PortfolioPage() {
 
             <div className="mb-6">
               <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
+            </div>
+
+            <div className="mb-6">
+              <LiveTradingCard portfolioId={id} />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">

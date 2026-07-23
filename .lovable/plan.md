@@ -1,100 +1,110 @@
-# AI Market Analyst & Paper Trader — v1 Plan
+# Wire Aegis for live investing (Saxo Bank)
 
-A web app that gives an AI a virtual £1000 pot and lets it decide what to buy/sell across global markets. Two modes: **Backtest** (replay history to prove the strategy) and **Live Paper** (daily decisions against real current prices). No real money, no borrowing, no leverage — the AI can only spend what's in the cash balance.
+## What this delivers
 
-## What you'll be able to do
+You keep everything you have today (paper mode, backtests, diagnostics, learning). On top of that, each portfolio gets a **Mode** switch:
 
-- Set a starting pot (default £1000) and a **risk level** (Conservative / Balanced / Aggressive) that controls position sizing, diversification, and how volatile an asset the AI is allowed to touch.
-- Choose the **asset universe**: US stocks & ETFs, UK/EU stocks, major crypto (BTC, ETH, SOL, etc.), and commodities/FX (gold, oil, GBP/USD, EUR/USD).
-- Run a **backtest** over a chosen date range (e.g. last 2 years) and see equity curve, drawdown, win rate, Sharpe ratio, and a trade log.
-- Switch on **live paper trading** — once a day (after market close) the AI reviews positions, reads recent news, and places simulated buy/sell orders at the day's closing price.
-- Browse a **dashboard**: current portfolio value, P&L vs. £1000, holdings, cash, trade history, and the AI's written rationale for each decision.
-- Read the **AI's daily briefing**: a summary of what happened in the world and how it influenced the day's trades.
+- **Paper** (current default) — nothing changes.
+- **Live** — the same AI decision loop, but orders go to your Saxo account.
 
-## Guardrails (hard rules the AI cannot break)
+Flipping Live is a deliberate two-step confirmation, and there is a big red **Kill switch** that pauses all live activity across every portfolio instantly.
 
-- Cash balance can never go negative — no borrowing, no margin, no shorting, no options.
-- Total exposure ≤ 100% of portfolio value.
-- Position size caps depend on risk level (e.g. Conservative = max 10% per asset, Aggressive = max 25%).
-- No further money is ever added; once £1000 is gone, it's gone.
+## Saxo — what you need to do (once)
 
-## Screens
+Saxo's API is OAuth2. To keep this practical for a personal app I'll wire it up with the **24-hour developer access token** flow first (Saxo → Developer Portal → "24-Hour Token"), and leave a clean upgrade path to full OAuth later. You'll:
 
-1. **Setup** — starting pot, risk level, asset universe checkboxes, mode (backtest / live paper).
-2. **Dashboard** — portfolio value, P&L, holdings table, cash, allocation chart.
-3. **Decisions & Rationale** — chronological AI journal: what it saw, what it did, why.
-4. **Backtest Report** — equity curve, key stats, per-trade log, comparison vs. buy-and-hold benchmark.
-5. **Settings** — adjust risk, pause/resume the AI, reset the simulation.
+1. Open a Saxo account (or use existing) and enable Developer Portal access.
+2. Start in **SIM environment** (Saxo's free simulator with real market data) — I'll default the app to SIM. Live production requires flipping one env value.
+3. Paste your 24h token into the app's secrets when prompted. You'll refresh it daily from Saxo's portal; the UI will show a countdown and warn 2h before expiry.
 
----
+Full OAuth (auto-refreshing 30-day tokens) needs Saxo to approve an app registration — I'll build the adapter so we can turn that on later without touching the trading engine.
 
-## Technical section
+## Safety rails (all on by default)
 
-### Stack
-- **Frontend**: TanStack Start (existing), Tailwind, shadcn/ui, Recharts for equity curve & allocation.
-- **Backend**: Lovable Cloud (Postgres + auth) for portfolio state, trades, decisions, news cache.
-- **AI**: Lovable AI Gateway with `google/gemini-3.6-flash` for daily reasoning + news summarisation. Structured output (Zod schema) for trade orders.
-- **Market data (free tiers)**:
-  - Stocks/ETFs/FX/commodities: Yahoo Finance (unofficial) or Alpha Vantage (free key).
-  - Crypto: CoinGecko public API.
-- **News**: GDELT 2.0 DOC API (free, global, no key) + a couple of RSS feeds (Reuters, BBC Business), summarised & scored by the AI.
-- **Scheduling**: `pg_cron` in Lovable Cloud → hits a public server route (`/api/public/daily-tick`) once a day with an HMAC secret.
+- **SIM by default.** Live production requires a separate toggle inside the LIVE flow — not the same click.
+- **Kill switch** — global; sets every live portfolio to `paused`, cancels open orders.
+- **Guardrail re-check pre-submit** — the existing risk_config (per-asset cap, no leverage, stop-loss, take-profit) is enforced client-side by the AI AND server-side before every order is sent.
+- **No margin, ever.** Adapter refuses any order that would require borrowed cash. Uses Saxo cash account order types only.
+- **Order-size sanity caps** — reject any single order > 25% of portfolio, > 5x recent avg trade size, or below broker minimum.
+- **Idempotency** — every AI decision gets a UUID; the adapter refuses to submit the same decision twice.
+- **Reconciliation** — after every hourly run, pull actual Saxo positions + cash and reconcile against our DB; flag drift.
+- **Full audit log** — every request/response to Saxo (with secrets redacted) stored in `live_broker_log`.
 
-### Data model (Cloud tables)
-- `portfolios` — id, user_id, name, starting_cash, current_cash, risk_level, universe (jsonb), mode (`backtest`|`live`), status, created_at.
-- `holdings` — portfolio_id, symbol, asset_class, quantity, avg_cost.
-- `trades` — portfolio_id, symbol, side (`buy`|`sell`), quantity, price, executed_at, rationale_id.
-- `decisions` — portfolio_id, run_date, briefing (text), rationale (text), model, raw_json.
-- `price_cache` — symbol, date, ohlcv (avoid re-hitting APIs).
-- `news_cache` — date, source, headline, url, summary, sentiment.
-- `backtest_runs` — portfolio_id, start_date, end_date, final_value, sharpe, max_drawdown, metrics jsonb.
+## What changes in the app
 
-RLS: each user only sees their own portfolios. Standard `user_roles` + `has_role` pattern.
+### Database (new migration)
 
-### Server functions (`createServerFn`, called from UI)
-- `createPortfolio`, `updatePortfolio`, `resetPortfolio`.
-- `runBacktest({ portfolioId, start, end })` — streams progress; loops day-by-day, calls the AI decision function per day using only data available up to that date.
-- `getDashboard(portfolioId)` — returns holdings + latest prices + P&L.
-- `getDecisionJournal(portfolioId)`.
+- `portfolios.mode` extended: `paper | live_sim | live_prod` (default `paper`).
+- `portfolios.broker` = `'saxo'` when live; `portfolios.broker_account_id` stored.
+- `portfolios.live_paused` boolean (kill-switch state).
+- New table `live_orders` — our intent (decision_id, symbol, side, qty, limit/market, status).
+- New table `live_fills` — Saxo fills mapped back to orders.
+- New table `live_broker_log` — audit trail of API calls.
+- New table `live_reconciliation` — nightly snapshot of broker cash + positions vs our record, with `drift_flag`.
 
-### AI decision function (server-only)
-Input assembled per tick:
-- Portfolio state (cash, holdings, cost basis, risk level, universe).
-- Recent price history for candidate symbols (technical features: 20/50/200-day MA, RSI, volatility).
-- Top news of the last 24h, pre-summarised.
-- Explicit guardrail prompt (no borrowing, position caps, cash constraint).
+### Broker adapter
 
-Output (structured JSON via AI SDK `Output.object`):
-```
-{ briefing: string, orders: [{ symbol, side, quantityOrPctOfCash, reason }] }
-```
-Orders are then validated in code (cap enforcement, cash check, symbol whitelist) before being written as `trades` and applied to `holdings`. Any order violating a rule is rejected and logged — the AI never touches state directly.
+- `src/lib/brokers/adapter.ts` — interface: `getBalance`, `getPositions`, `placeOrder`, `cancelOrder`, `listOrders`, `ping`.
+- `src/lib/brokers/saxo.server.ts` — Saxo implementation, uses `SAXO_ACCESS_TOKEN`, `SAXO_ENV` (`sim`|`live`). Handles instrument lookup (Uic), rounding to tick size, market-hours check.
+- `src/lib/brokers/stub.server.ts` — dry-run adapter (already in spirit — logs only).
 
-### Public cron endpoint
-`/api/public/daily-tick` — HMAC-signed, called by pg_cron. Iterates over all live portfolios, fetches prices + news, calls the AI, executes vetted orders at the day's close price.
+### Trading engine
 
-### Backtest engine
-Same decision function, but fed historical slices. Runs in a server function with progress written to a `backtest_runs` row so the UI can poll.
+- `runHourlyCycle` gains a branch: for portfolios with `mode != 'paper'`, after the AI produces a decision, call `submitLiveDecision(portfolio, decision)` instead of the paper trade writer.
+- `submitLiveDecision` runs guardrails → creates `live_orders` row → calls adapter → writes `live_broker_log` → on fill webhook/poll, writes `live_fills` and updates `holdings` / cash from **broker-reported** values (source of truth).
+- Global kill: if `live_paused=true` on the portfolio OR the global `LIVE_KILL_SWITCH` flag is set, engine short-circuits before any broker call.
 
-### Risk-level mapping
-| Level | Max position | Max asset classes | Volatility cap | Cash floor |
-|---|---|---|---|---|
-| Conservative | 10% | broad ETFs, blue-chip | low | 20% |
-| Balanced | 15% | + individual stocks, majors crypto | medium | 10% |
-| Aggressive | 25% | full universe | high | 0% |
+### UI
 
-### Out of scope for v1 (call out explicitly)
-- Real brokerage execution (Alpaca/IBKR) — architecture leaves a `broker` adapter interface for later.
-- Intraday trading, options, shorting, leverage.
-- Tax accounting.
+- **Portfolio page** gains a "Live trading" card:
+  - Mode selector (Paper / Live SIM / Live PROD) with distinct colours.
+  - Broker connection status (token expiry countdown, last successful ping).
+  - Live positions table (from Saxo, side-by-side with our DB — drift highlighted).
+  - Recent live orders/fills stream.
+  - Big red **Pause live trading** button (per portfolio) + global kill-switch in the header.
+- **First-run wizard** for Live activation: 4-step modal — read risks, confirm SIM first, connect Saxo token, read broker balance and confirm starting capital.
+- **Get Started** wizard gets a "Try live in SIM" branch after the paper run.
 
-### Build order
-1. Enable Lovable Cloud + schema + RLS.
-2. Market data + news fetchers with caching.
-3. AI decision function with structured output + guardrail validator.
-4. Backtest engine + report UI.
-5. Live paper mode + daily cron.
-6. Dashboard, decision journal, settings polish.
+### Server routes / functions
 
-### Honest caveat shown in the UI
-A persistent banner: *"Simulation only. Past performance and backtests do not predict future results. Do not use this to make real investment decisions."*
+- `src/lib/live.functions.ts` — `activateLive`, `deactivateLive`, `pauseLive`, `resumeLive`, `syncBrokerBalance`, `getLiveStatus`, `getLivePositions`. All `requireSupabaseAuth`.
+- `src/routes/api/public/hooks/live-reconcile.ts` — nightly reconciliation (pg_cron @ 23:30 UTC, protected by `CRON_SECRET`).
+- Existing `hourly-run.ts` gains the live branch (guarded — SIM by default until you flip PROD).
+
+### Secrets to be added (when you're ready)
+
+- `SAXO_ACCESS_TOKEN` — your 24h dev token.
+- `SAXO_ENV` — `sim` (default) or `live`.
+- `SAXO_APP_KEY` / `SAXO_APP_SECRET` — placeholder for later OAuth upgrade.
+
+I'll only prompt for these the first time you click **Activate Live**.
+
+## Technical details
+
+- Saxo base URL: `https://gateway.saxobank.com/sim/openapi` (SIM) / `.../openapi` (live). Bearer auth via `Authorization: Bearer <token>`.
+- Instrument lookup: `/ref/v1/instruments?Keywords=<symbol>&AssetTypes=Stock,Etf` → cache Uic per symbol in a new `saxo_instrument_cache` table (24h TTL).
+- Order placement: `/trade/v2/orders` — cash account, `OrderType=Market` or `Limit`, `AmountType=Quantity`, `OrderDuration.DurationType=DayOrder`.
+- Fills: poll `/port/v1/orders/me` + `/port/v1/positions/me` on each cycle; also subscribe to Saxo's ENS (Event Notification Service) later if we upgrade to full OAuth.
+- Rate limits: Saxo publishes per-endpoint quotas; adapter uses a token bucket (60 req/min conservative default), logs 429s.
+- Position sizing: unchanged — uses your existing risk_config; on Live activation we call `getBalance()` and set `portfolio.starting_cash` from broker cash (as you chose).
+- No CFDs, no margin, no FX leverage — adapter rejects those instrument categories at the lookup step.
+
+## What I will NOT do in this change
+
+- No full OAuth flow (keeping it manual-token for v1; upgrade path documented in code).
+- No options / futures / CFDs.
+- No auto-refresh of the 24h token (Saxo doesn't allow it without app approval).
+- No changes to the paper engine, backtests, or learning system.
+
+## Order of implementation
+
+1. DB migration (portfolios columns + 4 new tables + grants + RLS).
+2. Broker adapter interface + Saxo implementation (SIM only initially).
+3. `live.functions.ts` server functions + kill-switch.
+4. Trading engine branch + guardrail re-check.
+5. Portfolio UI "Live trading" card + kill-switch header button.
+6. Live activation wizard + secrets prompt.
+7. Reconciliation cron + audit log viewer.
+8. Documentation card explaining the daily token refresh routine.
+
+After step 2 the app is safe to deploy (nothing routes to Saxo yet). Live only becomes reachable after step 6 when you personally activate a portfolio.
