@@ -194,6 +194,7 @@ export function AllPortfoliosChart() {
               />
               <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12, color: AXIS_COLOR }} />
               <Area
+                yAxisId="value"
                 type="monotone"
                 dataKey="total"
                 name="Total"
@@ -205,6 +206,7 @@ export function AllPortfoliosChart() {
               {portfolios.map((p, i) => (
                 <Line
                   key={p.id}
+                  yAxisId="value"
                   type="monotone"
                   dataKey={p.id}
                   name={p.name}
@@ -215,6 +217,7 @@ export function AllPortfoliosChart() {
                   isAnimationActive={false}
                 />
               ))}
+
             </ComposedChart>
           </ResponsiveContainer>
         </div>
