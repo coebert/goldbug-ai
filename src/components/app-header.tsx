@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Shield, GitCompare, Sparkles } from "lucide-react";
+import { TrendingUp, Shield, GitCompare, Sparkles, Plug } from "lucide-react";
 
 export function AppHeader({ email }: { email?: string | null }) {
   return (
@@ -26,6 +26,13 @@ export function AppHeader({ email }: { email?: string | null }) {
           >
             <GitCompare className="h-4 w-4" />
             <span className="hidden sm:inline">Compare</span>
+          </Link>
+          <Link
+            to="/saxo-status"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-muted [&.active]:text-foreground"
+          >
+            <Plug className="h-4 w-4" />
+            <span className="hidden sm:inline">Saxo</span>
           </Link>
           <Link
             to="/admin"

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -24,6 +25,11 @@ import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/pu
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 
+const SaxoStatusRoute = SaxoStatusRouteImport.update({
+  id: '/saxo-status',
+  path: '/saxo-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GetStartedRoute = GetStartedRouteImport.update({
   id: '/get-started',
   path: '/get-started',
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/saxo-status': typeof SaxoStatusRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/portfolio/$id/attribution'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/portfolio/$id/attribution'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/get-started'
+    | '/saxo-status'
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/portfolio/$id/attribution'
@@ -202,6 +214,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CompareRoute: typeof CompareRoute
   GetStartedRoute: typeof GetStartedRoute
+  SaxoStatusRoute: typeof SaxoStatusRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
@@ -212,6 +225,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/saxo-status': {
+      id: '/saxo-status'
+      path: '/saxo-status'
+      fullPath: '/saxo-status'
+      preLoaderRoute: typeof SaxoStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/get-started': {
       id: '/get-started'
       path: '/get-started'
@@ -335,6 +355,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
   GetStartedRoute: GetStartedRoute,
+  SaxoStatusRoute: SaxoStatusRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
