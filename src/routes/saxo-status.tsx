@@ -199,7 +199,23 @@ function EnvCard({
 }
 
 function SaxoStatusPage() {
-  const { user } = useSessionUser();
+  const navigate = useNavigate();
+  const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setReady(true);
+      if (!data.session) navigate({ to: "/auth" });
+    });
+    const { data } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s);
+      if (!s) navigate({ to: "/auth" });
+    });
+    return () => data.subscription.unsubscribe();
+  }, [navigate]);
+
   const fetchStatus = useServerFn(getSaxoOAuthStatus);
   const startOAuth = useServerFn(startSaxoOAuth);
 
@@ -207,7 +223,7 @@ function SaxoStatusPage() {
     queryKey: ["saxo-status"],
     queryFn: () => fetchStatus(),
     refetchInterval: 30_000,
-    enabled: !!user,
+    enabled: !!session,
   });
 
   const onConnect = async (env: EnvKey) => {
