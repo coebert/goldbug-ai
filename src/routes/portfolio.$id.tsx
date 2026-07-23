@@ -578,7 +578,7 @@ function PortfolioPage() {
                           width={64}
                           tick={{ fontSize: 11, fill: chartTheme.axis }}
                           stroke={chartTheme.axis}
-                          tickFormatter={(v) => `${p.currency}${Number(v).toFixed(0)}`}
+                          tickFormatter={(v) => compareMode === "pct" ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%` : `${p.currency}${Number(v).toFixed(0)}`}
                         />
                         <Tooltip
                           cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
