@@ -109,6 +109,16 @@ function PortfolioPage() {
       window.localStorage.setItem("aegis.chartContrast", chartContrast);
     }
   }, [chartContrast]);
+  const [riskFreeRate, setRiskFreeRate] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    const v = Number(window.localStorage.getItem("aegis.riskFreeRate"));
+    return Number.isFinite(v) ? v : 0;
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("aegis.riskFreeRate", String(riskFreeRate));
+    }
+  }, [riskFreeRate]);
   const chartTheme = useMemo(() => {
     if (chartContrast === "high") {
       return {
