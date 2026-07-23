@@ -13,13 +13,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ChevronDown, ShieldCheck } from "lucide-react";
+import { ChevronDown, ShieldCheck, Gauge } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
