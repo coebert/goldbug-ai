@@ -88,6 +88,55 @@ function PortfolioPage() {
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
   const [benchmark, setBenchmark] = useState<string>("SPY");
+  const [chartContrast, setChartContrast] = useState<"standard" | "high" | "light">(() => {
+    if (typeof window === "undefined") return "standard";
+    const v = window.localStorage.getItem("aegis.chartContrast");
+    return v === "high" || v === "light" ? v : "standard";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("aegis.chartContrast", chartContrast);
+    }
+  }, [chartContrast]);
+  const chartTheme = useMemo(() => {
+    if (chartContrast === "high") {
+      return {
+        equity: "#7dfcff",
+        equityFillTop: 0.55,
+        equityFillBottom: 0.05,
+        benchmark: "#ffd257",
+        peak: "#e5e7eb",
+        gridOpacity: 0.6,
+        axis: "#e5e7eb",
+        strokeWidth: 3,
+        surface: "transparent",
+      } as const;
+    }
+    if (chartContrast === "light") {
+      return {
+        equity: "#0e7490",
+        equityFillTop: 0.35,
+        equityFillBottom: 0,
+        benchmark: "#b45309",
+        peak: "#334155",
+        gridOpacity: 0.35,
+        axis: "#334155",
+        strokeWidth: 2.5,
+        surface: "#f8fafc",
+      } as const;
+    }
+    return {
+      equity: "#22d3ee",
+      equityFillTop: 0.35,
+      equityFillBottom: 0,
+      benchmark: "#f59e0b",
+      peak: "hsl(var(--muted-foreground))",
+      gridOpacity: 0.35,
+      axis: "hsl(var(--border))",
+      strokeWidth: 2.5,
+      surface: "transparent",
+    } as const;
+  }, [chartContrast]);
 
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
