@@ -116,6 +116,8 @@ async function callAiForDecision(args: {
   const model = gateway("google/gemini-3.6-flash");
 
   const risk = riskProfile(args.portfolio.risk_level);
+  const cfg = parseRiskConfig(args.portfolio.risk_config);
+  const perSymbolCap = cfg.per_symbol_limit_pct ?? risk.maxPositionPct;
 
   const holdingsSummary = args.holdings.map((h) => ({
     symbol: h.symbol,
@@ -123,15 +125,24 @@ async function callAiForDecision(args: {
     avg_cost: Number(h.avg_cost),
   }));
 
+  const classLimitsStr = Object.entries(cfg.asset_class_limits)
+    .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}%`)
+    .join(", ");
+
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
 - Cash balance must never go negative.
-- No single position may exceed ${(risk.maxPositionPct * 100).toFixed(0)}% of portfolio value.
+- No single position may exceed ${(perSymbolCap * 100).toFixed(0)}% of portfolio value.
 - Keep at least ${(risk.cashFloorPct * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
+- Asset-class exposure caps: ${classLimitsStr}.
+- Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
+- Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
+${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.`;
+
 
   const user = `Date: ${args.asOf}
 Portfolio value: ${args.totalValue.toFixed(2)} ${args.portfolio.currency}
