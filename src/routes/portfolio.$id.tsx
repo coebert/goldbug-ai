@@ -462,8 +462,13 @@ function PortfolioPage() {
               );
             })()}
 
-            <div className="mb-6">
+            <div className="mb-6 space-y-4">
               <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
+              <ExecutionCalibrationCard
+                portfolioId={id}
+                execParams={(p.risk_config as { execution_params?: Parameters<typeof ExecutionCalibrationCard>[0]["execParams"] } | null)?.execution_params ?? null}
+                calibration={(p.risk_config as { execution_calibration?: Parameters<typeof ExecutionCalibrationCard>[0]["calibration"] } | null)?.execution_calibration ?? null}
+              />
             </div>
 
 
