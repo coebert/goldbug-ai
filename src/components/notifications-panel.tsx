@@ -1,0 +1,162 @@
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { formatDistanceToNow } from "date-fns";
+import { Bell, Check, CheckCheck, RefreshCw, Trash2, ShieldAlert } from "lucide-react";
+import {
+  listNotifications,
+  markNotificationsRead,
+  markNotificationsUnread,
+  markAllNotificationsRead,
+  deleteNotifications,
+  type NotificationRow,
+} from "@/lib/notifications.functions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const CATEGORY = "pending_slices";
+
+function severityTone(s: string): string {
+  switch (s) {
+    case "critical": return "bg-destructive text-destructive-foreground";
+    case "warning": return "bg-amber-500/15 text-amber-500 border border-amber-500/40";
+    default: return "bg-muted text-muted-foreground";
+  }
+}
+
+function fmtWhen(iso: string): string {
+  try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); }
+  catch { return iso; }
+}
+
+export function NotificationsPanel() {
+  const list = useServerFn(listNotifications);
+  const markRead = useServerFn(markNotificationsRead);
+  const markUnread = useServerFn(markNotificationsUnread);
+  const markAll = useServerFn(markAllNotificationsRead);
+  const del = useServerFn(deleteNotifications);
+
+  const [tab, setTab] = useState<"all" | "unread">("unread");
+  const qc = useQueryClient();
+
+  const q = useQuery({
+    queryKey: ["notifications", CATEGORY, tab],
+    queryFn: () => list({ data: { category: CATEGORY, unreadOnly: tab === "unread", limit: 100 } }),
+    refetchInterval: 60_000,
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["notifications"] });
+
+  const mRead = useMutation({ mutationFn: (ids: string[]) => markRead({ data: { ids } }), onSuccess: invalidate });
+  const mUnread = useMutation({ mutationFn: (ids: string[]) => markUnread({ data: { ids } }), onSuccess: invalidate });
+  const mAll = useMutation({ mutationFn: () => markAll({ data: { category: CATEGORY } }), onSuccess: invalidate });
+  const mDel = useMutation({ mutationFn: (ids: string[]) => del({ data: { ids } }), onSuccess: invalidate });
+
+  const rows: NotificationRow[] = q.data?.rows ?? [];
+  const unreadCount = q.data?.unreadCount ?? 0;
+  const isBusy = mRead.isPending || mUnread.isPending || mAll.isPending || mDel.isPending;
+
+  const empty = useMemo(() => rows.length === 0, [rows]);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Bell className="h-4 w-4 text-primary" />
+          Notifications
+          {unreadCount > 0 && (
+            <Badge variant="destructive" className="ml-1">{unreadCount} unread</Badge>
+          )}
+        </CardTitle>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
+            <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => mAll.mutate()} disabled={unreadCount === 0 || isBusy}>
+            <CheckCheck className="mr-1 h-4 w-4" /> Mark all read
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "unread")}>
+          <TabsList>
+            <TabsTrigger value="unread">Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {q.isError && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            Failed to load notifications: {(q.error as Error).message}
+          </div>
+        )}
+
+        {empty ? (
+          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            {tab === "unread" ? "No unread pending_slices alerts." : "No notifications yet."}
+          </div>
+        ) : (
+          <ScrollArea className="max-h-[420px] pr-2">
+            <ul className="space-y-2">
+              {rows.map((n) => {
+                const unread = n.read_at == null;
+                return (
+                  <li
+                    key={n.id}
+                    className={`rounded-md border p-3 ${unread ? "bg-primary/5 border-primary/30" : "bg-card"}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ShieldAlert className="h-4 w-4 text-primary shrink-0" />
+                          <span className="font-medium truncate">{n.title}</span>
+                          <Badge className={severityTone(n.severity)}>{n.severity}</Badge>
+                          {unread && <Badge variant="outline" className="border-primary/50 text-primary">new</Badge>}
+                        </div>
+                        {n.body && (
+                          <p className="mt-1 text-sm text-muted-foreground break-words">{n.body}</p>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString()}>
+                            {fmtWhen(n.created_at)}
+                          </time>
+                          {n.read_at && (
+                            <span title={new Date(n.read_at).toLocaleString()}>
+                              read {fmtWhen(n.read_at)}
+                            </span>
+                          )}
+                          {n.portfolio_id && <span className="font-mono">pf {n.portfolio_id.slice(0, 8)}</span>}
+                          {n.slice_id && <span className="font-mono">slice {n.slice_id.slice(0, 8)}</span>}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {unread ? (
+                          <Button variant="ghost" size="sm" disabled={isBusy}
+                            onClick={() => mRead.mutate([n.id])}>
+                            <Check className="mr-1 h-3 w-3" /> Read
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" disabled={isBusy}
+                            onClick={() => mUnread.mutate([n.id])}>
+                            Unread
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" disabled={isBusy}
+                          onClick={() => mDel.mutate([n.id])}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
