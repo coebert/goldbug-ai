@@ -1,7 +1,11 @@
 // Lightweight global news fetcher using GDELT DOC API (free, no key).
 // Caches results by date in news_cache.
 
+import { generateText, Output, NoObjectGeneratedError } from "ai";
+import { z } from "zod";
+import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
 
 export type NewsItem = {
   date: string;
@@ -56,70 +60,142 @@ async function parseGdeltResponse(res: Response, dateISO: string): Promise<NewsI
 // single call. English headlines are left untouched (original_language stays
 // null). Failures degrade to the original headlines rather than blocking the
 // ingest pipeline — a stale-but-untranslated reel beats an empty one.
+//
+// Uses the AI SDK's Output.object structured-output path (same as the
+// sentiment scorer). The previous raw-fetch call relied on
+// `response_format: json_object`, which Gemini through the gateway ignores
+// intermittently, silently returning free-form text that then failed
+// JSON.parse and degraded every headline back to untranslated.
+
+const TranslateSchema = z.object({
+  results: z.array(
+    z.object({
+      i: z.number(),
+      lang: z.string().nullable().optional(),
+      translation: z.string().nullable().optional(),
+    }),
+  ),
+});
+
+// Fast heuristic: skip translation when a headline is plainly ASCII/Latin
+// and does not obviously contain non-English words. We keep this permissive
+// (any non-ASCII char routes through the LLM) so accented Latin scripts and
+// mixed-script headlines still get language-detected.
+function looksNonEnglish(s: string): boolean {
+  // Any char outside basic ASCII printable + common punctuation triggers
+  // translation. Cheap, safe over-approximation.
+  return /[^\x00-\x7F]/.test(s);
+}
+
+async function callTranslateLLM(
+  headlines: { i: number; text: string }[],
+): Promise<Map<number, { lang: string | null; translation: string | null }>> {
+  const out = new Map<number, { lang: string | null; translation: string | null }>();
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key || headlines.length === 0) return out;
+
+  const gateway = createLovableAiGatewayProvider(key);
+  const model = gateway("google/gemini-3.6-flash");
+
+  const prompt = `For each numbered headline below, detect its language and, if it is NOT English, translate it into natural English. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese", "Macedonian"). When the headline is already in English, set lang to "English" and translation to null. Never invent facts — translate only.
+
+Headlines:
+${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
+
+  try {
+    const { output } = await generateText({
+      model,
+      prompt,
+      output: Output.object({ schema: TranslateSchema }),
+    });
+    for (const r of output.results) {
+      out.set(r.i, {
+        lang: (r.lang ?? "").trim() || null,
+        translation: (r.translation ?? "")?.toString().trim() || null,
+      });
+    }
+  } catch (err) {
+    if (!NoObjectGeneratedError.isInstance(err)) {
+      console.warn("news: translate LLM failed", err instanceof Error ? err.message : String(err));
+    }
+  }
+  return out;
+}
+
 async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
   if (items.length === 0) return items;
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) return items;
 
-  // Ask the model to classify + translate every headline in one JSON payload.
-  // Keeping the schema shallow avoids Gemini's "too many states" rejections.
-  const numbered = items.map((it, i) => `${i}. ${it.headline}`).join("\n");
-  const system =
-    'You are a translator. For each numbered headline, detect its language and, if it is not English, translate it to natural English. Reply with STRICT JSON of the form {"results":[{"i":0,"lang":"English","translation":null}, ...]}. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese"). When the headline is already in English, set lang to "English" and translation to null. Never invent facts — translate only.';
+  // Only send candidates that plausibly aren't English. Keeps the prompt
+  // small, cost low, and avoids spurious "translations" of English text.
+  const candidates = items
+    .map((it, i) => ({ i, text: it.headline }))
+    .filter((c) => looksNonEnglish(c.text));
+  if (candidates.length === 0) return items;
+
+  const byIndex = await callTranslateLLM(candidates);
+  return items.map((it, i) => {
+    const t = byIndex.get(i);
+    if (!t) return it;
+    const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
+    if (isEnglish || !t.translation) return it;
+    return {
+      ...it,
+      headline: t.translation,
+      original_headline: it.headline,
+      original_language: t.lang,
+    };
+  });
+}
+
+// Repair pass: translate rows already cached with a null original_language
+// but a non-ASCII headline. Prior ingests (before translation shipped, or
+// during LLM outages) left these rows untranslated. Runs opportunistically —
+// bounded batch, best-effort, never throws.
+export async function backfillTranslations(
+  dateISO: string,
+  max = 30,
+): Promise<{ scanned: number; translated: number }> {
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": key,
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: numbered },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      console.warn(`news: translate request failed ${res.status}`);
-      return items;
-    }
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const raw = json.choices?.[0]?.message?.content ?? "";
-    const parsed = JSON.parse(raw) as {
-      results?: Array<{ i?: number; lang?: string | null; translation?: string | null }>;
-    };
-    const byIndex = new Map<number, { lang: string | null; translation: string | null }>();
-    for (const r of parsed.results ?? []) {
-      if (typeof r.i === "number") {
-        byIndex.set(r.i, {
-          lang: (r.lang ?? "").trim() || null,
-          translation: (r.translation ?? "")?.toString().trim() || null,
-        });
-      }
-    }
-    return items.map((it, i) => {
+    const { data } = await supabaseAdmin
+      .from("news_cache")
+      .select("news_date, headline, original_language")
+      .eq("news_date", dateISO)
+      .is("original_language", null)
+      .limit(200);
+    const rows = (data ?? []).filter((r) => looksNonEnglish(r.headline as string)).slice(0, max);
+    if (rows.length === 0) return { scanned: 0, translated: 0 };
+
+    const byIndex = await callTranslateLLM(
+      rows.map((r, i) => ({ i, text: r.headline as string })),
+    );
+    let translated = 0;
+    for (let i = 0; i < rows.length; i++) {
       const t = byIndex.get(i);
-      if (!t) return it;
+      if (!t) continue;
       const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
-      if (isEnglish || !t.translation) return it;
-      return {
-        ...it,
-        headline: t.translation,
-        original_headline: it.headline,
-        original_language: t.lang,
-      };
-    });
+      if (isEnglish || !t.translation) continue;
+      const originalHeadline = rows[i].headline as string;
+      const { error } = await supabaseAdmin
+        .from("news_cache")
+        .update({
+          headline: t.translation,
+          original_headline: originalHeadline,
+          original_language: t.lang,
+        } as never)
+        .eq("news_date", dateISO)
+        .eq("headline", originalHeadline);
+      if (!error) translated++;
+    }
+    if (translated > 0) {
+      console.log(`news: backfilled ${translated}/${rows.length} translations for ${dateISO}`);
+    }
+    return { scanned: rows.length, translated };
   } catch (err) {
-    console.warn("news: translate threw", err instanceof Error ? err.message : String(err));
-    return items;
+    console.warn("news: backfill threw", err instanceof Error ? err.message : String(err));
+    return { scanned: 0, translated: 0 };
   }
 }
+
 
 async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] | null> {
   // GDELT expects YYYYMMDDHHMMSS ranges. In some regions the dated-range query
@@ -187,6 +263,16 @@ export async function getNewsForDate(
     original_language: (r as { original_language?: string | null }).original_language ?? null,
   }));
 
+  // Any cached non-English rows still missing a translation get repaired
+  // in the background on every read. Bounded and fire-and-forget so it
+  // never blocks the reel or the trading engine.
+  const untranslatedCount = cachedItems.filter(
+    (c) => !c.original_language && looksNonEnglish(c.headline),
+  ).length;
+  if (untranslatedCount > 0) {
+    void backfillTranslations(dateISO);
+  }
+
   // Use existing cache when we're not forcing a refresh and it looks healthy.
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
 
@@ -198,6 +284,7 @@ export async function getNewsForDate(
     return cachedItems;
   }
   if (gdelt.length === 0) return cachedItems;
+
 
   // Translate before writing so the cache holds English + original metadata.
   const fresh = await translateHeadlines(gdelt);
