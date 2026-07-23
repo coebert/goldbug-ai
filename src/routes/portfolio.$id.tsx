@@ -82,6 +82,8 @@ function PortfolioPage() {
   const runBtFn = useServerFn(runBacktest);
   const resetFn = useServerFn(resetPortfolio);
   const [days, setDays] = useState(7);
+  const [eventsOn, setEventsOn] = useState(true);
+  const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
 
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
