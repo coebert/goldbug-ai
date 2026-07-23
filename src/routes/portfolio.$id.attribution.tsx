@@ -359,7 +359,10 @@ function AttributionPage() {
                             <Badge variant={t.side === "buy" ? "default" : "secondary"}>{t.side}</Badge>
                           </td>
                           <td className={`text-right pr-2 ${(t.forward_return_pct ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>{fmtPct(t.forward_return_pct)}</td>
+                          <td className="text-right pr-2 text-muted-foreground">{fmtPct(t.benchmark_return_pct)}</td>
+                          <td className={`text-right pr-2 ${(t.alpha_pct ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>{fmtPct(t.alpha_pct)}</td>
                           <td className="text-right pr-2">{t.news_score == null ? "—" : t.news_score.toFixed(2)}</td>
+
                           <td className="pr-2">{t.regime ?? "—"}</td>
                           <td className="pr-2">{penalties.length ? penalties.join(", ") : <span className="text-muted-foreground">none</span>}</td>
                           <td>
