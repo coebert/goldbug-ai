@@ -528,17 +528,17 @@ function PortfolioPage() {
                     {([
                       { label: "CAGR", value: perfMetrics.port.annReturn, suffix: "%", signed: true, negative: false },
                       { label: "Volatility (ann.)", value: perfMetrics.port.annVol, suffix: "%", signed: false, negative: false },
-                      { label: "Sharpe (rf=0)", value: perfMetrics.port.annVol > 0 ? perfMetrics.port.annReturn / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
+                      { label: `Sharpe (rf=${riskFreeRate}%)`, value: perfMetrics.port.annVol > 0 ? (perfMetrics.port.annReturn - riskFreeRate) / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
                       { label: "Max drawdown", value: perfMetrics.port.maxDrawdown, suffix: "%", signed: false, negative: true },
                     ] as const).map((m) => {
                       const bv = m.label === "CAGR" ? perfMetrics.bench?.annReturn
                         : m.label === "Volatility (ann.)" ? perfMetrics.bench?.annVol
                         : m.label === "Max drawdown" ? perfMetrics.bench?.maxDrawdown
-                        : (perfMetrics.bench && perfMetrics.bench.annVol > 0 ? perfMetrics.bench.annReturn / perfMetrics.bench.annVol : null);
+                        : (perfMetrics.bench && perfMetrics.bench.annVol > 0 ? (perfMetrics.bench.annReturn - riskFreeRate) / perfMetrics.bench.annVol : null);
                       const fmt = (v: number | null | undefined) => {
                         if (v == null || !Number.isFinite(v)) return "—";
                         const s = m.signed && v > 0 ? "+" : "";
-                        const d = m.label === "Sharpe (rf=0)" ? 2 : 2;
+                        const d = 2;
                         return `${s}${v.toFixed(d)}${m.suffix}`;
                       };
                       const color = (v: number | null | undefined) => {
