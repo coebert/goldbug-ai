@@ -152,10 +152,10 @@ export async function ensureSentimentScored(
     await supabaseAdmin
       .from("news_cache")
       .update({
-        sentiment: e.sentiment,
+        sentiment: e.sentiment as unknown as number,
         entities: e.entities,
-        source_weight: e.source_weight,
-      })
+        source_weight: e.source_weight as unknown as number,
+      } as never)
       .eq("news_date", dateISO)
       .eq("headline", e.headline);
   }
