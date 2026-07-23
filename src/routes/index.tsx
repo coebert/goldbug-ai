@@ -140,6 +140,13 @@ function Home() {
           </Suspense>
         </div>
 
+        <div className="mb-6">
+          <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
+            <NewsReel />
+          </Suspense>
+        </div>
+
+
 
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
