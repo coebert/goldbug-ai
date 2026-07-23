@@ -271,6 +271,8 @@ ${args.crossAsset}
 
 ${args.optionsBlock}
 
+${args.crossSectional}
+
 ${eventsBlock}
 ${coolingBlock}
 
