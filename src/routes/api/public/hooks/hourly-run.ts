@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
         const { getNewsForDate } = await import("@/lib/news.server");
         const { refreshLatestCandles } = await import("@/lib/market-data.server");
-        const { filterUniverse, classesFromUniverse } = await import("@/lib/universe");
+        const { filterUniverse, classesFromUniverse } = await import("@/lib/universe.server");
 
         const today = new Date().toISOString().slice(0, 10);
 
