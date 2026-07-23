@@ -975,6 +975,7 @@ export const getDiagnostics = createServerFn({ method: "POST" })
       },
       flags,
       rolling,
+      eventImpact,
     };
   });
 
