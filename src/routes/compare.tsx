@@ -104,23 +104,37 @@ function ComparePage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 6 ? prev : [...prev, id],
     );
 
-  const chartData = useMemo(() => {
-    if (!results || results.length === 0) return [];
-    // Normalise to % return from starting cash so different starting pots compare fairly
+  const [focused, setFocused] = useState<string | null>(null);
+
+  const { chartData, drawdownData } = useMemo(() => {
+    if (!results || results.length === 0) return { chartData: [], drawdownData: [] };
     const dateSet = new Set<string>();
     results.forEach((r) => r.series.forEach((s) => dateSet.add(s.snapshot_date)));
     const dates = Array.from(dateSet).sort();
-    return dates.map((d) => {
+
+    // Track running peak per portfolio for drawdown
+    const peaks: Record<string, number> = {};
+    const chart: Record<string, number | string>[] = [];
+    const dd: Record<string, number | string>[] = [];
+    for (const d of dates) {
       const row: Record<string, number | string> = { date: d };
-      results.forEach((r) => {
+      const ddRow: Record<string, number | string> = { date: d };
+      for (const r of results) {
         const point = r.series.find((s) => s.snapshot_date === d);
         if (point) {
-          row[r.portfolio.name] =
-            ((point.total_value - r.portfolio.starting_cash) / r.portfolio.starting_cash) * 100;
+          const pct = ((point.total_value - r.portfolio.starting_cash) / r.portfolio.starting_cash) * 100;
+          row[r.portfolio.name] = pct;
+          peaks[r.portfolio.name] = Math.max(peaks[r.portfolio.name] ?? -Infinity, point.total_value);
+          const drawdownPct = peaks[r.portfolio.name] > 0
+            ? ((point.total_value - peaks[r.portfolio.name]) / peaks[r.portfolio.name]) * 100
+            : 0;
+          ddRow[r.portfolio.name] = drawdownPct;
         }
-      });
-      return row;
-    });
+      }
+      chart.push(row);
+      dd.push(ddRow);
+    }
+    return { chartData: chart, drawdownData: dd };
   }, [results]);
 
   if (!ready || !session) {
