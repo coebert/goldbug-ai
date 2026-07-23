@@ -492,8 +492,10 @@ export function NewsReel() {
                         <TranslationBadge
                           originalLanguage={item.original_language}
                           originalHeadline={item.original_headline}
+                          confidence={item.translation_confidence}
                           className="mt-1"
                         />
+
 
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           {item.url ? (
@@ -745,8 +747,11 @@ export function NewsReel() {
                   <TranslationBadge
                     originalLanguage={item.original_language}
                     originalHeadline={item.original_headline}
+                    confidence={item.translation_confidence}
                     className="mt-2"
                   />
+
+
 
                 </DialogHeader>
                 <div className="space-y-3 text-sm">
@@ -758,6 +763,42 @@ export function NewsReel() {
                       Reliability {reliability}
                     </Badge>
                   </div>
+                  {item.original_language && item.original_headline && (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/[0.06] p-3 text-xs leading-relaxed">
+                      <div className="mb-1 flex items-center justify-between gap-2 font-semibold uppercase tracking-wide text-[10px] text-amber-600 dark:text-amber-400">
+                        <span>Translation</span>
+                        {typeof item.translation_confidence === "number" && (
+                          <span className="rounded-sm border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px]">
+                            {Math.round(Math.max(0, Math.min(1, item.translation_confidence)) * 100)}% confidence
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground">
+                        Detected language:{" "}
+                        <span className="font-semibold text-foreground">{item.original_language}</span>.
+                        {typeof item.translation_confidence === "number" ? (
+                          <>
+                            {" "}
+                            Model self-reported translation confidence is{" "}
+                            <span className="font-semibold text-foreground">
+                              {Math.round(Math.max(0, Math.min(1, item.translation_confidence)) * 100)}%
+                            </span>{" "}
+                            — {item.translation_confidence >= 0.85
+                              ? "treat as reliable."
+                              : item.translation_confidence >= 0.6
+                              ? "usable but double-check nuance."
+                              : "verify against the original before acting on it."}
+                          </>
+                        ) : (
+                          <> Confidence not reported by the model.</>
+                        )}
+                      </p>
+                      <p className="mt-1.5 italic text-muted-foreground">
+                        Original: “{item.original_headline}”
+                      </p>
+                    </div>
+                  )}
+
                   <div className="rounded-md border border-border bg-muted/30 p-3 text-xs leading-relaxed">
                     <div className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-foreground/70">
                       Sentiment & reliability

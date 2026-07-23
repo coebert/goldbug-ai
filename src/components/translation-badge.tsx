@@ -7,6 +7,8 @@
 //   - Nothing renders unless BOTH original_language and original_headline
 //     are present. English-only items produce no badge.
 //   - The visible label is exactly "Translated from {language}".
+//   - When a translation confidence (0..1) is provided, it is surfaced as a
+//     percentage on a small trailing chip and repeated in the title tooltip.
 //   - The original headline is quoted in italics next to the badge.
 //   - A native `title` attribute exposes the original for hover/AT users.
 
@@ -15,24 +17,50 @@ import { Badge } from "@/components/ui/badge";
 export type TranslationBadgeProps = {
   originalLanguage: string | null | undefined;
   originalHeadline: string | null | undefined;
+  /** Model's self-reported confidence in the detected language + translation, 0..1. */
+  confidence?: number | null;
   /** Extra classes on the wrapper paragraph. */
   className?: string;
 };
 
+// Clamp + round a 0..1 confidence into a whole-percent string. Returns null
+// when the input isn't a usable finite number (so the chip is hidden).
+export function formatConfidencePct(confidence: number | null | undefined): string | null {
+  if (typeof confidence !== "number" || !Number.isFinite(confidence)) return null;
+  const clamped = Math.max(0, Math.min(1, confidence));
+  return `${Math.round(clamped * 100)}%`;
+}
+
+function confidenceTone(confidence: number | null | undefined): string {
+  if (typeof confidence !== "number" || !Number.isFinite(confidence)) {
+    return "border-border bg-muted text-muted-foreground";
+  }
+  const c = Math.max(0, Math.min(1, confidence));
+  if (c >= 0.85) return "border-primary/50 bg-primary/10 text-primary";
+  if (c >= 0.6) return "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400";
+  return "border-destructive/40 bg-destructive/10 text-destructive";
+}
+
 export function TranslationBadge({
   originalLanguage,
   originalHeadline,
+  confidence,
   className,
 }: TranslationBadgeProps) {
   if (!originalLanguage || !originalHeadline) return null;
+  const pct = formatConfidencePct(confidence);
+  const title = pct
+    ? `Detected language: ${originalLanguage} · translation confidence ${pct}. Original: ${originalHeadline}`
+    : `Original ${originalLanguage} headline: ${originalHeadline}`;
   return (
     <p
       data-testid="translation-badge"
       data-original-language={originalLanguage}
+      data-translation-confidence={pct ?? ""}
       className={
         "text-[11px] text-muted-foreground " + (className ?? "")
       }
-      title={`Original ${originalLanguage} headline: ${originalHeadline}`}
+      title={title}
     >
       <Badge
         variant="outline"
@@ -40,6 +68,16 @@ export function TranslationBadge({
       >
         Translated from {originalLanguage}
       </Badge>
+      {pct && (
+        <Badge
+          variant="outline"
+          data-testid="translation-confidence"
+          className={`mr-1.5 text-[10px] font-semibold uppercase tracking-wide ${confidenceTone(confidence)}`}
+          title={`Model self-reported confidence in detected language + translation: ${pct}`}
+        >
+          {pct} confidence
+        </Badge>
+      )}
       <span className="italic">“{originalHeadline}”</span>
     </p>
   );

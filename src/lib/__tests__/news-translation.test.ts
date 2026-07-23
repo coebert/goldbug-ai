@@ -25,7 +25,7 @@ const llmCalls: LlmCall[] = [];
 
 // Programmable stub: maps every incoming (i, headline) tuple to a language
 // and translation. Anything not registered defaults to English/no-op.
-const translations = new Map<string, { lang: string | null; translation: string | null }>();
+const translations = new Map<string, { lang: string | null; translation: string | null; confidence?: number | null }>();
 
 vi.mock("ai", async () => {
   const actual = await vi.importActual<typeof import("ai")>("ai");
@@ -41,7 +41,7 @@ vi.mock("ai", async () => {
         const i = Number(m?.[1] ?? 0);
         const text = (m?.[2] ?? "").trim();
         const t = translations.get(text) ?? { lang: "English", translation: null };
-        return { i, lang: t.lang, translation: t.translation };
+        return { i, lang: t.lang, translation: t.translation, confidence: t.confidence ?? null };
       });
       return { output: { results } };
     }),
@@ -50,6 +50,7 @@ vi.mock("ai", async () => {
     NoObjectGeneratedError: { isInstance: () => false },
   };
 });
+
 
 // Track DB reads/writes so we can assert cache reuse and dedupe.
 const dbReads: Array<{ table: string; filters: Record<string, unknown> }> = [];
@@ -131,9 +132,11 @@ function makeItem(headline: string, overrides: Partial<NewsItem> = {}): NewsItem
     summary: null,
     original_headline: null,
     original_language: null,
+    translation_confidence: null,
     ...overrides,
   };
 }
+
 
 describe("looksNonEnglish", () => {
   it("returns false for pure ASCII English text", async () => {
@@ -239,7 +242,48 @@ describe("translateHeadlines", () => {
     expect(llmCalls).toHaveLength(1);
     expect(llmCalls[0].count).toBe(1); // three inputs collapsed to one
   });
+
+  it("propagates the model-reported confidence score onto the translated item", async () => {
+    translations.set("Столица под ударом", {
+      lang: "Russian",
+      translation: "Capital under attack",
+      confidence: 0.91,
+    });
+    translations.set("Straße gesperrt", {
+      lang: "German",
+      translation: "Street closed",
+      // No confidence supplied — should fall through as null on the item.
+    });
+    const { translateHeadlines } = await import("../news.server");
+    const out = await translateHeadlines([
+      makeItem("Столица под ударом"),
+      makeItem("Straße gesperrt"),
+    ]);
+    expect(out[0]).toMatchObject({
+      headline: "Capital under attack",
+      original_language: "Russian",
+      translation_confidence: 0.91,
+    });
+    expect(out[1]).toMatchObject({
+      headline: "Street closed",
+      original_language: "German",
+      translation_confidence: null,
+    });
+  });
+
+  it("clamps out-of-range confidence values into [0, 1]", async () => {
+    translations.set("Παγκόσμια αγορά", { lang: "Greek", translation: "Global market", confidence: 1.7 });
+    translations.set("央行加息", { lang: "Mandarin Chinese", translation: "Central bank raises rates", confidence: -0.5 });
+    const { translateHeadlines } = await import("../news.server");
+    const out = await translateHeadlines([
+      makeItem("Παγκόσμια αγορά"),
+      makeItem("央行加息"),
+    ]);
+    expect(out[0].translation_confidence).toBe(1);
+    expect(out[1].translation_confidence).toBe(0);
+  });
 });
+
 
 describe("backfillTranslations", () => {
   it("translates matching cached rows and writes back to news_cache", async () => {

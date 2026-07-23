@@ -15,7 +15,9 @@ export type NewsItem = {
   summary: string | null;
   original_headline: string | null;
   original_language: string | null;
+  translation_confidence: number | null; // 0..1, null when not translated
 };
+
 
 type GdeltArticle = {
   title?: string;
@@ -48,6 +50,8 @@ async function parseGdeltResponse(res: Response, dateISO: string): Promise<NewsI
         summary: null,
         original_headline: null,
         original_language: null,
+        translation_confidence: null,
+
       }));
   } catch (err) {
     console.error("news: gdelt JSON parse failed", err);
@@ -73,9 +77,13 @@ const TranslateSchema = z.object({
       i: z.number(),
       lang: z.string().nullable().optional(),
       translation: z.string().nullable().optional(),
+      // 0..1 self-reported confidence in the (detected language + translation).
+      // Nullable/optional because older prompts / non-conforming outputs may skip it.
+      confidence: z.number().nullable().optional(),
     }),
   ),
 });
+
 
 // Fast heuristic: skip translation when a headline is plainly ASCII/Latin
 // and does not obviously contain non-English words. We keep this permissive
@@ -106,7 +114,9 @@ export function looksNonEnglish(s: string): boolean {
 type TranslationCacheEntry = {
   lang: string | null; // null = English (or unknown/no-translate)
   translation: string | null; // null = no translation needed
+  confidence: number | null; // 0..1, null when unknown or no translation
 };
+
 
 const TRANSLATION_CACHE_MAX = 2000;
 const translationCache = new Map<string, TranslationCacheEntry>();
@@ -138,7 +148,7 @@ async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
   try {
     const { data } = await supabaseAdmin
       .from("news_cache")
-      .select("headline, original_headline, original_language")
+      .select("headline, original_headline, original_language, translation_confidence")
       .in("original_headline", missing)
       .not("original_language", "is", null)
       .limit(500);
@@ -146,9 +156,15 @@ async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
       const orig = (r as { original_headline: string | null }).original_headline;
       const lang = (r as { original_language: string | null }).original_language;
       const translated = (r as { headline: string }).headline;
+      const conf = (r as { translation_confidence?: number | string | null }).translation_confidence;
       if (!orig || !lang || !translated) continue;
-      cacheSet(orig, { lang, translation: translated });
+      cacheSet(orig, {
+        lang,
+        translation: translated,
+        confidence: conf == null ? null : Number(conf),
+      });
     }
+
   } catch (err) {
     // Non-fatal — the cache just stays cold for these keys.
     console.warn("news: cache hydrate failed", err instanceof Error ? err.message : String(err));
@@ -165,7 +181,7 @@ async function callTranslateLLM(
   const gateway = createLovableAiGatewayProvider(key);
   const model = gateway("google/gemini-3.6-flash");
 
-  const prompt = `For each numbered headline below, detect its language and, if it is NOT English, translate it into natural English. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese", "Macedonian"). When the headline is already in English, set lang to "English" and translation to null. Never invent facts — translate only.
+  const prompt = `For each numbered headline below, detect its language and, if it is NOT English, translate it into natural English. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese", "Macedonian"). When the headline is already in English, set lang to "English" and translation to null. Also return a "confidence" number between 0 and 1 representing how confident you are in the language detection AND the accuracy of the translation combined (1 = certain, 0.5 = unsure, 0 = guessing). Never invent facts — translate only.
 
 Headlines:
 ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
@@ -177,9 +193,15 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
       output: Output.object({ schema: TranslateSchema }),
     });
     for (const r of output.results) {
+      const rawConf = r.confidence;
+      const conf =
+        typeof rawConf === "number" && Number.isFinite(rawConf)
+          ? Math.max(0, Math.min(1, rawConf))
+          : null;
       out.set(r.i, {
         lang: (r.lang ?? "").trim() || null,
         translation: (r.translation ?? "")?.toString().trim() || null,
+        confidence: conf,
       });
     }
   } catch (err) {
@@ -188,6 +210,7 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
     }
   }
   return out;
+
 }
 
 // Batch-translate with caching. Cached entries never hit the LLM;
@@ -252,7 +275,9 @@ export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]>
       headline: t.translation,
       original_headline: it.headline,
       original_language: t.lang,
+      translation_confidence: t.confidence,
     };
+
   });
 }
 
@@ -296,9 +321,11 @@ export function backfillTranslations(
             headline: t.translation,
             original_headline: originalHeadline,
             original_language: t.lang,
+            translation_confidence: t.confidence,
           } as never)
           .eq("news_date", dateISO)
           .eq("headline", originalHeadline);
+
         if (!error) translated++;
       }
       if (translated > 0) {
@@ -370,7 +397,7 @@ export async function getNewsForDate(
 ): Promise<NewsItem[]> {
   const { data: cached } = await supabaseAdmin
     .from("news_cache")
-    .select("news_date, source, headline, url, summary, original_headline, original_language")
+    .select("news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
     .eq("news_date", dateISO)
     .limit(max);
 
@@ -382,7 +409,12 @@ export async function getNewsForDate(
     summary: r.summary,
     original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
     original_language: (r as { original_language?: string | null }).original_language ?? null,
+    translation_confidence:
+      (r as { translation_confidence?: number | string | null }).translation_confidence == null
+        ? null
+        : Number((r as { translation_confidence: number | string }).translation_confidence),
   }));
+
 
   // Any cached non-English rows still missing a translation get repaired
   // in the background on every read. Bounded and fire-and-forget so it
@@ -430,6 +462,8 @@ export async function getNewsForDate(
       summary: n.summary,
       original_headline: n.original_headline,
       original_language: n.original_language,
+      translation_confidence: n.translation_confidence,
+
     }));
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("news_cache").insert(rows);
