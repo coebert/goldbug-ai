@@ -115,11 +115,53 @@ export async function routeOrdersToBroker(params: {
     }));
   }
 
+  // Fetch broker account currency once per batch so we can record the FX rate
+  // used to translate the portfolio-currency notional into the currency Saxo
+  // will actually clear against. Non-blocking: fallback records rate=1 stale.
+  let accountCurrency: string | null = null;
+  try {
+    const bal = await adapter.getBalance();
+    accountCurrency = bal.currency;
+  } catch {
+    /* best-effort */
+  }
+  const pfRow = await supabaseAdmin
+    .from("portfolios")
+    .select("currency")
+    .eq("id", portfolio.id)
+    .maybeSingle();
+  const portfolioCurrency =
+    (pfRow.data as { currency?: string } | null)?.currency?.toUpperCase() ?? "GBP";
+
+  let fxRate = 1;
+  let fxStale = false;
+  let fxSource = "identity";
+  if (accountCurrency && accountCurrency.toUpperCase() !== portfolioCurrency) {
+    const { getFxRate } = await import("@/lib/fx.server");
+    const fx = await getFxRate(portfolioCurrency, accountCurrency);
+    fxRate = fx.rate;
+    fxStale = fx.stale;
+    fxSource = fx.source;
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "FX_CAPTURE",
+      path: `/fx/${portfolioCurrency}->${accountCurrency}`,
+      status: fxStale ? 206 : 200,
+      request: { asOf, decisionId, count: routable.length } as never,
+      response: { rate: fxRate, source: fxSource, stale: fxStale } as never,
+      error: fxStale ? "fx rate stale or fallback" : null,
+    });
+  }
+
   // Hour-bucketed idempotency key. Repeated CRON firings within the same UTC
   // hour collapse to the same key per (portfolio, symbol, side), and the
   // UNIQUE index on live_orders.client_order_id prevents duplicate rows even
   // under concurrent invocation.
   const hourBucket = new Date().toISOString().slice(0, 13); // e.g. "2026-07-23T14"
+
 
   for (const order of routable) {
     const clientOrderId = `aegis:${portfolio.id}:${hourBucket}:${order.symbol}:${order.side}`;
