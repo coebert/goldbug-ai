@@ -2024,15 +2024,35 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
 
     // 1. Recent global news (auth-readable cache). Fetch limit+1 to detect has_more.
     const fetchCap = Math.min(500, limit + 60);
-    const { data: newsRows } = await context.supabase
-      .from("news_cache")
-      .select("id, news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
-      .gte("news_date", since)
-      .order("news_date", { ascending: false })
-      .order("fetched_at", { ascending: false })
-      .limit(fetchCap);
-    const news = newsRows ?? [];
+    const readNews = async () =>
+      (
+        await context.supabase
+          .from("news_cache")
+          .select("id, news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
+          .gte("news_date", since)
+          .order("news_date", { ascending: false })
+          .order("fetched_at", { ascending: false })
+          .limit(fetchCap)
+      ).data ?? [];
+    let news = await readNews();
     if (news.length === 0) return { items: [], as_of: asOf.toISOString(), has_more: false, since_days: sinceDays, limit };
+
+    // Opportunistic translation repair: cached non-English rows with no
+    // translation yet get filled in synchronously (Workers cancel background
+    // promises the moment the response returns, so `void`-style backfill did
+    // nothing in production). Bounded to the dates actually shown, capped
+    // to a few LLM calls per request.
+    const { looksNonEnglish } = await import("@/lib/news.server");
+    const needsTranslation = news.filter(
+      (r) => !r.original_language && looksNonEnglish((r.headline as string) ?? ""),
+    );
+    if (needsTranslation.length > 0) {
+      const { backfillTranslations } = await import("@/lib/news.server");
+      const dates = Array.from(new Set(needsTranslation.map((r) => r.news_date as string))).slice(0, 5);
+      await Promise.all(dates.map((d) => backfillTranslations(d).catch(() => null)));
+      news = await readNews();
+    }
+
 
 
     // 2. Recent decisions across the user's own portfolios.
