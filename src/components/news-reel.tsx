@@ -120,7 +120,21 @@ export function NewsReel() {
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                           <span>{item.date}</span>
-                          {item.source && <span className="truncate">· {item.source}</span>}
+                          {item.source && (
+                            item.url ? (
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className="truncate hover:text-foreground hover:underline"
+                                title={`Open source: ${item.source}`}
+                              >
+                                · {item.source}
+                              </a>
+                            ) : (
+                              <span className="truncate">· {item.source}</span>
+                            )
+                          )}
                           <Badge variant="outline" className={`ml-auto border-transparent ${tone.cls}`}>
                             {tone.label}
                           </Badge>
@@ -140,6 +154,31 @@ export function NewsReel() {
                             item.headline
                           )}
                         </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          {item.url ? (
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="inline-flex items-center gap-1 rounded-sm border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/15"
+                              title="Verify at original source"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Verify source
+                            </a>
+                          ) : (
+                            <a
+                              href={`https://www.google.com/search?q=${encodeURIComponent(item.headline)}&tbm=nws`}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="inline-flex items-center gap-1 rounded-sm border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                              title="Search this headline on Google News"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Search news
+                            </a>
+                          )}
+                        </div>
                         <p className={`mt-1.5 text-xs ${cited ? "text-foreground/80" : "text-muted-foreground"}`}>
                           <span className={`mr-1 font-semibold ${cited ? "text-primary" : "text-muted-foreground"}`}>
                             AI note:
