@@ -51,6 +51,7 @@ import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
 import { SignalDecayCard } from "@/components/signal-decay-card";
 import { StressPanelCard } from "@/components/stress-panel-card";
+import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
@@ -902,6 +903,7 @@ function PortfolioPage() {
               <SignalDecayCard portfolioId={p.id} />
               <CorrelationHeatmapCard portfolioId={p.id} />
               <StressPanelCard portfolioId={p.id} currency={p.currency} />
+              <LearningDiagnosticsCard portfolioId={p.id} />
             </div>
 
             <Tabs defaultValue="journal" className="mt-6">
