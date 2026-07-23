@@ -29,6 +29,11 @@ import {
 } from "./signals-extended.server";
 import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
+import {
+  computeCrossSectionalRanks,
+  formatCrossSectionalBlock,
+  type RankInfo,
+} from "./cross-sectional-ranking.server";
 import { getNewsForDate } from "./news.server";
 import {
   ensureSentimentScored,
@@ -135,6 +140,8 @@ async function buildCandidateFeatures(
     news_score: number | null;
     news_contributors: number;
     cooling: boolean;
+    // Cross-sectional rank across today's universe (filled in later)
+    rank_info: RankInfo | null;
   }> = [];
   await Promise.all(
     candidates.map(async (c) => {
@@ -166,6 +173,7 @@ async function buildCandidateFeatures(
         news_score: null,
         news_contributors: 0,
         cooling: false,
+        rank_info: null,
       });
     }),
   );
@@ -194,6 +202,7 @@ async function callAiForDecision(args: {
   news: Array<{ headline: string; source: string | null; sentiment: number | null }>;
   crossAsset: string; // preformatted block
   optionsBlock: string; // preformatted options-implied block
+  crossSectional: string; // preformatted cross-sectional ranking block
   events: Array<{ event_date: string; kind: string; symbol: string | null; title: string; impact: string }>;
   cooling: string[];
   asOf: string;
@@ -261,6 +270,8 @@ ${regimeBlock}
 ${args.crossAsset}
 
 ${args.optionsBlock}
+
+${args.crossSectional}
 
 ${eventsBlock}
 ${coolingBlock}
@@ -427,6 +438,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
   }
 
+  // Cross-sectional ranking across today's universe (momentum + trend + quality + low-vol)
+  const rankMap = computeCrossSectionalRanks(features);
+  for (const f of features) f.rank_info = rankMap.get(f.symbol) ?? null;
+
   const coolingSymbols = features.filter((f) => f.cooling).map((f) => f.symbol);
 
   // Regime-linked risk tightening: bear/crisis → tighter per-symbol cap and stop-loss.
@@ -471,6 +486,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         })),
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable.",
+        crossSectional: formatCrossSectionalBlock(rankMap),
         events,
         cooling: coolingSymbols,
         asOf,
@@ -659,6 +675,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       if (isSymbolCooling(cooldowns, meta.symbol, asOf)) {
         spend *= 0.5;
         sizingNotes.push("cooldown x0.5");
+      }
+
+      // Cross-sectional ranking guardrail: outside top quartile => halve size,
+      // outside universe entirely (should not happen) => leave alone.
+      const rankInfo = rankMap.get(meta.symbol) ?? null;
+      if (rankInfo && !rankInfo.top_quartile) {
+        spend *= 0.5;
+        sizingNotes.push(`rank #${rankInfo.rank}/${rankInfo.universe_size} x0.5`);
       }
 
       // Event penalty (symbol-specific and broad macro)
