@@ -213,8 +213,6 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
 
 export type TermId = string;
 
-export type TermId = keyof typeof GLOSSARY;
-
 // Learn page groups — order matters for reading flow.
 export const LEARN_GROUPS: Array<{ heading: string; terms: TermId[] }> = [
   {
