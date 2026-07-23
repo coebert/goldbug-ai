@@ -139,36 +139,67 @@ function cacheSet(headline: string, entry: TranslationCacheEntry): void {
   }
 }
 
-// Warm the in-memory cache from already-translated rows so repeated appearances
-// of the same source headline (across days/sources) skip the LLM.
+// Warm the in-memory cache from the dedicated persistent translation cache
+// so translations survive server restarts. Only rows whose `expires_at` is
+// still in the future are honored — stale rows fall through to the LLM.
 async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
   const missing = originals.filter((h) => !translationCache.has(h));
   if (missing.length === 0) return;
   try {
+    const nowIso = new Date().toISOString();
     const { data } = await supabaseAdmin
-      .from("news_cache")
-      .select("headline, original_headline, original_language, translation_confidence")
-      .in("original_headline", missing)
-      .not("original_language", "is", null)
+      .from("headline_translation_cache")
+      .select("source_headline, language, translation, confidence, expires_at")
+      .in("source_headline", missing)
+      .gt("expires_at", nowIso)
       .limit(500);
     for (const r of data ?? []) {
-      const orig = (r as { original_headline: string | null }).original_headline;
-      const lang = (r as { original_language: string | null }).original_language;
-      const translated = (r as { headline: string }).headline;
-      const conf = (r as { translation_confidence?: number | string | null }).translation_confidence;
-      if (!orig || !lang || !translated) continue;
+      const orig = (r as { source_headline: string }).source_headline;
+      const lang = (r as { language: string | null }).language;
+      const translation = (r as { translation: string | null }).translation;
+      const conf = (r as { confidence: number | string | null }).confidence;
+      if (!orig) continue;
       cacheSet(orig, {
-        lang,
-        translation: translated,
+        lang: lang ?? null,
+        translation: translation ?? null,
         confidence: conf == null ? null : Number(conf),
       });
     }
-
   } catch (err) {
     // Non-fatal — the cache just stays cold for these keys.
     console.warn("news: cache hydrate failed", err instanceof Error ? err.message : String(err));
   }
 }
+
+// Persist fresh LLM results to the dedicated cache with a 30-day TTL
+// (via the column default). Upsert so repeated appearances refresh
+// `updated_at`/`expires_at` and keep hot entries alive.
+async function persistTranslations(
+  entries: { source: string; entry: TranslationCacheEntry }[],
+): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    const nowIso = new Date().toISOString();
+    const expiresIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const rows = entries.map(({ source, entry }) => ({
+      source_headline: source,
+      language: entry.lang,
+      translation: entry.translation,
+      confidence: entry.confidence,
+      updated_at: nowIso,
+      expires_at: expiresIso,
+    }));
+    const { error } = await supabaseAdmin
+      .from("headline_translation_cache")
+      .upsert(rows as never, { onConflict: "source_headline" });
+    if (error) {
+      console.warn("news: translation cache upsert failed", error.message);
+    }
+  } catch (err) {
+    console.warn("news: translation cache upsert threw", err instanceof Error ? err.message : String(err));
+  }
+}
+
 
 async function callTranslateLLM(
   headlines: { i: number; text: string }[],
@@ -271,17 +302,21 @@ async function translateWithCache(
   }
   if (truly.length === 0) return result;
 
-  // 3. LLM call for what's left, then persist in memory.
+  // 3. LLM call for what's left, then persist in memory + durable cache.
   const numbered = truly.map((text, i) => ({ i, text }));
   const byIndex = await callTranslateLLM(numbered);
+  const toPersist: { source: string; entry: TranslationCacheEntry }[] = [];
   for (let i = 0; i < truly.length; i++) {
     const entry = byIndex.get(i);
     if (!entry) continue;
     cacheSet(truly[i], entry);
     result.set(truly[i], entry);
+    toPersist.push({ source: truly[i], entry });
   }
+  await persistTranslations(toPersist);
   return result;
 }
+
 
 export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
   if (items.length === 0) return items;
