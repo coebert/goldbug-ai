@@ -139,6 +139,110 @@ export async function getPriceOn(symbol: string, date: string): Promise<number |
   return match?.close ?? null;
 }
 
+// Fetch a long historical window (up to Yahoo's max) and cache it.
+// Returns candles between `from` and `to` inclusive (ISO YYYY-MM-DD).
+export async function getDailyCandlesRange(
+  symbol: string,
+  from: string,
+  to: string,
+): Promise<Candle[]> {
+  const { data: cached } = await supabaseAdmin
+    .from("price_cache")
+    .select("price_date, open, high, low, close, volume")
+    .eq("symbol", symbol)
+    .gte("price_date", from)
+    .lte("price_date", to)
+    .order("price_date", { ascending: true });
+
+  const yearsSpan = Math.max(
+    0.1,
+    (new Date(to).getTime() - new Date(from).getTime()) / (365.25 * 86400000),
+  );
+  // If cache is dense (>=180 rows/yr, ~ trading days), use it.
+  if ((cached?.length ?? 0) >= Math.min(180 * yearsSpan, 180)) {
+    return (cached ?? []).map((r) => ({
+      date: r.price_date as string,
+      open: Number(r.open ?? r.close),
+      high: Number(r.high ?? r.close),
+      low: Number(r.low ?? r.close),
+      close: Number(r.close),
+      volume: Number(r.volume ?? 0),
+    }));
+  }
+
+  const period1 = Math.floor(new Date(from).getTime() / 1000);
+  const period2 = Math.floor(new Date(to).getTime() / 1000) + 86400;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+    symbol,
+  )}?interval=1d&period1=${period1}&period2=${period2}`;
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
+    });
+    if (!res.ok) throw new Error(`Yahoo ${res.status}`);
+    const json = (await res.json()) as {
+      chart?: {
+        result?: Array<{
+          timestamp?: number[];
+          indicators?: {
+            quote?: Array<{
+              open?: (number | null)[];
+              high?: (number | null)[];
+              low?: (number | null)[];
+              close?: (number | null)[];
+              volume?: (number | null)[];
+            }>;
+          };
+        }>;
+      };
+    };
+    const result = json.chart?.result?.[0];
+    if (!result?.timestamp) return [];
+    const q = result.indicators?.quote?.[0];
+    if (!q) return [];
+    const out: Candle[] = [];
+    for (let i = 0; i < result.timestamp.length; i++) {
+      const close = q.close?.[i];
+      if (close == null) continue;
+      out.push({
+        date: toISODate(result.timestamp[i]),
+        open: q.open?.[i] ?? close,
+        high: q.high?.[i] ?? close,
+        low: q.low?.[i] ?? close,
+        close,
+        volume: q.volume?.[i] ?? 0,
+      });
+    }
+    if (out.length > 0) {
+      const rows = out.map((c) => ({
+        symbol,
+        price_date: c.date,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+      }));
+      for (let i = 0; i < rows.length; i += 500) {
+        await supabaseAdmin
+          .from("price_cache")
+          .upsert(rows.slice(i, i + 500), { onConflict: "symbol,price_date" });
+      }
+    }
+    return out.filter((c) => c.date >= from && c.date <= to);
+  } catch (err) {
+    console.error(`getDailyCandlesRange failed for ${symbol}:`, err);
+    return (cached ?? []).map((r) => ({
+      date: r.price_date as string,
+      open: Number(r.open ?? r.close),
+      high: Number(r.high ?? r.close),
+      low: Number(r.low ?? r.close),
+      close: Number(r.close),
+      volume: Number(r.volume ?? 0),
+    }));
+  }
+}
+
 // Simple technicals
 export function sma(closes: number[], period: number): number | null {
   if (closes.length < period) return null;
