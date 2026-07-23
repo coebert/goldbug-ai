@@ -102,6 +102,9 @@ function LongHorizonPage() {
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
   const [rebalance, setRebalance] = useState<"monthly" | "quarterly">("monthly");
   const [topK, setTopK] = useState(6);
+  const [commissionBps, setCommissionBps] = useState(5);
+  const [slippageBps, setSlippageBps] = useState(10);
+  const [minTradeValue, setMinTradeValue] = useState(25);
   const [result, setResult] = useState<LHResult | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const [eventsOn, setEventsOn] = useState(true);
@@ -116,6 +119,9 @@ function LongHorizonPage() {
           to,
           rebalance,
           top_k: topK,
+          commission_bps: commissionBps,
+          slippage_bps: slippageBps,
+          min_trade_value: minTradeValue,
         },
       }),
     onSuccess: (r) => {
