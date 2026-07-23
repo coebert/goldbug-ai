@@ -306,6 +306,8 @@ export function NewsReel() {
             <ul className="space-y-3 pr-2">
               {loop.map((item, idx) => {
                 const tone = sentimentTone(item.avg_sentiment);
+                const cred = credibilityFor(item.source);
+                const rec = recencyFor(item.date, now);
                 const cited = item.decisions_count > 0;
                 return (
                   <li
