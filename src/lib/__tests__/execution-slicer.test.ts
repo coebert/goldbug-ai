@@ -99,7 +99,7 @@ afterEach(() => warnSpy.mockRestore());
 
 function securityWarnings() {
   return warnSpy.mock.calls.filter(
-    (c) => typeof c[0] === "string" && c[0].startsWith("SECURITY:pending_slices"),
+    (c: unknown[]) => typeof c[0] === "string" && (c[0] as string).startsWith("SECURITY:pending_slices"),
   );
 }
 
