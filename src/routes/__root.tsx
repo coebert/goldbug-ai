@@ -61,19 +61,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Aegis — AI Paper Trader" },
+      { title: "Aegis — Your AI Paper Portfolios" },
       {
         name: "description",
         content:
-          "Give an AI a virtual £1000 pot and watch it invest. Backtests, live paper trading, adjustable risk. Simulation only.",
+          "Manage AI-driven paper trading portfolios. Backtest, run daily, watch results.",
       },
-      { property: "og:title", content: "Aegis — AI Paper Trader" },
+      { property: "og:title", content: "Aegis — Your AI Paper Portfolios" },
       {
         property: "og:description",
-        content: "AI-driven paper trading simulator. No real money, no leverage.",
+        content: "Manage AI-driven paper trading portfolios. Backtest, run daily, watch results.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Aegis — Your AI Paper Portfolios" },
+      { name: "twitter:description", content: "Manage AI-driven paper trading portfolios. Backtest, run daily, watch results." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2c62bb4c-d877-44b6-a781-c2369a709990/id-preview-da2dfa21--5594d905-189c-4619-9fe0-7e9d01f54757.lovable.app-1784796209412.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2c62bb4c-d877-44b6-a781-c2369a709990/id-preview-da2dfa21--5594d905-189c-4619-9fe0-7e9d01f54757.lovable.app-1784796209412.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
