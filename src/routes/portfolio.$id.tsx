@@ -44,6 +44,7 @@ import { RiskControlsCard } from "@/components/risk-controls-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
+import { LiveTradingCard } from "@/components/live-trading-card";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 
