@@ -131,9 +131,11 @@ function makeItem(headline: string, overrides: Partial<NewsItem> = {}): NewsItem
     summary: null,
     original_headline: null,
     original_language: null,
+    translation_confidence: null,
     ...overrides,
   };
 }
+
 
 describe("looksNonEnglish", () => {
   it("returns false for pure ASCII English text", async () => {
