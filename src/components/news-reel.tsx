@@ -492,8 +492,10 @@ export function NewsReel() {
                         <TranslationBadge
                           originalLanguage={item.original_language}
                           originalHeadline={item.original_headline}
+                          confidence={item.translation_confidence}
                           className="mt-1"
                         />
+
 
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           {item.url ? (
@@ -745,8 +747,11 @@ export function NewsReel() {
                   <TranslationBadge
                     originalLanguage={item.original_language}
                     originalHeadline={item.original_headline}
+                    confidence={item.translation_confidence}
                     className="mt-2"
                   />
+
+
 
                 </DialogHeader>
                 <div className="space-y-3 text-sm">
