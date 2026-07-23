@@ -40,8 +40,8 @@ async function log(args: {
       method: args.method,
       path: args.path,
       status: args.status,
-      request: (args.request as Record<string, unknown>) ?? null,
-      response: (args.response as Record<string, unknown>) ?? null,
+      request: (args.request as never) ?? null,
+      response: (args.response as never) ?? null,
       error: args.error ?? null,
     });
   } catch (e) {
