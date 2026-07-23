@@ -23,7 +23,7 @@ const DECISION_A = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const serverImpl = {
   maybeSliceOrder: vi.fn<(input: unknown) => Promise<unknown>>(),
   tickSlicer: vi.fn<(portfolioId: string, userId: string) => Promise<unknown>>(),
-  recordSliceFill: vi.fn<(sliceId: string, userId: string, qty: number, note?: string) => Promise<void>>(),
+  recordSliceFill: vi.fn<(sliceId: string, userId: string, qty: number, note?: string, idempotencyKey?: string) => Promise<{ applied: boolean; reason?: "duplicate" } | void>>(),
 };
 vi.mock("../execution-slicer.server", () => serverImpl);
 
