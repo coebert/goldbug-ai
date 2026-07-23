@@ -259,6 +259,48 @@ function AdminPage() {
       <Card className="border-primary/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
+            <PlayCircle className="h-4 w-4 text-primary" /> Manual run
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Trigger the full hourly cycle right now — refreshes news, macro regime, and prices,
+            then runs a decision tick for every eligible portfolio. Runs already made in the
+            current UTC hour are skipped automatically, so this is safe to click any time
+            between scheduled runs.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => manual.mutate()}
+              disabled={manual.isPending}
+              className="gap-2"
+            >
+              <PlayCircle className={`h-4 w-4 ${manual.isPending ? "animate-pulse" : ""}`} />
+              {manual.isPending ? "Running full cycle…" : "Trigger hourly run now"}
+            </Button>
+            {manual.isSuccess && manual.data && (
+              <span className="text-xs text-muted-foreground">
+                Last manual run: {manual.data.results.filter((x) => x.ok && !x.skipped).length} ticked,{" "}
+                {manual.data.results.filter((x) => x.skipped).length} skipped,{" "}
+                {manual.data.results.filter((x) => !x.ok).length} failed ·{" "}
+                {((manual.data.duration_ms ?? 0) / 1000).toFixed(1)}s
+              </span>
+            )}
+          </div>
+          {manual.isError && (
+            <Alert variant="destructive">
+              <AlertTitle>Trigger failed</AlertTitle>
+              <AlertDescription>{(manual.error as Error).message}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+
+
+      <Card className="border-primary/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
             <Radio className="h-4 w-4 text-primary" /> Broker connection — Connect your Saxo account
           </CardTitle>
         </CardHeader>
