@@ -248,6 +248,9 @@ function AdminPage() {
 
       <PushNotificationsCard />
 
+      <GlobalSignalDecayCard />
+
+
 
 
       {s && (
