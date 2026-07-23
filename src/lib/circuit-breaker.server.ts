@@ -173,15 +173,16 @@ export function tightenForRegime(
     perFactor = 0.5;
     stopFactor = 0.6;
     note = "crisis regime — per-symbol cap ×0.5, stop-loss tightened ×0.6";
-  } else if (r === "bear" || r === "bear_high_vol") {
+  } else if (r === "bear") {
     perFactor = 0.7;
     stopFactor = 0.75;
     note = "bear regime — per-symbol cap ×0.7, stop-loss tightened ×0.75";
-  } else if (r === "sideways_high_vol") {
+  } else if (r === "correction") {
     perFactor = 0.85;
     stopFactor = 0.85;
-    note = "high-vol sideways — mild tightening ×0.85";
+    note = "correction — mild tightening ×0.85";
   }
+
   const per_symbol_effective_pct = Math.max(0.01, basePerSym * perFactor);
   const stop_loss_effective_pct = Math.max(0.005, baseStop * stopFactor);
   const tightened: RiskConfig = {
