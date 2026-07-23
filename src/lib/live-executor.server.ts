@@ -86,7 +86,7 @@ export async function routeOrdersToBroker(params: {
   let adapter: import("@/lib/brokers/saxo.server").SaxoAdapter;
   try {
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-    adapter = buildSaxoAdapter({
+    adapter = await buildSaxoAdapter({
       userId,
       portfolioId: portfolio.id,
       envOverride: portfolio.mode === "live_prod" ? "live" : "sim",

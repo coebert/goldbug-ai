@@ -60,7 +60,7 @@ export const activateLive = createServerFn({ method: "POST" })
     if (own.error || !own.data || own.data.user_id !== userId) throw new Error("Portfolio not found");
 
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-    const adapter = buildSaxoAdapter({
+    const adapter = await buildSaxoAdapter({
       userId, portfolioId: data.portfolioId,
       envOverride: data.targetEnv === "prod" ? "live" : "sim",
     });
@@ -268,7 +268,7 @@ export const pingBroker = createServerFn({ method: "POST" })
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     const env = data.env ?? (own.data.mode === "live_prod" ? "live" : "sim");
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-    const adapter = buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
+    const adapter = await buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
     return adapter.ping();
   });
 
@@ -282,7 +282,7 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     const env = own.data.mode === "live_prod" ? "live" : "sim";
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-    const adapter = buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
+    const adapter = await buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
     const bal = await adapter.getBalance();
     const pos = await adapter.getPositions();
     return { balance: bal, positions: pos };
@@ -339,7 +339,7 @@ export async function runReconciliation(userId: string, portfolioId: string) {
   }
   const env = p.data.mode === "live_prod" ? "live" : "sim";
   const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-  const adapter = buildSaxoAdapter({ userId, portfolioId, envOverride: env });
+  const adapter = await buildSaxoAdapter({ userId, portfolioId, envOverride: env });
   const [bal, pos, hold] = await Promise.all([
     adapter.getBalance(),
     adapter.getPositions(),
