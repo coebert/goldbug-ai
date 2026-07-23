@@ -43,15 +43,13 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         const today = new Date().toISOString().slice(0, 10);
 
         // 0. Keep Saxo OAuth tokens alive for BOTH envs, unconditionally.
-        //    getAccessToken() proactively refreshes when <5min remain, which
-        //    rolls the refresh-token's 30-day window forward. This must run
-        //    every hour regardless of whether the kill-switch is armed, whether
-        //    the tick produces routable orders, or whether a live_prod
-        //    portfolio exists — otherwise the refresh token silently lapses
-        //    and the broker connection dies until the user manually reconnects.
+        //    Saxo refresh tokens can be as short as ~60 minutes, so we MUST
+        //    force-refresh every hour even when the access token still has
+        //    time left — otherwise the refresh window silently lapses and the
+        //    broker connection dies until the user manually reconnects.
         const saxoRefresh: Record<string, { ok: boolean; error?: string; skipped?: string }> = {};
         try {
-          const { getAccessToken, getOAuthStatus } = await import(
+          const { forceRefreshTokens, getOAuthStatus } = await import(
             "@/lib/brokers/saxo-oauth.server"
           );
           for (const env of ["sim", "live"] as const) {
@@ -65,8 +63,8 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
                 saxoRefresh[env] = { ok: true, skipped: "no oauth row yet" };
                 continue;
               }
-              await getAccessToken(env); // refreshes in place if <5min remain
-              saxoRefresh[env] = { ok: true };
+              const r = await forceRefreshTokens(env);
+              saxoRefresh[env] = r.refreshed ? { ok: true } : { ok: true, skipped: r.reason };
             } catch (e) {
               const msg = e instanceof Error ? e.message : String(e);
               console.error(`hourly-run: saxo refresh failed for ${env}`, msg);
@@ -76,6 +74,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         } catch (e) {
           console.error("hourly-run: saxo refresh module load failed", e);
         }
+
 
 
         // 1. Refresh news (bust today's cache so hourly runs see new headlines)

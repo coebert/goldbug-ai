@@ -23,6 +23,7 @@ import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.re
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
+import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/public/hooks/daily-summary'
@@ -98,6 +99,12 @@ const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
   path: '/api/public/saxo/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksSaxoRefreshRoute =
+  ApiPublicHooksSaxoRefreshRouteImport.update({
+    id: '/api/public/hooks/saxo-refresh',
+    path: '/api/public/hooks/saxo-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksLiveReconcileRoute =
   ApiPublicHooksLiveReconcileRouteImport.update({
     id: '/api/public/hooks/live-reconcile',
@@ -139,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
+  '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -159,6 +167,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
+  '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRoutesById {
@@ -180,6 +189,7 @@ export interface FileRoutesById {
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
+  '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRouteTypes {
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
+    | '/api/public/hooks/saxo-refresh'
     | '/api/public/saxo/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
+    | '/api/public/hooks/saxo-refresh'
     | '/api/public/saxo/callback'
   id:
     | '__root__'
@@ -242,6 +254,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
+    | '/api/public/hooks/saxo-refresh'
     | '/api/public/saxo/callback'
   fileRoutesById: FileRoutesById
 }
@@ -260,6 +273,7 @@ export interface RootRouteChildren {
   ApiPublicHooksDailySummaryRoute: typeof ApiPublicHooksDailySummaryRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
   ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
+  ApiPublicHooksSaxoRefreshRoute: typeof ApiPublicHooksSaxoRefreshRoute
   ApiPublicSaxoCallbackRoute: typeof ApiPublicSaxoCallbackRoute
 }
 
@@ -363,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSaxoCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/saxo-refresh': {
+      id: '/api/public/hooks/saxo-refresh'
+      path: '/api/public/hooks/saxo-refresh'
+      fullPath: '/api/public/hooks/saxo-refresh'
+      preLoaderRoute: typeof ApiPublicHooksSaxoRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/live-reconcile': {
       id: '/api/public/hooks/live-reconcile'
       path: '/api/public/hooks/live-reconcile'
@@ -425,6 +446,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksDailySummaryRoute: ApiPublicHooksDailySummaryRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
   ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
+  ApiPublicHooksSaxoRefreshRoute: ApiPublicHooksSaxoRefreshRoute,
   ApiPublicSaxoCallbackRoute: ApiPublicSaxoCallbackRoute,
 }
 export const routeTree = rootRouteImport
