@@ -200,6 +200,7 @@ function BrokerCard({ env }: { env: BrokerEnvHealth }) {
 
 function AdminPage() {
   const fetchHealth = useServerFn(getAdminHealth);
+  const triggerRun = useServerFn(triggerHourlyRunNow);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
@@ -212,9 +213,26 @@ function AdminPage() {
     refetchInterval: 60_000,
   });
 
+  const manual = useMutation({
+    mutationFn: () => triggerRun(),
+    onSuccess: (r) => {
+      const ok = r.results.filter((x) => x.ok && !x.skipped).length;
+      const skipped = r.results.filter((x) => x.skipped).length;
+      const failed = r.results.filter((x) => !x.ok).length;
+      toast.success("Hourly run complete", {
+        description: `${ok} ticked · ${skipped} skipped · ${failed} failed · ${r.news_headlines ?? 0} headlines · ${((r.duration_ms ?? 0) / 1000).toFixed(1)}s`,
+      });
+      q.refetch();
+    },
+    onError: (e: Error) => {
+      toast.error("Manual run failed", { description: e.message });
+    },
+  });
+
   const s = q.data;
   const alerts = s ? computeAlerts(s) : [];
   void tick;
+
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
