@@ -727,6 +727,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         price,
         atrPct: featExec?.atr_pct ?? null,
         adv20d: featExec?.adv_20d ?? null,
+        params: cfg.execution_params ?? undefined,
       });
       if (outcome.belowMinTrade || outcome.qty <= 0) {
         executed.push({
