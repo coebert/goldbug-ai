@@ -481,6 +481,23 @@ function PortfolioPage() {
                           </button>
                         ))}
                       </div>
+                      <div className="inline-flex overflow-hidden rounded-md border border-border text-xs" role="group" aria-label="Benchmark compare mode">
+                        {(["raw", "pct"] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setCompareMode(mode)}
+                            className={`px-2 py-1 font-normal transition-colors ${
+                              compareMode === mode
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-background text-muted-foreground hover:text-foreground"
+                            }`}
+                            title={mode === "pct" ? "Normalized: % indexed to start" : "Raw value"}
+                          >
+                            {mode === "pct" ? "% vs start" : "Raw"}
+                          </button>
+                        ))}
+                      </div>
                       <EventOverlayControls
                         domainDates={equityData.map((d) => d.date)}
                         enabled={eventsOn}
