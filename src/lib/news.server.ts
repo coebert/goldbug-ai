@@ -181,7 +181,7 @@ async function callTranslateLLM(
   const gateway = createLovableAiGatewayProvider(key);
   const model = gateway("google/gemini-3.6-flash");
 
-  const prompt = `For each numbered headline below, detect its language and, if it is NOT English, translate it into natural English. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese", "Macedonian"). When the headline is already in English, set lang to "English" and translation to null. Never invent facts — translate only.
+  const prompt = `For each numbered headline below, detect its language and, if it is NOT English, translate it into natural English. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese", "Macedonian"). When the headline is already in English, set lang to "English" and translation to null. Also return a "confidence" number between 0 and 1 representing how confident you are in the language detection AND the accuracy of the translation combined (1 = certain, 0.5 = unsure, 0 = guessing). Never invent facts — translate only.
 
 Headlines:
 ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
@@ -193,9 +193,15 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
       output: Output.object({ schema: TranslateSchema }),
     });
     for (const r of output.results) {
+      const rawConf = r.confidence;
+      const conf =
+        typeof rawConf === "number" && Number.isFinite(rawConf)
+          ? Math.max(0, Math.min(1, rawConf))
+          : null;
       out.set(r.i, {
         lang: (r.lang ?? "").trim() || null,
         translation: (r.translation ?? "")?.toString().trim() || null,
+        confidence: conf,
       });
     }
   } catch (err) {
@@ -204,6 +210,7 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
     }
   }
   return out;
+
 }
 
 // Batch-translate with caching. Cached entries never hit the LLM;
