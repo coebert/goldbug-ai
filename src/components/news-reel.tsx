@@ -114,6 +114,14 @@ export function NewsReel() {
     setSinceDays((d) => Math.min(120, d + 10));
     setLimit((l) => Math.min(400, l + 40));
   };
+  // Infinite scroll sentinel: observed by an IntersectionObserver rooted on
+  // the reel's scroll container. When it enters the viewport we auto-request
+  // the next page, provided we're not already fetching and more data exists.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const isFetching = q.isFetching;
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
 
   // "Now" tick so the "updated Xs ago" label stays live.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -122,6 +130,32 @@ export function NewsReel() {
     return () => window.clearInterval(id);
   }, []);
   const lastUpdated = q.dataUpdatedAt || null;
+
+  // Wire the sentinel to an IntersectionObserver whose root is the reel's
+  // scroll container. As soon as the sentinel is visible (near the bottom)
+  // and we're not mid-fetch, expand the window. Re-runs when hasMore or
+  // fetching state changes so we don't fire while a load is in-flight and
+  // rebind cleanly once new data arrives.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = scrollerRef.current;
+    if (!sentinel || !root) return;
+    if (!hasMore || isFetching) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            loadMoreRef.current();
+            break;
+          }
+        }
+      },
+      { root, rootMargin: "160px 0px", threshold: 0 },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [hasMore, isFetching]);
+
 
 
   const [paused, setPaused] = useState(false);
@@ -695,6 +729,21 @@ export function NewsReel() {
                 );
               })}
             </ul>
+            {/* Infinite-scroll sentinel — observed to auto-load older events. */}
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                aria-hidden="true"
+                className="h-8 w-full"
+              />
+            )}
+            {(q.isFetching || !hasMore) && allItems.length > 0 && (
+              <div className="py-2 text-center text-[11px] italic text-muted-foreground">
+                {q.isFetching
+                  ? "Loading older events…"
+                  : "No older cached events"}
+              </div>
+            )}
           </div>
         )}
         {!q.isLoading && allItems.length > 0 && (
@@ -702,21 +751,21 @@ export function NewsReel() {
             <span>
               Showing {allItems.length} headline{allItems.length === 1 ? "" : "s"} from the last {sinceDays} day{sinceDays === 1 ? "" : "s"}
             </span>
-            {hasMore ? (
+            {hasMore && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={loadMore}
                 disabled={q.isFetching}
                 className="h-7 text-xs"
+                title="Older events also auto-load as you scroll to the bottom of the reel"
               >
                 {q.isFetching ? "Loading…" : "Load more"}
               </Button>
-            ) : (
-              <span className="italic">No older cached events</span>
             )}
           </div>
         )}
+
       </CardContent>
       <Dialog open={detailsId !== null} onOpenChange={(o) => !o && setDetailsId(null)}>
         <DialogContent className="max-w-lg">
