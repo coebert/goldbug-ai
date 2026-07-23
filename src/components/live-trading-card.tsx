@@ -139,15 +139,8 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!s?.hasToken && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>SAXO_ACCESS_TOKEN missing</AlertTitle>
-            <AlertDescription>
-              Add a 24-hour developer token in project secrets (SAXO_ACCESS_TOKEN, plus optional SAXO_ENV=sim|live and SAXO_ACCOUNT_KEY).
-            </AlertDescription>
-          </Alert>
-        )}
+        <SaxoOAuthPanel />
+
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => mPing.mutate()} disabled={mPing.isPending || !s?.hasToken}>
