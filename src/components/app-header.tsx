@@ -1,19 +1,42 @@
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Shield, GitCompare, Sparkles } from "lucide-react";
 
 export function AppHeader({ email }: { email?: string | null }) {
   return (
     <header className="border-b border-border bg-card">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <TrendingUp className="h-5 w-5 text-primary" />
           <span>Aegis</span>
-          <span className="text-xs font-normal text-muted-foreground">AI Paper Trader</span>
+          <span className="hidden text-xs font-normal text-muted-foreground sm:inline">AI Paper Trader</span>
         </Link>
+        <nav className="flex items-center gap-1 text-sm">
+          <Link
+            to="/get-started"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-muted [&.active]:text-foreground"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden sm:inline">Get started</span>
+          </Link>
+          <Link
+            to="/compare"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-muted [&.active]:text-foreground"
+          >
+            <GitCompare className="h-4 w-4" />
+            <span className="hidden sm:inline">Compare</span>
+          </Link>
+          <Link
+            to="/admin"
+            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 font-medium text-primary hover:bg-primary/20 [&.active]:bg-primary [&.active]:text-primary-foreground"
+          >
+            <Shield className="h-4 w-4" />
+            <span>Admin</span>
+          </Link>
+        </nav>
         <div className="flex items-center gap-3 text-sm">
-          {email && <span className="hidden text-muted-foreground sm:inline">{email}</span>}
+          {email && <span className="hidden text-muted-foreground md:inline">{email}</span>}
           {email ? (
             <Button
               variant="ghost"
