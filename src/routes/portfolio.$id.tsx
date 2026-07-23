@@ -43,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
+import { ModeBadge } from "@/components/mode-badge";
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
