@@ -1007,7 +1007,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }
 
 
+  // G. Log counterfactuals for rejected buys — later scored against 5d forward return.
+  {
+    const orderMeta = new Map(decision.orders.map((o) => [o.symbol, o] as const));
+    for (const t of executed) {
+      if (t.side !== "buy" || t.quantity > 0 || !t.rejected) continue;
+      const om = orderMeta.get(t.symbol);
+      logCounterfactual({
+        portfolioId,
+        asOf,
+        symbol: t.symbol,
+        side: "buy",
+        hypotheticalPrice: t.price || (priceMap.get(t.symbol) ?? 0),
+        blockReason: t.rejected,
+        conviction: typeof om?.conviction === "number" ? om.conviction : null,
+      }).catch(() => { /* ignore */ });
+    }
+  }
+
   // Persist state
+
 
   const admin = supabaseAdmin;
   const executedAt = new Date().toISOString();
