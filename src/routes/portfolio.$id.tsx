@@ -22,12 +22,14 @@ import { toast } from "sonner";
 import {
   LineChart,
   Line,
+  Area,
+  ComposedChart,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
   CartesianGrid,
+  Tooltip,
   ReferenceLine,
+  ResponsiveContainer,
 } from "recharts";
 import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity } from "lucide-react";
