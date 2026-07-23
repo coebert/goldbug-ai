@@ -241,9 +241,16 @@ function ComparePage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Equity curves (% return)</CardTitle>
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span>Equity curves (% return)</span>
+                  {focused && (
+                    <Button variant="ghost" size="sm" onClick={() => setFocused(null)}>
+                      Show all
+                    </Button>
+                  )}
+                </CardTitle>
                 <CardDescription>
-                  Normalised to starting pot so different amounts compare directly.
+                  Normalised to starting pot. Click a legend item to isolate one line; click again to reset.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -258,38 +265,131 @@ function ComparePage() {
                   </div>
                 )}
                 {results && chartData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                      <YAxis
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={11}
-                        tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: 6,
-                          fontSize: 12,
-                        }}
-                        formatter={(v: number) => `${v.toFixed(2)}%`}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      {results.map((r, i) => (
-                        <Line
-                          key={r.portfolio.id}
-                          type="monotone"
-                          dataKey={r.portfolio.name}
-                          stroke={COLORS[i % COLORS.length]}
-                          strokeWidth={2}
-                          dot={false}
-                          connectNulls
+                  <>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                        <YAxis
+                          stroke="hsl(var(--muted-foreground))"
+                          fontSize={11}
+                          tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
                         />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
+                        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                        <Tooltip
+                          cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                          content={({ active, payload, label }) => {
+                            if (!active || !payload?.length) return null;
+                            const sorted = [...payload].sort(
+                              (a, b) => Number(b.value ?? 0) - Number(a.value ?? 0),
+                            );
+                            return (
+                              <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
+                                <div className="mb-1 font-medium">{label}</div>
+                                {sorted.map((pt) => {
+                                  const val = Number(pt.value ?? 0);
+                                  return (
+                                    <div
+                                      key={String(pt.dataKey)}
+                                      className="flex items-center gap-2 tabular-nums"
+                                    >
+                                      <span
+                                        className="inline-block h-2 w-2 rounded-sm"
+                                        style={{ background: pt.color }}
+                                      />
+                                      <span className="flex-1">{pt.dataKey}</span>
+                                      <span className={val >= 0 ? "text-primary" : "text-destructive"}>
+                                        {val >= 0 ? "+" : ""}
+                                        {val.toFixed(2)}%
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
+                          onClick={(o: { dataKey?: string | number }) => {
+                            const key = String(o.dataKey ?? "");
+                            setFocused((prev) => (prev === key ? null : key));
+                          }}
+                          formatter={(value) => (
+                            <span
+                              style={{
+                                opacity: !focused || focused === value ? 1 : 0.35,
+                                textDecoration: focused === value ? "underline" : "none",
+                              }}
+                            >
+                              {value}
+                            </span>
+                          )}
+                        />
+                        {results.map((r, i) => {
+                          const isDim = focused !== null && focused !== r.portfolio.name;
+                          return (
+                            <Line
+                              key={r.portfolio.id}
+                              type="monotone"
+                              dataKey={r.portfolio.name}
+                              stroke={COLORS[i % COLORS.length]}
+                              strokeWidth={focused === r.portfolio.name ? 3 : 2}
+                              strokeOpacity={isDim ? 0.15 : 1}
+                              dot={false}
+                              activeDot={isDim ? false : { r: 4 }}
+                              connectNulls
+                              isAnimationActive={false}
+                            />
+                          );
+                        })}
+                      </LineChart>
+                    </ResponsiveContainer>
+
+                    <div className="mt-6">
+                      <div className="mb-2 text-xs font-medium text-muted-foreground">
+                        Drawdown (% below running peak)
+                      </div>
+                      <ResponsiveContainer width="100%" height={180}>
+                        <LineChart data={drawdownData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                          <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                          <YAxis
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={11}
+                            tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                          />
+                          <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                          <Tooltip
+                            cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                            contentStyle={{
+                              background: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: 6,
+                              fontSize: 12,
+                            }}
+                            formatter={(v: number) => `${Number(v).toFixed(2)}%`}
+                          />
+                          {results.map((r, i) => {
+                            const isDim = focused !== null && focused !== r.portfolio.name;
+                            return (
+                              <Line
+                                key={r.portfolio.id}
+                                type="monotone"
+                                dataKey={r.portfolio.name}
+                                stroke={COLORS[i % COLORS.length]}
+                                strokeWidth={focused === r.portfolio.name ? 2.5 : 1.5}
+                                strokeOpacity={isDim ? 0.12 : 0.9}
+                                dot={false}
+                                connectNulls
+                                isAnimationActive={false}
+                              />
+                            );
+                          })}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
