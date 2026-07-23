@@ -96,12 +96,18 @@ function Home() {
     <div className="min-h-screen">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Your Portfolios</h1>
-          <p className="text-sm text-muted-foreground">
-            Create a portfolio, pick a risk level, run a backtest, then let the AI make daily decisions.
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Your Portfolios</h1>
+            <p className="text-sm text-muted-foreground">
+              Create a portfolio, pick a risk level, run a backtest, then let the AI make daily decisions.
+            </p>
+          </div>
+          <Link to="/compare">
+            <Button variant="outline" size="sm">Compare</Button>
+          </Link>
         </div>
+
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">

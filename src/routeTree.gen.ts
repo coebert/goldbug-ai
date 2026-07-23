@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -38,12 +44,14 @@ const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/compare': typeof CompareRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/compare': typeof CompareRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
@@ -51,18 +59,30 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/compare': typeof CompareRoute
   '/portfolio/$id': typeof PortfolioIdRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/portfolio/$id' | '/api/public/hooks/daily-run'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/compare'
+    | '/portfolio/$id'
+    | '/api/public/hooks/daily-run'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/portfolio/$id' | '/api/public/hooks/daily-run'
+  to:
+    | '/'
+    | '/auth'
+    | '/compare'
+    | '/portfolio/$id'
+    | '/api/public/hooks/daily-run'
   id:
     | '__root__'
     | '/'
     | '/auth'
+    | '/compare'
     | '/portfolio/$id'
     | '/api/public/hooks/daily-run'
   fileRoutesById: FileRoutesById
@@ -70,12 +90,20 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  CompareRoute: typeof CompareRoute
   PortfolioIdRoute: typeof PortfolioIdRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -110,6 +138,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  CompareRoute: CompareRoute,
   PortfolioIdRoute: PortfolioIdRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
 }
