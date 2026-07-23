@@ -8,7 +8,7 @@ import {
   createPortfolio,
   deletePortfolio,
 } from "@/lib/trading.functions";
-import { activateLive, getSaxoOAuthStatus } from "@/lib/live.functions";
+import { activateLive, getSaxoOAuthStatus, previewBrokerBalance } from "@/lib/live.functions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
