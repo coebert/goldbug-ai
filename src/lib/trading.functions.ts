@@ -2120,3 +2120,84 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
 
     return { items: items.slice(0, 40), as_of: asOf.toISOString() };
   });
+
+// ---------------------------------------------------------------------------
+// Decision -> news breakdown: maps each recent decision to the top news items
+// that most influenced it (ranked by |sentiment|).
+// ---------------------------------------------------------------------------
+
+type DecisionNewsItem = {
+  headline: string;
+  source: string | null;
+  url: string | null;
+  sentiment: number | null;
+};
+
+type DecisionAction = { action: string; symbol: string; qty?: number | null };
+
+type DecisionBreakdownItem = {
+  decision_id: string;
+  portfolio_id: string;
+  portfolio_name: string;
+  run_date: string;
+  rationale: string | null;
+  actions: DecisionAction[];
+  top_news: DecisionNewsItem[];
+  total_news_considered: number;
+};
+
+export const getDecisionNewsBreakdown = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ items: DecisionBreakdownItem[]; as_of: string }> => {
+    const asOf = new Date();
+    const since = new Date(asOf.getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+
+    const { data: portfolios } = await context.supabase
+      .from("portfolios")
+      .select("id, name");
+    const pMap = new Map((portfolios ?? []).map((p) => [p.id, p.name]));
+
+    const { data: decisions } = await context.supabase
+      .from("decisions")
+      .select("id, portfolio_id, run_date, rationale, raw")
+      .gte("run_date", since)
+      .order("run_date", { ascending: false })
+      .limit(30);
+
+    const items: DecisionBreakdownItem[] = (decisions ?? []).map((d) => {
+      const raw = (d.raw ?? {}) as {
+        news?: Array<{ headline?: string; source?: string | null; url?: string | null; sentiment?: number | null }>;
+        executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+        orders?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+      };
+      const news = (raw.news ?? []).filter((n) => (n.headline ?? "").trim().length > 0);
+      const ranked = [...news].sort((a, b) => {
+        const av = typeof a.sentiment === "number" ? Math.abs(a.sentiment) : -1;
+        const bv = typeof b.sentiment === "number" ? Math.abs(b.sentiment) : -1;
+        return bv - av;
+      });
+      const top = ranked.slice(0, 5).map((n) => ({
+        headline: String(n.headline),
+        source: n.source ?? null,
+        url: n.url ?? null,
+        sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
+      }));
+      const acts = (raw.executed && raw.executed.length > 0 ? raw.executed : raw.orders) ?? [];
+      const actions = acts
+        .filter((a) => a && a.action && a.symbol)
+        .slice(0, 8)
+        .map((a) => ({ action: String(a.action), symbol: String(a.symbol), qty: a.qty ?? null }));
+      return {
+        decision_id: d.id,
+        portfolio_id: d.portfolio_id,
+        portfolio_name: pMap.get(d.portfolio_id) ?? "Portfolio",
+        run_date: d.run_date,
+        rationale: d.rationale ?? null,
+        actions,
+        top_news: top,
+        total_news_considered: news.length,
+      };
+    });
+
+    return { items, as_of: asOf.toISOString() };
+  });
