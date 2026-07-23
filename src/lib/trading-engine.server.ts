@@ -42,6 +42,7 @@ import {
   upcomingEvents,
 } from "./portfolio-optimizer.server";
 import { computeAttribution, formatAttributionBlock } from "./attribution.server";
+import { getOrRefreshHyperparams, formatHyperparamBlock, type TunedHyperparams } from "./hyperparam-tuning.server";
 import {
   parseCircuit,
   evaluateBreaker,
