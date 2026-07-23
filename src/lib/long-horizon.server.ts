@@ -553,8 +553,11 @@ export async function runLongHorizonBacktest(opts: {
     starting_cash: opts.startingCash,
     currency: opts.currency,
     rebalance,
+    execution,
     series,
     regimes,
     tradeCount,
+    skippedSmallTrades,
+    totalCostsPaid,
   };
 }
