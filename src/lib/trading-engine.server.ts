@@ -354,22 +354,44 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const totalValue = cash + holdingsValue;
 
   const features = await buildCandidateFeatures(candidateSymbols, asOf);
-  const news = opts?.skipNews ? [] : await getNewsForDate(asOf).catch(() => []);
-  const regime = await detectAndPersistRegime(asOf).catch((e) => {
-    console.warn("Regime detection failed:", e);
-    return null;
-  });
-  const learning = await buildLearningContext(portfolioId, asOf).catch((e) => {
-    console.warn("Learning context failed:", e);
-    return {
-      stats: {
-        window_days: 20, horizon_days: 5, evaluable: 0, wins: 0, losses: 0,
-        win_rate: null, avg_return_pct: null, best: null, worst: null,
-        per_symbol: [], per_side: { buy: { n: 0, win_rate: null }, sell: { n: 0, win_rate: null } },
-      },
-      lessons: [], lessons_as_of: null, samples: [],
-    } satisfies LearningContext;
-  });
+
+  const [rawNews, regime, learning, crossAsset, cooldowns, events] = await Promise.all([
+    opts?.skipNews ? Promise.resolve([]) : getNewsForDate(asOf).catch(() => []),
+    detectAndPersistRegime(asOf).catch((e) => {
+      console.warn("Regime detection failed:", e);
+      return null;
+    }),
+    buildLearningContext(portfolioId, asOf).catch((e) => {
+      console.warn("Learning context failed:", e);
+      return {
+        stats: {
+          window_days: 20, horizon_days: 5, evaluable: 0, wins: 0, losses: 0,
+          win_rate: null, avg_return_pct: null, best: null, worst: null,
+          per_symbol: [], per_side: { buy: { n: 0, win_rate: null }, sell: { n: 0, win_rate: null } },
+        },
+        lessons: [], lessons_as_of: null, samples: [],
+      } satisfies LearningContext;
+    }),
+    getCrossAssetSnapshot(asOf).catch(() => null),
+    refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
+    upcomingEvents(asOf, candidateSymbols.map((c) => c.symbol)).catch(() => []),
+  ]);
+
+  // Score news sentiment (LLM pass, cached), then aggregate per-symbol
+  const scoredNews = rawNews.length > 0
+    ? await ensureSentimentScored(asOf, rawNews).catch(() => rawNews.map((n) => ({
+        ...n, sentiment: null, entities: [] as string[], source_weight: 0.4,
+      })))
+    : [];
+
+  for (const f of features) {
+    const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
+    f.news_score = agg.contributors > 0 ? Number(agg.score.toFixed(3)) : null;
+    f.news_contributors = agg.contributors;
+    f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
+  }
+
+  const coolingSymbols = features.filter((f) => f.cooling).map((f) => f.symbol);
 
   const decision = await callAiForDecision({
     portfolio,
@@ -377,7 +399,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     cashValue: cash,
     totalValue,
     features,
-    news,
+    news: scoredNews.slice(0, 15).map((n) => ({
+      headline: n.headline,
+      source: n.source,
+      sentiment: n.sentiment,
+    })),
+    crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
+    events,
+    cooling: coolingSymbols,
     asOf,
     regime: regime ?? {
       as_of: asOf,
@@ -394,6 +423,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     },
     learning,
   });
+
 
   // Execute orders through guardrails
   const risk = riskProfile(portfolio.risk_level);
