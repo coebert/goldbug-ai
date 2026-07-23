@@ -950,7 +950,7 @@ function PortfolioPage() {
                     <table className="w-full min-w-[640px] text-sm">
                       <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
                         <tr>
-                          <th className="px-3 py-2 text-left">Date</th>
+                          <th className="px-3 py-2 text-left">Date &amp; time (GMT)</th>
                           <th className="px-3 py-2 text-left">Symbol</th>
                           <th className="px-3 py-2 text-left">Side</th>
                           <th className="px-3 py-2 text-right">Qty</th>
@@ -960,9 +960,19 @@ function PortfolioPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {trades.map((t) => (
+                        {trades.map((t) => {
+                          const executedAt = t.executed_at ? new Date(t.executed_at) : null;
+                          const timeGmt = executedAt && !isNaN(executedAt.getTime())
+                            ? `${String(executedAt.getUTCHours()).padStart(2, "0")}:${String(executedAt.getUTCMinutes()).padStart(2, "0")}:${String(executedAt.getUTCSeconds()).padStart(2, "0")}`
+                            : null;
+                          return (
                           <tr key={t.id} className="border-t border-border">
-                            <td className="px-3 py-2 tabular-nums">{t.trade_date}</td>
+                            <td className="px-3 py-2 tabular-nums whitespace-nowrap">
+                              <span>{t.trade_date}</span>
+                              {timeGmt && (
+                                <span className="ml-2 text-xs text-muted-foreground">{timeGmt} GMT</span>
+                              )}
+                            </td>
                             <td className="px-3 py-2 font-medium">{t.symbol}</td>
                             <td
                               className={`px-3 py-2 ${
