@@ -594,3 +594,98 @@ function CreatePortfolioCard() {
   );
 }
 
+function BrokerBalancePreview(props: {
+  env: "sim" | "live";
+  isRealMoney: boolean;
+  data:
+    | {
+        env: "sim" | "live";
+        accountId: string | null;
+        currency: string;
+        cash: number;
+        positionsValue: number;
+        totalValue: number;
+        positionsCount: number;
+        fetchedAt: string;
+      }
+    | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: string | null;
+  onRefresh: () => void;
+  fmt: (n: number, ccy: string) => string;
+}) {
+  const { data, isLoading, isFetching, error, onRefresh, fmt, isRealMoney, env } = props;
+  const emphasis = isRealMoney
+    ? "border-destructive/40 bg-destructive/5"
+    : "border-border bg-muted/30";
+  const headline = data ? fmt(data.cash, data.currency) : "—";
+
+  return (
+    <div className={`rounded-md border p-3 ${emphasis}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Starting cash from Saxo {env.toUpperCase()}
+          </div>
+          <div className="mt-0.5 text-lg font-semibold tabular-nums">
+            {isLoading ? "Loading…" : error ? "Unavailable" : headline}
+          </div>
+          {data && (
+            <div className="text-[11px] text-muted-foreground">
+              Account {data.accountId ?? "—"} · fetched{" "}
+              {new Date(data.fetchedAt).toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isFetching}
+          className="h-7 gap-1 px-2 text-[11px]"
+        >
+          {isFetching ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3 w-3" />
+          )}
+          Refresh
+        </Button>
+      </div>
+
+      {error && (
+        <div className="mt-2 text-[11px] text-destructive">
+          Couldn&apos;t read your Saxo {env.toUpperCase()} balance: {error}
+        </div>
+      )}
+
+      {data && (
+        <div className="mt-3 space-y-1 text-[11px]">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Cash (used as starting pot)</span>
+            <span className="font-medium tabular-nums">{fmt(data.cash, data.currency)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">
+              Existing positions ({data.positionsCount})
+            </span>
+            <span className="tabular-nums">{fmt(data.positionsValue, data.currency)}</span>
+          </div>
+          <div className="flex items-center justify-between border-t border-border/60 pt-1">
+            <span className="text-muted-foreground">Total account value</span>
+            <span className="tabular-nums">{fmt(data.totalValue, data.currency)}</span>
+          </div>
+          <p className="pt-1 text-muted-foreground">
+            Only the <span className="font-medium">cash</span> line becomes this
+            portfolio&apos;s starting pot. Existing positions on your Saxo{" "}
+            {env.toUpperCase()} account are left untouched — Aegis will not sell them.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
