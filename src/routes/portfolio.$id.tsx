@@ -133,6 +133,43 @@ function PortfolioPage() {
     });
   }, [equity]);
 
+  const benchFn = useServerFn(getBenchmarkSeries);
+  const fromDate = equityData[0]?.date;
+  const toDate = equityData[equityData.length - 1]?.date;
+  const benchQ = useQuery({
+    queryKey: ["benchmark", benchmark, fromDate, toDate],
+    queryFn: () => benchFn({ data: { symbol: benchmark, from: fromDate!, to: toDate! } }),
+    enabled: benchmark !== "none" && !!fromDate && !!toDate && equityData.length >= 2,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const startingCashForChart = Number(q.data?.portfolio?.starting_cash ?? 0);
+  const chartData = useMemo(() => {
+    if (benchmark === "none" || !benchQ.data?.series?.length) return equityData;
+    const bmap = new Map(benchQ.data.series.map((r) => [r.date, r.close]));
+    // Find first close on/before the first equity date to normalise
+    const dates = [...bmap.keys()].sort();
+    let base: number | null = null;
+    for (const d of dates) {
+      if (d <= equityData[0].date) base = bmap.get(d)!;
+      else break;
+    }
+    if (base == null) base = bmap.get(dates[0])!;
+    let lastBench: number | null = base;
+    return equityData.map((row) => {
+      // Latest close on/before this equity date
+      for (const d of dates) {
+        if (d <= row.date) lastBench = bmap.get(d)!;
+        else break;
+      }
+      const benchmark_value = lastBench != null && base != null
+        ? startingCashForChart * (lastBench / base)
+        : null;
+      return { ...row, benchmark: benchmark_value };
+    });
+  }, [equityData, benchQ.data, benchmark, startingCashForChart]);
+
+
   const p = q.data?.portfolio;
   const holdings = q.data?.holdings ?? [];
   const trades = q.data?.trades ?? [];
