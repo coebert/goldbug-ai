@@ -7,6 +7,14 @@ export const Route = createFileRoute("/api/public/hooks/live-reconcile")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { checkRateLimit, tooManyRequests } = await import("@/lib/rate-limit.server");
+        const rl = await checkRateLimit(request, {
+          bucket: "hooks:live-reconcile",
+          capacity: 5,
+          refillPerSec: 5 / 3600,
+        });
+        if (!rl.allowed) return tooManyRequests(rl);
+
         const provided = request.headers.get("x-cron-secret") ?? request.headers.get("X-Cron-Secret");
         const expected = process.env.CRON_SECRET;
         if (!expected || provided !== expected) {
