@@ -203,10 +203,24 @@ export interface OAuthStatus {
   refreshExpiresAt: string | null;
   secondsUntilExpiry: number | null;
   usingLegacyToken: boolean;
+  lastAuthAt: string | null;
+  appConfigured: boolean;
+  redirectUri: string;
+}
+
+function isAppConfigured(env: BrokerEnv): boolean {
+  try {
+    appCreds(env);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getOAuthStatus(env: BrokerEnv): Promise<OAuthStatus> {
   const row = await loadRow(env);
+  const appConfigured = isAppConfigured(env);
+  const redirect = redirectUri();
   if (!row) {
     return {
       env,
@@ -215,6 +229,9 @@ export async function getOAuthStatus(env: BrokerEnv): Promise<OAuthStatus> {
       refreshExpiresAt: null,
       secondsUntilExpiry: null,
       usingLegacyToken: !!process.env.SAXO_ACCESS_TOKEN,
+      lastAuthAt: null,
+      appConfigured,
+      redirectUri: redirect,
     };
   }
   const secs = Math.floor((new Date(row.expires_at).getTime() - Date.now()) / 1000);
@@ -225,5 +242,8 @@ export async function getOAuthStatus(env: BrokerEnv): Promise<OAuthStatus> {
     refreshExpiresAt: row.refresh_expires_at,
     secondsUntilExpiry: secs,
     usingLegacyToken: false,
+    lastAuthAt: row.updated_at,
+    appConfigured,
+    redirectUri: redirect,
   };
 }
