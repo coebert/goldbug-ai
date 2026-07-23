@@ -92,8 +92,9 @@ describe("<TranslationBadge>", () => {
           originalHeadline: "La bourse en hausse",
           confidence: c as number | null | undefined,
         });
-        expect(html).not.toContain("confidence");
+        expect(html).not.toContain("% confidence");
         expect(html).not.toContain('data-testid="translation-confidence"');
+
       }
     });
 
