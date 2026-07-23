@@ -31,7 +31,8 @@ import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
 import { AllPortfoliosChart } from "@/components/all-portfolios-chart";
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X } from "lucide-react";
+import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -117,9 +118,12 @@ function Home() {
           </div>
         </div>
 
+        <NewHereBanner />
+
         <div className="mb-6">
           <AllPortfoliosChart />
         </div>
+
 
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
