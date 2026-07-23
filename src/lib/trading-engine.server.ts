@@ -173,6 +173,7 @@ async function buildCandidateFeatures(
         news_score: null,
         news_contributors: 0,
         cooling: false,
+        rank_info: null,
       });
     }),
   );
