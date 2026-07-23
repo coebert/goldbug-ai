@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
+import { ModeBadge } from "@/components/mode-badge";
 import { AllPortfoliosChart } from "@/components/all-portfolios-chart";
 import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles } from "lucide-react";
