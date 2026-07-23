@@ -10,23 +10,57 @@
 // does not own. Never expose these helpers to unauthenticated code paths.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { z } from "zod";
 
 const DEFAULT_SLICE_TTL_MIN = 90; // 90 minutes total window
 const DEFAULT_SLICES = 4;
 const LARGE_ORDER_USD = 5_000;
 
-export type SliceInput = {
-  portfolioId: string;
-  /** auth.uid() of the caller. Required — used to prove ownership of `portfolioId`. */
-  ownerUserId: string;
-  decisionId: string | null;
-  symbol: string;
-  side: "buy" | "sell";
-  totalQty: number;
-  priceHint: number;
-  slices?: number;
-  ttlMinutes?: number;
-};
+// ----------------------------------------------------------------------------
+// Input validation (zod). Every public helper runs its arguments through these
+// before touching supabaseAdmin. Rejecting garbage inputs up-front removes a
+// whole class of "portfolio_not_found" / "slice_lookup_failed" noise from the
+// SECURITY:pending_slices logs and keeps unexpected-access warnings unambiguous.
+// ----------------------------------------------------------------------------
+
+const UUID = z.string().trim().uuid();
+const SYMBOL = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  // Common Yahoo/Saxo symbol shapes: AAPL, BRK.B, RDS-A, ES=F, BTC-USD.
+  .regex(/^[A-Za-z0-9._:=/-]+$/, "invalid symbol");
+const SIDE = z.enum(["buy", "sell"]);
+const POSITIVE = z.number().finite().positive();
+const NON_NEG = z.number().finite().nonnegative();
+
+const SliceInputSchema = z.object({
+  portfolioId: UUID,
+  ownerUserId: UUID,
+  decisionId: UUID.nullable(),
+  symbol: SYMBOL,
+  side: SIDE,
+  totalQty: POSITIVE.max(1e9),
+  priceHint: POSITIVE.max(1e9),
+  slices: z.number().int().min(2).max(8).optional(),
+  ttlMinutes: z.number().int().min(1).max(24 * 60).optional(),
+});
+
+const FillInputSchema = z.object({
+  sliceId: UUID,
+  ownerUserId: UUID,
+  filledQty: NON_NEG.max(1e9),
+  note: z.string().trim().max(500).optional(),
+});
+
+const TickInputSchema = z.object({
+  portfolioId: UUID,
+  ownerUserId: UUID,
+});
+
+export type SliceInput = z.input<typeof SliceInputSchema>;
+
 
 class PendingSliceAccessError extends Error {
   constructor(message: string, public readonly context: Record<string, unknown>) {
@@ -42,6 +76,26 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
     JSON.stringify({ at: new Date().toISOString(), ...context }),
   );
 }
+
+/**
+ * Run `input` through `schema` and throw a `PendingSliceAccessError` with a
+ * `validation_failed` warning on any issue. Keeps unexpected-access logs
+ * unambiguous: malformed inputs never reach the DB lookup layer.
+ */
+function validate<T>(op: string, schema: z.ZodType<T>, input: unknown): T {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => ({
+      path: i.path.join("."),
+      code: i.code,
+      message: i.message,
+    }));
+    logUnexpectedAccess({ op, reason: "validation_failed", issues });
+    throw new PendingSliceAccessError(`pending_slices: invalid input for ${op}`, { op, issues });
+  }
+  return parsed.data;
+}
+
 
 async function assertPortfolioOwnership(
   op: string,
@@ -88,29 +142,30 @@ async function assertPortfolioOwnership(
  * skip slicing and return `null` so caller can route immediately.
  */
 export async function maybeSliceOrder(input: SliceInput) {
-  const notional = input.totalQty * input.priceHint;
+  const clean = validate("maybeSliceOrder", SliceInputSchema, input);
+  const notional = clean.totalQty * clean.priceHint;
   if (notional < LARGE_ORDER_USD) return null;
 
-  await assertPortfolioOwnership("maybeSliceOrder", input.portfolioId, input.ownerUserId);
+  await assertPortfolioOwnership("maybeSliceOrder", clean.portfolioId, clean.ownerUserId);
 
-  const slices = Math.max(2, Math.min(8, input.slices ?? DEFAULT_SLICES));
-  const sliceQty = Math.max(1, Math.floor((input.totalQty / slices) * 10_000) / 10_000);
+  const slices = clean.slices ?? DEFAULT_SLICES;
+  const sliceQty = Math.max(1, Math.floor((clean.totalQty / slices) * 10_000) / 10_000);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + (input.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
+  const expiresAt = new Date(now.getTime() + (clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
 
   const { data, error } = await supabaseAdmin
     .from("pending_slices")
     .insert({
-      portfolio_id: input.portfolioId,
-      decision_id: input.decisionId,
-      symbol: input.symbol,
-      side: input.side,
-      total_qty: input.totalQty,
-      remaining_qty: input.totalQty,
+      portfolio_id: clean.portfolioId,
+      decision_id: clean.decisionId,
+      symbol: clean.symbol,
+      side: clean.side,
+      total_qty: clean.totalQty,
+      remaining_qty: clean.totalQty,
       slice_qty: sliceQty,
       slice_count: slices,
       slices_done: 0,
-      limit_price: input.priceHint,
+      limit_price: clean.priceHint,
       next_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       status: "active",
@@ -130,21 +185,22 @@ export async function maybeSliceOrder(input: SliceInput) {
  * authenticated user id owning `portfolioId`.
  */
 export async function tickSlicer(portfolioId: string, ownerUserId: string) {
-  await assertPortfolioOwnership("tickSlicer", portfolioId, ownerUserId);
+  const clean = validate("tickSlicer", TickInputSchema, { portfolioId, ownerUserId });
+  await assertPortfolioOwnership("tickSlicer", clean.portfolioId, clean.ownerUserId);
 
   const now = new Date().toISOString();
   // Expire past-due slices
   await supabaseAdmin
     .from("pending_slices")
     .update({ status: "expired" } as unknown as never)
-    .eq("portfolio_id", portfolioId)
+    .eq("portfolio_id", clean.portfolioId)
     .eq("status", "active")
     .lt("expires_at", now);
 
   const { data } = await supabaseAdmin
     .from("pending_slices")
     .select("*")
-    .eq("portfolio_id", portfolioId)
+    .eq("portfolio_id", clean.portfolioId)
     .eq("status", "active")
     .lte("next_at", now)
     .order("next_at", { ascending: true });
@@ -160,29 +216,33 @@ export async function recordSliceFill(
   filledQty: number,
   note?: string,
 ) {
+  const clean = validate("recordSliceFill", FillInputSchema, {
+    sliceId, ownerUserId, filledQty, note,
+  });
   // Look up the slice to discover its portfolio, then prove ownership before
   // mutating. This blocks a caller from patching another user's slice by id.
   const { data: slice, error: sliceErr } = await supabaseAdmin
     .from("pending_slices")
     .select("id, portfolio_id, remaining_qty, slices_done, slice_count")
-    .eq("id", sliceId)
+    .eq("id", clean.sliceId)
     .maybeSingle();
   if (sliceErr) {
-    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_lookup_failed", sliceId, error: sliceErr.message });
+    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_lookup_failed", sliceId: clean.sliceId, error: sliceErr.message });
     throw new PendingSliceAccessError("pending_slices: slice lookup failed", {
-      sliceId, error: sliceErr.message,
+      sliceId: clean.sliceId, error: sliceErr.message,
     });
   }
   if (!slice) {
-    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_not_found", sliceId, ownerUserId });
+    logUnexpectedAccess({ op: "recordSliceFill", reason: "slice_not_found", sliceId: clean.sliceId, ownerUserId: clean.ownerUserId });
     return;
   }
   const typed = slice as {
     portfolio_id: string; remaining_qty: number; slices_done: number; slice_count: number;
   };
-  await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, ownerUserId);
+  await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, clean.ownerUserId);
 
-  const remaining = Math.max(0, Number(typed.remaining_qty) - filledQty);
+
+  const remaining = Math.max(0, Number(typed.remaining_qty) - clean.filledQty);
   const done = Number(typed.slices_done) + 1;
   const status = remaining <= 1e-6 || done >= Number(typed.slice_count) ? "completed" : "active";
   const nextAt = status === "active"
@@ -192,12 +252,12 @@ export async function recordSliceFill(
     remaining_qty: remaining,
     slices_done: done,
     status,
-    notes: note ?? null,
+    notes: clean.note ?? null,
   };
   if (nextAt) patch.next_at = nextAt;
   await supabaseAdmin
     .from("pending_slices")
     .update(patch as unknown as never)
-    .eq("id", sliceId)
+    .eq("id", clean.sliceId)
     .eq("portfolio_id", typed.portfolio_id); // belt-and-braces scope
 }
