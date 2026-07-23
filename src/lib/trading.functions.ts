@@ -1983,6 +1983,9 @@ type NewsReelItem = {
   decisions_count: number;
   influences: NewsReelInfluence[];
   note: string;
+  asset_classes: string[];
+  risk_levels: string[];
+  symbols: string[];
 };
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
