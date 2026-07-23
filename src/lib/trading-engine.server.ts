@@ -605,7 +605,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         volatility_sizing: cfg.volatility_sizing,
         vol_target_pct: cfg.vol_target_pct,
       },
-
+      regime: regime ?? null,
     } as unknown as never,
   });
 
