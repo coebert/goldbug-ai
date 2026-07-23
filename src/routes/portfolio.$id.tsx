@@ -794,7 +794,7 @@ function PortfolioPage() {
                             );
                           }}
                         />
-                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axis, fontSize: 10, position: "insideTopRight" }} />
+                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axisText, fontSize: 10, position: "insideTopRight" }} />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={equityData.map((d) => d.date)}
