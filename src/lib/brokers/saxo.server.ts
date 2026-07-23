@@ -215,7 +215,7 @@ export class SaxoAdapter implements BrokerAdapter {
     await supabaseAdmin.from("saxo_instrument_cache").upsert({
       symbol, env: this.env, uic: hit.Identifier, asset_type: hit.AssetType,
       currency: hit.CurrencyCode ?? null, exchange_id: hit.ExchangeId ?? null,
-      raw: hit as unknown as Record<string, unknown>, refreshed_at: new Date().toISOString(),
+      raw: hit as never, refreshed_at: new Date().toISOString(),
     });
     return {
       uic: hit.Identifier, assetType: hit.AssetType,
