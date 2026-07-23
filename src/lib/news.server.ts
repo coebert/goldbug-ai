@@ -50,6 +50,8 @@ async function parseGdeltResponse(res: Response, dateISO: string): Promise<NewsI
         summary: null,
         original_headline: null,
         original_language: null,
+        translation_confidence: null,
+
       }));
   } catch (err) {
     console.error("news: gdelt JSON parse failed", err);
