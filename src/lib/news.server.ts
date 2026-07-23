@@ -51,7 +51,15 @@ async function fetchGdelt(dateISO: string, max = 20): Promise<NewsItem[]> {
   }
 }
 
-export async function getNewsForDate(dateISO: string, max = 15): Promise<NewsItem[]> {
+export async function getNewsForDate(
+  dateISO: string,
+  max = 15,
+  opts?: { forceRefresh?: boolean },
+): Promise<NewsItem[]> {
+  if (opts?.forceRefresh) {
+    await supabaseAdmin.from("news_cache").delete().eq("news_date", dateISO);
+  }
+
   const { data: cached } = await supabaseAdmin
     .from("news_cache")
     .select("news_date, source, headline, url, summary")
