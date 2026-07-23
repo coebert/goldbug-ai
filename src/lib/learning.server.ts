@@ -285,8 +285,7 @@ export async function reflectAndUpdateLessons(
   portfolioId: string,
   asOf: string,
   ctx: LearningContext,
-): Promise<{ updated: boolean; reason?: string }> {
-  // Only reflect when we have enough data and it's been a few days.
+): Promise<{ updated: boolean; reason?: string; regimes?: string[] }> {
   if (ctx.stats.evaluable < 5) return { updated: false, reason: "not enough evaluable trades" };
   if (ctx.lessons_as_of) {
     const daysSince =
@@ -300,22 +299,42 @@ export async function reflectAndUpdateLessons(
   const gateway = createLovableAiGatewayProvider(key);
   const model = gateway("google/gemini-3.6-flash");
 
-  const sampleLines = ctx.samples
-    .slice(-25)
-    .map(
-      (s) =>
-        `${s.trade_date} ${s.side.toUpperCase()} ${s.symbol} @ ${s.entry_price.toFixed(2)} → ${s.exit_price.toFixed(2)} (${s.return_pct.toFixed(2)}%, ${s.outcome})${s.reason ? ` — reason: "${s.reason}"` : ""}`,
-    )
-    .join("\n");
+  // Build one bucket per regime with ≥3 samples, plus a "general" bucket over
+  // all samples so newly-entered regimes still have a fallback lesson set.
+  type Bucket = { regime: string | null; samples: LearningContext["samples"] };
+  const byRegime = new Map<string, LearningContext["samples"]>();
+  for (const s of ctx.samples) {
+    if (!s.regime) continue;
+    if (!byRegime.has(s.regime)) byRegime.set(s.regime, []);
+    byRegime.get(s.regime)!.push(s);
+  }
+  const buckets: Bucket[] = [{ regime: null, samples: ctx.samples }];
+  for (const [regime, arr] of byRegime.entries()) {
+    if (arr.length >= 3) buckets.push({ regime, samples: arr });
+  }
 
-  const system = `You are the portfolio's own post-trade review analyst. Study its last ${ctx.stats.window_days} days of decisions and outcomes and produce 3–5 short lessons — each one concrete, testable, and actionable on future days. Prefer specific patterns ("SELL calls on crypto after RSI>70 have been early") over generic advice ("be careful"). If prior lessons are still valid, restate them; drop any that the data now contradicts.`;
+  const writtenRegimes: string[] = [];
+  for (const b of buckets) {
+    const sampleLines = b.samples
+      .slice(-25)
+      .map(
+        (s) =>
+          `${s.trade_date} [${s.regime ?? "unknown"}] ${s.side.toUpperCase()} ${s.symbol} @ ${s.entry_price.toFixed(2)} → ${s.exit_price.toFixed(2)} (${s.return_pct.toFixed(2)}%, ${s.outcome})${s.reason ? ` — reason: "${s.reason}"` : ""}`,
+      )
+      .join("\n");
 
-  const prior = ctx.lessons.length
-    ? `Prior lessons (may be kept, revised, or dropped):\n${ctx.lessons.map((l, i) => `${i + 1}. ${l}`).join("\n")}`
-    : "No prior lessons yet.";
+    const regimeIntro = b.regime
+      ? `You are reviewing this portfolio's trades that occurred specifically during the "${b.regime}" market regime. Produce lessons that are only applied when this regime is active again.`
+      : `You are reviewing this portfolio's trades across all recent market regimes. Produce general-purpose lessons that apply when no regime-specific lesson exists.`;
 
-  const user = `Date: ${asOf}
-Rolling stats: ${JSON.stringify(ctx.stats)}
+    const system = `You are the portfolio's post-trade review analyst. ${regimeIntro} Produce 3–5 short lessons — each one concrete, testable, and actionable on future days. Prefer specific patterns ("BUY calls on tech ETFs after RSI<30 in bull_quiet returned +2.1% avg") over generic advice.`;
+
+    const prior = b.regime && ctx.lessons_regime === b.regime && ctx.lessons.length
+      ? `Prior lessons for this regime (may be kept, revised, or dropped):\n${ctx.lessons.map((l, i) => `${i + 1}. ${l}`).join("\n")}`
+      : "No prior lessons for this regime yet.";
+
+    const user = `Date: ${asOf}
+Bucket: ${b.regime ?? "general"} (${b.samples.length} trades)
 
 Recent trades and outcomes:
 ${sampleLines || "(none)"}
@@ -324,31 +343,34 @@ ${prior}
 
 Return { lessons: string[] } with 3–5 items, each under 180 characters. Use plain English.`;
 
-  try {
-    const { output } = await generateText({
-      model,
-      system,
-      prompt: user,
-      output: Output.object({ schema: LessonsSchema }),
-    });
-    const lessons = (output.lessons ?? [])
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .slice(0, 5);
-    if (lessons.length === 0) return { updated: false, reason: "empty output" };
+    try {
+      const { output } = await generateText({
+        model,
+        system,
+        prompt: user,
+        output: Output.object({ schema: LessonsSchema }),
+      });
+      const lessons = (output.lessons ?? [])
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .slice(0, 5);
+      if (lessons.length === 0) continue;
 
-    await supabaseAdmin.from("portfolio_lessons").insert({
-      portfolio_id: portfolioId,
-      as_of: asOf,
-      lessons,
-      stats: ctx.stats as unknown as never,
-      window_days: ctx.stats.window_days,
-    });
-    return { updated: true };
-  } catch (error) {
-    if (NoObjectGeneratedError.isInstance(error)) {
-      return { updated: false, reason: "parse error" };
+      await supabaseAdmin.from("portfolio_lessons").insert({
+        portfolio_id: portfolioId,
+        as_of: asOf,
+        lessons,
+        stats: ctx.stats as unknown as never,
+        window_days: ctx.stats.window_days,
+        regime: b.regime,
+      });
+      writtenRegimes.push(b.regime ?? "general");
+    } catch (error) {
+      if (NoObjectGeneratedError.isInstance(error)) continue;
+      throw error;
     }
-    throw error;
   }
+
+  if (writtenRegimes.length === 0) return { updated: false, reason: "no buckets produced lessons" };
+  return { updated: true, regimes: writtenRegimes };
 }
