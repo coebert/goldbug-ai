@@ -34,6 +34,7 @@ type RiskConfig = {
   max_hold_days: number;
   volatility_sizing: boolean;
   vol_target_pct: number;
+  risk_level?: number;
 };
 
 const DEFAULTS: RiskConfig = {
@@ -50,6 +51,7 @@ const DEFAULTS: RiskConfig = {
 function parseCfg(raw: unknown): RiskConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULTS };
   const r = raw as Record<string, unknown>;
+  const lvl = r.risk_level == null ? undefined : Number(r.risk_level);
   return {
     asset_class_limits: {
       ...DEFAULTS.asset_class_limits,
@@ -66,8 +68,10 @@ function parseCfg(raw: unknown): RiskConfig {
         ? r.volatility_sizing
         : DEFAULTS.volatility_sizing,
     vol_target_pct: Number(r.vol_target_pct ?? DEFAULTS.vol_target_pct),
+    risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
   };
 }
+
 
 const CLASSES: { key: AssetClass; label: string }[] = [
   { key: "stock", label: "Stocks" },
