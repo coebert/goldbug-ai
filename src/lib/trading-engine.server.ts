@@ -177,6 +177,7 @@ async function buildCandidateFeatures(
         weekly_rsi14: wk?.weekly_rsi14 ?? null,
         news_score: null,
         news_contributors: 0,
+        news_momentum: null,
         cooling: false,
         rank_info: null,
       });
