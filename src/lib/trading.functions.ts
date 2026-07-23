@@ -1971,6 +1971,9 @@ type NewsReelInfluence = {
   portfolio_name: string;
   run_date: string;
   sentiment: number | null;
+  source_weight: number | null;
+  impact: number | null;
+  impact_pct: number | null;
   rationale: string | null;
   actions: Array<{ action: string; symbol: string; qty?: number | null }>;
 };
@@ -2057,7 +2060,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       const p = pMap.get(d.portfolio_id);
       const name = p?.name ?? "Portfolio";
       const raw = (d.raw ?? {}) as {
-        news?: Array<{ headline?: string; sentiment?: number | null }>;
+        news?: Array<{ headline?: string; sentiment?: number | null; source_weight?: number | null }>;
         executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
         orders?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
       };
@@ -2068,7 +2071,17 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         .filter((a) => a && a.action && a.symbol && a.action !== "HOLD")
         .slice(0, 4)
         .map((a) => ({ action: String(a.action), symbol: String(a.symbol), qty: a.qty ?? null }));
-      for (const n of usedNews) {
+
+      // Pre-compute per-decision impact = |sentiment| * source_weight, and total for normalization.
+      const impacts = usedNews.map((n) => {
+        const s = typeof n.sentiment === "number" ? Math.abs(n.sentiment) : 0;
+        const w = typeof n.source_weight === "number" ? Math.max(0, n.source_weight) : 0.4;
+        return s * w;
+      });
+      const impactTotal = impacts.reduce((a, b) => a + b, 0);
+
+      for (let i = 0; i < usedNews.length; i++) {
+        const n = usedNews[i];
         const head = (n.headline ?? "").trim();
         if (!head) continue;
         const bucket = infl.get(head) ?? {
@@ -2076,12 +2089,17 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
           assetClasses: new Set<string>(), riskLevels: new Set<string>(), symbols: new Set<string>(),
         };
         if (typeof n.sentiment === "number") { bucket.sum += n.sentiment; bucket.n += 1; }
+        const impact = impacts[i];
+        const impactPct = impactTotal > 0 ? (impact / impactTotal) * 100 : null;
         bucket.rows.push({
           decision_id: d.id,
           portfolio_id: d.portfolio_id,
           portfolio_name: name,
           run_date: d.run_date,
           sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
+          source_weight: typeof n.source_weight === "number" ? n.source_weight : null,
+          impact: Number.isFinite(impact) ? Number(impact.toFixed(3)) : null,
+          impact_pct: impactPct != null ? Number(impactPct.toFixed(1)) : null,
           rationale: (d.rationale ?? null) as string | null,
           actions: trimmed,
         });
