@@ -478,11 +478,11 @@ function PortfolioPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
                       {([
-                        { label: "Total return", key: "totalReturn", suffix: "%", signed: true },
-                        { label: "Annualized return", key: "annReturn", suffix: "%", signed: true },
-                        { label: "Volatility (ann.)", key: "annVol", suffix: "%", signed: false },
-                        { label: "Max drawdown", key: "maxDrawdown", suffix: "%", signed: false, negative: true },
-                        { label: "Return / Vol", key: "rvr", suffix: "", signed: true, derived: true },
+                        { label: "Total return", key: "totalReturn", suffix: "%", signed: true, negative: false, derived: false },
+                        { label: "Annualized return", key: "annReturn", suffix: "%", signed: true, negative: false, derived: false },
+                        { label: "Volatility (ann.)", key: "annVol", suffix: "%", signed: false, negative: false, derived: false },
+                        { label: "Max drawdown", key: "maxDrawdown", suffix: "%", signed: false, negative: true, derived: false },
+                        { label: "Return / Vol", key: "rvr", suffix: "", signed: true, negative: false, derived: true },
                       ] as const).map((m) => {
                         const fmt = (v: number | null | undefined) => {
                           if (v == null || !Number.isFinite(v)) return "—";
@@ -491,12 +491,13 @@ function PortfolioPage() {
                         };
                         const derived = (obj: { annReturn: number; annVol: number } | null) =>
                           obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
-                        const pv = m.derived ? derived(perfMetrics.port) : (perfMetrics.port as Record<string, number>)[m.key];
-                        const bv = m.derived
-                          ? derived(perfMetrics.bench)
-                          : perfMetrics.bench
-                            ? (perfMetrics.bench as Record<string, number>)[m.key]
-                            : null;
+                        const pick = (obj: typeof perfMetrics.port | null) => {
+                          if (!obj) return null;
+                          const v = (obj as unknown as Record<string, unknown>)[m.key];
+                          return typeof v === "number" ? v : null;
+                        };
+                        const pv = m.derived ? derived(perfMetrics.port) : pick(perfMetrics.port);
+                        const bv = m.derived ? derived(perfMetrics.bench) : pick(perfMetrics.bench);
                         const color = (v: number | null) => {
                           if (v == null) return "text-muted-foreground";
                           if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
@@ -506,12 +507,12 @@ function PortfolioPage() {
                         return (
                           <div key={m.label} className="min-w-0">
                             <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
-                            <div className={`tabular-nums font-medium ${color(pv as number | null)}`}>
-                              {fmt(pv as number | null)}
+                            <div className={`tabular-nums font-medium ${color(pv)}`}>
+                              {fmt(pv)}
                             </div>
                             {perfMetrics.bench && (
                               <div className="tabular-nums text-[11px] text-muted-foreground">
-                                {benchmark}: <span className={color(bv as number | null)}>{fmt(bv as number | null)}</span>
+                                {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
                               </div>
                             )}
                           </div>
