@@ -254,17 +254,27 @@ export function formatLearningBlock(ctx: LearningContext): string {
         `${p.symbol}: ${p.n} trades, ${(p.win_rate * 100).toFixed(0)}% win, avg ${p.avg_return_pct.toFixed(2)}%`,
     )
     .join("; ");
+  const regimeTag = ctx.lessons_regime
+    ? `regime-conditioned on "${ctx.lessons_regime}"`
+    : "general (no regime match yet)";
   const lessonsBlock = ctx.lessons.length
-    ? `Lessons learned so far (self-authored, last updated ${ctx.lessons_as_of ?? "n/a"}):\n${ctx.lessons.map((l, i) => `  ${i + 1}. ${l}`).join("\n")}`
+    ? `Lessons learned so far (self-authored, ${regimeTag}, last updated ${ctx.lessons_as_of ?? "n/a"}):\n${ctx.lessons.map((l, i) => `  ${i + 1}. ${l}`).join("\n")}`
     : "Not enough evaluable trades yet to author lessons.";
+  const perRegime = ctx.per_regime_stats.length
+    ? ctx.per_regime_stats
+        .map((p) => `${p.regime}: ${p.n} trades, ${(p.win_rate * 100).toFixed(0)}% win, avg ${p.avg_return_pct.toFixed(2)}%`)
+        .join("; ")
+    : "n/a";
   return `LEARNING MEMORY (rolling outcomes over the last ${s.window_days} days, forward-return horizon ${s.horizon_days}d):
+- Current market regime: ${ctx.current_regime ?? "unknown"} — lessons below are ${regimeTag}.
 - Evaluable trades: ${s.evaluable} (wins ${s.wins} / losses ${s.losses}) — win rate ${wr}, average return ${ar}
 - Best call: ${s.best ? `${s.best.symbol} (${s.best.return_pct.toFixed(2)}%)` : "n/a"} | Worst call: ${s.worst ? `${s.worst.symbol} (${s.worst.return_pct.toFixed(2)}%)` : "n/a"}
 - Per symbol: ${perSym || "n/a"}
+- Per regime: ${perRegime}
 - By side — buys: ${s.per_side.buy.n} (win ${s.per_side.buy.win_rate != null ? `${(s.per_side.buy.win_rate * 100).toFixed(0)}%` : "n/a"}), sells: ${s.per_side.sell.n} (win ${s.per_side.sell.win_rate != null ? `${(s.per_side.sell.win_rate * 100).toFixed(0)}%` : "n/a"})
 ${lessonsBlock}
 
-Apply these lessons: double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge. State in your rationale whenever a decision was directly informed by a specific lesson.`;
+Apply these lessons carefully: they were derived from the regime named above, so weight them heavier when the current regime matches and treat them as weaker priors when it doesn't. Double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge in this regime. State in your rationale whenever a decision was directly informed by a specific lesson.`;
 }
 
 const LessonsSchema = z.object({
