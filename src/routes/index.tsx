@@ -8,7 +8,7 @@ import {
   createPortfolio,
   deletePortfolio,
 } from "@/lib/trading.functions";
-import { activateLive, getSaxoOAuthStatus } from "@/lib/live.functions";
+import { activateLive, getSaxoOAuthStatus, previewBrokerBalance } from "@/lib/live.functions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +36,7 @@ const AllPortfoliosChart = lazy(() =>
   import("@/components/all-portfolios-chart").then((m) => ({ default: m.AllPortfoliosChart })),
 );
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/")({
@@ -313,6 +313,7 @@ function CreatePortfolioCard() {
   const create = useServerFn(createPortfolio);
   const activate = useServerFn(activateLive);
   const saxoStatus = useServerFn(getSaxoOAuthStatus);
+  const previewBal = useServerFn(previewBrokerBalance);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -336,6 +337,13 @@ function CreatePortfolioCard() {
   const envKey = meta.targetEnv === "prod" ? "live" : "sim";
   const saxoEnvStatus = meta.targetEnv ? saxoQ.data?.[envKey] : null;
   const saxoReady = !!saxoEnvStatus && (saxoEnvStatus.connected || saxoEnvStatus.usingLegacyToken);
+
+  const balQ = useQuery({
+    queryKey: ["broker-balance-preview", meta.targetEnv],
+    queryFn: () => previewBal({ data: { env: meta.targetEnv === "prod" ? "live" : "sim" } }),
+    enabled: isLive && saxoReady,
+    staleTime: 30_000,
+  });
 
   const toggleClass = (c: string) =>
     setClasses((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
@@ -394,10 +402,22 @@ function CreatePortfolioCard() {
     (isLive && !saxoReady) ||
     (mode === "live_prod" && !ackRisk);
 
+  const fmtMoney = (n: number, ccy: string) => {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(n);
+    } catch {
+      return `${ccy} ${n.toFixed(2)}`;
+    }
+  };
+
   const onSubmit = () => {
     if (mode === "live_prod") {
+      const bal = balQ.data;
+      const amountLine = bal
+        ? `\n\nStarting cash: ${fmtMoney(bal.cash, bal.currency)} (from Saxo LIVE account ${bal.accountId ?? "—"}).`
+        : `\n\nStarting cash will be read from your Saxo LIVE balance.`;
       const ok = window.confirm(
-        `Create "${name}" and start trading REAL MONEY on your Saxo LIVE account?\n\nStarting cash will be read from your Saxo LIVE balance. The AI will place real orders on every hourly cycle. You can pause or revert at any time.`,
+        `Create "${name}" and start trading REAL MONEY on your Saxo LIVE account?${amountLine}\n\nThe AI will place real orders on every hourly cycle. You can pause or revert at any time.`,
       );
       if (!ok) return;
     }
@@ -457,11 +477,7 @@ function CreatePortfolioCard() {
             <div className="mb-1 font-medium">Saxo {meta.targetEnv?.toUpperCase()} connection</div>
             {saxoQ.isLoading ? (
               <span className="text-muted-foreground">Checking…</span>
-            ) : saxoReady ? (
-              <span className="text-emerald-600 dark:text-emerald-400">
-                ✓ Connected — starting cash will be read from your Saxo {meta.targetEnv?.toUpperCase()} balance.
-              </span>
-            ) : (
+            ) : !saxoReady ? (
               <div className="space-y-2">
                 <span className="text-destructive">
                   Not connected. You must link your Saxo {meta.targetEnv?.toUpperCase()} account before creating this portfolio.
@@ -469,6 +485,22 @@ function CreatePortfolioCard() {
                 <Link to="/saxo-status" className="inline-flex items-center gap-1 text-primary hover:underline">
                   Open Saxo connection page <ExternalLink className="h-3 w-3" />
                 </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  ✓ Connected to Saxo {meta.targetEnv?.toUpperCase()}
+                </span>
+                <BrokerBalancePreview
+                  env={meta.targetEnv === "prod" ? "live" : "sim"}
+                  isRealMoney={mode === "live_prod"}
+                  data={balQ.data}
+                  isLoading={balQ.isLoading}
+                  isFetching={balQ.isFetching}
+                  error={balQ.error instanceof Error ? balQ.error.message : balQ.error ? String(balQ.error) : null}
+                  onRefresh={() => balQ.refetch()}
+                  fmt={fmtMoney}
+                />
               </div>
             )}
           </div>
@@ -561,4 +593,99 @@ function CreatePortfolioCard() {
     </Card>
   );
 }
+
+function BrokerBalancePreview(props: {
+  env: "sim" | "live";
+  isRealMoney: boolean;
+  data:
+    | {
+        env: "sim" | "live";
+        accountId: string | null;
+        currency: string;
+        cash: number;
+        positionsValue: number;
+        totalValue: number;
+        positionsCount: number;
+        fetchedAt: string;
+      }
+    | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: string | null;
+  onRefresh: () => void;
+  fmt: (n: number, ccy: string) => string;
+}) {
+  const { data, isLoading, isFetching, error, onRefresh, fmt, isRealMoney, env } = props;
+  const emphasis = isRealMoney
+    ? "border-destructive/40 bg-destructive/5"
+    : "border-border bg-muted/30";
+  const headline = data ? fmt(data.cash, data.currency) : "—";
+
+  return (
+    <div className={`rounded-md border p-3 ${emphasis}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Starting cash from Saxo {env.toUpperCase()}
+          </div>
+          <div className="mt-0.5 text-lg font-semibold tabular-nums">
+            {isLoading ? "Loading…" : error ? "Unavailable" : headline}
+          </div>
+          {data && (
+            <div className="text-[11px] text-muted-foreground">
+              Account {data.accountId ?? "—"} · fetched{" "}
+              {new Date(data.fetchedAt).toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isFetching}
+          className="h-7 gap-1 px-2 text-[11px]"
+        >
+          {isFetching ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3 w-3" />
+          )}
+          Refresh
+        </Button>
+      </div>
+
+      {error && (
+        <div className="mt-2 text-[11px] text-destructive">
+          Couldn&apos;t read your Saxo {env.toUpperCase()} balance: {error}
+        </div>
+      )}
+
+      {data && (
+        <div className="mt-3 space-y-1 text-[11px]">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Cash (used as starting pot)</span>
+            <span className="font-medium tabular-nums">{fmt(data.cash, data.currency)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">
+              Existing positions ({data.positionsCount})
+            </span>
+            <span className="tabular-nums">{fmt(data.positionsValue, data.currency)}</span>
+          </div>
+          <div className="flex items-center justify-between border-t border-border/60 pt-1">
+            <span className="text-muted-foreground">Total account value</span>
+            <span className="tabular-nums">{fmt(data.totalValue, data.currency)}</span>
+          </div>
+          <p className="pt-1 text-muted-foreground">
+            Only the <span className="font-medium">cash</span> line becomes this
+            portfolio&apos;s starting pot. Existing positions on your Saxo{" "}
+            {env.toUpperCase()} account are left untouched — Aegis will not sell them.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
