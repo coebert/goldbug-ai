@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { GLOBAL_EVENTS } from "./global-events";
 
 const RiskEnum = z.enum(["conservative", "balanced", "aggressive"]);
 const AssetClassEnum = z.enum(["stock", "etf", "crypto", "commodity", "fx"]);
@@ -863,6 +864,91 @@ export const getDiagnostics = createServerFn({ method: "POST" })
       });
     }
 
+    // Event impact: bucket outcomes into major event windows (plus a "Calm" baseline)
+    type EventBucket = {
+      id: string;
+      label: string;
+      category: string;
+      severity: number;
+      start: string;
+      end: string;
+      n: number;
+      wins: number;
+      avgReturn: number;
+      avgConviction: number;
+      weights: Record<string, number>;
+      topSignal: string;
+    };
+    const bucketMap = new Map<string, EventBucket & { retSum: number; convSum: number; weightSums: Record<string, number> }>();
+    function getBucket(key: string, meta: Omit<EventBucket, "n" | "wins" | "avgReturn" | "avgConviction" | "weights" | "topSignal">) {
+      let b = bucketMap.get(key);
+      if (!b) {
+        b = {
+          ...meta,
+          n: 0,
+          wins: 0,
+          avgReturn: 0,
+          avgConviction: 0,
+          weights: {},
+          topSignal: "",
+          retSum: 0,
+          convSum: 0,
+          weightSums: {},
+        };
+        bucketMap.set(key, b);
+      }
+      return b;
+    }
+    for (const o of outcomes) {
+      const hits = GLOBAL_EVENTS.filter((e) => o.run_date >= e.start && o.run_date <= e.end);
+      const targets = hits.length
+        ? hits.map((e) => ({
+            key: e.id,
+            meta: { id: e.id, label: e.label, category: e.category, severity: e.severity, start: e.start, end: e.end },
+          }))
+        : [{ key: "__calm", meta: { id: "__calm", label: "Calm periods (no major event)", category: "shock", severity: 0, start: "", end: "" } }];
+      for (const t of targets) {
+        const b = getBucket(t.key, t.meta);
+        b.n++;
+        if (o.win) b.wins++;
+        b.retSum += o.forwardReturn;
+        b.convSum += o.conviction;
+        for (const [k, v] of Object.entries(o.weights)) {
+          b.weightSums[k] = (b.weightSums[k] ?? 0) + Number(v);
+        }
+      }
+    }
+    const eventImpact = [...bucketMap.values()]
+      .filter((b) => b.n >= 1)
+      .map((b) => {
+        const weights: Record<string, number> = {};
+        let topSignal = "";
+        let topVal = -1;
+        for (const [k, v] of Object.entries(b.weightSums)) {
+          const avg = v / b.n;
+          weights[k] = avg;
+          if (avg > topVal) {
+            topVal = avg;
+            topSignal = k;
+          }
+        }
+        return {
+          id: b.id,
+          label: b.label,
+          category: b.category,
+          severity: b.severity,
+          start: b.start,
+          end: b.end,
+          n: b.n,
+          winRate: b.n ? b.wins / b.n : 0,
+          avgReturn: b.n ? b.retSum / b.n : 0,
+          avgConviction: b.n ? b.convSum / b.n : 0,
+          weights,
+          topSignal,
+        };
+      })
+      .sort((a, b) => (a.id === "__calm" ? 1 : b.id === "__calm" ? -1 : b.n - a.n));
+
     return {
       summary: {
         decisions: decRows.length,
@@ -889,6 +975,7 @@ export const getDiagnostics = createServerFn({ method: "POST" })
       },
       flags,
       rolling,
+      eventImpact,
     };
   });
 

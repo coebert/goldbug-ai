@@ -41,6 +41,8 @@ import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { RegimePanel } from "@/components/regime-panel";
+import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
+import { eventsInRange, eventColor } from "@/lib/global-events";
 
 
 export const Route = createFileRoute("/portfolio/$id")({
@@ -80,6 +82,8 @@ function PortfolioPage() {
   const runBtFn = useServerFn(runBacktest);
   const resetFn = useServerFn(resetPortfolio);
   const [days, setDays] = useState(7);
+  const [eventsOn, setEventsOn] = useState(true);
+  const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
 
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
@@ -240,7 +244,16 @@ function PortfolioPage() {
 
               <Card className="lg:col-span-2">
                 <CardHeader>
-                  <CardTitle className="text-base">Equity curve</CardTitle>
+                  <CardTitle className="text-base flex items-center justify-between gap-3">
+                    <span>Equity curve</span>
+                    <EventOverlayControls
+                      domainDates={equityData.map((d) => d.date)}
+                      enabled={eventsOn}
+                      onToggle={setEventsOn}
+                      minSeverity={eventSev}
+                      onSeverityChange={setEventSev}
+                    />
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="h-64">
                   {equityData.length < 2 ? (
@@ -274,6 +287,9 @@ function PortfolioPage() {
                             };
                             const pnlFromStart = row.value - startingCash;
                             const pnlPctFromStart = startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
+                            const active_events = eventsOn
+                              ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
+                              : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
                                 <div className="mb-1 font-medium">{label}</div>
@@ -288,11 +304,27 @@ function PortfolioPage() {
                                 <div className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}>
                                   Drawdown: {row.drawdown.toFixed(2)}%
                                 </div>
+                                {active_events.length > 0 && (
+                                  <div className="mt-1 border-t border-border/60 pt-1">
+                                    {active_events.map((e) => (
+                                      <div key={e.id} style={{ color: eventColor(e.category) }} className="font-medium">
+                                        ● {e.label}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           }}
                         />
                         <ReferenceLine y={startingCash} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" label={{ value: "start", fill: "hsl(var(--muted-foreground))", fontSize: 10, position: "insideTopRight" }} />
+                        {eventsOn && (
+                          <EventOverlay
+                            domainDates={equityData.map((d) => d.date)}
+                            minSeverity={eventSev}
+                            labelPosition="insideTop"
+                          />
+                        )}
                         <Area
                           type="monotone"
                           dataKey="peak"

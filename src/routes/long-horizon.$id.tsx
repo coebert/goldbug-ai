@@ -35,6 +35,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { CalendarClock, PlayCircle } from "lucide-react";
+import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
+import { eventsInRange, eventColor } from "@/lib/global-events";
 
 export const Route = createFileRoute("/long-horizon/$id")({
   ssr: false,
@@ -102,6 +104,8 @@ function LongHorizonPage() {
   const [topK, setTopK] = useState(6);
   const [result, setResult] = useState<LHResult | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
+  const [eventsOn, setEventsOn] = useState(true);
+  const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
 
   const runMut = useMutation({
     mutationFn: () =>
@@ -268,6 +272,15 @@ function LongHorizonPage() {
                     <CardDescription>
                       {result.from} → {result.to} · {result.rebalance} rebalance · {result.tradeCount} trades executed · click a legend item to isolate.
                     </CardDescription>
+                    <div className="mt-2">
+                      <EventOverlayControls
+                        domainDates={chartData.map((d) => String(d.date))}
+                        enabled={eventsOn}
+                        onToggle={setEventsOn}
+                        minSeverity={eventSev}
+                        onSeverityChange={setEventSev}
+                      />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={360}>
@@ -280,6 +293,13 @@ function LongHorizonPage() {
                           tickFormatter={(v) => `${Number(v).toFixed(0)}%`}
                         />
                         <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                        {eventsOn && (
+                          <EventOverlay
+                            domainDates={chartData.map((d) => String(d.date))}
+                            minSeverity={eventSev}
+                            labelPosition="insideTop"
+                          />
+                        )}
                         <Tooltip
                           cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
@@ -287,6 +307,9 @@ function LongHorizonPage() {
                             const sorted = [...payload].sort(
                               (a, b) => Number(b.value ?? 0) - Number(a.value ?? 0),
                             );
+                            const active_events = eventsOn
+                              ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
+                              : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
                                 <div className="mb-1 font-medium">{label}</div>
@@ -300,6 +323,15 @@ function LongHorizonPage() {
                                     </div>
                                   );
                                 })}
+                                {active_events.length > 0 && (
+                                  <div className="mt-1 border-t border-border/60 pt-1">
+                                    {active_events.map((e) => (
+                                      <div key={e.id} style={{ color: eventColor(e.category) }} className="font-medium">
+                                        ● {e.label}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           }}
