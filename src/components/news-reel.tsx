@@ -17,14 +17,58 @@ function sentimentTone(v: number | null) {
 const ASSET_CLASSES = ["stock", "etf", "crypto", "commodity", "fx"] as const;
 const RISK_LEVELS = ["conservative", "balanced", "aggressive"] as const;
 
+const REFRESH_OPTIONS = [
+  { key: "1m", label: "1 min", ms: 60_000 },
+  { key: "5m", label: "5 min", ms: 5 * 60_000 },
+  { key: "15m", label: "15 min", ms: 15 * 60_000 },
+  { key: "1h", label: "Hourly", ms: 60 * 60_000 },
+  { key: "1d", label: "Daily", ms: 24 * 60 * 60_000 },
+  { key: "off", label: "Off", ms: 0 },
+] as const;
+type RefreshKey = typeof REFRESH_OPTIONS[number]["key"];
+const REFRESH_STORAGE_KEY = "news-reel-refresh-interval";
+
+function formatAgo(from: number | null, now: number): string {
+  if (from == null) return "never";
+  const s = Math.max(0, Math.floor((now - from) / 1000));
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 export function NewsReel() {
   const fetchReel = useServerFn(getGlobalNewsReel);
+  const [refreshKey, setRefreshKey] = useState<RefreshKey>(() => {
+    if (typeof window === "undefined") return "5m";
+    const stored = window.localStorage.getItem(REFRESH_STORAGE_KEY) as RefreshKey | null;
+    return stored && REFRESH_OPTIONS.some((o) => o.key === stored) ? stored : "5m";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(REFRESH_STORAGE_KEY, refreshKey);
+    }
+  }, [refreshKey]);
+  const refreshMs = REFRESH_OPTIONS.find((o) => o.key === refreshKey)?.ms ?? 5 * 60_000;
+
   const q = useQuery({
     queryKey: ["global-news-reel"],
     queryFn: () => fetchReel(),
-    staleTime: 5 * 60_000,
-    refetchInterval: 5 * 60_000,
+    staleTime: refreshMs > 0 ? refreshMs : 5 * 60_000,
+    refetchInterval: refreshMs > 0 ? refreshMs : false,
   });
+
+  // "Now" tick so the "updated Xs ago" label stays live.
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const lastUpdated = q.dataUpdatedAt || null;
+
 
   const [paused, setPaused] = useState(false);
   const [assetFilter, setAssetFilter] = useState<Set<string>>(new Set());
