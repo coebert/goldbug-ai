@@ -2121,6 +2121,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         decisions_count: rows.length,
         influences: rows.slice(0, 6),
         note,
+        excerpt: toExcerpt((r as { summary?: string | null }).summary),
         asset_classes: bucket ? Array.from(bucket.assetClasses).sort() : [],
         risk_levels: bucket ? Array.from(bucket.riskLevels).sort() : [],
         symbols: bucket ? Array.from(bucket.symbols).sort() : [],
