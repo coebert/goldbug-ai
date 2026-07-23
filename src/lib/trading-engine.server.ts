@@ -228,6 +228,7 @@ async function callAiForDecision(args: {
   attribution?: string | null;
   regimeNote?: string | null;
   hyperparams?: TunedHyperparams | null;
+  calibrationBlock?: string | null;
 }): Promise<DecisionOutput> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
@@ -299,6 +300,7 @@ ${formatLearningBlock(args.learning)}
 
 ${args.attribution ?? ""}
 ${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
+${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 
 ${HISTORICAL_PLAYBOOK}
