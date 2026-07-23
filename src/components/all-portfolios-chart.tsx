@@ -147,14 +147,29 @@ export function AllPortfoliosChart() {
                 label={{ value: "Date", position: "insideBottom", offset: -6, fill: AXIS_COLOR, fontSize: 12 }}
               />
               <YAxis
+                yAxisId="value"
                 width={72}
                 tick={{ fontSize: 11, fill: AXIS_COLOR }}
                 stroke={AXIS_COLOR}
                 strokeOpacity={0.6}
                 tickFormatter={(v) => fmt(Number(v))}
-                domain={["auto", "auto"]}
+                domain={yDomain}
+                allowDataOverflow
                 label={{ value: `Total value (${currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: AXIS_COLOR, fontSize: 12 }}
               />
+              <YAxis
+                yAxisId="pct"
+                orientation="right"
+                width={56}
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                stroke={AXIS_COLOR}
+                strokeOpacity={0.6}
+                tickFormatter={(v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(1)}%`}
+                domain={pctDomain}
+                allowDataOverflow
+                label={{ value: "Change vs window start", angle: 90, position: "insideRight", offset: 8, style: { textAnchor: "middle" }, fill: AXIS_COLOR, fontSize: 12 }}
+              />
+
               <Tooltip
                 cursor={{ stroke: AXIS_COLOR, strokeOpacity: 0.4, strokeDasharray: "3 3" }}
                 content={({ active, payload, label }) => {
