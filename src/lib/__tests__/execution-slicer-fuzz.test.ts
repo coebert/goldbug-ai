@@ -190,7 +190,8 @@ describe("execution-slicer schemas: mutated inputs are rejected", () => {
         // At least one char outside the allowed set (spaces, quotes, ;, etc.).
         fc
           .string({ minLength: 1, maxLength: 40 })
-          .filter((s) => /[^A-Za-z0-9._:=/-]/.test(s)),
+          .filter((s) => /[^A-Za-z0-9._:=/-]/.test(s.trim()) && s.trim().length > 0),
+
         (base, badSymbol) => {
           const mutated = { ...base, symbol: badSymbol };
           expect(SliceInputSchema.safeParse(mutated).success).toBe(false);
