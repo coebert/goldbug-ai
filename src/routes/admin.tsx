@@ -1,16 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { getAdminHealth, type AdminHealthSnapshot, type BrokerEnvHealth } from "@/lib/admin.functions";
+import { triggerHourlyRunNow } from "@/lib/trading.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, PlayCircle, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
 import { SaxoOAuthPanel } from "@/components/live-trading-card";
 import { PushNotificationsCard } from "@/components/push-notifications-card";
 import { GlobalSignalDecayCard } from "@/components/global-signal-decay-card";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -197,6 +200,7 @@ function BrokerCard({ env }: { env: BrokerEnvHealth }) {
 
 function AdminPage() {
   const fetchHealth = useServerFn(getAdminHealth);
+  const triggerRun = useServerFn(triggerHourlyRunNow);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
@@ -209,9 +213,26 @@ function AdminPage() {
     refetchInterval: 60_000,
   });
 
+  const manual = useMutation({
+    mutationFn: () => triggerRun(),
+    onSuccess: (r) => {
+      const ok = r.results.filter((x) => x.ok && !x.skipped).length;
+      const skipped = r.results.filter((x) => x.skipped).length;
+      const failed = r.results.filter((x) => !x.ok).length;
+      toast.success("Hourly run complete", {
+        description: `${ok} ticked · ${skipped} skipped · ${failed} failed · ${r.news_headlines ?? 0} headlines · ${((r.duration_ms ?? 0) / 1000).toFixed(1)}s`,
+      });
+      q.refetch();
+    },
+    onError: (e: Error) => {
+      toast.error("Manual run failed", { description: e.message });
+    },
+  });
+
   const s = q.data;
   const alerts = s ? computeAlerts(s) : [];
   void tick;
+
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
@@ -234,6 +255,48 @@ function AdminPage() {
 
       {q.isLoading && <p className="text-sm text-muted-foreground">Pinging brokers…</p>}
       {q.error && <Alert variant="destructive"><AlertTitle>Failed to load</AlertTitle><AlertDescription>{(q.error as Error).message}</AlertDescription></Alert>}
+
+      <Card className="border-primary/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <PlayCircle className="h-4 w-4 text-primary" /> Manual run
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Trigger the full hourly cycle right now — refreshes news, macro regime, and prices,
+            then runs a decision tick for every eligible portfolio. Runs already made in the
+            current UTC hour are skipped automatically, so this is safe to click any time
+            between scheduled runs.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => manual.mutate()}
+              disabled={manual.isPending}
+              className="gap-2"
+            >
+              <PlayCircle className={`h-4 w-4 ${manual.isPending ? "animate-pulse" : ""}`} />
+              {manual.isPending ? "Running full cycle…" : "Trigger hourly run now"}
+            </Button>
+            {manual.isSuccess && manual.data && (
+              <span className="text-xs text-muted-foreground">
+                Last manual run: {manual.data.results.filter((x) => x.ok && !x.skipped).length} ticked,{" "}
+                {manual.data.results.filter((x) => x.skipped).length} skipped,{" "}
+                {manual.data.results.filter((x) => !x.ok).length} failed ·{" "}
+                {((manual.data.duration_ms ?? 0) / 1000).toFixed(1)}s
+              </span>
+            )}
+          </div>
+          {manual.isError && (
+            <Alert variant="destructive">
+              <AlertTitle>Trigger failed</AlertTitle>
+              <AlertDescription>{(manual.error as Error).message}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+
 
       <Card className="border-primary/40">
         <CardHeader>
