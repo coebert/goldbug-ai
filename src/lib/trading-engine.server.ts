@@ -112,12 +112,27 @@ async function buildCandidateFeatures(
     change5d: number | null;
     change30d: number | null;
     vol20d: number | null;
+    macd_hist: number | null;
+    macd_bull_cross: boolean;
+    macd_bear_cross: boolean;
+    bb_width: number | null;
+    atr_pct: number | null;
+    adv_20d: number | null;
+    vw_momentum_10d: number | null;
+    weekly_trend_up: boolean;
+    weekly_rsi14: number | null;
+    // Sentiment / cooldown are filled in later once news + cooldowns load
+    news_score: number | null;
+    news_contributors: number;
+    cooling: boolean;
   }> = [];
   await Promise.all(
     candidates.map(async (c) => {
-      const candles = await getDailyCandles(c.symbol, 90, asOf);
+      const candles = await getDailyCandles(c.symbol, 260, asOf);
       if (candles.length < 5) return;
       const closes = candles.map((k) => k.close);
+      const m = macd(closes);
+      const wk = weeklySnapshot(candles);
       rows.push({
         symbol: c.symbol,
         name: c.name,
@@ -129,11 +144,25 @@ async function buildCandidateFeatures(
         change5d: pctChange(closes, 5),
         change30d: pctChange(closes, 30),
         vol20d: dailyVolatility(closes, 20),
+        macd_hist: m ? m.histogram : null,
+        macd_bull_cross: m ? m.bullish_cross : false,
+        macd_bear_cross: m ? m.bearish_cross : false,
+        bb_width: bollingerWidth(closes, 20),
+        atr_pct: atrPct(candles, 14),
+        adv_20d: averageDailyVolume(candles, 20),
+        vw_momentum_10d: volumeWeightedMomentum(candles, 10),
+        weekly_trend_up: wk?.weekly_trend_up ?? false,
+        weekly_rsi14: wk?.weekly_rsi14 ?? null,
+        news_score: null,
+        news_contributors: 0,
+        cooling: false,
       });
     }),
   );
   return rows;
 }
+
+
 
 
 export type ExecutedTrade = {
