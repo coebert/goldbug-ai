@@ -140,6 +140,8 @@ async function buildCandidateFeatures(
     news_score: number | null;
     news_contributors: number;
     cooling: boolean;
+    // Cross-sectional rank across today's universe (filled in later)
+    rank_info: RankInfo | null;
   }> = [];
   await Promise.all(
     candidates.map(async (c) => {
