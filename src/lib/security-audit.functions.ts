@@ -28,7 +28,7 @@ export type SecurityAuditRow = {
   portfolio_id: string | null;
   slice_id: string | null;
   actor_user_id: string | null;
-  details: string | number | boolean | null | { [k: string]: unknown } | unknown[];
+  details: Json;
   created_at: string;
 };
 
