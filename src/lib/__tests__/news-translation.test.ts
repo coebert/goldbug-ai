@@ -25,7 +25,7 @@ const llmCalls: LlmCall[] = [];
 
 // Programmable stub: maps every incoming (i, headline) tuple to a language
 // and translation. Anything not registered defaults to English/no-op.
-const translations = new Map<string, { lang: string | null; translation: string | null }>();
+const translations = new Map<string, { lang: string | null; translation: string | null; confidence?: number | null }>();
 
 vi.mock("ai", async () => {
   const actual = await vi.importActual<typeof import("ai")>("ai");
@@ -41,7 +41,7 @@ vi.mock("ai", async () => {
         const i = Number(m?.[1] ?? 0);
         const text = (m?.[2] ?? "").trim();
         const t = translations.get(text) ?? { lang: "English", translation: null };
-        return { i, lang: t.lang, translation: t.translation };
+        return { i, lang: t.lang, translation: t.translation, confidence: t.confidence ?? null };
       });
       return { output: { results } };
     }),
@@ -50,6 +50,7 @@ vi.mock("ai", async () => {
     NoObjectGeneratedError: { isInstance: () => false },
   };
 });
+
 
 // Track DB reads/writes so we can assert cache reuse and dedupe.
 const dbReads: Array<{ table: string; filters: Record<string, unknown> }> = [];
