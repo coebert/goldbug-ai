@@ -135,20 +135,31 @@ function LongHorizonPage() {
   const chartData = useMemo(() => {
     if (!result) return [];
     const start = result.starting_cash;
-    // Downsample very large curves so recharts stays responsive: keep ~600 points max.
-    const maxPoints = 600;
     const s0 = result.series[0]?.curve ?? [];
-    const step = Math.max(1, Math.floor(s0.length / maxPoints));
-    const dates = s0.filter((_, i) => i % step === 0 || i === s0.length - 1).map((p) => p.date);
-    return dates.map((d) => {
-      const row: Record<string, number | string> = { date: d };
-      for (const s of result.series) {
-        const pt = s.curve.find((p) => p.date === d);
-        if (pt) row[s.name] = ((pt.value - start) / start) * 100;
+    if (s0.length === 0) return [];
+
+    // Phase 9 — chart virtualization for long-horizon curves.
+    // 1. Downsample each series independently via LTTB so shape (drawdowns,
+    //    peaks) survives even at ~200 points across a 25-year window.
+    // 2. Build a date→value map per series (O(N)) and merge by union of dates
+    //    from the anchor series, replacing the previous O(N * series) find().
+    const anchor = lttb(
+      s0.map((p, i) => ({ x: i, y: p.value, date: p.date })),
+      chartRes,
+    );
+    const dates = anchor.map((p) => p.date);
+    const rows: Array<Record<string, number | string>> = dates.map((d) => ({ date: d }));
+
+    for (const s of result.series) {
+      const idx = new Map<string, number>();
+      for (const p of s.curve) idx.set(p.date, p.value);
+      for (let i = 0; i < dates.length; i++) {
+        const v = idx.get(dates[i]);
+        if (v !== undefined) rows[i][s.name] = ((v - start) / start) * 100;
       }
-      return row;
-    });
-  }, [result]);
+    }
+    return rows;
+  }, [result, chartRes]);
 
   if (!ready || !session) {
     return (
