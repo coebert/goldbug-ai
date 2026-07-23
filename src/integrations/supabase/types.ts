@@ -689,6 +689,36 @@ export type Database = {
         }
         Relationships: []
       }
+      saxo_oauth_tokens: {
+        Row: {
+          access_token: string
+          env: string
+          expires_at: string
+          refresh_expires_at: string | null
+          refresh_token: string
+          token_type: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          env: string
+          expires_at: string
+          refresh_expires_at?: string | null
+          refresh_token: string
+          token_type?: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          env?: string
+          expires_at?: string
+          refresh_expires_at?: string | null
+          refresh_token?: string
+          token_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           asset_class: Database["public"]["Enums"]["asset_class"]
