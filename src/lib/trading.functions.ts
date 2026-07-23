@@ -2008,8 +2008,17 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     // 2. Recent decisions across the user's own portfolios.
     const { data: portfolios } = await context.supabase
       .from("portfolios")
-      .select("id, name");
-    const pMap = new Map((portfolios ?? []).map((p) => [p.id, p.name]));
+      .select("id, name, universe, risk_level");
+    const pMap = new Map(
+      (portfolios ?? []).map((p) => [
+        p.id,
+        {
+          name: p.name,
+          universe: (Array.isArray(p.universe) ? p.universe : []) as string[],
+          risk_level: (p.risk_level ?? "balanced") as string,
+        },
+      ]),
+    );
     const { data: decisions } = await context.supabase
       .from("decisions")
       .select("id, portfolio_id, run_date, raw")
@@ -2018,9 +2027,20 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       .limit(120);
 
     // 3. Build headline -> influences lookup.
-    const infl = new Map<string, { sum: number; n: number; rows: NewsReelInfluence[] }>();
+    const infl = new Map<
+      string,
+      {
+        sum: number;
+        n: number;
+        rows: NewsReelInfluence[];
+        assetClasses: Set<string>;
+        riskLevels: Set<string>;
+        symbols: Set<string>;
+      }
+    >();
     for (const d of decisions ?? []) {
-      const name = pMap.get(d.portfolio_id) ?? "Portfolio";
+      const p = pMap.get(d.portfolio_id);
+      const name = p?.name ?? "Portfolio";
       const raw = (d.raw ?? {}) as {
         news?: Array<{ headline?: string; sentiment?: number | null }>;
         executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
@@ -2036,7 +2056,10 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       for (const n of usedNews) {
         const head = (n.headline ?? "").trim();
         if (!head) continue;
-        const bucket = infl.get(head) ?? { sum: 0, n: 0, rows: [] };
+        const bucket = infl.get(head) ?? {
+          sum: 0, n: 0, rows: [],
+          assetClasses: new Set<string>(), riskLevels: new Set<string>(), symbols: new Set<string>(),
+        };
         if (typeof n.sentiment === "number") { bucket.sum += n.sentiment; bucket.n += 1; }
         bucket.rows.push({
           portfolio_id: d.portfolio_id,
@@ -2045,6 +2068,11 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
           sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
           actions: trimmed,
         });
+        if (p) {
+          for (const c of p.universe) bucket.assetClasses.add(c);
+          bucket.riskLevels.add(p.risk_level);
+        }
+        for (const a of trimmed) bucket.symbols.add(a.symbol);
         infl.set(head, bucket);
       }
     }
@@ -2076,6 +2104,9 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         decisions_count: rows.length,
         influences: rows.slice(0, 6),
         note,
+        asset_classes: bucket ? Array.from(bucket.assetClasses).sort() : [],
+        risk_levels: bucket ? Array.from(bucket.riskLevels).sort() : [],
+        symbols: bucket ? Array.from(bucket.symbols).sort() : [],
       };
     });
 
