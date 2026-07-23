@@ -302,17 +302,21 @@ async function translateWithCache(
   }
   if (truly.length === 0) return result;
 
-  // 3. LLM call for what's left, then persist in memory.
+  // 3. LLM call for what's left, then persist in memory + durable cache.
   const numbered = truly.map((text, i) => ({ i, text }));
   const byIndex = await callTranslateLLM(numbered);
+  const toPersist: { source: string; entry: TranslationCacheEntry }[] = [];
   for (let i = 0; i < truly.length; i++) {
     const entry = byIndex.get(i);
     if (!entry) continue;
     cacheSet(truly[i], entry);
     result.set(truly[i], entry);
+    toPersist.push({ source: truly[i], entry });
   }
+  await persistTranslations(toPersist);
   return result;
 }
+
 
 export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
   if (items.length === 0) return items;
