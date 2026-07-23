@@ -752,8 +752,10 @@ function DecisionCard({
                 news={news}
                 guardrails={guardrails}
                 currency={currency}
+                weights={weightsByKey.get(`${o.symbol.toUpperCase()}:${o.side}`)}
               />
             ))}
+
           </div>
         )}
         {executed.length === 0 && (
