@@ -883,13 +883,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   await admin.from("holdings").delete().eq("portfolio_id", portfolioId);
   const holdingsRows = Array.from(holdingsByS.values())
     .filter((h) => Number(h.quantity) > 1e-8)
-    .map((h) => ({
-      portfolio_id: portfolioId,
-      symbol: h.symbol,
-      asset_class: h.asset_class,
-      quantity: Number(h.quantity),
-      avg_cost: Number(h.avg_cost),
-    }));
+    .map((h) => {
+      const hExt = h as unknown as { opened_at?: string | null; high_water_mark?: number | null };
+      return {
+        portfolio_id: portfolioId,
+        symbol: h.symbol,
+        asset_class: h.asset_class,
+        quantity: Number(h.quantity),
+        avg_cost: Number(h.avg_cost),
+        opened_at: hExt.opened_at ?? new Date().toISOString(),
+        high_water_mark: hExt.high_water_mark ?? Number(h.avg_cost),
+      };
+    });
   if (holdingsRows.length > 0) await admin.from("holdings").insert(holdingsRows);
 
   // Recompute portfolio value with latest holdings
