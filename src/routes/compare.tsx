@@ -462,6 +462,14 @@ function ComparePage() {
                 </CardContent>
               </Card>
             )}
+
+            {results && results.length > 0 && (
+              <TradeDivergenceCard
+                portfolioIds={results.map((r) => r.portfolio.id)}
+                names={results.map((r) => r.portfolio.name)}
+                colors={results.map((_, i) => COLORS[i % COLORS.length])}
+              />
+            )}
           </div>
         </div>
       </main>
