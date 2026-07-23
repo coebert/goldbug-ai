@@ -123,7 +123,9 @@ function Home() {
         <NewHereBanner />
 
         <div className="mb-6">
-          <AllPortfoliosChart />
+          <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+            <AllPortfoliosChart />
+          </Suspense>
         </div>
 
 
