@@ -18,63 +18,22 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseStatus } from "@tanstack/react-start/server";
-import { z, ZodError } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   SliceInputSchema,
   TickInputSchema,
   FillInputSchema,
 } from "./execution-slicer-schemas";
+import {
+  enqueueSliceHandler,
+  tickSlicesHandler,
+  recordFillHandler,
+  type SlicerResult,
+} from "./execution-slicer-handlers";
 
-// ---- Response shape ----------------------------------------------------
+export type { SlicerResult } from "./execution-slicer-handlers";
 
-type ErrorCode =
-  | "invalid_input"
-  | "ownership_mismatch"
-  | "not_found"
-  | "internal_error";
-
-type StructuredError = {
-  code: ErrorCode;
-  message: string;
-  issues?: Array<{ path: string; message: string }>;
-};
-
-export type SlicerResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: StructuredError };
-
-const STATUS_BY_CODE: Record<ErrorCode, number> = {
-  invalid_input: 400,
-  ownership_mismatch: 403,
-  not_found: 404,
-  internal_error: 500,
-};
-
-function fail(code: ErrorCode, message: string, issues?: StructuredError["issues"]): SlicerResult<never> {
-  setResponseStatus(STATUS_BY_CODE[code]);
-  return { ok: false, error: { code, message, ...(issues ? { issues } : {}) } };
-}
-
-function zodIssues(err: ZodError): StructuredError["issues"] {
-  return err.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
-}
-
-function classifyThrown(e: unknown): SlicerResult<never> {
-  const msg = e instanceof Error ? e.message : String(e);
-  if (/ownership mismatch/i.test(msg)) return fail("ownership_mismatch", "Portfolio or slice is not owned by the caller.");
-  if (/portfolio_not_found|slice lookup failed|not found/i.test(msg)) return fail("not_found", msg);
-  if (/invalid input/i.test(msg)) return fail("invalid_input", msg);
-  console.error("slicer server-fn failed", e);
-  return fail("internal_error", "Slicer operation failed.");
-}
-
-// ---- Client-facing input schemas (ownerUserId stripped) ----------------
-//
-// The schemas from `execution-slicer-schemas` require `ownerUserId` because
-// the server helpers must know which user to attribute the call to. Over the
-// wire we drop it — the server injects the authenticated user id instead.
-
+// Client-facing input schemas — server injects the trusted ownerUserId.
 const EnqueueClientSchema = SliceInputSchema.omit({ ownerUserId: true });
 const TickClientSchema = TickInputSchema.omit({ ownerUserId: true });
 const FillClientSchema = FillInputSchema.omit({ ownerUserId: true });
@@ -91,20 +50,7 @@ export const enqueueSlice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<SlicerResult<{
     sliceId: string; sliceQty: number; slices: number;
   } | { skipped: true; reason: "below_threshold" }>> => {
-    // Re-validate with the canonical schema after injecting the trusted
-    // ownerUserId — protects against schema drift between client/server.
-    const full = SliceInputSchema.safeParse({ ...data, ownerUserId: context.userId });
-    if (!full.success) return fail("invalid_input", "invalid enqueue input", zodIssues(full.error));
-
-    try {
-      const { maybeSliceOrder } = await import("./execution-slicer.server");
-      const result = await maybeSliceOrder(full.data);
-      if (result === null) return { ok: true, data: { skipped: true, reason: "below_threshold" } };
-      return { ok: true, data: result };
-    } catch (e) {
-      if (e instanceof ZodError) return fail("invalid_input", "invalid enqueue input", zodIssues(e));
-      return classifyThrown(e);
-    }
+    return enqueueSliceHandler(data, context.userId, setResponseStatus);
   });
 
 // ---- tick --------------------------------------------------------------
@@ -117,17 +63,7 @@ export const tickSlices = createServerFn({ method: "POST" })
     return parsed.data;
   })
   .handler(async ({ data, context }) => {
-    const full = TickInputSchema.safeParse({ ...data, ownerUserId: context.userId });
-    if (!full.success) return fail("invalid_input", "invalid tick input", zodIssues(full.error));
-
-    try {
-      const { tickSlicer } = await import("./execution-slicer.server");
-      const due = await tickSlicer(full.data.portfolioId, full.data.ownerUserId);
-      return { ok: true, data: { due } };
-    } catch (e) {
-      if (e instanceof ZodError) return fail("invalid_input", "invalid tick input", zodIssues(e));
-      return classifyThrown(e);
-    }
+    return tickSlicesHandler(data, context.userId, setResponseStatus);
   });
 
 // ---- fill --------------------------------------------------------------
@@ -140,17 +76,7 @@ export const recordFill = createServerFn({ method: "POST" })
     return parsed.data;
   })
   .handler(async ({ data, context }): Promise<SlicerResult<{ recorded: true }>> => {
-    const full = FillInputSchema.safeParse({ ...data, ownerUserId: context.userId });
-    if (!full.success) return fail("invalid_input", "invalid fill input", zodIssues(full.error));
-
-    try {
-      const { recordSliceFill } = await import("./execution-slicer.server");
-      await recordSliceFill(full.data.sliceId, full.data.ownerUserId, full.data.filledQty, full.data.note);
-      return { ok: true, data: { recorded: true } };
-    } catch (e) {
-      if (e instanceof ZodError) return fail("invalid_input", "invalid fill input", zodIssues(e));
-      return classifyThrown(e);
-    }
+    return recordFillHandler(data, context.userId, setResponseStatus);
   });
 
 // Re-export the schemas so component code has one import for both the
