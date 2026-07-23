@@ -1102,6 +1102,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     console.warn("Reflection skipped:", e),
   );
 
+  // Signal-decay tracker: refresh rolling 30d hit rates & edge bps by signal.
+  updateSignalPerformance(portfolioId, asOf).catch((e) =>
+    console.warn("Signal-decay update skipped:", e),
+  );
+
+
   return { decision, executed, totalValue: newTotal, cash: workingCash, routedOrders };
 }
 
