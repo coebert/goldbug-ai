@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle, Radio } from "lucide-react";
 import { SaxoOAuthPanel } from "@/components/live-trading-card";
+import { PushNotificationsCard } from "@/components/push-notifications-card";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -243,6 +244,8 @@ function AdminPage() {
           <SaxoOAuthPanel />
         </CardContent>
       </Card>
+
+      <PushNotificationsCard />
 
 
 

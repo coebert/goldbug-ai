@@ -1,0 +1,11 @@
+{
+  "name": "Aegis — AI Paper Portfolios",
+  "short_name": "Aegis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0f",
+  "theme_color": "#0b0b0f",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" }
+  ]
+}
