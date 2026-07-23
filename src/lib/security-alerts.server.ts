@@ -51,6 +51,22 @@ export function maybeNotifySecurityEvent(params: {
       const body =
         `${total} SECURITY:${params.event} events in the last ${settings.window_minutes}m` +
         (params.reason ? ` (latest: ${params.reason})` : "");
+
+      // In-app notification row (read/unread + timestamps live here).
+      await supabaseAdmin.from("notifications").insert({
+        user_id: userId,
+        category: params.event,
+        severity: total >= settings.threshold * 2 ? "critical" : "warning",
+        title,
+        body,
+        portfolio_id: params.portfolioId ?? null,
+        details: {
+          count: total,
+          window_minutes: settings.window_minutes,
+          reason: params.reason ?? null,
+        },
+      });
+
       await sendPushToUser(userId, {
         title,
         body,
