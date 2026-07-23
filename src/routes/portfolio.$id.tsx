@@ -49,6 +49,9 @@ import { Tooltip as UITooltip, TooltipContent as UITooltipContent, TooltipProvid
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
+import { SignalDecayCard } from "@/components/signal-decay-card";
+import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
+
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
