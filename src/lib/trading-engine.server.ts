@@ -260,6 +260,8 @@ ${regimeBlock}
 
 ${args.crossAsset}
 
+${args.optionsBlock}
+
 ${eventsBlock}
 ${coolingBlock}
 
