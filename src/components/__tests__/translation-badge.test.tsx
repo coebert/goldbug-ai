@@ -3,7 +3,8 @@
 // static HTML directly.
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TranslationBadge } from "../translation-badge";
+import { TranslationBadge, formatConfidencePct } from "../translation-badge";
+
 
 function render(props: Parameters<typeof TranslationBadge>[0]) {
   return renderToStaticMarkup(<TranslationBadge {...props} />);
@@ -63,4 +64,58 @@ describe("<TranslationBadge>", () => {
     });
     expect(html).toMatch(/class="[^"]*text-\[11px\][^"]*mt-2 custom-x/);
   });
+
+  describe("confidence chip", () => {
+    it("shows a rounded percentage chip and enriches the title when confidence is provided", () => {
+      const html = render({
+        originalLanguage: "German",
+        originalHeadline: "Börse steigt",
+        confidence: 0.923,
+      });
+      expect(html).toContain("92% confidence");
+      expect(html).toContain('data-testid="translation-confidence"');
+      expect(html).toContain('data-translation-confidence="92%"');
+      expect(html).toContain("translation confidence 92%");
+    });
+
+    it("clamps out-of-range confidences into [0,1] before rendering", () => {
+      const high = render({ originalLanguage: "Italian", originalHeadline: "Borsa sale", confidence: 1.7 });
+      expect(high).toContain("100% confidence");
+      const low = render({ originalLanguage: "Italian", originalHeadline: "Borsa sale", confidence: -0.4 });
+      expect(low).toContain("0% confidence");
+    });
+
+    it("omits the confidence chip when the value is missing or non-finite", () => {
+      for (const c of [null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) {
+        const html = render({
+          originalLanguage: "French",
+          originalHeadline: "La bourse en hausse",
+          confidence: c as number | null | undefined,
+        });
+        expect(html).not.toContain("confidence");
+        expect(html).not.toContain('data-testid="translation-confidence"');
+      }
+    });
+
+    it("falls back to the plain title when confidence is absent", () => {
+      const html = render({ originalLanguage: "Spanish", originalHeadline: "Bolsa sube" });
+      expect(html).toContain('title="Original Spanish headline: Bolsa sube"');
+    });
+  });
+
+  describe("formatConfidencePct", () => {
+    it("rounds and clamps", () => {
+      expect(formatConfidencePct(0.5)).toBe("50%");
+      expect(formatConfidencePct(0.876)).toBe("88%");
+      expect(formatConfidencePct(2)).toBe("100%");
+      expect(formatConfidencePct(-1)).toBe("0%");
+    });
+    it("returns null for non-finite / missing values", () => {
+      expect(formatConfidencePct(null)).toBeNull();
+      expect(formatConfidencePct(undefined)).toBeNull();
+      expect(formatConfidencePct(Number.NaN)).toBeNull();
+      expect(formatConfidencePct(Number.POSITIVE_INFINITY)).toBeNull();
+    });
+  });
 });
+
