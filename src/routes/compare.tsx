@@ -365,12 +365,20 @@ function ComparePage() {
                       <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={drawdownData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-                          <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                          <XAxis
+                            dataKey="date"
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={11}
+                            label={{ value: "Date", position: "insideBottom", offset: -2, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          />
                           <YAxis
                             stroke="hsl(var(--muted-foreground))"
                             fontSize={11}
+                            width={70}
                             tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                            label={{ value: "Drawdown (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                           />
+
                           <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
                           <Tooltip
                             cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
