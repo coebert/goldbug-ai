@@ -701,6 +701,26 @@ export function NewsReel() {
             </ul>
           </div>
         )}
+        {!q.isLoading && allItems.length > 0 && (
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span>
+              Showing {allItems.length} headline{allItems.length === 1 ? "" : "s"} from the last {sinceDays} day{sinceDays === 1 ? "" : "s"}
+            </span>
+            {hasMore ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadMore}
+                disabled={q.isFetching}
+                className="h-7 text-xs"
+              >
+                {q.isFetching ? "Loading…" : "Load more"}
+              </Button>
+            ) : (
+              <span className="italic">No older cached events</span>
+            )}
+          </div>
+        )}
       </CardContent>
       <Dialog open={detailsId !== null} onOpenChange={(o) => !o && setDetailsId(null)}>
         <DialogContent className="max-w-lg">
