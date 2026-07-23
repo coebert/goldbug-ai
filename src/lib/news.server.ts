@@ -200,6 +200,62 @@ async function persistTranslations(
   }
 }
 
+// Background refresh: find translation cache rows that have expired (or are
+// within `soonMs` of expiring) and re-run the LLM so the persistent cache
+// stays warm without waiting for a page read to trigger it. Bounded batch,
+// best-effort, never throws. Called from the /api/public/hooks/translation-refresh
+// cron endpoint.
+const refreshInFlight = { p: null as Promise<{ scanned: number; refreshed: number }> | null };
+export function refreshStaleTranslations(
+  max = 50,
+  soonMs = 24 * 60 * 60 * 1000, // also refresh anything expiring in next 24h
+): Promise<{ scanned: number; refreshed: number }> {
+  if (refreshInFlight.p) return refreshInFlight.p;
+  const p = (async () => {
+    try {
+      const cutoffIso = new Date(Date.now() + soonMs).toISOString();
+      const { data, error } = await supabaseAdmin
+        .from("headline_translation_cache")
+        .select("source_headline, expires_at")
+        .lt("expires_at", cutoffIso)
+        .order("expires_at", { ascending: true })
+        .limit(max);
+      if (error) {
+        console.warn("news: stale translation scan failed", error.message);
+        return { scanned: 0, refreshed: 0 };
+      }
+      const rows = data ?? [];
+      if (rows.length === 0) return { scanned: 0, refreshed: 0 };
+
+      const originals = rows
+        .map((r) => (r as { source_headline: string }).source_headline)
+        .filter((h): h is string => typeof h === "string" && h.length > 0);
+
+      // Evict from memory so translateWithCache is forced to re-hit the LLM
+      // instead of returning the about-to-expire entry.
+      for (const h of originals) translationCache.delete(h);
+
+      // Re-translate (in-memory + persistent cache both get rewritten with a
+      // fresh 30-day TTL via persistTranslations).
+      const fresh = await translateWithCache(originals);
+      const refreshed = fresh.size;
+      if (refreshed > 0) {
+        console.log(`news: refreshed ${refreshed}/${rows.length} stale translations`);
+      }
+      return { scanned: rows.length, refreshed };
+    } catch (err) {
+      console.warn("news: stale refresh threw", err instanceof Error ? err.message : String(err));
+      return { scanned: 0, refreshed: 0 };
+    } finally {
+      refreshInFlight.p = null;
+    }
+  })();
+  refreshInFlight.p = p;
+  return p;
+}
+
+
+
 
 async function callTranslateLLM(
   headlines: { i: number; text: string }[],
