@@ -1,9 +1,8 @@
 // Lightweight global news fetcher using GDELT DOC API (free, no key).
 // Caches results by date in news_cache.
 
-import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 
