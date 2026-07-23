@@ -679,9 +679,17 @@ function DecisionCard({
   const signals = raw.signals ?? [];
   const news = raw.news ?? [];
   const guardrails = raw.guardrails;
+  const aiOrders = raw.orders ?? [];
   const signalBySymbol = new Map(signals.map((s) => [s.symbol, s]));
+  const weightsByKey = new Map<string, SignalWeights>();
+  for (const o of aiOrders) {
+    if (!o?.symbol || !o?.side) continue;
+    const w = normalizeWeights(o.signal_weights);
+    if (w) weightsByKey.set(`${o.symbol.toUpperCase()}:${o.side}`, w);
+  }
   const approvedCount = executed.filter((e) => !e.rejected && e.quantity > 0).length;
   const rejectedCount = executed.filter((e) => e.rejected).length;
+
 
   return (
     <Card>
