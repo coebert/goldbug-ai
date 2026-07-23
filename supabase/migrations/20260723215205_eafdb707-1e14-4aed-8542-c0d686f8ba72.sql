@@ -1,0 +1,2 @@
+DROP POLICY "auth read pending_slices" ON public.pending_slices;
+CREATE POLICY "owner read pending_slices" ON public.pending_slices FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.portfolios p WHERE p.id = pending_slices.portfolio_id AND p.user_id = auth.uid()));
