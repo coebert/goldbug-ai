@@ -754,6 +754,28 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
+      // K. Global calibration multiplier — shrinks buys when AI conviction has been over-stated
+      if (calibration.global_size_mult !== 1) {
+        spend *= calibration.global_size_mult;
+        sizingNotes.push(`calib×${calibration.global_size_mult.toFixed(2)}`);
+      }
+
+      // J. Ensemble second opinion — halve on strong disagreement, log to journal
+      {
+        const feat = featureBySymbol.get(meta.symbol);
+        if (feat) {
+          const vote = ensembleVote({
+            symbol: feat.symbol, price: feat.price,
+            sma20: feat.sma20, sma50: feat.sma50, rsi14: feat.rsi14,
+            change5d: feat.change5d, change30d: feat.change30d,
+          });
+          if (scoreDisagreement(order.side, vote)) {
+            spend *= 0.5;
+            sizingNotes.push(`ensemble≠AI (${vote.side} ${vote.score.toFixed(2)}) x0.5`);
+          }
+        }
+      }
+
       // Loss cooldown: halve size while cooling
       if (isSymbolCooling(cooldowns, meta.symbol, asOf)) {
         spend *= 0.5;
