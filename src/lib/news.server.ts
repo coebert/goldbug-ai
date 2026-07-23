@@ -462,6 +462,8 @@ export async function getNewsForDate(
       summary: n.summary,
       original_headline: n.original_headline,
       original_language: n.original_language,
+      translation_confidence: n.translation_confidence,
+
     }));
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("news_cache").insert(rows);
