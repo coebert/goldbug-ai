@@ -88,6 +88,16 @@ function PortfolioPage() {
   const [eventsOn, setEventsOn] = useState(true);
   const [eventSev, setEventSev] = useState<1 | 2 | 3>(2);
   const [benchmark, setBenchmark] = useState<string>("SPY");
+  const [compareMode, setCompareMode] = useState<"raw" | "pct">(() => {
+    if (typeof window === "undefined") return "raw";
+    const v = window.localStorage.getItem("aegis.compareMode");
+    return v === "pct" ? "pct" : "raw";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("aegis.compareMode", compareMode);
+    }
+  }, [compareMode]);
   const [chartContrast, setChartContrast] = useState<"standard" | "high" | "light" | "cb">(() => {
     if (typeof window === "undefined") return "standard";
     const v = window.localStorage.getItem("aegis.chartContrast");
@@ -237,6 +247,21 @@ function PortfolioPage() {
       return { ...row, benchmark: benchmark_value };
     });
   }, [equityData, benchQ.data, benchmark, startingCashForChart]);
+
+  const displayChartData = useMemo(() => {
+    if (compareMode === "raw" || startingCashForChart <= 0) return chartData;
+    const base = startingCashForChart;
+    return chartData.map((row) => {
+      const r = row as typeof row & { benchmark?: number | null };
+      return {
+        ...row,
+        value: ((row.value - base) / base) * 100,
+        peak: ((row.peak - base) / base) * 100,
+        drawdown: row.drawdown,
+        benchmark: r.benchmark != null ? ((r.benchmark - base) / base) * 100 : r.benchmark ?? null,
+      };
+    });
+  }, [chartData, compareMode, startingCashForChart]);
 
   const perfMetrics = useMemo(() => {
     const rows = chartData.filter((r) => Number.isFinite(r.value));
@@ -456,6 +481,23 @@ function PortfolioPage() {
                           </button>
                         ))}
                       </div>
+                      <div className="inline-flex overflow-hidden rounded-md border border-border text-xs" role="group" aria-label="Benchmark compare mode">
+                        {(["raw", "pct"] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setCompareMode(mode)}
+                            className={`px-2 py-1 font-normal transition-colors ${
+                              compareMode === mode
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-background text-muted-foreground hover:text-foreground"
+                            }`}
+                            title={mode === "pct" ? "Normalized: % indexed to start" : "Raw value"}
+                          >
+                            {mode === "pct" ? "% vs start" : "Raw"}
+                          </button>
+                        ))}
+                      </div>
                       <EventOverlayControls
                         domainDates={equityData.map((d) => d.date)}
                         enabled={eventsOn}
@@ -531,7 +573,7 @@ function PortfolioPage() {
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                      <ComposedChart data={displayChartData} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
                         <defs>
                           <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor={chartTheme.drawdown} stopOpacity={0.28} />
@@ -553,7 +595,7 @@ function PortfolioPage() {
                           width={64}
                           tick={{ fontSize: 11, fill: chartTheme.axis }}
                           stroke={chartTheme.axis}
-                          tickFormatter={(v) => `${p.currency}${Number(v).toFixed(0)}`}
+                          tickFormatter={(v) => compareMode === "pct" ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%` : `${p.currency}${Number(v).toFixed(0)}`}
                         />
                         <Tooltip
                           cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
@@ -565,36 +607,48 @@ function PortfolioPage() {
                               drawdown: number;
                               benchmark?: number | null;
                             };
-                            const pnlFromStart = row.value - startingCash;
-                            const pnlPctFromStart = startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
-                            const benchPct = row.benchmark != null && startingCash > 0
-                              ? ((row.benchmark - startingCash) / startingCash) * 100
-                              : null;
+                            const isPct = compareMode === "pct";
+                            const fmtVal = (v: number) => isPct
+                              ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
+                              : `${p.currency} ${v.toFixed(2)}`;
+                            const pnlFromStart = isPct ? row.value : row.value - startingCash;
+                            const pnlPctFromStart = isPct
+                              ? row.value
+                              : startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
+                            const benchPct = row.benchmark == null
+                              ? null
+                              : isPct
+                                ? row.benchmark
+                                : startingCash > 0 ? ((row.benchmark - startingCash) / startingCash) * 100 : null;
                             const active_events = eventsOn
                               ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
                               : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
-                                <div className="mb-1 font-medium">{label}</div>
+                                <div className="mb-1 font-medium">
+                                  {label} <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">{isPct ? "% vs start" : "value"}</span>
+                                </div>
                                 <div className="tabular-nums">
                                   <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.equity }} />
-                                  Portfolio: {p.currency} {row.value.toFixed(2)}
+                                  Portfolio: {fmtVal(row.value)}
                                 </div>
-                                <div className="tabular-nums text-muted-foreground pl-3.5">
-                                  vs start: {pnlFromStart >= 0 ? "+" : ""}
-                                  {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
-                                </div>
+                                {!isPct && (
+                                  <div className="tabular-nums text-muted-foreground pl-3.5">
+                                    vs start: {pnlFromStart >= 0 ? "+" : ""}
+                                    {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
+                                  </div>
+                                )}
                                 {row.benchmark != null && (
                                   <div className="tabular-nums mt-1">
                                     <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.benchmark }} />
-                                    {benchmark}: {p.currency} {row.benchmark.toFixed(2)}
-                                    {benchPct != null && (
+                                    {benchmark}: {fmtVal(row.benchmark)}
+                                    {!isPct && benchPct != null && (
                                       <span className="text-muted-foreground"> ({benchPct >= 0 ? "+" : ""}{benchPct.toFixed(2)}%)</span>
                                     )}
                                   </div>
                                 )}
                                 <div className="tabular-nums text-muted-foreground mt-1">
-                                  Peak: {p.currency} {row.peak.toFixed(2)}
+                                  Peak: {fmtVal(row.peak)}
                                 </div>
                                 <div className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}>
                                   Drawdown: {row.drawdown.toFixed(2)}%
@@ -612,7 +666,7 @@ function PortfolioPage() {
                             );
                           }}
                         />
-                        <ReferenceLine y={startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axis, fontSize: 10, position: "insideTopRight" }} />
+                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axis, fontSize: 10, position: "insideTopRight" }} />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={equityData.map((d) => d.date)}
