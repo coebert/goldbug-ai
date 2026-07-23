@@ -249,7 +249,7 @@ function NewHereBanner() {
   );
 }
 
-function PortfolioRow({ portfolio }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null } }) {
+function PortfolioRow({ portfolio, sparkValues }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkValues: number[] }) {
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const deleteMut = useMutation({
