@@ -380,3 +380,25 @@ function detectPositionDrift(
   }
   return out;
 }
+
+// ─── Saxo OAuth (auto-refresh) ──────────────────────────────────────────────
+
+const saxoEnvSchema = z.object({ env: z.enum(["sim", "live"]) });
+
+/** Return the URL the user should visit to grant Saxo access. */
+export const startSaxoOAuth = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof saxoEnvSchema>) => saxoEnvSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { getAuthorizeUrl, redirectUri } = await import("@/lib/brokers/saxo-oauth.server");
+    return { url: getAuthorizeUrl(data.env), redirectUri: redirectUri() };
+  });
+
+/** Read current Saxo OAuth token status for both envs. */
+export const getSaxoOAuthStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { getOAuthStatus } = await import("@/lib/brokers/saxo-oauth.server");
+    const [sim, live] = await Promise.all([getOAuthStatus("sim"), getOAuthStatus("live")]);
+    return { sim, live };
+  });
