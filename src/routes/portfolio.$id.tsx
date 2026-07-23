@@ -514,6 +514,44 @@ function PortfolioPage() {
                   </CardTitle>
                 </CardHeader>
                 {perfMetrics && (
+                  <div className="mx-6 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {([
+                      { label: "CAGR", value: perfMetrics.port.annReturn, suffix: "%", signed: true, negative: false },
+                      { label: "Volatility (ann.)", value: perfMetrics.port.annVol, suffix: "%", signed: false, negative: false },
+                      { label: "Sharpe (rf=0)", value: perfMetrics.port.annVol > 0 ? perfMetrics.port.annReturn / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
+                      { label: "Max drawdown", value: perfMetrics.port.maxDrawdown, suffix: "%", signed: false, negative: true },
+                    ] as const).map((m) => {
+                      const bv = m.label === "CAGR" ? perfMetrics.bench?.annReturn
+                        : m.label === "Volatility (ann.)" ? perfMetrics.bench?.annVol
+                        : m.label === "Max drawdown" ? perfMetrics.bench?.maxDrawdown
+                        : (perfMetrics.bench && perfMetrics.bench.annVol > 0 ? perfMetrics.bench.annReturn / perfMetrics.bench.annVol : null);
+                      const fmt = (v: number | null | undefined) => {
+                        if (v == null || !Number.isFinite(v)) return "—";
+                        const s = m.signed && v > 0 ? "+" : "";
+                        const d = m.label === "Sharpe (rf=0)" ? 2 : 2;
+                        return `${s}${v.toFixed(d)}${m.suffix}`;
+                      };
+                      const color = (v: number | null | undefined) => {
+                        if (v == null) return "text-muted-foreground";
+                        if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
+                        if (!m.signed) return "text-foreground";
+                        return v >= 0 ? "text-primary" : "text-destructive";
+                      };
+                      return (
+                        <div key={m.label} className="rounded-md border border-border/70 bg-muted/30 p-3">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
+                          <div className={`tabular-nums text-xl font-semibold ${color(m.value)}`}>{fmt(m.value)}</div>
+                          {perfMetrics.bench && (
+                            <div className="tabular-nums text-[11px] text-muted-foreground">
+                              {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {perfMetrics && (
                   <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
                     <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
                       <span>Performance vs {benchmark === "none" ? "benchmark" : benchmark}</span>
