@@ -10,7 +10,7 @@ export type GlossaryEntry = {
   example?: string;
 };
 
-export const GLOSSARY = {
+export const GLOSSARY: Record<string, GlossaryEntry> = {
   // ---------------- Money & modes ----------------
   backtest: {
     title: "Backtest",
@@ -209,7 +209,9 @@ export const GLOSSARY = {
       "A single setting that forces every 'live simulated' portfolio to stay on paper trading, even if it's marked live.",
     why: "A one-flip safety net if you ever want to be sure nothing routes to the broker.",
   },
-} as const;
+};
+
+export type TermId = string;
 
 export type TermId = keyof typeof GLOSSARY;
 
