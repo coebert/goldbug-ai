@@ -224,8 +224,12 @@ function AdminPage() {
       });
       q.refetch();
     },
-    onError: (e: Error) => {
-      toast.error("Manual run failed", { description: e.message });
+    onError: (e: Error & { code?: string }) => {
+      if (e.code === "run_in_progress") {
+        toast.warning("Run already in progress", { description: e.message });
+      } else {
+        toast.error("Manual run failed", { description: e.message });
+      }
     },
   });
 

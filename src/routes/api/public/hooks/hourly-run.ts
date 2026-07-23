@@ -27,11 +27,39 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { acquireRunLock } = await import("@/lib/run-lock.server");
         const { runDailyTick } = await import("@/lib/trading-engine.server");
         const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
         const { getNewsForDate } = await import("@/lib/news.server");
         const { refreshLatestCandles } = await import("@/lib/market-data.server");
         const { filterUniverse } = await import("@/lib/universe.server");
+
+        // Concurrency guard: only one hourly cycle at a time (cron OR manual).
+        let manualTrigger = false;
+        try {
+          const bodyText = await request.clone().text();
+          if (bodyText) {
+            const parsed = JSON.parse(bodyText);
+            manualTrigger = parsed?.manual === true;
+          }
+        } catch { /* body optional */ }
+        const lock = await acquireRunLock("hourly-run", {
+          owner: manualTrigger ? "manual" : "cron",
+        });
+        if (!lock.acquired) {
+          return new Response(
+            JSON.stringify({
+              error: "run_in_progress",
+              message: `An hourly run is already in progress (started by ${lock.heldBy ?? "unknown"} ${Math.round(lock.ageMs / 1000)}s ago). Please wait for it to finish before triggering another.`,
+              held_by: lock.heldBy,
+              acquired_at: lock.acquiredAt,
+              age_ms: lock.ageMs,
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        try {
         const classesFromUniverse = (u: unknown): Array<"stock" | "etf" | "crypto" | "commodity" | "fx"> => {
           const all = ["stock", "etf", "crypto", "commodity", "fx"] as const;
           if (!Array.isArray(u)) return [...all];
@@ -192,8 +220,12 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           portfolios: portfolios.length,
           skipped_paused: skippedPaused,
           saxo_refresh: saxoRefresh,
+          triggered_by: manualTrigger ? "manual" : "cron",
           results,
         });
+        } finally {
+          await lock.release();
+        }
       },
     },
   },
