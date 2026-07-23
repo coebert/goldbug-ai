@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   listPortfolios,
   getComparison,
+  getTradeComparison,
   runBacktestMany,
 } from "@/lib/trading.functions";
 import { Button } from "@/components/ui/button";
