@@ -484,6 +484,7 @@ export type Database = {
           id: string
           lessons: Json
           portfolio_id: string
+          regime: string | null
           stats: Json
           window_days: number
         }
@@ -493,6 +494,7 @@ export type Database = {
           id?: string
           lessons?: Json
           portfolio_id: string
+          regime?: string | null
           stats?: Json
           window_days?: number
         }
@@ -502,6 +504,7 @@ export type Database = {
           id?: string
           lessons?: Json
           portfolio_id?: string
+          regime?: string | null
           stats?: Json
           window_days?: number
         }

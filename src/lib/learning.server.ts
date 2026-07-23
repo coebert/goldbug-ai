@@ -26,6 +26,9 @@ export type LearningContext = {
   stats: LearningStats;
   lessons: string[];
   lessons_as_of: string | null;
+  lessons_regime: string | null; // which regime these lessons were authored under (null = general)
+  per_regime_stats: { regime: string; n: number; win_rate: number; avg_return_pct: number }[];
+  current_regime: string | null;
   samples: {
     symbol: string;
     side: "buy" | "sell";
@@ -35,6 +38,7 @@ export type LearningContext = {
     return_pct: number;
     outcome: "win" | "loss";
     reason: string | null;
+    regime: string | null;
   }[];
 };
 
@@ -49,13 +53,37 @@ export async function computeRecentOutcomes(
   since.setDate(since.getDate() - Math.ceil(windowDays * 1.7));
   const sinceStr = since.toISOString().slice(0, 10);
 
-  const { data: trades } = await supabaseAdmin
-    .from("trades")
-    .select("symbol, side, price, trade_date, reason")
-    .eq("portfolio_id", portfolioId)
-    .gte("trade_date", sinceStr)
-    .lte("trade_date", asOf)
-    .order("trade_date", { ascending: true });
+  const [{ data: trades }, { data: regimeRows }] = await Promise.all([
+    supabaseAdmin
+      .from("trades")
+      .select("symbol, side, price, trade_date, reason")
+      .eq("portfolio_id", portfolioId)
+      .gte("trade_date", sinceStr)
+      .lte("trade_date", asOf)
+      .order("trade_date", { ascending: true }),
+    supabaseAdmin
+      .from("market_regimes")
+      .select("as_of, regime")
+      .gte("as_of", sinceStr)
+      .lte("as_of", asOf)
+      .order("as_of", { ascending: true }),
+  ]);
+
+  // Build a step-function of regime by date; each trade_date snaps to the
+  // most-recent regime observation on or before it.
+  const regimeSeries: { d: string; r: string }[] = (regimeRows ?? []).map((row) => ({
+    d: row.as_of as string,
+    r: row.regime as string,
+  }));
+  function regimeFor(dateStr: string): string | null {
+    if (regimeSeries.length === 0) return null;
+    let match: string | null = null;
+    for (const p of regimeSeries) {
+      if (p.d <= dateStr) match = p.r;
+      else break;
+    }
+    return match;
+  }
 
   const samples: LearningContext["samples"] = [];
   for (const t of trades ?? []) {
@@ -85,6 +113,7 @@ export async function computeRecentOutcomes(
       return_pct: signed * 100,
       outcome: signed >= 0 ? "win" : "loss",
       reason: t.reason ?? null,
+      regime: regimeFor(t.trade_date),
     });
   }
 
@@ -147,28 +176,68 @@ export async function computeRecentOutcomes(
   };
 }
 
-async function fetchLatestLessons(portfolioId: string) {
+async function fetchLatestLessons(portfolioId: string, currentRegime: string | null) {
+  // Prefer lessons authored under the same regime; fall back to general (regime IS NULL).
+  async function grab(regime: string | null) {
+    const q = supabaseAdmin
+      .from("portfolio_lessons")
+      .select("as_of, lessons, regime")
+      .eq("portfolio_id", portfolioId)
+      .order("as_of", { ascending: false })
+      .limit(1);
+    const { data } = await (regime == null ? q.is("regime", null) : q.eq("regime", regime)).maybeSingle();
+    if (!data) return null;
+    const raw = (data.lessons as unknown) ?? [];
+    const lessons = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : [];
+    if (!lessons.length) return null;
+    return { lessons, as_of: (data.as_of as string | undefined) ?? null, regime: (data.regime as string | null) ?? null };
+  }
+  const scoped = currentRegime ? await grab(currentRegime) : null;
+  const general = scoped ? null : await grab(null);
+  const hit = scoped ?? general;
+  return {
+    lessons: hit?.lessons ?? [],
+    lessons_as_of: hit?.as_of ?? null,
+    lessons_regime: hit?.regime ?? null,
+  };
+}
+
+async function currentRegimeFor(asOf: string): Promise<string | null> {
   const { data } = await supabaseAdmin
-    .from("portfolio_lessons")
-    .select("as_of, lessons")
-    .eq("portfolio_id", portfolioId)
+    .from("market_regimes")
+    .select("regime")
+    .lte("as_of", asOf)
     .order("as_of", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const raw = (data?.lessons as unknown) ?? [];
-  const lessons = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : [];
-  return { lessons, lessons_as_of: (data?.as_of as string | undefined) ?? null };
+  return (data?.regime as string | null) ?? null;
 }
 
 export async function buildLearningContext(
   portfolioId: string,
   asOf: string,
 ): Promise<LearningContext> {
-  const [{ stats, samples }, { lessons, lessons_as_of }] = await Promise.all([
+  const current_regime = await currentRegimeFor(asOf);
+  const [{ stats, samples }, lessonHit] = await Promise.all([
     computeRecentOutcomes(portfolioId, asOf),
-    fetchLatestLessons(portfolioId),
+    fetchLatestLessons(portfolioId, current_regime),
   ]);
-  return { stats, samples, lessons, lessons_as_of };
+  // Per-regime rolling stats from the same sample window.
+  const buckets = new Map<string, LearningContext["samples"]>();
+  for (const s of samples) {
+    if (!s.regime) continue;
+    if (!buckets.has(s.regime)) buckets.set(s.regime, []);
+    buckets.get(s.regime)!.push(s);
+  }
+  const per_regime_stats = Array.from(buckets.entries())
+    .map(([regime, arr]) => ({
+      regime,
+      n: arr.length,
+      win_rate: arr.filter((x) => x.outcome === "win").length / arr.length,
+      avg_return_pct: arr.reduce((a, b) => a + b.return_pct, 0) / arr.length,
+    }))
+    .sort((a, b) => b.n - a.n);
+  return { stats, samples, ...lessonHit, per_regime_stats, current_regime };
 }
 
 export function formatLearningBlock(ctx: LearningContext): string {
@@ -185,17 +254,27 @@ export function formatLearningBlock(ctx: LearningContext): string {
         `${p.symbol}: ${p.n} trades, ${(p.win_rate * 100).toFixed(0)}% win, avg ${p.avg_return_pct.toFixed(2)}%`,
     )
     .join("; ");
+  const regimeTag = ctx.lessons_regime
+    ? `regime-conditioned on "${ctx.lessons_regime}"`
+    : "general (no regime match yet)";
   const lessonsBlock = ctx.lessons.length
-    ? `Lessons learned so far (self-authored, last updated ${ctx.lessons_as_of ?? "n/a"}):\n${ctx.lessons.map((l, i) => `  ${i + 1}. ${l}`).join("\n")}`
+    ? `Lessons learned so far (self-authored, ${regimeTag}, last updated ${ctx.lessons_as_of ?? "n/a"}):\n${ctx.lessons.map((l, i) => `  ${i + 1}. ${l}`).join("\n")}`
     : "Not enough evaluable trades yet to author lessons.";
+  const perRegime = ctx.per_regime_stats.length
+    ? ctx.per_regime_stats
+        .map((p) => `${p.regime}: ${p.n} trades, ${(p.win_rate * 100).toFixed(0)}% win, avg ${p.avg_return_pct.toFixed(2)}%`)
+        .join("; ")
+    : "n/a";
   return `LEARNING MEMORY (rolling outcomes over the last ${s.window_days} days, forward-return horizon ${s.horizon_days}d):
+- Current market regime: ${ctx.current_regime ?? "unknown"} — lessons below are ${regimeTag}.
 - Evaluable trades: ${s.evaluable} (wins ${s.wins} / losses ${s.losses}) — win rate ${wr}, average return ${ar}
 - Best call: ${s.best ? `${s.best.symbol} (${s.best.return_pct.toFixed(2)}%)` : "n/a"} | Worst call: ${s.worst ? `${s.worst.symbol} (${s.worst.return_pct.toFixed(2)}%)` : "n/a"}
 - Per symbol: ${perSym || "n/a"}
+- Per regime: ${perRegime}
 - By side — buys: ${s.per_side.buy.n} (win ${s.per_side.buy.win_rate != null ? `${(s.per_side.buy.win_rate * 100).toFixed(0)}%` : "n/a"}), sells: ${s.per_side.sell.n} (win ${s.per_side.sell.win_rate != null ? `${(s.per_side.sell.win_rate * 100).toFixed(0)}%` : "n/a"})
 ${lessonsBlock}
 
-Apply these lessons: double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge. State in your rationale whenever a decision was directly informed by a specific lesson.`;
+Apply these lessons carefully: they were derived from the regime named above, so weight them heavier when the current regime matches and treat them as weaker priors when it doesn't. Double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge in this regime. State in your rationale whenever a decision was directly informed by a specific lesson.`;
 }
 
 const LessonsSchema = z.object({
@@ -206,8 +285,7 @@ export async function reflectAndUpdateLessons(
   portfolioId: string,
   asOf: string,
   ctx: LearningContext,
-): Promise<{ updated: boolean; reason?: string }> {
-  // Only reflect when we have enough data and it's been a few days.
+): Promise<{ updated: boolean; reason?: string; regimes?: string[] }> {
   if (ctx.stats.evaluable < 5) return { updated: false, reason: "not enough evaluable trades" };
   if (ctx.lessons_as_of) {
     const daysSince =
@@ -221,22 +299,42 @@ export async function reflectAndUpdateLessons(
   const gateway = createLovableAiGatewayProvider(key);
   const model = gateway("google/gemini-3.6-flash");
 
-  const sampleLines = ctx.samples
-    .slice(-25)
-    .map(
-      (s) =>
-        `${s.trade_date} ${s.side.toUpperCase()} ${s.symbol} @ ${s.entry_price.toFixed(2)} → ${s.exit_price.toFixed(2)} (${s.return_pct.toFixed(2)}%, ${s.outcome})${s.reason ? ` — reason: "${s.reason}"` : ""}`,
-    )
-    .join("\n");
+  // Build one bucket per regime with ≥3 samples, plus a "general" bucket over
+  // all samples so newly-entered regimes still have a fallback lesson set.
+  type Bucket = { regime: string | null; samples: LearningContext["samples"] };
+  const byRegime = new Map<string, LearningContext["samples"]>();
+  for (const s of ctx.samples) {
+    if (!s.regime) continue;
+    if (!byRegime.has(s.regime)) byRegime.set(s.regime, []);
+    byRegime.get(s.regime)!.push(s);
+  }
+  const buckets: Bucket[] = [{ regime: null, samples: ctx.samples }];
+  for (const [regime, arr] of byRegime.entries()) {
+    if (arr.length >= 3) buckets.push({ regime, samples: arr });
+  }
 
-  const system = `You are the portfolio's own post-trade review analyst. Study its last ${ctx.stats.window_days} days of decisions and outcomes and produce 3–5 short lessons — each one concrete, testable, and actionable on future days. Prefer specific patterns ("SELL calls on crypto after RSI>70 have been early") over generic advice ("be careful"). If prior lessons are still valid, restate them; drop any that the data now contradicts.`;
+  const writtenRegimes: string[] = [];
+  for (const b of buckets) {
+    const sampleLines = b.samples
+      .slice(-25)
+      .map(
+        (s) =>
+          `${s.trade_date} [${s.regime ?? "unknown"}] ${s.side.toUpperCase()} ${s.symbol} @ ${s.entry_price.toFixed(2)} → ${s.exit_price.toFixed(2)} (${s.return_pct.toFixed(2)}%, ${s.outcome})${s.reason ? ` — reason: "${s.reason}"` : ""}`,
+      )
+      .join("\n");
 
-  const prior = ctx.lessons.length
-    ? `Prior lessons (may be kept, revised, or dropped):\n${ctx.lessons.map((l, i) => `${i + 1}. ${l}`).join("\n")}`
-    : "No prior lessons yet.";
+    const regimeIntro = b.regime
+      ? `You are reviewing this portfolio's trades that occurred specifically during the "${b.regime}" market regime. Produce lessons that are only applied when this regime is active again.`
+      : `You are reviewing this portfolio's trades across all recent market regimes. Produce general-purpose lessons that apply when no regime-specific lesson exists.`;
 
-  const user = `Date: ${asOf}
-Rolling stats: ${JSON.stringify(ctx.stats)}
+    const system = `You are the portfolio's post-trade review analyst. ${regimeIntro} Produce 3–5 short lessons — each one concrete, testable, and actionable on future days. Prefer specific patterns ("BUY calls on tech ETFs after RSI<30 in bull_quiet returned +2.1% avg") over generic advice.`;
+
+    const prior = b.regime && ctx.lessons_regime === b.regime && ctx.lessons.length
+      ? `Prior lessons for this regime (may be kept, revised, or dropped):\n${ctx.lessons.map((l, i) => `${i + 1}. ${l}`).join("\n")}`
+      : "No prior lessons for this regime yet.";
+
+    const user = `Date: ${asOf}
+Bucket: ${b.regime ?? "general"} (${b.samples.length} trades)
 
 Recent trades and outcomes:
 ${sampleLines || "(none)"}
@@ -245,31 +343,34 @@ ${prior}
 
 Return { lessons: string[] } with 3–5 items, each under 180 characters. Use plain English.`;
 
-  try {
-    const { output } = await generateText({
-      model,
-      system,
-      prompt: user,
-      output: Output.object({ schema: LessonsSchema }),
-    });
-    const lessons = (output.lessons ?? [])
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .slice(0, 5);
-    if (lessons.length === 0) return { updated: false, reason: "empty output" };
+    try {
+      const { output } = await generateText({
+        model,
+        system,
+        prompt: user,
+        output: Output.object({ schema: LessonsSchema }),
+      });
+      const lessons = (output.lessons ?? [])
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .slice(0, 5);
+      if (lessons.length === 0) continue;
 
-    await supabaseAdmin.from("portfolio_lessons").insert({
-      portfolio_id: portfolioId,
-      as_of: asOf,
-      lessons,
-      stats: ctx.stats as unknown as never,
-      window_days: ctx.stats.window_days,
-    });
-    return { updated: true };
-  } catch (error) {
-    if (NoObjectGeneratedError.isInstance(error)) {
-      return { updated: false, reason: "parse error" };
+      await supabaseAdmin.from("portfolio_lessons").insert({
+        portfolio_id: portfolioId,
+        as_of: asOf,
+        lessons,
+        stats: ctx.stats as unknown as never,
+        window_days: ctx.stats.window_days,
+        regime: b.regime,
+      });
+      writtenRegimes.push(b.regime ?? "general");
+    } catch (error) {
+      if (NoObjectGeneratedError.isInstance(error)) continue;
+      throw error;
     }
-    throw error;
   }
+
+  if (writtenRegimes.length === 0) return { updated: false, reason: "no buckets produced lessons" };
+  return { updated: true, regimes: writtenRegimes };
 }
