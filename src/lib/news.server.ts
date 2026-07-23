@@ -9,6 +9,8 @@ export type NewsItem = {
   headline: string;
   url: string | null;
   summary: string | null;
+  original_headline: string | null;
+  original_language: string | null;
 };
 
 type GdeltArticle = {
@@ -40,10 +42,82 @@ async function parseGdeltResponse(res: Response, dateISO: string): Promise<NewsI
         headline: a.title!,
         url: a.url ?? null,
         summary: null,
+        original_headline: null,
+        original_language: null,
       }));
   } catch (err) {
     console.error("news: gdelt JSON parse failed", err);
     return null;
+  }
+}
+
+// Batch-translate non-English headlines to English via the Lovable AI Gateway.
+// The model both detects the language and returns the English translation in a
+// single call. English headlines are left untouched (original_language stays
+// null). Failures degrade to the original headlines rather than blocking the
+// ingest pipeline — a stale-but-untranslated reel beats an empty one.
+async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
+  if (items.length === 0) return items;
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) return items;
+
+  // Ask the model to classify + translate every headline in one JSON payload.
+  // Keeping the schema shallow avoids Gemini's "too many states" rejections.
+  const numbered = items.map((it, i) => `${i}. ${it.headline}`).join("\n");
+  const system =
+    'You are a translator. For each numbered headline, detect its language and, if it is not English, translate it to natural English. Reply with STRICT JSON of the form {"results":[{"i":0,"lang":"English","translation":null}, ...]}. Use the full English name of the language (e.g. "Spanish", "Mandarin Chinese"). When the headline is already in English, set lang to "English" and translation to null. Never invent facts — translate only.';
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Lovable-API-Key": key,
+        "X-Lovable-AIG-SDK": "fetch",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3.6-flash",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: numbered },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`news: translate request failed ${res.status}`);
+      return items;
+    }
+    const json = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const raw = json.choices?.[0]?.message?.content ?? "";
+    const parsed = JSON.parse(raw) as {
+      results?: Array<{ i?: number; lang?: string | null; translation?: string | null }>;
+    };
+    const byIndex = new Map<number, { lang: string | null; translation: string | null }>();
+    for (const r of parsed.results ?? []) {
+      if (typeof r.i === "number") {
+        byIndex.set(r.i, {
+          lang: (r.lang ?? "").trim() || null,
+          translation: (r.translation ?? "")?.toString().trim() || null,
+        });
+      }
+    }
+    return items.map((it, i) => {
+      const t = byIndex.get(i);
+      if (!t) return it;
+      const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
+      if (isEnglish || !t.translation) return it;
+      return {
+        ...it,
+        headline: t.translation,
+        original_headline: it.headline,
+        original_language: t.lang,
+      };
+    });
+  } catch (err) {
+    console.warn("news: translate threw", err instanceof Error ? err.message : String(err));
+    return items;
   }
 }
 
@@ -99,29 +173,34 @@ export async function getNewsForDate(
 ): Promise<NewsItem[]> {
   const { data: cached } = await supabaseAdmin
     .from("news_cache")
-    .select("news_date, source, headline, url, summary")
+    .select("news_date, source, headline, url, summary, original_headline, original_language")
     .eq("news_date", dateISO)
     .limit(max);
 
-  const cachedItems = (cached ?? []).map((r) => ({
+  const cachedItems: NewsItem[] = (cached ?? []).map((r) => ({
     date: r.news_date as string,
     source: r.source,
     headline: r.headline,
     url: r.url,
     summary: r.summary,
+    original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+    original_language: (r as { original_language?: string | null }).original_language ?? null,
   }));
 
   // Use existing cache when we're not forcing a refresh and it looks healthy.
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
 
-  const fresh = await fetchGdeltForDate(dateISO, max);
-  if (fresh === null) {
+  const gdelt = await fetchGdeltForDate(dateISO, max);
+  if (gdelt === null) {
     // Provider unavailable — preserve whatever cache we already have instead
     // of nuking it. Better a stale reel than an empty one.
     console.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (provider unavailable)`);
     return cachedItems;
   }
-  if (fresh.length === 0) return cachedItems;
+  if (gdelt.length === 0) return cachedItems;
+
+  // Translate before writing so the cache holds English + original metadata.
+  const fresh = await translateHeadlines(gdelt);
 
   // We have a real fresh set. Only NOW do we replace today's rows on
   // forceRefresh; otherwise merge (skip duplicates by headline).
@@ -129,16 +208,20 @@ export async function getNewsForDate(
     await supabaseAdmin.from("news_cache").delete().eq("news_date", dateISO);
   }
   const existingHeads = new Set(
-    opts?.forceRefresh ? [] : cachedItems.map((c) => c.headline),
+    opts?.forceRefresh
+      ? []
+      : cachedItems.flatMap((c) => [c.headline, c.original_headline ?? ""].filter(Boolean)),
   );
   const rows = fresh
-    .filter((n) => !existingHeads.has(n.headline))
+    .filter((n) => !existingHeads.has(n.headline) && !(n.original_headline && existingHeads.has(n.original_headline)))
     .map((n) => ({
       news_date: n.date,
       source: n.source,
       headline: n.headline,
       url: n.url,
       summary: n.summary,
+      original_headline: n.original_headline,
+      original_language: n.original_language,
     }));
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("news_cache").insert(rows);

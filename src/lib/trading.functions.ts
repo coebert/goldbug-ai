@@ -1984,6 +1984,8 @@ type NewsReelItem = {
   source: string | null;
   headline: string;
   url: string | null;
+  original_headline: string | null;
+  original_language: string | null;
   avg_sentiment: number | null;
   decisions_count: number;
   influences: NewsReelInfluence[];
@@ -2015,7 +2017,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     // 1. Recent global news (auth-readable cache).
     const { data: newsRows } = await context.supabase
       .from("news_cache")
-      .select("id, news_date, source, headline, url, summary")
+      .select("id, news_date, source, headline, url, summary, original_headline, original_language")
       .gte("news_date", since)
       .order("news_date", { ascending: false })
       .order("fetched_at", { ascending: false })
@@ -2135,6 +2137,8 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         source: r.source,
         headline: r.headline,
         url: r.url,
+        original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+        original_language: (r as { original_language?: string | null }).original_language ?? null,
         avg_sentiment: avg,
         decisions_count: rows.length,
         influences: rows.slice(0, 6),
