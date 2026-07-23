@@ -14,6 +14,44 @@ function sentimentTone(v: number | null) {
   return { label: `neutral ${v >= 0 ? "+" : ""}${v.toFixed(2)}`, cls: "text-foreground bg-muted" };
 }
 
+// Reliability tiers by source. Higher = more editorially rigorous / less prone to rumor.
+const SOURCE_TIERS: Array<{ tier: "high" | "medium" | "low"; score: number; match: RegExp }> = [
+  { tier: "high", score: 95, match: /reuters|associated press|\bap\b|bloomberg|financial times|wall street journal|wsj|the economist|bbc|npr|nikkei|dow jones/i },
+  { tier: "high", score: 88, match: /new york times|nyt|washington post|guardian|le monde|der spiegel|abc news|cbs news|nbc news|cnbc|marketwatch|barron/i },
+  { tier: "medium", score: 72, match: /forbes|business insider|fortune|axios|politico|the hill|time\.com|newsweek|usa today|yahoo finance|investing\.com|seeking alpha/i },
+  { tier: "medium", score: 62, match: /coindesk|cointelegraph|the block|decrypt|techcrunch|the verge|wired|engadget/i },
+  { tier: "low", score: 45, match: /reddit|medium\.com|substack|blogspot|wordpress|prnewswire|globenewswire|businesswire|press release/i },
+];
+
+function credibilityFor(source: string | null | undefined) {
+  if (!source) return { tier: "unknown" as const, score: 50, label: "Credibility n/a", cls: "text-muted-foreground bg-muted" };
+  const hit = SOURCE_TIERS.find((t) => t.match.test(source));
+  if (!hit) return { tier: "medium" as const, score: 60, label: "Credibility 60", cls: "text-foreground bg-muted" };
+  const cls =
+    hit.tier === "high" ? "text-primary bg-primary/10"
+    : hit.tier === "low" ? "text-destructive bg-destructive/10"
+    : "text-foreground bg-muted";
+  return { tier: hit.tier, score: hit.score, label: `Credibility ${hit.score}`, cls };
+}
+
+function recencyFor(dateStr: string | null | undefined, now: number) {
+  if (!dateStr) return { score: 0, label: "Recency n/a", ageLabel: "unknown", cls: "text-muted-foreground bg-muted" };
+  const t = Date.parse(dateStr);
+  if (!Number.isFinite(t)) return { score: 0, label: "Recency n/a", ageLabel: "unknown", cls: "text-muted-foreground bg-muted" };
+  const hours = Math.max(0, (now - t) / 3_600_000);
+  // Half-life ~ 48h; 0h => 100, 48h => 50, 96h => 25, 7d => ~9
+  const score = Math.round(100 * Math.pow(0.5, hours / 48));
+  const ageLabel =
+    hours < 1 ? `${Math.max(1, Math.round(hours * 60))}m old`
+    : hours < 48 ? `${Math.round(hours)}h old`
+    : `${Math.round(hours / 24)}d old`;
+  const cls =
+    score >= 75 ? "text-primary bg-primary/10"
+    : score >= 40 ? "text-foreground bg-muted"
+    : "text-destructive bg-destructive/10";
+  return { score, label: `Recency ${score}`, ageLabel, cls };
+}
+
 const ASSET_CLASSES = ["stock", "etf", "crypto", "commodity", "fx"] as const;
 const RISK_LEVELS = ["conservative", "balanced", "aggressive"] as const;
 
