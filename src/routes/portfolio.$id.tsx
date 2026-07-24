@@ -82,6 +82,8 @@ import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-hold
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { BacktestResultsCard } from "@/components/backtest-results-card";
 import { BacktestRunHistoryCard, saveRun as saveBacktestRun } from "@/components/backtest-run-history-card";
+import { getBacktestSeries } from "@/lib/backtest-series.functions";
+
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
