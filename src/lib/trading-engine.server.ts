@@ -396,14 +396,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     .select("*")
     .eq("portfolio_id", portfolioId);
 
-  const universe = filterUniverse(classesFromUniverse(portfolio.universe));
+  const fullUniverse = filterUniverse(classesFromUniverse(portfolio.universe));
 
-  // Prices for holdings + top candidates
-  const candidateSymbols = universe.slice(0, 22); // keep prompt bounded
-  const allSymbols = Array.from(
-    new Set([...(holdings ?? []).map((h) => h.symbol), ...candidateSymbols.map((c) => c.symbol)]),
+  // Price the entire (asset-class-filtered) universe up front so we can pick a
+  // candidate list the portfolio's cash can actually trade. Held symbols are
+  // always included so sells remain possible even if now unaffordable.
+  const heldSymbols = (holdings ?? []).map((h) => h.symbol);
+  const universePriceSyms = Array.from(
+    new Set([...heldSymbols, ...fullUniverse.map((c) => c.symbol)]),
   );
-  const priceMap = await currentPrices(allSymbols, asOf);
+  const priceMap = await currentPrices(universePriceSyms, asOf);
 
   const cash = Number(portfolio.current_cash);
   const holdingsValue = (holdings ?? []).reduce((sum, h) => {
@@ -411,6 +413,68 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     return sum + p * Number(h.quantity);
   }, 0);
   const totalValue = cash + holdingsValue;
+
+  // Cash-aware universe filter. Uses raw risk_config (pre-regime tightening) so
+  // the pre-filter is at least as generous as the final guardrails. The
+  // per-symbol budget is the smaller of (per-symbol cap × total value) and
+  // available cash — you can't spend money you don't have. Instruments where
+  // ONE whole share costs more than the budget, or where the budget is below
+  // the min_trade_value floor, are dropped from BUY candidates (still
+  // considered for SELL if already held).
+  const preRiskCfg = parseRiskConfig(portfolio.risk_config);
+  const preRisk = riskProfile(portfolio.risk_level);
+  const perSymbolCapPct = preRiskCfg.per_symbol_limit_pct ?? preRisk.maxPositionPct;
+  const minTradeValue = preRiskCfg.execution_params?.min_trade_value ?? 25;
+  const perSymbolBudget = Math.min(totalValue * perSymbolCapPct, cash);
+  const affordable: UniverseSymbol[] = [];
+  const droppedForCash: Array<{ symbol: string; price: number; reason: string }> = [];
+  for (const u of fullUniverse) {
+    const price = priceMap.get(u.symbol);
+    if (price == null || price <= 0) {
+      affordable.push(u); // unknown price — let downstream logic handle it
+      continue;
+    }
+    if (price > perSymbolBudget) {
+      droppedForCash.push({
+        symbol: u.symbol, price,
+        reason: `1 share (${price.toFixed(2)}) > per-symbol budget ${perSymbolBudget.toFixed(2)}`,
+      });
+      continue;
+    }
+    if (perSymbolBudget < minTradeValue) {
+      droppedForCash.push({
+        symbol: u.symbol, price,
+        reason: `per-symbol budget ${perSymbolBudget.toFixed(2)} < min trade value ${minTradeValue}`,
+      });
+      continue;
+    }
+    affordable.push(u);
+  }
+  const heldSet = new Set(heldSymbols);
+  const alreadyAffordable = new Set(affordable.map((a) => a.symbol));
+  for (const u of fullUniverse) {
+    if (heldSet.has(u.symbol) && !alreadyAffordable.has(u.symbol)) affordable.push(u);
+  }
+
+  const budgetNotes: string[] = [];
+  let candidateSymbols: UniverseSymbol[];
+  if (affordable.length === 0) {
+    candidateSymbols = fullUniverse
+      .map((u) => ({ u, p: priceMap.get(u.symbol) ?? Infinity }))
+      .sort((a, b) => a.p - b.p)
+      .slice(0, 6)
+      .map((x) => x.u);
+    budgetNotes.push(
+      `No instruments affordable within per-symbol budget ${perSymbolBudget.toFixed(2)} ${portfolio.currency}; showing 6 cheapest for reference. Add funds or widen the per-symbol cap to enable buys.`,
+    );
+  } else {
+    candidateSymbols = affordable.slice(0, 22);
+    if (droppedForCash.length > 0) {
+      budgetNotes.push(
+        `Cash-aware filter kept ${candidateSymbols.length}/${fullUniverse.length} instruments; dropped ${droppedForCash.length} priced above per-symbol budget ${perSymbolBudget.toFixed(2)} ${portfolio.currency}.`,
+      );
+    }
+  }
 
   // Circuit breaker: evaluate BEFORE spending on the AI call. If tripped,
   // we still run auto-liquidation stops but skip the AI + any new buys.
