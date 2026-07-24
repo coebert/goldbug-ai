@@ -133,12 +133,14 @@ function Home() {
 
 
 
+  const [includeDeposits, setIncludeDeposits] = useIncludeDeposits();
+
   const todaySummary = useMemo(() => {
     const series = (equityQ.data?.series ?? []) as Array<Record<string, unknown> & { date: string }>;
     const portfolios = (equityQ.data?.portfolios ?? []) as Array<{ id: string; mode?: string }>;
     const deposits = (equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? [];
-    return computeModeSummary(series, portfolios, deposits);
-  }, [equityQ.data]);
+    return computeModeSummary(series, portfolios, deposits, { includeDeposits });
+  }, [equityQ.data, includeDeposits]);
 
 
 
