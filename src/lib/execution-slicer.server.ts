@@ -50,14 +50,10 @@ class PendingSliceAccessError extends Error {
 }
 
 function logUnexpectedAccess(context: Record<string, unknown>) {
-  // Structured, greppable log line — surfaces in edge function logs.
-  console.warn(
-    "SECURITY:pending_slices unexpected access attempt",
-    JSON.stringify({ at: new Date().toISOString(), ...context }),
-  );
-  // Fire-and-forget persistence to the security audit log so admins can
-  // review the event via the UI. We never await this and never let a
-  // persistence failure mask the original access-control decision.
+  // Delegate structured logging + audit persistence to the shared logger.
+  // Prefix stays `SECURITY:pending_slices ...` so ops greps and existing
+  // alerting rules keep working.
+  logSecurity("pending_slices", "unexpected access attempt", context);
   void (async () => {
     try {
       const op = typeof context.op === "string" ? context.op : null;
@@ -74,8 +70,6 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
         actor_user_id: actor,
         details: JSON.parse(JSON.stringify(context)),
       });
-      // Threshold-based notifications (push). Never let a notify failure
-      // mask the original security signal.
       const { maybeNotifySecurityEvent } = await import("@/lib/security-alerts.server");
       maybeNotifySecurityEvent({
         actorUserId: actor,
@@ -84,10 +78,7 @@ function logUnexpectedAccess(context: Record<string, unknown>) {
         portfolioId,
       });
     } catch (e) {
-      console.warn(
-        "SECURITY:pending_slices audit persist failed",
-        e instanceof Error ? e.message : String(e),
-      );
+      slicerLog.warn("SECURITY:pending_slices audit persist failed", { err: e });
     }
   })();
 }
