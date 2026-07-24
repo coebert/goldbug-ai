@@ -82,7 +82,7 @@ function OptimizerPage() {
   return (
     <div className="min-h-dvh bg-background">
       <AppHeader />
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
         <div className="mb-4 flex items-center gap-3 flex-wrap">
           <Button variant="ghost" size="sm" asChild>
             <Link to="/portfolio/$id" params={{ id }}>
