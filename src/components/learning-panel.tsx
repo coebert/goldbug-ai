@@ -1,14 +1,87 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getPortfolioLearning } from "@/lib/trading.functions";
+import {
+  getPortfolioLearning,
+  setLessonOverride,
+  clearLessonOverride,
+} from "@/lib/trading.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import {
+  Brain,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  Pencil,
+  Ban,
+  RotateCcw,
+  Check,
+  X,
+} from "lucide-react";
+
+type OverrideAction = "disabled" | "edited";
+
+type OverrideView = {
+  original_text: string;
+  action: OverrideAction;
+  replacement_text: string | null;
+} | undefined;
 
 export function LearningPanel({ portfolioId }: { portfolioId: string }) {
+  const qc = useQueryClient();
   const fn = useServerFn(getPortfolioLearning);
+  const setOverride = useServerFn(setLessonOverride);
+  const clearOverride = useServerFn(clearLessonOverride);
+
   const q = useQuery({
     queryKey: ["learning", portfolioId],
     queryFn: () => fn({ data: { portfolio_id: portfolioId } }),
+  });
+
+  const [editing, setEditing] = useState<{ text: string; draft: string; reason: string } | null>(null);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["learning", portfolioId] });
+
+  const disableMut = useMutation({
+    mutationFn: (original_text: string) =>
+      setOverride({ data: { original_text, action: "disabled" } }),
+    onSuccess: () => {
+      toast.success("Lesson marked as unhelpful — the AI will stop applying it.");
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to disable lesson"),
+  });
+
+  const editMut = useMutation({
+    mutationFn: (input: { original_text: string; replacement_text: string; reason: string }) =>
+      setOverride({
+        data: {
+          original_text: input.original_text,
+          action: "edited",
+          replacement_text: input.replacement_text,
+          reason: input.reason || null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Lesson updated — the AI will use your revised wording.");
+      setEditing(null);
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to edit lesson"),
+  });
+
+  const restoreMut = useMutation({
+    mutationFn: (original_text: string) => clearOverride({ data: { original_text } }),
+    onSuccess: () => {
+      toast.success("Restored — the AI will use the original lesson again.");
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to restore lesson"),
   });
 
   if (q.isLoading) {
@@ -25,9 +98,12 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
   }
   if (q.isError || !q.data) return null;
 
-  const { stats, lessons, lessons_as_of, as_of } = q.data;
+  const { stats, lessons_raw, lessons_overrides, lessons_as_of, as_of } = q.data;
   const wr = stats.win_rate != null ? `${(stats.win_rate * 100).toFixed(0)}%` : "—";
   const ar = stats.avg_return_pct != null ? `${stats.avg_return_pct.toFixed(2)}%` : "—";
+
+  const overrideFor = (text: string): OverrideView =>
+    lessons_overrides.find((o) => o.original_text === text) as OverrideView;
 
   return (
     <Card>
@@ -78,18 +154,135 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
               </span>
             )}
           </div>
-          {lessons.length === 0 ? (
+          <p className="mb-2 text-xs text-muted-foreground">
+            Edit a lesson to reword it, or mark it as unhelpful to stop the AI applying it. Changes take effect on the next run.
+          </p>
+          {lessons_raw.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Not enough trade outcomes yet — the AI needs at least 5 evaluable trades before it writes lessons.
             </p>
           ) : (
             <ol className="space-y-2 text-sm">
-              {lessons.map((l, i) => (
-                <li key={i} className="flex gap-2 rounded-md border bg-muted/40 p-2">
-                  <span className="text-muted-foreground">{i + 1}.</span>
-                  <span>{l}</span>
-                </li>
-              ))}
+              {lessons_raw.map((l, i) => {
+                const ov = overrideFor(l);
+                const isEditing = editing?.text === l;
+                const busy =
+                  (disableMut.isPending && disableMut.variables === l) ||
+                  (restoreMut.isPending && restoreMut.variables === l) ||
+                  (editMut.isPending && editMut.variables?.original_text === l);
+
+                return (
+                  <li key={i} className="rounded-md border bg-muted/40 p-2">
+                    <div className="flex items-start gap-2">
+                      <span className="text-muted-foreground">{i + 1}.</span>
+                      <div className="flex-1 space-y-1">
+                        {ov?.action === "disabled" && (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive" className="text-[10px]">Disabled</Badge>
+                            <span className="text-xs text-muted-foreground">Not applied by the AI.</span>
+                          </div>
+                        )}
+                        {ov?.action === "edited" && (
+                          <div className="flex items-center gap-2">
+                            <Badge className="text-[10px]">Edited</Badge>
+                            <span className="text-xs text-muted-foreground">AI uses your revised wording.</span>
+                          </div>
+                        )}
+                        <div className={ov?.action === "disabled" ? "line-through text-muted-foreground" : ""}>
+                          {l}
+                        </div>
+                        {ov?.action === "edited" && ov.replacement_text && (
+                          <div className="rounded border border-primary/30 bg-primary/5 p-1.5 text-xs">
+                            <span className="font-medium text-primary">Your version: </span>
+                            {ov.replacement_text}
+                          </div>
+                        )}
+
+                        {isEditing ? (
+                          <div className="space-y-2 pt-1">
+                            <Textarea
+                              value={editing!.draft}
+                              onChange={(e) => setEditing({ ...editing!, draft: e.target.value })}
+                              rows={3}
+                              className="text-sm"
+                              placeholder="Reword this lesson so the AI applies your improved version."
+                            />
+                            <Input
+                              value={editing!.reason}
+                              onChange={(e) => setEditing({ ...editing!, reason: e.target.value })}
+                              placeholder="Why is the original wrong? (optional)"
+                              className="text-xs"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  editMut.mutate({
+                                    original_text: l,
+                                    replacement_text: editing!.draft,
+                                    reason: editing!.reason,
+                                  })
+                                }
+                                disabled={!editing!.draft.trim() || editMut.isPending}
+                              >
+                                <Check className="mr-1 h-3 w-3" /> Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setEditing(null)}
+                                disabled={editMut.isPending}
+                              >
+                                <X className="mr-1 h-3 w-3" /> Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              disabled={busy}
+                              onClick={() =>
+                                setEditing({
+                                  text: l,
+                                  draft: ov?.replacement_text ?? l,
+                                  reason: "",
+                                })
+                              }
+                            >
+                              <Pencil className="mr-1 h-3 w-3" /> Edit
+                            </Button>
+                            {ov?.action !== "disabled" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                                disabled={busy}
+                                onClick={() => disableMut.mutate(l)}
+                              >
+                                <Ban className="mr-1 h-3 w-3" /> Mark unhelpful
+                              </Button>
+                            )}
+                            {ov && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                disabled={busy}
+                                onClick={() => restoreMut.mutate(l)}
+                              >
+                                <RotateCcw className="mr-1 h-3 w-3" /> Restore original
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
           )}
         </div>
