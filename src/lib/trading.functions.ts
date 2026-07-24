@@ -5,6 +5,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { GLOBAL_EVENTS } from "./global-events";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
+import {
+  detectSnapshotTimingMismatches,
+  logSnapshotTimingMismatches,
+  type SnapshotMismatch,
+  type SnapshotMismatchInput,
+} from "./snapshot-timing-mismatch";
 
 const RiskEnum = z.enum(["conservative", "balanced", "aggressive"]);
 const AssetClassEnum = z.enum(["stock", "etf", "crypto", "commodity", "fx"]);
