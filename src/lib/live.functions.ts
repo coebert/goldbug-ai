@@ -299,13 +299,18 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
     const own = await context.supabase.from("portfolios")
       .select("id, user_id, mode").eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
+    // Pick up any external deposits/withdrawals into Saxo before returning the
+    // broker snapshot so the UI immediately reflects the newly-available cash.
+    const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
+    const sync = await syncLiveCashFromBroker(data.portfolioId);
     const env = own.data.mode === "live_prod" ? "live" : "sim";
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
     const adapter = await buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
     const bal = await adapter.getBalance();
     const pos = await adapter.getPositions();
-    return { balance: bal, positions: pos };
+    return { balance: bal, positions: pos, sync };
   });
+
 
 /**
  * Preview the cash + position breakdown Saxo would use as the starting pot
