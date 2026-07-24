@@ -513,9 +513,7 @@ function PortfolioPage() {
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    if (confirm("Reset to starting cash and delete history?")) reset.mutate();
-                  }}
+                  onClick={() => setConfirmReset(true)}
                   disabled={reset.isPending}
                 >
                   <RotateCcw className="mr-1 h-4 w-4" /> Reset
