@@ -347,6 +347,114 @@ export class SaxoAdapter implements BrokerAdapter {
     }
   }
 
+  /**
+   * List currently working (open) orders on the account. Saxo returns filled /
+   * cancelled orders here only briefly; anything not present in this list has
+   * moved to history.
+   */
+  async listWorkingOrders(): Promise<
+    Array<{
+      brokerOrderId: string;
+      symbol: string;
+      status: string;
+      amount: number;
+      filledAmount: number;
+    }>
+  > {
+    const res = await this.req<{
+      Data?: Array<{
+        OrderId?: string;
+        Status?: string;
+        Amount?: number;
+        FilledAmount?: number;
+        DisplayAndFormat?: { Symbol?: string };
+      }>;
+    }>("GET", "/port/v1/orders/me", { query: { FieldGroups: "DisplayAndFormat" } });
+    return (res.Data ?? []).map((o) => ({
+      brokerOrderId: String(o.OrderId ?? ""),
+      symbol: o.DisplayAndFormat?.Symbol ?? "",
+      status: String(o.Status ?? "Working"),
+      amount: Number(o.Amount ?? 0),
+      filledAmount: Number(o.FilledAmount ?? 0),
+    })).filter((o) => o.brokerOrderId);
+  }
+
+  /**
+   * Look up a single historical (closed) order by id. Returns null if Saxo
+   * cannot find it in the given lookback window — some environments don't
+   * expose the hist endpoint, so the caller must treat null as "unknown".
+   */
+  async getHistoricalOrder(
+    brokerOrderId: string,
+    sinceIso: string,
+  ): Promise<
+    | {
+        brokerOrderId: string;
+        status: string;
+        amount: number;
+        filledAmount: number;
+        avgPrice: number | null;
+        filledAt: string | null;
+        reason?: string;
+      }
+    | null
+  > {
+    const clientKey = await this.getClientKey();
+    if (!clientKey) return null;
+    try {
+      const res = await this.req<{
+        Data?: Array<{
+          OrderId?: string;
+          Status?: string;
+          Amount?: number;
+          FilledAmount?: number;
+          AverageOpenPrice?: number;
+          Price?: number;
+          ExecutionTimeClose?: string;
+          LastFilledTime?: string;
+          ErrorText?: string;
+        }>;
+      }>("GET", `/hist/v3/orders/${encodeURIComponent(clientKey)}`, {
+        query: { FromDateTime: sinceIso },
+      });
+      const hit = (res.Data ?? []).find((o) => String(o.OrderId ?? "") === brokerOrderId);
+      if (!hit) return null;
+      return {
+        brokerOrderId,
+        status: String(hit.Status ?? "Unknown"),
+        amount: Number(hit.Amount ?? 0),
+        filledAmount: Number(hit.FilledAmount ?? 0),
+        avgPrice:
+          hit.AverageOpenPrice != null
+            ? Number(hit.AverageOpenPrice)
+            : hit.Price != null
+              ? Number(hit.Price)
+              : null,
+        filledAt: hit.ExecutionTimeClose ?? hit.LastFilledTime ?? null,
+        reason: hit.ErrorText ?? undefined,
+      };
+    } catch {
+      // /hist endpoint is not universally enabled — treat as "unknown"
+      return null;
+    }
+  }
+
+  private cachedClientKey: string | undefined;
+  private async getClientKey(): Promise<string | undefined> {
+    if (this.cachedClientKey) return this.cachedClientKey;
+    if (this.clientKey) {
+      this.cachedClientKey = this.clientKey;
+      return this.cachedClientKey;
+    }
+    try {
+      const me = await this.req<{ ClientKey?: string }>("GET", "/port/v1/users/me");
+      if (me.ClientKey) this.cachedClientKey = me.ClientKey;
+      return this.cachedClientKey;
+    } catch {
+      return undefined;
+    }
+  }
+
   async cancelOrder(brokerOrderId: string): Promise<{ ok: boolean; reason?: string }> {
     try {
       await this.req("DELETE", `/trade/v2/orders/${encodeURIComponent(brokerOrderId)}`, {
