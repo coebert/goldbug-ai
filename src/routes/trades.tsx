@@ -157,8 +157,8 @@ function TradesPage() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Trades</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-semibold leading-tight tracking-tight sm:text-2xl">Trades</h1>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
             Every order's lifecycle — submitted, filled, rejected — alongside the current position it moved.
           </p>
         </div>
@@ -262,7 +262,7 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
     <Card>
       <CardContent className="px-3 py-2.5">
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className={`text-xl font-semibold ${toneMap[tone]}`}>{value}</p>
+        <p className={`text-lg font-semibold leading-tight sm:text-xl ${toneMap[tone]}`}>{value}</p>
       </CardContent>
     </Card>
   );

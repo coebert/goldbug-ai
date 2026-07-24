@@ -107,20 +107,20 @@ export function LiveHoldingsCard({
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border bg-muted/30 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <TrendingUp className="h-3.5 w-3.5" /> Invested
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground sm:text-xs">
+              <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Invested
             </div>
-            <div className="mt-1 text-lg font-semibold tabular-nums">{fmt(holdingsValue)}</div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(holdingsValue)}</div>
+            <div className="text-[10px] text-muted-foreground sm:text-[11px]">
               {denom > 0 ? `${(100 - cashPct).toFixed(0)}% of portfolio` : "—"}
             </div>
           </div>
           <div className="rounded-lg border bg-muted/30 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Wallet className="h-3.5 w-3.5" /> Cash
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground sm:text-xs">
+              <Wallet className="h-3.5 w-3.5 shrink-0" /> Cash
             </div>
-            <div className="mt-1 text-lg font-semibold tabular-nums">{fmt(cash)}</div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(cash)}</div>
+            <div className="text-[10px] text-muted-foreground sm:text-[11px]">
               {denom > 0 ? `${cashPct.toFixed(0)}% of portfolio` : "—"}
             </div>
           </div>
