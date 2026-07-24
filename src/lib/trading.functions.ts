@@ -952,15 +952,43 @@ export const getComparison = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const results = await Promise.all(
       (portfolios ?? []).map(async (p) => {
-        const { data: equity } = await context.supabase
-          .from("equity_snapshots")
-          .select("snapshot_date,total_value")
-          .eq("portfolio_id", p.id)
-          .order("snapshot_date", { ascending: true });
+        const [{ data: equity }, simRes, liveRes] = await Promise.all([
+          context.supabase
+            .from("equity_snapshots")
+            .select("snapshot_date,total_value")
+            .eq("portfolio_id", p.id)
+            .order("snapshot_date", { ascending: true }),
+          (p.mode !== "live_prod" && p.mode !== "live_sim")
+            ? context.supabase.from("sim_fund_events").select("amount, created_at").eq("portfolio_id", p.id)
+            : Promise.resolve({ data: [] as Array<{ amount: unknown; created_at: unknown }> }),
+          (p.mode === "live_prod" || p.mode === "live_sim")
+            ? context.supabase
+                .from("live_broker_log")
+                .select("created_at, response, status, method")
+                .eq("portfolio_id", p.id)
+                .eq("method", "CASH_SYNC")
+                .eq("status", 200)
+            : Promise.resolve({ data: [] as Array<{ created_at: unknown; response: unknown }> }),
+        ]);
         const series = (equity ?? []).map((e) => ({
           snapshot_date: e.snapshot_date as string,
           total_value: Number(e.total_value),
         }));
+        const deposits: Array<{ date: string; amount: number }> = [];
+        for (const e of (simRes.data ?? []) as Array<{ amount: unknown; created_at: unknown }>) {
+          if (!e.created_at) continue;
+          const amt = Number(e.amount);
+          if (!Number.isFinite(amt)) continue;
+          deposits.push({ date: String(e.created_at).slice(0, 10), amount: amt });
+        }
+        for (const row of (liveRes.data ?? []) as Array<{ created_at: unknown; response: unknown }>) {
+          if (!row.created_at) continue;
+          const resp = (row.response ?? {}) as { delta?: number | string; startingCashAdjusted?: boolean };
+          if (!resp.startingCashAdjusted) continue;
+          const amt = Number(resp.delta);
+          if (!Number.isFinite(amt) || amt === 0) continue;
+          deposits.push({ date: String(row.created_at).slice(0, 10), amount: amt });
+        }
         return {
           portfolio: {
             id: p.id,
@@ -972,6 +1000,7 @@ export const getComparison = createServerFn({ method: "POST" })
             mode: p.mode,
           },
           series,
+          deposits,
           metrics: computeMetrics(series, Number(p.starting_cash)),
         };
       }),
