@@ -20,7 +20,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ChevronDown, ShieldCheck, Gauge } from "lucide-react";
+import { ChevronDown, ShieldCheck, Gauge, SlidersHorizontal } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
@@ -223,6 +223,7 @@ export function RiskControlsCard({
     () => initial.risk_level ?? inferRiskLevel(initial),
   );
   const [open, setOpen] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [lastChange, setLastChange] = useState<{
     fromName: string;
     toName: string;
@@ -405,6 +406,27 @@ export function RiskControlsCard({
             </div>
 
 
+            <div className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm">
+                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Fine-tune individual limits</span>
+                <span className="hidden sm:inline text-xs text-muted-foreground">
+                  (stops, caps, sizing)
+                </span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant={showAdvanced ? "secondary" : "outline"}
+                onClick={() => setShowAdvanced((v) => !v)}
+                aria-expanded={showAdvanced}
+              >
+                {showAdvanced ? "Hide advanced" : "Show advanced"}
+              </Button>
+            </div>
+
+            {showAdvanced && (
+            <>
             <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
               <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
               <p className="mb-3 text-xs text-muted-foreground">
@@ -595,6 +617,9 @@ export function RiskControlsCard({
                 </div>
               )}
             </div>
+            </>
+            )}
+
 
             <div className="flex items-center gap-3 border-t border-border pt-4">
               <Button

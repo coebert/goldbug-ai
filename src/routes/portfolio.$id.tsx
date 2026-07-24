@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
@@ -89,6 +90,7 @@ function PortfolioPage() {
   const [ready, setReady] = useState(false);
   const [tradeSort, setTradeSort] = useState<{ key: "date" | "symbol" | "side" | "qty" | "price" | "value"; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -511,9 +513,7 @@ function PortfolioPage() {
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    if (confirm("Reset to starting cash and delete history?")) reset.mutate();
-                  }}
+                  onClick={() => setConfirmReset(true)}
                   disabled={reset.isPending}
                 >
                   <RotateCcw className="mr-1 h-4 w-4" /> Reset
@@ -1119,6 +1119,23 @@ function PortfolioPage() {
 
         )}
       </main>
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title="Reset portfolio?"
+        description={
+          <p>
+            This resets the portfolio to its <span className="font-semibold">starting cash</span>{" "}
+            and permanently deletes every trade, decision and equity point. This cannot be undone.
+          </p>
+        }
+        requireText="RESET"
+        confirmLabel="Reset portfolio"
+        onConfirm={() => {
+          setConfirmReset(false);
+          reset.mutate();
+        }}
+      />
     </div>
   );
 }

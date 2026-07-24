@@ -38,6 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
@@ -377,6 +378,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
   const rangePct = first != null && first > 0 && last != null ? ((last - first) / first) * 100 : null;
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => {
@@ -445,8 +447,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                   className="text-destructive focus:text-destructive"
                   onSelect={(e) => {
                     e.preventDefault();
-                    if (confirm(`Delete "${portfolio.name}"? This cannot be undone.`))
-                      deleteMut.mutate(portfolio.id);
+                    setConfirmDelete(true);
                   }}
                 >
                   <Trash2 className="mr-2 h-4 w-4" /> Delete portfolio
@@ -503,6 +504,27 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
           </div>
         </div>
       </CardContent>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete portfolio?"
+        description={
+          <>
+            <p>
+              You're about to permanently delete{" "}
+              <span className="font-semibold text-foreground">{portfolio.name}</span>,
+              including all trades, decisions and history.
+            </p>
+            <p>This cannot be undone.</p>
+          </>
+        }
+        requireText="DELETE"
+        confirmLabel="Delete portfolio"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          deleteMut.mutate(portfolio.id);
+        }}
+      />
     </Card>
   );
 }
@@ -647,25 +669,20 @@ function CreatePortfolioCard() {
     }
   };
 
+  const [confirmLive, setConfirmLive] = useState(false);
+
   const onSubmit = () => {
     if (mode === "live_prod") {
-      const bal = balQ.data;
-      const pot = bal ? (bal.cashAvailable ?? bal.cash) : null;
-      const pending = bal?.transactionsNotBooked ?? 0;
-      const reserved = bal?.reservedCash ?? 0;
-      const amountLine = bal
-        ? `\n\nStarting cash (available/settled): ${fmtMoney(pot ?? 0, bal.currency)}` +
-          (pending ? `\nPending / unsettled (excluded): ${fmtMoney(pending, bal.currency)}` : "") +
-          (reserved ? `\nReserved by open orders (excluded): ${fmtMoney(reserved, bal.currency)}` : "") +
-          `\nFrom Saxo LIVE account ${bal.accountId ?? "—"}.`
-        : `\n\nStarting cash will be read from your Saxo LIVE available balance.`;
-      const ok = window.confirm(
-        `Create "${name}" and start trading REAL MONEY on your Saxo LIVE account?${amountLine}\n\nThe AI will place real orders on every hourly cycle. You can pause or revert at any time.`,
-      );
-      if (!ok) return;
+      setConfirmLive(true);
+      return;
     }
     mut.mutate();
   };
+
+  const liveBal = balQ.data;
+  const livePot = liveBal ? (liveBal.cashAvailable ?? liveBal.cash) : null;
+  const livePending = liveBal?.transactionsNotBooked ?? 0;
+  const liveReserved = liveBal?.reservedCash ?? 0;
 
   return (
     <Card>
@@ -833,6 +850,42 @@ function CreatePortfolioCard() {
           {mut.isPending ? "Creating…" : meta.cta}
         </Button>
       </CardContent>
+      <ConfirmDialog
+        open={confirmLive}
+        onOpenChange={setConfirmLive}
+        title="Trade with real money?"
+        confirmLabel="Yes, start real-money trading"
+        cancelLabel="Not yet"
+        description={
+          <>
+            <p>
+              You're about to create{" "}
+              <span className="font-semibold text-foreground">{name}</span> and let
+              the AI place <span className="font-semibold text-destructive">real orders</span> on
+              your Saxo LIVE account every hourly cycle. You can pause or revert at any time.
+            </p>
+            {liveBal ? (
+              <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+                <div>Starting cash (available/settled): <span className="tabular-nums font-semibold">{fmtMoney(livePot ?? 0, liveBal.currency)}</span></div>
+                {livePending > 0 && (
+                  <div>Pending / unsettled (excluded): {fmtMoney(livePending, liveBal.currency)}</div>
+                )}
+                {liveReserved > 0 && (
+                  <div>Reserved by open orders (excluded): {fmtMoney(liveReserved, liveBal.currency)}</div>
+                )}
+                <div>Account: {liveBal.accountId ?? "—"}</div>
+              </div>
+            ) : (
+              <p className="text-xs">Starting cash will be read from your Saxo LIVE available balance.</p>
+            )}
+          </>
+        }
+        requireText="TRADE LIVE"
+        onConfirm={() => {
+          setConfirmLive(false);
+          mut.mutate();
+        }}
+      />
     </Card>
   );
 }

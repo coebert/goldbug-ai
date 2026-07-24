@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppHeader } from "@/components/app-header";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import {
   LineChart,
@@ -109,6 +110,7 @@ function ComparePage() {
     );
 
   const [focused, setFocused] = useState<string | null>(null);
+  const [confirmRerun, setConfirmRerun] = useState(false);
 
   const { chartData, drawdownData } = useMemo(() => {
     if (!results || results.length === 0) return { chartData: [], drawdownData: [] };
@@ -221,14 +223,7 @@ function ComparePage() {
                 <Button
                   className="w-full"
                   disabled={selected.length === 0 || runMut.isPending}
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `This will RESET and re-run ${selected.length} portfolio(s) over ${days} days. Continue?`,
-                      )
-                    )
-                      runMut.mutate();
-                  }}
+                  onClick={() => setConfirmRerun(true)}
                 >
                   <PlayCircle className="mr-2 h-4 w-4" />
                   {runMut.isPending ? "Running backtests…" : "Run backtests & compare"}
@@ -241,6 +236,24 @@ function ComparePage() {
               </div>
             </CardContent>
           </Card>
+          <ConfirmDialog
+            open={confirmRerun}
+            onOpenChange={setConfirmRerun}
+            title="Reset and re-run backtests?"
+            description={
+              <p>
+                This will <span className="font-semibold text-destructive">reset</span> the
+                selected {selected.length} portfolio(s) and re-run the AI over the last{" "}
+                <span className="font-semibold">{days}</span> days. Existing trades and history
+                for those portfolios will be replaced.
+              </p>
+            }
+            confirmLabel="Reset and re-run"
+            onConfirm={() => {
+              setConfirmRerun(false);
+              runMut.mutate();
+            }}
+          />
 
           <div className="space-y-6">
             <Card>

@@ -34,7 +34,7 @@ Goal: make it obvious where you are, what you can do next, and how to get back.
 - Trade table: add sticky header, column sort, and a mobile card view (each trade becomes a stacked mini-card) instead of horizontal scroll.
 - Add an inline **"What does this mean?"** link next to Sharpe, CAGR, Drawdown, ATR, guardrail terms — reuse the existing glossary popover component.
 
-### Phase 4 — Forms, wizards & risk controls
+### Phase 4 — Forms, wizards & risk controls ✅ shipped
 
 - Risk controls card is 631 lines with slider + ~15 fields visible at once. Reorganise into: **Simple** (slider + summary) shown by default, **Advanced fields** behind a "Fine-tune" toggle. The change-summary panel stays.
 - `/get-started` wizard: add a visible progress bar (Step 2 of 4), make Next/Back buttons full-width and sticky on mobile, and add a "Skip for now" that lands the user on Home with a partly-configured portfolio.
