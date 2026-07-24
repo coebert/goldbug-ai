@@ -737,11 +737,17 @@ export function SaxoOAuthPanel() {
     if (q.isLoading) return <StatusPill state="loading" label={`${env.toUpperCase()}: checking…`} />;
     if (q.error) return <StatusPill state="error" label={`${env.toUpperCase()}: error`} detail={(q.error as Error).message} />;
     const st = env === "sim" ? q.data?.sim : q.data?.live;
-    const mins = st?.secondsUntilExpiry != null ? Math.max(0, Math.round(st.secondsUntilExpiry / 60)) : null;
+    const secs = st?.secondsUntilExpiry ?? 0;
+    const mins = st?.secondsUntilExpiry != null ? Math.max(0, Math.round(secs / 60)) : null;
+    const refreshMins = st?.secondsUntilRefreshExpiry != null ? Math.max(0, Math.round(st.secondsUntilRefreshExpiry / 60)) : null;
     if (!st?.connected && !st?.usingLegacyToken) return <StatusPill state="disconnected" label={`${env.toUpperCase()}: not connected`} detail="click Connect below" />;
     if (st.usingLegacyToken) return <StatusPill state="warning" label={`${env.toUpperCase()}: legacy 24h token`} detail="reconnect for auto-refresh" />;
-    if ((st.secondsUntilExpiry ?? 0) <= 0) return <StatusPill state="error" label={`${env.toUpperCase()}: token expired`} detail="reconnect required" />;
-    if ((st.secondsUntilExpiry ?? 0) < 15 * 60) return <StatusPill state="warning" label={`${env.toUpperCase()}: connected`} detail={`expires in ${mins}m — auto-refresh pending`} />;
+    // Refresh token gone → true reconnect required.
+    if (!st.refreshTokenValid) return <StatusPill state="error" label={`${env.toUpperCase()}: refresh token expired`} detail="reconnect required" />;
+    // Access token elapsed but refresh token still valid → the next call (or
+    // the 15-min cron) will roll it forward on demand.
+    if (secs <= 0) return <StatusPill state="warning" label={`${env.toUpperCase()}: auto-renewing`} detail={refreshMins != null ? `refresh valid ${refreshMins}m` : "refresh valid"} />;
+    if (secs < 15 * 60) return <StatusPill state="warning" label={`${env.toUpperCase()}: connected`} detail={`expires in ${mins}m — auto-refresh pending`} />;
     return <StatusPill state="connected" label={`${env.toUpperCase()}: connected`} detail={`auto-refresh · expires in ${mins}m`} />;
   };
 
