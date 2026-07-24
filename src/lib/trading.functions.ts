@@ -222,12 +222,49 @@ export const getPortfolio = createServerFn({ method: "GET" })
           .order("snapshot_date", { ascending: true }),
       ]);
     if (!portfolio) throw new Error("Portfolio not found");
+
+    // External cash-flow events for this portfolio so the chart can
+    // net deposits/withdrawals out of % calculations (matches
+    // ModeSummaryTile). Sim funding lives in sim_fund_events; live
+    // deposits/withdrawals are surfaced via CASH_SYNC broker log rows
+    // where the starting_cash baseline was adjusted.
+    const deposits: Array<{ date: string; amount: number }> = [];
+    const mode = (portfolio as { mode?: string }).mode;
+    if (mode !== "live_prod" && mode !== "live_sim") {
+      const { data: simEvents } = await context.supabase
+        .from("sim_fund_events")
+        .select("amount, created_at")
+        .eq("portfolio_id", data.id);
+      for (const e of simEvents ?? []) {
+        if (!e.created_at) continue;
+        const amt = Number(e.amount);
+        if (!Number.isFinite(amt)) continue;
+        deposits.push({ date: String(e.created_at).slice(0, 10), amount: amt });
+      }
+    } else {
+      const { data: cashSyncs } = await context.supabase
+        .from("live_broker_log")
+        .select("created_at, response, status, method")
+        .eq("portfolio_id", data.id)
+        .eq("method", "CASH_SYNC")
+        .eq("status", 200);
+      for (const row of cashSyncs ?? []) {
+        if (!row.created_at) continue;
+        const resp = (row.response ?? {}) as { delta?: number | string; startingCashAdjusted?: boolean };
+        if (!resp.startingCashAdjusted) continue;
+        const amt = Number(resp.delta);
+        if (!Number.isFinite(amt) || amt === 0) continue;
+        deposits.push({ date: String(row.created_at).slice(0, 10), amount: amt });
+      }
+    }
+
     return {
       portfolio,
       holdings: holdings ?? [],
       trades: trades ?? [],
       decisions: decisions ?? [],
       equity: equity ?? [],
+      deposits,
     };
   });
 
