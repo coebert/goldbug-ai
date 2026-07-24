@@ -25,8 +25,11 @@ const NAV = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/compare", label: "Compare", icon: GitCompare },
-  { to: "/saxo-status", label: "Saxo", icon: Plug },
-  { to: "/saxo-reconnect", label: "Reconnect", icon: RefreshCw },
+  { to: "/saxo-status", label: "Broker", icon: Plug },
+] as const;
+
+const MOBILE_EXTRAS = [
+  { to: "/saxo-reconnect", label: "Reconnect broker", icon: RefreshCw },
 ] as const;
 
 export function AppHeader({ email }: { email?: string | null }) {
@@ -118,6 +121,17 @@ export function AppHeader({ email }: { email?: string | null }) {
               </SheetHeader>
               <nav className="flex flex-col gap-1 p-3 text-sm">
                 {NAV.map(({ to, label, icon: Icon }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    onClick={() => setOpen(false)}
+                    className="inline-flex items-center gap-3 rounded-md px-3 py-3 text-foreground hover:bg-muted [&.active]:bg-muted [&.active]:text-foreground"
+                  >
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <span>{label}</span>
+                  </Link>
+                ))}
+                {MOBILE_EXTRAS.map(({ to, label, icon: Icon }) => (
                   <Link
                     key={to}
                     to={to}
