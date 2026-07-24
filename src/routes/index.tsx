@@ -310,9 +310,9 @@ export function ModeSummaryTile({
   // Defensive: never let a non-finite value reach Intl.NumberFormat — it
   // would render "£NaN". Callers already coerce, but this is the last
   // line of defence for the equity tile.
-  const safeMoney = Number.isFinite(money) ? money : 0;
-  const safePnl = Number.isFinite(pnl) ? pnl : 0;
-  const safePct = Number.isFinite(pct) ? pct : 0;
+  const safeMoney = Number.isFinite(money) ? (Object.is(money, -0) ? 0 : money) : 0;
+  const safePnl = Number.isFinite(pnl) ? (Object.is(pnl, -0) ? 0 : pnl) : 0;
+  const safePct = Number.isFinite(pct) ? (Object.is(pct, -0) ? 0 : pct) : 0;
   const borderTone = tone === "real" ? "border-emerald-500/50" : "border-cyan-500/40";
   const chipTone =
     tone === "real"
