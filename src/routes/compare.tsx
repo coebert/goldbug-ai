@@ -355,41 +355,24 @@ function ComparePage() {
                             );
                           }}
                         />
-                        <Legend
-                          wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
-                          onClick={(o) => {
-                            const dk = (o as { dataKey?: unknown }).dataKey;
-                            const key = typeof dk === "string" ? dk : String(dk ?? "");
-                            setFocused((prev) => (prev === key ? null : key));
-                          }}
-                          formatter={(value) => (
-                            <span
-                              style={{
-                                opacity: !focused || focused === value ? 1 : 0.35,
-                                textDecoration: focused === value ? "underline" : "none",
-                              }}
-                            >
-                              {value}
-                            </span>
-                          )}
-                        />
-                        {results.map((r, i) => {
-                          const isDim = focused !== null && focused !== r.portfolio.name;
-                          return (
-                            <Line
-                              key={r.portfolio.id}
-                              type="monotone"
-                              dataKey={r.portfolio.name}
-                              stroke={COLORS[i % COLORS.length]}
-                              strokeWidth={focused === r.portfolio.name ? 3 : 2}
-                              strokeOpacity={isDim ? 0.15 : 1}
-                              dot={false}
-                              activeDot={isDim ? false : { r: 4 }}
-                              connectNulls
-                              isAnimationActive={false}
-                            />
-                          );
-                        })}
+                        {results
+                          .filter((r) => !hidden.has(r.portfolio.name))
+                          .map((r) => {
+                            const i = results.findIndex((x) => x.portfolio.id === r.portfolio.id);
+                            return (
+                              <Line
+                                key={r.portfolio.id}
+                                type="monotone"
+                                dataKey={r.portfolio.name}
+                                stroke={COLORS[i % COLORS.length]}
+                                strokeWidth={2}
+                                dot={false}
+                                activeDot={{ r: 4 }}
+                                connectNulls
+                                isAnimationActive={false}
+                              />
+                            );
+                          })}
                       </LineChart>
                     </ResponsiveContainer>
 
