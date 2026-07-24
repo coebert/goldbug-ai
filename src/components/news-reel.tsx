@@ -484,7 +484,7 @@ export function NewsReel() {
                 const prev = idx > 0 ? loop[idx - 1] : null;
                 const showDayHeader = !prev || prev.date !== item.date;
                 return (
-                  <div key={`${item.id}-${idx}`}>
+                  <Fragment key={`${item.id}-${idx}`}>
                     {showDayHeader && item.date && (
                       <li className="sticky top-0 z-10 -mx-2 mb-2 border-y border-border bg-card/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
                         {item.date}
