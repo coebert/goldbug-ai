@@ -158,6 +158,9 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
 
         <CashSyncIndicator lastSync={s?.lastCashSync ?? null} pending={mSync.isPending} />
 
+        <NoTradesAlert data={alertQ.data} />
+
+
 
 
 
