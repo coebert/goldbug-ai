@@ -41,6 +41,7 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
+import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
 const AllPortfoliosChart = lazy(() =>
