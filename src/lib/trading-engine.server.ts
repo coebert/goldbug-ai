@@ -400,6 +400,17 @@ async function currentPrices(symbols: string[], asOf: string): Promise<Map<strin
 }
 
 export async function runDailyTick(portfolioId: string, asOf: string, opts?: { skipNews?: boolean }) {
+  // For live portfolios, pick up external Saxo deposits/withdrawals before we
+  // read current_cash. Failures here are logged and non-blocking — the tick
+  // proceeds with the last-known local cash so a transient broker outage can't
+  // stop trading logic from running.
+  try {
+    const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
+    await syncLiveCashFromBroker(portfolioId);
+  } catch (e) {
+    console.error("cash sync failed", portfolioId, e);
+  }
+
   const { data: portfolio, error: pErr } = await supabaseAdmin
     .from("portfolios")
     .select("*")
@@ -411,6 +422,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     .from("holdings")
     .select("*")
     .eq("portfolio_id", portfolioId);
+
 
   const fullUniverse = filterUniverse(classesFromUniverse(portfolio.universe));
 
