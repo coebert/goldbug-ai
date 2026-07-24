@@ -1,0 +1,332 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`portfolio performance chart — visual regression > compactChartNum formats k / M thresholds consistently 1`] = `
+[
+  "0 → 0",
+  "500 → 500",
+  "999 → 999",
+  "1000 → 1.0k",
+  "9999 → 10.0k",
+  "10000 → 10k",
+  "999999 → 1000k",
+  "1000000 → 1.0M",
+  "9999999 → 10.0M",
+  "10000000 → 10M",
+  "-1500 → -1.5k",
+  "-1500000 → -1.5M",
+]
+`;
+
+exports[`portfolio performance chart — visual regression > compare-grid header text stays consistent for named / none benchmark 1`] = `
+{
+  "none": "Performance vs benchmark",
+  "qqq": "Performance vs QQQ",
+  "spy": "Performance vs SPY",
+}
+`;
+
+exports[`portfolio performance chart — visual regression > compare-grid metric row labels stay consistent 1`] = `
+[
+  {
+    "derived": false,
+    "key": "totalReturn",
+    "label": "Total return",
+    "negative": false,
+    "signed": true,
+    "suffix": "%",
+  },
+  {
+    "derived": false,
+    "key": "annReturn",
+    "label": "Annualized return",
+    "negative": false,
+    "signed": true,
+    "suffix": "%",
+  },
+  {
+    "derived": false,
+    "key": "annVol",
+    "label": "Volatility (ann.)",
+    "negative": false,
+    "signed": false,
+    "suffix": "%",
+  },
+  {
+    "derived": false,
+    "key": "maxDrawdown",
+    "label": "Max drawdown",
+    "negative": true,
+    "signed": false,
+    "suffix": "%",
+  },
+  {
+    "derived": true,
+    "key": "rvr",
+    "label": "Return / Vol",
+    "negative": false,
+    "signed": true,
+    "suffix": "",
+  },
+]
+`;
+
+exports[`portfolio performance chart — visual regression > hero metric row labels stay consistent 1`] = `
+{
+  "rf_0": [
+    {
+      "key": "cagr",
+      "label": "CAGR",
+      "negative": false,
+      "signed": true,
+      "suffix": "%",
+    },
+    {
+      "key": "vol",
+      "label": "Volatility (ann.)",
+      "negative": false,
+      "signed": false,
+      "suffix": "%",
+    },
+    {
+      "key": "sharpe",
+      "label": "Sharpe (rf=0%)",
+      "negative": false,
+      "signed": true,
+      "suffix": "",
+    },
+    {
+      "key": "maxdd",
+      "label": "Max drawdown",
+      "negative": true,
+      "signed": false,
+      "suffix": "%",
+    },
+  ],
+  "rf_2": [
+    {
+      "key": "cagr",
+      "label": "CAGR",
+      "negative": false,
+      "signed": true,
+      "suffix": "%",
+    },
+    {
+      "key": "vol",
+      "label": "Volatility (ann.)",
+      "negative": false,
+      "signed": false,
+      "suffix": "%",
+    },
+    {
+      "key": "sharpe",
+      "label": "Sharpe (rf=2%)",
+      "negative": false,
+      "signed": true,
+      "suffix": "",
+    },
+    {
+      "key": "maxdd",
+      "label": "Max drawdown",
+      "negative": true,
+      "signed": false,
+      "suffix": "%",
+    },
+  ],
+  "rf_425": [
+    {
+      "key": "cagr",
+      "label": "CAGR",
+      "negative": false,
+      "signed": true,
+      "suffix": "%",
+    },
+    {
+      "key": "vol",
+      "label": "Volatility (ann.)",
+      "negative": false,
+      "signed": false,
+      "suffix": "%",
+    },
+    {
+      "key": "sharpe",
+      "label": "Sharpe (rf=4.25%)",
+      "negative": false,
+      "signed": true,
+      "suffix": "",
+    },
+    {
+      "key": "maxdd",
+      "label": "Max drawdown",
+      "negative": true,
+      "signed": false,
+      "suffix": "%",
+    },
+  ],
+}
+`;
+
+exports[`portfolio performance chart — visual regression > metric-tile formatter handles finite / null / NaN / Infinity + signed/unsigned 1`] = `
+[
+  {
+    "label": "signed pct positive",
+    "out": "+12.35%",
+  },
+  {
+    "label": "signed pct negative",
+    "out": "-4.20%",
+  },
+  {
+    "label": "signed pct zero",
+    "out": "0.00%",
+  },
+  {
+    "label": "unsigned pct",
+    "out": "12.30%",
+  },
+  {
+    "label": "unitless signed",
+    "out": "+1.50",
+  },
+  {
+    "label": "null",
+    "out": "—",
+  },
+  {
+    "label": "undefined",
+    "out": "—",
+  },
+  {
+    "label": "NaN",
+    "out": "—",
+  },
+  {
+    "label": "Infinity",
+    "out": "—",
+  },
+]
+`;
+
+exports[`portfolio performance chart — visual regression > shortChartDate handles invalid strings without throwing 1`] = `
+{
+  "empty": "",
+  "invalid": "not-a-date",
+  "valid": "Mar 15",
+}
+`;
+
+exports[`portfolio performance chart — visual regression > signed pct + signed number helpers keep +/- prefix consistent 1`] = `
+{
+  "signedNum": [
+    "+0.00",
+    "+5.43",
+    "-3.10",
+    "+100.00",
+  ],
+  "signedPct": [
+    "+0.00%",
+    "+5.43%",
+    "-3.10%",
+    "+100.00%",
+  ],
+  "signedPct_0dp": [
+    "+0%",
+    "+5%",
+    "-3%",
+    "+100%",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — visual regression > tooltip mode chip stays consistent 1`] = `
+{
+  "pct": "% vs start",
+  "raw": "value",
+}
+`;
+
+exports[`portfolio performance chart — visual regression > tooltip value formatter renders raw currency and pct with 2dp 1`] = `
+{
+  "pct": [
+    "+0.00%",
+    "+12.50%",
+    "+1234.57%",
+    "-50.25%",
+  ],
+  "raw_gbp": [
+    "£ 0.00",
+    "£ 12.50",
+    "£ 1234.57",
+    "£ -50.25",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — visual regression > x-axis date tick uses raw ISO on desktop and short label on mobile 1`] = `
+{
+  "desktop": [
+    "2024-01-04",
+    "2024-06-15",
+    "2024-12-31",
+    "not-a-date",
+  ],
+  "mobile": [
+    "Jan 04",
+    "Jun 15",
+    "Dec 31",
+    "not-a-date",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — visual regression > y-axis title text stays consistent across raw/pct + currency 1`] = `
+{
+  "pct": "Return vs start (%)",
+  "raw_gbp": "Portfolio value (£)",
+  "raw_usd": "Portfolio value ($)",
+}
+`;
+
+exports[`portfolio performance chart — visual regression > y-axis value tick formats raw currency (desktop + mobile) and pct 1`] = `
+{
+  "pct_desktop": [
+    "+0%",
+    "+250%",
+    "+1000%",
+    "+12346%",
+    "+1500000%",
+    "-750%",
+  ],
+  "pct_mobile": [
+    "+0%",
+    "+250%",
+    "+1000%",
+    "+12346%",
+    "+1500000%",
+    "-750%",
+  ],
+  "raw_desktop_gbp": [
+    "£0",
+    "£250",
+    "£1000",
+    "£12346",
+    "£1500000",
+    "£-750",
+  ],
+  "raw_desktop_usd": [
+    "$0",
+    "$250",
+    "$1000",
+    "$12346",
+    "$1500000",
+    "$-750",
+  ],
+  "raw_mobile_gbp": [
+    "£0",
+    "£250",
+    "£1.0k",
+    "£12k",
+    "£1.5M",
+    "£-750",
+  ],
+}
+`;

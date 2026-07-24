@@ -60,17 +60,21 @@ import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card"
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-function shortChartDate(s: string) {
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return String(s);
-  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
-}
-function compactChartNum(v: number) {
-  const a = Math.abs(v);
-  if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1)}M`;
-  if (a >= 1_000) return `${(v / 1_000).toFixed(a >= 10_000 ? 0 : 1)}k`;
-  return `${v.toFixed(0)}`;
-}
+import {
+  shortChartDate,
+  formatDateTick,
+  formatValueTick,
+  formatTooltipValue,
+  formatSignedPct,
+  formatSignedNum,
+  formatMetric,
+  heroMetricRows,
+  COMPARE_METRIC_ROWS,
+  yAxisLabel,
+  compareGridHeader,
+  tooltipModeChip,
+} from "@/lib/portfolio-performance-format";
+
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
@@ -878,7 +882,7 @@ function PortfolioPage() {
                           tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
                           minTickGap={isMobile ? 56 : 30}
-                          tickFormatter={(v) => (isMobile ? shortChartDate(String(v)) : String(v))}
+                          tickFormatter={(v) => formatDateTick(v, isMobile)}
                           label={isMobile ? undefined : { value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
                         />
                         <YAxis
@@ -886,11 +890,10 @@ function PortfolioPage() {
                           width={isMobile ? 44 : 72}
                           tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
-                          tickFormatter={(v) => compareMode === "pct"
-                            ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`
-                            : isMobile ? `${p.currency}${compactChartNum(Number(v))}` : `${p.currency}${Number(v).toFixed(0)}`}
-                          label={isMobile ? undefined : { value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
+                          tickFormatter={(v) => formatValueTick(v, { currency: p.currency, isPct: compareMode === "pct", isMobile })}
+                          label={isMobile ? undefined : { value: yAxisLabel(compareMode, p.currency), angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
                         />
+
 
 
                         <Tooltip
