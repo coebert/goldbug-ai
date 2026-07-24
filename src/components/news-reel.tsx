@@ -754,7 +754,7 @@ export function NewsReel() {
                       </div>
                     </div>
                   </li>
-                  </div>
+                  </Fragment>
                 );
               })}
             </ul>
