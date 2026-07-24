@@ -19,6 +19,7 @@ import {
   Menu,
   RefreshCw,
   LogOut,
+  Receipt,
 } from "lucide-react";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { HelpDrawer } from "@/components/help-drawer";
@@ -26,9 +27,11 @@ import { HelpDrawer } from "@/components/help-drawer";
 const NAV = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
   { to: "/learn", label: "Learn", icon: BookOpen },
+  { to: "/trades", label: "Trades", icon: Receipt },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/saxo-status", label: "Broker", icon: Plug },
 ] as const;
+
 
 const MOBILE_EXTRAS = [
   { to: "/saxo-reconnect", label: "Reconnect broker", icon: RefreshCw },
