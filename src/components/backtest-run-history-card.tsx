@@ -206,20 +206,17 @@ export function BacktestRunHistoryCard({
   }, [runsQuery.data]);
 
   // Refresh when a save/delete elsewhere fires the event bus.
-  if (typeof window !== "undefined") {
-    // Attach once per mount via a stable listener.
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useMemo(() => {
-      const refresh = (e: Event) => {
-        const detail = (e as CustomEvent<string>).detail;
-        if (!detail || detail === portfolioId) {
-          qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
-        }
-      };
-      window.addEventListener("aegis:backtest-runs-updated", refresh);
-      return () => window.removeEventListener("aegis:backtest-runs-updated", refresh);
-    }, [portfolioId, qc]);
-  }
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refresh = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (!detail || detail === portfolioId) {
+        qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
+      }
+    };
+    window.addEventListener("aegis:backtest-runs-updated", refresh);
+    return () => window.removeEventListener("aegis:backtest-runs-updated", refresh);
+  }, [portfolioId, qc]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupByRisk, setGroupByRisk] = useState(true);
