@@ -106,6 +106,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         .limit(50);
       const lastSyncByPortfolio = new Map<string, { at: string; cash: number }>();
       for (const row of brokerLogs ?? []) {
+        if (!row.portfolio_id || !row.created_at) continue;
         if (lastSyncByPortfolio.has(row.portfolio_id)) continue;
         const resp = (row.response ?? {}) as { brokerCash?: number | string };
         const cash = Number(resp.brokerCash);
