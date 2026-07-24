@@ -1,89 +1,56 @@
-## Aegis — Usability & Clarity Review
+# Consistent deposit-adjusted % across all equity/PnL charts
 
-Based on a walkthrough of the dashboard, portfolio detail, compare, get-started, admin, news reel and Saxo flows on both mobile (390px) and desktop, plus a file-size audit (portfolio.$id.tsx is 1,450 lines, news-reel 933, risk-controls 631, compare 819). The app is feature-rich but suffers from information overload, inconsistent hierarchy, tiny mobile tap targets, and jargon that new users can't parse quickly.
+Today only the home-page `ModeSummaryTile` uses `computeModeSummary` to net out deposits. Several charts still compute `%` directly from raw equity totals, so a fresh deposit shows up as fake profit.
 
-Below is a prioritised plan. Each phase ships independently — no phase blocks the next.
+## Charts that need fixing
 
----
+1. **`src/components/all-portfolios-chart.tsx`** — the "Real" and "Sim" equity lines. When rendered in "% vs start" mode (or any % tooltip), it currently normalises to the first snapshot; a mid-period deposit spikes the curve.
+2. **`src/routes/portfolio.$id.tsx`** — the per-portfolio chart's `compareMode === "pct"` branch. Line 911 computes `(value/startingCash − 1) × 100`, ignoring any `addSimFunds` deposits after start.
+3. **`src/routes/compare.tsx`** (line ~153) — the multi-portfolio comparison normalises each series with `(total_value − starting_cash) / starting_cash`, again ignoring deposits.
+4. **Home tiles / sparkline hovers** already use `computeModeSummary`; verify no stray raw-% remains after the refactor.
 
-### Phase 1 — Navigation & global shell (highest leverage)
+Backtest metrics on `portfolio.$id.report.tsx` (strategy_return_pct, alpha, drawdown, etc.) are **out of scope** — those come from historical simulation with no deposit concept.
 
-Goal: make it obvious where you are, what you can do next, and how to get back.
+## Approach
 
-- Consolidate the top nav. Today it's 6 items (Get started, Learn, Compare, Saxo, Reconnect, Admin) with two of them Saxo-related. Merge "Saxo status" and "Reconnect" into a single **Broker** entry with tabs inside; drop "Reconnect" from the top bar. Result: 5 → 4 items, less noise.
-- Add a persistent **bottom tab bar on mobile** (Home · News · Compare · Broker · More) so key sections are one tap away instead of behind the hamburger.
-- Add a page title + breadcrumb strip under the header on every non-home route ("Portfolios › Aggressive Growth › Attribution"). Currently deep pages have no back affordance except the browser button.
-- Show a compact **status pill** in the header: green dot "Live · Saxo connected · Last run 14:02 GMT" or amber "Reconnect required". Replaces having to visit /saxo-status to check.
-- Ensure hamburger sheet on mobile includes Sign out, current email, and a link to Settings/Notifications (today Sign out lives at the bottom but Notifications is buried in /admin).
+### 1. Extract a shared helper — `src/lib/deposit-adjusted-series.ts`
+```ts
+// Given an equity series for ONE portfolio + its deposits, return a
+// deposit-adjusted series where each point is:
+//   adjusted[i] = raw[i] − cumulativeDeposits(<= date[i], strictly after start)
+// and % vs start uses adjusted values only.
+export function buildDepositAdjustedSeries(
+  points: { date: string; equity: number }[],
+  deposits: { date: string; amount: number }[],
+  startDate: string,
+): { date: string; equity: number; adjusted: number; pct: number }[]
+```
+Same window semantics as `computeModeSummary` (`amount` on `startDate` is treated as already baked into the baseline; only deposits with `date > startDate` are subtracted). This keeps every chart consistent with the tile.
 
-### Phase 2 — Home dashboard clarity
+### 2. Route the helper through each chart
+- **`all-portfolios-chart.tsx`**: sum deposits per mode per date, feed into the helper, plot `adjusted` instead of raw when the user is viewing % (and keep raw for £-mode).
+- **`portfolio.$id.tsx`**: fetch per-portfolio `funding_events` (already stored for sim funding), pass through the helper. In `pct` mode plot the helper's `pct`; in raw mode plot equity but ensure tooltips display the deposit-adjusted `pct` badge.
+- **`compare.tsx`**: same treatment per compared portfolio, so a portfolio that received deposits mid-comparison doesn't visually beat the others.
 
-- Give the "New portfolio" CTA a prominent position at the top of the list on mobile (today the card list dominates the fold and CTA is easy to miss).
-- Portfolio card: unify the row into three clear zones — **Identity** (name + mode badge + live/offline), **Trend** (sparkline + % change + timeframe), **Actions** (Open, kebab for Rename/Duplicate/Delete). Currently actions are inconsistent per card.
-- Add an **empty state** for users with no portfolios that walks straight into `/get-started`.
-- Add a small "Today" summary strip above the list: total equity across all portfolios, day P&L, next scheduled run.
-- Fix mobile density: minimum 44px tap targets on Open button and timeframe chips; wrap long portfolio names with `truncate` + tooltip.
+### 3. Data plumbing
+- `all-portfolios-equity.ts` already returns deposits alongside snapshots — pass them through.
+- `portfolio.$id.tsx` loader: extend the server function that returns equity history to also return `funding_events` (date + amount) so the client can adjust without a second round-trip.
+- `compare.tsx`: extend the compare server function similarly (currently returns snapshots only).
 
-### Phase 3 — Portfolio detail page (biggest offender)
+### 4. UI touches
+- Add an "adjusted for deposits" tooltip hint on any % axis so it's obvious that curves diverge from raw £ growth by design.
+- Real-money charts (which never receive deposits from within the app — deposits come from Saxo cash sync) still need the same code path; when the deposit list is empty the helper is a pass-through, so this is free.
 
-`portfolio.$id.tsx` is 1,450 lines rendering ~12 cards on one scroll. New users can't tell what matters.
+### 5. Tests
+- Unit: `buildDepositAdjustedSeries` — empty deposits (pass-through), single deposit mid-series, deposit on start date (ignored), withdrawal, multiple deposits, unknown dates.
+- Visual regression: refresh snapshots for `AllPortfoliosChart` and the portfolio detail chart with a fixture that includes a mid-period deposit — the % curve must stay flat when the deposit exactly funds the equity bump.
+- Integration: extend `real-money-equity-extreme-flow.integration.test.tsx` style — feed the full pipeline with a deposit and assert both tile pct and chart pct agree to within tolerance.
 
-- Split into **tabs**: Overview · Trades · Decisions · Risk · Diagnostics · Reports. Overview keeps equity chart, mode/live badges, today's decision, and next-run info. Everything else moves behind a tab. On mobile this becomes a horizontally scrollable tab strip.
-- Move the AI Decision panel + News breakdown to the top of Overview — that's the "why did it do this" moment users care about.
-- Collapse advanced diagnostics (execution calibration, shadow variants, signal decay, stress) into a single **Advanced** accordion inside Diagnostics tab, collapsed by default.
-- Trade table: add sticky header, column sort, and a mobile card view (each trade becomes a stacked mini-card) instead of horizontal scroll.
-- Add an inline **"What does this mean?"** link next to Sharpe, CAGR, Drawdown, ATR, guardrail terms — reuse the existing glossary popover component.
+## Out of scope
+- Backtest/report metrics (`strategy_return_pct`, `alpha_pct`, drawdown) — no deposits in the simulator.
+- Per-asset "since purchase" sparklines (already share-based, unaffected).
+- Any change to how deposits themselves are recorded.
 
-### Phase 4 — Forms, wizards & risk controls ✅ shipped
-
-- Risk controls card is 631 lines with slider + ~15 fields visible at once. Reorganise into: **Simple** (slider + summary) shown by default, **Advanced fields** behind a "Fine-tune" toggle. The change-summary panel stays.
-- `/get-started` wizard: add a visible progress bar (Step 2 of 4), make Next/Back buttons full-width and sticky on mobile, and add a "Skip for now" that lands the user on Home with a partly-configured portfolio.
-- Number inputs everywhere: pair with unit suffix ("%", "£", "bps") and inline validation copy instead of red border only.
-- Confirmations for destructive actions (Delete portfolio, Disconnect Saxo, Switch to Real money) use a typed-confirmation dialog, not just a native `confirm()`.
-
-### Phase 5 — News reel & notifications ✅ shipped
-
-- News reel (933 lines) currently mixes filters, sort, translation badges, AI notes, infinite scroll. Move filters into a collapsible drawer on mobile so the reel itself is full-width.
-- Group headlines by day with sticky day headers.
-- Add an unread indicator on the Notifications bell in the header, opening a popover instead of requiring a trip to `/admin`.
-
-### Phase 6 — Compare page ✅ shipped
-
-- Compare (819 lines) has heavy controls above the chart. On mobile the chart is squeezed. Solution: chart first, controls collapse into a bottom sheet triggered by a "Configure" FAB.
-- Legend chips should double as show/hide toggles with clear on-state colour; today the isolate behaviour is not discoverable.
-
-### Phase 7 — Visual system polish
-
-- Standardise card padding (currently varies between `p-3`, `p-4`, `p-6`). Adopt `p-4 sm:p-6` everywhere.
-- Standardise section headings: single `<h2>` per card, muted-foreground subtitle, consistent icon size (`h-4 w-4`).
-- Add `focus-visible` ring to every interactive element (currently inconsistent — accessibility win).
-- Replace `h-screen` with `h-dvh` on any full-height layout to fix mobile Safari.
-- Loading states: replace bare "Loading…" text with skeleton cards matching the final layout.
-
-### Phase 8 — Onboarding & help
-
-- First-run **coach marks** (dismissible) on Home pointing to New Portfolio, Broker status, News reel.
-- A single **Help** entry in the More menu opening a slide-over with: glossary, keyboard shortcuts, "What's happening right now" (last run, next run, live/paper mode), and a link to `/learn`.
-- Rename `/learn` content to be beginner-first, with a "5-minute tour" at the top.
-
----
-
-### Technical notes
-
-- Bottom tab bar: new `src/components/mobile-tab-bar.tsx`, mounted in `__root.tsx` with `md:hidden`, hidden on `/auth`.
-- Header status pill: derive from existing Saxo status query + last-run query already used by `/admin`; extract into `useSystemStatus()` hook in `src/hooks/`.
-- Portfolio tabs: use existing shadcn `Tabs`, route as search param (`?tab=overview`) so links are shareable and browser back works.
-- Trade card mobile view: `hidden md:table` on the table, `md:hidden` stacked list — no new component required.
-- Split `portfolio.$id.tsx` into `portfolio.$id/_layout.tsx` + child files per tab to keep bundles manageable.
-- Splitting `news-reel.tsx`, `risk-controls-card.tsx`, `compare.tsx` into presentation + logic modules is a prerequisite for tab/drawer refactors; do it as the first commit of each phase.
-- All changes are frontend/presentation only — no schema, cron, or trading-engine changes.
-
-### Suggested execution order
-
-1. Phase 1 (nav + mobile tab bar + status pill) — 1 change, immediate clarity win.
-2. Phase 3 (portfolio tabs) — biggest complexity reduction.
-3. Phase 2 (dashboard polish).
-4. Phase 4 (forms & risk).
-5. Phases 5, 6, 7, 8 in parallel as smaller passes.
-
-Tell me which phase to start with — or say "do phase 1" and I'll ship it.
+## Risk
+- Extending the compare + portfolio loaders may bump the server-function response shape; existing callers must remain compatible. I'll keep the new field optional.
+- Snapshot tests will need re-baselining after the switch; that's expected and part of the plan.
