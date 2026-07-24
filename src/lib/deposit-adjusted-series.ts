@@ -35,22 +35,33 @@ export function buildDepositAdjustedSeries(
   const startDate = startDateOverride ?? points[0].date;
   const baseline = Number(points[0].equity);
 
-  // Bucket deposits by date (strictly after startDate). Non-finite
-  // amounts are silently dropped; unknown dates are still bucketed
-  // because the caller filtered by portfolio already.
-  const byDate = new Map<string, number>();
-  for (const d of deposits) {
-    if (!d || d.date <= startDate) continue;
-    const amt = Number(d.amount);
-    if (!Number.isFinite(amt)) continue;
-    byDate.set(d.date, (byDate.get(d.date) ?? 0) + amt);
-  }
+  // Collect deposits strictly after startDate and sort ascending so
+  // we can sweep them into the cumulative total as each point date
+  // passes. This matches computeModeSummary, which counts every
+  // deposit in the window regardless of whether its date lines up
+  // with a stored equity snapshot.
+  const relevant = deposits
+    .filter((d) => {
+      if (!d || d.date <= startDate) return false;
+      const amt = Number(d.amount);
+      return Number.isFinite(amt);
+    })
+    .map((d) => ({ date: d.date, amount: Number(d.amount) }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   let cumulative = 0;
+  let depIdx = 0;
   const out: AdjustedPoint[] = [];
   for (const p of points) {
     const equity = Number(p.equity);
-    const dep = byDate.get(p.date) ?? 0;
+    // Absorb every not-yet-applied deposit dated on/before this
+    // point. Deposits landing between two stored snapshots are
+    // still fully accounted for at the next snapshot.
+    let dep = 0;
+    while (depIdx < relevant.length && relevant[depIdx].date <= p.date) {
+      dep += relevant[depIdx].amount;
+      depIdx += 1;
+    }
     cumulative += dep;
     const adjusted = equity - cumulative;
     const pct =
@@ -67,6 +78,7 @@ export function buildDepositAdjustedSeries(
   }
   return out;
 }
+
 
 // Convenience: last-point % vs baseline, deposit-adjusted.
 export function trailingAdjustedPct(
