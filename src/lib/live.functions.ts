@@ -79,9 +79,23 @@ export const activateLive = createServerFn({ method: "POST" })
     const brokerAccountId = ping.accountId;
     if (data.useBrokerBalance) {
       const bal = await adapter.getBalance();
-      // Use the available/settled cash as the starting pot when Saxo reports it,
-      // so pending/unsettled or reserved funds are not double-counted.
+      // Use the tradable cash Saxo reports (already max of settled + pending
+      // deposits + SpendingPower). We adopt whatever the broker says — even a
+      // small deposit like £100 — so the app never invents cash the account
+      // doesn't hold.
       starting = bal.cashAvailable ?? bal.cash;
+      if (!(starting > 0)) {
+        await logAudit({
+          userId, portfolioId: data.portfolioId, action: "ACTIVATE",
+          env: data.targetEnv, status: 400,
+          request: { targetEnv: data.targetEnv, reason: data.reason },
+          response: { ok: false, brokerBalance: bal },
+          error: "broker balance is zero",
+        });
+        throw new Error(
+          `Saxo ${data.targetEnv.toUpperCase()} reports no available cash on this account. Deposit funds in Saxo and try again.`,
+        );
+      }
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const patch = {
@@ -90,10 +104,13 @@ export const activateLive = createServerFn({ method: "POST" })
       broker_account_id: brokerAccountId ?? null,
       live_paused: false,
       live_activated_at: new Date().toISOString(),
-      ...(starting != null && starting > 0
+      // Always overwrite starting/current cash when we successfully read the
+      // broker so the portfolio can never claim more money than Saxo confirms.
+      ...(starting != null
         ? { starting_cash: starting, current_cash: starting }
         : {}),
     };
+
     const upd = await supabaseAdmin.from("portfolios").update(patch).eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
     await logAudit({
