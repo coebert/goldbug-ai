@@ -401,3 +401,100 @@ export async function buildSaxoAdapter(opts: {
     accountKey: process.env.SAXO_ACCOUNT_KEY, clientKey: process.env.SAXO_CLIENT_KEY,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Pure helpers for Yahoo → Saxo symbol resolution. Exported for unit tests.
+// ---------------------------------------------------------------------------
+
+export type SaxoInstrumentHit = {
+  Identifier: number;
+  AssetType: string;
+  CurrencyCode?: string;
+  ExchangeId?: string;
+  Symbol: string;
+  Description?: string;
+};
+
+// Yahoo Finance suffix → preferred Saxo ExchangeId(s), in priority order.
+export const YAHOO_SUFFIX_TO_EXCHANGE: Record<string, string[]> = {
+  L: ["LSE", "LSE_INTL", "LSE_ETF", "LSE_SETSMM"],
+  DE: ["XETR", "FRA"],
+  PA: ["PAR"],
+  AS: ["AMS"],
+  MI: ["MIL"],
+  MC: ["MCE"],
+  SW: ["SWX", "VIRT_X"],
+  TO: ["TSE"],
+  HK: ["HKEX"],
+  T: ["TSE_JP"],
+  AX: ["ASX"],
+  ST: ["OMX"],
+  CO: ["CSE"],
+  HE: ["HEX"],
+  OL: ["OSE"],
+};
+
+/**
+ * Normalize a Yahoo-style ticker (VUKE.L, SAP.DE) into the pieces the Saxo
+ * instrument search needs: bare keyword, base ticker, suffix, preferred
+ * exchange list, and the ordered fallback keyword list to try.
+ *
+ * Saxo's /ref/v1/instruments does NOT understand Yahoo suffixes: "VUKE.L"
+ * returns zero hits while "VUKE" returns the LSE-listed ETF we want.
+ */
+export function normalizeSaxoSymbol(symbol: string): {
+  upper: string;
+  base: string;
+  suffix: string;
+  preferredExchanges: string[];
+  keyword: string;
+  searchKeywords: string[];
+} {
+  const upper = symbol.toUpperCase();
+  const dotIdx = upper.lastIndexOf(".");
+  const suffix = dotIdx > 0 ? upper.slice(dotIdx + 1) : "";
+  const base = dotIdx > 0 ? upper.slice(0, dotIdx) : upper;
+  const preferredExchanges = suffix ? YAHOO_SUFFIX_TO_EXCHANGE[suffix] ?? [] : [];
+  const keyword = suffix && preferredExchanges.length ? base : upper;
+  const searchKeywords = Array.from(new Set([keyword, base, upper].filter(Boolean)));
+  return { upper, base, suffix, preferredExchanges, keyword, searchKeywords };
+}
+
+/**
+ * Pick the best Saxo instrument hit for a Yahoo-style symbol.
+ *
+ * Match priority:
+ *   1. Exact Symbol on a preferred exchange for the Yahoo suffix
+ *   2. Symbol starts with base ticker on a preferred exchange (Saxo often
+ *      appends ":xlon" style)
+ *   3. Any hit on a preferred exchange
+ *   4. Exact Symbol match (any exchange)
+ *   5. Any symMatches hit
+ *   6. First hit
+ *
+ * Returns undefined when the candidate list is empty.
+ */
+export function selectSaxoInstrument(
+  symbol: string,
+  candidates: SaxoInstrumentHit[],
+): SaxoInstrumentHit | undefined {
+  if (!candidates.length) return undefined;
+  const { upper, base, preferredExchanges } = normalizeSaxoSymbol(symbol);
+
+  const symMatches = (s: string) => {
+    const su = s.toUpperCase();
+    return su === base || su.startsWith(`${base}:`) || su === upper;
+  };
+  const onPreferred = (ex?: string) =>
+    !!ex && preferredExchanges.some((e) => ex.toUpperCase().includes(e));
+
+  return (
+    candidates.find((d) => symMatches(d.Symbol) && onPreferred(d.ExchangeId)) ??
+    candidates.find((d) => d.Symbol.toUpperCase().startsWith(base) && onPreferred(d.ExchangeId)) ??
+    (preferredExchanges.length ? candidates.find((d) => onPreferred(d.ExchangeId)) : undefined) ??
+    candidates.find((d) => d.Symbol.toUpperCase() === upper) ??
+    candidates.find((d) => symMatches(d.Symbol)) ??
+    candidates[0]
+  );
+}
+
