@@ -58,6 +58,15 @@ export class SaxoAdapter implements BrokerAdapter {
   private readonly accountKey: string | undefined;
   private readonly clientKey: string | undefined;
   private resolvedAccountKey: string | undefined;
+  // Saxo throttles /trade/v2/orders at roughly 1 req/sec per app. Track the
+  // last POST time so back-to-back placeOrder calls space themselves out
+  // instead of racing into a 429 storm.
+  private lastOrderPostAt = 0;
+  // Saxo's /hist/v3/orders endpoint is not enabled on every environment
+  // (notably SIM). Once we see a 404 there we stop retrying for the life of
+  // this adapter — the reconciler treats "unknown" the same way and we
+  // avoid flooding live_broker_log with one row per open order per pass.
+  private histUnsupported = false;
 
   constructor(opts: {
     env: BrokerEnv;
@@ -74,6 +83,7 @@ export class SaxoAdapter implements BrokerAdapter {
     this.accountKey = opts.accountKey;
     this.clientKey = opts.clientKey;
   }
+
 
   private url(path: string, query?: Record<string, string | number | undefined>): string {
     const u = new URL(BASE[this.env] + path);
