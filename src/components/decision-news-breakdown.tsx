@@ -257,6 +257,7 @@ export function DecisionNewsBreakdown() {
           </ul>
         )}
       </CardContent>
+      )}
     </Card>
   );
 }
