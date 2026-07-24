@@ -622,6 +622,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         regimeNote: tightened.note,
         hyperparams: hyperparams ?? null,
         calibrationBlock: formatCalibrationBlock(calibration),
+        budgetNotes,
+        perSymbolBudget,
+        minTradeValue,
       });
 
 
