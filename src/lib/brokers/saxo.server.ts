@@ -221,13 +221,16 @@ export class SaxoAdapter implements BrokerAdapter {
     // Without DisplayAndFormat/NetPositionBase/NetPositionView the Symbol,
     // quantity and price fields are all missing, which used to make every
     // real Saxo position silently drop out of our reconciler.
+    // Valid NetPositionFieldGroup values per Saxo OpenAPI:
+    // DisplayAndFormat, ExchangeInfo, Greeks, NetPositionBase, NetPositionView,
+    // SingleFxPosition. "PositionIdentifier" / "InstrumentPriceDetails" belong
+    // to /port/v1/positions (per-position endpoint) and Saxo rejects the whole
+    // request with HTTP 400 InvalidModelState if we send them here.
     const fieldGroups = [
       "DisplayAndFormat",
       "ExchangeInfo",
       "NetPositionBase",
       "NetPositionView",
-      "PositionIdentifier",
-      "InstrumentPriceDetails",
     ].join(",");
     const res = await this.req<{
       Data?: Array<{
