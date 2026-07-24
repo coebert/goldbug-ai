@@ -1072,7 +1072,7 @@ function BrokerBalancePreview(props: {
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <span>
                 Account {data.accountId ?? "—"} · fetched{" "}
-                {new Date(data.fetchedAt).toLocaleTimeString()}
+                {formatUkTime(data.fetchedAt)}
               </span>
               {justUpdated && (
                 <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/15 px-1 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
@@ -1168,7 +1168,7 @@ function BrokerBalancePreview(props: {
               {data && (
                 <span className="text-[10px] opacity-80">
                   Showing last known balance from{" "}
-                  {new Date(data.fetchedAt).toLocaleTimeString()}.
+                  {formatUkTime(data.fetchedAt)}.
                 </span>
               )}
             </div>
