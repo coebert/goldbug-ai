@@ -169,4 +169,85 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Cash-aware universe filter (pure). Extracted so it can be unit-tested and
+// reused. Given the asset-class-filtered universe, a price map, portfolio cash
+// and total value, plus the effective per-symbol cap % and min trade value,
+// returns the buy-eligible candidate list, drop reasons, and metadata that
+// gets written to decisions.raw.guardrails.affordability.
+export type AffordabilityDrop = { symbol: string; price: number; reason: string };
+export type AffordabilityResult = {
+  candidates: UniverseSymbol[];
+  dropped: AffordabilityDrop[];
+  perSymbolBudget: number;
+  minTradeValue: number;
+  notes: string[];
+  fellBackToCheapest: boolean;
+};
+
+export function filterUniverseByAffordability(args: {
+  fullUniverse: UniverseSymbol[];
+  priceMap: Map<string, number>;
+  heldSymbols: string[];
+  cash: number;
+  totalValue: number;
+  perSymbolCapPct: number;
+  minTradeValue: number;
+  currency: string;
+  maxCandidates?: number;
+}): AffordabilityResult {
+  const {
+    fullUniverse, priceMap, heldSymbols, cash, totalValue,
+    perSymbolCapPct, minTradeValue, currency,
+  } = args;
+  const maxCandidates = args.maxCandidates ?? 22;
+  const perSymbolBudget = Math.min(totalValue * perSymbolCapPct, cash);
+  const affordable: UniverseSymbol[] = [];
+  const dropped: AffordabilityDrop[] = [];
+  for (const u of fullUniverse) {
+    const price = priceMap.get(u.symbol);
+    if (price == null || price <= 0) { affordable.push(u); continue; }
+    if (price > perSymbolBudget) {
+      dropped.push({ symbol: u.symbol, price,
+        reason: `1 share (${price.toFixed(2)}) > per-symbol budget ${perSymbolBudget.toFixed(2)}` });
+      continue;
+    }
+    if (perSymbolBudget < minTradeValue) {
+      dropped.push({ symbol: u.symbol, price,
+        reason: `per-symbol budget ${perSymbolBudget.toFixed(2)} < min trade value ${minTradeValue}` });
+      continue;
+    }
+    affordable.push(u);
+  }
+  const heldSet = new Set(heldSymbols);
+  const alreadyAffordable = new Set(affordable.map((a) => a.symbol));
+  for (const u of fullUniverse) {
+    if (heldSet.has(u.symbol) && !alreadyAffordable.has(u.symbol)) affordable.push(u);
+  }
+
+  const notes: string[] = [];
+  let candidates: UniverseSymbol[];
+  let fellBackToCheapest = false;
+  if (affordable.length === 0) {
+    fellBackToCheapest = true;
+    candidates = fullUniverse
+      .map((u) => ({ u, p: priceMap.get(u.symbol) ?? Infinity }))
+      .sort((a, b) => a.p - b.p)
+      .slice(0, 6)
+      .map((x) => x.u);
+    notes.push(
+      `No instruments affordable within per-symbol budget ${perSymbolBudget.toFixed(2)} ${currency}; showing 6 cheapest for reference. Add funds or widen the per-symbol cap to enable buys.`,
+    );
+  } else {
+    candidates = affordable.slice(0, maxCandidates);
+    if (dropped.length > 0) {
+      notes.push(
+        `Cash-aware filter kept ${candidates.length}/${fullUniverse.length} instruments; dropped ${dropped.length} priced above per-symbol budget ${perSymbolBudget.toFixed(2)} ${currency}.`,
+      );
+    }
+  }
+  return { candidates, dropped, perSymbolBudget, minTradeValue, notes, fellBackToCheapest };
+}
+
+
 
