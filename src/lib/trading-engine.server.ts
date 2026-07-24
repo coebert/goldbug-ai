@@ -1256,6 +1256,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       console.error("live routing failed", portfolioId, e);
       routedOrders = { error: e instanceof Error ? e.message : String(e) };
     }
+    // Broker is authoritative for live portfolios: overwrite local holdings /
+    // cash / today's equity snapshot with what Saxo actually holds so any
+    // rejected or errored order can't leave phantom positions behind.
+    try {
+      const { reconcileLiveHoldingsFromBroker } = await import(
+        "@/lib/live-holdings-sync.server"
+      );
+      await reconcileLiveHoldingsFromBroker(portfolioId);
+    } catch (e) {
+      console.warn("live holdings reconcile skipped", portfolioId, e);
+    }
   }
 
   // Self-reflection: refresh distilled lessons periodically. Fire-and-forget so
