@@ -23,5 +23,12 @@ export const getAttributionDashboard = createServerFn({ method: "POST" })
 
     const asOf = new Date().toISOString().slice(0, 10);
     const { getAttributionDashboard: run } = await import("./attribution-dashboard.server");
-    return run(data.portfolioId, asOf, data.windowDays, data.horizonDays);
+    const { withOwnedClient } = await import("@/lib/_server/owned-client");
+    return run(
+      data.portfolioId,
+      asOf,
+      data.windowDays,
+      data.horizonDays,
+      withOwnedClient(context.userId, context.supabase),
+    );
   });
