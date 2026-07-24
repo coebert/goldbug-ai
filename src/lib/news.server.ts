@@ -476,7 +476,14 @@ async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] 
   const headers = { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" };
   const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
   try {
-    const res = await fetch(dated, { headers });
+    const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
+    const res = await runWithBreaker("gdelt", () =>
+      fetch(dated, { headers }).then((r) => {
+        if (!r.ok && (r.status >= 500 || r.status === 429)) {
+          throw new Error(`GDELT transient ${r.status}`);
+        }
+        return r;
+      }));
     if (res.ok) {
       const parsed = await parseGdeltResponse(res, dateISO);
       if (parsed && parsed.length > 0) return parsed.slice(0, max);
