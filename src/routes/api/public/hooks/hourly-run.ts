@@ -45,6 +45,10 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         } catch { /* body optional */ }
         const lock = await acquireRunLock("hourly-run", {
           owner: manualTrigger ? "manual" : "cron",
+          // Worker wall/CPU limits can kill the run before `finally` releases
+          // the lock. Evict anything older than 5 min so a crashed run cannot
+          // permanently block manual/cron triggers.
+          staleMs: 5 * 60 * 1000,
         });
         if (!lock.acquired) {
           return new Response(
