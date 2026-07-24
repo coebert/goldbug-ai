@@ -942,35 +942,18 @@ function PortfolioPage() {
               <LearningPanel portfolioId={p.id} />
             </div>
 
-
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              <SignalDecayCard portfolioId={p.id} />
-              <CorrelationHeatmapCard portfolioId={p.id} />
-              <StressPanelCard portfolioId={p.id} currency={p.currency} />
-              <LearningDiagnosticsCard portfolioId={p.id} />
-              <ShadowVariantCard portfolioId={p.id} />
-            </div>
-
-            <Tabs defaultValue="journal" className="mt-6">
-
-              <TabsList>
-                <TabsTrigger value="journal">AI Journal ({decisions.length})</TabsTrigger>
-                <TabsTrigger value="trades">Trades ({trades.length})</TabsTrigger>
-                <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
-                <TabsTrigger value="attribution" asChild>
-                  <Link to="/portfolio/$id/attribution" params={{ id: p.id }}>Attribution</Link>
-                </TabsTrigger>
-                <TabsTrigger value="report" asChild>
-                  <Link to="/portfolio/$id/report" params={{ id: p.id }}>Report</Link>
-                </TabsTrigger>
-                <TabsTrigger value="optimizer" asChild>
-                  <Link to="/portfolio/$id/optimizer" params={{ id: p.id }}>Optimizer</Link>
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="diagnostics" className="space-y-4">
-                <DiagnosticsPanel portfolioId={p.id} />
               </TabsContent>
-              <TabsContent value="journal" className="space-y-4">
+
+              <TabsContent value="risk" className="mt-4 space-y-4">
+                <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
+                <ExecutionCalibrationCard
+                  portfolioId={id}
+                  execParams={(p.risk_config as { execution_params?: Parameters<typeof ExecutionCalibrationCard>[0]["execParams"] } | null)?.execution_params ?? null}
+                  calibration={(p.risk_config as { execution_calibration?: Parameters<typeof ExecutionCalibrationCard>[0]["calibration"] } | null)?.execution_calibration ?? null}
+                />
+              </TabsContent>
+
+              <TabsContent value="decisions" className="mt-4 space-y-4">
                 {decisions.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No AI decisions yet. Run one day or a backtest to see the AI's reasoning here.
@@ -980,66 +963,160 @@ function PortfolioPage() {
                   <DecisionCard key={d.id} decision={d} currency={p.currency} />
                 ))}
               </TabsContent>
-              <TabsContent value="trades">
+
+              <TabsContent value="trades" className="mt-4">
                 {trades.length === 0 && (
                   <p className="text-sm text-muted-foreground">No trades yet.</p>
                 )}
                 {trades.length > 0 && (
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full min-w-[640px] text-sm">
-                      <thead className="bg-muted/30 text-xs uppercase text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Date &amp; time (GMT)</th>
-                          <th className="px-3 py-2 text-left">Symbol</th>
-                          <th className="px-3 py-2 text-left">Side</th>
-                          <th className="px-3 py-2 text-right">Qty</th>
-                          <th className="px-3 py-2 text-right">Price</th>
-                          <th className="px-3 py-2 text-right">Value</th>
-                          <th className="px-3 py-2 text-left">Reason</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {trades.map((t) => {
-                          const executedAt = t.executed_at ? new Date(t.executed_at) : null;
-                          const timeGmt = executedAt && !isNaN(executedAt.getTime())
-                            ? `${String(executedAt.getUTCHours()).padStart(2, "0")}:${String(executedAt.getUTCMinutes()).padStart(2, "0")}:${String(executedAt.getUTCSeconds()).padStart(2, "0")}`
-                            : null;
-                          return (
-                          <tr key={t.id} className="border-t border-border">
-                            <td className="px-3 py-2 tabular-nums whitespace-nowrap">
-                              <span>{t.trade_date}</span>
-                              {timeGmt && (
-                                <span className="ml-2 text-xs text-muted-foreground">{timeGmt} GMT</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 font-medium">{t.symbol}</td>
-                            <td
-                              className={`px-3 py-2 ${
-                                t.side === "buy" ? "text-primary" : "text-accent"
-                              }`}
-                            >
-                              {t.side.toUpperCase()}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
-                              {Number(t.quantity).toFixed(4)}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
-                              {Number(t.price).toFixed(2)}
-                            </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
-                              {Number(t.value).toFixed(2)}
-                            </td>
-                            <td className="px-3 py-2 text-xs text-muted-foreground">{t.reason}</td>
+                  <>
+                    {/* Desktop / tablet: sortable table with sticky header */}
+                    <div className="hidden md:block overflow-x-auto rounded-lg border border-border">
+                      <table className="w-full min-w-[640px] text-sm">
+                        <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur text-xs uppercase text-muted-foreground">
+                          <tr>
+                            {([
+                              { key: "date", label: "Date & time (GMT)", align: "left" },
+                              { key: "symbol", label: "Symbol", align: "left" },
+                              { key: "side", label: "Side", align: "left" },
+                              { key: "qty", label: "Qty", align: "right" },
+                              { key: "price", label: "Price", align: "right" },
+                              { key: "value", label: "Value", align: "right" },
+                            ] as const).map((col) => {
+                              const active = tradeSort.key === col.key;
+                              const Icon = active ? (tradeSort.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                              return (
+                                <th
+                                  key={col.key}
+                                  className={`px-3 py-2 select-none ${col.align === "right" ? "text-right" : "text-left"}`}
+                                >
+                                  <button
+                                    type="button"
+                                    className={`inline-flex items-center gap-1 hover:text-foreground ${active ? "text-foreground" : ""}`}
+                                    onClick={() =>
+                                      setTradeSort((s) =>
+                                        s.key === col.key
+                                          ? { key: col.key, dir: s.dir === "asc" ? "desc" : "asc" }
+                                          : { key: col.key, dir: col.key === "date" || col.key === "value" || col.key === "qty" || col.key === "price" ? "desc" : "asc" },
+                                      )
+                                    }
+                                  >
+                                    {col.label}
+                                    <Icon className="h-3 w-3 opacity-70" />
+                                  </button>
+                                </th>
+                              );
+                            })}
+                            <th className="px-3 py-2 text-left">Reason</th>
                           </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {sortedTrades.map((t) => {
+                            const executedAt = t.executed_at ? new Date(t.executed_at) : null;
+                            const timeGmt = executedAt && !isNaN(executedAt.getTime())
+                              ? `${String(executedAt.getUTCHours()).padStart(2, "0")}:${String(executedAt.getUTCMinutes()).padStart(2, "0")}:${String(executedAt.getUTCSeconds()).padStart(2, "0")}`
+                              : null;
+                            return (
+                              <tr key={t.id} className="border-t border-border">
+                                <td className="px-3 py-2 tabular-nums whitespace-nowrap">
+                                  <span>{t.trade_date}</span>
+                                  {timeGmt && (
+                                    <span className="ml-2 text-xs text-muted-foreground">{timeGmt} GMT</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 font-medium">{t.symbol}</td>
+                                <td className={`px-3 py-2 ${t.side === "buy" ? "text-primary" : "text-accent"}`}>
+                                  {t.side.toUpperCase()}
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums">{Number(t.quantity).toFixed(4)}</td>
+                                <td className="px-3 py-2 text-right tabular-nums">{Number(t.price).toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right tabular-nums">{Number(t.value).toFixed(2)}</td>
+                                <td className="px-3 py-2 text-xs text-muted-foreground">{t.reason}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile: stacked cards */}
+                    <div className="md:hidden space-y-3">
+                      {sortedTrades.map((t) => {
+                        const executedAt = t.executed_at ? new Date(t.executed_at) : null;
+                        const timeGmt = executedAt && !isNaN(executedAt.getTime())
+                          ? `${String(executedAt.getUTCHours()).padStart(2, "0")}:${String(executedAt.getUTCMinutes()).padStart(2, "0")}:${String(executedAt.getUTCSeconds()).padStart(2, "0")}`
+                          : null;
+                        return (
+                          <div key={t.id} className="rounded-lg border border-border bg-card p-3 text-sm">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Badge className={t.side === "buy" ? "bg-primary/15 text-primary hover:bg-primary/15" : "bg-accent/15 text-accent hover:bg-accent/15"}>
+                                  {t.side.toUpperCase()}
+                                </Badge>
+                                <span className="font-medium truncate">{t.symbol}</span>
+                              </div>
+                              <span className="tabular-nums font-semibold shrink-0">{Number(t.value).toFixed(2)}</span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
+                              <span>{t.trade_date}{timeGmt ? ` · ${timeGmt} GMT` : ""}</span>
+                              <span>Qty {Number(t.quantity).toFixed(4)}</span>
+                              <span>@ {Number(t.price).toFixed(2)}</span>
+                            </div>
+                            {t.reason && (
+                              <p className="mt-2 text-xs text-muted-foreground">{t.reason}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
+              </TabsContent>
+
+              <TabsContent value="diagnostics" className="mt-4 space-y-4">
+                <DiagnosticsPanel portfolioId={p.id} />
+                <Collapsible open={showAdvancedDiag} onOpenChange={setShowAdvancedDiag}>
+                  <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedDiag ? "rotate-180" : ""}`} />
+                    {showAdvancedDiag ? "Hide" : "Show"} advanced diagnostics (signal decay, correlations, stress, learning delta, shadow variants)
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <SignalDecayCard portfolioId={p.id} />
+                      <CorrelationHeatmapCard portfolioId={p.id} />
+                      <StressPanelCard portfolioId={p.id} currency={p.currency} />
+                      <LearningDiagnosticsCard portfolioId={p.id} />
+                      <ShadowVariantCard portfolioId={p.id} />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </TabsContent>
+
+              <TabsContent value="reports" className="mt-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {([
+                    { to: "/portfolio/$id/attribution", label: "Attribution", desc: "Per-asset P&L contribution and factor breakdown.", Icon: BarChart3 },
+                    { to: "/portfolio/$id/report", label: "Report", desc: "Downloadable performance report for this portfolio.", Icon: FileText },
+                    { to: "/portfolio/$id/optimizer", label: "Optimizer", desc: "Re-run the AI with alternate risk profiles for comparison.", Icon: Settings2 },
+                    { to: "/long-horizon/$id", label: "Long-horizon backtest", desc: "Multi-decade rule-based simulation vs benchmarks.", Icon: CalendarClock },
+                  ] as const).map((r) => (
+                    <Link key={r.to} to={r.to} params={{ id: p.id }} className="block">
+                      <Card className="h-full transition-colors hover:border-primary/40">
+                        <CardContent className="flex items-start gap-3 py-4">
+                          <div className="mt-0.5 rounded-md bg-muted p-2"><r.Icon className="h-4 w-4" /></div>
+                          <div className="min-w-0">
+                            <div className="font-medium">{r.label}</div>
+                            <p className="text-xs text-muted-foreground">{r.desc}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
               </TabsContent>
             </Tabs>
           </>
+
         )}
       </main>
     </div>
