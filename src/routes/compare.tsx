@@ -110,8 +110,28 @@ function ComparePage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 6 ? prev : [...prev, id],
     );
 
-  const [focused, setFocused] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [confirmRerun, setConfirmRerun] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const toggleHidden = (name: string) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  const isolate = (name: string) =>
+    setHidden((prev) => {
+      // If already isolated to this one, restore all
+      if (prev.size > 0 && !prev.has(name) && prev.size === (results?.length ?? 0) - 1) {
+        return new Set();
+      }
+      const next = new Set<string>();
+      (results ?? []).forEach((r) => {
+        if (r.portfolio.name !== name) next.add(r.portfolio.name);
+      });
+      return next;
+    });
 
   const { chartData, drawdownData } = useMemo(() => {
     if (!results || results.length === 0) return { chartData: [], drawdownData: [] };
