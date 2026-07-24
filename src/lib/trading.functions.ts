@@ -122,9 +122,16 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     });
 
     const currency = perPortfolio[0]?.currency ?? "GBP";
+    // Per-portfolio raw series (only dates where that portfolio actually has
+    // a snapshot). Used for per-portfolio sparklines so a portfolio with a
+    // single snapshot doesn't get a fake flat-then-drop curve back-filled
+    // from starting_cash across every other portfolio's snapshot dates.
+    const perPortfolioSeries: Record<string, Array<{ date: string; value: number }>> = {};
+    for (const p of perPortfolio) perPortfolioSeries[p.id] = p.series;
     return {
       portfolios: perPortfolio.map((p) => ({ id: p.id, name: p.name, currency: p.currency, mode: p.mode })),
       series,
+      perPortfolioSeries,
       currency,
     };
   });
