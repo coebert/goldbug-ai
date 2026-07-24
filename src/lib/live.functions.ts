@@ -483,3 +483,146 @@ export const getSaxoOAuthStatus = createServerFn({ method: "GET" })
     const [sim, live] = await Promise.all([getOAuthStatus("sim"), getOAuthStatus("live")]);
     return { sim, live };
   });
+
+/**
+ * Dashboard alert: detect when a live portfolio has completed several run
+ * windows without producing a single successful fill, and explain why.
+ *
+ * A "run window" is one recorded decision row (hourly-run inserts one per tick).
+ * We look at the last N runs, count fills recorded during that timespan, and
+ * classify the dominant blocker from the most recent decision's guardrail
+ * metadata and any live_orders written since then.
+ */
+export const getLiveTradeAlert = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { portfolioId: string; windowRuns?: number }) =>
+    z.object({
+      portfolioId: z.string().uuid(),
+      windowRuns: z.number().int().min(1).max(50).default(5),
+    }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const p = await supabase.from("portfolios")
+      .select("id, user_id, mode, live_paused, current_cash, currency")
+      .eq("id", data.portfolioId).maybeSingle();
+    if (p.error || !p.data || p.data.user_id !== userId) throw new Error("Portfolio not found");
+
+    const mode = p.data.mode;
+    if (mode !== "live_sim" && mode !== "live_prod") {
+      return { active: false, reason: "not_live" as const };
+    }
+
+    const decs = await supabase.from("decisions")
+      .select("id, run_date, briefing, raw, created_at")
+      .eq("portfolio_id", data.portfolioId)
+      .order("created_at", { ascending: false })
+      .limit(data.windowRuns);
+    const runs = decs.data ?? [];
+    if (runs.length < 2) {
+      // Not enough history to judge — don't nag the user right after activation.
+      return { active: false, reason: "insufficient_runs" as const, runsSeen: runs.length };
+    }
+
+    const windowStart = runs[runs.length - 1].created_at;
+
+    const [fillsRes, ordersRes] = await Promise.all([
+      supabase.from("live_fills").select("id, filled_at")
+        .eq("portfolio_id", data.portfolioId)
+        .gte("filled_at", windowStart),
+      supabase.from("live_orders").select("id, status, reject_reason, created_at, symbol")
+        .eq("portfolio_id", data.portfolioId)
+        .gte("created_at", windowStart)
+        .order("created_at", { ascending: false }),
+    ]);
+    const fills = fillsRes.data ?? [];
+    const orders = ordersRes.data ?? [];
+
+    if (fills.length > 0) {
+      return { active: false, reason: "has_fills" as const, fills: fills.length, runsSeen: runs.length };
+    }
+
+    // No successful fills in the window — classify why.
+    type Latest = { raw?: { orders?: unknown[]; guardrails?: Record<string, unknown> }; briefing?: string | null };
+    const latest = runs[0] as unknown as Latest;
+    const guard = (latest.raw?.guardrails ?? {}) as Record<string, unknown>;
+    const afford = (guard.affordability ?? {}) as {
+      per_symbol_budget?: number;
+      min_trade_value?: number;
+      universe_total?: number;
+      candidates_kept?: number;
+      dropped_for_cash?: string[];
+      broker_blocked?: string[];
+      notes?: string[];
+    };
+    const intendedOrders = Array.isArray(latest.raw?.orders) ? latest.raw!.orders! : [];
+    const briefing = String(latest.briefing ?? "");
+
+    let category:
+      | "circuit_breaker"
+      | "paused"
+      | "no_affordable"
+      | "broker_blocked"
+      | "no_ai_orders"
+      | "orders_never_reached_broker"
+      | "orders_rejected"
+      | "unknown" = "unknown";
+    let title = "No successful trades in the last run window";
+    let detail = "";
+    const hint: string[] = [];
+
+    if (p.data.live_paused) {
+      category = "paused";
+      title = "Live trading is paused";
+      detail = "Runs continue but no orders are sent to the broker while paused. Resume live trading to allow new fills.";
+    } else if (/circuit breaker/i.test(briefing)) {
+      category = "circuit_breaker";
+      title = "Circuit breaker active — no new AI orders";
+      detail = briefing || "The engine auto-paused new buys after a drawdown/volatility trigger. Stops still enforced.";
+    } else if ((afford.candidates_kept ?? 0) === 0 && (afford.universe_total ?? 0) > 0) {
+      const blocked = afford.broker_blocked ?? [];
+      const dropped = afford.dropped_for_cash ?? [];
+      if (blocked.length && dropped.length === 0) {
+        category = "broker_blocked";
+        title = "Every candidate was filtered as un-tradeable at the broker";
+        detail = `${blocked.length} symbol${blocked.length === 1 ? "" : "s"} blocked (e.g. ${blocked.slice(0, 4).join(", ")}). Add broker-tradeable tickers to the universe.`;
+      } else {
+        category = "no_affordable";
+        title = "No affordable instruments for this cash balance";
+        const budget = afford.per_symbol_budget;
+        const minT = afford.min_trade_value;
+        detail = `Per-symbol budget ${typeof budget === "number" ? `${p.data.currency} ${budget.toFixed(2)}` : "n/a"}${typeof minT === "number" ? `, min trade ${p.data.currency} ${minT.toFixed(2)}` : ""} — no whole share of any candidate fits. Add funds, widen the per-symbol cap, or lower min_trade_value.`;
+        if (dropped.length) hint.push(`Recently dropped for cash: ${dropped.slice(0, 6).join(", ")}`);
+      }
+    } else if (intendedOrders.length === 0) {
+      category = "no_ai_orders";
+      title = "The AI proposed no trades in the last run window";
+      detail = "Every recent run returned an empty order list — usually low-conviction signals or all guardrails triggered hold. This is normal in quiet markets.";
+    } else if (orders.length === 0) {
+      category = "orders_never_reached_broker";
+      title = "AI proposed trades but none reached the broker";
+      detail = "Order routing produced no live_orders rows — check Saxo OAuth status and broker connectivity.";
+    } else {
+      // Aggregate rejection reasons.
+      const bad = orders.filter((o) => ["rejected", "errored", "cancelled"].includes(o.status));
+      const reasons = Array.from(new Set(bad.map((o) => o.reject_reason).filter(Boolean))) as string[];
+      category = "orders_rejected";
+      title = `${bad.length} of ${orders.length} broker order${orders.length === 1 ? "" : "s"} did not fill`;
+      detail = reasons.length
+        ? `Broker reasons: ${reasons.slice(0, 3).join(" · ")}`
+        : "Orders were submitted but none returned a fill. Open a trade row for its timeline.";
+    }
+
+    return {
+      active: true,
+      category,
+      title,
+      detail,
+      hint,
+      runsSeen: runs.length,
+      windowStart,
+      ordersInWindow: orders.length,
+      intendedOrdersLastRun: intendedOrders.length,
+      affordability: afford,
+      reason: "no_fills" as const,
+    };
+  });

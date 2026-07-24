@@ -9,7 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   activateLive, deactivateLive, pauseLive, killAllLive, resumeAllLive, getAuditLog,
   pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio,
-  startSaxoOAuth, getSaxoOAuthStatus,
+  startSaxoOAuth, getSaxoOAuthStatus, getLiveTradeAlert,
 } from "@/lib/live.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,13 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
     queryKey: ["live-audit", portfolioId],
     queryFn: () => audit({ data: { portfolioId, limit: 20 } }),
     enabled: showAudit,
+  });
+
+  const tradeAlertFn = useServerFn(getLiveTradeAlert);
+  const alertQ = useQuery({
+    queryKey: ["live-trade-alert", portfolioId],
+    queryFn: () => tradeAlertFn({ data: { portfolioId, windowRuns: 5 } }),
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const refresh = () => {
@@ -150,6 +157,9 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         <SaxoOAuthPanel />
 
         <CashSyncIndicator lastSync={s?.lastCashSync ?? null} pending={mSync.isPending} />
+
+        <NoTradesAlert data={alertQ.data} />
+
 
 
 
@@ -344,6 +354,45 @@ function CashSyncIndicator({ lastSync, pending }: { lastSync: CashSyncLog; pendi
         <span className="opacity-80 truncate max-w-[240px]">· {lastSync.error}</span>
       )}
     </div>
+  );
+}
+
+type TradeAlertData = {
+  active: boolean;
+  category?: string;
+  title?: string;
+  detail?: string;
+  hint?: string[];
+  runsSeen?: number;
+  ordersInWindow?: number;
+  intendedOrdersLastRun?: number;
+  windowStart?: string;
+} | undefined;
+
+function NoTradesAlert({ data }: { data: TradeAlertData }) {
+  if (!data || !data.active) return null;
+  const started = data.windowStart ? new Date(data.windowStart) : null;
+  return (
+    <Alert variant={data.category === "orders_rejected" || data.category === "orders_never_reached_broker" ? "destructive" : "default"}>
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>{data.title ?? "No successful trades in the last run window"}</AlertTitle>
+      <AlertDescription className="space-y-1">
+        <div>{data.detail}</div>
+        <div className="text-xs text-muted-foreground">
+          Window: last {data.runsSeen ?? 0} run{(data.runsSeen ?? 0) === 1 ? "" : "s"}
+          {started && <> · since {started.toLocaleString()}</>}
+          {typeof data.intendedOrdersLastRun === "number" && (
+            <> · AI proposed {data.intendedOrdersLastRun} order{data.intendedOrdersLastRun === 1 ? "" : "s"} last run</>
+          )}
+          {typeof data.ordersInWindow === "number" && (
+            <> · {data.ordersInWindow} broker order{data.ordersInWindow === 1 ? "" : "s"} in window</>
+          )}
+        </div>
+        {(data.hint ?? []).map((h, i) => (
+          <div key={i} className="text-xs text-muted-foreground">{h}</div>
+        ))}
+      </AlertDescription>
+    </Alert>
   );
 }
 
