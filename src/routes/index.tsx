@@ -147,16 +147,9 @@ function Home() {
   const nextRunLabel = useMemo(() => {
     const now = new Date();
     const next = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        now.getUTCHours() + 1,
-        0,
-        0,
-      ),
-    );
-    return `${String(next.getUTCHours()).padStart(2, "0")}:00 GMT`;
+    const now = new Date();
+    const nextHour = (ukHour(now) + 1) % 24;
+    return `${String(nextHour).padStart(2, "0")}:00 ${ukZoneAbbr(now)}`;
   }, [equityQ.dataUpdatedAt]);
 
   if (!ready || !session) {
