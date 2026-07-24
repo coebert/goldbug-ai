@@ -241,9 +241,12 @@ export async function buildLearningContext(
   asOf: string,
 ): Promise<LearningContext> {
   const current_regime = await currentRegimeFor(asOf);
+  const userId = await resolveUserId(portfolioId);
   const [{ stats, samples }, lessonHit] = await Promise.all([
     computeRecentOutcomes(portfolioId, asOf),
-    fetchLatestLessons(portfolioId, current_regime),
+    userId
+      ? fetchLatestLessons(userId, current_regime)
+      : Promise.resolve({ lessons: [] as string[], lessons_as_of: null, lessons_regime: null }),
   ]);
   // Per-regime rolling stats from the same sample window.
   const buckets = new Map<string, LearningContext["samples"]>();
