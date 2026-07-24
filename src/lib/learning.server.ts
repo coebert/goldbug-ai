@@ -291,7 +291,7 @@ export function formatLearningBlock(ctx: LearningContext): string {
         .map((p) => `${p.regime}: ${p.n} trades, ${(p.win_rate * 100).toFixed(0)}% win, avg ${p.avg_return_pct.toFixed(2)}%`)
         .join("; ")
     : "n/a";
-  return `LEARNING MEMORY (rolling outcomes over the last ${s.window_days} days, forward-return horizon ${s.horizon_days}d):
+  return `LEARNING MEMORY (rolling outcomes over the last ${s.window_days} days pooled across ALL of this user's portfolios — lessons persist even when individual portfolios are deleted; forward-return horizon ${s.horizon_days}d):
 - Current market regime: ${ctx.current_regime ?? "unknown"} — lessons below are ${regimeTag}.
 - Evaluable trades: ${s.evaluable} (wins ${s.wins} / losses ${s.losses}) — win rate ${wr}, average return ${ar}
 - Best call: ${s.best ? `${s.best.symbol} (${s.best.return_pct.toFixed(2)}%)` : "n/a"} | Worst call: ${s.worst ? `${s.worst.symbol} (${s.worst.return_pct.toFixed(2)}%)` : "n/a"}
