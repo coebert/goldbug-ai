@@ -85,7 +85,7 @@ describe("runBacktest", () => {
     );
     expect(res.snapshots).toHaveLength(0);
     expect(res.rejections).toHaveLength(1);
-    expect(res.rejections[0].reason).toBe("insufficient_cash");
+    expect(res.rejections[0].reason).toBe("would_borrow");
     expect(res.rejections[0].date).toBe("2020-01-02");
   });
 
