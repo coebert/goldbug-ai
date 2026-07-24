@@ -10,23 +10,13 @@ export const Route = createFileRoute("/api/public/hooks/saxo-refresh")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { checkRateLimit, tooManyRequests } = await import("@/lib/rate-limit.server");
-        const rl = await checkRateLimit(request, {
+        const { verifyCronRequest } = await import("@/lib/_server/cron");
+        const verified = await verifyCronRequest(request, {
           bucket: "hooks:saxo-refresh",
           capacity: 20,
-          refillPerSec: 20 / 3600,
+          refillPerSec: 20/3600,
         });
-        if (!rl.allowed) return tooManyRequests(rl);
-
-        const provided = request.headers.get("x-cron-secret") ?? request.headers.get("X-Cron-Secret");
-        const expected = process.env.CRON_SECRET;
-        if (!expected || provided !== expected) {
-          return new Response(JSON.stringify({ error: "unauthorized" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
+        if (!verified.ok) return verified.response;
         const { forceRefreshTokens, getOAuthStatus } = await import(
           "@/lib/brokers/saxo-oauth.server"
         );

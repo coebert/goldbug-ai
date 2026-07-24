@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
+    "check:serverfn": "bun run scripts/check-serverfn-shape.ts",
     "format": "prettier --write ."
   },
   "dependencies": {
