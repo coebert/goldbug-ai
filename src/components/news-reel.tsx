@@ -754,6 +754,7 @@ export function NewsReel() {
                       </div>
                     </div>
                   </li>
+                  </div>
                 );
               })}
             </ul>
