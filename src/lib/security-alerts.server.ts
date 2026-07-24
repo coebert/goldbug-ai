@@ -8,7 +8,17 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendPushToUser } from "@/lib/push.server";
 
-type AuditEventKind = "pending_slices";
+// Widened when the shared `_server/ownership` helper landed — the audit log
+// now covers trading/live/attribution/holdings/insights/backtest as well.
+export type AuditEventKind =
+  | "pending_slices"
+  | "trading"
+  | "live"
+  | "attribution"
+  | "holdings"
+  | "insights"
+  | "backtest"
+  | "generic";
 
 export function maybeNotifySecurityEvent(params: {
   actorUserId: string | null;
