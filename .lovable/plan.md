@@ -41,7 +41,7 @@ Goal: make it obvious where you are, what you can do next, and how to get back.
 - Number inputs everywhere: pair with unit suffix ("%", "£", "bps") and inline validation copy instead of red border only.
 - Confirmations for destructive actions (Delete portfolio, Disconnect Saxo, Switch to Real money) use a typed-confirmation dialog, not just a native `confirm()`.
 
-### Phase 5 — News reel & notifications
+### Phase 5 — News reel & notifications ✅ shipped
 
 - News reel (933 lines) currently mixes filters, sort, translation badges, AI notes, infinite scroll. Move filters into a collapsible drawer on mobile so the reel itself is full-width.
 - Group headlines by day with sticky day headers.
