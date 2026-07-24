@@ -62,70 +62,87 @@ export function DecisionNewsBreakdown() {
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Layers className="h-4 w-4 text-primary" />
-              Decision → news breakdown
-            </CardTitle>
-            <CardDescription>
-              Each recent decision mapped to the specific headlines that most influenced the AI's take (ranked by sentiment strength).
-            </CardDescription>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => q.refetch()}
-            disabled={q.isFetching}
-            aria-label="Refresh"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="uppercase tracking-wide text-muted-foreground">Portfolio:</span>
           <button
             type="button"
-            onClick={() => setPortfolioFilter("all")}
-            className={`rounded-full border px-2 py-0.5 ${
-              portfolioFilter === "all"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => setSectionOpen((v) => !v)}
+            className="flex flex-1 items-start gap-2 text-left"
+            aria-expanded={sectionOpen}
           >
-            all
+            {sectionOpen ? (
+              <ChevronUp className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Layers className="h-4 w-4 text-primary" />
+                Decision → news breakdown
+              </CardTitle>
+              <CardDescription>
+                Each recent decision mapped to the specific headlines that most influenced the AI's take (ranked by sentiment strength).
+              </CardDescription>
+            </div>
           </button>
-          {portfolios.map((p) => (
+          {sectionOpen && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => { e.stopPropagation(); q.refetch(); }}
+              disabled={q.isFetching}
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
+            </Button>
+          )}
+        </div>
+        {sectionOpen && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="uppercase tracking-wide text-muted-foreground">Portfolio:</span>
             <button
-              key={p.id}
               type="button"
-              onClick={() => setPortfolioFilter(p.id)}
+              onClick={() => setPortfolioFilter("all")}
               className={`rounded-full border px-2 py-0.5 ${
-                portfolioFilter === p.id
+                portfolioFilter === "all"
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
               }`}
             >
-              {p.name}
+              all
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setOnlyWithNews((v) => !v)}
-            className={`ml-2 rounded-full border px-2 py-0.5 ${
-              onlyWithNews
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-            }`}
-            title="Hide decisions that cited no news"
-          >
-            News-cited only
-          </button>
-          <span className="ml-auto text-muted-foreground">
-            {visible.length} of {items.length} decisions
-          </span>
-        </div>
+            {portfolios.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPortfolioFilter(p.id)}
+                className={`rounded-full border px-2 py-0.5 ${
+                  portfolioFilter === p.id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setOnlyWithNews((v) => !v)}
+              className={`ml-2 rounded-full border px-2 py-0.5 ${
+                onlyWithNews
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+              }`}
+              title="Hide decisions that cited no news"
+            >
+              News-cited only
+            </button>
+            <span className="ml-auto text-muted-foreground">
+              {visible.length} of {items.length} decisions
+            </span>
+          </div>
+        )}
       </CardHeader>
+      {sectionOpen && (
       <CardContent>
         {q.isLoading ? (
           <div className="h-40 animate-pulse rounded-md bg-muted/40" />
