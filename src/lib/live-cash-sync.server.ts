@@ -15,6 +15,16 @@
 //    transient Saxo outage.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+
+/**
+ * Supabase client used for the actual reads/writes. When the caller passes
+ * their own authenticated client (from `requireSupabaseAuth` context),
+ * every write goes through RLS as that user — service_role is only used
+ * for unauthenticated cron paths that have no session to attach.
+ */
+export type ScopedDbClient = SupabaseClient<Database>;
 
 const DRIFT_EPSILON = 0.5;
 
@@ -32,8 +42,12 @@ export type LiveCashSyncResult =
 
 export async function syncLiveCashFromBroker(
   portfolioId: string,
+  client?: ScopedDbClient,
 ): Promise<LiveCashSyncResult> {
-  const { data: p, error } = await supabaseAdmin
+  // Prefer the caller's user-scoped client so RLS enforces ownership.
+  // Fall back to admin for cron-triggered paths that have no session.
+  const db = client ?? supabaseAdmin;
+  const { data: p, error } = await db
     .from("portfolios")
     .select("id, user_id, mode, current_cash, starting_cash, live_paused")
     .eq("id", portfolioId)
