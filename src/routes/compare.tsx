@@ -35,8 +35,9 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2 } from "lucide-react";
+import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2, SlidersHorizontal } from "lucide-react";
 import { Explain } from "@/components/explain";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/compare")({
   ssr: false,
