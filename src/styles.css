@@ -156,5 +156,25 @@
   html, body {
     min-height: 100dvh;
   }
+
+  /* Prevent any stray wide element (long broker tokens, JSON error blobs,
+   * font-mono reconciliation lines) from forcing mobile Safari to zoom the
+   * whole page out to fit. Opt-in horizontal scroll containers (tables with
+   * `overflow-x-auto`) still work because they establish their own scroll
+   * context. */
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Long unbroken strings — broker order IDs, base64 account keys, JSON
+   * error payloads — must wrap on narrow screens instead of pushing the
+   * page wider than the viewport. */
+  .font-mono,
+  code,
+  pre {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 
