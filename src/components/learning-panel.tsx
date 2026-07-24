@@ -177,8 +177,9 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
             )}
           </div>
           <p className="mb-2 text-xs text-muted-foreground">
-            Edit a lesson to reword it, or mark it as unhelpful to stop the AI applying it. Changes take effect on the next run.
+            Rate each lesson helpful or unhelpful — the AI uses these scores to prioritise or down-weight it in future decisions. You can also edit or fully disable a lesson. Changes take effect on the next run.
           </p>
+
           {lessons_raw.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Not enough trade outcomes yet — the AI needs at least 5 evaluable trades before it writes lessons.
