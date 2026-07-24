@@ -115,7 +115,9 @@ function ModeChart({
   allSeries: Array<Record<string, string | number>>;
   currency: string;
 }) {
+  const [range, setRange] = useState<Range>("all");
   const isMobile = useIsMobile();
+
 
   const { series, totalNow, startingTotal, yDomain } = useMemo(() => {
     const opt = RANGE_OPTS.find((r) => r.value === range)!;
