@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { GLOBAL_EVENTS } from "./global-events";
+import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 
 const RiskEnum = z.enum(["conservative", "balanced", "aggressive"]);
 const AssetClassEnum = z.enum(["stock", "etf", "crypto", "commodity", "fx"]);
@@ -62,7 +63,9 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const list = portfolios ?? [];
-    if (list.length === 0) return { portfolios: [], series: [], currency: "GBP" as string };
+    if (list.length === 0) {
+      return { portfolios: [], series: [], perPortfolioSeries: {}, currency: "GBP" as string };
+    }
 
     // Phase 8 — one query for all portfolios instead of N (uses new
     // (portfolio_id, snapshot_date DESC) index).
@@ -73,67 +76,12 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       .in("portfolio_id", ids)
       .order("snapshot_date", { ascending: true });
 
-    const byPortfolio = new Map<string, Array<{ date: string; value: number }>>();
-    for (const e of allEq ?? []) {
-      const arr = byPortfolio.get(e.portfolio_id as string) ?? [];
-      arr.push({ date: e.snapshot_date as string, value: Number(e.total_value) });
-      byPortfolio.set(e.portfolio_id as string, arr);
-    }
-
-    const perPortfolio = list.map((p) => ({
-      id: p.id as string,
-      name: p.name as string,
-      currency: p.currency as string,
-      mode: (p.mode as string) ?? "paper",
-      starting_cash: Number(p.starting_cash),
-      current_cash: Number(p.current_cash),
-      series: byPortfolio.get(p.id as string) ?? [],
-    }));
-
     const today = new Date().toISOString().slice(0, 10);
-    const allDates = new Set<string>();
-    for (const p of perPortfolio) {
-      if (p.series.length === 0) allDates.add(today);
-      else for (const r of p.series) allDates.add(r.date);
-    }
-    const dates = [...allDates].sort();
-
-    const isReal = (m: string) => m === "live_prod";
-
-    const series = dates.map((d) => {
-      let totalSim = 0;
-      let totalReal = 0;
-      const perId: Record<string, number> = {};
-      for (const p of perPortfolio) {
-        let v = p.starting_cash;
-        if (p.series.length === 0) {
-          v = p.current_cash;
-        } else {
-          for (const r of p.series) {
-            if (r.date <= d) v = r.value;
-            else break;
-          }
-        }
-        perId[p.id] = v;
-        if (isReal(p.mode)) totalReal += v;
-        else totalSim += v;
-      }
-      return { date: d, total_sim: totalSim, total_real: totalReal, ...perId } as Record<string, string | number>;
+    return buildAllPortfoliosEquity({
+      portfolios: list,
+      snapshots: allEq ?? [],
+      today,
     });
-
-    const currency = perPortfolio[0]?.currency ?? "GBP";
-    // Per-portfolio raw series (only dates where that portfolio actually has
-    // a snapshot). Used for per-portfolio sparklines so a portfolio with a
-    // single snapshot doesn't get a fake flat-then-drop curve back-filled
-    // from starting_cash across every other portfolio's snapshot dates.
-    const perPortfolioSeries: Record<string, Array<{ date: string; value: number }>> = {};
-    for (const p of perPortfolio) perPortfolioSeries[p.id] = p.series;
-    return {
-      portfolios: perPortfolio.map((p) => ({ id: p.id, name: p.name, currency: p.currency, mode: p.mode })),
-      series,
-      perPortfolioSeries,
-      currency,
-    };
   });
 
 
