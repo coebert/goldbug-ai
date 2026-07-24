@@ -263,14 +263,14 @@ function SaxoReconnectPage() {
 
   if (!ready || !email) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-dvh bg-background">
         <AppHeader email={email} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <AppHeader email={email} />
       <main className="mx-auto max-w-3xl px-4 py-6">
         <div className="mb-6 flex items-start justify-between gap-4">

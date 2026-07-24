@@ -169,7 +169,7 @@ function GetStarted() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
         Loading…
       </div>
     );
@@ -178,7 +178,7 @@ function GetStarted() {
   const totalSteps = 4;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-3xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between">

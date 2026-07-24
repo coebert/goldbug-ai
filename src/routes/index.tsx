@@ -166,14 +166,14 @@ function Home() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
         Loading…
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:mb-8 sm:flex sm:items-start sm:justify-between">

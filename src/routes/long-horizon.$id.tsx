@@ -165,7 +165,7 @@ function LongHorizonPage() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
         Loading…
       </div>
     );
@@ -174,7 +174,7 @@ function LongHorizonPage() {
   const portfolio = pQ.data?.portfolio;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">

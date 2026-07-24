@@ -70,7 +70,7 @@ function AttributionPage() {
   const data = q.data;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <AppHeader />
       <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-3">

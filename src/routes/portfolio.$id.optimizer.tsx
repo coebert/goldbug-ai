@@ -80,7 +80,7 @@ function OptimizerPage() {
   const currency = data?.portfolio.currency ?? "";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <AppHeader />
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-4 flex items-center gap-3 flex-wrap">
