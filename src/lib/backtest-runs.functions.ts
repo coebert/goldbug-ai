@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 // Server-side persistence for backtest run history. The card used to
 // stash rows in localStorage; that stayed put per-browser and got lost
@@ -13,8 +14,8 @@ export type PersistedBacktestRun = {
   risk_level: string | null;
   days: number;
   // metrics and equity are opaque to the server — the card owns their shape.
-  metrics: unknown;
-  equity: unknown;
+  metrics: Json;
+  equity: Json | null;
 };
 
 export const listBacktestRuns = createServerFn({ method: "GET" })
