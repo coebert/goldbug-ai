@@ -121,11 +121,11 @@ function ModeChart({
 
   const { series, totalNow, startingTotal, yDomain } = useMemo(() => {
     const opt = RANGE_OPTS.find((r) => r.value === range)!;
-    let s = allSeries;
+    let s = allSeries.filter((row) => Number.isFinite(Number(row[totalKey])));
     if (opt.days && s.length > 0) {
       const cutoff = Date.now() - opt.days * 86_400_000;
       s = s.filter((r) => new Date(String(r.date)).getTime() >= cutoff);
-      if (s.length === 0) s = allSeries.slice(-1);
+      if (s.length === 0) s = allSeries.filter((row) => Number.isFinite(Number(row[totalKey]))).slice(-1);
     }
     const start = s[0] ? Number(s[0][totalKey]) : 0;
     const last = s[s.length - 1] ? Number(s[s.length - 1][totalKey]) : 0;
@@ -230,7 +230,9 @@ function ModeChart({
                           {portfolios.map((p, i) => (
                             <div key={p.id} className="flex justify-between gap-3 tabular-nums">
                               <span className="truncate" style={{ color: LINE_COLORS[i % LINE_COLORS.length] }}>{p.name}</span>
-                              <span className="shrink-0">{currency} {Number(row[p.id] ?? 0).toFixed(2)}</span>
+                              <span className="shrink-0">
+                                {Number.isFinite(Number(row[p.id])) ? `${currency} ${Number(row[p.id]).toFixed(2)}` : "—"}
+                              </span>
                             </div>
                           ))}
                         </div>

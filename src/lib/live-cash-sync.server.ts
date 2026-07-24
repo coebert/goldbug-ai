@@ -77,19 +77,56 @@ export async function syncLiveCashFromBroker(
     return { skipped: true, reason: "no material drift" };
   }
 
-  const newStarting = Math.max(0, prevStarting + delta);
+  const { data: existingHoldings } = await supabaseAdmin
+    .from("holdings")
+    .select("id")
+    .eq("portfolio_id", portfolioId)
+    .limit(1);
+  const hasLocalHoldings = (existingHoldings ?? []).length > 0;
+
+  // Cash can legitimately move when live orders fill, settle, or fees are
+  // booked. Only treat a cash drift as an external deposit/withdrawal while
+  // the portfolio is still cash-only; once assets exist, keep the funding
+  // baseline stable and let holdings reconciliation own total equity.
+  const newStarting = hasLocalHoldings ? prevStarting : Math.max(0, prevStarting + delta);
   const upd = await supabaseAdmin.from("portfolios")
     .update({ current_cash: brokerCash, starting_cash: newStarting })
     .eq("id", portfolioId);
+
+  const latestSnapshotQuery = supabaseAdmin
+    .from("equity_snapshots")
+    .select("holdings_value")
+    .eq("portfolio_id", portfolioId)
+    .order("snapshot_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const latestSnapshot = await latestSnapshotQuery;
+  const holdingsValue = Number(latestSnapshot.data?.holdings_value ?? 0);
+  const today = new Date().toISOString().slice(0, 10);
+  await supabaseAdmin.from("equity_snapshots").upsert(
+    {
+      portfolio_id: portfolioId,
+      snapshot_date: today,
+      cash: brokerCash,
+      holdings_value: holdingsValue,
+      total_value: brokerCash + holdingsValue,
+    },
+    { onConflict: "portfolio_id,snapshot_date" },
+  );
 
   await supabaseAdmin.from("live_broker_log").insert({
     portfolio_id: portfolioId, user_id: p.user_id,
     broker: "saxo", env,
     method: "CASH_SYNC", path: "/sync/cash",
     status: upd.error ? 500 : 200,
-    request: { previousCash: prevCash, previousStarting: prevStarting } as never,
+    request: { previousCash: prevCash, previousStarting: prevStarting, hasLocalHoldings } as never,
     response: {
-      brokerCash, delta, newCash: brokerCash, newStarting, currency,
+      brokerCash,
+      delta,
+      newCash: brokerCash,
+      newStarting,
+      startingCashAdjusted: !hasLocalHoldings,
+      currency,
     } as never,
     error: upd.error?.message ?? null,
   });

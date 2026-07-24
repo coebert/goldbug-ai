@@ -133,24 +133,40 @@ function Home() {
     const series = equityQ.data?.series ?? [];
     const portfolios = (equityQ.data?.portfolios ?? []) as Array<{ id: string; mode?: string }>;
     if (series.length === 0 || portfolios.length === 0) return null;
-    const sumMode = (row: Record<string, unknown>, real: boolean) =>
-      portfolios.reduce((s, p) => {
+    const hasModeValue = (row: Record<string, unknown>, real: boolean) =>
+      portfolios.some((p) => {
         const isReal = p.mode === "live_prod";
-        if (isReal !== real) return s;
+        if (isReal !== real) return false;
         const v = Number(row[p.id]);
-        return s + (Number.isFinite(v) ? v : 0);
+        return Number.isFinite(v);
+      });
+    const sumMode = (row: Record<string, unknown>, real: boolean) =>
+      portfolios.reduce((sum, p) => {
+        const isReal = p.mode === "live_prod";
+        if (isReal !== real) return sum;
+        const value = Number(row[p.id]);
+        return sum + (Number.isFinite(value) ? value : 0);
       }, 0);
-    const last = series[series.length - 1] as Record<string, unknown>;
-    const prev = (series[series.length - 2] as Record<string, unknown>) ?? last;
-    const simNow = sumMode(last, false);
-    const simPrev = sumMode(prev, false);
-    const realNow = sumMode(last, true);
-    const realPrev = sumMode(prev, true);
+    const modeSummary = (real: boolean) => {
+      const rows = series.filter((row) => hasModeValue(row as Record<string, unknown>, real)) as Array<Record<string, unknown>>;
+      const last = rows[rows.length - 1];
+      if (!last) return { now: 0, pnl: 0, pct: 0 };
+      const prev = rows.length > 1 ? rows[rows.length - 2] : last;
+      const now = sumMode(last, real);
+      const previous = sumMode(prev, real);
+      return {
+        now,
+        pnl: now - previous,
+        pct: previous > 0 ? ((now - previous) / previous) * 100 : 0,
+      };
+    };
+    const sim = modeSummary(false);
+    const real = modeSummary(true);
     const simCount = portfolios.filter((p) => p.mode !== "live_prod").length;
     const realCount = portfolios.filter((p) => p.mode === "live_prod").length;
     return {
-      sim: { now: simNow, pnl: simNow - simPrev, pct: simPrev > 0 ? ((simNow - simPrev) / simPrev) * 100 : 0, count: simCount },
-      real: { now: realNow, pnl: realNow - realPrev, pct: realPrev > 0 ? ((realNow - realPrev) / realPrev) * 100 : 0, count: realCount },
+      sim: { ...sim, count: simCount },
+      real: { ...real, count: realCount },
     };
   }, [equityQ.data]);
 
