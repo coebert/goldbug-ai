@@ -117,7 +117,7 @@ export function buildHoldingsOverTime(
   }
 
   // Trim symbols that never held any value in the window — keeps the legend tidy.
-  const kept = symbols.filter((s) => points.some((p) => (p[s] ?? 0) > 0.000001));
+  const kept = symbols.filter((s) => points.some((p) => Number(p[s] ?? 0) > 0.000001));
   if (kept.length !== symbols.length) {
     for (const p of points) {
       for (const s of symbols) {
