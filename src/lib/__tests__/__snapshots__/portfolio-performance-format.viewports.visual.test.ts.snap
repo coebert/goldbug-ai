@@ -1,0 +1,259 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`portfolio performance chart — viewport visual regression > desktop (1440px) — chart layout constants 1`] = `
+{
+  "chartMargin": {
+    "bottom": 8,
+    "left": 0,
+    "right": 12,
+    "top": 8,
+  },
+  "isMobile": false,
+  "xAxis": {
+    "labelText": "Date",
+    "minTickGap": 30,
+    "showLabel": true,
+    "tickFontSize": 11,
+  },
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > desktop (1440px) — tooltip label surface 1`] = `
+{
+  "chipPct": "% vs start",
+  "chipRaw": "value",
+  "header": {
+    "none": "Performance vs benchmark",
+    "spy": "Performance vs SPY",
+  },
+  "valuesPct": [
+    "+0.00%",
+    "+12.50%",
+    "+1234.57%",
+    "-50.25%",
+  ],
+  "valuesRawGbp": [
+    "£ 0.00",
+    "£ 12.50",
+    "£ 1234.57",
+    "£ -50.25",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > desktop (1440px) — x-axis date ticks 1`] = `
+[
+  "2024-01-04",
+  "2024-06-15",
+  "2024-12-31",
+]
+`;
+
+exports[`portfolio performance chart — viewport visual regression > desktop (1440px) — y-axis ticks raw/pct in £ and $ 1`] = `
+{
+  "pct": [
+    "+0%",
+    "+250%",
+    "+1000%",
+    "+12346%",
+    "+1500000%",
+    "-750%",
+  ],
+  "raw_gbp": [
+    "£0",
+    "£250",
+    "£1000",
+    "£12346",
+    "£1500000",
+    "£-750",
+  ],
+  "raw_usd": [
+    "$0",
+    "$250",
+    "$1000",
+    "$12346",
+    "$1500000",
+    "$-750",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > desktop (1440px) — y-axis title text 1`] = `
+{
+  "pct": "Return vs start (%)",
+  "raw_gbp": "Portfolio value (£)",
+  "raw_usd": "Portfolio value ($)",
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > mobile (375px) — chart layout constants 1`] = `
+{
+  "chartMargin": {
+    "bottom": 8,
+    "left": -12,
+    "right": 6,
+    "top": 8,
+  },
+  "isMobile": true,
+  "xAxis": {
+    "labelText": undefined,
+    "minTickGap": 56,
+    "showLabel": false,
+    "tickFontSize": 10,
+  },
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > mobile (375px) — tooltip label surface 1`] = `
+{
+  "chipPct": "% vs start",
+  "chipRaw": "value",
+  "header": {
+    "none": "Performance vs benchmark",
+    "spy": "Performance vs SPY",
+  },
+  "valuesPct": [
+    "+0.00%",
+    "+12.50%",
+    "+1234.57%",
+    "-50.25%",
+  ],
+  "valuesRawGbp": [
+    "£ 0.00",
+    "£ 12.50",
+    "£ 1234.57",
+    "£ -50.25",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > mobile (375px) — x-axis date ticks 1`] = `
+[
+  "Jan 04",
+  "Jun 15",
+  "Dec 31",
+]
+`;
+
+exports[`portfolio performance chart — viewport visual regression > mobile (375px) — y-axis ticks raw/pct in £ and $ 1`] = `
+{
+  "pct": [
+    "+0%",
+    "+250%",
+    "+1000%",
+    "+12346%",
+    "+1500000%",
+    "-750%",
+  ],
+  "raw_gbp": [
+    "£0",
+    "£250",
+    "£1.0k",
+    "£12k",
+    "£1.5M",
+    "£-750",
+  ],
+  "raw_usd": [
+    "$0",
+    "$250",
+    "$1.0k",
+    "$12k",
+    "$1.5M",
+    "$-750",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > mobile (375px) — y-axis title text 1`] = `
+{
+  "pct": "Return vs start (%)",
+  "raw_gbp": "Portfolio value (£)",
+  "raw_usd": "Portfolio value ($)",
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > tablet (834px) — chart layout constants 1`] = `
+{
+  "chartMargin": {
+    "bottom": 8,
+    "left": 0,
+    "right": 12,
+    "top": 8,
+  },
+  "isMobile": false,
+  "xAxis": {
+    "labelText": "Date",
+    "minTickGap": 30,
+    "showLabel": true,
+    "tickFontSize": 11,
+  },
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > tablet (834px) — tooltip label surface 1`] = `
+{
+  "chipPct": "% vs start",
+  "chipRaw": "value",
+  "header": {
+    "none": "Performance vs benchmark",
+    "spy": "Performance vs SPY",
+  },
+  "valuesPct": [
+    "+0.00%",
+    "+12.50%",
+    "+1234.57%",
+    "-50.25%",
+  ],
+  "valuesRawGbp": [
+    "£ 0.00",
+    "£ 12.50",
+    "£ 1234.57",
+    "£ -50.25",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > tablet (834px) — x-axis date ticks 1`] = `
+[
+  "2024-01-04",
+  "2024-06-15",
+  "2024-12-31",
+]
+`;
+
+exports[`portfolio performance chart — viewport visual regression > tablet (834px) — y-axis ticks raw/pct in £ and $ 1`] = `
+{
+  "pct": [
+    "+0%",
+    "+250%",
+    "+1000%",
+    "+12346%",
+    "+1500000%",
+    "-750%",
+  ],
+  "raw_gbp": [
+    "£0",
+    "£250",
+    "£1000",
+    "£12346",
+    "£1500000",
+    "£-750",
+  ],
+  "raw_usd": [
+    "$0",
+    "$250",
+    "$1000",
+    "$12346",
+    "$1500000",
+    "$-750",
+  ],
+}
+`;
+
+exports[`portfolio performance chart — viewport visual regression > tablet (834px) — y-axis title text 1`] = `
+{
+  "pct": "Return vs start (%)",
+  "raw_gbp": "Portfolio value (£)",
+  "raw_usd": "Portfolio value ($)",
+}
+`;
