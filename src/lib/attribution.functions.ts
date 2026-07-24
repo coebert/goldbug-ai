@@ -2,15 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const Input = z.object({
-  portfolioId: z.string().uuid(),
-  windowDays: z.number().int().min(7).max(365).default(90),
-  horizonDays: z.number().int().min(1).max(30).default(5),
-});
-
 export const getAttributionDashboard = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => Input.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({
+      portfolioId: z.string().uuid(),
+      windowDays: z.number().int().min(7).max(365).default(90),
+      horizonDays: z.number().int().min(1).max(30).default(5),
+    }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     // Ownership check via RLS-scoped client
     const { data: owned, error } = await context.supabase

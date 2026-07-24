@@ -2,11 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const SettingsSchema = z.object({
-  enabled: z.boolean(),
-  cadence_days: z.number().int().min(1).max(365),
-});
-
 export const getRetrainSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -29,7 +24,12 @@ export const getRetrainSettings = createServerFn({ method: "GET" })
 
 export const upsertRetrainSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => SettingsSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({
+      enabled: z.boolean(),
+      cadence_days: z.number().int().min(1).max(365),
+    }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("retrain_settings")

@@ -8,11 +8,6 @@ import {
   type HoldingsOverTime,
 } from "./backtest-series";
 
-const InputSchema = z.object({
-  portfolio_id: z.string().uuid(),
-  days: z.number().int().min(1).max(3650),
-});
-
 export type BacktestTradeMarker = {
   date: string;
   executed_at: string | null;
@@ -37,7 +32,12 @@ export type BacktestSeriesResult = {
  */
 export const getBacktestSeries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => InputSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({
+      portfolio_id: z.string().uuid(),
+      days: z.number().int().min(1).max(3650),
+    }).parse(input),
+  )
   .handler(async ({ data, context }): Promise<BacktestSeriesResult> => {
     const { data: pf } = await context.supabase
       .from("portfolios")

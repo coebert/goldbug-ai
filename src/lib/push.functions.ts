@@ -8,16 +8,16 @@ export const getVapidPublicKey = createServerFn({ method: "GET" }).handler(async
   return { publicKey: key };
 });
 
-const subSchema = z.object({
-  endpoint: z.string().url(),
-  p256dh: z.string().min(1),
-  auth: z.string().min(1),
-  userAgent: z.string().max(500).optional(),
-});
-
 export const savePushSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => subSchema.parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({
+      endpoint: z.string().url(),
+      p256dh: z.string().min(1),
+      auth: z.string().min(1),
+      userAgent: z.string().max(500).optional(),
+    }).parse(data),
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { error } = await supabase.from("push_subscriptions").upsert(
