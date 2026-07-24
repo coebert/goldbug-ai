@@ -113,7 +113,7 @@ export async function reconcileLiveHoldingsFromBroker(
       broker: "saxo", env,
       method: "HOLDINGS_SYNC", path: "/sync/holdings",
       status: 502,
-      request: {} as never, response: null,
+      request: asJson({}), response: null,
       error: `broker read failed: ${msg}`,
     });
     return { skipped: true, reason: `broker read failed: ${msg}` };
@@ -141,21 +141,23 @@ export async function reconcileLiveHoldingsFromBroker(
   }
 
   // Upsert broker positions as local holdings.
-  const rowsToUpsert = positions
+  const rowsToUpsert: Insert<"holdings">[] = positions
     .filter((p) => p.symbol && Math.abs(p.quantity) > 1e-8)
-    .map((p) => ({
-      portfolio_id: portfolioId,
-      symbol: p.symbol,
-      asset_class: (ALLOWED_ASSET_CLASSES.has(saxoAssetToClass(p.assetType))
-        ? saxoAssetToClass(p.assetType)
-        : "stock") as never,
-      quantity: p.quantity,
-      avg_cost: p.avgPrice || p.marketPrice || 0,
-      high_water_mark: p.avgPrice || p.marketPrice || 0,
-    }));
+    .map((p) => {
+      const mapped = saxoAssetToClass(p.assetType);
+      const asset_class: AssetClass = ALLOWED_ASSET_CLASSES.has(mapped) ? mapped : "stock";
+      return {
+        portfolio_id: portfolioId,
+        symbol: p.symbol,
+        asset_class,
+        quantity: p.quantity,
+        avg_cost: p.avgPrice || p.marketPrice || 0,
+        high_water_mark: p.avgPrice || p.marketPrice || 0,
+      };
+    });
   if (rowsToUpsert.length > 0) {
     await db.from("holdings").upsert(
-      rowsToUpsert as never,
+      rowsToUpsert,
       { onConflict: "portfolio_id,symbol" },
     );
   }
@@ -188,13 +190,13 @@ export async function reconcileLiveHoldingsFromBroker(
     broker: "saxo", env,
     method: "HOLDINGS_SYNC", path: "/sync/holdings",
     status: 200,
-    request: { localSymbols } as never,
-    response: {
+    request: asJson({ localSymbols }),
+    response: asJson({
       brokerCash, currency, holdingsValue, newTotal,
       brokerPositions: positions.length,
       removedSymbols,
       keptSymbols: Array.from(brokerSymbols),
-    } as never,
+    }),
     error: null,
   });
 
