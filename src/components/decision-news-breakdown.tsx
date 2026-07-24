@@ -60,44 +60,30 @@ export function DecisionNewsBreakdown() {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => setSectionOpen((v) => !v)}
-            className="flex flex-1 items-start gap-2 text-left"
-            aria-expanded={sectionOpen}
-          >
-            {sectionOpen ? (
-              <ChevronUp className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
-            )}
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Layers className="h-4 w-4 text-primary" />
-                Decision → news breakdown
-              </CardTitle>
-              <CardDescription>
-                Each recent decision mapped to the specific headlines that most influenced the AI's take (ranked by sentiment strength).
-              </CardDescription>
-            </div>
-          </button>
-          {sectionOpen && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => { e.stopPropagation(); q.refetch(); }}
-              disabled={q.isFetching}
-              aria-label="Refresh"
-              title="Refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
-            </Button>
-          )}
+      <button
+        type="button"
+        onClick={() => setSectionOpen((v) => !v)}
+        aria-expanded={sectionOpen}
+        className="flex w-full items-start justify-between gap-3 p-6 text-left"
+      >
+        <div className="min-w-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Layers className="h-4 w-4 text-primary" />
+            Decision → news breakdown
+          </CardTitle>
+          <CardDescription className="mt-1.5">
+            Each recent decision mapped to the specific headlines that most influenced the AI's take (ranked by sentiment strength).
+          </CardDescription>
         </div>
-        {sectionOpen && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+        {sectionOpen ? (
+          <ChevronUp className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+      {sectionOpen && (
+        <CardHeader className="pt-0">
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
             <span className="uppercase tracking-wide text-muted-foreground">Portfolio:</span>
             <button
               type="button"
@@ -136,12 +122,23 @@ export function DecisionNewsBreakdown() {
             >
               News-cited only
             </button>
-            <span className="ml-auto text-muted-foreground">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto h-7 px-2"
+              onClick={() => q.refetch()}
+              disabled={q.isFetching}
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
+            </Button>
+            <span className="w-full text-muted-foreground">
               {visible.length} of {items.length} decisions
             </span>
           </div>
-        )}
-      </CardHeader>
+        </CardHeader>
+      )}
       {sectionOpen && (
       <CardContent>
         {q.isLoading ? (
