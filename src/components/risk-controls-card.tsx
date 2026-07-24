@@ -617,6 +617,7 @@ export function RiskControlsCard({
                 </div>
               )}
             </div>
+            </>
             )}
 
 
