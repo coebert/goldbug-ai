@@ -64,6 +64,7 @@ import {
   tightenForRegime,
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
+import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
   filterUniverse,
   filterUniverseByAffordability,
@@ -1103,7 +1104,44 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   }
 
+  // ---- Broker-simulator invariant guard ---------------------------------
+  // Replays the final executed order list through a pure ledger with
+  // strict no-borrow / no-leverage rules. Risk level tunes strictness
+  // (see broker-simulator-integration.ts). Diagnostics-only: the guard
+  // NEVER mutates persisted state — a mismatch is logged into the
+  // decision guardrails for later inspection.
+  let brokerSimGuard: ReturnType<typeof runBrokerSimulatorGuard> | null = null;
+  try {
+    brokerSimGuard = runBrokerSimulatorGuard({
+      riskLevel: portfolio.risk_level,
+      startingCash: cash,
+      startingHoldings: (holdings ?? []).map((h) => ({
+        symbol: h.symbol,
+        quantity: Number(h.quantity),
+        avgCost: Number(h.avg_cost),
+      })),
+      executed,
+      priceMap: Object.fromEntries(priceMap.entries()),
+    });
+    if (!brokerSimGuard.ledgerMatchesEngine) {
+      console.warn(
+        "broker-simulator guard flagged divergence",
+        {
+          portfolioId,
+          asOf,
+          riskLevel: portfolio.risk_level,
+          rejected: brokerSimGuard.rejectedTradeIds.length,
+          drift: brokerSimGuard.drift.length,
+        },
+      );
+    }
+  } catch (e) {
+    console.warn("broker-simulator guard skipped:", e);
+  }
+
   // Persist state
+
+
 
 
   const admin = supabaseAdmin;
@@ -1210,6 +1248,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           broker_blocked: brokerBlockedSymbols,
           notes: budgetNotes,
         },
+        broker_simulator: brokerSimGuard
+          ? {
+              risk_level: portfolio.risk_level,
+              options: brokerSimGuard.options,
+              ledger_matches_engine: brokerSimGuard.ledgerMatchesEngine,
+              rejected_trade_ids: brokerSimGuard.rejectedTradeIds,
+              drift: brokerSimGuard.drift,
+              final_cash: brokerSimGuard.simulation.finalState.cash,
+              final_holdings: brokerSimGuard.simulation.finalState.holdings,
+            }
+          : { skipped: true },
       },
       regime: regime ?? null,
       learning: {
