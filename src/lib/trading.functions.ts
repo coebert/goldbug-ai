@@ -645,7 +645,39 @@ export const runBacktest = createServerFn({ method: "POST" })
         await snapshotPortfolio(data.portfolio_id, d).catch(() => {});
       }
     }
-    return { ok: true, days: dates.length, finalValue: lastTotal };
+
+    // Compute key performance metrics for this backtest run.
+    const { computeBacktestMetrics } = await import("./backtest-metrics");
+    const [{ data: eqRows }, { data: tradeRows }] = await Promise.all([
+      context.supabase
+        .from("equity_snapshots")
+        .select("snapshot_date,total_value")
+        .eq("portfolio_id", data.portfolio_id)
+        .order("snapshot_date", { ascending: true }),
+      context.supabase
+        .from("trades")
+        .select("trade_date,executed_at,side,symbol,quantity,price")
+        .eq("portfolio_id", data.portfolio_id)
+        .order("trade_date", { ascending: true }),
+    ]);
+    const startingCash = Number(p?.starting_cash ?? 0);
+    const metrics = computeBacktestMetrics(
+      (eqRows ?? []).map((r) => ({
+        snapshot_date: r.snapshot_date as string,
+        total_value: Number(r.total_value),
+      })),
+      (tradeRows ?? []).map((t) => ({
+        trade_date: t.trade_date as string,
+        executed_at: (t.executed_at as string | null) ?? null,
+        side: t.side as "buy" | "sell",
+        symbol: t.symbol as string,
+        quantity: Number(t.quantity),
+        price: Number(t.price),
+      })),
+      startingCash,
+    );
+
+    return { ok: true, days: dates.length, finalValue: lastTotal, metrics };
   });
 
 // ---------- Comparison ----------

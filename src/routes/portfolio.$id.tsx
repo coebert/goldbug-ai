@@ -255,10 +255,23 @@ function PortfolioPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
+  const [lastBtMetrics, setLastBtMetrics] = useState<
+    import("@/lib/backtest-metrics").BacktestMetrics | null
+  >(null);
   const runBt = useMutation({
     mutationFn: () => runBtFn({ data: { portfolio_id: id, days } }),
     onSuccess: (r) => {
-      toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
+      const m = r.metrics;
+      setLastBtMetrics(m ?? null);
+      if (m) {
+        const winPart =
+          m.winRatePct != null ? ` · Win ${m.winRatePct.toFixed(0)}%` : "";
+        toast.success(
+          `Backtest done. Return ${m.totalReturnPct.toFixed(2)}% · MDD ${m.maxDrawdownPct.toFixed(2)}% · Sharpe ${m.sharpe.toFixed(2)}${winPart}`,
+        );
+      } else {
+        toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
+      }
       qc.invalidateQueries({ queryKey: ["portfolio", id] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
@@ -692,6 +705,27 @@ function PortfolioPage() {
                 )}
               </CardContent>
             </Card>
+
+            {lastBtMetrics && (
+              <Card className="mb-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Backtest metrics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <Metric label="Total return" value={`${lastBtMetrics.totalReturnPct.toFixed(2)}%`} tone={lastBtMetrics.totalReturnPct >= 0 ? "up" : "down"} />
+                    <Metric label="Max drawdown" value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`} tone="down" hint={lastBtMetrics.maxDrawdownPeakDate && lastBtMetrics.maxDrawdownTroughDate ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}` : undefined} />
+                    <Metric label="Sharpe (ann.)" value={lastBtMetrics.sharpe.toFixed(2)} tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"} />
+                    <Metric label="Win rate" value={lastBtMetrics.winRatePct != null ? `${lastBtMetrics.winRatePct.toFixed(0)}%` : "—"} hint={`${lastBtMetrics.wins}W / ${lastBtMetrics.losses}L / ${lastBtMetrics.trades} trades`} />
+                    <Metric label="Volatility (ann.)" value={`${lastBtMetrics.volatilityPct.toFixed(2)}%`} />
+                    <Metric label="Best day" value={`${lastBtMetrics.bestDayPct.toFixed(2)}%`} tone="up" />
+                    <Metric label="Worst day" value={`${lastBtMetrics.worstDayPct.toFixed(2)}%`} tone="down" />
+                    <Metric label="Realized PnL" value={lastBtMetrics.grossRealizedPnl.toFixed(2)} tone={lastBtMetrics.grossRealizedPnl >= 0 ? "up" : "down"} />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
 
             {(() => {
               const cb = p.circuit_breaker as { paused?: boolean; reason?: string; tripped_at?: string } | null;
@@ -1760,3 +1794,25 @@ function DecisionCard({
   );
 }
 
+
+function Metric({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "up" | "down";
+}) {
+  const toneClass =
+    tone === "up" ? "text-emerald-400" : tone === "down" ? "text-red-400" : "";
+  return (
+    <div className="min-w-0 rounded-md border border-border/60 bg-card px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`truncate text-base font-semibold tabular-nums ${toneClass}`}>{value}</div>
+      {hint ? <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{hint}</div> : null}
+    </div>
+  );
+}
