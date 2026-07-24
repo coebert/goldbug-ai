@@ -206,8 +206,17 @@ export async function routeOrdersToBroker(params: {
   const attemptSeed = decisionId ?? new Date().toISOString().slice(0, 16);
 
 
+  // Saxo's /trade/v2/orders endpoint is rate-limited to roughly 1 request per
+  // second per app. Space out submissions so a multi-order run doesn't get the
+  // first order accepted and every follow-up rejected with HTTP 429.
+  const ORDER_SPACING_MS = 1500;
+  let firstOrder = true;
 
   for (const order of routable) {
+    if (!firstOrder) {
+      await new Promise((resolve) => setTimeout(resolve, ORDER_SPACING_MS));
+    }
+    firstOrder = false;
     const clientOrderId = makeClientOrderId({
       portfolioId: portfolio.id,
       attemptSeed,
