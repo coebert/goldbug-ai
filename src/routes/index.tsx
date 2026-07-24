@@ -58,6 +58,8 @@ import { toast } from "sonner";
 import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle, MoreVertical, TrendingUp, TrendingDown, Clock, Pencil } from "lucide-react";
 import { Explain } from "@/components/explain";
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
+import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
+
 
 
 export const Route = createFileRoute("/")({
@@ -424,6 +426,9 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const isSim = portfolio.mode !== "live_prod";
+
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => {
@@ -496,7 +501,18 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                 >
                   <Pencil className="mr-2 h-4 w-4" /> Rename portfolio
                 </DropdownMenuItem>
+                {isSim && (
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setAddFundsOpen(true);
+                    }}
+                  >
+                    <Banknote className="mr-2 h-4 w-4" /> Add simulated funds
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onSelect={(e) => {
@@ -586,7 +602,19 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
         portfolioId={portfolio.id}
         currentName={portfolio.name}
       />
+      {isSim && (
+        <AddSimFundsDialog
+          open={addFundsOpen}
+          onOpenChange={setAddFundsOpen}
+          portfolioId={portfolio.id}
+          portfolioName={portfolio.name}
+          currency={portfolio.currency}
+          currentCash={Number(portfolio.current_cash)}
+          startingCash={Number(portfolio.starting_cash)}
+        />
+      )}
     </Card>
+
   );
 }
 

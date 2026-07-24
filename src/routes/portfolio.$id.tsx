@@ -33,8 +33,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles, Pencil } from "lucide-react";
+import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles, Pencil, Banknote } from "lucide-react";
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
+import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
+
 import {
   Collapsible,
   CollapsibleContent,
@@ -93,6 +95,8 @@ function PortfolioPage() {
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [addFundsOpen, setAddFundsOpen] = useState(false);
+
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -441,9 +445,20 @@ function PortfolioPage() {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
+                  {p.mode !== "live_prod" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1"
+                      onClick={() => setAddFundsOpen(true)}
+                    >
+                      <Banknote className="h-4 w-4" /> Add funds
+                    </Button>
+                  )}
                   <ModeBadge mode={p.mode} />
                   <LiveToggle portfolioId={p.id} mode={p.mode} livePaused={(p as { live_paused?: boolean | null }).live_paused} />
                 </div>
+
                 <p className="text-sm text-muted-foreground">
                   {p.currency} {startingCash.toFixed(0)} <Explain term="starting_pot">starting pot</Explain> · <Explain term="risk_level">{p.risk_level} risk</Explain>
                 </p>
@@ -1153,6 +1168,17 @@ function PortfolioPage() {
           onOpenChange={setRenameOpen}
           portfolioId={p.id}
           currentName={p.name}
+        />
+      )}
+      {p && p.mode !== "live_prod" && (
+        <AddSimFundsDialog
+          open={addFundsOpen}
+          onOpenChange={setAddFundsOpen}
+          portfolioId={p.id}
+          portfolioName={p.name}
+          currency={p.currency}
+          currentCash={Number(p.current_cash)}
+          startingCash={Number(p.starting_cash)}
         />
       )}
     </div>
