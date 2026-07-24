@@ -513,6 +513,36 @@ function PortfolioPage() {
               </div>
             </div>
 
+            {underfunded && (
+              <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">Portfolio underfunded — no affordable instruments</p>
+                    <p className="text-muted-foreground">
+                      The latest AI run found no tradeable symbols. Per-symbol budget is{" "}
+                      <span className="font-medium text-foreground">
+                        {p.currency} {underfunded.budget.toFixed(2)}
+                      </span>{" "}
+                      and the minimum trade value is{" "}
+                      <span className="font-medium text-foreground">
+                        {p.currency} {underfunded.minTradeValue.toFixed(2)}
+                      </span>
+                      . Try adding funds{p.mode !== "live_prod" ? " to this portfolio" : " to your broker account"}, raising the max position size, or lowering the minimum trade value in Risk controls.
+                    </p>
+                    {underfunded.notes.length > 0 && (
+                      <p className="text-xs text-muted-foreground">{underfunded.notes.slice(0, 2).join(" · ")}</p>
+                    )}
+                    <div className="pt-1">
+                      <Button size="sm" variant="outline" onClick={() => setTab("risk")}>Open Risk controls</Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
+
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
               <TabsList className="flex w-full flex-wrap justify-start gap-1 h-auto p-1 md:flex-nowrap md:overflow-x-auto">
                 <TabsTrigger value="overview" className="min-h-10">Overview</TabsTrigger>
