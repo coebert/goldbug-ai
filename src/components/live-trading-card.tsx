@@ -227,10 +227,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
 
         {s && (s.orders.length > 0 || s.fills.length > 0 || s.reconciliation.length > 0) && (
           <div className="grid gap-3 md:grid-cols-3 text-xs">
-            <MiniList title={`Orders (${s.orders.length})`} rows={s.orders.map((o) => ({
-              key: o.id,
-              text: `${new Date(o.created_at).toLocaleString()} · ${o.side} ${o.quantity} ${o.symbol} · ${o.status}`,
-            }))} />
+            <OrderTimelineList orders={s.orders} fills={s.fills} />
             <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
               key: f.id,
               text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
