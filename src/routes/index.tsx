@@ -228,6 +228,9 @@ function Home() {
           </a>
         </div>
 
+        {/* Snapshot timing mismatch warning — dashboard totals may be stale. */}
+        <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
+
         {/* Today summary strip — real and simulated kept strictly separate */}
         {todaySummary && (
           <div className="mb-6 grid gap-2 sm:grid-cols-3">
