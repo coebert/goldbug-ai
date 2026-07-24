@@ -41,8 +41,8 @@ export const saveBacktestRun = createServerFn({ method: "POST" })
       riskLevel?: string | null;
       days: number;
       ranAt?: string;
-      metrics: unknown;
-      equity?: unknown;
+      metrics: Json;
+      equity?: Json | null;
     }) => input,
   )
   .handler(async ({ data, context }) => {
