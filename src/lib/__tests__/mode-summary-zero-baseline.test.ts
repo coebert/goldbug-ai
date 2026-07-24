@@ -102,7 +102,7 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
     const html = renderToString(
       React.createElement(ModeSummaryTile, { ...baseProps, money: 150, pnl: 150, pct: 0 }),
     );
-    expect(html).toMatch(/\+(<!---->)?0\.00(<!---->)?%/);
+    expect(html).toMatch(/\+(<!-- -->)?0\.00(<!-- -->)?%/);
     expect(html).not.toMatch(/NaN/);
     expect(html).not.toMatch(/Infinity/);
     // Positive pnl → emerald tone.
@@ -113,7 +113,7 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
     const html = renderToString(
       React.createElement(ModeSummaryTile, { ...baseProps, money: 0, pnl: -50, pct: 0 }),
     );
-    expect(html).toMatch(/0\.00(<!---->)?%/);
+    expect(html).toMatch(/0\.00(<!-- -->)?%/);
     expect(html).toContain("text-red-400");
     expect(html).not.toMatch(/NaN/);
   });
@@ -132,7 +132,7 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
     );
     // React SSR inserts <!-- --> markers between adjacent expressions,
     // so match the digits and % separately.
-    expect(html).toMatch(/0\.00(<!---->)?%/);
+    expect(html).toMatch(/0\.00(<!-- -->)?%/);
     expect(html).not.toMatch(/Infinity/);
     expect(html).not.toMatch(/NaN/);
   });
@@ -146,9 +146,9 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
         pct: Number.NaN,
       }),
     );
-    expect(html).toMatch(/0\.00(<!---->)?%/);
+    expect(html).toMatch(/0\.00(<!-- -->)?%/);
     expect(html).toContain("£300");
     expect(html).not.toMatch(/£NaN/);
-    expect(html).not.toMatch(/NaN(<!---->)?%/);
+    expect(html).not.toMatch(/NaN(<!-- -->)?%/);
   });
 });
