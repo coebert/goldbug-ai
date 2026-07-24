@@ -281,14 +281,14 @@ function ComparePage() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center justify-between gap-2">
                   <span>Equity curves (% return)</span>
-                  {focused && (
-                    <Button variant="ghost" size="sm" onClick={() => setFocused(null)}>
+                  {hidden.size > 0 && (
+                    <Button variant="ghost" size="sm" onClick={() => setHidden(new Set())}>
                       Show all
                     </Button>
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Normalised to starting pot. Click a legend item to isolate one line; click again to reset.
+                  Normalised to starting pot. Tap a legend chip to hide/show that line. Double-tap to isolate.
                 </CardDescription>
               </CardHeader>
               <CardContent>
