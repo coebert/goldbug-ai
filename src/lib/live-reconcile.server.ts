@@ -68,7 +68,7 @@ export async function runReconciliation(
   await (await import("@/lib/live-cash-sync.server"))
     .syncLiveCashFromBroker(portfolioId, owned);
   await (await import("@/lib/live-holdings-sync.server"))
-    .reconcileLiveHoldingsFromBroker(portfolioId, client);
+    .reconcileLiveHoldingsFromBroker(portfolioId, owned);
 
   // On the admin branch RLS is bypassed, so re-scope by user_id. On the
   // authenticated branch the RLS policy already restricts the row set.

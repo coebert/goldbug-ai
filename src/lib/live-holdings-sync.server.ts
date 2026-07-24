@@ -16,8 +16,7 @@
 // are still applied because the broker is authoritative here; only true
 // broker read failures leave local state alone.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { ScopedDbClient } from "@/lib/live-cash-sync.server";
+import type { OwnedDbClient } from "@/lib/_server/owned-client";
 
 export type LiveHoldingsSyncResult =
   | { skipped: true; reason: string }
@@ -47,17 +46,27 @@ function saxoAssetToClass(assetType: string | undefined): string {
 
 export async function reconcileLiveHoldingsFromBroker(
   portfolioId: string,
-  client?: ScopedDbClient,
+  owned: OwnedDbClient,
 ): Promise<LiveHoldingsSyncResult> {
   // Same pattern as syncLiveCashFromBroker: prefer the caller's user-scoped
-  // client so RLS enforces ownership; admin only for cron paths.
-  const db = client ?? supabaseAdmin;
-  const { data: p, error } = await db
+  // client so RLS enforces ownership; on the admin branch (cron) RLS is
+  // bypassed and we add `.eq("user_id", userId)` on the top-level portfolio
+  // lookup as defence-in-depth. Downstream `.eq("portfolio_id", …)` calls
+  // are safe on both branches once portfolio ownership has been proven.
+  const { db, userId, isAdmin } = owned;
+
+  const portfolioQuery = db
     .from("portfolios")
     .select("id, user_id, mode, live_paused")
-    .eq("id", portfolioId)
-    .maybeSingle();
+    .eq("id", portfolioId);
+  const { data: p, error } = await (isAdmin
+    ? portfolioQuery.eq("user_id", userId)
+    : portfolioQuery
+  ).maybeSingle();
   if (error || !p) return { skipped: true, reason: "portfolio not found" };
+  if (p.user_id !== userId) {
+    return { skipped: true, reason: "portfolio not owned by caller" };
+  }
   if (p.mode !== "live_sim" && p.mode !== "live_prod") {
     return { skipped: true, reason: "not a live portfolio" };
   }
