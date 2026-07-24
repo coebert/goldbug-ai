@@ -55,8 +55,10 @@ const DecisionNewsBreakdown = lazy(() =>
 );
 
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle, MoreVertical, TrendingUp, TrendingDown, Clock } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle, MoreVertical, TrendingUp, TrendingDown, Clock, Pencil } from "lucide-react";
 import { Explain } from "@/components/explain";
+import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
+
 
 export const Route = createFileRoute("/")({
   ssr: false,
