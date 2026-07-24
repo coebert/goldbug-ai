@@ -278,8 +278,11 @@ export class SaxoAdapter implements BrokerAdapter {
       let currency = df.Currency ?? "GBP";
       const quantity = firstFiniteNumber(base.Amount, base.AmountLong) ?? 0;
       const absQuantity = Math.abs(quantity);
-      const perUnit = (value: number | undefined | null) =>
-        value != null && absQuantity > 0 ? Math.abs(Number(value)) / absQuantity : undefined;
+      const perUnit = (value: number | undefined | null) => {
+        if (value == null || absQuantity <= 0) return undefined;
+        const n = Math.abs(Number(value));
+        return Number.isFinite(n) ? n / absQuantity : undefined;
+      };
       const avgPrice = firstPositiveNumber(
         base.AverageOpenPrice,
         view.AverageOpenPrice,
