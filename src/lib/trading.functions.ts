@@ -1674,6 +1674,67 @@ export const getPortfolioLearning = createServerFn({ method: "GET" })
     return { as_of: asOf, ...ctx };
   });
 
+// ============================================================================
+// Lesson overrides: mark AI-authored lessons as unhelpful (disable) or edit
+// them so the trading engine uses the user-approved wording.
+// ============================================================================
+
+export const listLessonOverrides = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("lesson_overrides")
+      .select("id, original_text, action, replacement_text, reason, updated_at")
+      .order("updated_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return { overrides: data ?? [] };
+  });
+
+const SetLessonOverrideSchema = z.object({
+  original_text: z.string().min(1).max(2000),
+  action: z.enum(["disabled", "edited"]),
+  replacement_text: z.string().max(2000).optional().nullable(),
+  reason: z.string().max(500).optional().nullable(),
+});
+
+export const setLessonOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => SetLessonOverrideSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    if (data.action === "edited" && !(data.replacement_text && data.replacement_text.trim())) {
+      throw new Error("Replacement text is required when editing a lesson.");
+    }
+    const { error } = await context.supabase
+      .from("lesson_overrides")
+      .upsert(
+        {
+          user_id: context.userId,
+          original_text: data.original_text,
+          action: data.action,
+          replacement_text: data.action === "edited" ? (data.replacement_text ?? "").trim() : null,
+          reason: data.reason?.trim() || null,
+        },
+        { onConflict: "user_id,original_text" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const clearLessonOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ original_text: z.string().min(1).max(2000) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("lesson_overrides")
+      .delete()
+      .eq("user_id", context.userId)
+      .eq("original_text", data.original_text);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const getBenchmarkSeries = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
