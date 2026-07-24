@@ -447,8 +447,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                   className="text-destructive focus:text-destructive"
                   onSelect={(e) => {
                     e.preventDefault();
-                    if (confirm(`Delete "${portfolio.name}"? This cannot be undone.`))
-                      deleteMut.mutate(portfolio.id);
+                    setConfirmDelete(true);
                   }}
                 >
                   <Trash2 className="mr-2 h-4 w-4" /> Delete portfolio
