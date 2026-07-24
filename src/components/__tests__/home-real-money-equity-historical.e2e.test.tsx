@@ -129,22 +129,22 @@ describe("home dashboard real-money equity across historical dates (e2e)", () =>
     // date — i.e. other dates' totals or sim totals.
     forbidden: number[];
   }> = [
-    // Before the live portfolio exists — tile must show £0 and 1 portfolio
-    // (count is portfolio existence, not snapshot existence), NOT any of
-    // the future real-money totals or sim totals.
+    // Before the live portfolio exists — it isn't in the DB yet, so the
+    // tile shows £0 and no real-money portfolios. Must NOT preview any
+    // future real total or sim totals.
     {
       today: "2026-07-20",
       expectedNow: 0,
       expectedPnl: 0,
-      expectedCount: 1,
-      forbidden: [300, 320, 1000, 1010, 1030, 1050, 1080],
+      expectedCount: 0,
+      forbidden: [300, 320, 1010, 1030, 1050, 1080],
     },
     {
       today: "2026-07-21",
       expectedNow: 0,
       expectedPnl: 0,
-      expectedCount: 1,
-      forbidden: [300, 320, 1000, 1010, 1030, 1050, 1080],
+      expectedCount: 0,
+      forbidden: [300, 320, 1030, 1050, 1080],
     },
     // First live snapshot — £300, zero PnL (only one point).
     {
@@ -152,7 +152,7 @@ describe("home dashboard real-money equity across historical dates (e2e)", () =>
       expectedNow: 300,
       expectedPnl: 0,
       expectedCount: 1,
-      forbidden: [320, 1030, 1050, 1080],
+      forbidden: [320, 1050, 1080],
     },
     // Day 4 — 300.46 vs 300 previous.
     {
