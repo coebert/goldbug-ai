@@ -552,6 +552,31 @@ function ComparePage() {
           </div>
         </div>
       </main>
+
+      {/* Mobile Configure FAB + bottom sheet */}
+      <Sheet open={configOpen} onOpenChange={setConfigOpen}>
+        <button
+          type="button"
+          onClick={() => setConfigOpen(true)}
+          className="fixed bottom-20 right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 ring-2 ring-primary/20 hover:bg-primary/90 md:bottom-6 lg:hidden"
+          aria-label="Configure comparison"
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+          Configure
+          {selected.length > 0 && (
+            <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-[11px] font-bold">
+              {selected.length}
+            </span>
+          )}
+        </button>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="text-left">
+            <SheetTitle>Select portfolios</SheetTitle>
+            <SheetDescription>{selected.length}/6 selected · Choose up to 6, then run or compare.</SheetDescription>
+          </SheetHeader>
+          <div className="pt-4">{controls}</div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
