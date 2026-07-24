@@ -15,6 +15,16 @@
 //    transient Saxo outage.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+
+/**
+ * Supabase client used for the actual reads/writes. When the caller passes
+ * their own authenticated client (from `requireSupabaseAuth` context),
+ * every write goes through RLS as that user — service_role is only used
+ * for unauthenticated cron paths that have no session to attach.
+ */
+export type ScopedDbClient = SupabaseClient<Database>;
 
 const DRIFT_EPSILON = 0.5;
 
@@ -32,8 +42,12 @@ export type LiveCashSyncResult =
 
 export async function syncLiveCashFromBroker(
   portfolioId: string,
+  client?: ScopedDbClient,
 ): Promise<LiveCashSyncResult> {
-  const { data: p, error } = await supabaseAdmin
+  // Prefer the caller's user-scoped client so RLS enforces ownership.
+  // Fall back to admin for cron-triggered paths that have no session.
+  const db = client ?? supabaseAdmin;
+  const { data: p, error } = await db
     .from("portfolios")
     .select("id, user_id, mode, current_cash, starting_cash, live_paused")
     .eq("id", portfolioId)
@@ -58,7 +72,7 @@ export async function syncLiveCashFromBroker(
     currency = bal.currency;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await supabaseAdmin.from("live_broker_log").insert({
+    await db.from("live_broker_log").insert({
       portfolio_id: portfolioId, user_id: p.user_id,
       broker: "saxo", env,
       method: "CASH_SYNC", path: "/sync/cash",
@@ -77,7 +91,7 @@ export async function syncLiveCashFromBroker(
     return { skipped: true, reason: "no material drift" };
   }
 
-  const { data: existingHoldings } = await supabaseAdmin
+  const { data: existingHoldings } = await db
     .from("holdings")
     .select("id")
     .eq("portfolio_id", portfolioId)
@@ -89,11 +103,11 @@ export async function syncLiveCashFromBroker(
   // the portfolio is still cash-only; once assets exist, keep the funding
   // baseline stable and let holdings reconciliation own total equity.
   const newStarting = hasLocalHoldings ? prevStarting : Math.max(0, prevStarting + delta);
-  const upd = await supabaseAdmin.from("portfolios")
+  const upd = await db.from("portfolios")
     .update({ current_cash: brokerCash, starting_cash: newStarting })
     .eq("id", portfolioId);
 
-  const latestSnapshotQuery = supabaseAdmin
+  const latestSnapshotQuery = db
     .from("equity_snapshots")
     .select("holdings_value")
     .eq("portfolio_id", portfolioId)
@@ -103,7 +117,7 @@ export async function syncLiveCashFromBroker(
   const latestSnapshot = await latestSnapshotQuery;
   const holdingsValue = Number(latestSnapshot.data?.holdings_value ?? 0);
   const today = new Date().toISOString().slice(0, 10);
-  await writeCashSyncSnapshot(supabaseAdmin as unknown as CashSyncSnapshotClient, {
+  await writeCashSyncSnapshot(db as unknown as CashSyncSnapshotClient, {
     portfolioId,
     snapshotDate: today,
     cash: brokerCash,
@@ -112,7 +126,7 @@ export async function syncLiveCashFromBroker(
 
 
 
-  await supabaseAdmin.from("live_broker_log").insert({
+  await db.from("live_broker_log").insert({
     portfolio_id: portfolioId, user_id: p.user_id,
     broker: "saxo", env,
     method: "CASH_SYNC", path: "/sync/cash",

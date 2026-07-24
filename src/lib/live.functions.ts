@@ -249,8 +249,10 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     // Pick up any external deposits/withdrawals into Saxo before returning the
     // broker snapshot so the UI immediately reflects the newly-available cash.
+    // Pass context.supabase so external cash movements are picked up under
+    // the caller's RLS (portfolio/holdings/equity writes all owner-scoped).
     const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
-    const sync = await syncLiveCashFromBroker(data.portfolioId);
+    const sync = await syncLiveCashFromBroker(data.portfolioId, context.supabase);
     const env = own.data.mode === "live_prod" ? "live" : "sim";
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
     const adapter = await buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
@@ -341,7 +343,7 @@ export const reconcilePortfolio = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({ portfolioId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
-    return runReconciliation(context.userId, data.portfolioId);
+    return runReconciliation(context.userId, data.portfolioId, context.supabase);
   });
 
 /** Fetch Saxo order statuses for every open live order and update fills. */

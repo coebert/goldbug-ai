@@ -17,6 +17,7 @@
 // broker read failures leave local state alone.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { ScopedDbClient } from "@/lib/live-cash-sync.server";
 
 export type LiveHoldingsSyncResult =
   | { skipped: true; reason: string }
@@ -46,8 +47,12 @@ function saxoAssetToClass(assetType: string | undefined): string {
 
 export async function reconcileLiveHoldingsFromBroker(
   portfolioId: string,
+  client?: ScopedDbClient,
 ): Promise<LiveHoldingsSyncResult> {
-  const { data: p, error } = await supabaseAdmin
+  // Same pattern as syncLiveCashFromBroker: prefer the caller's user-scoped
+  // client so RLS enforces ownership; admin only for cron paths.
+  const db = client ?? supabaseAdmin;
+  const { data: p, error } = await db
     .from("portfolios")
     .select("id, user_id, mode, live_paused")
     .eq("id", portfolioId)
@@ -87,7 +92,7 @@ export async function reconcileLiveHoldingsFromBroker(
     positions = pos;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await supabaseAdmin.from("live_broker_log").insert({
+    await db.from("live_broker_log").insert({
       portfolio_id: portfolioId, user_id: p.user_id,
       broker: "saxo", env,
       method: "HOLDINGS_SYNC", path: "/sync/holdings",
@@ -105,7 +110,7 @@ export async function reconcileLiveHoldingsFromBroker(
   );
 
   // Load existing local holdings so we know what to delete.
-  const existing = await supabaseAdmin
+  const existing = await db
     .from("holdings").select("symbol")
     .eq("portfolio_id", portfolioId);
   const localSymbols = (existing.data ?? []).map((r) => r.symbol);
@@ -114,7 +119,7 @@ export async function reconcileLiveHoldingsFromBroker(
     (s) => !brokerSymbols.has(s.toUpperCase()),
   );
   if (removedSymbols.length > 0) {
-    await supabaseAdmin.from("holdings")
+    await db.from("holdings")
       .delete().eq("portfolio_id", portfolioId)
       .in("symbol", removedSymbols);
   }
@@ -133,7 +138,7 @@ export async function reconcileLiveHoldingsFromBroker(
       high_water_mark: p.avgPrice || p.marketPrice || 0,
     }));
   if (rowsToUpsert.length > 0) {
-    await supabaseAdmin.from("holdings").upsert(
+    await db.from("holdings").upsert(
       rowsToUpsert as never,
       { onConflict: "portfolio_id,symbol" },
     );
@@ -146,12 +151,12 @@ export async function reconcileLiveHoldingsFromBroker(
   );
   const newTotal = brokerCash + holdingsValue;
 
-  await supabaseAdmin.from("portfolios")
+  await db.from("portfolios")
     .update({ current_cash: brokerCash })
     .eq("id", portfolioId);
 
   const asOf = new Date().toISOString().slice(0, 10);
-  await supabaseAdmin.from("equity_snapshots").upsert(
+  await db.from("equity_snapshots").upsert(
     {
       portfolio_id: portfolioId,
       snapshot_date: asOf,
@@ -162,7 +167,7 @@ export async function reconcileLiveHoldingsFromBroker(
     { onConflict: "portfolio_id,snapshot_date" },
   );
 
-  await supabaseAdmin.from("live_broker_log").insert({
+  await db.from("live_broker_log").insert({
     portfolio_id: portfolioId, user_id: p.user_id,
     broker: "saxo", env,
     method: "HOLDINGS_SYNC", path: "/sync/holdings",
