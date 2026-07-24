@@ -391,41 +391,96 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
 
   return (
     <Card>
-      <CardContent className="flex items-center justify-between gap-4 py-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/portfolio/$id"
-              params={{ id: portfolio.id }}
-              className="font-medium hover:underline"
-            >
-              {portfolio.name}
-            </Link>
-            <ModeBadge mode={portfolio.mode} size="sm" />
-            <LiveToggle portfolioId={portfolio.id} mode={portfolio.mode} livePaused={portfolio.live_paused} size="sm" />
+      <CardContent className="p-4 sm:p-5">
+        {/* Row 1 — Identity + primary actions */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/portfolio/$id"
+                params={{ id: portfolio.id }}
+                className="truncate text-base font-semibold hover:underline"
+              >
+                {portfolio.name}
+              </Link>
+              <ModeBadge mode={portfolio.mode} size="sm" />
+              <LiveToggle
+                portfolioId={portfolio.id}
+                mode={portfolio.mode}
+                livePaused={portfolio.live_paused}
+                size="sm"
+              />
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} ·{" "}
+              {portfolio.risk_level} risk
+              {portfolio.last_run_date && ` · last run ${portfolio.last_run_date}`}
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} · {portfolio.risk_level} risk
-            {portfolio.last_run_date && ` · last run ${portfolio.last_run_date}`}
+          <div className="flex shrink-0 items-center gap-1">
+            <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
+              <Button size="sm" variant="outline" className="h-10">
+                <PlayCircle className="mr-1 h-4 w-4" /> Open
+              </Button>
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-10 w-10"
+                  aria-label={`More actions for ${portfolio.name}`}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
+                    Open portfolio
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (confirm(`Delete "${portfolio.name}"? This cannot be undone.`))
+                      deleteMut.mutate(portfolio.id);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete portfolio
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex flex-col items-end gap-1" title="Recent equity trend">
+
+        {/* Row 2 — Trend + balance */}
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Sparkline values={values} width={120} height={36} />
+              <Sparkline values={values} width={120} height={32} />
               {rangePct != null && (
-                <span className={`text-xs font-medium tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  {rangePct >= 0 ? "+" : ""}{rangePct.toFixed(1)}%
+                <span
+                  className={`text-sm font-semibold tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}
+                >
+                  {rangePct >= 0 ? "+" : ""}
+                  {rangePct.toFixed(1)}%
                 </span>
               )}
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {sparkRange}
+              </span>
             </div>
-            <div className="flex gap-0.5 rounded-md border border-border/60 p-0.5">
+            <div className="mt-2 flex gap-0.5 rounded-md border border-border/60 p-0.5">
               {SPARK_RANGES.map((r) => (
                 <button
                   key={r.key}
                   type="button"
                   onClick={() => setSparkRange(r.key)}
-                  className={`px-1.5 py-0.5 text-[10px] font-medium rounded-sm transition-colors ${
+                  aria-pressed={sparkRange === r.key}
+                  className={`min-h-[28px] flex-1 rounded-sm px-2 text-[11px] font-medium transition-colors ${
                     sparkRange === r.key
                       ? "bg-primary/20 text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -436,30 +491,16 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
               ))}
             </div>
           </div>
-
-          <div className="text-right">
-            <div className="text-sm font-medium">
+          <div className="shrink-0 text-right">
+            <div className="text-sm font-semibold tabular-nums">
               {portfolio.currency} {Number(portfolio.current_cash).toFixed(2)}
             </div>
-            <div className={`text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
-              (cash-only) {pnl >= 0 ? "+" : ""}
+            <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {pnl >= 0 ? "+" : ""}
               {pnlPct.toFixed(2)}%
+              <span className="ml-1 text-[10px] text-muted-foreground">cash</span>
             </div>
           </div>
-          <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
-            <Button size="sm" variant="outline">
-              <PlayCircle className="mr-1 h-4 w-4" /> Open
-            </Button>
-          </Link>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => {
-              if (confirm("Delete this portfolio?")) deleteMut.mutate(portfolio.id);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
         </div>
       </CardContent>
     </Card>
