@@ -50,8 +50,17 @@ export function AddSimFundsDialog({
     if (open) setAmount("");
   }, [open]);
 
-  const parsed = Number(amount);
-  const valid = Number.isFinite(parsed) && parsed > 0 && parsed <= 1_000_000;
+  const trimmed = amount.trim();
+  const parsed = Number(trimmed);
+  const isNumber = trimmed !== "" && Number.isFinite(parsed);
+  let error: string | null = null;
+  if (trimmed === "") error = null;
+  else if (!isNumber) error = "Enter a valid number";
+  else if (parsed <= 0) error = "Amount must be greater than zero";
+  else if (parsed < 1) error = `Minimum top-up is ${fmt(currency, 1)}`;
+  else if (parsed > 1_000_000) error = `Maximum top-up is ${fmt(currency, 1_000_000)}`;
+  else if (Math.round(parsed * 100) !== parsed * 100) error = "Use at most 2 decimal places";
+  const valid = isNumber && error === null && parsed > 0;
 
   const mut = useMutation({
     mutationFn: (n: number) => addFn({ data: { id: portfolioId, amount: n } }),
@@ -65,7 +74,7 @@ export function AddSimFundsDialog({
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to add funds"),
   });
 
-  const presets = [100, 500, 1000, 5000];
+  const presets = [100, 250, 500, 1000];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
