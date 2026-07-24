@@ -10,6 +10,10 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "check:serverfn": "bun run scripts/check-serverfn-shape.ts",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:ci": "vitest run --project ci",
+    "test:watch": "vitest",
     "format": "prettier --write ."
   },
   "dependencies": {
