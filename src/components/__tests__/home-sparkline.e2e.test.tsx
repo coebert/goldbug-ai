@@ -127,9 +127,13 @@ describe("home sparkline (e2e)", () => {
     const expectedYs = values.map((v) => HEIGHT - ((v - min) / span) * HEIGHT);
     pts.forEach((p, i) => expect(p.y).toBeCloseTo(expectedYs[i], 1));
 
-    // The live portfolio's lone value (300.46) is far outside sim's range
-    // — if it had leaked in, at least one y would map to HEIGHT (new min).
-    expect(pts.some((p) => Math.abs(p.y - HEIGHT) < 0.01)).toBe(false);
+    // If the live portfolio's value (300.46) had leaked into sim's range,
+    // it would become the new min → sim's original min (990) would no
+    // longer map to y=HEIGHT. Verify sim's own min still anchors the axis.
+    const minIdx = values.indexOf(min);
+    expect(pts[minIdx].y).toBeCloseTo(HEIGHT, 1);
+    // And no plotted x corresponds to the live portfolio's single point.
+    expect(pts).toHaveLength(values.length);
   });
 
   it("handles a portfolio with no snapshots without crashing or fabricating points", () => {
