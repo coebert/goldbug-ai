@@ -110,5 +110,16 @@ export const getBacktestSeries = createServerFn({ method: "GET" })
       startingCash,
     );
 
-    return { equity, holdings, startingCash, from, to };
+    const tradeMarkers: BacktestTradeMarker[] = trades
+      .filter((t) => t.trade_date >= from && t.trade_date <= to)
+      .map((t) => ({
+        date: t.trade_date,
+        executed_at: t.executed_at,
+        side: t.side,
+        symbol: t.symbol,
+        quantity: t.quantity,
+        price: t.price,
+      }));
+
+    return { equity, holdings, trades: tradeMarkers, startingCash, from, to };
   });
