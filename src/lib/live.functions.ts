@@ -473,7 +473,20 @@ export async function runReconciliation(userId: string, portfolioId: string) {
       ? `cash Δ=${cashDrift.toFixed(2)}; positions Δ=${symDrift.join(", ") || "none"}`
       : null,
   });
-  return { drift, cashDrift, positionDrift: symDrift };
+
+  // Also refresh per-order broker statuses so filled/rejected trades are
+  // reflected in live_orders + live_fills without waiting for a manual click.
+  let orderRecon: Awaited<ReturnType<typeof import("@/lib/order-reconciliation.server").reconcileOrderStatusesForPortfolio>> | null = null;
+  try {
+    const { reconcileOrderStatusesForPortfolio } = await import("@/lib/order-reconciliation.server");
+    orderRecon = await reconcileOrderStatusesForPortfolio({
+      portfolioId, userId, adapter, lookbackHours: 72,
+    });
+  } catch (e) {
+    console.warn("order-status reconciliation failed", e);
+  }
+
+  return { drift, cashDrift, positionDrift: symDrift, orderRecon };
 }
 
 function detectPositionDrift(
