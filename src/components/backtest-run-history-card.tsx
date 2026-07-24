@@ -1,8 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { BacktestMetrics } from "@/lib/backtest-metrics";
+
+export type BacktestEquityPoint = { snapshot_date: string; total_value: number };
 
 export type BacktestRunRecord = {
   id: string;
@@ -11,7 +23,25 @@ export type BacktestRunRecord = {
   riskLevel: string;
   days: number;
   metrics: BacktestMetrics;
+  // Optional per-run equity series captured at save-time. Overlays in the
+  // history card need this because there is no per-run entity server-side
+  // to re-fetch from — each backtest recomputes over shared snapshots.
+  equity?: BacktestEquityPoint[];
 };
+
+// Deterministic overlay colours so a given run keeps its colour across
+// re-renders and toggles.
+const OVERLAY_PALETTE = [
+  "hsl(217 91% 60%)",
+  "hsl(142 71% 45%)",
+  "hsl(38 92% 50%)",
+  "hsl(291 64% 55%)",
+  "hsl(0 84% 60%)",
+  "hsl(199 89% 48%)",
+  "hsl(48 96% 53%)",
+  "hsl(262 83% 58%)",
+];
+
 
 const STORAGE_PREFIX = "aegis.backtestRuns.";
 
@@ -121,6 +151,62 @@ export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string })
     };
   });
 
+  // Overlay data for the equity + drawdown charts.
+  // Runs are aligned by day-index (t = 0..N) because they may span different
+  // absolute date ranges; comparing them at the same *elapsed day* is the
+  // apples-to-apples view. Equity is normalized to % change vs the run's own
+  // starting equity; drawdown is (v / running-peak - 1) * 100.
+  const overlayRuns = useMemo(
+    () =>
+      compareRuns.filter(
+        (r): r is BacktestRunRecord & { equity: BacktestEquityPoint[] } =>
+          Array.isArray(r.equity) && r.equity.length >= 2,
+      ),
+    [compareRuns],
+  );
+
+  const overlaySeries = useMemo(() => {
+    return overlayRuns.map((r, idx) => {
+      const start = r.equity[0].total_value;
+      const safeStart = start !== 0 && Number.isFinite(start) ? start : 1;
+      let peak = start;
+      const points = r.equity.map((p, i) => {
+        peak = Math.max(peak, p.total_value);
+        const equityPct = ((p.total_value - safeStart) / Math.abs(safeStart)) * 100;
+        const ddPct = peak > 0 ? (p.total_value / peak - 1) * 100 : 0;
+        return { t: i, date: p.snapshot_date, equity: equityPct, drawdown: ddPct };
+      });
+      const label = `${new Date(r.ranAt).toLocaleDateString()} · ${r.riskLevel} · ${r.days}d`;
+      return {
+        id: r.id,
+        label,
+        color: OVERLAY_PALETTE[idx % OVERLAY_PALETTE.length],
+        points,
+      };
+    });
+  }, [overlayRuns]);
+
+  // Recharts wants a single dataset when overlaying series that share an
+  // x-axis; key each run's series by its id so multiple lines coexist.
+  const mergedOverlay = useMemo(() => {
+    const maxLen = overlaySeries.reduce((m, s) => Math.max(m, s.points.length), 0);
+    const rows: Array<Record<string, number | string>> = [];
+    for (let t = 0; t < maxLen; t++) {
+      const row: Record<string, number | string> = { t };
+      for (const s of overlaySeries) {
+        const p = s.points[t];
+        if (p) {
+          row[`eq_${s.id}`] = p.equity;
+          row[`dd_${s.id}`] = p.drawdown;
+        }
+      }
+      rows.push(row);
+    }
+    return rows;
+  }, [overlaySeries]);
+
+
+
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
@@ -194,6 +280,104 @@ export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string })
                 </table>
               </div>
             )}
+
+            {overlaySeries.length > 0 && (
+              <div className="mb-6">
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Overlay ({overlaySeries.length} run{overlaySeries.length === 1 ? "" : "s"})
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Aligned by elapsed day; equity shown as % vs each run's start.
+                  </div>
+                </div>
+                <div className="mb-1 text-xs text-muted-foreground">Equity curve</div>
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={mergedOverlay} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis
+                        dataKey="t"
+                        tick={{ fontSize: 10 }}
+                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                        width={44}
+                      />
+                      <Tooltip
+                        formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
+                        labelFormatter={(t: number) => `Day ${t}`}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      {overlaySeries.map((s) => (
+                        <Line
+                          key={s.id}
+                          type="monotone"
+                          dataKey={`eq_${s.id}`}
+                          name={s.label}
+                          stroke={s.color}
+                          strokeWidth={2}
+                          dot={false}
+                          isAnimationActive={false}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mb-1 mt-4 text-xs text-muted-foreground">Drawdown curve</div>
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={mergedOverlay} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis
+                        dataKey="t"
+                        tick={{ fontSize: 10 }}
+                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                        width={44}
+                        domain={["auto", 0]}
+                      />
+                      <Tooltip
+                        formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
+                        labelFormatter={(t: number) => `Day ${t}`}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      {overlaySeries.map((s) => (
+                        <Line
+                          key={s.id}
+                          type="monotone"
+                          dataKey={`dd_${s.id}`}
+                          name={s.label}
+                          stroke={s.color}
+                          strokeWidth={2}
+                          dot={false}
+                          isAnimationActive={false}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {compareRuns.length > 0 && overlaySeries.length === 0 && (
+              <div className="mb-4 rounded-md border border-dashed border-border/60 p-3 text-xs text-muted-foreground">
+                No equity series stored for the selected runs. Newer runs record
+                their equity curve automatically; re-run a backtest to populate
+                the overlay charts.
+              </div>
+            )}
+
+
 
             <div className="overflow-x-auto">
               <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
