@@ -769,7 +769,7 @@ function PortfolioPage() {
                             <span>{m.label}</span>
                             <ExplainIcon term={m.term} />
                           </div>
-                          <div className={`tabular-nums text-xl font-semibold ${color(m.value)}`}>{fmt(m.value)}</div>
+                          <div className={`tabular-nums text-base font-semibold leading-tight sm:text-xl ${color(m.value)}`}>{fmt(m.value)}</div>
                           {perfMetrics.bench && (
                             <div className="tabular-nums text-[11px] text-muted-foreground">
                               {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
