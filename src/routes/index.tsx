@@ -310,9 +310,9 @@ export function ModeSummaryTile({
   // Defensive: never let a non-finite value reach Intl.NumberFormat — it
   // would render "£NaN". Callers already coerce, but this is the last
   // line of defence for the equity tile.
-  const safeMoney = Number.isFinite(money) ? money : 0;
-  const safePnl = Number.isFinite(pnl) ? pnl : 0;
-  const safePct = Number.isFinite(pct) ? pct : 0;
+  const safeMoney = Number.isFinite(money) ? (Object.is(money, -0) ? 0 : money) : 0;
+  const safePnl = Number.isFinite(pnl) ? (Object.is(pnl, -0) ? 0 : pnl) : 0;
+  const safePct = Number.isFinite(pct) ? (Object.is(pct, -0) ? 0 : pct) : 0;
   const borderTone = tone === "real" ? "border-emerald-500/50" : "border-cyan-500/40";
   const chipTone =
     tone === "real"
@@ -337,7 +337,7 @@ export function ModeSummaryTile({
           </div>
           <div className={`flex items-center gap-1 text-xs tabular-nums ${safePnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
             {safePnl >= 0 ? <TrendingUp className="h-3 w-3" aria-hidden="true" /> : <TrendingDown className="h-3 w-3" aria-hidden="true" />}
-            <span>{safePnl >= 0 ? "+" : ""}{safePct.toFixed(2)}% · {safePnl >= 0 ? "+" : ""}{new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(safePnl)}</span>
+            <span>{safePnl >= 0 ? "+" : ""}{new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }).format(safePct)}% · {safePnl >= 0 ? "+" : ""}{new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(safePnl)}</span>
           </div>
           <div className="text-[10px] text-muted-foreground">{sublabel} · {count} portfolio{count === 1 ? "" : "s"}</div>
         </>
