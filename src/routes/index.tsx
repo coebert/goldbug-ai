@@ -339,6 +339,12 @@ export function ModeSummaryTile({
   count: number;
 }) {
   const empty = count === 0;
+  // Defensive: never let a non-finite value reach Intl.NumberFormat — it
+  // would render "£NaN". Callers already coerce, but this is the last
+  // line of defence for the equity tile.
+  const safeMoney = Number.isFinite(money) ? money : 0;
+  const safePnl = Number.isFinite(pnl) ? pnl : 0;
+  const safePct = Number.isFinite(pct) ? pct : 0;
   const borderTone = tone === "real" ? "border-emerald-500/50" : "border-cyan-500/40";
   const chipTone =
     tone === "real"
@@ -359,11 +365,11 @@ export function ModeSummaryTile({
       ) : (
         <>
           <div className="mt-1 truncate text-base font-semibold tabular-nums sm:text-lg">
-            {new Intl.NumberFormat(undefined, { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(money)}
+            {new Intl.NumberFormat(undefined, { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(safeMoney)}
           </div>
-          <div className={`flex items-center gap-1 text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {pnl >= 0 ? <TrendingUp className="h-3 w-3" aria-hidden="true" /> : <TrendingDown className="h-3 w-3" aria-hidden="true" />}
-            <span>{pnl >= 0 ? "+" : ""}{pct.toFixed(2)}% · {pnl >= 0 ? "+" : ""}{new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(pnl)}</span>
+          <div className={`flex items-center gap-1 text-xs tabular-nums ${safePnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {safePnl >= 0 ? <TrendingUp className="h-3 w-3" aria-hidden="true" /> : <TrendingDown className="h-3 w-3" aria-hidden="true" />}
+            <span>{safePnl >= 0 ? "+" : ""}{safePct.toFixed(2)}% · {safePnl >= 0 ? "+" : ""}{new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(safePnl)}</span>
           </div>
           <div className="text-[10px] text-muted-foreground">{sublabel} · {count} portfolio{count === 1 ? "" : "s"}</div>
         </>
