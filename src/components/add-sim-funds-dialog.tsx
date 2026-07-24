@@ -50,8 +50,17 @@ export function AddSimFundsDialog({
     if (open) setAmount("");
   }, [open]);
 
-  const parsed = Number(amount);
-  const valid = Number.isFinite(parsed) && parsed > 0 && parsed <= 1_000_000;
+  const trimmed = amount.trim();
+  const parsed = Number(trimmed);
+  const isNumber = trimmed !== "" && Number.isFinite(parsed);
+  let error: string | null = null;
+  if (trimmed === "") error = null;
+  else if (!isNumber) error = "Enter a valid number";
+  else if (parsed <= 0) error = "Amount must be greater than zero";
+  else if (parsed < 1) error = `Minimum top-up is ${fmt(currency, 1)}`;
+  else if (parsed > 1_000_000) error = `Maximum top-up is ${fmt(currency, 1_000_000)}`;
+  else if (Math.round(parsed * 100) !== parsed * 100) error = "Use at most 2 decimal places";
+  const valid = isNumber && error === null && parsed > 0;
 
   const mut = useMutation({
     mutationFn: (n: number) => addFn({ data: { id: portfolioId, amount: n } }),
@@ -65,7 +74,7 @@ export function AddSimFundsDialog({
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to add funds"),
   });
 
-  const presets = [100, 500, 1000, 5000];
+  const presets = [100, 250, 500, 1000];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -95,20 +104,36 @@ export function AddSimFundsDialog({
               id="add-amount"
               type="number"
               inputMode="decimal"
-              min="0"
+              min="1"
+              max="1000000"
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               autoFocus
-              placeholder="e.g. 500"
+              placeholder="e.g. 250"
+              aria-invalid={!!error}
+              aria-describedby={error ? "add-amount-error" : "add-amount-help"}
             />
             <div className="flex flex-wrap gap-1.5 pt-1">
               {presets.map((p) => (
-                <Button key={p} type="button" size="sm" variant="outline" onClick={() => setAmount(String(p))}>
+                <Button
+                  key={p}
+                  type="button"
+                  size="sm"
+                  variant={parsed === p ? "default" : "outline"}
+                  onClick={() => setAmount(String(p))}
+                >
                   +{fmt(currency, p)}
                 </Button>
               ))}
             </div>
+            {error ? (
+              <p id="add-amount-error" className="text-xs text-destructive">{error}</p>
+            ) : (
+              <p id="add-amount-help" className="text-xs text-muted-foreground">
+                Between {fmt(currency, 1)} and {fmt(currency, 1_000_000)}.
+              </p>
+            )}
           </div>
 
           {valid && (
