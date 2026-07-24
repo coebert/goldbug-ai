@@ -314,6 +314,101 @@ export function BacktestRunHistoryCard({
           </p>
         ) : (
           <>
+            {/* Recommendation panel */}
+            <div className="mb-4 rounded-md border border-border/60 bg-muted/30 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Recommended run for your risk tolerance
+                </div>
+                <div className="flex items-center gap-1" role="tablist" aria-label="Risk tolerance">
+                  {(["conservative", "balanced", "aggressive"] as const).map((t) => (
+                    <Button
+                      key={t}
+                      size="sm"
+                      variant={tolerance === t ? "default" : "outline"}
+                      onClick={() => setTolerance(t)}
+                      className="h-7 px-2 text-xs capitalize"
+                    >
+                      {t}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {recommendation ? (
+                <div className="mt-3">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <div className="text-sm font-semibold">
+                      {new Date(recommendation.best.run.ranAt).toLocaleString()}
+                    </div>
+                    <Badge variant="secondary" className="capitalize">
+                      {recommendation.best.run.riskLevel || "unknown"} risk
+                    </Badge>
+                    <div className="text-xs text-muted-foreground">
+                      {recommendation.best.run.days}d window · score{" "}
+                      <span className="font-mono text-foreground">
+                        {recommendation.best.score.toFixed(3)}
+                      </span>
+                      {recommendation.runnerUp && (
+                        <>
+                          {" "}· next best{" "}
+                          <span className="font-mono text-foreground">
+                            {recommendation.runnerUp.score.toFixed(3)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                    <ReasonRow
+                      label="Return"
+                      raw={fmt(recommendation.best.parts.ret.raw, 2, "%")}
+                      norm={recommendation.best.parts.ret.norm}
+                      weight={recommendation.weights.ret}
+                      contribution={recommendation.best.parts.ret.contribution}
+                      tone={toneClass(recommendation.best.parts.ret.raw)}
+                    />
+                    <ReasonRow
+                      label="Max drawdown"
+                      raw={fmt(recommendation.best.parts.mdd.raw, 2, "%")}
+                      norm={recommendation.best.parts.mdd.norm}
+                      weight={recommendation.weights.mdd}
+                      contribution={recommendation.best.parts.mdd.contribution}
+                      tone={toneClass(recommendation.best.parts.mdd.raw, true)}
+                      hint="lower is better"
+                    />
+                    <ReasonRow
+                      label="Sharpe"
+                      raw={fmt(recommendation.best.parts.sharpe.raw, 2)}
+                      norm={recommendation.best.parts.sharpe.norm}
+                      weight={recommendation.weights.sharpe}
+                      contribution={recommendation.best.parts.sharpe.contribution}
+                      tone={toneClass(recommendation.best.parts.sharpe.raw)}
+                    />
+                  </div>
+
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Ranked against{" "}
+                    {recommendation.scopedToBucket
+                      ? `${recommendation.poolSize} run(s) at ${tolerance} risk level`
+                      : `all ${recommendation.poolSize} runs (no ${tolerance}-level runs recorded yet)`}
+                    . Each axis is normalized 0–1 across the pool, then weighted{" "}
+                    <span className="font-mono">
+                      ret {(recommendation.weights.ret * 100).toFixed(0)}% · mdd{" "}
+                      {(recommendation.weights.mdd * 100).toFixed(0)}% · sharpe{" "}
+                      {(recommendation.weights.sharpe * 100).toFixed(0)}%
+                    </span>
+                    . Drawdown is inverted so smaller losses score higher.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Run a backtest to see a recommendation.
+                </p>
+              )}
+            </div>
+
+
             {groupByRisk && aggregates.length > 0 && (
               <div className="mb-4 overflow-x-auto">
                 <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
