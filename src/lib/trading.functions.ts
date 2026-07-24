@@ -175,6 +175,28 @@ export const deletePortfolio = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const renamePortfolio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        name: z.string().trim().min(1, "Name required").max(80, "Max 80 characters"),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("portfolios")
+      .update({ name: data.name })
+      .eq("id", data.id)
+      .select("id, name")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true, portfolio: row };
+  });
+
+
 const RiskConfigSchema = z.object({
   asset_class_limits: z
     .object({

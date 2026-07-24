@@ -55,8 +55,10 @@ const DecisionNewsBreakdown = lazy(() =>
 );
 
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle, MoreVertical, TrendingUp, TrendingDown, Clock } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle, MoreVertical, TrendingUp, TrendingDown, Clock, Pencil } from "lucide-react";
 import { Explain } from "@/components/explain";
+import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
+
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -421,6 +423,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => {
@@ -429,6 +432,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   const pnl = Number(portfolio.current_cash) - Number(portfolio.starting_cash);
   const pnlPct = (pnl / Number(portfolio.starting_cash)) * 100;
@@ -484,6 +488,14 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                     Open portfolio
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setRenameOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" /> Rename portfolio
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
@@ -494,6 +506,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                 >
                   <Trash2 className="mr-2 h-4 w-4" /> Delete portfolio
                 </DropdownMenuItem>
+
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -566,6 +579,12 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
           setConfirmDelete(false);
           deleteMut.mutate(portfolio.id);
         }}
+      />
+      <RenamePortfolioDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        portfolioId={portfolio.id}
+        currentName={portfolio.name}
       />
     </Card>
   );

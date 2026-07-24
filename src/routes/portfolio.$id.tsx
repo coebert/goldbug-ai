@@ -33,7 +33,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles } from "lucide-react";
+import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles, Pencil } from "lucide-react";
+import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -91,6 +92,7 @@ function PortfolioPage() {
   const [tradeSort, setTradeSort] = useState<{ key: "date" | "symbol" | "side" | "qty" | "price" | "value"; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -430,6 +432,15 @@ function PortfolioPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight">{p.name}</h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    aria-label="Rename portfolio"
+                    onClick={() => setRenameOpen(true)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <ModeBadge mode={p.mode} />
                   <LiveToggle portfolioId={p.id} mode={p.mode} livePaused={(p as { live_paused?: boolean | null }).live_paused} />
                 </div>
@@ -1136,6 +1147,14 @@ function PortfolioPage() {
           reset.mutate();
         }}
       />
+      {p && (
+        <RenamePortfolioDialog
+          open={renameOpen}
+          onOpenChange={setRenameOpen}
+          portfolioId={p.id}
+          currentName={p.name}
+        />
+      )}
     </div>
   );
 }
