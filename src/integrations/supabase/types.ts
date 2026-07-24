@@ -1010,6 +1010,39 @@ export type Database = {
         }
         Relationships: []
       }
+      retrain_settings: {
+        Row: {
+          cadence_days: number
+          created_at: string
+          enabled: boolean
+          last_run_at: string | null
+          last_run_error: string | null
+          last_run_status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cadence_days?: number
+          created_at?: string
+          enabled?: boolean
+          last_run_at?: string | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cadence_days?: number
+          created_at?: string
+          enabled?: boolean
+          last_run_at?: string | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       run_locks: {
         Row: {
           acquired_at: string

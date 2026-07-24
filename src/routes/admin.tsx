@@ -18,6 +18,7 @@ import { SecurityAlertSettingsCard } from "@/components/security-alert-settings-
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { TranslationQualityCard } from "@/components/translation-quality-card";
 import { BatchLessonsCard } from "@/components/batch-lessons-card";
+import { RetrainScheduleCard } from "@/components/retrain-schedule-card";
 
 
 export const Route = createFileRoute("/admin")({
@@ -306,6 +307,8 @@ function AdminPage() {
       </Card>
 
       <BatchLessonsCard />
+
+      <RetrainScheduleCard />
 
 
 
