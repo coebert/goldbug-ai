@@ -135,21 +135,29 @@ function Home() {
 
   const todaySummary = useMemo(() => {
     const series = equityQ.data?.series ?? [];
-    const portfolios = equityQ.data?.portfolios ?? [];
+    const portfolios = (equityQ.data?.portfolios ?? []) as Array<{ id: string; mode?: string }>;
     if (series.length === 0 || portfolios.length === 0) return null;
-    const sumRow = (row: Record<string, unknown>) =>
+    const sumMode = (row: Record<string, unknown>, real: boolean) =>
       portfolios.reduce((s, p) => {
-        const v = Number((row as Record<string, unknown>)[p.id]);
+        const isReal = p.mode === "live_prod";
+        if (isReal !== real) return s;
+        const v = Number(row[p.id]);
         return s + (Number.isFinite(v) ? v : 0);
       }, 0);
     const last = series[series.length - 1] as Record<string, unknown>;
     const prev = (series[series.length - 2] as Record<string, unknown>) ?? last;
-    const totalEquity = sumRow(last);
-    const prevEquity = sumRow(prev);
-    const dayPnl = totalEquity - prevEquity;
-    const dayPct = prevEquity > 0 ? (dayPnl / prevEquity) * 100 : 0;
-    return { totalEquity, dayPnl, dayPct, count: portfolios.length };
+    const simNow = sumMode(last, false);
+    const simPrev = sumMode(prev, false);
+    const realNow = sumMode(last, true);
+    const realPrev = sumMode(prev, true);
+    const simCount = portfolios.filter((p) => p.mode !== "live_prod").length;
+    const realCount = portfolios.filter((p) => p.mode === "live_prod").length;
+    return {
+      sim: { now: simNow, pnl: simNow - simPrev, pct: simPrev > 0 ? ((simNow - simPrev) / simPrev) * 100 : 0, count: simCount },
+      real: { now: realNow, pnl: realNow - realPrev, pct: realPrev > 0 ? ((realNow - realPrev) / realPrev) * 100 : 0, count: realCount },
+    };
   }, [equityQ.data]);
+
 
   const nextRunLabel = useMemo(() => {
     const now = new Date();
@@ -208,53 +216,32 @@ function Home() {
           </a>
         </div>
 
-        {/* Today summary strip */}
+        {/* Today summary strip — real and simulated kept strictly separate */}
         {todaySummary && (
-          <div className="mb-6 grid grid-cols-3 gap-2 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
-                Total equity
-              </div>
-              <div className="truncate text-base font-semibold tabular-nums sm:text-lg">
-                {new Intl.NumberFormat(undefined, {
-                  style: "currency",
-                  currency: "GBP",
-                  maximumFractionDigits: 0,
-                }).format(todaySummary.totalEquity)}
-              </div>
-              <div className="text-[10px] text-muted-foreground sm:text-xs">
-                {todaySummary.count} portfolio{todaySummary.count === 1 ? "" : "s"}
-              </div>
-            </div>
-            <div className="min-w-0 border-l border-border pl-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
-                Day P&amp;L
-              </div>
-              <div
-                className={`flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg ${todaySummary.dayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
-              >
-                {todaySummary.dayPnl >= 0 ? (
-                  <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-                )}
-                <span className="truncate">
-                  {todaySummary.dayPnl >= 0 ? "+" : ""}
-                  {todaySummary.dayPct.toFixed(2)}%
-                </span>
-              </div>
-              <div className="text-[10px] tabular-nums text-muted-foreground sm:text-xs">
-                {todaySummary.dayPnl >= 0 ? "+" : ""}
-                {new Intl.NumberFormat(undefined, {
-                  maximumFractionDigits: 0,
-                }).format(todaySummary.dayPnl)}
-              </div>
-            </div>
-            <div className="min-w-0 border-l border-border pl-3">
+          <div className="mb-6 grid gap-2 sm:grid-cols-3">
+            <ModeSummaryTile
+              label="Simulated equity"
+              sublabel="SIM · paper + live-sim"
+              tone="sim"
+              money={todaySummary.sim.now}
+              pnl={todaySummary.sim.pnl}
+              pct={todaySummary.sim.pct}
+              count={todaySummary.sim.count}
+            />
+            <ModeSummaryTile
+              label="Real-money equity"
+              sublabel="REAL · live Saxo"
+              tone="real"
+              money={todaySummary.real.now}
+              pnl={todaySummary.real.pnl}
+              pct={todaySummary.real.pct}
+              count={todaySummary.real.count}
+            />
+            <div className="min-w-0 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
                 Next run
               </div>
-              <div className="flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg">
+              <div className="mt-1 flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg">
                 <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span className="truncate">{nextRunLabel}</span>
               </div>
@@ -262,6 +249,7 @@ function Home() {
             </div>
           </div>
         )}
+
 
         <NewHereBanner />
 
@@ -317,6 +305,57 @@ function Home() {
     </div>
   );
 }
+function ModeSummaryTile({
+  label,
+  sublabel,
+  tone,
+  money,
+  pnl,
+  pct,
+  count,
+}: {
+  label: string;
+  sublabel: string;
+  tone: "sim" | "real";
+  money: number;
+  pnl: number;
+  pct: number;
+  count: number;
+}) {
+  const empty = count === 0;
+  const borderTone = tone === "real" ? "border-emerald-500/50" : "border-cyan-500/40";
+  const chipTone =
+    tone === "real"
+      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+      : "bg-cyan-500/15 text-cyan-300 border-cyan-500/40";
+  return (
+    <div className={`min-w-0 rounded-lg border ${borderTone} bg-card px-3 py-3 sm:px-4`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+          {label}
+        </div>
+        <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase ${chipTone}`}>
+          {tone === "real" ? "Real" : "Sim"}
+        </span>
+      </div>
+      {empty ? (
+        <div className="mt-1 text-sm text-muted-foreground">No {tone === "real" ? "real-money" : "simulated"} portfolios</div>
+      ) : (
+        <>
+          <div className="mt-1 truncate text-base font-semibold tabular-nums sm:text-lg">
+            {new Intl.NumberFormat(undefined, { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(money)}
+          </div>
+          <div className={`flex items-center gap-1 text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {pnl >= 0 ? <TrendingUp className="h-3 w-3" aria-hidden="true" /> : <TrendingDown className="h-3 w-3" aria-hidden="true" />}
+            <span>{pnl >= 0 ? "+" : ""}{pct.toFixed(2)}% · {pnl >= 0 ? "+" : ""}{new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(pnl)}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground">{sublabel} · {count} portfolio{count === 1 ? "" : "s"}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 
 function NewHereBanner() {
   const [hidden, setHidden] = useState(() => {
