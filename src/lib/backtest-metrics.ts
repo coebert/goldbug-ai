@@ -315,6 +315,7 @@ export function computeBacktestMetrics(
   const volatilityPct = computeAnnualisedVolPct(rets);
   const bestDayPct = rets.length ? Math.max(...rets) * 100 : 0;
   const worstDayPct = rets.length ? Math.min(...rets) * 100 : 0;
+  const cis = bootstrapCIs(rets);
 
   const roundTrips = realizedPnlPerRoundTrip(trades);
   const wins = roundTrips.filter((p) => p > 0);
