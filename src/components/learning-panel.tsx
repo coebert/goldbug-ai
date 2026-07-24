@@ -244,6 +244,53 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
                           </div>
                         )}
 
+                        {/* Plain-English explanation of how this lesson's
+                            feedback score changed the AI's use of it. */}
+                        {(() => {
+                          if (ov?.action === "disabled") {
+                            return (
+                              <div className="rounded border border-destructive/40 bg-destructive/10 p-1.5 text-xs text-destructive">
+                                <span className="font-medium">Excluded:</span> you marked this lesson unhelpful, so the AI does not see it on any run.
+                              </div>
+                            );
+                          }
+                          if (autoSuppressed) {
+                            return (
+                              <div className="rounded border border-destructive/40 bg-destructive/10 p-1.5 text-xs text-destructive">
+                                <span className="font-medium">Auto-suppressed:</span> net score {score} (≤ −2) from {unhelpful} unhelpful vs {helpful} helpful vote{helpful === 1 ? "" : "s"}. The AI does not receive this lesson.
+                              </div>
+                            );
+                          }
+                          if (score >= 2) {
+                            return (
+                              <div className="rounded border border-emerald-500/40 bg-emerald-500/10 p-1.5 text-xs text-emerald-300">
+                                <span className="font-medium">Prioritised:</span> tagged <code className="rounded bg-emerald-500/20 px-1">[user-priority: high, +{score}]</code> in the AI prompt — the model is told to weight it more strongly.
+                              </div>
+                            );
+                          }
+                          if (score <= -1) {
+                            return (
+                              <div className="rounded border border-red-500/40 bg-red-500/10 p-1.5 text-xs text-red-300">
+                                <span className="font-medium">Down-weighted:</span> tagged <code className="rounded bg-red-500/20 px-1">[user-priority: low, {score}]</code> in the AI prompt — the model requires stronger evidence before acting on it.
+                              </div>
+                            );
+                          }
+                          if (score === 1) {
+                            return (
+                              <div className="rounded border border-emerald-500/30 bg-emerald-500/5 p-1.5 text-xs text-muted-foreground">
+                                <span className="font-medium text-emerald-300">Slight boost:</span> one net helpful vote — sent to the AI at normal priority. Reaches high priority at +2.
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="rounded border border-border bg-muted/40 p-1.5 text-xs text-muted-foreground">
+                              <span className="font-medium">Neutral:</span> no feedback yet, so the AI receives this lesson at default priority alongside all other lessons for this regime.
+                            </div>
+                          );
+                        })()}
+
+
+
                         {isEditing ? (
                           <div className="space-y-2 pt-1">
                             <Textarea
