@@ -104,20 +104,36 @@ export function AddSimFundsDialog({
               id="add-amount"
               type="number"
               inputMode="decimal"
-              min="0"
+              min="1"
+              max="1000000"
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               autoFocus
-              placeholder="e.g. 500"
+              placeholder="e.g. 250"
+              aria-invalid={!!error}
+              aria-describedby={error ? "add-amount-error" : "add-amount-help"}
             />
             <div className="flex flex-wrap gap-1.5 pt-1">
               {presets.map((p) => (
-                <Button key={p} type="button" size="sm" variant="outline" onClick={() => setAmount(String(p))}>
+                <Button
+                  key={p}
+                  type="button"
+                  size="sm"
+                  variant={parsed === p ? "default" : "outline"}
+                  onClick={() => setAmount(String(p))}
+                >
                   +{fmt(currency, p)}
                 </Button>
               ))}
             </div>
+            {error ? (
+              <p id="add-amount-error" className="text-xs text-destructive">{error}</p>
+            ) : (
+              <p id="add-amount-help" className="text-xs text-muted-foreground">
+                Between {fmt(currency, 1)} and {fmt(currency, 1_000_000)}.
+              </p>
+            )}
           </div>
 
           {valid && (
