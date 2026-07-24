@@ -213,6 +213,15 @@ function ModeChart({
               </div>
               <div className={`mt-0.5 text-[11px] leading-snug sm:text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
                 {pnl >= 0 ? "+" : ""}{currency} {pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%) over {RANGE_OPTS.find((r) => r.value === range)!.label}
+                {Math.abs(netDeposits) > 0.005 && (
+                  <span
+                    className="ml-1 text-muted-foreground"
+                    title={`Excludes ${currency}${netDeposits.toFixed(2)} of ${netDeposits >= 0 ? "deposits" : "withdrawals"} in this window`}
+                  >
+                    · trading only
+                  </span>
+                )}
+              </div>
               </div>
             </div>
             <div className="h-[260px] w-full sm:h-[280px]">
