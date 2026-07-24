@@ -255,10 +255,23 @@ function PortfolioPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
+  const [lastBtMetrics, setLastBtMetrics] = useState<
+    import("@/lib/backtest-metrics").BacktestMetrics | null
+  >(null);
   const runBt = useMutation({
     mutationFn: () => runBtFn({ data: { portfolio_id: id, days } }),
     onSuccess: (r) => {
-      toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
+      const m = r.metrics;
+      setLastBtMetrics(m ?? null);
+      if (m) {
+        const winPart =
+          m.winRatePct != null ? ` · Win ${m.winRatePct.toFixed(0)}%` : "";
+        toast.success(
+          `Backtest done. Return ${m.totalReturnPct.toFixed(2)}% · MDD ${m.maxDrawdownPct.toFixed(2)}% · Sharpe ${m.sharpe.toFixed(2)}${winPart}`,
+        );
+      } else {
+        toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
+      }
       qc.invalidateQueries({ queryKey: ["portfolio", id] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
