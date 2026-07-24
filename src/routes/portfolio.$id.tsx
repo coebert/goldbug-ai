@@ -90,6 +90,7 @@ function PortfolioPage() {
   const [ready, setReady] = useState(false);
   const [tradeSort, setTradeSort] = useState<{ key: "date" | "symbol" | "side" | "qty" | "price" | "value"; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
