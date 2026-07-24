@@ -222,7 +222,6 @@ function ModeChart({
                   </span>
                 )}
               </div>
-              </div>
             </div>
             <div className="h-[260px] w-full sm:h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
