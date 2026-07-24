@@ -1346,7 +1346,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const { reconcileLiveHoldingsFromBroker } = await import(
         "@/lib/live-holdings-sync.server"
       );
-      await reconcileLiveHoldingsFromBroker(portfolioId);
+      const { withOwnedClient } = await import("./_server/owned-client");
+      await reconcileLiveHoldingsFromBroker(
+        portfolioId,
+        withOwnedClient(portfolio.user_id),
+      );
     } catch (e) {
       console.warn("live holdings reconcile skipped", portfolioId, e);
     }
