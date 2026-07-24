@@ -44,6 +44,8 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
   const fn = useServerFn(getPortfolioLearning);
   const setOverride = useServerFn(setLessonOverride);
   const clearOverride = useServerFn(clearLessonOverride);
+  const rateFeedback = useServerFn(rateLessonFeedback);
+
 
   const q = useQuery({
     queryKey: ["learning", portfolioId],
