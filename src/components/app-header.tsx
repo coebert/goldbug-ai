@@ -91,8 +91,9 @@ export function AppHeader({ email }: { email?: string | null }) {
           ) : null}
         </div>
 
-        {/* Mobile: Admin + hamburger */}
+        {/* Mobile: notifications + Admin + hamburger */}
         <div className="flex shrink-0 items-center gap-1 md:hidden">
+          {email && <NotificationsBell />}
           <Link
             to="/admin"
             aria-label="Admin"
