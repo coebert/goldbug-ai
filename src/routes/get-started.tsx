@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
+import { PageLoading } from "@/components/page-loading";
 import { toast } from "sonner";
 import {
   Shield,
@@ -169,9 +170,7 @@ function GetStarted() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
+      <PageLoading />
     );
   }
 

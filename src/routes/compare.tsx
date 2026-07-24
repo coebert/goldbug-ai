@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppHeader } from "@/components/app-header";
+import { PageLoading } from "@/components/page-loading";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import {
@@ -166,9 +167,7 @@ function ComparePage() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
+      <PageLoading />
     );
   }
 

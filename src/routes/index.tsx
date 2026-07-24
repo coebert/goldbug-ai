@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AppHeader } from "@/components/app-header";
+import { PageLoading } from "@/components/page-loading";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
 const AllPortfoliosChart = lazy(() =>
@@ -166,9 +167,7 @@ function Home() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
+      <PageLoading />
     );
   }
 

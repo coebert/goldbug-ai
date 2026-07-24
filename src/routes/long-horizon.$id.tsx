@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppHeader } from "@/components/app-header";
+import { PageLoading } from "@/components/page-loading";
 import {
   Select,
   SelectContent,
@@ -165,9 +166,7 @@ function LongHorizonPage() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
+      <PageLoading />
     );
   }
 
