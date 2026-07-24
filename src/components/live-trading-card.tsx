@@ -149,6 +149,10 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
       <CardContent className="space-y-4">
         <SaxoOAuthPanel />
 
+        <CashSyncIndicator lastSync={s?.lastCashSync ?? null} pending={mSync.isPending} />
+
+
+
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => mPing.mutate()} disabled={mPing.isPending || !s?.hasToken}>
