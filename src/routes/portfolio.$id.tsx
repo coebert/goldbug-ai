@@ -285,7 +285,7 @@ function PortfolioPage() {
         // recomputes off the shared equity_snapshots table.
         let equity: { snapshot_date: string; total_value: number }[] | undefined;
         try {
-          const series = await getBacktestSeries({ data: { portfolio_id: id, days } });
+          const series = await getBtSeriesFn({ data: { portfolio_id: id, days } });
           equity = series.equity ?? undefined;
         } catch {
           // Overlay is a nice-to-have; falling back to metrics-only is fine.
