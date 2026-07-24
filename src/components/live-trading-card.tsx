@@ -15,7 +15,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Send, Clock, Ban, Zap, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { Explain } from "@/components/explain";
 
@@ -227,10 +227,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
 
         {s && (s.orders.length > 0 || s.fills.length > 0 || s.reconciliation.length > 0) && (
           <div className="grid gap-3 md:grid-cols-3 text-xs">
-            <MiniList title={`Orders (${s.orders.length})`} rows={s.orders.map((o) => ({
-              key: o.id,
-              text: `${new Date(o.created_at).toLocaleString()} · ${o.side} ${o.quantity} ${o.symbol} · ${o.status}`,
-            }))} />
+            <OrderTimelineList orders={s.orders} fills={s.fills} />
             <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
               key: f.id,
               text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
@@ -358,6 +355,236 @@ function MiniList({ title, rows }: { title: string; rows: Array<{ key: string; t
         {rows.length === 0 ? (
           <li className="text-muted-foreground italic">none</li>
         ) : rows.map((r) => <li key={r.key} className="font-mono">{r.text}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+// ── Order timeline ──────────────────────────────────────────────────────────
+// Each broker order gets an expandable per-stage timeline so it's obvious
+// where in the lifecycle a trade stalled or failed and why. All data is
+// already loaded via getLiveStatus (orders + fills).
+
+type OrderRow = {
+  id: string;
+  symbol: string;
+  side: string;
+  quantity: number | string;
+  status: string;
+  reject_reason: string | null;
+  broker_order_id: string | null;
+  created_at: string;
+  submitted_at: string | null;
+  updated_at?: string;
+};
+
+type FillRow = {
+  id: string;
+  order_id: string;
+  side: string;
+  quantity: number | string;
+  fill_price: number | string;
+  filled_at: string;
+};
+
+type OutcomeKey = "accepted" | "filled" | "partial" | "rejected" | "errored" | "cancelled" | "skipped" | "pending";
+
+function classifyOutcome(o: OrderRow): { key: OutcomeKey; label: string; cls: string; Icon: typeof CheckCircle2 } {
+  const staleMs = Date.now() - new Date(o.updated_at ?? o.created_at).getTime();
+  switch (o.status) {
+    case "filled":
+      return { key: "filled", label: "Filled", cls: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500", Icon: CheckCircle2 };
+    case "partial":
+      return { key: "partial", label: "Partially filled", cls: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500", Icon: CheckCircle2 };
+    case "submitted":
+      return { key: "accepted", label: "Accepted · working", cls: "border-sky-500/50 bg-sky-500/10 text-sky-500", Icon: Send };
+    case "rejected":
+      return { key: "rejected", label: "Rejected by Saxo", cls: "border-destructive/50 bg-destructive/10 text-destructive", Icon: Ban };
+    case "error":
+      return { key: "errored", label: "Errored", cls: "border-destructive/50 bg-destructive/10 text-destructive", Icon: XCircle };
+    case "cancelled":
+      return { key: "cancelled", label: "Cancelled", cls: "border-muted-foreground/40 bg-muted/40 text-muted-foreground", Icon: Ban };
+    case "pending":
+      if (staleMs > 15 * 60_000) {
+        return { key: "skipped", label: "Skipped · never reached broker", cls: "border-amber-500/50 bg-amber-500/10 text-amber-500", Icon: SkipForward };
+      }
+      return { key: "pending", label: "Pending", cls: "border-muted-foreground/40 bg-muted/40 text-muted-foreground", Icon: Clock };
+    default:
+      return { key: "pending", label: o.status, cls: "border-muted-foreground/40 bg-muted/40 text-muted-foreground", Icon: Clock };
+  }
+}
+
+function TimelineStep({
+  Icon,
+  title,
+  at,
+  detail,
+  tone,
+  reached,
+}: {
+  Icon: typeof CheckCircle2;
+  title: string;
+  at?: string | null;
+  detail?: string;
+  tone: "done" | "pending" | "error" | "warn" | "muted";
+  reached: boolean;
+}) {
+  const toneMap = {
+    done: "bg-emerald-500/15 text-emerald-500 border-emerald-500/40",
+    pending: "bg-sky-500/15 text-sky-500 border-sky-500/40",
+    error: "bg-destructive/15 text-destructive border-destructive/40",
+    warn: "bg-amber-500/15 text-amber-500 border-amber-500/40",
+    muted: "bg-muted/40 text-muted-foreground border-border",
+  } as const;
+  return (
+    <li className="flex items-start gap-2">
+      <span
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${toneMap[tone]} ${
+          reached ? "" : "opacity-40"
+        }`}
+      >
+        <Icon className="h-3 w-3" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className={`text-[11px] font-medium ${reached ? "text-foreground" : "text-muted-foreground"}`}>
+          {title}
+        </div>
+        {at && <div className="font-mono text-[10px] text-muted-foreground">{new Date(at).toLocaleString()}</div>}
+        {detail && <div className="mt-0.5 break-words text-[11px] text-muted-foreground">{detail}</div>}
+      </div>
+    </li>
+  );
+}
+
+function OrderTimeline({ order, fills }: { order: OrderRow; fills: FillRow[] }) {
+  const outcome = classifyOutcome(order);
+  const orderFills = fills.filter((f) => f.order_id === order.id);
+  const reachedBroker = !!order.submitted_at && order.status !== "pending" || order.status === "submitted" || order.status === "filled" || order.status === "partial" || order.status === "rejected";
+  const errored = order.status === "error";
+  const skipped = outcome.key === "skipped";
+
+  const outcomeStep = (() => {
+    switch (outcome.key) {
+      case "filled":
+      case "partial":
+        return { Icon: CheckCircle2, tone: "done" as const, title: outcome.label, at: orderFills[0]?.filled_at ?? order.updated_at ?? null };
+      case "accepted":
+        return { Icon: Send, tone: "pending" as const, title: "Accepted — awaiting fill", at: order.updated_at ?? order.submitted_at };
+      case "rejected":
+        return { Icon: Ban, tone: "error" as const, title: "Rejected by Saxo", at: order.updated_at ?? null };
+      case "errored":
+        return { Icon: XCircle, tone: "error" as const, title: "Errored during placement", at: order.updated_at ?? null };
+      case "cancelled":
+        return { Icon: Ban, tone: "muted" as const, title: "Cancelled", at: order.updated_at ?? null };
+      case "skipped":
+        return { Icon: SkipForward, tone: "warn" as const, title: "Skipped — never routed", at: order.updated_at ?? null };
+      default:
+        return { Icon: Clock, tone: "muted" as const, title: "Pending", at: null as string | null };
+    }
+  })();
+
+  return (
+    <div className="mt-2 rounded-md border border-border/60 bg-background/60 p-2">
+      <ol className="space-y-2">
+        <TimelineStep Icon={Zap} title="Order created" at={order.created_at} tone="done" reached />
+        <TimelineStep
+          Icon={Send}
+          title="Submitted to Saxo"
+          at={order.submitted_at ?? undefined}
+          detail={skipped ? "Never sent — routing was skipped before it reached the broker." : undefined}
+          tone={skipped ? "warn" : reachedBroker || errored ? "done" : "muted"}
+          reached={!!order.submitted_at || reachedBroker || errored}
+        />
+        <TimelineStep
+          Icon={outcomeStep.Icon}
+          title={outcomeStep.title}
+          at={outcomeStep.at ?? undefined}
+          detail={order.reject_reason ?? undefined}
+          tone={outcomeStep.tone}
+          reached={outcome.key !== "pending"}
+        />
+        {orderFills.length > 0 && (
+          <li className="ml-7 space-y-1 border-l border-border/60 pl-3">
+            {orderFills.map((f) => (
+              <div key={f.id} className="font-mono text-[10px] text-muted-foreground">
+                {new Date(f.filled_at).toLocaleString()} · {f.side} {Number(f.quantity)} @ {Number(f.fill_price).toFixed(2)}
+              </div>
+            ))}
+          </li>
+        )}
+      </ol>
+      {order.broker_order_id && (
+        <div className="mt-2 font-mono text-[10px] text-muted-foreground">
+          Broker ref: {order.broker_order_id}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrderTimelineList({ orders, fills }: { orders: OrderRow[]; fills: FillRow[] }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  return (
+    <div>
+      <div className="text-muted-foreground mb-1">Orders ({orders.length})</div>
+      <ul className="max-h-72 space-y-1 overflow-auto">
+        {orders.length === 0 ? (
+          <li className="italic text-muted-foreground">none</li>
+        ) : (
+          orders.map((o) => {
+            const isOpen = open.has(o.id);
+            const outcome = classifyOutcome(o);
+            return (
+              <li key={o.id} className="rounded-md border border-border/60 bg-card/40">
+                <button
+                  type="button"
+                  onClick={() => toggle(o.id)}
+                  aria-expanded={isOpen}
+                  className="flex w-full items-start gap-2 p-2 text-left hover:bg-muted/30"
+                >
+                  {isOpen ? (
+                    <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-[11px]">
+                      <span className="text-muted-foreground">{new Date(o.created_at).toLocaleString()}</span>
+                      {" · "}
+                      <span className="uppercase">{o.side}</span>{" "}
+                      {Number(o.quantity)} {o.symbol}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-medium ${outcome.cls}`}
+                      >
+                        <outcome.Icon className="h-3 w-3" />
+                        {outcome.label}
+                      </span>
+                      {o.reject_reason && !isOpen && (
+                        <span className="truncate text-[10px] text-destructive/80" title={o.reject_reason}>
+                          — {o.reject_reason}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="px-2 pb-2">
+                    <OrderTimeline order={o} fills={fills} />
+                  </div>
+                )}
+              </li>
+            );
+          })
+        )}
       </ul>
     </div>
   );
