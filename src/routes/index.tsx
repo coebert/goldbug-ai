@@ -499,7 +499,18 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                 >
                   <Pencil className="mr-2 h-4 w-4" /> Rename portfolio
                 </DropdownMenuItem>
+                {isSim && (
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setAddFundsOpen(true);
+                    }}
+                  >
+                    <Banknote className="mr-2 h-4 w-4" /> Add simulated funds
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onSelect={(e) => {
