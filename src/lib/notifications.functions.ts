@@ -22,15 +22,15 @@ export type NotificationRow = {
   created_at: string;
 };
 
-const ListSchema = z.object({
-  category: z.string().trim().min(1).max(64).optional(),
-  unreadOnly: z.boolean().default(false),
-  limit: z.number().int().min(1).max(200).default(50),
-});
-
 export const listNotifications = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => ListSchema.parse(input ?? {}))
+  .inputValidator((input: unknown) =>
+    z.object({
+      category: z.string().trim().min(1).max(64).optional(),
+      unreadOnly: z.boolean().default(false),
+      limit: z.number().int().min(1).max(200).default(50),
+    }).parse(input ?? {}),
+  )
   .handler(async ({ data, context }): Promise<{
     rows: NotificationRow[];
     unreadCount: number;
@@ -55,11 +55,11 @@ export const listNotifications = createServerFn({ method: "POST" })
     return { rows: (rows ?? []) as NotificationRow[], unreadCount: count ?? 0 };
   });
 
-const IdsSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(200) });
-
 export const markNotificationsRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdsSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ ids: z.array(z.string().uuid()).min(1).max(200) }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("notifications")
@@ -72,7 +72,9 @@ export const markNotificationsRead = createServerFn({ method: "POST" })
 
 export const markNotificationsUnread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdsSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ ids: z.array(z.string().uuid()).min(1).max(200) }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("notifications")
@@ -101,7 +103,9 @@ export const markAllNotificationsRead = createServerFn({ method: "POST" })
 
 export const deleteNotifications = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdsSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ ids: z.array(z.string().uuid()).min(1).max(200) }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("notifications")

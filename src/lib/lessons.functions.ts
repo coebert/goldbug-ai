@@ -42,16 +42,16 @@ export const listLessonOverrides = createServerFn({ method: "GET" })
     return { overrides: data ?? [] };
   });
 
-const SetLessonOverrideSchema = z.object({
-  original_text: z.string().min(1).max(2000),
-  action: z.enum(["disabled", "edited"]),
-  replacement_text: z.string().max(2000).optional().nullable(),
-  reason: z.string().max(500).optional().nullable(),
-});
-
 export const setLessonOverride = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => SetLessonOverrideSchema.parse(i))
+  .inputValidator((i: unknown) =>
+    z.object({
+      original_text: z.string().min(1).max(2000),
+      action: z.enum(["disabled", "edited"]),
+      replacement_text: z.string().max(2000).optional().nullable(),
+      reason: z.string().max(500).optional().nullable(),
+    }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     if (data.action === "edited" && !(data.replacement_text && data.replacement_text.trim())) {
       throw new Error("Replacement text is required when editing a lesson.");
@@ -104,18 +104,18 @@ export const clearLessonOverride = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const RateLessonFeedbackSchema = z.object({
-  original_text: z.string().min(1).max(2000),
-  vote: z.enum(["helpful", "unhelpful", "clear"]),
-});
-
 // Thumbs-up / thumbs-down feedback on a lesson. Ratings accumulate into
 // helpful_count / unhelpful_count and the generated feedback_score is used
 // by the learning layer to reorder and (below a threshold) auto-suppress
 // lessons before they reach the AI prompt.
 export const rateLessonFeedback = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => RateLessonFeedbackSchema.parse(i))
+  .inputValidator((i: unknown) =>
+    z.object({
+      original_text: z.string().min(1).max(2000),
+      vote: z.enum(["helpful", "unhelpful", "clear"]),
+    }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     const { data: existing } = await context.supabase
       .from("lesson_overrides")

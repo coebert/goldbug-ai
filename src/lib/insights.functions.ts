@@ -2,8 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const IdSchema = z.object({ portfolioId: z.string().uuid() });
-
 export const getGlobalSignalDecay = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -40,7 +38,9 @@ export const getGlobalSignalDecay = createServerFn({ method: "GET" })
 
 export const getSignalPerformance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ portfolioId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { data: rows } = await context.supabase
       .from("signal_performance")
@@ -52,7 +52,9 @@ export const getSignalPerformance = createServerFn({ method: "GET" })
 
 export const getCorrelationMatrix = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ portfolioId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { data: holdings } = await context.supabase
       .from("holdings")
@@ -97,7 +99,9 @@ export const getSectorScores = createServerFn({ method: "GET" })
 
 export const getPortfolioStress = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ portfolioId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data }) => {
     const { computePortfolioStress } = await import("./portfolio-stress.server");
     const asOf = new Date().toISOString().slice(0, 10);
@@ -106,7 +110,9 @@ export const getPortfolioStress = createServerFn({ method: "GET" })
 
 export const getLearningDiagnostics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ portfolioId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const [calib, cfRows, hpRows] = await Promise.all([
       context.supabase
@@ -165,7 +171,9 @@ export const getLearningDiagnostics = createServerFn({ method: "GET" })
 
 export const getShadowVariantReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ portfolioId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { data: p } = await context.supabase
       .from("portfolios")

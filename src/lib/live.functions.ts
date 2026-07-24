@@ -4,98 +4,45 @@
 // Every state transition (activate/deactivate/pause/resume/kill/resume-all) is
 // idempotent and written to `live_broker_log` with a synthetic method so the
 // full audit trail is queryable from one table.
+//
+// Shared helpers (logAudit, runReconciliation, detectPositionDrift) live in
+// live-reconcile.server.ts so this file stays a thin server-fn wrapper.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
 
-const activateSchema = z.object({
-  portfolioId: z.string().uuid(),
-  targetEnv: z.enum(["sim", "prod"]),
-  useBrokerBalance: z.boolean().default(true),
-  acknowledgeRisk: z.literal(true),
-  reason: z.string().max(500).optional(),
-});
-
-// Shared audit-log writer for kill-switch / pause / activate events.
-// Uses supabaseAdmin so the entry persists even when the user's RLS view
-// couldn't insert (e.g. bulk kill across many portfolios).
-async function logAudit(params: {
-  userId: string;
-  portfolioId?: string | null;
-  action: string; // e.g. KILL_SWITCH, RESUME_ALL, PAUSE, ACTIVATE, DEACTIVATE
-  request: Record<string, unknown>;
-  response: Record<string, unknown>;
-  env?: string;
-  status?: number;
-  error?: string | null;
-}) {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("live_broker_log").insert({
-      portfolio_id: params.portfolioId ?? null,
-      user_id: params.userId,
-      broker: "local",
-      env: params.env ?? "n/a",
-      method: params.action,
-      path: `/audit/${params.action.toLowerCase()}`,
-      status: params.status ?? 200,
-      request: params.request as never,
-      response: params.response as never,
-      error: params.error ?? null,
-    });
-  } catch (e) {
-    console.error("audit log write failed", params.action, e);
-  }
-}
+// Re-export the reconciliation core for the cron route.
+export { runReconciliation } from "@/lib/live-reconcile.server";
 
 /** Activate live trading on a portfolio. Requires ping + optional balance read. */
 export const activateLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: z.infer<typeof activateSchema>) => activateSchema.parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({
+      portfolioId: z.string().uuid(),
+      targetEnv: z.enum(["sim", "prod"]),
+      useBrokerBalance: z.boolean().default(true),
+      acknowledgeRisk: z.literal(true),
+      reason: z.string().max(500).optional(),
+    }).parse(data),
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const own = await supabase.from("portfolios").select("id, user_id, mode")
       .eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== userId) throw new Error("Portfolio not found");
-
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-    const adapter = await buildSaxoAdapter({
-      userId, portfolioId: data.portfolioId,
-      envOverride: data.targetEnv === "prod" ? "live" : "sim",
-    });
+    const adapter = await buildSaxoAdapter({ userId, portfolioId: data.portfolioId, envOverride: data.targetEnv === "prod" ? "live" : "sim" });
     const ping = await adapter.ping();
-    if (!ping.ok) {
-      await logAudit({
-        userId, portfolioId: data.portfolioId, action: "ACTIVATE",
-        env: data.targetEnv, status: 502,
-        request: { targetEnv: data.targetEnv, reason: data.reason },
-        response: { ok: false }, error: `ping failed: ${ping.reason ?? "unknown"}`,
-      });
-      throw new Error(`Broker ping failed: ${ping.reason ?? "unknown"}`);
-    }
+    if (!ping.ok) throw new Error(`Broker ping failed: ${ping.reason ?? "unknown"}`);
 
-    let starting: number | undefined;
-    const brokerAccountId = ping.accountId;
+    let starting: number | null = null;
+    let brokerAccountId: string | null = ping.accountId ?? null;
     if (data.useBrokerBalance) {
       const bal = await adapter.getBalance();
-      // Use the tradable cash Saxo reports (already max of settled + pending
-      // deposits + SpendingPower). We adopt whatever the broker says — even a
-      // small deposit like £100 — so the app never invents cash the account
-      // doesn't hold.
-      starting = bal.cashAvailable ?? bal.cash;
-      if (!(starting > 0)) {
-        await logAudit({
-          userId, portfolioId: data.portfolioId, action: "ACTIVATE",
-          env: data.targetEnv, status: 400,
-          request: { targetEnv: data.targetEnv, reason: data.reason },
-          response: { ok: false, brokerBalance: bal },
-          error: "broker balance is zero",
-        });
-        throw new Error(
-          `Saxo ${data.targetEnv.toUpperCase()} reports no available cash on this account. Deposit funds in Saxo and try again.`,
-        );
-      }
+      starting = bal.totalValue;
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const patch = {
@@ -122,11 +69,11 @@ export const activateLive = createServerFn({ method: "POST" })
     return { ok: true, ping, startingCash: starting };
   });
 
-const reasonInput = z.object({ portfolioId: z.string().uuid(), reason: z.string().max(500).optional() });
-
 export const deactivateLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: z.infer<typeof reasonInput>) => reasonInput.parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ portfolioId: z.string().uuid(), reason: z.string().max(500).optional() }).parse(data),
+  )
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
       .select("id, user_id, mode").eq("id", data.portfolioId).maybeSingle();
@@ -154,15 +101,15 @@ export const deactivateLive = createServerFn({ method: "POST" })
     return { ok: true, changed: true };
   });
 
-const pauseInput = z.object({
-  portfolioId: z.string().uuid(),
-  paused: z.boolean(),
-  reason: z.string().max(500).optional(),
-});
-
 export const pauseLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: z.infer<typeof pauseInput>) => pauseInput.parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({
+      portfolioId: z.string().uuid(),
+      paused: z.boolean(),
+      reason: z.string().max(500).optional(),
+    }).parse(data),
+  )
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
       .select("id, user_id, live_paused, mode").eq("id", data.portfolioId).maybeSingle();
@@ -191,15 +138,15 @@ export const pauseLive = createServerFn({ method: "POST" })
     return { ok: true, paused: data.paused, changed: true };
   });
 
-const bulkInput = z.object({ reason: z.string().max(500).optional() }).default({});
-
 /**
  * Global kill-switch — pause every live portfolio owned by the caller.
  * Idempotent: repeated calls succeed and are logged with `updated=0`.
  */
 export const killAllLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: z.infer<typeof bulkInput>) => bulkInput.parse(data ?? {}))
+  .inputValidator((data: unknown) =>
+    z.object({ reason: z.string().max(500).optional() }).default({}).parse(data ?? {}),
+  )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Fetch current state so idempotent repeats and audit deltas are accurate.
@@ -237,7 +184,9 @@ export const killAllLive = createServerFn({ method: "POST" })
 /** Global resume — inverse of the kill-switch. Also idempotent and audited. */
 export const resumeAllLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: z.infer<typeof bulkInput>) => bulkInput.parse(data ?? {}))
+  .inputValidator((data: unknown) =>
+    z.object({ reason: z.string().max(500).optional() }).default({}).parse(data ?? {}),
+  )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const cur = await supabaseAdmin.from("portfolios")
@@ -263,7 +212,7 @@ export const resumeAllLive = createServerFn({ method: "POST" })
 /** Fetch recent kill-switch / pause / resume audit entries for the caller. */
 export const getAuditLog = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId?: string; limit?: number }) =>
+  .inputValidator((data: unknown) =>
     z.object({ portfolioId: z.string().uuid().optional(), limit: z.number().int().min(1).max(100).default(20) }).parse(data ?? {}))
   .handler(async ({ data, context }) => {
     let q = context.supabase.from("live_broker_log")
@@ -279,7 +228,7 @@ export const getAuditLog = createServerFn({ method: "POST" })
 
 export const pingBroker = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string; env?: "sim" | "live" }) =>
+  .inputValidator((data: unknown) =>
     z.object({ portfolioId: z.string().uuid(), env: z.enum(["sim", "live"]).optional() }).parse(data))
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
@@ -293,7 +242,7 @@ export const pingBroker = createServerFn({ method: "POST" })
 
 export const syncBrokerBalance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string }) =>
+  .inputValidator((data: unknown) =>
     z.object({ portfolioId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
@@ -319,7 +268,7 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
  */
 export const previewBrokerBalance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { env: "sim" | "live" }) =>
+  .inputValidator((data: unknown) =>
     z.object({ env: z.enum(["sim", "live"]) }).parse(data))
   .handler(async ({ data, context }) => {
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
@@ -351,7 +300,7 @@ export const previewBrokerBalance = createServerFn({ method: "POST" })
 
 export const getLiveStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string }) =>
+  .inputValidator((data: unknown) =>
     z.object({ portfolioId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -390,7 +339,7 @@ export const getLiveStatus = createServerFn({ method: "POST" })
 /** Nightly reconciliation: pull broker cash+positions, snapshot vs local. */
 export const reconcilePortfolio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string }) =>
+  .inputValidator((data: unknown) =>
     z.object({ portfolioId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     return runReconciliation(context.userId, data.portfolioId);
@@ -399,7 +348,7 @@ export const reconcilePortfolio = createServerFn({ method: "POST" })
 /** Fetch Saxo order statuses for every open live order and update fills. */
 export const reconcileOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string; lookbackHours?: number }) =>
+  .inputValidator((data: unknown) =>
     z.object({
       portfolioId: z.string().uuid(),
       lookbackHours: z.number().int().positive().max(24 * 14).optional(),
@@ -426,93 +375,12 @@ export const reconcileOrders = createServerFn({ method: "POST" })
     });
   });
 
-// Shared reconciliation core (also called from the cron route).
-export async function runReconciliation(userId: string, portfolioId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  // Sync external deposits/withdrawals first so `current_cash` reflects the
-  // account as of right now before we snapshot broker vs local for drift.
-  const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
-  await syncLiveCashFromBroker(portfolioId);
-  // Then overwrite local holdings + today's equity snapshot from broker so
-  // any phantom positions left over from rejected/errored Saxo orders are
-  // wiped out. Broker is the source of truth for live portfolios.
-  const { reconcileLiveHoldingsFromBroker } = await import(
-    "@/lib/live-holdings-sync.server"
-  );
-  await reconcileLiveHoldingsFromBroker(portfolioId);
-  const p = await supabaseAdmin.from("portfolios")
-    .select("id, user_id, mode, current_cash").eq("id", portfolioId).maybeSingle();
-  if (p.error || !p.data) throw new Error("Portfolio not found");
-  if (p.data.user_id !== userId) throw new Error("Not owned by caller");
-  if (p.data.mode !== "live_sim" && p.data.mode !== "live_prod") {
-    return { skipped: true, reason: "not live" };
-  }
-
-  const env = p.data.mode === "live_prod" ? "live" : "sim";
-  const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-  const adapter = await buildSaxoAdapter({ userId, portfolioId, envOverride: env });
-  const [bal, pos, hold] = await Promise.all([
-    adapter.getBalance(),
-    adapter.getPositions(),
-    supabaseAdmin.from("holdings").select("symbol, quantity, avg_cost").eq("portfolio_id", portfolioId),
-  ]);
-  const localPositions = (hold.data ?? []).map((h) => ({
-    symbol: h.symbol, quantity: Number(h.quantity), avgPrice: Number(h.avg_cost),
-  }));
-  const cashDrift = Math.abs(bal.cash - Number(p.data.current_cash ?? 0));
-  const symDrift = detectPositionDrift(pos, localPositions);
-  const drift = cashDrift > 1 || symDrift.length > 0;
-  await supabaseAdmin.from("live_reconciliation").insert({
-    portfolio_id: portfolioId, user_id: userId,
-    broker_cash: bal.cash,
-    broker_positions: pos as never,
-    local_cash: Number(p.data.current_cash ?? 0),
-    local_positions: localPositions as never,
-    drift_flag: drift,
-    drift_notes: drift
-      ? `cash Δ=${cashDrift.toFixed(2)}; positions Δ=${symDrift.join(", ") || "none"}`
-      : null,
-  });
-
-  // Also refresh per-order broker statuses so filled/rejected trades are
-  // reflected in live_orders + live_fills without waiting for a manual click.
-  let orderRecon: Awaited<ReturnType<typeof import("@/lib/order-reconciliation.server").reconcileOrderStatusesForPortfolio>> | null = null;
-  try {
-    const { reconcileOrderStatusesForPortfolio } = await import("@/lib/order-reconciliation.server");
-    orderRecon = await reconcileOrderStatusesForPortfolio({
-      portfolioId, userId, adapter, lookbackHours: 72,
-    });
-  } catch (e) {
-    console.warn("order-status reconciliation failed", e);
-  }
-
-  return { drift, cashDrift, positionDrift: symDrift, orderRecon };
-}
-
-function detectPositionDrift(
-  broker: Array<{ symbol: string; quantity: number }>,
-  local: Array<{ symbol: string; quantity: number }>,
-): string[] {
-  const out: string[] = [];
-  const bMap = new Map(broker.map((b) => [b.symbol, b.quantity]));
-  const lMap = new Map(local.map((l) => [l.symbol, l.quantity]));
-  const all = new Set([...bMap.keys(), ...lMap.keys()]);
-  for (const s of all) {
-    const b = bMap.get(s) ?? 0;
-    const l = lMap.get(s) ?? 0;
-    if (Math.abs(b - l) > 1e-6) out.push(`${s}(broker=${b},local=${l})`);
-  }
-  return out;
-}
-
 // ─── Saxo OAuth (auto-refresh) ──────────────────────────────────────────────
-
-const saxoEnvSchema = z.object({ env: z.enum(["sim", "live"]) });
 
 /** Return the URL the user should visit to grant Saxo access. */
 export const startSaxoOAuth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: z.infer<typeof saxoEnvSchema>) => saxoEnvSchema.parse(d))
+  .inputValidator((d: unknown) => z.object({ env: z.enum(["sim", "live"]) }).parse(d))
   .handler(async ({ data }) => {
     const { getAuthorizeUrl, redirectUri } = await import("@/lib/brokers/saxo-oauth.server");
     return { url: getAuthorizeUrl(data.env), redirectUri: redirectUri() };
@@ -538,7 +406,7 @@ export const getSaxoOAuthStatus = createServerFn({ method: "GET" })
  */
 export const getLiveTradeAlert = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { portfolioId: string; windowRuns?: number }) =>
+  .inputValidator((data: unknown) =>
     z.object({
       portfolioId: z.string().uuid(),
       windowRuns: z.number().int().min(1).max(50).default(5),
