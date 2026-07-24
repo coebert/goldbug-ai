@@ -122,7 +122,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="pb-16 md:pb-0">
+      <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         <Outlet />
       </div>
       <MobileTabBar />
