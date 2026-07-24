@@ -1017,6 +1017,7 @@ function PortfolioPage() {
                 cash={Number(p.current_cash)}
                 totalValue={totalValue}
                 mode={p.mode}
+                series={holdingsSeries}
               />
             </div>
 
