@@ -442,7 +442,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           win_rate: null, avg_return_pct: null, best: null, worst: null,
           per_symbol: [], per_side: { buy: { n: 0, win_rate: null }, sell: { n: 0, win_rate: null } },
         },
-        lessons: [], lessons_as_of: null, lessons_regime: null, per_regime_stats: [], current_regime: null, samples: [],
+        lessons: [], lessons_as_of: null, lessons_regime: null, lessons_raw: [], lessons_overrides: [], per_regime_stats: [], current_regime: null, samples: [],
       } satisfies LearningContext;
     }),
     cached("crossAsset", asOf, () => getCrossAssetSnapshot(asOf)).catch(() => null),
