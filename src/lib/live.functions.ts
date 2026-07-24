@@ -391,6 +391,10 @@ export const reconcilePortfolio = createServerFn({ method: "POST" })
 // Shared reconciliation core (also called from the cron route).
 export async function runReconciliation(userId: string, portfolioId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // Sync external deposits/withdrawals first so `current_cash` reflects the
+  // account as of right now before we snapshot broker vs local for drift.
+  const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
+  await syncLiveCashFromBroker(portfolioId);
   const p = await supabaseAdmin.from("portfolios")
     .select("id, user_id, mode, current_cash").eq("id", portfolioId).maybeSingle();
   if (p.error || !p.data) throw new Error("Portfolio not found");
@@ -398,6 +402,7 @@ export async function runReconciliation(userId: string, portfolioId: string) {
   if (p.data.mode !== "live_sim" && p.data.mode !== "live_prod") {
     return { skipped: true, reason: "not live" };
   }
+
   const env = p.data.mode === "live_prod" ? "live" : "sim";
   const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
   const adapter = await buildSaxoAdapter({ userId, portfolioId, envOverride: env });
