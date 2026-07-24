@@ -21,6 +21,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { HelpDrawer } from "@/components/help-drawer";
 
 const NAV = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
