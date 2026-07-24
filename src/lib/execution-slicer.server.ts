@@ -316,7 +316,7 @@ export async function recordSliceFill(
   const nextAt = status === "active"
     ? new Date(Date.now() + 20 * 60_000).toISOString() // next slice in ~20 min
     : null;
-  const patch: Record<string, unknown> = {
+  const patch: Update<"pending_slices"> = {
     remaining_qty: remaining,
     slices_done: done,
     status,
