@@ -32,6 +32,17 @@ export type TradeRow = {
   price: number;
 };
 
+export type ConfidenceInterval = {
+  /** 2.5th percentile of the bootstrap distribution. */
+  low: number;
+  /** 50th percentile (median) of the bootstrap distribution. */
+  median: number;
+  /** 97.5th percentile of the bootstrap distribution. */
+  high: number;
+  /** Number of resamples used. */
+  samples: number;
+};
+
 export type BacktestMetrics = {
   totalReturnPct: number;
   maxDrawdownPct: number;
@@ -49,6 +60,10 @@ export type BacktestMetrics = {
   avgWin: number | null;
   avgLoss: number | null;
   grossRealizedPnl: number;
+  /** 95% bootstrap CI for annualised Sharpe. Null when < 2 daily returns. */
+  sharpeCI: ConfidenceInterval | null;
+  /** 95% bootstrap CI for max drawdown (negative %). Null when < 2 returns. */
+  maxDrawdownCI: ConfidenceInterval | null;
 };
 
 const TRADING_DAYS_PER_YEAR = 252;
