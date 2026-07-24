@@ -580,6 +580,12 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
           deleteMut.mutate(portfolio.id);
         }}
       />
+      <RenamePortfolioDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        portfolioId={portfolio.id}
+        currentName={portfolio.name}
+      />
     </Card>
   );
 }
