@@ -4,7 +4,8 @@
 // reconciliation core that the cron route imports directly.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { ScopedDbClient } from "@/lib/live-cash-sync.server";
+import { withOwnedClient } from "@/lib/_server/owned-client";
+import type { ScopedDbClient } from "@/lib/_server/owned-client";
 
 export async function logAudit(params: {
   userId: string;
@@ -57,17 +58,25 @@ export async function runReconciliation(
   portfolioId: string,
   client?: ScopedDbClient,
 ) {
-  // Same pattern as the sidecars: pass the caller's user-scoped client through
-  // so every write below is enforced by RLS. Cron paths omit the arg → admin.
-  const db = client ?? supabaseAdmin;
-  const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
-  await syncLiveCashFromBroker(portfolioId, client);
-  const { reconcileLiveHoldingsFromBroker } = await import(
-    "@/lib/live-holdings-sync.server"
-  );
-  await reconcileLiveHoldingsFromBroker(portfolioId, client);
-  const p = await db.from("portfolios")
-    .select("id, user_id, mode, current_cash").eq("id", portfolioId).maybeSingle();
+  // Standardised "which client + whose rows" pair. When `client` is present
+  // (authenticated caller), RLS enforces ownership on every write below.
+  // When it's absent (cron path), `isAdmin` is true and we add explicit
+  // `user_id`/portfolio-owner filters as defence-in-depth.
+  const owned = withOwnedClient(userId, client);
+  const { db, isAdmin } = owned;
+
+  await (await import("@/lib/live-cash-sync.server"))
+    .syncLiveCashFromBroker(portfolioId, client);
+  await (await import("@/lib/live-holdings-sync.server"))
+    .reconcileLiveHoldingsFromBroker(portfolioId, client);
+
+  // On the admin branch RLS is bypassed, so re-scope by user_id. On the
+  // authenticated branch the RLS policy already restricts the row set.
+  const portfolioQuery = db.from("portfolios")
+    .select("id, user_id, mode, current_cash")
+    .eq("id", portfolioId);
+  const p = await (isAdmin ? portfolioQuery.eq("user_id", userId) : portfolioQuery)
+    .maybeSingle();
   if (p.error || !p.data) throw new Error("Portfolio not found");
   if (p.data.user_id !== userId) throw new Error("Not owned by caller");
   if (p.data.mode !== "live_sim" && p.data.mode !== "live_prod") {

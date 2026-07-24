@@ -15,16 +15,11 @@
 //    transient Saxo outage.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
-
-/**
- * Supabase client used for the actual reads/writes. When the caller passes
- * their own authenticated client (from `requireSupabaseAuth` context),
- * every write goes through RLS as that user — service_role is only used
- * for unauthenticated cron paths that have no session to attach.
- */
-export type ScopedDbClient = SupabaseClient<Database>;
+// Canonical location for the "which client + whose rows" pair. Re-exported
+// here so existing sidecar imports (`live-holdings-sync`, `live-reconcile`)
+// keep working without churn.
+export type { ScopedDbClient } from "@/lib/_server/owned-client";
+import type { ScopedDbClient } from "@/lib/_server/owned-client";
 
 const DRIFT_EPSILON = 0.5;
 
