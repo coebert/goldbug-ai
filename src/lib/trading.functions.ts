@@ -218,7 +218,7 @@ export async function addSimFundsHandler(
       update: (patch: Record<string, unknown>) => {
         eq: (col: string, val: string) => {
           select: (cols: string) => {
-            single: () => Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+            single: () => Promise<{ data: { id: string; starting_cash: number; current_cash: number; currency: string } | null; error: { message: string } | null }>;
           };
         };
       };
