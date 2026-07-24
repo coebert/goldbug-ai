@@ -98,7 +98,20 @@ export class SaxoAdapter implements BrokerAdapter {
   private async req<T>(
     method: string,
     path: string,
-    opts?: { query?: Record<string, string | number | undefined>; body?: unknown },
+    opts?: {
+      query?: Record<string, string | number | undefined>;
+      body?: unknown;
+      // When set, HTTP statuses in this list are treated as expected: the
+      // request throws (so the caller can react) but no error row is written
+      // to live_broker_log. Used for endpoints where "not found" is a normal
+      // outcome (e.g. /hist/v3/orders on environments that don't expose it).
+      silentStatuses?: number[];
+      // Override the default retry budget. Order placement uses a wider
+      // budget because Saxo's /trade/v2/orders is aggressively throttled.
+      maxAttempts?: number;
+      // Cap for Retry-After honouring, in ms. Defaults to 5s.
+      retryCapMs?: number;
+    },
   ): Promise<T> {
     const url = this.url(path, opts?.query);
     const init: RequestInit = {
@@ -112,10 +125,9 @@ export class SaxoAdapter implements BrokerAdapter {
     };
     let status: number | null = null;
     let response: unknown = null;
-    // Saxo trading endpoints are aggressively rate-limited (~1 req/sec per
-    // app on /trade/v2/orders). Retry a bounded number of times on HTTP 429,
-    // honouring Retry-After when Saxo provides it.
-    const maxAttempts = 3;
+    const maxAttempts = opts?.maxAttempts ?? 3;
+    const retryCapMs = opts?.retryCapMs ?? 5000;
+    const silentStatuses = new Set(opts?.silentStatuses ?? []);
     try {
       let res: Response | null = null;
       let text = "";
@@ -127,17 +139,22 @@ export class SaxoAdapter implements BrokerAdapter {
         if (res.status !== 429 || attempt === maxAttempts) break;
         const retryAfterHeader = res.headers.get("retry-after");
         const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+        // Exponential backoff with jitter when Saxo doesn't send Retry-After.
+        const backoffMs = Math.min(retryCapMs, 1000 * 2 ** (attempt - 1))
+          + Math.floor(Math.random() * 250);
         const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
-          ? Math.min(retryAfterSec * 1000, 5000)
-          : 1500 * attempt;
+          ? Math.min(retryAfterSec * 1000, retryCapMs)
+          : backoffMs;
         await new Promise((r) => setTimeout(r, waitMs));
       }
       if (!res!.ok) {
         const msg = `Saxo ${method} ${path} failed [${res!.status}]: ${text.slice(0, 400)}`;
-        await log({
-          portfolioId: this.portfolioId, userId: this.userId, env: this.env,
-          method, path, status, request: opts?.body ?? opts?.query ?? null, response, error: msg,
-        });
+        if (!silentStatuses.has(res!.status)) {
+          await log({
+            portfolioId: this.portfolioId, userId: this.userId, env: this.env,
+            method, path, status, request: opts?.body ?? opts?.query ?? null, response, error: msg,
+          });
+        }
         throw new Error(msg);
       }
       await log({
@@ -156,6 +173,7 @@ export class SaxoAdapter implements BrokerAdapter {
       throw err;
     }
   }
+
 
   async ping(): Promise<BrokerPingResult> {
     const t0 = Date.now();
