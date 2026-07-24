@@ -1248,6 +1248,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           broker_blocked: brokerBlockedSymbols,
           notes: budgetNotes,
         },
+        broker_simulator: brokerSimGuard
+          ? {
+              risk_level: portfolio.risk_level,
+              options: brokerSimGuard.options,
+              ledger_matches_engine: brokerSimGuard.ledgerMatchesEngine,
+              rejected_trade_ids: brokerSimGuard.rejectedTradeIds,
+              drift: brokerSimGuard.drift,
+              final_cash: brokerSimGuard.simulation.finalState.cash,
+              final_holdings: brokerSimGuard.simulation.finalState.holdings,
+            }
+          : { skipped: true },
       },
       regime: regime ?? null,
       learning: {
