@@ -20,6 +20,7 @@ import {
   RefreshCw,
   LogOut,
 } from "lucide-react";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 const NAV = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
