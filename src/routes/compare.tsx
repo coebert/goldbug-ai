@@ -239,17 +239,17 @@ function ComparePage() {
     <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-              <GitCompareArrows className="h-6 w-6 text-primary" /> Compare portfolios
+        <div className="mb-6 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight sm:text-2xl">
+              <GitCompareArrows className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6" /> Compare portfolios
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
               Select up to 6 portfolios, run backtests on the same date range, and compare equity curves and risk-adjusted metrics.
             </p>
           </div>
-          <Link to="/">
-            <Button variant="outline" size="sm">Back to portfolios</Button>
+          <Link to="/" className="shrink-0">
+            <Button variant="outline" size="sm">Back</Button>
           </Link>
         </div>
 
