@@ -113,6 +113,7 @@ function ModeChart({
   portfolios,
   allSeries,
   currency,
+  deposits,
 }: {
   title: string;
   description: string;
@@ -123,12 +124,13 @@ function ModeChart({
   portfolios: PortfolioMeta[];
   allSeries: Array<Record<string, string | number>>;
   currency: string;
+  deposits: Array<{ portfolio_id: string; date: string; amount: number }>;
 }) {
   const [range, setRange] = useState<Range>("all");
   const isMobile = useIsMobile();
 
 
-  const { series, totalNow, startingTotal, yDomain } = useMemo(() => {
+  const { series, totalNow, startingTotal, adjustedNow, netDeposits, yDomain } = useMemo(() => {
     const opt = RANGE_OPTS.find((r) => r.value === range)!;
     let s = allSeries.filter((row) => Number.isFinite(Number(row[totalKey])));
     if (opt.days && s.length > 0) {
@@ -143,15 +145,32 @@ function ModeChart({
     let hi = Math.max(...totals);
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) { lo = 0; hi = 1; }
     const pad = Math.max((hi - lo) * 0.1, hi * 0.005, 1);
+
+    // Deposit-adjusted trailing % for this window. Only deposits dated
+    // strictly after the first visible point are netted out (matches
+    // computeModeSummary semantics).
+    const startDate = s[0] ? String(s[0].date) : "";
+    const adj = buildDepositAdjustedSeries(
+      s.map((r) => ({ date: String(r.date), equity: Number(r[totalKey]) })),
+      deposits.map((d) => ({ date: d.date, amount: d.amount })),
+      startDate,
+    );
+    const adjLast = adj.length > 0 ? adj[adj.length - 1].adjusted : last;
+    const netDep = last - adjLast;
+
     return {
       series: s,
       totalNow: last,
       startingTotal: start,
+      adjustedNow: adjLast,
+      netDeposits: netDep,
       yDomain: [Math.max(0, lo - pad), hi + pad] as [number, number],
     };
-  }, [allSeries, totalKey, range]);
+  }, [allSeries, totalKey, range, deposits]);
 
-  const pnl = totalNow - startingTotal;
+  // Trading-only PnL and % — deposits are excluded so a cash top-up
+  // never masquerades as profit.
+  const pnl = adjustedNow - startingTotal;
   const pnlPct = startingTotal > 0 ? (pnl / startingTotal) * 100 : 0;
   const fmt = (v: number) => `${currency}${v.toFixed(0)}`;
 
