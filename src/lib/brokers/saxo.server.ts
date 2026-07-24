@@ -361,6 +361,16 @@ export class SaxoAdapter implements BrokerAdapter {
   async lookupUic(symbol: string): Promise<{
     uic: number; assetType: string; currency: string; exchangeId?: string; tickSize?: number;
   }> {
+    // Yahoo-style pseudo-tickers Saxo will never resolve: FX pairs
+    // ("GBPEUR=X"), indices ("^FTSE"), futures ("=F"). Fail fast with a
+    // clear reason instead of firing three fruitless instrument searches
+    // and writing a misleading "instrument not found" row per attempt.
+    if (/[=^]/.test(symbol) || symbol.endsWith("=X") || symbol.endsWith("=F")) {
+      throw new Error(
+        `Saxo cannot trade pseudo-symbol ${symbol} (FX/index/futures ticker not routable to a cash-equity instrument)`,
+      );
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const cached = await supabaseAdmin
       .from("saxo_instrument_cache")
