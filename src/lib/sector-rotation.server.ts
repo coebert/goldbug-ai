@@ -76,7 +76,7 @@ export async function refreshSectorScores(asOf: string): Promise<SectorScore[]> 
   if (persist.length > 0) {
     await supabaseAdmin
       .from("sector_scores")
-      .upsert(persist as unknown as never, { onConflict: "sector,as_of" });
+      .upsert(persist, { onConflict: "sector,as_of" });
   }
   return rows;
 }
