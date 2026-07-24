@@ -81,10 +81,90 @@ function toneClass(v: number | null | undefined, invert = false) {
   return good ? "text-emerald-500" : "text-red-500";
 }
 
-export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string }) {
+function ReasonRow({
+  label,
+  raw,
+  norm,
+  weight,
+  contribution,
+  tone,
+  hint,
+}: {
+  label: string;
+  raw: string;
+  norm: number;
+  weight: number;
+  contribution: number;
+  tone: string;
+  hint?: string;
+}) {
+  const pct = Math.max(0, Math.min(1, norm)) * 100;
+  return (
+    <div className="rounded border border-border/50 bg-background/60 px-2 py-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className={`text-sm font-medium ${tone}`}>{raw}</span>
+      </div>
+      <div className="mt-1 h-1 w-full overflow-hidden rounded bg-border/50">
+        <div
+          className="h-full bg-primary/70"
+          style={{ width: `${pct.toFixed(1)}%` }}
+          aria-hidden
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+        <span>
+          norm {norm.toFixed(2)} × w {(weight * 100).toFixed(0)}%
+        </span>
+        <span className="font-mono">+{contribution.toFixed(3)}</span>
+      </div>
+      {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
+    </div>
+  );
+}
+
+type RiskTolerance = "conservative" | "balanced" | "aggressive";
+
+// Weights sum to 1. MDD is treated as "lower is better" — inverted before
+// weighting. Conservative punishes drawdowns hardest; aggressive rewards
+// return most. Sharpe is always meaningful so it never drops below 0.2.
+const TOLERANCE_WEIGHTS: Record<RiskTolerance, { ret: number; mdd: number; sharpe: number }> = {
+  conservative: { ret: 0.2, mdd: 0.55, sharpe: 0.25 },
+  balanced:     { ret: 0.35, mdd: 0.35, sharpe: 0.3 },
+  aggressive:   { ret: 0.6, mdd: 0.1, sharpe: 0.3 },
+};
+
+function inferTolerance(riskLevel: string | undefined): RiskTolerance {
+  const s = (riskLevel ?? "").toLowerCase();
+  if (s.includes("low") || s.includes("conserv")) return "conservative";
+  if (s.includes("high") || s.includes("aggress")) return "aggressive";
+  return "balanced";
+}
+
+// Min-max normalize into [0,1]. When all values are equal, everyone scores 1
+// (nothing differentiates them on this axis, so it shouldn't drag anyone down).
+function normalize(values: number[]): number[] {
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (!finite.length) return values.map(() => 0);
+  const lo = Math.min(...finite);
+  const hi = Math.max(...finite);
+  if (hi === lo) return values.map((v) => (Number.isFinite(v) ? 1 : 0));
+  return values.map((v) => (Number.isFinite(v) ? (v - lo) / (hi - lo) : 0));
+}
+
+export function BacktestRunHistoryCard({
+  portfolioId,
+  portfolioRiskLevel,
+}: {
+  portfolioId: string;
+  portfolioRiskLevel?: string;
+}) {
   const [runs, setRuns] = useState<BacktestRunRecord[]>(() => loadRuns(portfolioId));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupByRisk, setGroupByRisk] = useState(true);
+  const [tolerance, setTolerance] = useState<RiskTolerance>(() =>
+    inferTolerance(portfolioRiskLevel),
+  );
 
   useEffect(() => {
     const refresh = (e: Event) => {
@@ -205,6 +285,44 @@ export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string })
     return rows;
   }, [overlaySeries]);
 
+  // Recommendation: rank runs matching the chosen risk tolerance's own risk
+  // level bucket first, then fall back to the full pool if none match. Each
+  // axis is min-max normalized across the candidate pool so weights compose
+  // sensibly. MDD is stored as a negative pct (or 0), so we invert its
+  // magnitude — smaller drawdowns score higher.
+  const recommendation = useMemo(() => {
+    if (runs.length === 0) return null;
+    const targetBucket = tolerance; // conservative | balanced | aggressive
+    const bucketMatches = runs.filter(
+      (r) => inferTolerance(r.riskLevel) === targetBucket,
+    );
+    const pool = bucketMatches.length > 0 ? bucketMatches : runs;
+    const scopedToBucket = bucketMatches.length > 0;
+
+    const rets = pool.map((r) => r.metrics.totalReturnPct ?? 0);
+    const mddMag = pool.map((r) => Math.abs(r.metrics.maxDrawdownPct ?? 0));
+    const sharpes = pool.map((r) => r.metrics.sharpe ?? 0);
+
+    const nRet = normalize(rets);
+    // Invert MDD magnitude so lower drawdown => higher score.
+    const nMddRaw = normalize(mddMag);
+    const nMdd = nMddRaw.map((v) => 1 - v);
+    const nSharpe = normalize(sharpes);
+
+    const w = TOLERANCE_WEIGHTS[tolerance];
+    const scored = pool.map((r, i) => ({
+      run: r,
+      score: nRet[i] * w.ret + nMdd[i] * w.mdd + nSharpe[i] * w.sharpe,
+      parts: {
+        ret: { raw: rets[i], norm: nRet[i], contribution: nRet[i] * w.ret },
+        mdd: { raw: -mddMag[i], norm: nMdd[i], contribution: nMdd[i] * w.mdd },
+        sharpe: { raw: sharpes[i], norm: nSharpe[i], contribution: nSharpe[i] * w.sharpe },
+      },
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    return { best: scored[0], runnerUp: scored[1] ?? null, weights: w, poolSize: pool.length, scopedToBucket };
+  }, [runs, tolerance]);
+
 
 
   return (
@@ -238,6 +356,101 @@ export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string })
           </p>
         ) : (
           <>
+            {/* Recommendation panel */}
+            <div className="mb-4 rounded-md border border-border/60 bg-muted/30 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Recommended run for your risk tolerance
+                </div>
+                <div className="flex items-center gap-1" role="tablist" aria-label="Risk tolerance">
+                  {(["conservative", "balanced", "aggressive"] as const).map((t) => (
+                    <Button
+                      key={t}
+                      size="sm"
+                      variant={tolerance === t ? "default" : "outline"}
+                      onClick={() => setTolerance(t)}
+                      className="h-7 px-2 text-xs capitalize"
+                    >
+                      {t}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {recommendation ? (
+                <div className="mt-3">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <div className="text-sm font-semibold">
+                      {new Date(recommendation.best.run.ranAt).toLocaleString()}
+                    </div>
+                    <Badge variant="secondary" className="capitalize">
+                      {recommendation.best.run.riskLevel || "unknown"} risk
+                    </Badge>
+                    <div className="text-xs text-muted-foreground">
+                      {recommendation.best.run.days}d window · score{" "}
+                      <span className="font-mono text-foreground">
+                        {recommendation.best.score.toFixed(3)}
+                      </span>
+                      {recommendation.runnerUp && (
+                        <>
+                          {" "}· next best{" "}
+                          <span className="font-mono text-foreground">
+                            {recommendation.runnerUp.score.toFixed(3)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                    <ReasonRow
+                      label="Return"
+                      raw={fmt(recommendation.best.parts.ret.raw, 2, "%")}
+                      norm={recommendation.best.parts.ret.norm}
+                      weight={recommendation.weights.ret}
+                      contribution={recommendation.best.parts.ret.contribution}
+                      tone={toneClass(recommendation.best.parts.ret.raw)}
+                    />
+                    <ReasonRow
+                      label="Max drawdown"
+                      raw={fmt(recommendation.best.parts.mdd.raw, 2, "%")}
+                      norm={recommendation.best.parts.mdd.norm}
+                      weight={recommendation.weights.mdd}
+                      contribution={recommendation.best.parts.mdd.contribution}
+                      tone={toneClass(recommendation.best.parts.mdd.raw, true)}
+                      hint="lower is better"
+                    />
+                    <ReasonRow
+                      label="Sharpe"
+                      raw={fmt(recommendation.best.parts.sharpe.raw, 2)}
+                      norm={recommendation.best.parts.sharpe.norm}
+                      weight={recommendation.weights.sharpe}
+                      contribution={recommendation.best.parts.sharpe.contribution}
+                      tone={toneClass(recommendation.best.parts.sharpe.raw)}
+                    />
+                  </div>
+
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Ranked against{" "}
+                    {recommendation.scopedToBucket
+                      ? `${recommendation.poolSize} run(s) at ${tolerance} risk level`
+                      : `all ${recommendation.poolSize} runs (no ${tolerance}-level runs recorded yet)`}
+                    . Each axis is normalized 0–1 across the pool, then weighted{" "}
+                    <span className="font-mono">
+                      ret {(recommendation.weights.ret * 100).toFixed(0)}% · mdd{" "}
+                      {(recommendation.weights.mdd * 100).toFixed(0)}% · sharpe{" "}
+                      {(recommendation.weights.sharpe * 100).toFixed(0)}%
+                    </span>
+                    . Drawdown is inverted so smaller losses score higher.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Run a backtest to see a recommendation.
+                </p>
+              )}
+            </div>
+
+
             {groupByRisk && aggregates.length > 0 && (
               <div className="mb-4 overflow-x-auto">
                 <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

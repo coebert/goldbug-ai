@@ -766,7 +766,7 @@ function PortfolioPage() {
               />
             )}
 
-            <BacktestRunHistoryCard portfolioId={id} />
+            <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
 
 
 
