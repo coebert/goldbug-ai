@@ -10,16 +10,14 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 
-const FilterSchema = z.object({
-  event: z.string().trim().min(1).max(64).optional(),
-  reason: z.string().trim().min(1).max(64).optional(),
-  op: z.string().trim().min(1).max(64).optional(),
-  portfolioId: z.string().trim().uuid().optional(),
-  sinceHours: z.number().int().min(1).max(24 * 30).default(24),
-  limit: z.number().int().min(1).max(500).default(100),
-});
-
-export type SecurityAuditFilter = z.input<typeof FilterSchema>;
+export type SecurityAuditFilter = {
+  event?: string;
+  reason?: string;
+  op?: string;
+  portfolioId?: string;
+  sinceHours?: number;
+  limit?: number;
+};
 
 export type SecurityAuditRow = {
   id: string;
@@ -53,7 +51,16 @@ export type SecurityAuditResult = {
 
 export const listSecurityAudit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => FilterSchema.parse(input ?? {}))
+  .inputValidator((input: unknown) =>
+    z.object({
+      event: z.string().trim().min(1).max(64).optional(),
+      reason: z.string().trim().min(1).max(64).optional(),
+      op: z.string().trim().min(1).max(64).optional(),
+      portfolioId: z.string().trim().uuid().optional(),
+      sinceHours: z.number().int().min(1).max(24 * 30).default(24),
+      limit: z.number().int().min(1).max(500).default(100),
+    }).parse(input ?? {}),
+  )
   .handler(async ({ data, context }): Promise<SecurityAuditResult> => {
     const { supabase } = context;
     const since = new Date(Date.now() - data.sinceHours * 60 * 60 * 1000).toISOString();

@@ -2,8 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const IdSchema = z.object({ portfolioId: z.string().uuid() });
-
 export type HoldingSeries = {
   symbol: string;
   opened_at: string | null;
@@ -24,7 +22,9 @@ export type HoldingSeries = {
  */
 export const getHoldingsHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ portfolioId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data, context }): Promise<HoldingSeries[]> => {
     const { data: holdings } = await context.supabase
       .from("holdings")

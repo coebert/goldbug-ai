@@ -101,3 +101,15 @@ export function maybeNotifySecurityEvent(params: {
     }
   })();
 }
+
+// UI defaults for security_alert_settings. Lives in the .server sidecar so
+// the .functions.ts wrapper stays a thin server-fn module.
+export const SECURITY_ALERT_DEFAULTS = {
+  enabled: true,
+  event_type: "pending_slices" as const,
+  threshold: 5,
+  window_minutes: 60,
+  cooldown_minutes: 30,
+  last_notified_at: null as string | null,
+  last_notified_count: null as number | null,
+};

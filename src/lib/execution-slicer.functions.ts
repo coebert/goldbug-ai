@@ -33,17 +33,17 @@ import {
 
 export type { SlicerResult } from "./execution-slicer-handlers";
 
-// Client-facing input schemas — server injects the trusted ownerUserId.
-const EnqueueClientSchema = SliceInputSchema.omit({ ownerUserId: true });
-const TickClientSchema = TickInputSchema.omit({ ownerUserId: true });
-const FillClientSchema = FillInputSchema.omit({ ownerUserId: true });
+// Client-facing input schemas — server injects the trusted ownerUserId, so
+// each schema drops that field. Inlined into `.inputValidator` bodies below
+// because the TanStack server-fn splitter can otherwise strip module-scope
+// helper consts from the server chunk (see tanstack-serverfn-splitting).
 
 // ---- enqueue -----------------------------------------------------------
 
 export const enqueueSlice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
-    const parsed = EnqueueClientSchema.safeParse(data);
+    const parsed = SliceInputSchema.omit({ ownerUserId: true }).safeParse(data);
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
@@ -59,7 +59,7 @@ export const enqueueSlice = createServerFn({ method: "POST" })
 export const tickSlices = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
-    const parsed = TickClientSchema.safeParse(data);
+    const parsed = TickInputSchema.omit({ ownerUserId: true }).safeParse(data);
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
@@ -72,7 +72,7 @@ export const tickSlices = createServerFn({ method: "POST" })
 export const recordFill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
-    const parsed = FillClientSchema.safeParse(data);
+    const parsed = FillInputSchema.omit({ ownerUserId: true }).safeParse(data);
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })

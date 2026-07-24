@@ -15,7 +15,7 @@ export const Route = createFileRoute("/api/public/hooks/live-reconcile")({
         });
         if (!verified.ok) return verified.response;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { runReconciliation } = await import("@/lib/live.functions");
+        const { runReconciliation } = await import("@/lib/live-reconcile.server");
         const { data: portfolios, error } = await supabaseAdmin
           .from("portfolios").select("id, user_id, mode")
           .in("mode", ["live_sim", "live_prod"]);

@@ -5,21 +5,23 @@
 // surface systematically low-confidence sources.
 
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  CacheRow,
+  LOW_CONFIDENCE_THRESHOLD,
+  TranslationQualityFilterInput,
+  TranslationQualityFilterSchema,
+  dayKey,
+  fmtDay,
+} from "./translation-quality.server";
 
-const FilterSchema = z.object({
-  sinceDays: z.number().int().min(1).max(180).default(30),
-  minCount: z.number().int().min(1).max(1000).default(3),
-});
-
-export type TranslationQualityFilter = z.input<typeof FilterSchema>;
+export type TranslationQualityFilter = TranslationQualityFilterInput;
 
 export interface LanguageDayPoint {
   day: string; // YYYY-MM-DD
   avgConfidence: number;
   count: number;
-  lowCount: number; // confidence < 0.6
+  lowCount: number; // confidence < LOW_CONFIDENCE_THRESHOLD
 }
 
 export interface LanguageSeries {
@@ -51,26 +53,9 @@ export interface TranslationQualityResult {
   days: string[]; // sorted asc, covers full window
 }
 
-interface CacheRow {
-  news_date: string | null;
-  source: string | null;
-  original_language: string | null;
-  translation_confidence: number | string | null;
-}
-
-const LOW = 0.6;
-
-function dayKey(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-function fmtDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
 export const getTranslationQuality = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => FilterSchema.parse(input ?? {}))
+  .inputValidator((input: unknown) => TranslationQualityFilterSchema.parse(input ?? {}))
   .handler(async ({ data, context }): Promise<TranslationQualityResult> => {
     const { supabase } = context;
     const since = new Date(Date.now() - data.sinceDays * 86400_000);
@@ -127,7 +112,7 @@ export const getTranslationQuality = createServerFn({ method: "POST" })
       }
       lang_.total += 1;
       lang_.sum += conf;
-      if (conf < LOW) lang_.low += 1;
+      if (conf < LOW_CONFIDENCE_THRESHOLD) lang_.low += 1;
       let dayBucket = lang_.perDay.get(day);
       if (!dayBucket) {
         dayBucket = { sum: 0, count: 0, low: 0 };
@@ -135,7 +120,7 @@ export const getTranslationQuality = createServerFn({ method: "POST" })
       }
       dayBucket.sum += conf;
       dayBucket.count += 1;
-      if (conf < LOW) dayBucket.low += 1;
+      if (conf < LOW_CONFIDENCE_THRESHOLD) dayBucket.low += 1;
 
       const src = (r.source ?? "unknown").trim() || "unknown";
       const key = `${src}::${lang}`;
@@ -146,7 +131,7 @@ export const getTranslationQuality = createServerFn({ method: "POST" })
       }
       s.count += 1;
       s.sum += conf;
-      if (conf < LOW) s.low += 1;
+      if (conf < LOW_CONFIDENCE_THRESHOLD) s.low += 1;
     }
 
     const languages: LanguageSeries[] = Array.from(langMap.entries())
