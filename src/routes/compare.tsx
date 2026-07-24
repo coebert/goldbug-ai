@@ -236,6 +236,24 @@ function ComparePage() {
               </div>
             </CardContent>
           </Card>
+          <ConfirmDialog
+            open={confirmRerun}
+            onOpenChange={setConfirmRerun}
+            title="Reset and re-run backtests?"
+            description={
+              <p>
+                This will <span className="font-semibold text-destructive">reset</span> the
+                selected {selected.length} portfolio(s) and re-run the AI over the last{" "}
+                <span className="font-semibold">{days}</span> days. Existing trades and history
+                for those portfolios will be replaced.
+              </p>
+            }
+            confirmLabel="Reset and re-run"
+            onConfirm={() => {
+              setConfirmRerun(false);
+              runMut.mutate();
+            }}
+          />
 
           <div className="space-y-6">
             <Card>
