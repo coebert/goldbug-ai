@@ -17,16 +17,17 @@ const STEPS: Step[] = [
     targetSelector: '[data-coach="new-portfolio"]',
   },
   {
-    title: "Check the market status",
-    body: "The header shows your broker connection and last hourly run. Green means all systems go.",
-    targetSelector: '[data-coach="status-pill"]',
-  },
-  {
     title: "Follow global events",
     body: "The News reel explains which headlines shaped each AI decision. Filters and language translation are built in.",
     targetSelector: '[data-coach="news-reel"]',
   },
+  {
+    title: "Need a refresher?",
+    body: "Tap the ? icon in the header any time for a quick tour, keyboard shortcuts, and a link to the glossary.",
+    targetSelector: '[data-coach="help-button"]',
+  },
 ];
+
 
 /**
  * Dismissible first-run coach marks for the Home dashboard.
