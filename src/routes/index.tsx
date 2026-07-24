@@ -121,20 +121,11 @@ function Home() {
     enabled: !!session,
     staleTime: 30_000,
   });
-  const sparkByPortfolio = useMemo(() => {
-    const map: Record<string, { date: string; value: number }[]> = {};
-    const portfolios = equityQ.data?.portfolios ?? [];
-    const own = (equityQ.data as { perPortfolioSeries?: Record<string, { date: string; value: number }[]> } | undefined)
-      ?.perPortfolioSeries ?? {};
-    for (const p of portfolios) {
-      // Only that portfolio's real snapshot dates — never back-filled from
-      // starting_cash on dates it had no data (that produced a fake flat
-      // baseline dropping to today's value for portfolios with a single
-      // snapshot).
-      map[p.id] = own[p.id] ?? [];
-    }
-    return map;
-  }, [equityQ.data]);
+  const sparkByPortfolio = useMemo(
+    () => computeSparkByPortfolio(equityQ.data),
+    [equityQ.data],
+  );
+
 
 
   const todaySummary = useMemo(() => {
