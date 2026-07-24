@@ -5,6 +5,7 @@ import { getAllPortfoliosEquity } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Area,
   CartesianGrid,
@@ -16,6 +17,21 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+function compactNum(v: number) {
+  const a = Math.abs(v);
+  if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1)}M`;
+  if (a >= 1_000) return `${(v / 1_000).toFixed(a >= 10_000 ? 0 : 1)}k`;
+  return `${v.toFixed(0)}`;
+}
+
+function shortDate(s: string) {
+  // "2026-07-24" -> "24 Jul"
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return String(s);
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+}
+
 
 const LINE_COLORS = ["#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c", "#60a5fa"];
 const SIM_COLOR = "#22d3ee";
