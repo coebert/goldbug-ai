@@ -378,6 +378,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
   const rangePct = first != null && first > 0 && last != null ? ((last - first) / first) * 100 : null;
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => {
