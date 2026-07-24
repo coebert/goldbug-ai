@@ -484,14 +484,14 @@ function PortfolioPage() {
         {q.isLoading && <p className="text-muted-foreground">Loading…</p>}
         {p && (
           <>
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-              <div>
+            <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:flex-wrap sm:justify-between sm:gap-4">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold tracking-tight">{p.name}</h1>
+                  <h1 className="truncate text-lg font-semibold tracking-tight sm:text-2xl">{p.name}</h1>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-8 w-8 shrink-0"
                     aria-label="Rename portfolio"
                     onClick={() => setRenameOpen(true)}
                   >
@@ -501,7 +501,7 @@ function PortfolioPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 gap-1"
+                      className="h-8 shrink-0 gap-1"
                       onClick={() => setAddFundsOpen(true)}
                     >
                       <Banknote className="h-4 w-4" /> Add funds
@@ -511,25 +511,25 @@ function PortfolioPage() {
                   <LiveToggle portfolioId={p.id} mode={p.mode} livePaused={(p as { live_paused?: boolean | null }).live_paused} />
                 </div>
 
-                <p className="text-sm text-muted-foreground">
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {p.currency} {startingCash.toFixed(0)} <Explain term="starting_pot">starting pot</Explain> · <Explain term="risk_level">{p.risk_level} risk</Explain>
                 </p>
                 {p.mode === "live_prod" ? (
-                  <p className="mt-1 text-xs font-medium text-destructive">
+                  <p className="mt-1 text-[11px] font-medium leading-snug text-destructive sm:text-xs">
                     ⚠ <Explain term="live_prod">Real money</Explain> — approved orders route to your live broker account.
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground sm:text-xs">
                     This portfolio uses <span className="font-medium text-foreground">pretend money</span> — nothing you do here touches your bank or Saxo account. {p.mode === "live_sim" ? <>(<Explain term="live_sim">paper-traded against live prices</Explain>)</> : <>(<Explain term="backtest">historical backtest only</Explain>)</>}
                   </p>
                 )}
               </div>
-              <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-semibold tabular-nums">
+              <div className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+                <span className="text-xl font-semibold leading-tight tabular-nums sm:text-3xl">
                   {p.currency} {totalValue.toFixed(2)}
                 </span>
                 <span
-                  className={`text-sm font-medium tabular-nums ${
+                  className={`text-[11px] font-medium tabular-nums sm:text-sm ${
                     pnl >= 0 ? "text-primary" : "text-destructive"
                   }`}
                 >
@@ -538,6 +538,7 @@ function PortfolioPage() {
                 </span>
               </div>
             </div>
+
 
             {underfunded && (
               <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
