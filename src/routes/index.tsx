@@ -38,6 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
