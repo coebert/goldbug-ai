@@ -386,10 +386,6 @@ export class SaxoAdapter implements BrokerAdapter {
 
   private async getDefaultAccountKey(): Promise<string | undefined> {
     if (this.resolvedAccountKey) return this.resolvedAccountKey;
-    if (this.accountKey) {
-      this.resolvedAccountKey = this.accountKey;
-      return this.resolvedAccountKey;
-    }
     try {
       const res = await this.req<{
         Data?: Array<{
@@ -400,10 +396,26 @@ export class SaxoAdapter implements BrokerAdapter {
         }>;
       }>("GET", "/port/v1/accounts/me");
       const accounts = res.Data ?? [];
+      const configured = this.accountKey
+        ? accounts.find((a) => a.AccountKey === this.accountKey && a.Active !== false)
+        : undefined;
       const tradable = accounts.find(
         (a) => a.Active !== false && a.AccountKey && a.LegalAssetTypes?.some((t) => t === "Stock" || t === "Etf"),
       ) ?? accounts.find((a) => a.Active !== false && a.AccountKey) ?? accounts.find((a) => a.AccountKey);
-      this.resolvedAccountKey = tradable?.AccountKey;
+      this.resolvedAccountKey = configured?.AccountKey ?? tradable?.AccountKey;
+      if (this.accountKey && !configured) {
+        await log({
+          portfolioId: this.portfolioId,
+          userId: this.userId,
+          env: this.env,
+          method: "ACCOUNT_KEY_DISCOVERED",
+          path: "/port/v1/accounts/me",
+          status: 200,
+          request: { configuredProvided: true } as never,
+          response: { selected: !!this.resolvedAccountKey, accountCount: accounts.length } as never,
+          error: "Configured SAXO_ACCOUNT_KEY did not match this broker environment; using discovered active account.",
+        });
+      }
       return this.resolvedAccountKey;
     } catch (e) {
       await log({
@@ -415,7 +427,8 @@ export class SaxoAdapter implements BrokerAdapter {
         status: null,
         error: e instanceof Error ? e.message : String(e),
       });
-      return undefined;
+      this.resolvedAccountKey = this.accountKey;
+      return this.resolvedAccountKey;
     }
   }
 }
