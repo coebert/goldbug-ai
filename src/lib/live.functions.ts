@@ -13,8 +13,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
 
-// Re-export the reconciliation core for the cron route.
-export { runReconciliation } from "@/lib/live-reconcile.server";
 
 /** Activate live trading on a portfolio. Requires ping + optional balance read. */
 export const activateLive = createServerFn({ method: "POST" })
