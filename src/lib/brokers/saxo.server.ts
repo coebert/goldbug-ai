@@ -58,6 +58,15 @@ export class SaxoAdapter implements BrokerAdapter {
   private readonly accountKey: string | undefined;
   private readonly clientKey: string | undefined;
   private resolvedAccountKey: string | undefined;
+  // Saxo throttles /trade/v2/orders at roughly 1 req/sec per app. Track the
+  // last POST time so back-to-back placeOrder calls space themselves out
+  // instead of racing into a 429 storm.
+  private lastOrderPostAt = 0;
+  // Saxo's /hist/v3/orders endpoint is not enabled on every environment
+  // (notably SIM). Once we see a 404 there we stop retrying for the life of
+  // this adapter — the reconciler treats "unknown" the same way and we
+  // avoid flooding live_broker_log with one row per open order per pass.
+  private histUnsupported = false;
 
   constructor(opts: {
     env: BrokerEnv;
@@ -75,6 +84,7 @@ export class SaxoAdapter implements BrokerAdapter {
     this.clientKey = opts.clientKey;
   }
 
+
   private url(path: string, query?: Record<string, string | number | undefined>): string {
     const u = new URL(BASE[this.env] + path);
     if (query) {
@@ -88,7 +98,20 @@ export class SaxoAdapter implements BrokerAdapter {
   private async req<T>(
     method: string,
     path: string,
-    opts?: { query?: Record<string, string | number | undefined>; body?: unknown },
+    opts?: {
+      query?: Record<string, string | number | undefined>;
+      body?: unknown;
+      // When set, HTTP statuses in this list are treated as expected: the
+      // request throws (so the caller can react) but no error row is written
+      // to live_broker_log. Used for endpoints where "not found" is a normal
+      // outcome (e.g. /hist/v3/orders on environments that don't expose it).
+      silentStatuses?: number[];
+      // Override the default retry budget. Order placement uses a wider
+      // budget because Saxo's /trade/v2/orders is aggressively throttled.
+      maxAttempts?: number;
+      // Cap for Retry-After honouring, in ms. Defaults to 5s.
+      retryCapMs?: number;
+    },
   ): Promise<T> {
     const url = this.url(path, opts?.query);
     const init: RequestInit = {
@@ -102,10 +125,9 @@ export class SaxoAdapter implements BrokerAdapter {
     };
     let status: number | null = null;
     let response: unknown = null;
-    // Saxo trading endpoints are aggressively rate-limited (~1 req/sec per
-    // app on /trade/v2/orders). Retry a bounded number of times on HTTP 429,
-    // honouring Retry-After when Saxo provides it.
-    const maxAttempts = 3;
+    const maxAttempts = opts?.maxAttempts ?? 3;
+    const retryCapMs = opts?.retryCapMs ?? 5000;
+    const silentStatuses = new Set(opts?.silentStatuses ?? []);
     try {
       let res: Response | null = null;
       let text = "";
@@ -117,17 +139,22 @@ export class SaxoAdapter implements BrokerAdapter {
         if (res.status !== 429 || attempt === maxAttempts) break;
         const retryAfterHeader = res.headers.get("retry-after");
         const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+        // Exponential backoff with jitter when Saxo doesn't send Retry-After.
+        const backoffMs = Math.min(retryCapMs, 1000 * 2 ** (attempt - 1))
+          + Math.floor(Math.random() * 250);
         const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
-          ? Math.min(retryAfterSec * 1000, 5000)
-          : 1500 * attempt;
+          ? Math.min(retryAfterSec * 1000, retryCapMs)
+          : backoffMs;
         await new Promise((r) => setTimeout(r, waitMs));
       }
       if (!res!.ok) {
         const msg = `Saxo ${method} ${path} failed [${res!.status}]: ${text.slice(0, 400)}`;
-        await log({
-          portfolioId: this.portfolioId, userId: this.userId, env: this.env,
-          method, path, status, request: opts?.body ?? opts?.query ?? null, response, error: msg,
-        });
+        if (!silentStatuses.has(res!.status)) {
+          await log({
+            portfolioId: this.portfolioId, userId: this.userId, env: this.env,
+            method, path, status, request: opts?.body ?? opts?.query ?? null, response, error: msg,
+          });
+        }
         throw new Error(msg);
       }
       await log({
@@ -146,6 +173,7 @@ export class SaxoAdapter implements BrokerAdapter {
       throw err;
     }
   }
+
 
   async ping(): Promise<BrokerPingResult> {
     const t0 = Date.now();
@@ -333,6 +361,16 @@ export class SaxoAdapter implements BrokerAdapter {
   async lookupUic(symbol: string): Promise<{
     uic: number; assetType: string; currency: string; exchangeId?: string; tickSize?: number;
   }> {
+    // Yahoo-style pseudo-tickers Saxo will never resolve: FX pairs
+    // ("GBPEUR=X"), indices ("^FTSE"), futures ("=F"). Fail fast with a
+    // clear reason instead of firing three fruitless instrument searches
+    // and writing a misleading "instrument not found" row per attempt.
+    if (/[=^]/.test(symbol) || symbol.endsWith("=X") || symbol.endsWith("=F")) {
+      throw new Error(
+        `Saxo cannot trade pseudo-symbol ${symbol} (FX/index/futures ticker not routable to a cash-equity instrument)`,
+      );
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const cached = await supabaseAdmin
       .from("saxo_instrument_cache")
@@ -430,9 +468,19 @@ export class SaxoAdapter implements BrokerAdapter {
     if (req.orderType === "limit" && req.limitPrice != null) body.OrderPrice = req.limitPrice;
 
     try {
+      // Saxo throttles /trade/v2/orders at ~1 req/sec. Space consecutive
+      // placeOrder calls on the same adapter to at least 1.1s apart so a
+      // burst of two orders doesn't waste retries fighting rate limits.
+      const MIN_ORDER_GAP_MS = 1100;
+      const wait = Math.max(0, this.lastOrderPostAt + MIN_ORDER_GAP_MS - Date.now());
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      this.lastOrderPostAt = Date.now();
       const res = await this.req<{ OrderId?: string; ErrorInfo?: { Message?: string } }>(
-        "POST", "/trade/v2/orders", { body },
+        "POST",
+        "/trade/v2/orders",
+        { body, maxAttempts: 5, retryCapMs: 10_000 },
       );
+      this.lastOrderPostAt = Date.now();
       if (res.ErrorInfo) {
         return { brokerOrderId: "", status: "rejected", reason: res.ErrorInfo.Message ?? "unknown", raw: res };
       }
@@ -440,6 +488,7 @@ export class SaxoAdapter implements BrokerAdapter {
     } catch (e) {
       return { brokerOrderId: "", status: "error", reason: e instanceof Error ? e.message : String(e) };
     }
+
   }
 
   /**
@@ -494,9 +543,13 @@ export class SaxoAdapter implements BrokerAdapter {
       }
     | null
   > {
+    if (this.histUnsupported) return null;
     const clientKey = await this.getClientKey();
     if (!clientKey) return null;
     try {
+      // Saxo accepts the raw ClientKey (including trailing `==`) in the path;
+      // URL-encoding it to `%3D%3D` trips IIS routing and returns an HTML 404
+      // before the request ever reaches the OpenAPI layer.
       const res = await this.req<{
         Data?: Array<{
           OrderId?: string;
@@ -509,8 +562,12 @@ export class SaxoAdapter implements BrokerAdapter {
           LastFilledTime?: string;
           ErrorText?: string;
         }>;
-      }>("GET", `/hist/v3/orders/${encodeURIComponent(clientKey)}`, {
+      }>("GET", `/hist/v3/orders/${clientKey}`, {
         query: { FromDateTime: sinceIso },
+        // Suppress noisy per-order 404s: reconciler polls this on every
+        // open order every pass; when the env doesn't expose /hist we'd
+        // otherwise write one error row per (order × pass).
+        silentStatuses: [404],
       });
       const hit = (res.Data ?? []).find((o) => String(o.OrderId ?? "") === brokerOrderId);
       if (!hit) return null;
@@ -528,11 +585,26 @@ export class SaxoAdapter implements BrokerAdapter {
         filledAt: hit.ExecutionTimeClose ?? hit.LastFilledTime ?? null,
         reason: hit.ErrorText ?? undefined,
       };
-    } catch {
-      // /hist endpoint is not universally enabled — treat as "unknown"
+    } catch (e) {
+      // /hist endpoint is not universally enabled — treat as "unknown" and
+      // stop trying for the life of this adapter to avoid log spam. Record
+      // the disablement once so operators can still see why reconciliation
+      // is degraded on this environment.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("failed [404]") && !this.histUnsupported) {
+        this.histUnsupported = true;
+        await log({
+          portfolioId: this.portfolioId, userId: this.userId, env: this.env,
+          method: "HIST_ORDERS_UNSUPPORTED",
+          path: `/hist/v3/orders/${clientKey}`,
+          status: 404,
+          error: "Saxo /hist/v3/orders returned 404; further reconciliation calls to this endpoint will be skipped for this session.",
+        });
+      }
       return null;
     }
   }
+
 
   private cachedClientKey: string | undefined;
   private async getClientKey(): Promise<string | undefined> {
