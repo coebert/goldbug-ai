@@ -47,7 +47,7 @@ Goal: make it obvious where you are, what you can do next, and how to get back.
 - Group headlines by day with sticky day headers.
 - Add an unread indicator on the Notifications bell in the header, opening a popover instead of requiring a trip to `/admin`.
 
-### Phase 6 — Compare page
+### Phase 6 — Compare page ✅ shipped
 
 - Compare (819 lines) has heavy controls above the chart. On mobile the chart is squeezed. Solution: chart first, controls collapse into a bottom sheet triggered by a "Configure" FAB.
 - Legend chips should double as show/hide toggles with clear on-state colour; today the isolate behaviour is not discoverable.
