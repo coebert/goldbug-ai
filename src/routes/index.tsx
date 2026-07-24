@@ -488,6 +488,14 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                     Open portfolio
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setRenameOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" /> Rename portfolio
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
@@ -498,6 +506,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
                 >
                   <Trash2 className="mr-2 h-4 w-4" /> Delete portfolio
                 </DropdownMenuItem>
+
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
