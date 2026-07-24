@@ -43,7 +43,7 @@ export default tseslint.config(
   // pull `supabaseAdmin` / secrets into the client bundle graph.
   {
     files: ["src/routes/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}", "src/hooks/**/*.{ts,tsx}"],
-    ignores: ["src/routes/api/**"],
+    ignores: ["src/routes/api/**", "**/__tests__/**", "**/*.test.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
         "error",
