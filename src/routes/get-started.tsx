@@ -327,6 +327,7 @@ function GetStarted() {
               <StepNav
                 onBack={() => setStep(1)}
                 onNext={() => setStep(3)}
+                onSkip={() => navigate({ to: "/" })}
                 nextDisabled={classes.length === 0}
               />
             </CardContent>
