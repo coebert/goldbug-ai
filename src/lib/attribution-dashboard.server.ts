@@ -1,8 +1,12 @@
 // Attribution dashboard — breaks each executed trade's outcome into
 // per-signal contribution, news_score impact, and regime/event penalties.
-// Server-only (uses supabaseAdmin + price cache).
+//
+// Reads per-user rows from `decisions`. Callers pass an `OwnedDbClient`; the
+// authenticated path (RLS via `context.supabase`) is preferred, and the
+// admin fallback re-scopes with an explicit portfolio ownership check so
+// the service-role branch cannot leak another user's decisions.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withOwnedClient, type OwnedDbClient } from "@/lib/_server/owned-client";
 import { getPriceOn } from "./market-data.server";
 import { computeAttribution, SIGNAL_KEYS, type SignalKey, type AttributionReport } from "./attribution.server";
 
