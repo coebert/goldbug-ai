@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   activateLive, deactivateLive, pauseLive, killAllLive, resumeAllLive, getAuditLog,
-  pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio,
+  pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio, reconcileOrders,
   startSaxoOAuth, getSaxoOAuthStatus, getLiveTradeAlert,
 } from "@/lib/live.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
