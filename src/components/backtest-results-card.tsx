@@ -167,14 +167,30 @@ export function BacktestResultsCard({
       </CardHeader>
       <CardContent className="space-y-6">
         <section>
-          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Equity curve
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Equity curve
+            </div>
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" /> buy
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-red-500" /> sell
+              </span>
+            </div>
           </div>
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={equityData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+              <ComposedChart data={equityData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
+                <XAxis
+                  dataKey="date"
+                  type="category"
+                  allowDuplicatedCategory={false}
+                  tick={{ fontSize: 11 }}
+                  minTickGap={24}
+                />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtCompact} width={56} />
                 <Tooltip
                   formatter={(v: number) => fmtCurrency(v)}
@@ -189,10 +205,58 @@ export function BacktestResultsCard({
                   strokeWidth={2}
                   dot={false}
                 />
-              </LineChart>
+                <Scatter
+                  name="Buys"
+                  data={buyMarkers}
+                  dataKey="value"
+                  fill="rgb(16 185 129)"
+                  shape="triangle"
+                />
+                <Scatter
+                  name="Sells"
+                  data={sellMarkers}
+                  dataKey="value"
+                  fill="rgb(239 68 68)"
+                  shape="triangle"
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </section>
+
+        <section>
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Drawdown curve
+          </div>
+          <div className="h-40 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={drawdownData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  width={56}
+                  tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                  domain={[(min: number) => Math.min(0, Math.floor(min)), 0]}
+                />
+                <Tooltip
+                  formatter={(v: number) => `${v.toFixed(2)}%`}
+                  labelFormatter={(l) => `${l}`}
+                  contentStyle={{ fontSize: 12 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="drawdown"
+                  name="Drawdown"
+                  stroke="rgb(239 68 68)"
+                  fill="rgb(239 68 68)"
+                  fillOpacity={0.25}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
 
         <section>
           <div className="mb-2 flex items-center justify-between">
