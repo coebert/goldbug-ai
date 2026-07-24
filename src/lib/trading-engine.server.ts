@@ -1207,6 +1207,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           universe_total: fullUniverse.length,
           candidates_kept: candidateSymbols.length,
           dropped_for_cash: droppedForCash,
+          broker_blocked: brokerBlockedSymbols,
           notes: budgetNotes,
         },
       },
