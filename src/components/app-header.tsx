@@ -97,6 +97,9 @@ export function AppHeader({ email }: { email?: string | null }) {
 
         {/* Mobile: notifications + Admin + hamburger */}
         <div className="flex shrink-0 items-center gap-1 md:hidden">
+          <span data-coach="help-button">
+            <HelpDrawer />
+          </span>
           {email && <NotificationsBell />}
           <Link
             to="/admin"
