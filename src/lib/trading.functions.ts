@@ -70,7 +70,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const list = portfolios ?? [];
     if (list.length === 0) {
-      return { portfolios: [], series: [], perPortfolioSeries: {}, currency: "GBP" as string };
+      return { portfolios: [], series: [], perPortfolioSeries: {}, currency: "GBP" as string, mismatches: [] as SnapshotMismatch[] };
     }
 
     // Phase 8 — one query for all portfolios instead of N (uses new
@@ -78,16 +78,69 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     const ids = list.map((p) => p.id);
     const { data: allEq } = await context.supabase
       .from("equity_snapshots")
-      .select("portfolio_id,snapshot_date,total_value")
+      .select("portfolio_id,snapshot_date,total_value,cash")
       .in("portfolio_id", ids)
       .order("snapshot_date", { ascending: true });
 
     const today = new Date().toISOString().slice(0, 10);
-    return buildAllPortfoliosEquity({
+    const built = buildAllPortfoliosEquity({
       portfolios: list,
       snapshots: allEq ?? [],
       today,
     });
+
+    // Snapshot timing mismatch detection: compare the most recent successful
+    // broker CASH_SYNC log to the latest persisted snapshot for each live
+    // portfolio. Warns the dashboard when the totals it's about to render
+    // are based on stale data.
+    const liveIds = list.filter((p) => p.mode === "live_prod").map((p) => p.id);
+    let mismatches: SnapshotMismatch[] = [];
+    if (liveIds.length > 0) {
+      const { data: brokerLogs } = await context.supabase
+        .from("live_broker_log")
+        .select("portfolio_id,created_at,response,status")
+        .in("portfolio_id", liveIds)
+        .eq("method", "CASH_SYNC")
+        .eq("status", 200)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      const lastSyncByPortfolio = new Map<string, { at: string; cash: number }>();
+      for (const row of brokerLogs ?? []) {
+        if (lastSyncByPortfolio.has(row.portfolio_id)) continue;
+        const resp = (row.response ?? {}) as { brokerCash?: number | string };
+        const cash = Number(resp.brokerCash);
+        if (!Number.isFinite(cash)) continue;
+        lastSyncByPortfolio.set(row.portfolio_id, { at: row.created_at, cash });
+      }
+      const latestSnapByPortfolio = new Map<string, { date: string; cash: number | null; totalValue: number }>();
+      for (const s of allEq ?? []) {
+        if (!liveIds.includes(s.portfolio_id)) continue;
+        const prev = latestSnapByPortfolio.get(s.portfolio_id);
+        if (!prev || s.snapshot_date > prev.date) {
+          const rawCash = (s as { cash?: number | string | null }).cash;
+          const cash = rawCash == null ? null : Number(rawCash);
+          latestSnapByPortfolio.set(s.portfolio_id, {
+            date: s.snapshot_date,
+            cash: cash != null && Number.isFinite(cash) ? cash : null,
+            totalValue: Number(s.total_value ?? 0),
+          });
+        }
+      }
+      const inputs: SnapshotMismatchInput[] = list
+        .filter((p) => p.mode === "live_prod")
+        .map((p) => ({
+          portfolioId: p.id,
+          portfolioName: p.name,
+          mode: p.mode,
+          today,
+          lastBrokerSync: lastSyncByPortfolio.get(p.id) ?? null,
+          latestSnapshot: latestSnapByPortfolio.get(p.id) ?? null,
+        }));
+      mismatches = detectSnapshotTimingMismatches(inputs);
+      logSnapshotTimingMismatches(mismatches);
+    }
+
+    return { ...built, mismatches };
   });
 
 
