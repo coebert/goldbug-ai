@@ -244,6 +244,12 @@ export class SaxoAdapter implements BrokerAdapter {
           CurrentPrice?: number;
           MarketValue?: number;
           MarketValueInBaseCurrency?: number;
+          MarketValueOpen?: number;
+          MarketValueOpenInBaseCurrency?: number;
+          AverageOpenPrice?: number;
+          PositionsAverageBuyPrice?: number;
+          ProfitLossOnTrade?: number;
+          ProfitLossOnTradeInBaseCurrency?: number;
         };
         DisplayAndFormat?: {
           Symbol?: string;
@@ -265,6 +271,34 @@ export class SaxoAdapter implements BrokerAdapter {
       const assetType = String(base.AssetType ?? p.AssetType ?? "Stock");
       let symbol = df.Symbol ?? "";
       let currency = df.Currency ?? "GBP";
+      const quantity = Number(base.Amount ?? 0);
+      const absQuantity = Math.abs(quantity);
+      const avgPrice = firstPositiveNumber(
+        base.AverageOpenPrice,
+        view.AverageOpenPrice,
+        view.PositionsAverageBuyPrice,
+        absQuantity > 0 && view.MarketValueOpen != null
+          ? Math.abs(Number(view.MarketValueOpen)) / absQuantity
+          : undefined,
+        absQuantity > 0 && view.MarketValueOpenInBaseCurrency != null
+          ? Math.abs(Number(view.MarketValueOpenInBaseCurrency)) / absQuantity
+          : undefined,
+      );
+      const pnl = firstFiniteNumber(view.ProfitLossOnTrade, view.ProfitLossOnTradeInBaseCurrency) ?? 0;
+      const priceFromOpenValue = avgPrice > 0 && absQuantity > 0
+        ? Math.max(0, avgPrice + pnl / absQuantity)
+        : 0;
+      const marketPrice = firstPositiveNumber(
+        view.CurrentPrice,
+        view.MarketValue != null && absQuantity > 0
+          ? Math.abs(Number(view.MarketValue)) / absQuantity
+          : undefined,
+        view.MarketValueInBaseCurrency != null && absQuantity > 0
+          ? Math.abs(Number(view.MarketValueInBaseCurrency)) / absQuantity
+          : undefined,
+        priceFromOpenValue,
+        avgPrice,
+      );
 
       // Some Saxo responses still omit Symbol for the aggregated NetPosition
       // row (e.g. certain ETFs). Fall back to the instrument details endpoint
@@ -281,9 +315,9 @@ export class SaxoAdapter implements BrokerAdapter {
 
       out.push({
         symbol,
-        quantity: Number(base.Amount ?? 0),
-        avgPrice: Number(base.AverageOpenPrice ?? 0),
-        marketPrice: Number(view.CurrentPrice ?? 0),
+        quantity,
+        avgPrice,
+        marketPrice,
         currency,
         assetType,
       });
