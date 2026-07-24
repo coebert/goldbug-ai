@@ -185,9 +185,16 @@ export async function getDailyCandlesRange(
     symbol,
   )}?interval=1d&period1=${period1}&period2=${period2}`;
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
-    });
+    const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
+    const res = await runWithBreaker("yahoo", () =>
+      fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
+      }).then((r) => {
+        if (!r.ok && (r.status >= 500 || r.status === 429)) {
+          throw new Error(`Yahoo transient ${r.status}`);
+        }
+        return r;
+      }));
     if (!res.ok) throw new Error(`Yahoo ${res.status}`);
     const json = (await res.json()) as {
       chart?: {
