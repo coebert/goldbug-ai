@@ -230,6 +230,9 @@ export async function callAiForDecision(args: {
   regimeNote?: string | null;
   hyperparams?: TunedHyperparams | null;
   calibrationBlock?: string | null;
+  budgetNotes?: string[];
+  perSymbolBudget?: number;
+  minTradeValue?: number;
   variantSuffix?: string | null;
 }): Promise<DecisionOutput> {
 
