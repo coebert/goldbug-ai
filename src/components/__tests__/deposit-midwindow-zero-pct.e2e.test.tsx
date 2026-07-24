@@ -107,9 +107,11 @@ describe("dashboard e2e — mid-window deposit shows 0% until trading moves", ()
     expect(nums2).toContain(500);
     expect(step.html).toContain("+0.00%");
     expect(step.html).toContain("+0");
-    // Regressions would surface as any non-zero % — assert none present.
-    expect(step.html).not.toMatch(/[+\-]\d+\.\d+%(?!.*\+0\.00%)/); // sanity
+    // Regression guard: the deposit must NOT surface as a +66.67% gain
+    // (that's the raw un-netted delta) or any other non-zero %.
     expect(step.html).not.toContain("66.67");
+    expect(step.html).not.toMatch(/[+-](?!0\.00)\d+\.\d{2}%/);
+
 
     // --- Day 3: real trading gain of £25 on top of the £500 base. -----
     snapshots = [
