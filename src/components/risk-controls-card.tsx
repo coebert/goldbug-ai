@@ -426,6 +426,7 @@ export function RiskControlsCard({
             </div>
 
             {showAdvanced && (
+            <>
             <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
               <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
               <p className="mb-3 text-xs text-muted-foreground">
