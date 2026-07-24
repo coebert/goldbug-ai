@@ -22,11 +22,19 @@ export type LearningStats = {
   per_side: { buy: { n: number; win_rate: number | null }; sell: { n: number; win_rate: number | null } };
 };
 
+export type LessonOverrideEntry = {
+  original_text: string;
+  action: string;
+  replacement_text: string | null;
+};
+
 export type LearningContext = {
   stats: LearningStats;
   lessons: string[];
   lessons_as_of: string | null;
   lessons_regime: string | null; // which regime these lessons were authored under (null = general)
+  lessons_raw: string[];
+  lessons_overrides: LessonOverrideEntry[];
   per_regime_stats: { regime: string; n: number; win_rate: number; avg_return_pct: number }[];
   current_regime: string | null;
   samples: {
@@ -218,10 +226,41 @@ async function fetchLatestLessons(userId: string, currentRegime: string | null) 
   const scoped = currentRegime ? await grab(currentRegime) : null;
   const general = scoped ? null : await grab(null);
   const hit = scoped ?? general;
+  const raw = hit?.lessons ?? [];
+
+  // Apply user overrides so lessons flagged as unhelpful are dropped
+  // or replaced with the user's revised wording before the AI sees them.
+  const { data: overrides } = await supabaseAdmin
+    .from("lesson_overrides")
+    .select("original_text, action, replacement_text")
+    .eq("user_id", userId);
+  const overrideMap = new Map<string, { action: string; replacement_text: string | null }>();
+  for (const o of overrides ?? []) {
+    overrideMap.set(o.original_text as string, {
+      action: o.action as string,
+      replacement_text: (o.replacement_text as string | null) ?? null,
+    });
+  }
+  const lessons: string[] = [];
+  for (const l of raw) {
+    const o = overrideMap.get(l);
+    if (!o) { lessons.push(l); continue; }
+    if (o.action === "disabled") continue;
+    if (o.action === "edited" && o.replacement_text && o.replacement_text.trim().length > 0) {
+      lessons.push(o.replacement_text.trim());
+    }
+  }
+
   return {
-    lessons: hit?.lessons ?? [],
+    lessons,
     lessons_as_of: hit?.as_of ?? null,
     lessons_regime: hit?.regime ?? null,
+    lessons_raw: raw,
+    lessons_overrides: Array.from(overrideMap, ([original_text, v]) => ({
+      original_text,
+      action: v.action,
+      replacement_text: v.replacement_text,
+    })),
   };
 }
 
@@ -246,7 +285,7 @@ export async function buildLearningContext(
     computeRecentOutcomes(portfolioId, asOf),
     userId
       ? fetchLatestLessons(userId, current_regime)
-      : Promise.resolve({ lessons: [] as string[], lessons_as_of: null, lessons_regime: null }),
+      : Promise.resolve({ lessons: [] as string[], lessons_as_of: null, lessons_regime: null, lessons_raw: [] as string[], lessons_overrides: [] as LessonOverrideEntry[] }),
   ]);
   // Per-regime rolling stats from the same sample window.
   const buckets = new Map<string, LearningContext["samples"]>();

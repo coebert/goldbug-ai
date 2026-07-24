@@ -326,6 +326,39 @@ export type Database = {
           },
         ]
       }
+      lesson_overrides: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          original_text: string
+          reason: string | null
+          replacement_text: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          original_text: string
+          reason?: string | null
+          replacement_text?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          original_text?: string
+          reason?: string | null
+          replacement_text?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       live_broker_log: {
         Row: {
           broker: string
