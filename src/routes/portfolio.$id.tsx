@@ -81,9 +81,14 @@ export const Route = createFileRoute("/portfolio/$id")({
 
 function PortfolioPage() {
   const { id } = Route.useParams();
+  const { tab } = Route.useSearch();
   const navigate = useNavigate();
+  const setTab = (next: PortfolioTab) =>
+    navigate({ to: "/portfolio/$id", params: { id }, search: { tab: next }, replace: true });
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [tradeSort, setTradeSort] = useState<{ key: "date" | "symbol" | "side" | "qty" | "price" | "value"; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
+  const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
