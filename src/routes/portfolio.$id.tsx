@@ -749,6 +749,10 @@ function PortfolioPage() {
               />
             )}
 
+            <BacktestRunHistoryCard portfolioId={id} />
+
+
+
 
             {(() => {
               const cb = p.circuit_breaker as { paused?: boolean; reason?: string; tripped_at?: string } | null;
