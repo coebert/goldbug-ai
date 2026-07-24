@@ -48,12 +48,24 @@ export type ModeSummaryPair = {
   real: ModeSummary;
 } | null;
 
+export type ComputeModeSummaryOptions = {
+  /**
+   * When true, deposits are NOT netted out of pnl/pct — the summary
+   * reflects raw equity change including cash-flows. Default false.
+   * The default (false) matches the user's stated intent that
+   * deposits must not masquerade as trading profit.
+   */
+  includeDeposits?: boolean;
+};
+
 export function computeModeSummary(
   series: SummarySeriesRow[],
   portfolios: SummaryPortfolio[],
   deposits: DepositEvent[] = [],
+  options: ComputeModeSummaryOptions = {},
 ): ModeSummaryPair {
   if (series.length === 0 || portfolios.length === 0) return null;
+  const includeDeposits = options.includeDeposits === true;
 
   const isRealPortfolio = (p: SummaryPortfolio) => p.mode === "live_prod";
   const idsByMode = (real: boolean) =>
