@@ -17,6 +17,7 @@
 // broker read failures leave local state alone.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { ScopedDbClient } from "@/lib/live-cash-sync.server";
 
 export type LiveHoldingsSyncResult =
   | { skipped: true; reason: string }
@@ -46,8 +47,12 @@ function saxoAssetToClass(assetType: string | undefined): string {
 
 export async function reconcileLiveHoldingsFromBroker(
   portfolioId: string,
+  client?: ScopedDbClient,
 ): Promise<LiveHoldingsSyncResult> {
-  const { data: p, error } = await supabaseAdmin
+  // Same pattern as syncLiveCashFromBroker: prefer the caller's user-scoped
+  // client so RLS enforces ownership; admin only for cron paths.
+  const db = client ?? supabaseAdmin;
+  const { data: p, error } = await db
     .from("portfolios")
     .select("id, user_id, mode, live_paused")
     .eq("id", portfolioId)
