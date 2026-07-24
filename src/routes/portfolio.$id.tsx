@@ -1147,6 +1147,14 @@ function PortfolioPage() {
           reset.mutate();
         }}
       />
+      {p && (
+        <RenamePortfolioDialog
+          open={renameOpen}
+          onOpenChange={setRenameOpen}
+          portfolioId={p.id}
+          currentName={p.name}
+        />
+      )}
     </div>
   );
 }
