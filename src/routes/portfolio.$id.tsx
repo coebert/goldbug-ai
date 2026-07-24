@@ -1172,15 +1172,18 @@ function PortfolioPage() {
         />
       )}
       {p && p.mode !== "live_prod" && (
-        <AddSimFundsDialog
-          open={addFundsOpen}
-          onOpenChange={setAddFundsOpen}
-          portfolioId={p.id}
-          portfolioName={p.name}
-          currency={p.currency}
-          currentCash={Number(p.current_cash)}
-          startingCash={Number(p.starting_cash)}
-        />
+        <>
+          <SimFundHistoryCard portfolioId={p.id} currency={p.currency} />
+          <AddSimFundsDialog
+            open={addFundsOpen}
+            onOpenChange={setAddFundsOpen}
+            portfolioId={p.id}
+            portfolioName={p.name}
+            currency={p.currency}
+            currentCash={Number(p.current_cash)}
+            startingCash={Number(p.starting_cash)}
+          />
+        </>
       )}
     </div>
   );
