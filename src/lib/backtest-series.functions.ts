@@ -13,9 +13,19 @@ const InputSchema = z.object({
   days: z.number().int().min(1).max(3650),
 });
 
+export type BacktestTradeMarker = {
+  date: string;
+  executed_at: string | null;
+  side: "buy" | "sell";
+  symbol: string;
+  quantity: number;
+  price: number;
+};
+
 export type BacktestSeriesResult = {
   equity: EquityRow[];
   holdings: HoldingsOverTime;
+  trades: BacktestTradeMarker[];
   startingCash: number;
   from: string | null;
   to: string | null;
