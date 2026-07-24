@@ -110,6 +110,7 @@ function ComparePage() {
     );
 
   const [focused, setFocused] = useState<string | null>(null);
+  const [confirmRerun, setConfirmRerun] = useState(false);
 
   const { chartData, drawdownData } = useMemo(() => {
     if (!results || results.length === 0) return { chartData: [], drawdownData: [] };
