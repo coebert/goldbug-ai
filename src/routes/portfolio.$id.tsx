@@ -922,7 +922,7 @@ function PortfolioPage() {
                               ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
                               : [];
                             return (
-                              <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
+                              <div className="max-w-[85vw] rounded-md border border-border bg-card p-2 text-[11px] shadow-md sm:text-xs">
                                 <div className="mb-1 font-medium">
                                   {label} <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">{isPct ? "% vs start" : "value"}</span>
                                 </div>
