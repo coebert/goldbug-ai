@@ -408,22 +408,24 @@ function ComparePage() {
                             }}
                             formatter={(v: number) => `${Number(v).toFixed(2)}%`}
                           />
-                          {results.map((r, i) => {
-                            const isDim = focused !== null && focused !== r.portfolio.name;
-                            return (
-                              <Line
-                                key={r.portfolio.id}
-                                type="monotone"
-                                dataKey={r.portfolio.name}
-                                stroke={COLORS[i % COLORS.length]}
-                                strokeWidth={focused === r.portfolio.name ? 2.5 : 1.5}
-                                strokeOpacity={isDim ? 0.12 : 0.9}
-                                dot={false}
-                                connectNulls
-                                isAnimationActive={false}
-                              />
-                            );
-                          })}
+                          {results
+                            .filter((r) => !hidden.has(r.portfolio.name))
+                            .map((r) => {
+                              const i = results.findIndex((x) => x.portfolio.id === r.portfolio.id);
+                              return (
+                                <Line
+                                  key={r.portfolio.id}
+                                  type="monotone"
+                                  dataKey={r.portfolio.name}
+                                  stroke={COLORS[i % COLORS.length]}
+                                  strokeWidth={1.5}
+                                  strokeOpacity={0.9}
+                                  dot={false}
+                                  connectNulls
+                                  isAnimationActive={false}
+                                />
+                              );
+                            })}
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
