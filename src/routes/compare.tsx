@@ -260,64 +260,7 @@ function ComparePage() {
               <CardTitle className="text-base">Select portfolios</CardTitle>
               <CardDescription>{selected.length}/6 selected</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {portfolios.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No portfolios yet. Create some first.
-                </p>
-              )}
-              {portfolios.map((p) => (
-                <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-md border border-border/60 p-2 text-sm hover:bg-muted/40">
-                  <Checkbox
-                    checked={selected.includes(p.id)}
-                    onCheckedChange={() => toggle(p.id)}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {p.currency} {Number(p.starting_cash).toFixed(0)} · {p.risk_level} · {(p.universe as string[]).join(", ")}
-                    </div>
-                  </div>
-                </label>
-              ))}
-
-              <div className="border-t border-border pt-3">
-                <Label htmlFor="days" className="text-xs">Backtest window (trading days)</Label>
-                <Input
-                  id="days"
-                  type="number"
-                  min={3}
-                  max={30}
-                  value={days}
-                  onChange={(e) => setDays(Math.max(3, Math.min(30, Number(e.target.value) || 10)))}
-                />
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <Button
-                  className="w-full"
-                  disabled={selected.length === 0 || compareMut.isPending}
-                  onClick={() => compareMut.mutate()}
-                  variant="outline"
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  {compareMut.isPending ? "Loading…" : "Compare existing results"}
-                </Button>
-                <Button
-                  className="w-full"
-                  disabled={selected.length === 0 || runMut.isPending}
-                  onClick={() => setConfirmRerun(true)}
-                >
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  {runMut.isPending ? "Running backtests…" : "Run backtests & compare"}
-                </Button>
-                {runMut.isPending && (
-                  <p className="text-xs text-muted-foreground">
-                    Each portfolio simulates {days} days — this can take a couple of minutes.
-                  </p>
-                )}
-              </div>
-            </CardContent>
+            <CardContent>{controls}</CardContent>
           </Card>
           <ConfirmDialog
             open={confirmRerun}
