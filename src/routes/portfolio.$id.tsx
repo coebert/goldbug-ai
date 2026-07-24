@@ -291,13 +291,14 @@ function PortfolioPage() {
           // Overlay is a nice-to-have; falling back to metrics-only is fine.
         }
         saveBacktestRun({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           ranAt: new Date().toISOString(),
           portfolioId: id,
           riskLevel: (q.data?.portfolio?.risk_level as string | undefined) ?? "unknown",
           days,
           metrics: m,
           equity,
+        }).catch((err) => {
+          console.error("Failed to persist backtest run", err);
         });
       } else {
         toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);

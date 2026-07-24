@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      backtest_runs: {
+        Row: {
+          created_at: string
+          days: number
+          equity: Json | null
+          id: string
+          metrics: Json
+          portfolio_id: string
+          ran_at: string
+          risk_level: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          days: number
+          equity?: Json | null
+          id?: string
+          metrics: Json
+          portfolio_id: string
+          ran_at?: string
+          risk_level?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          days?: number
+          equity?: Json | null
+          id?: string
+          metrics?: Json
+          portfolio_id?: string
+          ran_at?: string
+          risk_level?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       calibration_snapshots: {
         Row: {
           as_of: string

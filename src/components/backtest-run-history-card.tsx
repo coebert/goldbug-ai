@@ -1,4 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  listBacktestRuns,
+  saveBacktestRun as saveBacktestRunFn,
+  deleteBacktestRun as deleteBacktestRunFn,
+  clearBacktestRuns as clearBacktestRunsFn,
+  type PersistedBacktestRun,
+} from "@/lib/backtest-runs.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,31 +52,40 @@ const OVERLAY_PALETTE = [
 ];
 
 
-const STORAGE_PREFIX = "aegis.backtestRuns.";
 
-export function loadRuns(portfolioId: string): BacktestRunRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_PREFIX + portfolioId);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as BacktestRunRecord[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+
+// React Query key for a portfolio's persisted run history.
+export const backtestRunsQueryKey = (portfolioId: string) =>
+  ["backtestRuns", portfolioId] as const;
+
+// Called from the portfolio route after a successful backtest. Writes to
+// the `backtest_runs` table via a server function, then dispatches an
+// event so any mounted history card refreshes without prop-drilling a
+// setter. Kept as a plain async function so existing imperative callers
+// (`onSuccess` in the run mutation) don't need to become hooks.
+export async function saveRun(record: {
+  portfolioId: string;
+  riskLevel?: string;
+  days: number;
+  ranAt?: string;
+  metrics: BacktestMetrics;
+  equity?: BacktestEquityPoint[];
+}) {
+  await saveBacktestRunFn({
+    data: {
+      portfolioId: record.portfolioId,
+      riskLevel: record.riskLevel ?? null,
+      days: record.days,
+      ranAt: record.ranAt,
+      metrics: record.metrics as unknown as Parameters<typeof saveBacktestRunFn>[0]["data"]["metrics"],
+      equity: (record.equity ?? null) as unknown as Parameters<typeof saveBacktestRunFn>[0]["data"]["equity"],
+    },
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("aegis:backtest-runs-updated", { detail: record.portfolioId }),
+    );
   }
-}
-
-export function saveRun(record: BacktestRunRecord) {
-  if (typeof window === "undefined") return;
-  const existing = loadRuns(record.portfolioId);
-  const next = [record, ...existing].slice(0, 25);
-  window.localStorage.setItem(
-    STORAGE_PREFIX + record.portfolioId,
-    JSON.stringify(next),
-  );
-  window.dispatchEvent(
-    new CustomEvent("aegis:backtest-runs-updated", { detail: record.portfolioId }),
-  );
 }
 
 function fmt(n: number | null | undefined, digits = 2, suffix = "") {
@@ -80,6 +98,7 @@ function toneClass(v: number | null | undefined, invert = false) {
   const good = invert ? v <= 0 : v >= 0;
   return good ? "text-emerald-500" : "text-red-500";
 }
+
 
 function ReasonRow({
   label,
@@ -159,41 +178,66 @@ export function BacktestRunHistoryCard({
   portfolioId: string;
   portfolioRiskLevel?: string;
 }) {
-  const [runs, setRuns] = useState<BacktestRunRecord[]>(() => loadRuns(portfolioId));
+  const qc = useQueryClient();
+  const listFn = useServerFn(listBacktestRuns);
+  const deleteFn = useServerFn(deleteBacktestRunFn);
+  const clearFn = useServerFn(clearBacktestRunsFn);
+
+  const runsQuery = useQuery({
+    queryKey: backtestRunsQueryKey(portfolioId),
+    queryFn: () => listFn({ data: { portfolioId } }),
+    staleTime: 30_000,
+  });
+
+  // Map the persisted row shape into the card's in-memory record shape.
+  // metrics/equity are stored as opaque JSON server-side to avoid coupling
+  // the schema to the metrics engine; we cast on read.
+  const runs: BacktestRunRecord[] = useMemo(() => {
+    const rows = runsQuery.data ?? [];
+    return rows.map((r: PersistedBacktestRun) => ({
+      id: r.id,
+      ranAt: r.ran_at,
+      portfolioId: r.portfolio_id,
+      riskLevel: r.risk_level ?? "unknown",
+      days: r.days,
+      metrics: r.metrics as unknown as BacktestMetrics,
+      equity: (r.equity as unknown as BacktestEquityPoint[] | null) ?? undefined,
+    }));
+  }, [runsQuery.data]);
+
+  // Refresh when a save/delete elsewhere fires the event bus.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refresh = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (!detail || detail === portfolioId) {
+        qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
+      }
+    };
+    window.addEventListener("aegis:backtest-runs-updated", refresh);
+    return () => window.removeEventListener("aegis:backtest-runs-updated", refresh);
+  }, [portfolioId, qc]);
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupByRisk, setGroupByRisk] = useState(true);
   const [tolerance, setTolerance] = useState<RiskTolerance>(() =>
     inferTolerance(portfolioRiskLevel),
   );
 
-  useEffect(() => {
-    const refresh = (e: Event) => {
-      const detail = (e as CustomEvent<string>).detail;
-      if (!detail || detail === portfolioId) setRuns(loadRuns(portfolioId));
-    };
-    window.addEventListener("aegis:backtest-runs-updated", refresh);
-    return () => window.removeEventListener("aegis:backtest-runs-updated", refresh);
-  }, [portfolioId]);
-
-  const clearAll = () => {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(STORAGE_PREFIX + portfolioId);
-    setRuns([]);
+  const clearAll = async () => {
+    await clearFn({ data: { portfolioId } });
     setSelected(new Set());
+    qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
   };
 
-  const removeOne = (id: string) => {
-    const next = runs.filter((r) => r.id !== id);
-    window.localStorage.setItem(
-      STORAGE_PREFIX + portfolioId,
-      JSON.stringify(next),
-    );
-    setRuns(next);
+  const removeOne = async (id: string) => {
+    await deleteFn({ data: { id } });
     setSelected((s) => {
       const n = new Set(s);
       n.delete(id);
       return n;
     });
+    qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
   };
 
   const toggle = (id: string) =>
