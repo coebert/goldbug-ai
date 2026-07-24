@@ -121,10 +121,12 @@ describe("computeModeSummary — mixed deposit fixtures & event ordering", () =>
     const unsorted: SummarySeriesRow[] = [series[2], series[0], series[1]];
     const s = computeModeSummary(unsorted, portfolios, shuffledDeposits)!;
     // Last two rows in array order are 2026-07-20 (prev) and 2026-07-21 (last).
-    // Real: now = 305+495 = 800; prev = 300+500 = 800. No in-window deposits
-    // (all real deposits are dated 2026-07-22 or excluded). pnl = 0.
+    // Real: now = 305+495 = 800; prev = 300+500 = 800; rawDelta = 0.
+    // In-window real deposit: the 07-21 £123 into REAL_A (strictly after
+    // prev 07-20, ≤ last 07-21). All other real events are dated 07-22
+    // (out of window) or 07-19 (before prev). pnl = 0 − 123 = −123.
     expect(s.real.now).toBe(800);
-    expect(s.real.pnl).toBe(0);
-    expect(s.real.pct).toBe(0);
+    expect(s.real.pnl).toBeCloseTo(-123, 6);
+    expect(s.real.pct).toBeCloseTo((-123 / 800) * 100, 6);
   });
 });
