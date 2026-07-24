@@ -258,11 +258,15 @@ function PortfolioPage() {
   const [lastBtMetrics, setLastBtMetrics] = useState<
     import("@/lib/backtest-metrics").BacktestMetrics | null
   >(null);
+  const [backtestRunToken, setBacktestRunToken] = useState(0);
+  const [lastBtDays, setLastBtDays] = useState<number | null>(null);
   const runBt = useMutation({
     mutationFn: () => runBtFn({ data: { portfolio_id: id, days } }),
     onSuccess: (r) => {
       const m = r.metrics;
       setLastBtMetrics(m ?? null);
+      setLastBtDays(days);
+      setBacktestRunToken((n) => n + 1);
       if (m) {
         const winPart =
           m.winRatePct != null ? ` · Win ${m.winRatePct.toFixed(0)}%` : "";
