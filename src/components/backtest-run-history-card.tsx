@@ -178,41 +178,69 @@ export function BacktestRunHistoryCard({
   portfolioId: string;
   portfolioRiskLevel?: string;
 }) {
-  const [runs, setRuns] = useState<BacktestRunRecord[]>(() => loadRuns(portfolioId));
+  const qc = useQueryClient();
+  const listFn = useServerFn(listBacktestRuns);
+  const deleteFn = useServerFn(deleteBacktestRunFn);
+  const clearFn = useServerFn(clearBacktestRunsFn);
+
+  const runsQuery = useQuery({
+    queryKey: backtestRunsQueryKey(portfolioId),
+    queryFn: () => listFn({ data: { portfolioId } }),
+    staleTime: 30_000,
+  });
+
+  // Map the persisted row shape into the card's in-memory record shape.
+  // metrics/equity are stored as opaque JSON server-side to avoid coupling
+  // the schema to the metrics engine; we cast on read.
+  const runs: BacktestRunRecord[] = useMemo(() => {
+    const rows = runsQuery.data ?? [];
+    return rows.map((r: PersistedBacktestRun) => ({
+      id: r.id,
+      ranAt: r.ran_at,
+      portfolioId: r.portfolio_id,
+      riskLevel: r.risk_level ?? "unknown",
+      days: r.days,
+      metrics: r.metrics as unknown as BacktestMetrics,
+      equity: (r.equity as unknown as BacktestEquityPoint[] | null) ?? undefined,
+    }));
+  }, [runsQuery.data]);
+
+  // Refresh when a save/delete elsewhere fires the event bus.
+  if (typeof window !== "undefined") {
+    // Attach once per mount via a stable listener.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useMemo(() => {
+      const refresh = (e: Event) => {
+        const detail = (e as CustomEvent<string>).detail;
+        if (!detail || detail === portfolioId) {
+          qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
+        }
+      };
+      window.addEventListener("aegis:backtest-runs-updated", refresh);
+      return () => window.removeEventListener("aegis:backtest-runs-updated", refresh);
+    }, [portfolioId, qc]);
+  }
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupByRisk, setGroupByRisk] = useState(true);
   const [tolerance, setTolerance] = useState<RiskTolerance>(() =>
     inferTolerance(portfolioRiskLevel),
   );
 
-  useEffect(() => {
-    const refresh = (e: Event) => {
-      const detail = (e as CustomEvent<string>).detail;
-      if (!detail || detail === portfolioId) setRuns(loadRuns(portfolioId));
-    };
-    window.addEventListener("aegis:backtest-runs-updated", refresh);
-    return () => window.removeEventListener("aegis:backtest-runs-updated", refresh);
-  }, [portfolioId]);
-
-  const clearAll = () => {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(STORAGE_PREFIX + portfolioId);
-    setRuns([]);
+  const clearAll = async () => {
+    await clearFn({ data: { portfolioId } });
     setSelected(new Set());
+    qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
   };
 
-  const removeOne = (id: string) => {
-    const next = runs.filter((r) => r.id !== id);
-    window.localStorage.setItem(
-      STORAGE_PREFIX + portfolioId,
-      JSON.stringify(next),
-    );
-    setRuns(next);
+  const removeOne = async (id: string) => {
+    await deleteFn({ data: { id } });
     setSelected((s) => {
       const n = new Set(s);
       n.delete(id);
       return n;
     });
+    qc.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) });
   };
 
   const toggle = (id: string) =>
