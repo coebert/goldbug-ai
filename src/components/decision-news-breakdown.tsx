@@ -40,6 +40,7 @@ export function DecisionNewsBreakdown() {
   const [portfolioFilter, setPortfolioFilter] = useState<string>("all");
   const [onlyWithNews, setOnlyWithNews] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sectionOpen, setSectionOpen] = useState(false);
 
   const visible = useMemo(() => {
     return items.filter((it) => {
