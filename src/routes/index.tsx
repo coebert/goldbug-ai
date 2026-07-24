@@ -268,11 +268,12 @@ function Home() {
           </Suspense>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6" data-coach="news-reel">
           <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
             <NewsReel />
           </Suspense>
         </div>
+
 
         <div className="mb-6">
           <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
