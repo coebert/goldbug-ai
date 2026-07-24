@@ -257,17 +257,20 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         )}
 
         {s && (s.orders.length > 0 || s.fills.length > 0 || s.reconciliation.length > 0) && (
-          <div className="grid gap-3 md:grid-cols-3 text-xs">
-            <OrderTimelineList orders={s.orders} fills={s.fills} />
-            <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
-              key: f.id,
-              text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
-            }))} />
-            <MiniList title="Reconciliation" rows={s.reconciliation.map((r) => ({
-              key: r.id,
-              text: `${new Date(r.as_of).toLocaleString()} · ${r.drift_flag ? "DRIFT" : "OK"}${r.drift_notes ? ` · ${r.drift_notes}` : ""}`,
-            }))} />
-          </div>
+          <>
+            <OrderOutcomeSummary orders={s.orders} />
+            <div className="grid gap-3 md:grid-cols-3 text-xs">
+              <OrderTimelineList orders={s.orders} fills={s.fills} />
+              <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
+                key: f.id,
+                text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
+              }))} />
+              <MiniList title="Reconciliation" rows={s.reconciliation.map((r) => ({
+                key: r.id,
+                text: `${new Date(r.as_of).toLocaleString()} · ${r.drift_flag ? "DRIFT" : "OK"}${r.drift_notes ? ` · ${r.drift_notes}` : ""}`,
+              }))} />
+            </div>
+          </>
         )}
 
         <div className="pt-2 border-t border-border">
