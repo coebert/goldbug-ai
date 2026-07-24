@@ -97,9 +97,16 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   });
   const mSync = useMutation({
     mutationFn: () => syncBal({ data: { portfolioId } }),
-    onSuccess: (r) => toast.success(`Balance ${r.balance.cash.toFixed(2)} ${r.balance.currency}, ${r.positions.length} positions`),
+    onSuccess: (r) => {
+      const applied = r.sync && !r.sync.skipped
+        ? ` — applied ${r.sync.delta >= 0 ? "+" : ""}${r.sync.delta.toFixed(2)} ${r.sync.currency}`
+        : "";
+      toast.success(`Balance ${r.balance.cash.toFixed(2)} ${r.balance.currency}, ${r.positions.length} positions${applied}`);
+      refresh();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
+
   const mRecon = useMutation({
     mutationFn: () => reconcile({ data: { portfolioId } }),
     onSuccess: (r) => { toast[r.drift ? "warning" : "success"](r.drift ? "Drift detected — see log" : "In sync with broker"); refresh(); },
