@@ -122,7 +122,11 @@ describe("writeCashSyncSnapshot", () => {
       cash: 124.6,
       holdingsValue: 175.86,
     });
-    expect(res).toEqual({ action: "updated", totalValue: 300.46, previousTotalValue: 329.75 });
+    expect(res.action).toBe("updated");
+    if (res.action === "updated") {
+      expect(res.totalValue).toBeCloseTo(300.46, 10);
+      expect(res.previousTotalValue).toBe(329.75);
+    }
     // Still exactly ONE row for that (portfolio, date), even though the fake
     // client has no unique constraint to fall back on.
     expect(rows).toHaveLength(1);
