@@ -882,7 +882,7 @@ function PortfolioPage() {
                           tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
                           minTickGap={isMobile ? 56 : 30}
-                          tickFormatter={(v) => (isMobile ? shortChartDate(String(v)) : String(v))}
+                          tickFormatter={(v) => formatDateTick(v, isMobile)}
                           label={isMobile ? undefined : { value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
                         />
                         <YAxis
@@ -890,11 +890,10 @@ function PortfolioPage() {
                           width={isMobile ? 44 : 72}
                           tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
-                          tickFormatter={(v) => compareMode === "pct"
-                            ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`
-                            : isMobile ? `${p.currency}${compactChartNum(Number(v))}` : `${p.currency}${Number(v).toFixed(0)}`}
-                          label={isMobile ? undefined : { value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
+                          tickFormatter={(v) => formatValueTick(v, { currency: p.currency, isPct: compareMode === "pct", isMobile })}
+                          label={isMobile ? undefined : { value: yAxisLabel(compareMode, p.currency), angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
                         />
+
 
 
                         <Tooltip
