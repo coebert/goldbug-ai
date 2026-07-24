@@ -941,7 +941,11 @@ function PortfolioPage() {
                             const fmtVal = (v: number) => isPct
                               ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
                               : `${p.currency} ${v.toFixed(2)}`;
-                            const pnlFromStart = isPct ? row.value : row.value - startingCash;
+                            // Net cumulative deposits out of the raw
+                            // tooltip pnl so it never shows a top-up
+                            // as profit (matches ModeSummaryTile).
+                            const dep = cumulativeDepositsByDate.get(String(label)) ?? 0;
+                            const pnlFromStart = isPct ? row.value : row.value - dep - startingCash;
                             const pnlPctFromStart = isPct
                               ? row.value
                               : startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
@@ -966,6 +970,11 @@ function PortfolioPage() {
                                   <div className="tabular-nums text-muted-foreground pl-3.5">
                                     vs start: {pnlFromStart >= 0 ? "+" : ""}
                                     {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
+                                    {dep !== 0 && (
+                                      <span className="ml-1" title={`Excludes ${p.currency} ${dep.toFixed(2)} of ${dep >= 0 ? "deposits" : "withdrawals"}`}>
+                                        · trading only
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                                 {row.benchmark != null && (
