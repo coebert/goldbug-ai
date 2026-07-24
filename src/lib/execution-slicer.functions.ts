@@ -43,7 +43,7 @@ export type { SlicerResult } from "./execution-slicer-handlers";
 export const enqueueSlice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
-    const parsed = EnqueueClientSchema.safeParse(data);
+    const parsed = SliceInputSchema.omit({ ownerUserId: true }).safeParse(data);
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
@@ -59,7 +59,7 @@ export const enqueueSlice = createServerFn({ method: "POST" })
 export const tickSlices = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
-    const parsed = TickClientSchema.safeParse(data);
+    const parsed = TickInputSchema.omit({ ownerUserId: true }).safeParse(data);
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
@@ -72,7 +72,7 @@ export const tickSlices = createServerFn({ method: "POST" })
 export const recordFill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => {
-    const parsed = FillClientSchema.safeParse(data);
+    const parsed = FillInputSchema.omit({ ownerUserId: true }).safeParse(data);
     if (!parsed.success) throw parsed.error;
     return parsed.data;
   })
