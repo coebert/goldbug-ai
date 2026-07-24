@@ -226,7 +226,28 @@ export const addSimFunds = createServerFn({ method: "POST" })
       .select("id, starting_cash, current_cash, currency")
       .single();
     if (error) throw new Error(error.message);
+    await context.supabase.from("sim_fund_events").insert({
+      portfolio_id: data.id,
+      user_id: context.userId,
+      amount: data.amount,
+      currency: p.currency,
+      balance_after: newCurrent,
+    });
     return { ok: true, portfolio: updated };
+  });
+
+export const listSimFundEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("sim_fund_events")
+      .select("id, amount, currency, balance_after, created_at")
+      .eq("portfolio_id", data.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return { events: rows ?? [] };
   });
 
 
