@@ -275,6 +275,14 @@ function PortfolioPage() {
         toast.success(
           `Backtest done. Return ${m.totalReturnPct.toFixed(2)}% · MDD ${m.maxDrawdownPct.toFixed(2)}% · Sharpe ${m.sharpe.toFixed(2)}${winPart}`,
         );
+        saveBacktestRun({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          ranAt: new Date().toISOString(),
+          portfolioId: id,
+          riskLevel: (q.data?.portfolio?.risk_level as string | undefined) ?? "unknown",
+          days,
+          metrics: m,
+        });
       } else {
         toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
       }
