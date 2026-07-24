@@ -70,11 +70,15 @@ function overallTone(s: {
   appConfigured: boolean;
   connected: boolean;
   secondsUntilExpiry: number | null;
+  refreshTokenValid?: boolean;
 }): { tone: "ok" | "warn" | "err" | "muted"; label: string } {
   if (!s.appConfigured) return { tone: "err", label: "App credentials missing" };
   if (!s.connected) return { tone: "muted", label: "Not connected" };
   const s2 = s.secondsUntilExpiry ?? 0;
-  if (s2 <= 0) return { tone: "err", label: "Access token expired" };
+  // With refresh token still valid, an elapsed access token is auto-renewing
+  // (on-demand via getAccessToken, and every 15 min via the cron).
+  if (s2 <= 0 && s.refreshTokenValid === false) return { tone: "err", label: "Refresh token expired — reconnect" };
+  if (s2 <= 0) return { tone: "warn", label: "Auto-renewing" };
   if (s2 < 3600) return { tone: "warn", label: "Token expiring soon" };
   return { tone: "ok", label: "Connected" };
 }
