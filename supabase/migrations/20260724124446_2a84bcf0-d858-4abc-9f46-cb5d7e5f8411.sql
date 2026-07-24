@@ -1,0 +1,1 @@
+DELETE FROM public.run_locks WHERE name = 'hourly-run';
