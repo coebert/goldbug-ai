@@ -89,6 +89,7 @@ import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
+import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 
 
 type PortfolioTab = "overview" | "trades" | "decisions" | "risk" | "diagnostics" | "reports";
