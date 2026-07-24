@@ -406,8 +406,20 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // proceeds with the last-known local cash so a transient broker outage can't
   // stop trading logic from running.
   try {
-    const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
-    await syncLiveCashFromBroker(portfolioId);
+    // Cron path: no authenticated session, so resolve the owning user first
+    // and hand syncLiveCashFromBroker an admin-mode OwnedDbClient. That flips
+    // isAdmin=true inside the sidecar so it re-scopes the portfolio lookup
+    // by user_id (RLS is bypassed on this branch).
+    const ownerLookup = await supabaseAdmin
+      .from("portfolios").select("user_id").eq("id", portfolioId).maybeSingle();
+    if (ownerLookup.data?.user_id) {
+      const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
+      const { withOwnedClient } = await import("./_server/owned-client");
+      await syncLiveCashFromBroker(
+        portfolioId,
+        withOwnedClient(ownerLookup.data.user_id),
+      );
+    }
   } catch (e) {
     console.error("cash sync failed", portfolioId, e);
   }

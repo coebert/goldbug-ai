@@ -14,12 +14,11 @@
 //    proceeds with the last-known local cash so trading isn't blocked by a
 //    transient Saxo outage.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 // Canonical location for the "which client + whose rows" pair. Re-exported
 // here so existing sidecar imports (`live-holdings-sync`, `live-reconcile`)
 // keep working without churn.
-export type { ScopedDbClient } from "@/lib/_server/owned-client";
-import type { ScopedDbClient } from "@/lib/_server/owned-client";
+export type { ScopedDbClient, OwnedDbClient } from "@/lib/_server/owned-client";
+import type { OwnedDbClient } from "@/lib/_server/owned-client";
 
 const DRIFT_EPSILON = 0.5;
 
@@ -37,17 +36,28 @@ export type LiveCashSyncResult =
 
 export async function syncLiveCashFromBroker(
   portfolioId: string,
-  client?: ScopedDbClient,
+  owned: OwnedDbClient,
 ): Promise<LiveCashSyncResult> {
-  // Prefer the caller's user-scoped client so RLS enforces ownership.
-  // Fall back to admin for cron-triggered paths that have no session.
-  const db = client ?? supabaseAdmin;
-  const { data: p, error } = await db
+  // Standardised "which client + whose rows" pair. On the authenticated
+  // branch (`isAdmin === false`), every read/write below is enforced by
+  // RLS as the caller. On the admin branch (cron paths), RLS is bypassed
+  // and we add `.eq("user_id", userId)` on every top-level portfolio read
+  // as defence-in-depth. Downstream `.eq("portfolio_id", …)` calls are
+  // safe on both branches once ownership of the portfolio has been proven.
+  const { db, userId, isAdmin } = owned;
+
+  const portfolioQuery = db
     .from("portfolios")
     .select("id, user_id, mode, current_cash, starting_cash, live_paused")
-    .eq("id", portfolioId)
-    .maybeSingle();
+    .eq("id", portfolioId);
+  const { data: p, error } = await (isAdmin
+    ? portfolioQuery.eq("user_id", userId)
+    : portfolioQuery
+  ).maybeSingle();
   if (error || !p) return { skipped: true, reason: "portfolio not found" };
+  if (p.user_id !== userId) {
+    return { skipped: true, reason: "portfolio not owned by caller" };
+  }
   if (p.mode !== "live_sim" && p.mode !== "live_prod") {
     return { skipped: true, reason: "not a live portfolio" };
   }

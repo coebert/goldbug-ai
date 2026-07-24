@@ -249,10 +249,15 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     // Pick up any external deposits/withdrawals into Saxo before returning the
     // broker snapshot so the UI immediately reflects the newly-available cash.
-    // Pass context.supabase so external cash movements are picked up under
-    // the caller's RLS (portfolio/holdings/equity writes all owner-scoped).
+    // Pass an OwnedDbClient built from context so external cash movements
+    // are picked up under the caller's RLS (portfolio/holdings/equity writes
+    // are owner-scoped). isAdmin=false → no defence-in-depth filter needed.
     const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
-    const sync = await syncLiveCashFromBroker(data.portfolioId, context.supabase);
+    const { withOwnedClient } = await import("@/lib/_server/owned-client");
+    const sync = await syncLiveCashFromBroker(
+      data.portfolioId,
+      withOwnedClient(context.userId, context.supabase),
+    );
     const env = own.data.mode === "live_prod" ? "live" : "sim";
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
     const adapter = await buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
