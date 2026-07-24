@@ -66,7 +66,7 @@ export async function runReconciliation(
   const { db, isAdmin } = owned;
 
   await (await import("@/lib/live-cash-sync.server"))
-    .syncLiveCashFromBroker(portfolioId, client);
+    .syncLiveCashFromBroker(portfolioId, owned);
   await (await import("@/lib/live-holdings-sync.server"))
     .reconcileLiveHoldingsFromBroker(portfolioId, client);
 
