@@ -70,7 +70,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const list = portfolios ?? [];
     if (list.length === 0) {
-      return { portfolios: [], series: [], perPortfolioSeries: {}, currency: "GBP" as string, mismatches: [] as SnapshotMismatch[] };
+      return { portfolios: [], series: [], perPortfolioSeries: {}, currency: "GBP" as string, mismatches: [] as SnapshotMismatch[], deposits: [] as Array<{ portfolio_id: string; date: string; amount: number }> };
     }
 
     // Phase 8 — one query for all portfolios instead of N (uses new
@@ -88,6 +88,56 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       snapshots: allEq ?? [],
       today,
     });
+
+    // External cash-flow events per portfolio — used by the dashboard's
+    // ModeSummaryTile to net deposits/withdrawals out of the pnl/pct
+    // calculation so they don't masquerade as trading profit.
+    //   • sim portfolios: sim_fund_events (amount + created_at)
+    //   • live portfolios: live_broker_log CASH_SYNC entries where the
+    //     starting_cash baseline was adjusted (external deposit/withdrawal)
+    const simIds = list.filter((p) => p.mode !== "live_prod" && p.mode !== "live_sim").map((p) => p.id);
+    const liveIdsAll = list.filter((p) => p.mode === "live_prod" || p.mode === "live_sim").map((p) => p.id);
+    const deposits: Array<{ portfolio_id: string; date: string; amount: number }> = [];
+    if (simIds.length > 0) {
+      const { data: simEvents } = await context.supabase
+        .from("sim_fund_events")
+        .select("portfolio_id, amount, created_at")
+        .in("portfolio_id", simIds);
+      for (const e of simEvents ?? []) {
+        if (!e.portfolio_id || !e.created_at) continue;
+        const amt = Number(e.amount);
+        if (!Number.isFinite(amt)) continue;
+        deposits.push({
+          portfolio_id: e.portfolio_id,
+          date: String(e.created_at).slice(0, 10),
+          amount: amt,
+        });
+      }
+    }
+    if (liveIdsAll.length > 0) {
+      const { data: cashSyncs } = await context.supabase
+        .from("live_broker_log")
+        .select("portfolio_id, created_at, response, status, method")
+        .in("portfolio_id", liveIdsAll)
+        .eq("method", "CASH_SYNC")
+        .eq("status", 200);
+      for (const row of cashSyncs ?? []) {
+        if (!row.portfolio_id || !row.created_at) continue;
+        const resp = (row.response ?? {}) as {
+          delta?: number | string;
+          startingCashAdjusted?: boolean;
+        };
+        if (!resp.startingCashAdjusted) continue;
+        const amt = Number(resp.delta);
+        if (!Number.isFinite(amt) || amt === 0) continue;
+        deposits.push({
+          portfolio_id: row.portfolio_id,
+          date: String(row.created_at).slice(0, 10),
+          amount: amt,
+        });
+      }
+    }
+
 
     // Snapshot timing mismatch detection: compare the most recent successful
     // broker CASH_SYNC log to the latest persisted snapshot for each live
