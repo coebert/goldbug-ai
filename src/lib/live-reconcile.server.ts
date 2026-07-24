@@ -4,6 +4,7 @@
 // reconciliation core that the cron route imports directly.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/_server/db-json";
 import { withOwnedClient } from "@/lib/_server/owned-client";
 import type { ScopedDbClient } from "@/lib/_server/owned-client";
 
@@ -26,8 +27,8 @@ export async function logAudit(params: {
       method: params.action,
       path: `/audit/${params.action.toLowerCase()}`,
       status: params.status ?? 200,
-      request: params.request as never,
-      response: params.response as never,
+      request: asJson(params.request),
+      response: asJson(params.response),
       error: params.error ?? null,
     });
   } catch (e) {
@@ -100,9 +101,9 @@ export async function runReconciliation(
   await db.from("live_reconciliation").insert({
     portfolio_id: portfolioId, user_id: userId,
     broker_cash: bal.cash,
-    broker_positions: pos as never,
+    broker_positions: asJson(pos),
     local_cash: Number(p.data.current_cash ?? 0),
-    local_positions: localPositions as never,
+    local_positions: asJson(localPositions),
     drift_flag: drift,
     drift_notes: drift
       ? `cash Δ=${cashDrift.toFixed(2)}; positions Δ=${symDrift.join(", ") || "none"}`
