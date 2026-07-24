@@ -1,13 +1,20 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, GitCompare, Plug, Shield, BookOpen } from "lucide-react";
 
-const TABS = [
+type Tab = {
+  to: "/" | "/compare" | "/saxo-status" | "/learn" | "/admin";
+  label: string;
+  icon: typeof Home;
+  exact?: boolean;
+};
+
+const TABS: Tab[] = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/saxo-status", label: "Broker", icon: Plug },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/admin", label: "Admin", icon: Shield },
-] as const;
+];
 
 const HIDDEN_PREFIXES = ["/auth"];
 
