@@ -206,9 +206,26 @@ function Home() {
 
         {/* Today summary strip — real and simulated kept strictly separate */}
         {todaySummary && (
-          <div className="mb-6 grid gap-2 sm:grid-cols-3">
-            <ModeSummaryTile
-              label="Simulated equity"
+          <>
+            <div className="mb-2 flex items-center justify-end gap-2 text-[11px] text-muted-foreground sm:text-xs">
+              <label htmlFor="include-deposits-toggle" className="cursor-pointer select-none">
+                Include deposits in % change
+              </label>
+              <Switch
+                id="include-deposits-toggle"
+                checked={includeDeposits}
+                onCheckedChange={setIncludeDeposits}
+                aria-label="Include deposits in equity percent change"
+              />
+              <span className="hidden sm:inline text-muted-foreground/70" title={includeDeposits
+                ? "Percentages reflect raw equity change, including deposits/withdrawals."
+                : "Percentages reflect trading PnL only — external deposits/withdrawals are netted out."}>
+                {includeDeposits ? "raw" : "trading only"}
+              </span>
+            </div>
+            <div className="mb-6 grid gap-2 sm:grid-cols-3">
+              <ModeSummaryTile
+                label="Simulated equity"
               sublabel="SIM · paper + live-sim"
               tone="sim"
               money={todaySummary.sim.now}
