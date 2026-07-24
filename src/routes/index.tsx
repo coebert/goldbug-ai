@@ -175,14 +175,14 @@ function Home() {
     <div className="min-h-screen">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Your Portfolios</h1>
-            <p className="text-sm text-muted-foreground">
-              Create a portfolio, pick a risk level, run a backtest, then let the AI make daily decisions.
+        <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:mb-8 sm:flex sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Your Portfolios</h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+              Create a portfolio, pick a risk level, run a backtest, then let the AI make hourly decisions.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="hidden shrink-0 items-center gap-2 sm:flex">
             <Link to="/get-started">
               <Button variant="secondary" size="sm">
                 <Sparkles className="mr-1 h-4 w-4" /> £1000 demo
@@ -197,7 +197,68 @@ function Home() {
               <Button variant="outline" size="sm">Compare</Button>
             </Link>
           </div>
+          {/* Mobile primary CTA */}
+          <a href="#create-portfolio" className="sm:hidden">
+            <Button size="sm" className="h-10">
+              <PlusCircle className="mr-1 h-4 w-4" /> New
+            </Button>
+          </a>
         </div>
+
+        {/* Today summary strip */}
+        {todaySummary && (
+          <div className="mb-6 grid grid-cols-3 gap-2 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+                Total equity
+              </div>
+              <div className="truncate text-base font-semibold tabular-nums sm:text-lg">
+                {new Intl.NumberFormat(undefined, {
+                  style: "currency",
+                  currency: "GBP",
+                  maximumFractionDigits: 0,
+                }).format(todaySummary.totalEquity)}
+              </div>
+              <div className="text-[10px] text-muted-foreground sm:text-xs">
+                {todaySummary.count} portfolio{todaySummary.count === 1 ? "" : "s"}
+              </div>
+            </div>
+            <div className="min-w-0 border-l border-border pl-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+                Day P&amp;L
+              </div>
+              <div
+                className={`flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg ${todaySummary.dayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+              >
+                {todaySummary.dayPnl >= 0 ? (
+                  <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+                )}
+                <span className="truncate">
+                  {todaySummary.dayPnl >= 0 ? "+" : ""}
+                  {todaySummary.dayPct.toFixed(2)}%
+                </span>
+              </div>
+              <div className="text-[10px] tabular-nums text-muted-foreground sm:text-xs">
+                {todaySummary.dayPnl >= 0 ? "+" : ""}
+                {new Intl.NumberFormat(undefined, {
+                  maximumFractionDigits: 0,
+                }).format(todaySummary.dayPnl)}
+              </div>
+            </div>
+            <div className="min-w-0 border-l border-border pl-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+                Next run
+              </div>
+              <div className="flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg">
+                <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="truncate">{nextRunLabel}</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground sm:text-xs">hourly cycle</div>
+            </div>
+          </div>
+        )}
 
         <NewHereBanner />
 
@@ -219,9 +280,6 @@ function Home() {
           </Suspense>
         </div>
 
-
-
-
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">
             {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
@@ -238,7 +296,7 @@ function Home() {
                     </p>
                   </div>
                   <Link to="/get-started">
-                    <Button>Start demo</Button>
+                    <Button className="w-full sm:w-auto">Start demo</Button>
                   </Link>
                 </CardContent>
               </Card>
@@ -247,7 +305,9 @@ function Home() {
               <PortfolioRow key={p.id} portfolio={p} sparkSeries={sparkByPortfolio[p.id] ?? []} />
             ))}
           </div>
-          <CreatePortfolioCard />
+          <div id="create-portfolio" className="scroll-mt-24">
+            <CreatePortfolioCard />
+          </div>
         </div>
       </main>
     </div>
