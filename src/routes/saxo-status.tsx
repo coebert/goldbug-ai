@@ -31,7 +31,7 @@ function fmtDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString();
+  return d.toLocaleString("en-GB", { timeZone: "Europe/London" });
 }
 
 function fmtDuration(secs: number | null): string {

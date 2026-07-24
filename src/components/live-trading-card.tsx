@@ -247,7 +247,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
             <span className="text-sm">
               Account: <span className="font-mono">{s?.portfolio.broker_account_id ?? "(unknown)"}</span>
               {s?.portfolio.live_activated_at && (
-                <> · since {new Date(s.portfolio.live_activated_at).toLocaleString()}</>
+                <> · since {new Date(s.portfolio.live_activated_at).toLocaleString("en-GB", { timeZone: "Europe/London" })}</>
               )}
             </span>
             <Button size="sm" variant="destructive" onClick={() => mDeact.mutate(promptReason("Revert to paper"))} disabled={mDeact.isPending}>
@@ -263,11 +263,11 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
               <OrderTimelineList orders={s.orders} fills={s.fills} />
               <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
                 key: f.id,
-                text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
+                text: `${new Date(f.filled_at).toLocaleString("en-GB", { timeZone: "Europe/London" })} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
               }))} />
               <MiniList title="Reconciliation" rows={s.reconciliation.map((r) => ({
                 key: r.id,
-                text: `${new Date(r.as_of).toLocaleString()} · ${r.drift_flag ? "DRIFT" : "OK"}${r.drift_notes ? ` · ${r.drift_notes}` : ""}`,
+                text: `${new Date(r.as_of).toLocaleString("en-GB", { timeZone: "Europe/London" })} · ${r.drift_flag ? "DRIFT" : "OK"}${r.drift_notes ? ` · ${r.drift_notes}` : ""}`,
               }))} />
             </div>
           </>
@@ -304,7 +304,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
                             : "ok";
                     return (
                       <li key={e.id} className="flex flex-wrap gap-x-2">
-                        <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
+                        <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString("en-GB", { timeZone: "Europe/London" })}</span>
                         <Badge variant={e.method === "KILL_SWITCH" ? "destructive" : "outline"} className="text-[10px] px-1">
                           {e.method}
                         </Badge>
@@ -365,7 +365,7 @@ function CashSyncIndicator({ lastSync, pending }: { lastSync: CashSyncLog; pendi
       <span className="font-medium">
         {ok ? "Cash synced" : "Cash sync failed"}
       </span>
-      <span className="opacity-80">· {rel} ({when.toLocaleTimeString()})</span>
+      <span className="opacity-80">· {rel} ({when.toLocaleTimeString("en-GB", { timeZone: "Europe/London" })})</span>
       {ok && delta !== null && (
         <span className="font-mono">
           · Δ {delta >= 0 ? "+" : ""}{delta.toFixed(2)} {cur}
@@ -404,7 +404,7 @@ function NoTradesAlert({ data }: { data: TradeAlertData }) {
         <div>{data.detail}</div>
         <div className="text-xs text-muted-foreground">
           Window: last {data.runsSeen ?? 0} run{(data.runsSeen ?? 0) === 1 ? "" : "s"}
-          {started && <> · since {started.toLocaleString()}</>}
+          {started && <> · since {started.toLocaleString("en-GB", { timeZone: "Europe/London" })}</>}
           {typeof data.intendedOrdersLastRun === "number" && (
             <> · AI proposed {data.intendedOrdersLastRun} order{data.intendedOrdersLastRun === 1 ? "" : "s"} last run</>
           )}
@@ -555,7 +555,7 @@ function TimelineStep({
         <div className={`text-[11px] font-medium ${reached ? "text-foreground" : "text-muted-foreground"}`}>
           {title}
         </div>
-        {at && <div className="font-mono text-[10px] text-muted-foreground">{new Date(at).toLocaleString()}</div>}
+        {at && <div className="font-mono text-[10px] text-muted-foreground">{new Date(at).toLocaleString("en-GB", { timeZone: "Europe/London" })}</div>}
         {detail && <div className="mt-0.5 break-words text-[11px] text-muted-foreground">{detail}</div>}
       </div>
     </li>
@@ -613,7 +613,7 @@ function OrderTimeline({ order, fills }: { order: OrderRow; fills: FillRow[] }) 
           <li className="ml-7 space-y-1 border-l border-border/60 pl-3">
             {orderFills.map((f) => (
               <div key={f.id} className="font-mono text-[10px] text-muted-foreground">
-                {new Date(f.filled_at).toLocaleString()} · {f.side} {Number(f.quantity)} @ {Number(f.fill_price).toFixed(2)}
+                {new Date(f.filled_at).toLocaleString("en-GB", { timeZone: "Europe/London" })} · {f.side} {Number(f.quantity)} @ {Number(f.fill_price).toFixed(2)}
               </div>
             ))}
           </li>
@@ -662,7 +662,7 @@ function OrderTimelineList({ orders, fills }: { orders: OrderRow[]; fills: FillR
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-[11px]">
-                      <span className="text-muted-foreground">{new Date(o.created_at).toLocaleString()}</span>
+                      <span className="text-muted-foreground">{new Date(o.created_at).toLocaleString("en-GB", { timeZone: "Europe/London" })}</span>
                       {" · "}
                       <span className="uppercase">{o.side}</span>{" "}
                       {Number(o.quantity)} {o.symbol}

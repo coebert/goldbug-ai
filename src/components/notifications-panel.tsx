@@ -120,11 +120,11 @@ export function NotificationsPanel() {
                           <p className="mt-1 text-sm text-muted-foreground break-words">{n.body}</p>
                         )}
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString()}>
+                          <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString("en-GB", { timeZone: "Europe/London" })}>
                             {fmtWhen(n.created_at)}
                           </time>
                           {n.read_at && (
-                            <span title={new Date(n.read_at).toLocaleString()}>
+                            <span title={new Date(n.read_at).toLocaleString("en-GB", { timeZone: "Europe/London" })}>
                               read {fmtWhen(n.read_at)}
                             </span>
                           )}

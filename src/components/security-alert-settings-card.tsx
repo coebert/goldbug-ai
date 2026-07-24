@@ -76,7 +76,7 @@ export function SecurityAlertSettingsCard() {
   };
 
   const lastAt = q.data?.last_notified_at
-    ? new Date(q.data.last_notified_at).toLocaleString()
+    ? new Date(q.data.last_notified_at).toLocaleString("en-GB", { timeZone: "Europe/London" })
     : null;
 
   return (
