@@ -850,6 +850,42 @@ function CreatePortfolioCard() {
           {mut.isPending ? "Creating…" : meta.cta}
         </Button>
       </CardContent>
+      <ConfirmDialog
+        open={confirmLive}
+        onOpenChange={setConfirmLive}
+        title="Trade with real money?"
+        confirmLabel="Yes, start real-money trading"
+        cancelLabel="Not yet"
+        description={
+          <>
+            <p>
+              You're about to create{" "}
+              <span className="font-semibold text-foreground">{name}</span> and let
+              the AI place <span className="font-semibold text-destructive">real orders</span> on
+              your Saxo LIVE account every hourly cycle. You can pause or revert at any time.
+            </p>
+            {liveBal ? (
+              <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+                <div>Starting cash (available/settled): <span className="tabular-nums font-semibold">{fmtMoney(livePot ?? 0, liveBal.currency)}</span></div>
+                {livePending > 0 && (
+                  <div>Pending / unsettled (excluded): {fmtMoney(livePending, liveBal.currency)}</div>
+                )}
+                {liveReserved > 0 && (
+                  <div>Reserved by open orders (excluded): {fmtMoney(liveReserved, liveBal.currency)}</div>
+                )}
+                <div>Account: {liveBal.accountId ?? "—"}</div>
+              </div>
+            ) : (
+              <p className="text-xs">Starting cash will be read from your Saxo LIVE available balance.</p>
+            )}
+          </>
+        }
+        requireText="TRADE LIVE"
+        onConfirm={() => {
+          setConfirmLive(false);
+          mut.mutate();
+        }}
+      />
     </Card>
   );
 }
