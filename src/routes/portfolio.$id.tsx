@@ -1119,6 +1119,23 @@ function PortfolioPage() {
 
         )}
       </main>
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title="Reset portfolio?"
+        description={
+          <p>
+            This resets the portfolio to its <span className="font-semibold">starting cash</span>{" "}
+            and permanently deletes every trade, decision and equity point. This cannot be undone.
+          </p>
+        }
+        requireText="RESET"
+        confirmLabel="Reset portfolio"
+        onConfirm={() => {
+          setConfirmReset(false);
+          reset.mutate();
+        }}
+      />
     </div>
   );
 }
