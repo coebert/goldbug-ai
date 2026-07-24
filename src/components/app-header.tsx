@@ -25,8 +25,11 @@ const NAV = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/compare", label: "Compare", icon: GitCompare },
-  { to: "/saxo-status", label: "Saxo", icon: Plug },
-  { to: "/saxo-reconnect", label: "Reconnect", icon: RefreshCw },
+  { to: "/saxo-status", label: "Broker", icon: Plug },
+] as const;
+
+const MOBILE_EXTRAS = [
+  { to: "/saxo-reconnect", label: "Reconnect broker", icon: RefreshCw },
 ] as const;
 
 export function AppHeader({ email }: { email?: string | null }) {
