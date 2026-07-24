@@ -1207,7 +1207,7 @@ function PortfolioPage() {
                         <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur text-xs uppercase text-muted-foreground">
                           <tr>
                             {([
-                              { key: "date", label: "Date & time (GMT)", align: "left" },
+                              { key: "date", label: `Date & time (${ukZoneAbbr()})`, align: "left" },
                               { key: "symbol", label: "Symbol", align: "left" },
                               { key: "side", label: "Side", align: "left" },
                               { key: "qty", label: "Qty", align: "right" },
@@ -1244,15 +1244,16 @@ function PortfolioPage() {
                         <tbody>
                           {sortedTrades.map((t) => {
                             const executedAt = t.executed_at ? new Date(t.executed_at) : null;
-                            const timeGmt = executedAt && !isNaN(executedAt.getTime())
-                              ? `${String(executedAt.getUTCHours()).padStart(2, "0")}:${String(executedAt.getUTCMinutes()).padStart(2, "0")}:${String(executedAt.getUTCSeconds()).padStart(2, "0")}`
+                            const timeUk = executedAt && !isNaN(executedAt.getTime())
+                              ? formatUk(executedAt, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
                               : null;
+                            const zoneUk = executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
                             return (
                               <tr key={t.id} className="border-t border-border">
                                 <td className="px-3 py-2 tabular-nums whitespace-nowrap">
                                   <span>{t.trade_date}</span>
-                                  {timeGmt && (
-                                    <span className="ml-2 text-xs text-muted-foreground">{timeGmt} GMT</span>
+                                  {timeUk && (
+                                    <span className="ml-2 text-xs text-muted-foreground">{timeUk} {zoneUk}</span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2 font-medium">{t.symbol}</td>
@@ -1274,9 +1275,10 @@ function PortfolioPage() {
                     <div className="md:hidden space-y-2">
                       {sortedTrades.map((t) => {
                         const executedAt = t.executed_at ? new Date(t.executed_at) : null;
-                        const timeGmt = executedAt && !isNaN(executedAt.getTime())
-                          ? `${String(executedAt.getUTCHours()).padStart(2, "0")}:${String(executedAt.getUTCMinutes()).padStart(2, "0")}:${String(executedAt.getUTCSeconds()).padStart(2, "0")}`
+                        const timeUk = executedAt && !isNaN(executedAt.getTime())
+                          ? formatUk(executedAt, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
                           : null;
+                        const zoneUk = executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
                         return (
                           <details
                             key={t.id}
@@ -1292,7 +1294,7 @@ function PortfolioPage() {
                             </summary>
                             <div className="border-t border-border px-3 py-2 space-y-1.5">
                               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
-                                <span>{t.trade_date}{timeGmt ? ` · ${timeGmt} GMT` : ""}</span>
+                                <span>{t.trade_date}{timeUk ? ` · ${timeUk} ${zoneUk}` : ""}</span>
                                 <span>Qty {Number(t.quantity).toFixed(4)}</span>
                                 <span>@ {Number(t.price).toFixed(2)}</span>
                               </div>
