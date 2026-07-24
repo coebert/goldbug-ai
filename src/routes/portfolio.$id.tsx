@@ -417,6 +417,31 @@ function PortfolioPage() {
     return arr;
   }, [trades, tradeSort]);
 
+  const underfunded = useMemo(() => {
+    const latest = decisions[0] as { raw?: unknown } | undefined;
+    if (!latest) return null;
+    const raw = (latest.raw ?? {}) as {
+      guardrails?: {
+        affordability?: {
+          per_symbol_budget?: number;
+          min_trade_value?: number;
+          universe_total?: number;
+          candidates_kept?: number;
+          notes?: string[];
+        };
+      };
+    };
+    const a = raw.guardrails?.affordability;
+    if (!a) return null;
+    if ((a.candidates_kept ?? 0) > 0) return null;
+    if ((a.universe_total ?? 0) === 0) return null;
+    return {
+      budget: a.per_symbol_budget ?? 0,
+      minTradeValue: a.min_trade_value ?? 0,
+      notes: a.notes ?? [],
+    };
+  }, [decisions]);
+
   if (!ready) return null;
 
   return (
