@@ -64,6 +64,7 @@ import {
   tightenForRegime,
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
+import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
   filterUniverse,
   filterUniverseByAffordability,
