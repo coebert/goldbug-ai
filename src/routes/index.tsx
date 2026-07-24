@@ -31,6 +31,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
@@ -45,7 +52,7 @@ const DecisionNewsBreakdown = lazy(() =>
 );
 
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle, MoreVertical, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/")({
@@ -123,6 +130,39 @@ function Home() {
     return map;
   }, [equityQ.data]);
 
+  const todaySummary = useMemo(() => {
+    const series = equityQ.data?.series ?? [];
+    const portfolios = equityQ.data?.portfolios ?? [];
+    if (series.length === 0 || portfolios.length === 0) return null;
+    const sumRow = (row: Record<string, unknown>) =>
+      portfolios.reduce((s, p) => {
+        const v = Number((row as Record<string, unknown>)[p.id]);
+        return s + (Number.isFinite(v) ? v : 0);
+      }, 0);
+    const last = series[series.length - 1] as Record<string, unknown>;
+    const prev = (series[series.length - 2] as Record<string, unknown>) ?? last;
+    const totalEquity = sumRow(last);
+    const prevEquity = sumRow(prev);
+    const dayPnl = totalEquity - prevEquity;
+    const dayPct = prevEquity > 0 ? (dayPnl / prevEquity) * 100 : 0;
+    return { totalEquity, dayPnl, dayPct, count: portfolios.length };
+  }, [equityQ.data]);
+
+  const nextRunLabel = useMemo(() => {
+    const now = new Date();
+    const next = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        now.getUTCHours() + 1,
+        0,
+        0,
+      ),
+    );
+    return `${String(next.getUTCHours()).padStart(2, "0")}:00 GMT`;
+  }, [equityQ.dataUpdatedAt]);
+
   if (!ready || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
@@ -135,14 +175,14 @@ function Home() {
     <div className="min-h-screen">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Your Portfolios</h1>
-            <p className="text-sm text-muted-foreground">
-              Create a portfolio, pick a risk level, run a backtest, then let the AI make daily decisions.
+        <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:mb-8 sm:flex sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Your Portfolios</h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+              Create a portfolio, pick a risk level, run a backtest, then let the AI make hourly decisions.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="hidden shrink-0 items-center gap-2 sm:flex">
             <Link to="/get-started">
               <Button variant="secondary" size="sm">
                 <Sparkles className="mr-1 h-4 w-4" /> £1000 demo
@@ -157,7 +197,68 @@ function Home() {
               <Button variant="outline" size="sm">Compare</Button>
             </Link>
           </div>
+          {/* Mobile primary CTA */}
+          <a href="#create-portfolio" className="sm:hidden">
+            <Button size="sm" className="h-10">
+              <PlusCircle className="mr-1 h-4 w-4" /> New
+            </Button>
+          </a>
         </div>
+
+        {/* Today summary strip */}
+        {todaySummary && (
+          <div className="mb-6 grid grid-cols-3 gap-2 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+                Total equity
+              </div>
+              <div className="truncate text-base font-semibold tabular-nums sm:text-lg">
+                {new Intl.NumberFormat(undefined, {
+                  style: "currency",
+                  currency: "GBP",
+                  maximumFractionDigits: 0,
+                }).format(todaySummary.totalEquity)}
+              </div>
+              <div className="text-[10px] text-muted-foreground sm:text-xs">
+                {todaySummary.count} portfolio{todaySummary.count === 1 ? "" : "s"}
+              </div>
+            </div>
+            <div className="min-w-0 border-l border-border pl-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+                Day P&amp;L
+              </div>
+              <div
+                className={`flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg ${todaySummary.dayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+              >
+                {todaySummary.dayPnl >= 0 ? (
+                  <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+                )}
+                <span className="truncate">
+                  {todaySummary.dayPnl >= 0 ? "+" : ""}
+                  {todaySummary.dayPct.toFixed(2)}%
+                </span>
+              </div>
+              <div className="text-[10px] tabular-nums text-muted-foreground sm:text-xs">
+                {todaySummary.dayPnl >= 0 ? "+" : ""}
+                {new Intl.NumberFormat(undefined, {
+                  maximumFractionDigits: 0,
+                }).format(todaySummary.dayPnl)}
+              </div>
+            </div>
+            <div className="min-w-0 border-l border-border pl-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+                Next run
+              </div>
+              <div className="flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg">
+                <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="truncate">{nextRunLabel}</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground sm:text-xs">hourly cycle</div>
+            </div>
+          </div>
+        )}
 
         <NewHereBanner />
 
@@ -179,9 +280,6 @@ function Home() {
           </Suspense>
         </div>
 
-
-
-
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">
             {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
@@ -198,7 +296,7 @@ function Home() {
                     </p>
                   </div>
                   <Link to="/get-started">
-                    <Button>Start demo</Button>
+                    <Button className="w-full sm:w-auto">Start demo</Button>
                   </Link>
                 </CardContent>
               </Card>
@@ -207,7 +305,9 @@ function Home() {
               <PortfolioRow key={p.id} portfolio={p} sparkSeries={sparkByPortfolio[p.id] ?? []} />
             ))}
           </div>
-          <CreatePortfolioCard />
+          <div id="create-portfolio" className="scroll-mt-24">
+            <CreatePortfolioCard />
+          </div>
         </div>
       </main>
     </div>
@@ -291,41 +391,96 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
 
   return (
     <Card>
-      <CardContent className="flex items-center justify-between gap-4 py-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/portfolio/$id"
-              params={{ id: portfolio.id }}
-              className="font-medium hover:underline"
-            >
-              {portfolio.name}
-            </Link>
-            <ModeBadge mode={portfolio.mode} size="sm" />
-            <LiveToggle portfolioId={portfolio.id} mode={portfolio.mode} livePaused={portfolio.live_paused} size="sm" />
+      <CardContent className="p-4 sm:p-5">
+        {/* Row 1 — Identity + primary actions */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/portfolio/$id"
+                params={{ id: portfolio.id }}
+                className="truncate text-base font-semibold hover:underline"
+              >
+                {portfolio.name}
+              </Link>
+              <ModeBadge mode={portfolio.mode} size="sm" />
+              <LiveToggle
+                portfolioId={portfolio.id}
+                mode={portfolio.mode}
+                livePaused={portfolio.live_paused}
+                size="sm"
+              />
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} ·{" "}
+              {portfolio.risk_level} risk
+              {portfolio.last_run_date && ` · last run ${portfolio.last_run_date}`}
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {portfolio.currency} {Number(portfolio.starting_cash).toFixed(0)} · {portfolio.risk_level} risk
-            {portfolio.last_run_date && ` · last run ${portfolio.last_run_date}`}
+          <div className="flex shrink-0 items-center gap-1">
+            <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
+              <Button size="sm" variant="outline" className="h-10">
+                <PlayCircle className="mr-1 h-4 w-4" /> Open
+              </Button>
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-10 w-10"
+                  aria-label={`More actions for ${portfolio.name}`}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
+                    Open portfolio
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (confirm(`Delete "${portfolio.name}"? This cannot be undone.`))
+                      deleteMut.mutate(portfolio.id);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete portfolio
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex flex-col items-end gap-1" title="Recent equity trend">
+
+        {/* Row 2 — Trend + balance */}
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Sparkline values={values} width={120} height={36} />
+              <Sparkline values={values} width={120} height={32} />
               {rangePct != null && (
-                <span className={`text-xs font-medium tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  {rangePct >= 0 ? "+" : ""}{rangePct.toFixed(1)}%
+                <span
+                  className={`text-sm font-semibold tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}
+                >
+                  {rangePct >= 0 ? "+" : ""}
+                  {rangePct.toFixed(1)}%
                 </span>
               )}
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {sparkRange}
+              </span>
             </div>
-            <div className="flex gap-0.5 rounded-md border border-border/60 p-0.5">
+            <div className="mt-2 flex gap-0.5 rounded-md border border-border/60 p-0.5">
               {SPARK_RANGES.map((r) => (
                 <button
                   key={r.key}
                   type="button"
                   onClick={() => setSparkRange(r.key)}
-                  className={`px-1.5 py-0.5 text-[10px] font-medium rounded-sm transition-colors ${
+                  aria-pressed={sparkRange === r.key}
+                  className={`min-h-[28px] flex-1 rounded-sm px-2 text-[11px] font-medium transition-colors ${
                     sparkRange === r.key
                       ? "bg-primary/20 text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -336,30 +491,16 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
               ))}
             </div>
           </div>
-
-          <div className="text-right">
-            <div className="text-sm font-medium">
+          <div className="shrink-0 text-right">
+            <div className="text-sm font-semibold tabular-nums">
               {portfolio.currency} {Number(portfolio.current_cash).toFixed(2)}
             </div>
-            <div className={`text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
-              (cash-only) {pnl >= 0 ? "+" : ""}
+            <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {pnl >= 0 ? "+" : ""}
               {pnlPct.toFixed(2)}%
+              <span className="ml-1 text-[10px] text-muted-foreground">cash</span>
             </div>
           </div>
-          <Link to="/portfolio/$id" params={{ id: portfolio.id }}>
-            <Button size="sm" variant="outline">
-              <PlayCircle className="mr-1 h-4 w-4" /> Open
-            </Button>
-          </Link>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => {
-              if (confirm("Delete this portfolio?")) deleteMut.mutate(portfolio.id);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
         </div>
       </CardContent>
     </Card>
