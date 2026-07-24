@@ -22,11 +22,19 @@ export type LearningStats = {
   per_side: { buy: { n: number; win_rate: number | null }; sell: { n: number; win_rate: number | null } };
 };
 
+export type LessonOverrideEntry = {
+  original_text: string;
+  action: string;
+  replacement_text: string | null;
+};
+
 export type LearningContext = {
   stats: LearningStats;
   lessons: string[];
   lessons_as_of: string | null;
   lessons_regime: string | null; // which regime these lessons were authored under (null = general)
+  lessons_raw: string[];
+  lessons_overrides: LessonOverrideEntry[];
   per_regime_stats: { regime: string; n: number; win_rate: number; avg_return_pct: number }[];
   current_regime: string | null;
   samples: {
