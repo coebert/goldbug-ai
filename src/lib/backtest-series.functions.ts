@@ -64,6 +64,7 @@ export const getBacktestSeries = createServerFn({ method: "GET" })
       return {
         equity,
         holdings: { symbols: [], points: [] },
+        trades: [],
         startingCash,
         from,
         to,
