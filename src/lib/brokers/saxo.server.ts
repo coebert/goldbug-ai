@@ -241,39 +241,10 @@ export class SaxoAdapter implements BrokerAdapter {
       }
     }
 
-    // Normalize Yahoo-style suffixes (e.g. VUKE.L, SAP.DE) into a bare keyword
-    // plus a preferred Saxo ExchangeId. Saxo's /ref/v1/instruments search does
-    // NOT recognise Yahoo suffixes, so "VUKE.L" returns zero hits while "VUKE"
-    // returns the LSE-listed ETF we actually want.
-    const YAHOO_SUFFIX_TO_EXCHANGE: Record<string, string[]> = {
-      L: ["LSE", "LSE_INTL", "LSE_ETF", "LSE_SETSMM"],
-      DE: ["XETR", "FRA"],
-      PA: ["PAR"],
-      AS: ["AMS"],
-      MI: ["MIL"],
-      MC: ["MCE"],
-      SW: ["SWX", "VIRT_X"],
-      TO: ["TSE"],
-      HK: ["HKEX"],
-      T: ["TSE_JP"],
-      AX: ["ASX"],
-      ST: ["OMX"],
-      CO: ["CSE"],
-      HE: ["HEX"],
-      OL: ["OSE"],
-    };
-    const upper = symbol.toUpperCase();
-    const dotIdx = upper.lastIndexOf(".");
-    const suffix = dotIdx > 0 ? upper.slice(dotIdx + 1) : "";
-    const base = dotIdx > 0 ? upper.slice(0, dotIdx) : upper;
-    const preferredExchanges = suffix ? YAHOO_SUFFIX_TO_EXCHANGE[suffix] ?? [] : [];
-    const keyword = suffix && preferredExchanges.length ? base : upper;
+    const { upper, base, suffix, preferredExchanges, searchKeywords } =
+      normalizeSaxoSymbol(symbol);
 
-    type InstrumentHit = {
-      Identifier: number; AssetType: string; CurrencyCode?: string;
-      ExchangeId?: string; Symbol: string; Description?: string;
-    };
-    const searchKeywords = Array.from(new Set([keyword, base, upper].filter(Boolean)));
+    type InstrumentHit = SaxoInstrumentHit;
     const attempts: Array<{ keyword: string; count: number }> = [];
     let candidates: InstrumentHit[] = [];
     for (const searchKeyword of searchKeywords) {
@@ -288,27 +259,8 @@ export class SaxoAdapter implements BrokerAdapter {
       }
     }
 
-    // Match order:
-    //   1. Exact Symbol on a preferred exchange for the Yahoo suffix
-    //   2. Symbol starts with base ticker on a preferred exchange (Saxo often
-    //      appends ":xlon" style)
-    //   3. Any hit on a preferred exchange
-    //   4. Exact Symbol match (any exchange)
-    //   5. First hit
-    const symMatches = (s: string) => {
-      const su = s.toUpperCase();
-      return su === base || su.startsWith(`${base}:`) || su === upper;
-    };
-    const onPreferred = (ex?: string) =>
-      !!ex && preferredExchanges.some((e) => ex.toUpperCase().includes(e));
+    const hit = selectSaxoInstrument(symbol, candidates);
 
-    const hit =
-      candidates.find((d) => symMatches(d.Symbol) && onPreferred(d.ExchangeId)) ??
-      candidates.find((d) => d.Symbol.toUpperCase().startsWith(base) && onPreferred(d.ExchangeId)) ??
-      (preferredExchanges.length ? candidates.find((d) => onPreferred(d.ExchangeId)) : undefined) ??
-      candidates.find((d) => d.Symbol.toUpperCase() === upper) ??
-      candidates.find((d) => symMatches(d.Symbol)) ??
-      candidates[0];
 
     if (!hit) {
       try {
