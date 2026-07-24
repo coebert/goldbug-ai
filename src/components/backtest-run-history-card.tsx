@@ -99,11 +99,6 @@ function toneClass(v: number | null | undefined, invert = false) {
   return good ? "text-emerald-500" : "text-red-500";
 }
 
-function toneClass(v: number | null | undefined, invert = false) {
-  if (v == null || !Number.isFinite(v)) return "text-muted-foreground";
-  const good = invert ? v <= 0 : v >= 0;
-  return good ? "text-emerald-500" : "text-red-500";
-}
 
 function ReasonRow({
   label,
