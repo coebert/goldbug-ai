@@ -35,8 +35,9 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2 } from "lucide-react";
+import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2, SlidersHorizontal } from "lucide-react";
 import { Explain } from "@/components/explain";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/compare")({
   ssr: false,
@@ -109,8 +110,28 @@ function ComparePage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 6 ? prev : [...prev, id],
     );
 
-  const [focused, setFocused] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [confirmRerun, setConfirmRerun] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const toggleHidden = (name: string) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  const isolate = (name: string) =>
+    setHidden((prev) => {
+      // If already isolated to this one, restore all
+      if (prev.size > 0 && !prev.has(name) && prev.size === (results?.length ?? 0) - 1) {
+        return new Set();
+      }
+      const next = new Set<string>();
+      (results ?? []).forEach((r) => {
+        if (r.portfolio.name !== name) next.add(r.portfolio.name);
+      });
+      return next;
+    });
 
   const { chartData, drawdownData } = useMemo(() => {
     if (!results || results.length === 0) return { chartData: [], drawdownData: [] };
@@ -153,6 +174,68 @@ function ComparePage() {
 
   const portfolios = portfoliosQ.data ?? [];
 
+  const controls = (
+    <div className="space-y-3">
+      {portfolios.length === 0 && (
+        <p className="text-sm text-muted-foreground">No portfolios yet. Create some first.</p>
+      )}
+      {portfolios.map((p) => (
+        <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-md border border-border/60 p-2 text-sm hover:bg-muted/40">
+          <Checkbox checked={selected.includes(p.id)} onCheckedChange={() => toggle(p.id)} />
+          <div className="flex-1 min-w-0">
+            <div className="font-medium truncate">{p.name}</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {p.currency} {Number(p.starting_cash).toFixed(0)} · {p.risk_level} · {(p.universe as string[]).join(", ")}
+            </div>
+          </div>
+        </label>
+      ))}
+
+      <div className="border-t border-border pt-3">
+        <Label htmlFor="days" className="text-xs">Backtest window (trading days)</Label>
+        <Input
+          id="days"
+          type="number"
+          min={3}
+          max={30}
+          value={days}
+          onChange={(e) => setDays(Math.max(3, Math.min(30, Number(e.target.value) || 10)))}
+        />
+      </div>
+
+      <div className="space-y-2 pt-1">
+        <Button
+          className="w-full"
+          disabled={selected.length === 0 || compareMut.isPending}
+          onClick={() => {
+            compareMut.mutate();
+            setConfigOpen(false);
+          }}
+          variant="outline"
+        >
+          <RefreshCw className="mr-2 h-4 w-4" />
+          {compareMut.isPending ? "Loading…" : "Compare existing results"}
+        </Button>
+        <Button
+          className="w-full"
+          disabled={selected.length === 0 || runMut.isPending}
+          onClick={() => {
+            setConfigOpen(false);
+            setConfirmRerun(true);
+          }}
+        >
+          <PlayCircle className="mr-2 h-4 w-4" />
+          {runMut.isPending ? "Running backtests…" : "Run backtests & compare"}
+        </Button>
+        {runMut.isPending && (
+          <p className="text-xs text-muted-foreground">
+            Each portfolio simulates {days} days — this can take a couple of minutes.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen">
       <AppHeader email={session.user.email} />
@@ -172,69 +255,12 @@ function ComparePage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <Card>
+          <Card className="hidden lg:block">
             <CardHeader>
               <CardTitle className="text-base">Select portfolios</CardTitle>
               <CardDescription>{selected.length}/6 selected</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {portfolios.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No portfolios yet. Create some first.
-                </p>
-              )}
-              {portfolios.map((p) => (
-                <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-md border border-border/60 p-2 text-sm hover:bg-muted/40">
-                  <Checkbox
-                    checked={selected.includes(p.id)}
-                    onCheckedChange={() => toggle(p.id)}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {p.currency} {Number(p.starting_cash).toFixed(0)} · {p.risk_level} · {(p.universe as string[]).join(", ")}
-                    </div>
-                  </div>
-                </label>
-              ))}
-
-              <div className="border-t border-border pt-3">
-                <Label htmlFor="days" className="text-xs">Backtest window (trading days)</Label>
-                <Input
-                  id="days"
-                  type="number"
-                  min={3}
-                  max={30}
-                  value={days}
-                  onChange={(e) => setDays(Math.max(3, Math.min(30, Number(e.target.value) || 10)))}
-                />
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <Button
-                  className="w-full"
-                  disabled={selected.length === 0 || compareMut.isPending}
-                  onClick={() => compareMut.mutate()}
-                  variant="outline"
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  {compareMut.isPending ? "Loading…" : "Compare existing results"}
-                </Button>
-                <Button
-                  className="w-full"
-                  disabled={selected.length === 0 || runMut.isPending}
-                  onClick={() => setConfirmRerun(true)}
-                >
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  {runMut.isPending ? "Running backtests…" : "Run backtests & compare"}
-                </Button>
-                {runMut.isPending && (
-                  <p className="text-xs text-muted-foreground">
-                    Each portfolio simulates {days} days — this can take a couple of minutes.
-                  </p>
-                )}
-              </div>
-            </CardContent>
+            <CardContent>{controls}</CardContent>
           </Card>
           <ConfirmDialog
             open={confirmRerun}
@@ -260,14 +286,14 @@ function ComparePage() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center justify-between gap-2">
                   <span>Equity curves (% return)</span>
-                  {focused && (
-                    <Button variant="ghost" size="sm" onClick={() => setFocused(null)}>
+                  {hidden.size > 0 && (
+                    <Button variant="ghost" size="sm" onClick={() => setHidden(new Set())}>
                       Show all
                     </Button>
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Normalised to starting pot. Click a legend item to isolate one line; click again to reset.
+                  Normalised to starting pot. Tap a legend chip to hide/show that line. Double-tap to isolate.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -283,6 +309,34 @@ function ComparePage() {
                 )}
                 {results && chartData.length > 0 && (
                   <>
+                    <div className="mb-3 flex flex-wrap gap-1.5">
+                      {results.map((r, i) => {
+                        const color = COLORS[i % COLORS.length];
+                        const off = hidden.has(r.portfolio.name);
+                        return (
+                          <button
+                            key={r.portfolio.id}
+                            type="button"
+                            onClick={() => toggleHidden(r.portfolio.name)}
+                            onDoubleClick={() => isolate(r.portfolio.name)}
+                            aria-pressed={!off}
+                            title={off ? "Show this line (double-click to isolate)" : "Hide this line (double-click to isolate)"}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                              off
+                                ? "border-border/60 bg-muted/30 text-muted-foreground line-through"
+                                : "border-transparent text-foreground"
+                            }`}
+                            style={off ? undefined : { background: `${color}22`, borderColor: `${color}66`, color }}
+                          >
+                            <span
+                              className="inline-block h-2 w-2 rounded-full"
+                              style={{ background: off ? "hsl(var(--muted-foreground))" : color }}
+                            />
+                            <span className="max-w-[140px] truncate">{r.portfolio.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                     <ResponsiveContainer width="100%" height={320}>
                       <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
@@ -334,41 +388,24 @@ function ComparePage() {
                             );
                           }}
                         />
-                        <Legend
-                          wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
-                          onClick={(o) => {
-                            const dk = (o as { dataKey?: unknown }).dataKey;
-                            const key = typeof dk === "string" ? dk : String(dk ?? "");
-                            setFocused((prev) => (prev === key ? null : key));
-                          }}
-                          formatter={(value) => (
-                            <span
-                              style={{
-                                opacity: !focused || focused === value ? 1 : 0.35,
-                                textDecoration: focused === value ? "underline" : "none",
-                              }}
-                            >
-                              {value}
-                            </span>
-                          )}
-                        />
-                        {results.map((r, i) => {
-                          const isDim = focused !== null && focused !== r.portfolio.name;
-                          return (
-                            <Line
-                              key={r.portfolio.id}
-                              type="monotone"
-                              dataKey={r.portfolio.name}
-                              stroke={COLORS[i % COLORS.length]}
-                              strokeWidth={focused === r.portfolio.name ? 3 : 2}
-                              strokeOpacity={isDim ? 0.15 : 1}
-                              dot={false}
-                              activeDot={isDim ? false : { r: 4 }}
-                              connectNulls
-                              isAnimationActive={false}
-                            />
-                          );
-                        })}
+                        {results
+                          .filter((r) => !hidden.has(r.portfolio.name))
+                          .map((r) => {
+                            const i = results.findIndex((x) => x.portfolio.id === r.portfolio.id);
+                            return (
+                              <Line
+                                key={r.portfolio.id}
+                                type="monotone"
+                                dataKey={r.portfolio.name}
+                                stroke={COLORS[i % COLORS.length]}
+                                strokeWidth={2}
+                                dot={false}
+                                activeDot={{ r: 4 }}
+                                connectNulls
+                                isAnimationActive={false}
+                              />
+                            );
+                          })}
                       </LineChart>
                     </ResponsiveContainer>
 
@@ -404,22 +441,24 @@ function ComparePage() {
                             }}
                             formatter={(v: number) => `${Number(v).toFixed(2)}%`}
                           />
-                          {results.map((r, i) => {
-                            const isDim = focused !== null && focused !== r.portfolio.name;
-                            return (
-                              <Line
-                                key={r.portfolio.id}
-                                type="monotone"
-                                dataKey={r.portfolio.name}
-                                stroke={COLORS[i % COLORS.length]}
-                                strokeWidth={focused === r.portfolio.name ? 2.5 : 1.5}
-                                strokeOpacity={isDim ? 0.12 : 0.9}
-                                dot={false}
-                                connectNulls
-                                isAnimationActive={false}
-                              />
-                            );
-                          })}
+                          {results
+                            .filter((r) => !hidden.has(r.portfolio.name))
+                            .map((r) => {
+                              const i = results.findIndex((x) => x.portfolio.id === r.portfolio.id);
+                              return (
+                                <Line
+                                  key={r.portfolio.id}
+                                  type="monotone"
+                                  dataKey={r.portfolio.name}
+                                  stroke={COLORS[i % COLORS.length]}
+                                  strokeWidth={1.5}
+                                  strokeOpacity={0.9}
+                                  dot={false}
+                                  connectNulls
+                                  isAnimationActive={false}
+                                />
+                              );
+                            })}
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -513,6 +552,31 @@ function ComparePage() {
           </div>
         </div>
       </main>
+
+      {/* Mobile Configure FAB + bottom sheet */}
+      <Sheet open={configOpen} onOpenChange={setConfigOpen}>
+        <button
+          type="button"
+          onClick={() => setConfigOpen(true)}
+          className="fixed bottom-20 right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 ring-2 ring-primary/20 hover:bg-primary/90 md:bottom-6 lg:hidden"
+          aria-label="Configure comparison"
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+          Configure
+          {selected.length > 0 && (
+            <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-[11px] font-bold">
+              {selected.length}
+            </span>
+          )}
+        </button>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="text-left">
+            <SheetTitle>Select portfolios</SheetTitle>
+            <SheetDescription>{selected.length}/6 selected · Choose up to 6, then run or compare.</SheetDescription>
+          </SheetHeader>
+          <div className="pt-4">{controls}</div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
