@@ -41,7 +41,7 @@ export function AppHeader({ email }: { email?: string | null }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="border-b border-border bg-card">
+    <header className="border-b border-border bg-card pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <Link
           to="/"

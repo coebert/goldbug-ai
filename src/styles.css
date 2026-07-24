@@ -167,6 +167,17 @@
     overflow-x: hidden;
   }
 
+  /* Respect the iPhone notch / rounded corners: pad the horizontal edges
+   * with the device-reported safe-area insets so content isn't clipped
+   * when the page is displayed in landscape or as an installed PWA with
+   * viewport-fit=cover. Top and bottom insets are handled per-region
+   * (sticky header pads top, fixed tab bar pads bottom) to avoid stacking
+   * extra whitespace on every page. */
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
   /* Long unbroken strings — broker order IDs, base64 account keys, JSON
    * error payloads — must wrap on narrow screens instead of pushing the
    * page wider than the viewport. */
