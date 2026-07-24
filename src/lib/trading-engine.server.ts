@@ -424,7 +424,28 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     .eq("portfolio_id", portfolioId);
 
 
-  const fullUniverse = filterUniverse(classesFromUniverse(portfolio.universe));
+  let fullUniverse = filterUniverse(classesFromUniverse(portfolio.universe));
+
+  // Live-broker tradeability filter. Our Saxo integration only reliably resolves
+  // plain equities/ETFs (US + LSE `.L`). Yahoo FX pairs (`=X`), futures (`=F`),
+  // and crypto spot (`-USD`) do not map to Saxo retail cash-account UICs and
+  // consistently fail with "instrument not found", so exclude them from the
+  // universe for live_prod portfolios. live_sim and backtest keep the full set.
+  const brokerBlockedSymbols: string[] = [];
+  if (portfolio.mode === "live_prod") {
+    const originalCount = fullUniverse.length;
+    fullUniverse = fullUniverse.filter((u) => {
+      const s = u.symbol.toUpperCase();
+      const untradeable = s.endsWith("=X") || s.endsWith("=F") || s.endsWith("-USD");
+      if (untradeable) brokerBlockedSymbols.push(u.symbol);
+      return !untradeable;
+    });
+    if (brokerBlockedSymbols.length > 0) {
+      console.info(
+        `[trading-engine] live_prod broker filter dropped ${brokerBlockedSymbols.length}/${originalCount} untradeable symbols: ${brokerBlockedSymbols.join(", ")}`,
+      );
+    }
+  }
 
   // Price the entire (asset-class-filtered) universe up front so we can pick a
   // candidate list the portfolio's cash can actually trade. Held symbols are
