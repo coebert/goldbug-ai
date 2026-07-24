@@ -308,7 +308,14 @@ export class SaxoAdapter implements BrokerAdapter {
       OrderType: req.orderType === "limit" ? "Limit" : "Market",
       OrderDuration: { DurationType: "DayOrder" },
       ExternalReference: req.clientOrderId,
+      // Saxo requires this on every order since 2024: "true" marks the order
+      // as manually initiated by a human. We surface manual + cron runs the
+      // same way — the AI decides, but a real person configured the guardrails,
+      // so from the exchange's perspective this is a manual (non-algorithmic)
+      // order flow, not high-frequency automated trading.
+      ManualOrder: true,
     };
+
     if (accountKey) body.AccountKey = accountKey;
     if (req.orderType === "limit" && req.limitPrice != null) body.OrderPrice = req.limitPrice;
 
