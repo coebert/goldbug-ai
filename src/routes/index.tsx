@@ -423,6 +423,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => {
@@ -431,6 +432,7 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   const pnl = Number(portfolio.current_cash) - Number(portfolio.starting_cash);
   const pnlPct = (pnl / Number(portfolio.starting_cash)) * 100;
