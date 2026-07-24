@@ -223,6 +223,7 @@ export function RiskControlsCard({
     () => initial.risk_level ?? inferRiskLevel(initial),
   );
   const [open, setOpen] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [lastChange, setLastChange] = useState<{
     fromName: string;
     toName: string;
