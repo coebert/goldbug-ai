@@ -59,7 +59,8 @@ import { StressPanelCard } from "@/components/stress-panel-card";
 import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
-import { LiveHoldingsCard } from "@/components/live-holdings-card";
+import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
+import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
@@ -113,6 +114,14 @@ function PortfolioPage() {
     queryKey: ["portfolio", id],
     queryFn: () => get({ data: { id } }),
     enabled: ready,
+  });
+
+  const getHistory = useServerFn(getHoldingsHistory);
+  const holdingsHistoryQ = useQuery({
+    queryKey: ["holdings-history", id],
+    queryFn: () => getHistory({ data: { portfolioId: id } }),
+    enabled: ready,
+    refetchInterval: 60 * 60 * 1000,
   });
 
   const qc = useQueryClient();
@@ -383,6 +392,22 @@ function PortfolioPage() {
   const holdings = q.data?.holdings ?? [];
   const trades = q.data?.trades ?? [];
   const decisions = q.data?.decisions ?? [];
+
+  const holdingsSeries = useMemo(() => {
+    const map: Record<string, HoldingSeriesInfo> = {};
+    for (const h of holdingsHistoryQ.data ?? []) {
+      map[h.symbol] = {
+        closes: h.closes,
+        currentPrice: h.currentPrice,
+        pctChangeSincePurchase: h.pctChangeSincePurchase,
+        valueChangeSincePurchase: h.valueChangeSincePurchase,
+        opened_at: h.opened_at,
+      };
+    }
+    return map;
+  }, [holdingsHistoryQ.data]);
+
+
 
   const holdingsValue = useMemo(() => {
     // Approx: use avg_cost as fallback (real value shown in dashboard when snapshots exist)
@@ -992,6 +1017,7 @@ function PortfolioPage() {
                 cash={Number(p.current_cash)}
                 totalValue={totalValue}
                 mode={p.mode}
+                series={holdingsSeries}
               />
             </div>
 

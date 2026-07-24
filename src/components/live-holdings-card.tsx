@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Wallet, TrendingUp } from "lucide-react";
+import { Briefcase, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Sparkline } from "@/components/sparkline";
 
 type Holding = {
   id: string;
@@ -8,6 +9,15 @@ type Holding = {
   quantity: number | string;
   avg_cost: number | string;
   asset_class?: string | null;
+  opened_at?: string | null;
+};
+
+export type HoldingSeriesInfo = {
+  closes: number[];
+  currentPrice: number | null;
+  pctChangeSincePurchase: number | null;
+  valueChangeSincePurchase: number | null;
+  opened_at?: string | null;
 };
 
 export function LiveHoldingsCard({
@@ -16,12 +26,14 @@ export function LiveHoldingsCard({
   cash,
   totalValue,
   mode,
+  series,
 }: {
   holdings: Holding[];
   currency: string;
   cash: number;
   totalValue: number;
   mode: string;
+  series?: Record<string, HoldingSeriesInfo>;
 }) {
   const isLive = mode === "live_prod";
 
@@ -29,8 +41,12 @@ export function LiveHoldingsCard({
     .map((h) => {
       const qty = Number(h.quantity);
       const avg = Number(h.avg_cost);
-      const value = qty * avg;
-      return { ...h, qty, avg, value };
+      const s = series?.[h.symbol];
+      // Prefer live price when we have one, otherwise fall back to cost.
+      const mark = s?.currentPrice ?? avg;
+      const value = qty * mark;
+      const costBasis = qty * avg;
+      return { ...h, qty, avg, mark, value, costBasis, series: s };
     })
     .sort((a, b) => b.value - a.value);
 
@@ -43,6 +59,32 @@ export function LiveHoldingsCard({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+
+  const fmtSigned = (n: number) => {
+    const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+    return `${sign}${currency} ${Math.abs(n).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const fmtPct = (p: number) => {
+    const sign = p > 0 ? "+" : p < 0 ? "−" : "";
+    return `${sign}${Math.abs(p * 100).toFixed(2)}%`;
+  };
+
+  const fmtOpened = (iso?: string | null) => {
+    if (!iso) return null;
+    try {
+      return new Date(iso).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return null;
+    }
+  };
 
   return (
     <Card className={isLive ? "border-primary/40 shadow-sm" : undefined}>
@@ -94,6 +136,12 @@ export function LiveHoldingsCard({
           <ul className="space-y-2">
             {rows.map((r) => {
               const pct = denom > 0 ? (r.value / denom) * 100 : 0;
+              const s = r.series;
+              const changePct = s?.pctChangeSincePurchase ?? null;
+              const changeVal = s?.valueChangeSincePurchase ?? null;
+              const up = (changePct ?? 0) >= 0;
+              const openedLabel = fmtOpened(r.opened_at ?? s?.opened_at ?? null);
+              const hasSeries = (s?.closes.length ?? 0) >= 2;
               return (
                 <li
                   key={r.id}
@@ -112,6 +160,11 @@ export function LiveHoldingsCard({
                       <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {currency}{" "}
                         {r.avg.toFixed(2)}
+                        {openedLabel && (
+                          <span className="ml-1 text-muted-foreground/70">
+                            · since {openedLabel}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -121,6 +174,60 @@ export function LiveHoldingsCard({
                       </div>
                     </div>
                   </div>
+
+                  {/* Sparkline + % change since purchase */}
+                  <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+                    <div className="min-w-0">
+                      {hasSeries ? (
+                        <Sparkline
+                          values={s!.closes}
+                          width={220}
+                          height={36}
+                          className="w-full max-w-full"
+                        />
+                      ) : (
+                        <div
+                          className="flex h-9 items-center rounded-md border border-dashed border-border/60 px-2 text-[10px] text-muted-foreground"
+                          aria-label="No price history available yet"
+                        >
+                          No price history yet
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      {changePct != null ? (
+                        <>
+                          <div
+                            className={`inline-flex items-center gap-1 text-xs font-semibold tabular-nums ${
+                              up ? "text-emerald-500" : "text-rose-400"
+                            }`}
+                          >
+                            {up ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            {fmtPct(changePct)}
+                          </div>
+                          {changeVal != null && (
+                            <div
+                              className={`text-[11px] tabular-nums ${
+                                up ? "text-emerald-500/80" : "text-rose-400/80"
+                              }`}
+                            >
+                              {fmtSigned(changeVal)}
+                            </div>
+                          )}
+                          <div className="text-[10px] text-muted-foreground">since purchase</div>
+                        </>
+                      ) : (
+                        <div className="text-[10px] text-muted-foreground">
+                          Awaiting price data
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
                       className="h-full bg-primary/70"
@@ -135,8 +242,8 @@ export function LiveHoldingsCard({
 
         {isLive && (
           <p className="text-[11px] text-muted-foreground">
-            Values shown at average cost from your broker. Live market prices are re-synced during
-            each run and reconciliation.
+            Values shown at latest close where available, otherwise at broker average cost. Live
+            market prices are re-synced during each run and reconciliation.
           </p>
         )}
       </CardContent>
