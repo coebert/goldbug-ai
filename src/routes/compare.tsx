@@ -193,7 +193,7 @@ function ComparePage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <Card>
+          <Card className="hidden lg:block">
             <CardHeader>
               <CardTitle className="text-base">Select portfolios</CardTitle>
               <CardDescription>{selected.length}/6 selected</CardDescription>
