@@ -107,7 +107,7 @@ describe("real-money equity tile — snapshot arrival e2e", () => {
     // Sign prefix rendered without a spurious "+" and destructive tone applied.
     expect(step.html).toContain("-4.55%");
     expect(step.html).not.toContain("+-");
-    expect(step.html).toContain("text-rose-400");
+    expect(step.html).toContain("text-red-400");
   });
 
   it("a same-day repeated snapshot (idempotent) does not fabricate a delta", () => {
