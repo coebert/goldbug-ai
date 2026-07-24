@@ -420,6 +420,39 @@ function NoTradesAlert({ data }: { data: TradeAlertData }) {
   );
 }
 
+function OrderOutcomeSummary({ orders }: { orders: OrderRow[] }) {
+  const buckets = { filled: 0, partial: 0, working: 0, rejected: 0, errored: 0, cancelled: 0, skipped: 0, pending: 0 };
+  for (const o of orders) {
+    const key = classifyOutcome(o).key;
+    if (key === "accepted") buckets.working++;
+    else if (key === "filled") buckets.filled++;
+    else if (key === "partial") buckets.partial++;
+    else if (key === "rejected") buckets.rejected++;
+    else if (key === "errored") buckets.errored++;
+    else if (key === "cancelled") buckets.cancelled++;
+    else if (key === "skipped") buckets.skipped++;
+    else buckets.pending++;
+  }
+  const tile = (label: string, count: number, cls: string) => (
+    <div className={`rounded-md border px-2 py-1.5 text-center ${cls}`}>
+      <div className="text-base font-semibold leading-tight">{count}</div>
+      <div className="text-[10px] uppercase tracking-wide opacity-80">{label}</div>
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-4 gap-1.5 text-xs sm:grid-cols-8">
+      {tile("Filled", buckets.filled, "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")}
+      {tile("Partial", buckets.partial, "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400")}
+      {tile("Working", buckets.working, "border-sky-500/40 bg-sky-500/10 text-sky-600 dark:text-sky-400")}
+      {tile("Rejected", buckets.rejected, "border-destructive/40 bg-destructive/10 text-destructive")}
+      {tile("Errored", buckets.errored, "border-destructive/30 bg-destructive/5 text-destructive")}
+      {tile("Cancelled", buckets.cancelled, "border-muted-foreground/30 bg-muted/30 text-muted-foreground")}
+      {tile("Skipped", buckets.skipped, "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400")}
+      {tile("Pending", buckets.pending, "border-border bg-muted/20 text-muted-foreground")}
+    </div>
+  );
+}
+
 function MiniList({ title, rows }: { title: string; rows: Array<{ key: string; text: string }> }) {
   return (
     <div>
