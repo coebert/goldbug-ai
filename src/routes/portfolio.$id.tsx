@@ -95,6 +95,8 @@ function PortfolioPage() {
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [addFundsOpen, setAddFundsOpen] = useState(false);
+
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
