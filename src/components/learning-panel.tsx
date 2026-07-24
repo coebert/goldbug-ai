@@ -93,6 +93,19 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to restore lesson"),
   });
 
+  const rateMut = useMutation({
+    mutationFn: (input: { original_text: string; vote: "helpful" | "unhelpful" | "clear" }) =>
+      rateFeedback({ data: input }),
+    onSuccess: (_data, vars) => {
+      if (vars.vote === "helpful") toast.success("Marked helpful — the AI will weight this lesson more strongly.");
+      else if (vars.vote === "unhelpful") toast.success("Marked unhelpful — the AI will require stronger evidence before acting on it.");
+      else toast.success("Feedback cleared.");
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to record feedback"),
+  });
+
+
   if (q.isLoading) {
     return (
       <Card>
