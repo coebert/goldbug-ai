@@ -406,6 +406,26 @@ export function RiskControlsCard({
             </div>
 
 
+            <div className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm">
+                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Fine-tune individual limits</span>
+                <span className="hidden sm:inline text-xs text-muted-foreground">
+                  (stops, caps, sizing)
+                </span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant={showAdvanced ? "secondary" : "outline"}
+                onClick={() => setShowAdvanced((v) => !v)}
+                aria-expanded={showAdvanced}
+              >
+                {showAdvanced ? "Hide advanced" : "Show advanced"}
+              </Button>
+            </div>
+
+            {showAdvanced && (
             <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
               <h4 className="mb-1 text-sm font-semibold text-primary">Pre-trade enforcement</h4>
               <p className="mb-3 text-xs text-muted-foreground">
