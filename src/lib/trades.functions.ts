@@ -103,12 +103,13 @@ export const getTradesDashboard = createServerFn({ method: "POST" })
 
 
     const portfolioById = new Map(portfolios.map(p => [p.id, p]));
-    const fillsByOrder = new Map<string, typeof fills>();
+    const fillsByOrder = new Map<string, FillRow[]>();
     for (const f of fills) {
       const arr = fillsByOrder.get(f.order_id) ?? [];
       arr.push(f);
       fillsByOrder.set(f.order_id, arr);
     }
+
     const holdingByKey = new Map(
       holdings.map(h => [`${h.portfolio_id}::${h.symbol}`, h])
     );
