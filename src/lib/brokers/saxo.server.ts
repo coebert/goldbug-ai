@@ -609,6 +609,22 @@ function safeJson(text: string): unknown {
   try { return JSON.parse(text); } catch { return { raw: text.slice(0, 500) }; }
 }
 
+function firstFiniteNumber(...values: Array<number | undefined | null>): number | undefined {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function firstPositiveNumber(...values: Array<number | undefined | null>): number {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
 export async function buildSaxoAdapter(opts: {
   userId: string; portfolioId?: string | null; envOverride?: BrokerEnv;
 }): Promise<SaxoAdapter> {
