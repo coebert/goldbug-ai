@@ -543,9 +543,13 @@ export class SaxoAdapter implements BrokerAdapter {
       }
     | null
   > {
+    if (this.histUnsupported) return null;
     const clientKey = await this.getClientKey();
     if (!clientKey) return null;
     try {
+      // Saxo accepts the raw ClientKey (including trailing `==`) in the path;
+      // URL-encoding it to `%3D%3D` trips IIS routing and returns an HTML 404
+      // before the request ever reaches the OpenAPI layer.
       const res = await this.req<{
         Data?: Array<{
           OrderId?: string;
@@ -558,8 +562,12 @@ export class SaxoAdapter implements BrokerAdapter {
           LastFilledTime?: string;
           ErrorText?: string;
         }>;
-      }>("GET", `/hist/v3/orders/${encodeURIComponent(clientKey)}`, {
+      }>("GET", `/hist/v3/orders/${clientKey}`, {
         query: { FromDateTime: sinceIso },
+        // Suppress noisy per-order 404s: reconciler polls this on every
+        // open order every pass; when the env doesn't expose /hist we'd
+        // otherwise write one error row per (order × pass).
+        silentStatuses: [404],
       });
       const hit = (res.Data ?? []).find((o) => String(o.OrderId ?? "") === brokerOrderId);
       if (!hit) return null;
@@ -577,11 +585,26 @@ export class SaxoAdapter implements BrokerAdapter {
         filledAt: hit.ExecutionTimeClose ?? hit.LastFilledTime ?? null,
         reason: hit.ErrorText ?? undefined,
       };
-    } catch {
-      // /hist endpoint is not universally enabled — treat as "unknown"
+    } catch (e) {
+      // /hist endpoint is not universally enabled — treat as "unknown" and
+      // stop trying for the life of this adapter to avoid log spam. Record
+      // the disablement once so operators can still see why reconciliation
+      // is degraded on this environment.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("failed [404]") && !this.histUnsupported) {
+        this.histUnsupported = true;
+        await log({
+          portfolioId: this.portfolioId, userId: this.userId, env: this.env,
+          method: "HIST_ORDERS_UNSUPPORTED",
+          path: `/hist/v3/orders/${clientKey}`,
+          status: 404,
+          error: "Saxo /hist/v3/orders returned 404; further reconciliation calls to this endpoint will be skipped for this session.",
+        });
+      }
       return null;
     }
   }
+
 
   private cachedClientKey: string | undefined;
   private async getClientKey(): Promise<string | undefined> {
