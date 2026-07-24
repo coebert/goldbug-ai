@@ -135,21 +135,29 @@ function Home() {
 
   const todaySummary = useMemo(() => {
     const series = equityQ.data?.series ?? [];
-    const portfolios = equityQ.data?.portfolios ?? [];
+    const portfolios = (equityQ.data?.portfolios ?? []) as Array<{ id: string; mode?: string }>;
     if (series.length === 0 || portfolios.length === 0) return null;
-    const sumRow = (row: Record<string, unknown>) =>
+    const sumMode = (row: Record<string, unknown>, real: boolean) =>
       portfolios.reduce((s, p) => {
-        const v = Number((row as Record<string, unknown>)[p.id]);
+        const isReal = p.mode === "live_prod";
+        if (isReal !== real) return s;
+        const v = Number(row[p.id]);
         return s + (Number.isFinite(v) ? v : 0);
       }, 0);
     const last = series[series.length - 1] as Record<string, unknown>;
     const prev = (series[series.length - 2] as Record<string, unknown>) ?? last;
-    const totalEquity = sumRow(last);
-    const prevEquity = sumRow(prev);
-    const dayPnl = totalEquity - prevEquity;
-    const dayPct = prevEquity > 0 ? (dayPnl / prevEquity) * 100 : 0;
-    return { totalEquity, dayPnl, dayPct, count: portfolios.length };
+    const simNow = sumMode(last, false);
+    const simPrev = sumMode(prev, false);
+    const realNow = sumMode(last, true);
+    const realPrev = sumMode(prev, true);
+    const simCount = portfolios.filter((p) => p.mode !== "live_prod").length;
+    const realCount = portfolios.filter((p) => p.mode === "live_prod").length;
+    return {
+      sim: { now: simNow, pnl: simNow - simPrev, pct: simPrev > 0 ? ((simNow - simPrev) / simPrev) * 100 : 0, count: simCount },
+      real: { now: realNow, pnl: realNow - realPrev, pct: realPrev > 0 ? ((realNow - realPrev) / realPrev) * 100 : 0, count: realCount },
+    };
   }, [equityQ.data]);
+
 
   const nextRunLabel = useMemo(() => {
     const now = new Date();
