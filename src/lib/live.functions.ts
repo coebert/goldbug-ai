@@ -42,7 +42,6 @@ export const activateLive = createServerFn({ method: "POST" })
       const bal = await adapter.getBalance();
       starting = bal.totalValue;
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const patch = {
       mode: (data.targetEnv === "prod" ? "live_prod" : "live_sim") as "live_prod" | "live_sim",
       broker: "saxo",
@@ -56,7 +55,9 @@ export const activateLive = createServerFn({ method: "POST" })
         : {}),
     };
 
-    const upd = await supabaseAdmin.from("portfolios").update(patch).eq("id", data.portfolioId);
+    // RLS on portfolios (`user_id = auth.uid()`) enforces ownership on this
+    // update via the caller's JWT — no service_role needed.
+    const upd = await supabase.from("portfolios").update(patch).eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
     await logAudit({
       userId, portfolioId: data.portfolioId, action: "ACTIVATE",
@@ -86,8 +87,8 @@ export const deactivateLive = createServerFn({ method: "POST" })
       });
       return { ok: true, changed: false };
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const upd = await supabaseAdmin.from("portfolios").update({
+    // RLS scopes the update to the caller's own portfolios.
+    const upd = await context.supabase.from("portfolios").update({
       mode: "paper", live_paused: false,
     }).eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
@@ -123,8 +124,7 @@ export const pauseLive = createServerFn({ method: "POST" })
       });
       return { ok: true, paused: prevPaused, changed: false };
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const upd = await supabaseAdmin.from("portfolios").update({ live_paused: data.paused })
+    const upd = await context.supabase.from("portfolios").update({ live_paused: data.paused })
       .eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
     await logAudit({
@@ -146,18 +146,19 @@ export const killAllLive = createServerFn({ method: "POST" })
     z.object({ reason: z.string().max(500).optional() }).default({}).parse(data ?? {}),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Fetch current state so idempotent repeats and audit deltas are accurate.
-    const cur = await supabaseAdmin.from("portfolios")
+    const { supabase, userId } = context;
+    // RLS already restricts to caller-owned rows; the `.eq("user_id", ...)` is
+    // a defence-in-depth guard so a policy regression can't leak data.
+    const cur = await supabase.from("portfolios")
       .select("id, live_paused, mode")
       .in("mode", ["live_sim", "live_prod"])
-      .eq("user_id", context.userId);
+      .eq("user_id", userId);
     if (cur.error) throw new Error(cur.error.message);
     const rows = cur.data ?? [];
     const toPause = rows.filter((r) => !r.live_paused).map((r) => r.id);
     const alreadyPaused = rows.filter((r) => r.live_paused).map((r) => r.id);
     if (toPause.length > 0) {
-      const upd = await supabaseAdmin.from("portfolios").update({ live_paused: true })
+      const upd = await supabase.from("portfolios").update({ live_paused: true })
         .in("id", toPause);
       if (upd.error) throw new Error(upd.error.message);
     }
@@ -186,16 +187,16 @@ export const resumeAllLive = createServerFn({ method: "POST" })
     z.object({ reason: z.string().max(500).optional() }).default({}).parse(data ?? {}),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const cur = await supabaseAdmin.from("portfolios")
+    const { supabase, userId } = context;
+    const cur = await supabase.from("portfolios")
       .select("id, live_paused, mode")
       .in("mode", ["live_sim", "live_prod"])
-      .eq("user_id", context.userId);
+      .eq("user_id", userId);
     if (cur.error) throw new Error(cur.error.message);
     const rows = cur.data ?? [];
     const toResume = rows.filter((r) => r.live_paused).map((r) => r.id);
     if (toResume.length > 0) {
-      const upd = await supabaseAdmin.from("portfolios").update({ live_paused: false })
+      const upd = await supabase.from("portfolios").update({ live_paused: false })
         .in("id", toResume);
       if (upd.error) throw new Error(upd.error.message);
     }
