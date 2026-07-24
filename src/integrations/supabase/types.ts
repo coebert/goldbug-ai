@@ -813,9 +813,10 @@ export type Database = {
           created_at: string
           id: string
           lessons: Json
-          portfolio_id: string
+          portfolio_id: string | null
           regime: string | null
           stats: Json
+          user_id: string
           window_days: number
         }
         Insert: {
@@ -823,9 +824,10 @@ export type Database = {
           created_at?: string
           id?: string
           lessons?: Json
-          portfolio_id: string
+          portfolio_id?: string | null
           regime?: string | null
           stats?: Json
+          user_id: string
           window_days?: number
         }
         Update: {
@@ -833,9 +835,10 @@ export type Database = {
           created_at?: string
           id?: string
           lessons?: Json
-          portfolio_id?: string
+          portfolio_id?: string | null
           regime?: string | null
           stats?: Json
+          user_id?: string
           window_days?: number
         }
         Relationships: [

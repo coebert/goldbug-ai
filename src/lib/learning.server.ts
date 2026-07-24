@@ -42,22 +42,44 @@ export type LearningContext = {
   }[];
 };
 
+async function resolveUserId(portfolioId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("portfolios")
+    .select("user_id")
+    .eq("id", portfolioId)
+    .maybeSingle();
+  return (data?.user_id as string | undefined) ?? null;
+}
+
+async function listUserPortfolioIds(userId: string): Promise<string[]> {
+  const { data } = await supabaseAdmin
+    .from("portfolios")
+    .select("id")
+    .eq("user_id", userId);
+  return (data ?? []).map((r) => r.id as string);
+}
+
 export async function computeRecentOutcomes(
   portfolioId: string,
   asOf: string,
   windowDays = 20,
   horizonDays = 5,
 ): Promise<Pick<LearningContext, "stats" | "samples">> {
-  // Fetch trades in a slightly wider calendar window (to cover weekends).
+  // Pool trades across ALL of this user's portfolios so lessons carry over
+  // between portfolios (and survive deletion of any single one).
   const since = new Date(asOf);
   since.setDate(since.getDate() - Math.ceil(windowDays * 1.7));
   const sinceStr = since.toISOString().slice(0, 10);
+
+  const userId = await resolveUserId(portfolioId);
+  const portfolioIds = userId ? await listUserPortfolioIds(userId) : [portfolioId];
+  const scopeIds = portfolioIds.length ? portfolioIds : [portfolioId];
 
   const [{ data: trades }, { data: regimeRows }] = await Promise.all([
     supabaseAdmin
       .from("trades")
       .select("symbol, side, price, trade_date, reason")
-      .eq("portfolio_id", portfolioId)
+      .in("portfolio_id", scopeIds)
       .gte("trade_date", sinceStr)
       .lte("trade_date", asOf)
       .order("trade_date", { ascending: true }),
@@ -176,13 +198,14 @@ export async function computeRecentOutcomes(
   };
 }
 
-async function fetchLatestLessons(portfolioId: string, currentRegime: string | null) {
-  // Prefer lessons authored under the same regime; fall back to general (regime IS NULL).
+async function fetchLatestLessons(userId: string, currentRegime: string | null) {
+  // Lessons are pooled per USER, not per portfolio, so they persist across
+  // every portfolio the user owns and survive portfolio deletion.
   async function grab(regime: string | null) {
     const q = supabaseAdmin
       .from("portfolio_lessons")
       .select("as_of, lessons, regime")
-      .eq("portfolio_id", portfolioId)
+      .eq("user_id", userId)
       .order("as_of", { ascending: false })
       .limit(1);
     const { data } = await (regime == null ? q.is("regime", null) : q.eq("regime", regime)).maybeSingle();
@@ -218,9 +241,12 @@ export async function buildLearningContext(
   asOf: string,
 ): Promise<LearningContext> {
   const current_regime = await currentRegimeFor(asOf);
+  const userId = await resolveUserId(portfolioId);
   const [{ stats, samples }, lessonHit] = await Promise.all([
     computeRecentOutcomes(portfolioId, asOf),
-    fetchLatestLessons(portfolioId, current_regime),
+    userId
+      ? fetchLatestLessons(userId, current_regime)
+      : Promise.resolve({ lessons: [] as string[], lessons_as_of: null, lessons_regime: null }),
   ]);
   // Per-regime rolling stats from the same sample window.
   const buckets = new Map<string, LearningContext["samples"]>();
@@ -265,7 +291,7 @@ export function formatLearningBlock(ctx: LearningContext): string {
         .map((p) => `${p.regime}: ${p.n} trades, ${(p.win_rate * 100).toFixed(0)}% win, avg ${p.avg_return_pct.toFixed(2)}%`)
         .join("; ")
     : "n/a";
-  return `LEARNING MEMORY (rolling outcomes over the last ${s.window_days} days, forward-return horizon ${s.horizon_days}d):
+  return `LEARNING MEMORY (rolling outcomes over the last ${s.window_days} days pooled across ALL of this user's portfolios — lessons persist even when individual portfolios are deleted; forward-return horizon ${s.horizon_days}d):
 - Current market regime: ${ctx.current_regime ?? "unknown"} — lessons below are ${regimeTag}.
 - Evaluable trades: ${s.evaluable} (wins ${s.wins} / losses ${s.losses}) — win rate ${wr}, average return ${ar}
 - Best call: ${s.best ? `${s.best.symbol} (${s.best.return_pct.toFixed(2)}%)` : "n/a"} | Worst call: ${s.worst ? `${s.worst.symbol} (${s.worst.return_pct.toFixed(2)}%)` : "n/a"}
@@ -286,6 +312,8 @@ export async function reflectAndUpdateLessons(
   asOf: string,
   ctx: LearningContext,
 ): Promise<{ updated: boolean; reason?: string; regimes?: string[] }> {
+  const userId = await resolveUserId(portfolioId);
+  if (!userId) return { updated: false, reason: "portfolio has no owner" };
   if (ctx.stats.evaluable < 5) return { updated: false, reason: "not enough evaluable trades" };
   if (ctx.lessons_as_of) {
     const daysSince =
@@ -357,6 +385,7 @@ Return { lessons: string[] } with 3–5 items, each under 180 characters. Use pl
       if (lessons.length === 0) continue;
 
       await supabaseAdmin.from("portfolio_lessons").insert({
+        user_id: userId,
         portfolio_id: portfolioId,
         as_of: asOf,
         lessons,
