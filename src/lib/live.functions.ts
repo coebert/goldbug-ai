@@ -403,6 +403,13 @@ export async function runReconciliation(userId: string, portfolioId: string) {
   // account as of right now before we snapshot broker vs local for drift.
   const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
   await syncLiveCashFromBroker(portfolioId);
+  // Then overwrite local holdings + today's equity snapshot from broker so
+  // any phantom positions left over from rejected/errored Saxo orders are
+  // wiped out. Broker is the source of truth for live portfolios.
+  const { reconcileLiveHoldingsFromBroker } = await import(
+    "@/lib/live-holdings-sync.server"
+  );
+  await reconcileLiveHoldingsFromBroker(portfolioId);
   const p = await supabaseAdmin.from("portfolios")
     .select("id, user_id, mode, current_cash").eq("id", portfolioId).maybeSingle();
   if (p.error || !p.data) throw new Error("Portfolio not found");
