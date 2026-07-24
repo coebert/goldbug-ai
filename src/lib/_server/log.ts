@@ -26,7 +26,7 @@ function serializeError(err: unknown): { message: string; name?: string; stack?:
 }
 
 function emit(level: Level, prefix: string, msg: string, meta?: LogMeta) {
-  const line: Record<string, unknown> = {
+  const payload: Record<string, unknown> = {
     ts: new Date().toISOString(),
     level,
     prefix,
@@ -34,15 +34,19 @@ function emit(level: Level, prefix: string, msg: string, meta?: LogMeta) {
   };
   if (meta) {
     for (const [k, v] of Object.entries(meta)) {
-      line[k] = v instanceof Error ? serializeError(v) : v;
+      payload[k] = v instanceof Error ? serializeError(v) : v;
     }
   }
-  const text = `${prefix} ${msg} ${JSON.stringify(line)}`;
-  // Route by level so Cloudflare / Node consoles colour and filter correctly.
-  if (level === "error") console.error(text);
-  else if (level === "warn") console.warn(text);
-  else if (level === "info") console.info(text);
-  else console.log(text);
+  // Two-arg shape: `<prefix> <msg>` first, JSON payload second. This keeps
+  // Cloudflare / Node consoles readable (message on the tag line, structured
+  // context inline) and preserves the historical call shape that existing
+  // `console.warn` spies in the test suite pattern-match on.
+  const headline = `${prefix} ${msg}`;
+  const json = JSON.stringify(payload);
+  if (level === "error") console.error(headline, json);
+  else if (level === "warn") console.warn(headline, json);
+  else if (level === "info") console.info(headline, json);
+  else console.log(headline, json);
 }
 
 /**

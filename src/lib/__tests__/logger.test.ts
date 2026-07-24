@@ -4,9 +4,7 @@ import { createLogger, logSecurity } from "@/lib/_server/log";
 afterEach(() => vi.restoreAllMocks());
 
 function parseTrailingJson(call: unknown[]): Record<string, unknown> {
-  const text = call[0] as string;
-  const braceIdx = text.indexOf("{");
-  return JSON.parse(text.slice(braceIdx)) as Record<string, unknown>;
+  return JSON.parse(call[1] as string) as Record<string, unknown>;
 }
 
 describe("structured logger", () => {
@@ -17,7 +15,7 @@ describe("structured logger", () => {
 
     expect(spy).toHaveBeenCalledTimes(1);
     const text = spy.mock.calls[0][0] as string;
-    expect(text.startsWith("news:gdelt ")).toBe(true);
+    expect(text).toBe("news:gdelt fetch failed");
     const payload = parseTrailingJson(spy.mock.calls[0]);
     expect(payload.prefix).toBe("news:gdelt");
     expect(payload.level).toBe("warn");
@@ -43,7 +41,7 @@ describe("structured logger", () => {
     logSecurity("pending_slices", "unexpected access attempt", { userId: "u1" });
 
     const text = spy.mock.calls[0][0] as string;
-    expect(text.startsWith("SECURITY:pending_slices ")).toBe(true);
+    expect(text).toBe("SECURITY:pending_slices unexpected access attempt");
     const payload = parseTrailingJson(spy.mock.calls[0]);
     expect(payload.prefix).toBe("SECURITY:pending_slices");
     expect(payload.userId).toBe("u1");
