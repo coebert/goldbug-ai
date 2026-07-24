@@ -157,10 +157,54 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
+  // ---------- Preflight: resolve every symbol to a Saxo instrument up front.
+  // If any lookup fails, block the entire batch so we never place a partial
+  // set of orders where some symbols would silently be dropped.
+  const uniqueSymbols = Array.from(new Set(routable.map((o) => o.symbol)));
+  const preflight: Array<{ symbol: string; ok: boolean; error?: string }> = [];
+  for (const sym of uniqueSymbols) {
+    try {
+      await adapter.lookupUic(sym);
+      preflight.push({ symbol: sym, ok: true });
+    } catch (err) {
+      preflight.push({
+        symbol: sym,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  const missing = preflight.filter((p) => !p.ok);
+  if (missing.length > 0) {
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "PREFLIGHT_BLOCKED",
+      path: "/route/preflight",
+      status: 424,
+      request: { asOf, decisionId, symbols: uniqueSymbols } as never,
+      response: { preflight } as never,
+      error: `Unresolved Saxo instrument(s): ${missing.map((m) => m.symbol).join(", ")}`,
+    });
+    const missingSet = new Set(missing.map((m) => m.symbol));
+    return routable.map((e) => ({
+      symbol: e.symbol,
+      side: e.side,
+      quantity: e.quantity,
+      status: "skipped",
+      skipped: missingSet.has(e.symbol)
+        ? `preflight: ${missing.find((m) => m.symbol === e.symbol)?.error ?? "instrument not found"}`
+        : "preflight blocked: another symbol in this batch failed instrument lookup",
+    }));
+  }
+
   // Broker-safe idempotency key. Scope it to the decision row when available so
   // a failed manual run can be retried in the same hour, while duplicate inserts
   // inside one decision still collapse on live_orders.client_order_id.
   const attemptSeed = decisionId ?? new Date().toISOString().slice(0, 16);
+
 
 
   for (const order of routable) {
