@@ -198,13 +198,14 @@ export async function computeRecentOutcomes(
   };
 }
 
-async function fetchLatestLessons(portfolioId: string, currentRegime: string | null) {
-  // Prefer lessons authored under the same regime; fall back to general (regime IS NULL).
+async function fetchLatestLessons(userId: string, currentRegime: string | null) {
+  // Lessons are pooled per USER, not per portfolio, so they persist across
+  // every portfolio the user owns and survive portfolio deletion.
   async function grab(regime: string | null) {
     const q = supabaseAdmin
       .from("portfolio_lessons")
       .select("as_of, lessons, regime")
-      .eq("portfolio_id", portfolioId)
+      .eq("user_id", userId)
       .order("as_of", { ascending: false })
       .limit(1);
     const { data } = await (regime == null ? q.is("regime", null) : q.eq("regime", regime)).maybeSingle();
