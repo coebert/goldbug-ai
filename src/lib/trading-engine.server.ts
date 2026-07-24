@@ -5,6 +5,7 @@ import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
+import { HEDGE_FUND_PLAYBOOK } from "./hedge-fund-playbook.server";
 import {
   buildLearningContext,
   formatLearningBlock,
@@ -306,6 +307,8 @@ ${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 
 ${HISTORICAL_PLAYBOOK}
+
+${HEDGE_FUND_PLAYBOOK}
 
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
 Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
