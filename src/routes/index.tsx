@@ -252,7 +252,7 @@ function Home() {
               </div>
               <div className="text-[10px] text-muted-foreground sm:text-xs">hourly cycle</div>
             </div>
-          </div>
+          </>
         )}
 
 
