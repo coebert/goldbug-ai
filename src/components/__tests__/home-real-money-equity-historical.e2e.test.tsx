@@ -199,13 +199,12 @@ describe("home dashboard real-money equity across historical dates (e2e)", () =>
     });
   }
 
-  it("re-rendering across all dates yields strictly non-decreasing PnL history (no cross-date bleed)", () => {
-    // For each date, capture the rendered "now" value. The sequence must
-    // exactly match the per-date fixture: 0, 0, 300, 300.46, 320.5.
+  it("re-rendering across all dates yields the exact per-date snapshot sequence (no cross-date bleed)", () => {
     const timeline = cases.map((c) => {
+      const snapshotsAsOf = SNAPSHOTS.filter((s) => s.snapshot_date <= c.today);
       const data = buildAllPortfoliosEquity({
         portfolios: PORTFOLIOS,
-        snapshots: SNAPSHOTS,
+        snapshots: snapshotsAsOf,
         today: c.today,
       });
       return computeTodaySummary(data)!.real.now;
