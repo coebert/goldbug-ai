@@ -1690,7 +1690,7 @@ export const listLessonOverrides = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("lesson_overrides")
-      .select("id, original_text, action, replacement_text, reason, updated_at")
+      .select("id, original_text, action, replacement_text, reason, helpful_count, unhelpful_count, feedback_score, updated_at")
       .order("updated_at", { ascending: false });
     if (error) throw new Error(error.message);
     return { overrides: data ?? [] };
@@ -1732,14 +1732,85 @@ export const clearLessonOverride = createServerFn({ method: "POST" })
     z.object({ original_text: z.string().min(1).max(2000) }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    // Preserve helpful/unhelpful feedback if any exists — only strip the
+    // edit/disable action so the AI stops applying the override, while the
+    // rating still influences lesson priority.
+    const { data: row } = await context.supabase
       .from("lesson_overrides")
-      .delete()
+      .select("id, helpful_count, unhelpful_count")
       .eq("user_id", context.userId)
-      .eq("original_text", data.original_text);
-    if (error) throw new Error(error.message);
+      .eq("original_text", data.original_text)
+      .maybeSingle();
+    if (!row) return { ok: true };
+    const hasFeedback = (row.helpful_count ?? 0) > 0 || (row.unhelpful_count ?? 0) > 0;
+    if (hasFeedback) {
+      const { error } = await context.supabase
+        .from("lesson_overrides")
+        .update({ action: "neutral", replacement_text: null, reason: null })
+        .eq("id", row.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await context.supabase
+        .from("lesson_overrides")
+        .delete()
+        .eq("id", row.id);
+      if (error) throw new Error(error.message);
+    }
     return { ok: true };
   });
+
+const RateLessonFeedbackSchema = z.object({
+  original_text: z.string().min(1).max(2000),
+  vote: z.enum(["helpful", "unhelpful", "clear"]),
+});
+
+// Thumbs-up / thumbs-down feedback on a lesson. Ratings accumulate into
+// helpful_count / unhelpful_count and the generated feedback_score is used
+// by the learning layer to reorder and (below a threshold) auto-suppress
+// lessons before they reach the AI prompt.
+export const rateLessonFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => RateLessonFeedbackSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: existing } = await context.supabase
+      .from("lesson_overrides")
+      .select("id, action, helpful_count, unhelpful_count")
+      .eq("user_id", context.userId)
+      .eq("original_text", data.original_text)
+      .maybeSingle();
+
+    let helpful = existing?.helpful_count ?? 0;
+    let unhelpful = existing?.unhelpful_count ?? 0;
+    if (data.vote === "helpful") helpful += 1;
+    else if (data.vote === "unhelpful") unhelpful += 1;
+    else { helpful = 0; unhelpful = 0; }
+
+    if (!existing) {
+      const { error } = await context.supabase.from("lesson_overrides").insert({
+        user_id: context.userId,
+        original_text: data.original_text,
+        action: "neutral",
+        helpful_count: helpful,
+        unhelpful_count: unhelpful,
+      });
+      if (error) throw new Error(error.message);
+    } else if (data.vote === "clear" && existing.action === "neutral") {
+      const { error } = await context.supabase
+        .from("lesson_overrides")
+        .delete()
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await context.supabase
+        .from("lesson_overrides")
+        .update({ helpful_count: helpful, unhelpful_count: unhelpful })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true, helpful_count: helpful, unhelpful_count: unhelpful, feedback_score: helpful - unhelpful };
+  });
+
+
 
 export const getBenchmarkSeries = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
