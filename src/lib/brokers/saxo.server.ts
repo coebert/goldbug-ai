@@ -57,6 +57,7 @@ export class SaxoAdapter implements BrokerAdapter {
   private readonly portfolioId: string | null;
   private readonly accountKey: string | undefined;
   private readonly clientKey: string | undefined;
+  private resolvedAccountKey: string | undefined;
 
   constructor(opts: {
     env: BrokerEnv;
@@ -268,15 +269,24 @@ export class SaxoAdapter implements BrokerAdapter {
     const preferredExchanges = suffix ? YAHOO_SUFFIX_TO_EXCHANGE[suffix] ?? [] : [];
     const keyword = suffix && preferredExchanges.length ? base : upper;
 
-    const search = await this.req<{
-      Data?: Array<{
-        Identifier: number; AssetType: string; CurrencyCode?: string;
-        ExchangeId?: string; Symbol: string;
-      }>;
-    }>("GET", "/ref/v1/instruments", {
-      query: { Keywords: keyword, AssetTypes: ALLOWED_ASSET_TYPES.join(",") },
-    });
-    const candidates = search.Data ?? [];
+    type InstrumentHit = {
+      Identifier: number; AssetType: string; CurrencyCode?: string;
+      ExchangeId?: string; Symbol: string; Description?: string;
+    };
+    const searchKeywords = Array.from(new Set([keyword, base, upper].filter(Boolean)));
+    const attempts: Array<{ keyword: string; count: number }> = [];
+    let candidates: InstrumentHit[] = [];
+    for (const searchKeyword of searchKeywords) {
+      const search = await this.req<{ Data?: InstrumentHit[] }>("GET", "/ref/v1/instruments", {
+        query: { Keywords: searchKeyword, AssetTypes: ALLOWED_ASSET_TYPES.join(",") },
+      });
+      const hits = search.Data ?? [];
+      attempts.push({ keyword: searchKeyword, count: hits.length });
+      if (hits.length > 0) {
+        candidates = hits;
+        break;
+      }
+    }
 
     // Match order:
     //   1. Exact Symbol on a preferred exchange for the Yahoo suffix
@@ -300,7 +310,25 @@ export class SaxoAdapter implements BrokerAdapter {
       candidates.find((d) => symMatches(d.Symbol)) ??
       candidates[0];
 
-    if (!hit) throw new Error(`Saxo instrument not found for symbol ${symbol}`);
+    if (!hit) {
+      try {
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: this.portfolioId,
+          user_id: this.userId,
+          broker: "saxo",
+          env: this.env,
+          method: "INSTRUMENT_LOOKUP_EMPTY",
+          path: "/ref/v1/instruments",
+          status: 404,
+          request: { symbol, normalized: { upper, base, suffix, preferredExchanges }, attempts } as never,
+          response: null,
+          error: `Saxo instrument not found for symbol ${symbol}`,
+        });
+      } catch {
+        // best-effort diagnostic only
+      }
+      throw new Error(`Saxo instrument not found for symbol ${symbol}`);
+    }
     if (!(ALLOWED_ASSET_TYPES as readonly string[]).includes(hit.AssetType)) {
       throw new Error(`Saxo asset type ${hit.AssetType} not permitted (cash-only, no leverage)`);
     }
@@ -318,6 +346,7 @@ export class SaxoAdapter implements BrokerAdapter {
 
   async placeOrder(req: BrokerOrderRequest): Promise<BrokerOrderResult> {
     const inst = await this.lookupUic(req.symbol);
+    const accountKey = await this.getDefaultAccountKey();
     const body: Record<string, unknown> = {
       Uic: inst.uic,
       AssetType: inst.assetType,
@@ -328,7 +357,7 @@ export class SaxoAdapter implements BrokerAdapter {
       OrderDuration: { DurationType: "DayOrder" },
       ExternalReference: req.clientOrderId,
     };
-    if (this.accountKey) body.AccountKey = this.accountKey;
+    if (accountKey) body.AccountKey = accountKey;
     if (req.orderType === "limit" && req.limitPrice != null) body.OrderPrice = req.limitPrice;
 
     try {
@@ -352,6 +381,54 @@ export class SaxoAdapter implements BrokerAdapter {
       return { ok: true };
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  private async getDefaultAccountKey(): Promise<string | undefined> {
+    if (this.resolvedAccountKey) return this.resolvedAccountKey;
+    try {
+      const res = await this.req<{
+        Data?: Array<{
+          AccountKey?: string;
+          Active?: boolean;
+          Currency?: string;
+          LegalAssetTypes?: string[];
+        }>;
+      }>("GET", "/port/v1/accounts/me");
+      const accounts = res.Data ?? [];
+      const configured = this.accountKey
+        ? accounts.find((a) => a.AccountKey === this.accountKey && a.Active !== false)
+        : undefined;
+      const tradable = accounts.find(
+        (a) => a.Active !== false && a.AccountKey && a.LegalAssetTypes?.some((t) => t === "Stock" || t === "Etf"),
+      ) ?? accounts.find((a) => a.Active !== false && a.AccountKey) ?? accounts.find((a) => a.AccountKey);
+      this.resolvedAccountKey = configured?.AccountKey ?? tradable?.AccountKey;
+      if (this.accountKey && !configured) {
+        await log({
+          portfolioId: this.portfolioId,
+          userId: this.userId,
+          env: this.env,
+          method: "ACCOUNT_KEY_DISCOVERED",
+          path: "/port/v1/accounts/me",
+          status: 200,
+          request: { configuredProvided: true } as never,
+          response: { selected: !!this.resolvedAccountKey, accountCount: accounts.length } as never,
+          error: "Configured SAXO_ACCOUNT_KEY did not match this broker environment; using discovered active account.",
+        });
+      }
+      return this.resolvedAccountKey;
+    } catch (e) {
+      await log({
+        portfolioId: this.portfolioId,
+        userId: this.userId,
+        env: this.env,
+        method: "ACCOUNT_LOOKUP_SKIPPED",
+        path: "/port/v1/accounts/me",
+        status: null,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      this.resolvedAccountKey = this.accountKey;
+      return this.resolvedAccountKey;
     }
   }
 }

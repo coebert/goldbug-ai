@@ -7,6 +7,7 @@
 // squares it against actual broker positions.
 
 import type { BrokerOrderResult } from "@/lib/brokers/adapter";
+import { createHash } from "node:crypto";
 
 export interface ExecutedOrderLike {
   symbol: string;
@@ -156,15 +157,19 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
-  // Hour-bucketed idempotency key. Repeated CRON firings within the same UTC
-  // hour collapse to the same key per (portfolio, symbol, side), and the
-  // UNIQUE index on live_orders.client_order_id prevents duplicate rows even
-  // under concurrent invocation.
-  const hourBucket = new Date().toISOString().slice(0, 13); // e.g. "2026-07-23T14"
+  // Broker-safe idempotency key. Scope it to the decision row when available so
+  // a failed manual run can be retried in the same hour, while duplicate inserts
+  // inside one decision still collapse on live_orders.client_order_id.
+  const attemptSeed = decisionId ?? new Date().toISOString().slice(0, 16);
 
 
   for (const order of routable) {
-    const clientOrderId = `aegis:${portfolio.id}:${hourBucket}:${order.symbol}:${order.side}`;
+    const clientOrderId = makeClientOrderId({
+      portfolioId: portfolio.id,
+      attemptSeed,
+      symbol: order.symbol,
+      side: order.side,
+    });
 
     // Round quantity to a whole share (Saxo Stock/Etf orders reject fractional
     // Amount). Skip if this rounds to zero.
@@ -289,4 +294,17 @@ export async function routeOrdersToBroker(params: {
   }
 
   return results;
+}
+
+function makeClientOrderId(args: {
+  portfolioId: string;
+  attemptSeed: string;
+  symbol: string;
+  side: "buy" | "sell";
+}): string {
+  const hash = createHash("sha256")
+    .update(`${args.portfolioId}:${args.attemptSeed}:${args.symbol}:${args.side}`)
+    .digest("hex")
+    .slice(0, 24);
+  return `aegis:${hash}`;
 }
