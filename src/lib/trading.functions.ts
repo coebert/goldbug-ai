@@ -26,6 +26,10 @@ export { getBenchmarkSeries } from "./benchmark.functions";
 export { getGlobalNewsReel } from "./news.functions";
 export { getDecisionNewsBreakdown } from "./news.functions";
 export { triggerHourlyRunNow } from "./hourly-run.functions";
+export { getPerformanceReport } from "./reports.functions";
+export { getComparison } from "./reports.functions";
+export { getTradeComparison } from "./reports.functions";
+export { getDiagnostics } from "./diagnostics.functions";
 
 
 
