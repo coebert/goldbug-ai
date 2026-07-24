@@ -105,7 +105,7 @@ export async function runShadowVariant(args: {
     primary_order_count: primaryOrders.length,
     shadow_order_count: shadowOrders.length,
     divergences,
-  } as never);
+  });
 }
 
 export async function getShadowReport(portfolioId: string, limit = 30) {

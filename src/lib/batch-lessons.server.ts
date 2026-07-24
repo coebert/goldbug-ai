@@ -242,13 +242,13 @@ Return { "lessons": string[] }.`;
         portfolio_id: null,
         as_of: to,
         lessons,
-        stats: {
+        stats: asJson({
           source: "batch_backtest_v1",
           window_years: 5,
           configs_evaluated: runs.length,
           rows_in_bucket: rows.length,
           historical_regimes: Array.from(new Set(rows.map((r) => r.regimeKey))),
-        } as unknown as never,
+        }),
         window_days: Math.round(5 * 365),
         regime: label,
       });
@@ -289,12 +289,12 @@ Return { "lessons": string[] }.`,
         portfolio_id: null,
         as_of: to,
         lessons,
-        stats: {
+        stats: asJson({
           source: "batch_backtest_v1",
           window_years: 5,
           configs_evaluated: runs.length,
           scope: "general_5y",
-        } as unknown as never,
+        }),
         window_days: Math.round(5 * 365),
         regime: null,
       });
