@@ -243,6 +243,44 @@ export function BacktestRunHistoryCard({
     return rows;
   }, [overlaySeries]);
 
+  // Recommendation: rank runs matching the chosen risk tolerance's own risk
+  // level bucket first, then fall back to the full pool if none match. Each
+  // axis is min-max normalized across the candidate pool so weights compose
+  // sensibly. MDD is stored as a negative pct (or 0), so we invert its
+  // magnitude — smaller drawdowns score higher.
+  const recommendation = useMemo(() => {
+    if (runs.length === 0) return null;
+    const targetBucket = tolerance; // conservative | balanced | aggressive
+    const bucketMatches = runs.filter(
+      (r) => inferTolerance(r.riskLevel) === targetBucket,
+    );
+    const pool = bucketMatches.length > 0 ? bucketMatches : runs;
+    const scopedToBucket = bucketMatches.length > 0;
+
+    const rets = pool.map((r) => r.metrics.totalReturnPct ?? 0);
+    const mddMag = pool.map((r) => Math.abs(r.metrics.maxDrawdownPct ?? 0));
+    const sharpes = pool.map((r) => r.metrics.sharpe ?? 0);
+
+    const nRet = normalize(rets);
+    // Invert MDD magnitude so lower drawdown => higher score.
+    const nMddRaw = normalize(mddMag);
+    const nMdd = nMddRaw.map((v) => 1 - v);
+    const nSharpe = normalize(sharpes);
+
+    const w = TOLERANCE_WEIGHTS[tolerance];
+    const scored = pool.map((r, i) => ({
+      run: r,
+      score: nRet[i] * w.ret + nMdd[i] * w.mdd + nSharpe[i] * w.sharpe,
+      parts: {
+        ret: { raw: rets[i], norm: nRet[i], contribution: nRet[i] * w.ret },
+        mdd: { raw: -mddMag[i], norm: nMdd[i], contribution: nMdd[i] * w.mdd },
+        sharpe: { raw: sharpes[i], norm: nSharpe[i], contribution: nSharpe[i] * w.sharpe },
+      },
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    return { best: scored[0], runnerUp: scored[1] ?? null, weights: w, poolSize: pool.length, scopedToBucket };
+  }, [runs, tolerance]);
+
 
 
   return (
