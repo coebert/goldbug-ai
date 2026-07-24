@@ -58,7 +58,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data: portfolios, error } = await context.supabase
       .from("portfolios")
-      .select("id,name,currency,starting_cash,current_cash,created_at")
+      .select("id,name,currency,starting_cash,current_cash,mode,created_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const list = portfolios ?? [];
@@ -84,6 +84,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       id: p.id as string,
       name: p.name as string,
       currency: p.currency as string,
+      mode: (p.mode as string) ?? "paper",
       starting_cash: Number(p.starting_cash),
       current_cash: Number(p.current_cash),
       series: byPortfolio.get(p.id as string) ?? [],
@@ -97,8 +98,11 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     }
     const dates = [...allDates].sort();
 
+    const isReal = (m: string) => m === "live_prod";
+
     const series = dates.map((d) => {
-      let total = 0;
+      let totalSim = 0;
+      let totalReal = 0;
       const perId: Record<string, number> = {};
       for (const p of perPortfolio) {
         let v = p.starting_cash;
@@ -111,18 +115,20 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
           }
         }
         perId[p.id] = v;
-        total += v;
+        if (isReal(p.mode)) totalReal += v;
+        else totalSim += v;
       }
-      return { date: d, total, ...perId } as Record<string, string | number>;
+      return { date: d, total_sim: totalSim, total_real: totalReal, ...perId } as Record<string, string | number>;
     });
 
     const currency = perPortfolio[0]?.currency ?? "GBP";
     return {
-      portfolios: perPortfolio.map((p) => ({ id: p.id, name: p.name, currency: p.currency })),
+      portfolios: perPortfolio.map((p) => ({ id: p.id, name: p.name, currency: p.currency, mode: p.mode })),
       series,
       currency,
     };
   });
+
 
 export const getPortfolio = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
