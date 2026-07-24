@@ -504,6 +504,27 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
           </div>
         </div>
       </CardContent>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete portfolio?"
+        description={
+          <>
+            <p>
+              You're about to permanently delete{" "}
+              <span className="font-semibold text-foreground">{portfolio.name}</span>,
+              including all trades, decisions and history.
+            </p>
+            <p>This cannot be undone.</p>
+          </>
+        }
+        requireText="DELETE"
+        confirmLabel="Delete portfolio"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          deleteMut.mutate(portfolio.id);
+        }}
+      />
     </Card>
   );
 }
