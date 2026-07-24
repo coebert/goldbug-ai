@@ -142,6 +142,59 @@ export function LiveHoldingsCard({
               const up = (changePct ?? 0) >= 0;
               const openedLabel = fmtOpened(r.opened_at ?? s?.opened_at ?? null);
               const hasSeries = (s?.closes.length ?? 0) >= 2;
+              const sparklineBlock = (
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+                  <div className="min-w-0">
+                    {hasSeries ? (
+                      <Sparkline
+                        values={s!.closes}
+                        width={220}
+                        height={36}
+                        className="w-full max-w-full"
+                      />
+                    ) : (
+                      <div
+                        className="flex h-9 items-center rounded-md border border-dashed border-border/60 px-2 text-[10px] text-muted-foreground"
+                        aria-label="No price history available yet"
+                      >
+                        No price history yet
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    {changePct != null ? (
+                      <>
+                        <div
+                          className={`inline-flex items-center gap-1 text-xs font-semibold tabular-nums ${
+                            up ? "text-emerald-500" : "text-rose-400"
+                          }`}
+                        >
+                          {up ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {fmtPct(changePct)}
+                        </div>
+                        {changeVal != null && (
+                          <div
+                            className={`text-[11px] tabular-nums ${
+                              up ? "text-emerald-500/80" : "text-rose-400/80"
+                            }`}
+                          >
+                            {fmtSigned(changeVal)}
+                          </div>
+                        )}
+                        <div className="text-[10px] text-muted-foreground">since purchase</div>
+                      </>
+                    ) : (
+                      <div className="text-[10px] text-muted-foreground">
+                        Awaiting price data
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
               return (
                 <li
                   key={r.id}
@@ -156,8 +209,18 @@ export function LiveHoldingsCard({
                             {r.asset_class}
                           </Badge>
                         )}
+                        {changePct != null && (
+                          <span
+                            className={`sm:hidden inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold tabular-nums ${
+                              up ? "text-emerald-500" : "text-rose-400"
+                            }`}
+                          >
+                            {up ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                            {fmtPct(changePct)}
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                      <div className="mt-0.5 text-xs text-muted-foreground tabular-nums break-words">
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {currency}{" "}
                         {r.avg.toFixed(2)}
                         {openedLabel && (
@@ -175,58 +238,17 @@ export function LiveHoldingsCard({
                     </div>
                   </div>
 
-                  {/* Sparkline + % change since purchase */}
-                  <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                    <div className="min-w-0">
-                      {hasSeries ? (
-                        <Sparkline
-                          values={s!.closes}
-                          width={220}
-                          height={36}
-                          className="w-full max-w-full"
-                        />
-                      ) : (
-                        <div
-                          className="flex h-9 items-center rounded-md border border-dashed border-border/60 px-2 text-[10px] text-muted-foreground"
-                          aria-label="No price history available yet"
-                        >
-                          No price history yet
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      {changePct != null ? (
-                        <>
-                          <div
-                            className={`inline-flex items-center gap-1 text-xs font-semibold tabular-nums ${
-                              up ? "text-emerald-500" : "text-rose-400"
-                            }`}
-                          >
-                            {up ? (
-                              <TrendingUp className="h-3 w-3" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3" />
-                            )}
-                            {fmtPct(changePct)}
-                          </div>
-                          {changeVal != null && (
-                            <div
-                              className={`text-[11px] tabular-nums ${
-                                up ? "text-emerald-500/80" : "text-rose-400/80"
-                              }`}
-                            >
-                              {fmtSigned(changeVal)}
-                            </div>
-                          )}
-                          <div className="text-[10px] text-muted-foreground">since purchase</div>
-                        </>
-                      ) : (
-                        <div className="text-[10px] text-muted-foreground">
-                          Awaiting price data
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  {/* Mobile: accordion — tap to reveal sparkline + change */}
+                  <details className="sm:hidden group mt-2 [&_summary::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground">
+                      <span>Show price trend</span>
+                      <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="mt-2">{sparklineBlock}</div>
+                  </details>
+
+                  {/* Desktop / tablet: sparkline always visible */}
+                  <div className="hidden sm:block mt-2">{sparklineBlock}</div>
 
                   <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
@@ -236,6 +258,7 @@ export function LiveHoldingsCard({
                   </div>
                 </li>
               );
+
             })}
           </ul>
         )}
