@@ -20,7 +20,8 @@ export type HoldingsPoint = {
   date: string;
   cash: number;
   total: number;
-} & Record<string, number>;
+  [symbol: string]: number | string;
+};
 
 export type HoldingsOverTime = {
   symbols: string[];
