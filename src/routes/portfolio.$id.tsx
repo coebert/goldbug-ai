@@ -36,6 +36,7 @@ import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles, Pencil, Banknote } from "lucide-react";
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
+import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
 
 import {
   Collapsible,
