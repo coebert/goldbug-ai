@@ -985,38 +985,13 @@ function PortfolioPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Holdings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-3 flex items-baseline justify-between text-sm">
-                    <span className="text-muted-foreground">Cash</span>
-                    <span className="tabular-nums">
-                      {p.currency} {Number(p.current_cash).toFixed(2)}
-                    </span>
-                  </div>
-                  {holdings.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Fully in cash.</p>
-                  ) : (
-                    <div className="space-y-2 text-sm">
-                      {holdings.map((h) => (
-                        <div key={h.id} className="flex items-baseline justify-between">
-                          <div>
-                            <div className="font-medium">{h.symbol}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {Number(h.quantity).toFixed(4)} @ {Number(h.avg_cost).toFixed(2)}
-                            </div>
-                          </div>
-                          <span className="tabular-nums">
-                            {(Number(h.quantity) * Number(h.avg_cost)).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <LiveHoldingsCard
+                holdings={holdings}
+                currency={p.currency}
+                cash={Number(p.current_cash)}
+                totalValue={totalValue}
+                mode={p.mode}
+              />
             </div>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
