@@ -304,6 +304,34 @@ function ComparePage() {
                 )}
                 {results && chartData.length > 0 && (
                   <>
+                    <div className="mb-3 flex flex-wrap gap-1.5">
+                      {results.map((r, i) => {
+                        const color = COLORS[i % COLORS.length];
+                        const off = hidden.has(r.portfolio.name);
+                        return (
+                          <button
+                            key={r.portfolio.id}
+                            type="button"
+                            onClick={() => toggleHidden(r.portfolio.name)}
+                            onDoubleClick={() => isolate(r.portfolio.name)}
+                            aria-pressed={!off}
+                            title={off ? "Show this line (double-click to isolate)" : "Hide this line (double-click to isolate)"}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                              off
+                                ? "border-border/60 bg-muted/30 text-muted-foreground line-through"
+                                : "border-transparent text-foreground"
+                            }`}
+                            style={off ? undefined : { background: `${color}22`, borderColor: `${color}66`, color }}
+                          >
+                            <span
+                              className="inline-block h-2 w-2 rounded-full"
+                              style={{ background: off ? "hsl(var(--muted-foreground))" : color }}
+                            />
+                            <span className="max-w-[140px] truncate">{r.portfolio.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                     <ResponsiveContainer width="100%" height={320}>
                       <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
