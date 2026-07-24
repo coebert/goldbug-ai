@@ -58,6 +58,20 @@ import { SignalDecayCard } from "@/components/signal-decay-card";
 import { StressPanelCard } from "@/components/stress-panel-card";
 import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
+import { useIsMobile } from "@/hooks/use-mobile";
+
+function shortChartDate(s: string) {
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return String(s);
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+}
+function compactChartNum(v: number) {
+  const a = Math.abs(v);
+  if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1)}M`;
+  if (a >= 1_000) return `${(v / 1_000).toFixed(a >= 10_000 ? 0 : 1)}k`;
+  return `${v.toFixed(0)}`;
+}
+
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
@@ -99,6 +113,8 @@ function PortfolioPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const isMobile = useIsMobile();
+
 
 
   useEffect(() => {
@@ -845,7 +861,7 @@ function PortfolioPage() {
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={displayChartData} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                      <ComposedChart data={displayChartData} margin={{ top: 8, right: isMobile ? 6 : 12, left: isMobile ? -12 : 0, bottom: 8 }}>
                         <defs>
                           <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor={chartTheme.drawdown} stopOpacity={0.28} />
@@ -859,22 +875,28 @@ function PortfolioPage() {
                         <CartesianGrid stroke={chartTheme.axis} strokeOpacity={chartTheme.gridOpacity} strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: 11, fill: chartTheme.axisText }}
+                          tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
-                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
+                          minTickGap={isMobile ? 56 : 30}
+                          tickFormatter={(v) => (isMobile ? shortChartDate(String(v)) : String(v))}
+                          label={isMobile ? undefined : { value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
                         />
                         <YAxis
                           domain={["auto", "auto"]}
-                          width={72}
-                          tick={{ fontSize: 11, fill: chartTheme.axisText }}
+                          width={isMobile ? 44 : 72}
+                          tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
                           stroke={chartTheme.axis}
-                          tickFormatter={(v) => compareMode === "pct" ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%` : `${p.currency}${Number(v).toFixed(0)}`}
-                          label={{ value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
+                          tickFormatter={(v) => compareMode === "pct"
+                            ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`
+                            : isMobile ? `${p.currency}${compactChartNum(Number(v))}` : `${p.currency}${Number(v).toFixed(0)}`}
+                          label={isMobile ? undefined : { value: compareMode === "pct" ? "Return vs start (%)" : `Portfolio value (${p.currency})`, angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
                         />
 
 
                         <Tooltip
                           cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
+                          wrapperStyle={{ zIndex: 40, maxWidth: "min(85vw, 320px)" }}
+
                           content={({ active, payload, label }) => {
                             if (!active || !payload?.length) return null;
                             const row = payload[0].payload as {
@@ -900,7 +922,7 @@ function PortfolioPage() {
                               ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
                               : [];
                             return (
-                              <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
+                              <div className="max-w-[85vw] rounded-md border border-border bg-card p-2 text-[11px] shadow-md sm:text-xs">
                                 <div className="mb-1 font-medium">
                                   {label} <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">{isPct ? "% vs start" : "value"}</span>
                                 </div>

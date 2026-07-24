@@ -5,6 +5,7 @@ import { getAllPortfoliosEquity } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Area,
   CartesianGrid,
@@ -16,6 +17,21 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+function compactNum(v: number) {
+  const a = Math.abs(v);
+  if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1)}M`;
+  if (a >= 1_000) return `${(v / 1_000).toFixed(a >= 10_000 ? 0 : 1)}k`;
+  return `${v.toFixed(0)}`;
+}
+
+function shortDate(s: string) {
+  // "2026-07-24" -> "24 Jul"
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return String(s);
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+}
+
 
 const LINE_COLORS = ["#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c", "#60a5fa"];
 const SIM_COLOR = "#22d3ee";
@@ -100,6 +116,8 @@ function ModeChart({
   currency: string;
 }) {
   const [range, setRange] = useState<Range>("all");
+  const isMobile = useIsMobile();
+
 
   const { series, totalNow, startingTotal, yDomain } = useMemo(() => {
     const opt = RANGE_OPTS.find((r) => r.value === range)!;
@@ -169,9 +187,9 @@ function ModeChart({
                 {pnl >= 0 ? "+" : ""}{currency} {pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%) over {RANGE_OPTS.find((r) => r.value === range)!.label}
               </div>
             </div>
-            <div className="h-[280px] w-full">
+            <div className="h-[260px] w-full sm:h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={series} margin={{ top: 8, right: 12, bottom: 24, left: 8 }}>
+                <ComposedChart data={series} margin={{ top: 8, right: isMobile ? 6 : 12, bottom: 20, left: isMobile ? -8 : 8 }}>
                   <defs>
                     <linearGradient id={`area-${totalKey}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={color} stopOpacity={0.35} />
@@ -181,43 +199,46 @@ function ModeChart({
                   <CartesianGrid stroke={GRID_COLOR} strokeOpacity={0.18} strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                    tick={{ fontSize: isMobile ? 10 : 11, fill: AXIS_COLOR }}
                     stroke={AXIS_COLOR}
                     strokeOpacity={0.6}
-                    minTickGap={40}
+                    minTickGap={isMobile ? 56 : 40}
+                    tickFormatter={(v) => (isMobile ? shortDate(String(v)) : String(v))}
                   />
                   <YAxis
-                    width={64}
-                    tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                    width={isMobile ? 44 : 64}
+                    tick={{ fontSize: isMobile ? 10 : 11, fill: AXIS_COLOR }}
                     stroke={AXIS_COLOR}
                     strokeOpacity={0.6}
-                    tickFormatter={(v) => fmt(Number(v))}
+                    tickFormatter={(v) => (isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v)))}
                     domain={yDomain}
                     allowDataOverflow
                   />
                   <Tooltip
                     cursor={{ stroke: AXIS_COLOR, strokeOpacity: 0.4, strokeDasharray: "3 3" }}
+                    wrapperStyle={{ zIndex: 40, maxWidth: "min(85vw, 320px)" }}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
                       const row = payload[0].payload as Record<string, number | string>;
                       return (
-                        <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md">
+                        <div className="max-w-[85vw] rounded-md border bg-popover px-2.5 py-2 text-[11px] shadow-md sm:text-xs">
                           <div className="mb-1 font-medium">{String(label)}</div>
-                          <div className="mb-1 flex justify-between gap-4">
+                          <div className="mb-1 flex justify-between gap-3 tabular-nums">
                             <span className="text-muted-foreground">{badgeLabel} total</span>
                             <span className="font-medium">{currency} {Number(row[totalKey]).toFixed(2)}</span>
                           </div>
                           {portfolios.map((p, i) => (
-                            <div key={p.id} className="flex justify-between gap-4">
-                              <span style={{ color: LINE_COLORS[i % LINE_COLORS.length] }}>{p.name}</span>
-                              <span>{currency} {Number(row[p.id] ?? 0).toFixed(2)}</span>
+                            <div key={p.id} className="flex justify-between gap-3 tabular-nums">
+                              <span className="truncate" style={{ color: LINE_COLORS[i % LINE_COLORS.length] }}>{p.name}</span>
+                              <span className="shrink-0">{currency} {Number(row[p.id] ?? 0).toFixed(2)}</span>
                             </div>
                           ))}
                         </div>
                       );
                     }}
                   />
-                  <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12, color: AXIS_COLOR }} />
+                  <Legend verticalAlign="top" height={24} wrapperStyle={{ fontSize: isMobile ? 10 : 12, color: AXIS_COLOR }} />
+
                   <Area
                     type="monotone"
                     dataKey={totalKey}
