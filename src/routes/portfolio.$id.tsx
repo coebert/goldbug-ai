@@ -730,6 +730,15 @@ function PortfolioPage() {
               </Card>
             )}
 
+            {backtestRunToken > 0 && lastBtDays != null && (
+              <BacktestResultsCard
+                portfolioId={id}
+                days={lastBtDays}
+                runToken={backtestRunToken}
+                currency={p?.currency ?? "USD"}
+              />
+            )}
+
 
             {(() => {
               const cb = p.circuit_breaker as { paused?: boolean; reason?: string; tripped_at?: string } | null;
