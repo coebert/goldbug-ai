@@ -217,22 +217,75 @@ export class SaxoAdapter implements BrokerAdapter {
   }
 
   async getPositions(): Promise<BrokerPosition[]> {
+    // Saxo returns a very thin payload unless we opt in to field groups.
+    // Without DisplayAndFormat/NetPositionBase/NetPositionView the Symbol,
+    // quantity and price fields are all missing, which used to make every
+    // real Saxo position silently drop out of our reconciler.
+    const fieldGroups = [
+      "DisplayAndFormat",
+      "ExchangeInfo",
+      "NetPositionBase",
+      "NetPositionView",
+      "PositionIdentifier",
+      "InstrumentPriceDetails",
+    ].join(",");
     const res = await this.req<{
       Data?: Array<{
-        NetPositionBase?: { Amount?: number; AverageOpenPrice?: number };
-        NetPositionView?: { CurrentPrice?: number };
-        DisplayAndFormat?: { Symbol?: string; Currency?: string };
+        NetPositionBase?: {
+          Amount?: number;
+          AverageOpenPrice?: number;
+          Uic?: number;
+          AssetType?: string;
+        };
+        NetPositionView?: {
+          CurrentPrice?: number;
+          MarketValue?: number;
+          MarketValueInBaseCurrency?: number;
+        };
+        DisplayAndFormat?: {
+          Symbol?: string;
+          Currency?: string;
+          Description?: string;
+        };
         AssetType?: string;
+        Uic?: number;
       }>;
-    }>("GET", "/port/v1/netpositions/me");
-    return (res.Data ?? []).map((p) => ({
-      symbol: p.DisplayAndFormat?.Symbol ?? "",
-      quantity: Number(p.NetPositionBase?.Amount ?? 0),
-      avgPrice: Number(p.NetPositionBase?.AverageOpenPrice ?? 0),
-      marketPrice: Number(p.NetPositionView?.CurrentPrice ?? 0),
-      currency: p.DisplayAndFormat?.Currency ?? "GBP",
-      assetType: p.AssetType ?? "Stock",
-    }));
+    }>("GET", `/port/v1/netpositions/me?FieldGroups=${fieldGroups}`);
+
+    const rows = res.Data ?? [];
+    const out: BrokerPosition[] = [];
+    for (const p of rows) {
+      const base = p.NetPositionBase ?? {};
+      const view = p.NetPositionView ?? {};
+      const df = p.DisplayAndFormat ?? {};
+      const uic = Number(base.Uic ?? p.Uic ?? 0);
+      const assetType = String(base.AssetType ?? p.AssetType ?? "Stock");
+      let symbol = df.Symbol ?? "";
+      let currency = df.Currency ?? "GBP";
+
+      // Some Saxo responses still omit Symbol for the aggregated NetPosition
+      // row (e.g. certain ETFs). Fall back to the instrument details endpoint
+      // so the position isn't dropped by the reconciler.
+      if (!symbol && uic > 0) {
+        try {
+          const det = await this.req<{
+            Symbol?: string; CurrencyCode?: string; AssetType?: string;
+          }>("GET", `/ref/v1/instruments/details/${uic}/${assetType}`);
+          if (det.Symbol) symbol = det.Symbol;
+          if (det.CurrencyCode) currency = det.CurrencyCode;
+        } catch { /* leave symbol blank; row will be filtered upstream */ }
+      }
+
+      out.push({
+        symbol,
+        quantity: Number(base.Amount ?? 0),
+        avgPrice: Number(base.AverageOpenPrice ?? 0),
+        marketPrice: Number(view.CurrentPrice ?? 0),
+        currency,
+        assetType,
+      });
+    }
+    return out;
   }
 
   async lookupUic(symbol: string): Promise<{
