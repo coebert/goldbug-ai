@@ -319,10 +319,21 @@ ${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== E
 
 
 
+  const budgetBlock = args.perSymbolBudget != null
+    ? `CASH-AWARE BUDGET:
+- Available cash: ${args.cashValue.toFixed(2)} ${args.portfolio.currency}
+- Per-symbol budget (cap × total, floored at cash): ${args.perSymbolBudget.toFixed(2)} ${args.portfolio.currency}
+- Minimum trade value: ${(args.minTradeValue ?? 25).toFixed(2)} ${args.portfolio.currency}
+- The candidate list has ALREADY been filtered to instruments whose share price fits within this budget. Do not propose buys of a size that cannot afford at least one whole share; guardrails will reject them.
+${(args.budgetNotes ?? []).map((n) => `- ${n}`).join("\n")}`
+    : "";
+
   const user = `Date: ${args.asOf}
 Portfolio value: ${args.totalValue.toFixed(2)} ${args.portfolio.currency}
 Cash: ${args.cashValue.toFixed(2)} ${args.portfolio.currency}
 Current holdings: ${JSON.stringify(holdingsSummary)}
+
+${budgetBlock}
 
 Candidate assets (extended technicals, sentiment, cooldown flag):
 ${JSON.stringify(args.features, null, 2)}
