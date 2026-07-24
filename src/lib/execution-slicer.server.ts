@@ -10,6 +10,9 @@
 // does not own. Never expose these helpers to unauthenticated code paths.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createLogger, logSecurity } from "@/lib/_server/log";
+
+const slicerLog = createLogger("SECURITY:pending_slices");
 import type { Update } from "@/lib/_server/db-json";
 import { z } from "zod";
 import {
