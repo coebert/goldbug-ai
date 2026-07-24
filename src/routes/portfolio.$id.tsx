@@ -80,6 +80,7 @@ import {
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
+import { BacktestResultsCard } from "@/components/backtest-results-card";
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
@@ -258,11 +259,15 @@ function PortfolioPage() {
   const [lastBtMetrics, setLastBtMetrics] = useState<
     import("@/lib/backtest-metrics").BacktestMetrics | null
   >(null);
+  const [backtestRunToken, setBacktestRunToken] = useState(0);
+  const [lastBtDays, setLastBtDays] = useState<number | null>(null);
   const runBt = useMutation({
     mutationFn: () => runBtFn({ data: { portfolio_id: id, days } }),
     onSuccess: (r) => {
       const m = r.metrics;
       setLastBtMetrics(m ?? null);
+      setLastBtDays(days);
+      setBacktestRunToken((n) => n + 1);
       if (m) {
         const winPart =
           m.winRatePct != null ? ` · Win ${m.winRatePct.toFixed(0)}%` : "";
@@ -724,6 +729,15 @@ function PortfolioPage() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {backtestRunToken > 0 && lastBtDays != null && (
+              <BacktestResultsCard
+                portfolioId={id}
+                days={lastBtDays}
+                runToken={backtestRunToken}
+                currency={p?.currency ?? "USD"}
+              />
             )}
 
 
