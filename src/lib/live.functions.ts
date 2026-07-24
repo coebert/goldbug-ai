@@ -396,6 +396,36 @@ export const reconcilePortfolio = createServerFn({ method: "POST" })
     return runReconciliation(context.userId, data.portfolioId);
   });
 
+/** Fetch Saxo order statuses for every open live order and update fills. */
+export const reconcileOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { portfolioId: string; lookbackHours?: number }) =>
+    z.object({
+      portfolioId: z.string().uuid(),
+      lookbackHours: z.number().int().positive().max(24 * 14).optional(),
+    }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const p = await supabase.from("portfolios").select("id, user_id, mode")
+      .eq("id", data.portfolioId).maybeSingle();
+    if (p.error || !p.data || p.data.user_id !== userId) throw new Error("Portfolio not found");
+    if (p.data.mode !== "live_sim" && p.data.mode !== "live_prod") {
+      return { skipped: true, reason: "not live" as const };
+    }
+    const env = p.data.mode === "live_prod" ? "live" : "sim";
+    const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
+    const { reconcileOrderStatusesForPortfolio } = await import("@/lib/order-reconciliation.server");
+    const adapter = await buildSaxoAdapter({
+      userId, portfolioId: data.portfolioId, envOverride: env,
+    });
+    return reconcileOrderStatusesForPortfolio({
+      portfolioId: data.portfolioId,
+      userId,
+      adapter,
+      lookbackHours: data.lookbackHours,
+    });
+  });
+
 // Shared reconciliation core (also called from the cron route).
 export async function runReconciliation(userId: string, portfolioId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
