@@ -188,7 +188,7 @@ function Home() {
     <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
       <HomeCoachMarks />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
 
         <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:mb-8 sm:flex sm:items-start sm:justify-between">
           <div className="min-w-0">

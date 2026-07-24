@@ -162,10 +162,10 @@ function ModeChart({
         ) : (
           <>
             <div className="mb-3">
-              <div className="text-2xl font-semibold tracking-tight tabular-nums">
+              <div className="text-lg font-semibold leading-tight tracking-tight tabular-nums sm:text-2xl">
                 {currency} {totalNow.toFixed(2)}
               </div>
-              <div className={`text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
+              <div className={`mt-0.5 text-[11px] leading-snug sm:text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
                 {pnl >= 0 ? "+" : ""}{currency} {pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%) over {RANGE_OPTS.find((r) => r.value === range)!.label}
               </div>
             </div>
