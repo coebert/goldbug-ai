@@ -131,6 +131,17 @@ export function AppHeader({ email }: { email?: string | null }) {
                     <span>{label}</span>
                   </Link>
                 ))}
+                {MOBILE_EXTRAS.map(({ to, label, icon: Icon }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    onClick={() => setOpen(false)}
+                    className="inline-flex items-center gap-3 rounded-md px-3 py-3 text-foreground hover:bg-muted [&.active]:bg-muted [&.active]:text-foreground"
+                  >
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <span>{label}</span>
+                  </Link>
+                ))}
                 <Link
                   to="/admin"
                   onClick={() => setOpen(false)}
