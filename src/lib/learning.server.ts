@@ -312,6 +312,8 @@ export async function reflectAndUpdateLessons(
   asOf: string,
   ctx: LearningContext,
 ): Promise<{ updated: boolean; reason?: string; regimes?: string[] }> {
+  const userId = await resolveUserId(portfolioId);
+  if (!userId) return { updated: false, reason: "portfolio has no owner" };
   if (ctx.stats.evaluable < 5) return { updated: false, reason: "not enough evaluable trades" };
   if (ctx.lessons_as_of) {
     const daysSince =
