@@ -114,6 +114,31 @@ export const allSingleSnapshot: EquityData = {
   ],
 };
 
+/**
+ * Bug shape: caller mistakenly copied the merged multi-portfolio axis into
+ * `perPortfolioSeries[liveNew]`, back-filling starting_cash (330) across
+ * days the live portfolio did not yet exist. The runtime validator in
+ * `spark-by-portfolio.ts` must detect this and emit an empty series for
+ * liveNew rather than plot the phantom flat-then-drop curve.
+ */
+export const crossPortfolioMerged: EquityData = {
+  portfolios: [
+    { id: PORTFOLIO_IDS.liveNew, mode: "live_prod" },
+    { id: PORTFOLIO_IDS.simMature, mode: "paper" },
+  ],
+  perPortfolioSeries: {
+    [PORTFOLIO_IDS.liveNew]: seriesFrom([
+      ["2026-07-20", 330],
+      ["2026-07-21", 330],
+      ["2026-07-22", 330],
+      ["2026-07-23", 330],
+      ["2026-07-24", 300.46],
+    ]),
+    [PORTFOLIO_IDS.simMature]: simMatureOwn,
+  },
+  series: [],
+};
+
 export const fixtures = {
   mixedDashboard,
   partialOverlap,
@@ -122,3 +147,4 @@ export const fixtures = {
 } as const;
 
 export type FixtureName = keyof typeof fixtures;
+
