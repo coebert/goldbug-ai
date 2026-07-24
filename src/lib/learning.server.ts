@@ -42,22 +42,44 @@ export type LearningContext = {
   }[];
 };
 
+async function resolveUserId(portfolioId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("portfolios")
+    .select("user_id")
+    .eq("id", portfolioId)
+    .maybeSingle();
+  return (data?.user_id as string | undefined) ?? null;
+}
+
+async function listUserPortfolioIds(userId: string): Promise<string[]> {
+  const { data } = await supabaseAdmin
+    .from("portfolios")
+    .select("id")
+    .eq("user_id", userId);
+  return (data ?? []).map((r) => r.id as string);
+}
+
 export async function computeRecentOutcomes(
   portfolioId: string,
   asOf: string,
   windowDays = 20,
   horizonDays = 5,
 ): Promise<Pick<LearningContext, "stats" | "samples">> {
-  // Fetch trades in a slightly wider calendar window (to cover weekends).
+  // Pool trades across ALL of this user's portfolios so lessons carry over
+  // between portfolios (and survive deletion of any single one).
   const since = new Date(asOf);
   since.setDate(since.getDate() - Math.ceil(windowDays * 1.7));
   const sinceStr = since.toISOString().slice(0, 10);
+
+  const userId = await resolveUserId(portfolioId);
+  const portfolioIds = userId ? await listUserPortfolioIds(userId) : [portfolioId];
+  const scopeIds = portfolioIds.length ? portfolioIds : [portfolioId];
 
   const [{ data: trades }, { data: regimeRows }] = await Promise.all([
     supabaseAdmin
       .from("trades")
       .select("symbol, side, price, trade_date, reason")
-      .eq("portfolio_id", portfolioId)
+      .in("portfolio_id", scopeIds)
       .gte("trade_date", sinceStr)
       .lte("trade_date", asOf)
       .order("trade_date", { ascending: true }),
