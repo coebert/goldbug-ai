@@ -54,34 +54,49 @@ const OVERLAY_PALETTE = [
 
 const STORAGE_PREFIX = "aegis.backtestRuns.";
 
-export function loadRuns(portfolioId: string): BacktestRunRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_PREFIX + portfolioId);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as BacktestRunRecord[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+// React Query key for a portfolio's persisted run history.
+export const backtestRunsQueryKey = (portfolioId: string) =>
+  ["backtestRuns", portfolioId] as const;
 
-export function saveRun(record: BacktestRunRecord) {
-  if (typeof window === "undefined") return;
-  const existing = loadRuns(record.portfolioId);
-  const next = [record, ...existing].slice(0, 25);
-  window.localStorage.setItem(
-    STORAGE_PREFIX + record.portfolioId,
-    JSON.stringify(next),
-  );
-  window.dispatchEvent(
-    new CustomEvent("aegis:backtest-runs-updated", { detail: record.portfolioId }),
-  );
+// Called from the portfolio route after a successful backtest. Writes to
+// the `backtest_runs` table via a server function, then dispatches an
+// event so any mounted history card refreshes without prop-drilling a
+// setter. Kept as a plain async function so existing imperative callers
+// (`onSuccess` in the run mutation) don't need to become hooks.
+export async function saveRun(record: {
+  portfolioId: string;
+  riskLevel?: string;
+  days: number;
+  ranAt?: string;
+  metrics: BacktestMetrics;
+  equity?: BacktestEquityPoint[];
+}) {
+  await saveBacktestRunFn({
+    data: {
+      portfolioId: record.portfolioId,
+      riskLevel: record.riskLevel ?? null,
+      days: record.days,
+      ranAt: record.ranAt,
+      metrics: record.metrics as unknown as Parameters<typeof saveBacktestRunFn>[0]["data"]["metrics"],
+      equity: (record.equity ?? null) as unknown as Parameters<typeof saveBacktestRunFn>[0]["data"]["equity"],
+    },
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("aegis:backtest-runs-updated", { detail: record.portfolioId }),
+    );
+  }
 }
 
 function fmt(n: number | null | undefined, digits = 2, suffix = "") {
   if (n == null || !Number.isFinite(n)) return "—";
   return `${n.toFixed(digits)}${suffix}`;
+}
+
+function toneClass(v: number | null | undefined, invert = false) {
+  if (v == null || !Number.isFinite(v)) return "text-muted-foreground";
+  const good = invert ? v <= 0 : v >= 0;
+  return good ? "text-emerald-500" : "text-red-500";
 }
 
 function toneClass(v: number | null | undefined, invert = false) {
