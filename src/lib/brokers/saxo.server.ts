@@ -239,16 +239,67 @@ export class SaxoAdapter implements BrokerAdapter {
         };
       }
     }
+
+    // Normalize Yahoo-style suffixes (e.g. VUKE.L, SAP.DE) into a bare keyword
+    // plus a preferred Saxo ExchangeId. Saxo's /ref/v1/instruments search does
+    // NOT recognise Yahoo suffixes, so "VUKE.L" returns zero hits while "VUKE"
+    // returns the LSE-listed ETF we actually want.
+    const YAHOO_SUFFIX_TO_EXCHANGE: Record<string, string[]> = {
+      L: ["LSE", "LSE_INTL", "LSE_ETF", "LSE_SETSMM"],
+      DE: ["XETR", "FRA"],
+      PA: ["PAR"],
+      AS: ["AMS"],
+      MI: ["MIL"],
+      MC: ["MCE"],
+      SW: ["SWX", "VIRT_X"],
+      TO: ["TSE"],
+      HK: ["HKEX"],
+      T: ["TSE_JP"],
+      AX: ["ASX"],
+      ST: ["OMX"],
+      CO: ["CSE"],
+      HE: ["HEX"],
+      OL: ["OSE"],
+    };
+    const upper = symbol.toUpperCase();
+    const dotIdx = upper.lastIndexOf(".");
+    const suffix = dotIdx > 0 ? upper.slice(dotIdx + 1) : "";
+    const base = dotIdx > 0 ? upper.slice(0, dotIdx) : upper;
+    const preferredExchanges = suffix ? YAHOO_SUFFIX_TO_EXCHANGE[suffix] ?? [] : [];
+    const keyword = suffix && preferredExchanges.length ? base : upper;
+
     const search = await this.req<{
       Data?: Array<{
         Identifier: number; AssetType: string; CurrencyCode?: string;
         ExchangeId?: string; Symbol: string;
       }>;
     }>("GET", "/ref/v1/instruments", {
-      query: { Keywords: symbol, AssetTypes: ALLOWED_ASSET_TYPES.join(",") },
+      query: { Keywords: keyword, AssetTypes: ALLOWED_ASSET_TYPES.join(",") },
     });
-    const hit = (search.Data ?? []).find((d) => d.Symbol.toUpperCase() === symbol.toUpperCase())
-      ?? search.Data?.[0];
+    const candidates = search.Data ?? [];
+
+    // Match order:
+    //   1. Exact Symbol on a preferred exchange for the Yahoo suffix
+    //   2. Symbol starts with base ticker on a preferred exchange (Saxo often
+    //      appends ":xlon" style)
+    //   3. Any hit on a preferred exchange
+    //   4. Exact Symbol match (any exchange)
+    //   5. First hit
+    const symMatches = (s: string) => {
+      const su = s.toUpperCase();
+      return su === base || su.startsWith(`${base}:`) || su === upper;
+    };
+    const onPreferred = (ex?: string) =>
+      !!ex && preferredExchanges.some((e) => ex.toUpperCase().includes(e));
+
+    const hit =
+      candidates.find((d) => symMatches(d.Symbol) && onPreferred(d.ExchangeId)) ??
+      candidates.find((d) => d.Symbol.toUpperCase().startsWith(base) && onPreferred(d.ExchangeId)) ??
+      (preferredExchanges.length ? candidates.find((d) => onPreferred(d.ExchangeId)) : undefined) ??
+      candidates.find((d) => d.Symbol.toUpperCase() === upper) ??
+      candidates.find((d) => symMatches(d.Symbol)) ??
+      candidates[0];
+
     if (!hit) throw new Error(`Saxo instrument not found for symbol ${symbol}`);
     if (!(ALLOWED_ASSET_TYPES as readonly string[]).includes(hit.AssetType)) {
       throw new Error(`Saxo asset type ${hit.AssetType} not permitted (cash-only, no leverage)`);
@@ -263,6 +314,7 @@ export class SaxoAdapter implements BrokerAdapter {
       currency: hit.CurrencyCode ?? "GBP", exchangeId: hit.ExchangeId,
     };
   }
+
 
   async placeOrder(req: BrokerOrderRequest): Promise<BrokerOrderResult> {
     const inst = await this.lookupUic(req.symbol);
