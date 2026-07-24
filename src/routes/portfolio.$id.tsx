@@ -60,17 +60,21 @@ import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card"
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-function shortChartDate(s: string) {
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return String(s);
-  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
-}
-function compactChartNum(v: number) {
-  const a = Math.abs(v);
-  if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1)}M`;
-  if (a >= 1_000) return `${(v / 1_000).toFixed(a >= 10_000 ? 0 : 1)}k`;
-  return `${v.toFixed(0)}`;
-}
+import {
+  shortChartDate,
+  formatDateTick,
+  formatValueTick,
+  formatTooltipValue,
+  formatSignedPct,
+  formatSignedNum,
+  formatMetric,
+  heroMetricRows,
+  COMPARE_METRIC_ROWS,
+  yAxisLabel,
+  compareGridHeader,
+  tooltipModeChip,
+} from "@/lib/portfolio-performance-format";
+
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
