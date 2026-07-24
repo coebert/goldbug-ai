@@ -14,7 +14,6 @@ import {
   ComposedChart,
   Legend,
   Line,
-  LineChart,
   ResponsiveContainer,
   Scatter,
   Tooltip,
