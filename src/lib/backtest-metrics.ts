@@ -204,6 +204,9 @@ export function bootstrapCIs(
     samples,
   });
   return { sharpe: ci(sharpes), maxDrawdown: ci(mdds) };
+}
+
+
 
 /** Annualised Sharpe ratio, rf = 0. Null when stdev is 0 or < 2 samples. */
 export function computeSharpe(returns: number[]): number {
