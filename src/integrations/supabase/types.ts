@@ -1390,6 +1390,44 @@ export type Database = {
           },
         ]
       }
+      sim_fund_events: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          currency: string
+          id: string
+          portfolio_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          currency: string
+          id?: string
+          portfolio_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          portfolio_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sim_fund_events_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       slice_fills: {
         Row: {
           created_at: string
