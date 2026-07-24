@@ -130,7 +130,9 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
         pct: Number.POSITIVE_INFINITY,
       }),
     );
-    expect(html).toContain("0.00%");
+    // React SSR inserts <!-- --> markers between adjacent expressions,
+    // so match the digits and % separately.
+    expect(html).toMatch(/0\.00(<!---->)?%/);
     expect(html).not.toMatch(/Infinity/);
     expect(html).not.toMatch(/NaN/);
   });
@@ -144,8 +146,9 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
         pct: Number.NaN,
       }),
     );
-    expect(html).toContain("0.00%");
+    expect(html).toMatch(/0\.00(<!---->)?%/);
+    expect(html).toContain("£300");
     expect(html).not.toMatch(/£NaN/);
-    expect(html).not.toMatch(/NaN%/);
+    expect(html).not.toMatch(/NaN(<!---->)?%/);
   });
 });
