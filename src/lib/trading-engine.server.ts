@@ -3,6 +3,7 @@
 
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
+import { asJson } from "@/lib/_server/db-json";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import { HEDGE_FUND_PLAYBOOK } from "./hedge-fund-playbook.server";

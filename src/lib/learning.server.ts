@@ -4,6 +4,7 @@
 
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
+import { asJson } from "@/lib/_server/db-json";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { getPriceOn } from "./market-data.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
