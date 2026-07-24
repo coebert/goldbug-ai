@@ -67,6 +67,12 @@ export function AllPortfoliosChart() {
 
   if (!q.data || portfolios.length === 0) return null;
 
+  const allDeposits = q.data.deposits ?? [];
+  const simIds = new Set(simPortfolios.map((p) => p.id));
+  const realIds = new Set(realPortfolios.map((p) => p.id));
+  const simDeposits = allDeposits.filter((d) => simIds.has(d.portfolio_id));
+  const realDeposits = allDeposits.filter((d) => realIds.has(d.portfolio_id));
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <ModeChart
@@ -79,6 +85,7 @@ export function AllPortfoliosChart() {
         portfolios={simPortfolios}
         allSeries={q.data.series}
         currency={currency}
+        deposits={simDeposits}
       />
       <ModeChart
         title="Real-money portfolios"
@@ -90,6 +97,7 @@ export function AllPortfoliosChart() {
         portfolios={realPortfolios}
         allSeries={q.data.series}
         currency={currency}
+        deposits={realDeposits}
       />
     </div>
   );
