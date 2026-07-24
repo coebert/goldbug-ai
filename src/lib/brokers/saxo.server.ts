@@ -102,13 +102,28 @@ export class SaxoAdapter implements BrokerAdapter {
     };
     let status: number | null = null;
     let response: unknown = null;
+    // Saxo trading endpoints are aggressively rate-limited (~1 req/sec per
+    // app on /trade/v2/orders). Retry a bounded number of times on HTTP 429,
+    // honouring Retry-After when Saxo provides it.
+    const maxAttempts = 3;
     try {
-      const res = await fetch(url, init);
-      status = res.status;
-      const text = await res.text();
-      response = text ? safeJson(text) : null;
-      if (!res.ok) {
-        const msg = `Saxo ${method} ${path} failed [${res.status}]: ${text.slice(0, 400)}`;
+      let res: Response | null = null;
+      let text = "";
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        res = await fetch(url, init);
+        status = res.status;
+        text = await res.text();
+        response = text ? safeJson(text) : null;
+        if (res.status !== 429 || attempt === maxAttempts) break;
+        const retryAfterHeader = res.headers.get("retry-after");
+        const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+        const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
+          ? Math.min(retryAfterSec * 1000, 5000)
+          : 1500 * attempt;
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+      if (!res!.ok) {
+        const msg = `Saxo ${method} ${path} failed [${res!.status}]: ${text.slice(0, 400)}`;
         await log({
           portfolioId: this.portfolioId, userId: this.userId, env: this.env,
           method, path, status, request: opts?.body ?? opts?.query ?? null, response, error: msg,
