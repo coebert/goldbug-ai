@@ -383,6 +383,15 @@ function TradeCard({ row }: { row: TradeRow }) {
     </div>
   );
 
+  const feesTotal = row.fills.reduce((s, f) => s + f.fee, 0);
+  const notional = row.notional ?? (row.avgFillPrice != null ? row.avgFillPrice * row.filledQty : 0);
+  const cashFlow = buy ? -(notional + feesTotal) : notional - feesTotal;
+  // Realized P&L estimate for sells (buys have no realized P&L on entry).
+  const realizedPnl = !buy && row.holding && row.avgFillPrice != null && row.filledQty > 0
+    ? (row.avgFillPrice - row.holding.avg_cost) * row.filledQty - feesTotal
+    : null;
+  const fillCurrency = row.fills[0]?.currency ?? "";
+
   const details = (
     <div className="space-y-3">
       {row.order.reject_reason && (
@@ -390,6 +399,21 @@ function TradeCard({ row }: { row: TradeRow }) {
           Reject reason: {row.order.reject_reason}
         </div>
       )}
+
+      {row.filledQty > 0 && (
+        <ImpactBreakdown
+          buy={buy}
+          priorQty={priorQty ?? 0}
+          nowQty={nowQty}
+          filledQty={row.filledQty}
+          notional={notional}
+          fees={feesTotal}
+          cashFlow={cashFlow}
+          realizedPnl={realizedPnl}
+          currency={fillCurrency}
+        />
+      )}
+
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {/* Lifecycle timeline */}
