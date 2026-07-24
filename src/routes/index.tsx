@@ -146,8 +146,6 @@ function Home() {
 
   const nextRunLabel = useMemo(() => {
     const now = new Date();
-    const next = new Date(
-    const now = new Date();
     const nextHour = (ukHour(now) + 1) % 24;
     return `${String(nextHour).padStart(2, "0")}:00 ${ukZoneAbbr(now)}`;
   }, [equityQ.dataUpdatedAt]);
