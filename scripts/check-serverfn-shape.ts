@@ -39,20 +39,27 @@ const ALLOWED_TOP = [
   /^import\b/,
   /^export\s+(type|interface)\b/,
   /^export\s+\*\s+from\b/,
-  /^export\s+\{[^}]*\}\s+from\b/,
   /^type\s+\w+\s*=/,
   /^interface\s+\w+/,
   /^export\s+const\s+\w+\s*=\s*createServerFn\b/,
-  /^const\s+\w+Schema\s*=\s*[A-Z]/, // schema aliases (Zod)
   /^\/\//, // comment
   /^\/\*/,
   /^\*/,
   /^$/,
 ];
 
+// Reject any sibling helpers/config at module scope. The previous
+// "^const \wSchema = [A-Z]" escape hatch is gone: Zod schemas must be
+// inlined into `.inputValidator()` or imported from a sidecar module,
+// otherwise the TanStack server-fn splitter can drop them from the
+// server chunk and cause a production-only ReferenceError.
 function isAllowedBlock(block: string): boolean {
-  const first = block.trimStart().split("\n", 1)[0]!;
-  return ALLOWED_TOP.some((re) => re.test(first));
+  const trimmed = block.trimStart();
+  const first = trimmed.split("\n", 1)[0]!;
+  if (ALLOWED_TOP.some((re) => re.test(first))) return true;
+  // Multi-line barrel re-export: `export { a, b } from "…";` block form.
+  if (/^export\s+\{/.test(first) && /\}\s+from\s+["']/.test(trimmed)) return true;
+  return false;
 }
 
 // Split top-level statements by matching braces / parens at depth 0.
