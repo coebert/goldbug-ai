@@ -49,7 +49,7 @@ describe("real-money equity formatting — resolved-options contract", () => {
     expect(r.minimumFractionDigits).toBe(0);
     // Rounding + sign contract: rely on the platform defaults. Anyone
     // who edits the tile to pick a non-default must update this lock.
-    expect(r.roundingMode ?? "halfExpand").toBe("halfExpand");
+    expect((r as { roundingMode?: string }).roundingMode ?? "halfExpand").toBe("halfExpand");
     expect(r.signDisplay ?? "auto").toBe("auto");
     expect(r.useGrouping).not.toBe(false); // grouping ON for money
   });
@@ -60,7 +60,7 @@ describe("real-money equity formatting — resolved-options contract", () => {
     expect(r.minimumFractionDigits).toBe(2);
     expect(r.maximumFractionDigits).toBe(2);
     expect(r.useGrouping).toBe(false);
-    expect(r.roundingMode ?? "halfExpand").toBe("halfExpand");
+    expect((r as { roundingMode?: string }).roundingMode ?? "halfExpand").toBe("halfExpand");
     expect(r.signDisplay ?? "auto").toBe("auto");
   });
 
@@ -68,7 +68,7 @@ describe("real-money equity formatting — resolved-options contract", () => {
     const r = PNL.resolvedOptions();
     expect(r.style).toBe("decimal");
     expect(r.maximumFractionDigits).toBe(0);
-    expect(r.roundingMode ?? "halfExpand").toBe("halfExpand");
+    expect((r as { roundingMode?: string }).roundingMode ?? "halfExpand").toBe("halfExpand");
     expect(r.signDisplay ?? "auto").toBe("auto");
   });
 });
