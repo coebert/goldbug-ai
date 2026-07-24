@@ -282,7 +282,7 @@ function GetStarted() {
                   );
                 })}
               </div>
-              <StepNav onBack={() => setStep(0)} onNext={() => setStep(2)} />
+              <StepNav onBack={() => setStep(0)} onNext={() => setStep(2)} onSkip={() => navigate({ to: "/" })} />
             </CardContent>
           </Card>
         )}
