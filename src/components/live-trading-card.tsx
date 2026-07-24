@@ -357,6 +357,45 @@ function CashSyncIndicator({ lastSync, pending }: { lastSync: CashSyncLog; pendi
   );
 }
 
+type TradeAlertData = {
+  active: boolean;
+  category?: string;
+  title?: string;
+  detail?: string;
+  hint?: string[];
+  runsSeen?: number;
+  ordersInWindow?: number;
+  intendedOrdersLastRun?: number;
+  windowStart?: string;
+} | undefined;
+
+function NoTradesAlert({ data }: { data: TradeAlertData }) {
+  if (!data || !data.active) return null;
+  const started = data.windowStart ? new Date(data.windowStart) : null;
+  return (
+    <Alert variant={data.category === "orders_rejected" || data.category === "orders_never_reached_broker" ? "destructive" : "default"}>
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>{data.title ?? "No successful trades in the last run window"}</AlertTitle>
+      <AlertDescription className="space-y-1">
+        <div>{data.detail}</div>
+        <div className="text-xs text-muted-foreground">
+          Window: last {data.runsSeen ?? 0} run{(data.runsSeen ?? 0) === 1 ? "" : "s"}
+          {started && <> · since {started.toLocaleString()}</>}
+          {typeof data.intendedOrdersLastRun === "number" && (
+            <> · AI proposed {data.intendedOrdersLastRun} order{data.intendedOrdersLastRun === 1 ? "" : "s"} last run</>
+          )}
+          {typeof data.ordersInWindow === "number" && (
+            <> · {data.ordersInWindow} broker order{data.ordersInWindow === 1 ? "" : "s"} in window</>
+          )}
+        </div>
+        {(data.hint ?? []).map((h, i) => (
+          <div key={i} className="text-xs text-muted-foreground">{h}</div>
+        ))}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function MiniList({ title, rows }: { title: string; rows: Array<{ key: string; text: string }> }) {
   return (
     <div>
