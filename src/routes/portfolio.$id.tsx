@@ -113,6 +113,8 @@ function PortfolioPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const isMobile = useIsMobile();
+
 
 
   useEffect(() => {
