@@ -228,6 +228,9 @@ export interface OAuthStatus {
   expiresAt: string | null;
   refreshExpiresAt: string | null;
   secondsUntilExpiry: number | null;
+  secondsUntilRefreshExpiry: number | null;
+  refreshTokenValid: boolean;
+  autoRenewing: boolean;
   usingLegacyToken: boolean;
   lastAuthAt: string | null;
   appConfigured: boolean;
@@ -254,19 +257,33 @@ export async function getOAuthStatus(env: BrokerEnv): Promise<OAuthStatus> {
       expiresAt: null,
       refreshExpiresAt: null,
       secondsUntilExpiry: null,
+      secondsUntilRefreshExpiry: null,
+      refreshTokenValid: false,
+      autoRenewing: false,
       usingLegacyToken: !!process.env.SAXO_ACCESS_TOKEN,
       lastAuthAt: null,
       appConfigured,
       redirectUri: redirect,
     };
   }
-  const secs = Math.floor((new Date(row.expires_at).getTime() - Date.now()) / 1000);
+  const now = Date.now();
+  const secs = Math.floor((new Date(row.expires_at).getTime() - now) / 1000);
+  const refreshSecs = row.refresh_expires_at
+    ? Math.floor((new Date(row.refresh_expires_at).getTime() - now) / 1000)
+    : null;
+  const refreshTokenValid = refreshSecs == null ? true : refreshSecs > 0;
   return {
     env,
     connected: true,
     expiresAt: row.expires_at,
     refreshExpiresAt: row.refresh_expires_at,
     secondsUntilExpiry: secs,
+    secondsUntilRefreshExpiry: refreshSecs,
+    refreshTokenValid,
+    // As long as the refresh token is still valid the on-demand refresh in
+    // getAccessToken (and the 15-min cron) will roll the access token forward
+    // automatically — even if the access token has already ticked below zero.
+    autoRenewing: refreshTokenValid,
     usingLegacyToken: false,
     lastAuthAt: row.updated_at,
     appConfigured,
