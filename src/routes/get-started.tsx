@@ -421,20 +421,39 @@ function Summary({ label, value }: { label: string; value: string }) {
 function StepNav({
   onBack,
   onNext,
+  onSkip,
   nextDisabled,
+  nextLabel = "Continue",
 }: {
   onBack: () => void;
   onNext: () => void;
+  onSkip?: () => void;
   nextDisabled?: boolean;
+  nextLabel?: string;
 }) {
   return (
-    <div className="flex items-center justify-between pt-2">
-      <Button variant="ghost" onClick={onBack}>
-        <ArrowLeft className="mr-1 h-4 w-4" /> Back
-      </Button>
-      <Button onClick={onNext} disabled={nextDisabled}>
-        Continue <ArrowRight className="ml-1 h-4 w-4" />
-      </Button>
+    <div className="sticky bottom-0 -mx-6 -mb-6 border-t border-border bg-card px-6 py-3 sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" onClick={onBack} className="min-h-[44px]">
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back
+        </Button>
+        {onSkip && (
+          <Button
+            variant="ghost"
+            onClick={onSkip}
+            className="min-h-[44px] text-muted-foreground"
+          >
+            Skip for now
+          </Button>
+        )}
+        <Button
+          onClick={onNext}
+          disabled={nextDisabled}
+          className="ml-auto min-h-[44px] flex-1 sm:flex-none"
+        >
+          {nextLabel} <ArrowRight className="ml-1 h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
