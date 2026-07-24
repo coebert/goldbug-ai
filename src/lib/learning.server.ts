@@ -373,7 +373,7 @@ export function formatLearningBlock(ctx: LearningContext): string {
 - By side — buys: ${s.per_side.buy.n} (win ${s.per_side.buy.win_rate != null ? `${(s.per_side.buy.win_rate * 100).toFixed(0)}%` : "n/a"}), sells: ${s.per_side.sell.n} (win ${s.per_side.sell.win_rate != null ? `${(s.per_side.sell.win_rate * 100).toFixed(0)}%` : "n/a"})
 ${lessonsBlock}
 
-Apply these lessons carefully: they were derived from the regime named above, so weight them heavier when the current regime matches and treat them as weaker priors when it doesn't. Double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge in this regime. State in your rationale whenever a decision was directly informed by a specific lesson.`;
+Apply these lessons carefully: they were derived from the regime named above, so weight them heavier when the current regime matches and treat them as weaker priors when it doesn't. Lessons are listed in the user's priority order — those tagged [user-priority: high] have been explicitly upvoted and MUST be weighted more strongly, while [user-priority: low] tags mean the user has partially disagreed and you should require stronger evidence before acting on them. Double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge in this regime. State in your rationale whenever a decision was directly informed by a specific lesson.`;
 }
 
 const LessonsSchema = z.object({
