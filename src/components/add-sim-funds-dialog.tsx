@@ -71,13 +71,16 @@ export function AddSimFundsDialog({
 
   const mut = useMutation({
     mutationFn: (n: number) => addFn({ data: { id: portfolioId, amount: n } }),
-    onSuccess: (_res, n) => {
+    onSuccess: async (_res, n) => {
       toast.success(`Added ${fmt(currency, n)} to ${portfolioName}`);
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
-      qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
-      qc.invalidateQueries({ queryKey: ["sim-fund-events", portfolioId] });
-      onAdded?.(n);
       setAddedAmount(n);
+      onAdded?.(n);
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["portfolios"], type: "active" }),
+        qc.refetchQueries({ queryKey: ["portfolio", portfolioId], type: "active" }),
+        qc.refetchQueries({ queryKey: ["sim-fund-events", portfolioId], type: "active" }),
+        qc.refetchQueries({ queryKey: ["all-portfolios-equity"], type: "active" }),
+      ]);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to add funds"),
   });
