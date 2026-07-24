@@ -1,8 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { BacktestMetrics } from "@/lib/backtest-metrics";
+
+export type BacktestEquityPoint = { snapshot_date: string; total_value: number };
 
 export type BacktestRunRecord = {
   id: string;
@@ -11,7 +23,25 @@ export type BacktestRunRecord = {
   riskLevel: string;
   days: number;
   metrics: BacktestMetrics;
+  // Optional per-run equity series captured at save-time. Overlays in the
+  // history card need this because there is no per-run entity server-side
+  // to re-fetch from — each backtest recomputes over shared snapshots.
+  equity?: BacktestEquityPoint[];
 };
+
+// Deterministic overlay colours so a given run keeps its colour across
+// re-renders and toggles.
+const OVERLAY_PALETTE = [
+  "hsl(217 91% 60%)",
+  "hsl(142 71% 45%)",
+  "hsl(38 92% 50%)",
+  "hsl(291 64% 55%)",
+  "hsl(0 84% 60%)",
+  "hsl(199 89% 48%)",
+  "hsl(48 96% 53%)",
+  "hsl(262 83% 58%)",
+];
+
 
 const STORAGE_PREFIX = "aegis.backtestRuns.";
 
