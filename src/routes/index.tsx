@@ -60,6 +60,7 @@ import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Be
 import { Explain } from "@/components/explain";
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
+import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
 
 
 
