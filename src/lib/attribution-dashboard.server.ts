@@ -1,8 +1,12 @@
 // Attribution dashboard — breaks each executed trade's outcome into
 // per-signal contribution, news_score impact, and regime/event penalties.
-// Server-only (uses supabaseAdmin + price cache).
+//
+// Reads per-user rows from `decisions`. Callers pass an `OwnedDbClient`; the
+// authenticated path (RLS via `context.supabase`) is preferred, and the
+// admin fallback re-scopes with an explicit portfolio ownership check so
+// the service-role branch cannot leak another user's decisions.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withOwnedClient, type OwnedDbClient } from "@/lib/_server/owned-client";
 import { getPriceOn } from "./market-data.server";
 import { computeAttribution, SIGNAL_KEYS, type SignalKey, type AttributionReport } from "./attribution.server";
 
@@ -104,6 +108,7 @@ export async function getAttributionDashboard(
   asOf: string,
   windowDays = 90,
   horizonDays = 5,
+  owned?: OwnedDbClient,
 ): Promise<AttributionDashboard> {
   const overall = await computeAttribution(portfolioId, asOf, windowDays, horizonDays);
 
@@ -111,7 +116,23 @@ export async function getAttributionDashboard(
   since.setDate(since.getDate() - windowDays);
   const sinceStr = since.toISOString().slice(0, 10);
 
-  const { data: decisions } = await supabaseAdmin
+  // When the admin fallback is in play (no user session — cron/backfill),
+  // re-scope with an explicit portfolio ownership check so a stray
+  // portfolioId can never pull another user's decisions.
+  const scope = owned;
+  if (scope?.isAdmin) {
+    const { data: pf, error: pfErr } = await scope.db
+      .from("portfolios")
+      .select("id")
+      .eq("id", portfolioId)
+      .eq("user_id", scope.userId)
+      .maybeSingle();
+    if (pfErr) throw new Error(pfErr.message);
+    if (!pf) throw new Error("Portfolio not found");
+  }
+  const db = scope?.db ?? withOwnedClient("__cron__").db;
+
+  const { data: decisions } = await db
     .from("decisions")
     .select("run_date, raw")
     .eq("portfolio_id", portfolioId)
