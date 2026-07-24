@@ -719,8 +719,8 @@ function PortfolioPage() {
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Metric label="Total return" value={`${lastBtMetrics.totalReturnPct.toFixed(2)}%`} tone={lastBtMetrics.totalReturnPct >= 0 ? "up" : "down"} />
-                    <Metric label="Max drawdown" value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`} tone="down" hint={lastBtMetrics.maxDrawdownPeakDate && lastBtMetrics.maxDrawdownTroughDate ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}` : undefined} />
-                    <Metric label="Sharpe (ann.)" value={lastBtMetrics.sharpe.toFixed(2)} tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"} />
+                    <Metric label="Max drawdown" value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`} tone="down" hint={lastBtMetrics.maxDrawdownCI ? `95% CI ${lastBtMetrics.maxDrawdownCI.low.toFixed(2)}% … ${lastBtMetrics.maxDrawdownCI.high.toFixed(2)}%` : lastBtMetrics.maxDrawdownPeakDate && lastBtMetrics.maxDrawdownTroughDate ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}` : undefined} />
+                    <Metric label="Sharpe (ann.)" value={lastBtMetrics.sharpe.toFixed(2)} tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"} hint={lastBtMetrics.sharpeCI ? `95% CI ${lastBtMetrics.sharpeCI.low.toFixed(2)} … ${lastBtMetrics.sharpeCI.high.toFixed(2)}` : undefined} />
                     <Metric label="Win rate" value={lastBtMetrics.winRatePct != null ? `${lastBtMetrics.winRatePct.toFixed(0)}%` : "—"} hint={`${lastBtMetrics.wins}W / ${lastBtMetrics.losses}L / ${lastBtMetrics.trades} trades`} />
                     <Metric label="Volatility (ann.)" value={`${lastBtMetrics.volatilityPct.toFixed(2)}%`} />
                     <Metric label="Best day" value={`${lastBtMetrics.bestDayPct.toFixed(2)}%`} tone="up" />
