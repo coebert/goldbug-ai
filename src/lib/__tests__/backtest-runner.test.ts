@@ -70,10 +70,10 @@ describe("runBacktest", () => {
       bars([["2020-01-02", { X: 40 }]]),
       () => [{ id: "b", symbol: "X", side: "BUY", quantity: 10, price: 40 }],
     );
-    // 100 / 40 = 2 shares affordable → truncated
-    expect(res.snapshots[0].fillQuantity).toBe(2);
-    expect(res.finalState.cash).toBe(20);
-    expect(res.finalState.holdings[0].quantity).toBe(2);
+    // 100 / 40 = 2.5 shares affordable → truncated (fractional allowed)
+    expect(res.snapshots[0].fillQuantity).toBeCloseTo(2.5, 8);
+    expect(res.finalState.cash).toBeCloseTo(0, 8);
+    expect(res.finalState.holdings[0].quantity).toBeCloseTo(2.5, 8);
   });
 
   it("rejects overspends when simulator options disable truncation", async () => {
