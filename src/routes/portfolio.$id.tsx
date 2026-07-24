@@ -706,6 +706,27 @@ function PortfolioPage() {
               </CardContent>
             </Card>
 
+            {lastBtMetrics && (
+              <Card className="mb-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Backtest metrics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <Metric label="Total return" value={`${lastBtMetrics.totalReturnPct.toFixed(2)}%`} tone={lastBtMetrics.totalReturnPct >= 0 ? "up" : "down"} />
+                    <Metric label="Max drawdown" value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`} tone="down" hint={lastBtMetrics.maxDrawdownPeakDate && lastBtMetrics.maxDrawdownTroughDate ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}` : undefined} />
+                    <Metric label="Sharpe (ann.)" value={lastBtMetrics.sharpe.toFixed(2)} tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"} />
+                    <Metric label="Win rate" value={lastBtMetrics.winRatePct != null ? `${lastBtMetrics.winRatePct.toFixed(0)}%` : "—"} hint={`${lastBtMetrics.wins}W / ${lastBtMetrics.losses}L / ${lastBtMetrics.trades} trades`} />
+                    <Metric label="Volatility (ann.)" value={`${lastBtMetrics.volatilityPct.toFixed(2)}%`} />
+                    <Metric label="Best day" value={`${lastBtMetrics.bestDayPct.toFixed(2)}%`} tone="up" />
+                    <Metric label="Worst day" value={`${lastBtMetrics.worstDayPct.toFixed(2)}%`} tone="down" />
+                    <Metric label="Realized PnL" value={lastBtMetrics.grossRealizedPnl.toFixed(2)} tone={lastBtMetrics.grossRealizedPnl >= 0 ? "up" : "down"} />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+
             {(() => {
               const cb = p.circuit_breaker as { paused?: boolean; reason?: string; tripped_at?: string } | null;
               if (!cb?.paused) return null;
