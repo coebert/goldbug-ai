@@ -66,6 +66,8 @@ import {
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import {
   filterUniverse,
+  filterUniverseByAffordability,
+
   findSymbol,
   riskProfile,
   parseRiskConfig,
@@ -429,66 +431,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const totalValue = cash + holdingsValue;
 
   // Cash-aware universe filter. Uses raw risk_config (pre-regime tightening) so
-  // the pre-filter is at least as generous as the final guardrails. The
-  // per-symbol budget is the smaller of (per-symbol cap × total value) and
-  // available cash — you can't spend money you don't have. Instruments where
-  // ONE whole share costs more than the budget, or where the budget is below
-  // the min_trade_value floor, are dropped from BUY candidates (still
-  // considered for SELL if already held).
+  // the pre-filter is at least as generous as the final guardrails. Shared
+  // helper is unit-tested in src/lib/__tests__/affordability-filter.test.ts.
   const preRiskCfg = parseRiskConfig(portfolio.risk_config);
   const preRisk = riskProfile(portfolio.risk_level);
   const perSymbolCapPct = preRiskCfg.per_symbol_limit_pct ?? preRisk.maxPositionPct;
   const minTradeValue = preRiskCfg.execution_params?.min_trade_value ?? 25;
-  const perSymbolBudget = Math.min(totalValue * perSymbolCapPct, cash);
-  const affordable: UniverseSymbol[] = [];
-  const droppedForCash: Array<{ symbol: string; price: number; reason: string }> = [];
-  for (const u of fullUniverse) {
-    const price = priceMap.get(u.symbol);
-    if (price == null || price <= 0) {
-      affordable.push(u); // unknown price — let downstream logic handle it
-      continue;
-    }
-    if (price > perSymbolBudget) {
-      droppedForCash.push({
-        symbol: u.symbol, price,
-        reason: `1 share (${price.toFixed(2)}) > per-symbol budget ${perSymbolBudget.toFixed(2)}`,
-      });
-      continue;
-    }
-    if (perSymbolBudget < minTradeValue) {
-      droppedForCash.push({
-        symbol: u.symbol, price,
-        reason: `per-symbol budget ${perSymbolBudget.toFixed(2)} < min trade value ${minTradeValue}`,
-      });
-      continue;
-    }
-    affordable.push(u);
-  }
-  const heldSet = new Set(heldSymbols);
-  const alreadyAffordable = new Set(affordable.map((a) => a.symbol));
-  for (const u of fullUniverse) {
-    if (heldSet.has(u.symbol) && !alreadyAffordable.has(u.symbol)) affordable.push(u);
-  }
+  const affordabilityResult = filterUniverseByAffordability({
+    fullUniverse, priceMap, heldSymbols, cash, totalValue,
+    perSymbolCapPct, minTradeValue, currency: portfolio.currency,
+  });
+  const perSymbolBudget = affordabilityResult.perSymbolBudget;
+  const droppedForCash = affordabilityResult.dropped;
+  const candidateSymbols = affordabilityResult.candidates;
+  const budgetNotes = affordabilityResult.notes;
 
-  const budgetNotes: string[] = [];
-  let candidateSymbols: UniverseSymbol[];
-  if (affordable.length === 0) {
-    candidateSymbols = fullUniverse
-      .map((u) => ({ u, p: priceMap.get(u.symbol) ?? Infinity }))
-      .sort((a, b) => a.p - b.p)
-      .slice(0, 6)
-      .map((x) => x.u);
-    budgetNotes.push(
-      `No instruments affordable within per-symbol budget ${perSymbolBudget.toFixed(2)} ${portfolio.currency}; showing 6 cheapest for reference. Add funds or widen the per-symbol cap to enable buys.`,
-    );
-  } else {
-    candidateSymbols = affordable.slice(0, 22);
-    if (droppedForCash.length > 0) {
-      budgetNotes.push(
-        `Cash-aware filter kept ${candidateSymbols.length}/${fullUniverse.length} instruments; dropped ${droppedForCash.length} priced above per-symbol budget ${perSymbolBudget.toFixed(2)} ${portfolio.currency}.`,
-      );
-    }
-  }
 
   // Circuit breaker: evaluate BEFORE spending on the AI call. If tripped,
   // we still run auto-liquidation stops but skip the AI + any new buys.
