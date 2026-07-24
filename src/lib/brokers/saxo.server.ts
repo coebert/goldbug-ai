@@ -468,9 +468,19 @@ export class SaxoAdapter implements BrokerAdapter {
     if (req.orderType === "limit" && req.limitPrice != null) body.OrderPrice = req.limitPrice;
 
     try {
+      // Saxo throttles /trade/v2/orders at ~1 req/sec. Space consecutive
+      // placeOrder calls on the same adapter to at least 1.1s apart so a
+      // burst of two orders doesn't waste retries fighting rate limits.
+      const MIN_ORDER_GAP_MS = 1100;
+      const wait = Math.max(0, this.lastOrderPostAt + MIN_ORDER_GAP_MS - Date.now());
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      this.lastOrderPostAt = Date.now();
       const res = await this.req<{ OrderId?: string; ErrorInfo?: { Message?: string } }>(
-        "POST", "/trade/v2/orders", { body },
+        "POST",
+        "/trade/v2/orders",
+        { body, maxAttempts: 5, retryCapMs: 10_000 },
       );
+      this.lastOrderPostAt = Date.now();
       if (res.ErrorInfo) {
         return { brokerOrderId: "", status: "rejected", reason: res.ErrorInfo.Message ?? "unknown", raw: res };
       }
@@ -478,6 +488,7 @@ export class SaxoAdapter implements BrokerAdapter {
     } catch (e) {
       return { brokerOrderId: "", status: "error", reason: e instanceof Error ? e.message : String(e) };
     }
+
   }
 
   /**
