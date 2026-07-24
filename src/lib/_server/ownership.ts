@@ -15,6 +15,9 @@
 // any route/component from reaching this file transitively.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { logSecurity, createLogger } from "@/lib/_server/log";
+
+const ownershipLog = createLogger("SECURITY:ownership");
 
 export class PortfolioAccessError extends Error {
   constructor(message: string, public readonly context: Record<string, unknown>) {
@@ -50,10 +53,7 @@ export interface OwnershipLogContext {
  */
 export function logUnexpectedAccess(context: OwnershipLogContext): void {
   const event = context.event ?? "generic";
-  console.warn(
-    `SECURITY:${event} unexpected access attempt`,
-    JSON.stringify({ at: new Date().toISOString(), ...context }),
-  );
+  logSecurity(event, "unexpected access attempt", context);
   void (async () => {
     try {
       await supabaseAdmin.from("security_audit_log").insert({
@@ -79,10 +79,7 @@ export function logUnexpectedAccess(context: OwnershipLogContext): void {
           typeof context.portfolioId === "string" ? context.portfolioId : null,
       });
     } catch (e) {
-      console.warn(
-        `SECURITY:${event} audit persist failed`,
-        e instanceof Error ? e.message : String(e),
-      );
+      ownershipLog.warn(`SECURITY:${event} audit persist failed`, { err: e });
     }
   })();
 }
