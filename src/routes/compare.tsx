@@ -223,14 +223,7 @@ function ComparePage() {
                 <Button
                   className="w-full"
                   disabled={selected.length === 0 || runMut.isPending}
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `This will RESET and re-run ${selected.length} portfolio(s) over ${days} days. Continue?`,
-                      )
-                    )
-                      runMut.mutate();
-                  }}
+                  onClick={() => setConfirmRerun(true)}
                 >
                   <PlayCircle className="mr-2 h-4 w-4" />
                   {runMut.isPending ? "Running backtests…" : "Run backtests & compare"}
