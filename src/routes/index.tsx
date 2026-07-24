@@ -685,7 +685,8 @@ function CreatePortfolioCard() {
   const liveReserved = liveBal?.reservedCash ?? 0;
 
   return (
-    <Card>
+    <Card data-coach="new-portfolio">
+
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <PlusCircle className="h-4 w-4 text-primary" /> New portfolio
