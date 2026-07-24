@@ -360,13 +360,20 @@ export const getLiveStatus = createServerFn({ method: "POST" })
       .eq("id", data.portfolioId).maybeSingle();
     if (p.error || !p.data || p.data.user_id !== userId) throw new Error("Portfolio not found");
 
-    const [orders, fills, recon] = await Promise.all([
+    const [orders, fills, recon, lastSync] = await Promise.all([
       supabase.from("live_orders").select("*")
         .eq("portfolio_id", data.portfolioId).order("created_at", { ascending: false }).limit(50),
       supabase.from("live_fills").select("*")
         .eq("portfolio_id", data.portfolioId).order("filled_at", { ascending: false }).limit(50),
       supabase.from("live_reconciliation").select("*")
         .eq("portfolio_id", data.portfolioId).order("as_of", { ascending: false }).limit(5),
+      supabase.from("live_broker_log")
+        .select("created_at, status, request, response, error")
+        .eq("portfolio_id", data.portfolioId)
+        .eq("method", "CASH_SYNC")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     return {
@@ -374,6 +381,7 @@ export const getLiveStatus = createServerFn({ method: "POST" })
       orders: orders.data ?? [],
       fills: fills.data ?? [],
       reconciliation: recon.data ?? [],
+      lastCashSync: lastSync.data ?? null,
       hasToken: !!process.env.SAXO_ACCESS_TOKEN,
       env: (process.env.SAXO_ENV as "sim" | "live" | undefined) ?? "sim",
     };

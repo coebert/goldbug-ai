@@ -149,6 +149,10 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
       <CardContent className="space-y-4">
         <SaxoOAuthPanel />
 
+        <CashSyncIndicator lastSync={s?.lastCashSync ?? null} pending={mSync.isPending} />
+
+
+
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => mPing.mutate()} disabled={mPing.isPending || !s?.hasToken}>
@@ -285,6 +289,64 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+type CashSyncLog = {
+  created_at: string;
+  status: number | null;
+  request: unknown;
+  response: unknown;
+  error: string | null;
+} | null;
+
+function CashSyncIndicator({ lastSync, pending }: { lastSync: CashSyncLog; pending: boolean }) {
+  if (pending) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        <span>Syncing cash from broker…</span>
+      </div>
+    );
+  }
+  if (!lastSync) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        <Radio className="h-3.5 w-3.5" />
+        <span>No cash sync yet — activate live or hit “Sync balance”.</span>
+      </div>
+    );
+  }
+  const ok = (lastSync.status ?? 500) < 300 && !lastSync.error;
+  const resp = (lastSync.response ?? {}) as { delta?: number; brokerCash?: number; currency?: string; newCash?: number };
+  const when = new Date(lastSync.created_at);
+  const secs = Math.max(0, Math.floor((Date.now() - when.getTime()) / 1000));
+  const rel = secs < 60 ? `${secs}s ago` : secs < 3600 ? `${Math.floor(secs / 60)}m ago` : `${Math.floor(secs / 3600)}h ago`;
+  const delta = typeof resp.delta === "number" ? resp.delta : null;
+  const cur = resp.currency ?? "";
+  const cls = ok
+    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+    : "border-destructive/40 bg-destructive/10 text-destructive";
+  const Icon = ok ? CheckCircle2 : XCircle;
+  return (
+    <div className={`flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs ${cls}`}>
+      <Icon className="h-3.5 w-3.5" />
+      <span className="font-medium">
+        {ok ? "Cash synced" : "Cash sync failed"}
+      </span>
+      <span className="opacity-80">· {rel} ({when.toLocaleTimeString()})</span>
+      {ok && delta !== null && (
+        <span className="font-mono">
+          · Δ {delta >= 0 ? "+" : ""}{delta.toFixed(2)} {cur}
+        </span>
+      )}
+      {ok && typeof resp.newCash === "number" && (
+        <span className="font-mono opacity-80">· cash {resp.newCash.toFixed(2)} {cur}</span>
+      )}
+      {!ok && lastSync.error && (
+        <span className="opacity-80 truncate max-w-[240px]">· {lastSync.error}</span>
+      )}
+    </div>
   );
 }
 
