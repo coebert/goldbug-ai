@@ -16,7 +16,8 @@
 // are still applied because the broker is authoritative here; only true
 // broker read failures leave local state alone.
 
-import type { OwnedDbClient } from "@/lib/_server/owned-client";
+import { asJson, type Insert } from "@/lib/_server/db-json";
+import type { Database } from "@/integrations/supabase/types";
 
 export type LiveHoldingsSyncResult =
   | { skipped: true; reason: string }
