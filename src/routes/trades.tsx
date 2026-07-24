@@ -383,6 +383,15 @@ function TradeCard({ row }: { row: TradeRow }) {
     </div>
   );
 
+  const feesTotal = row.fills.reduce((s, f) => s + f.fee, 0);
+  const notional = row.notional ?? (row.avgFillPrice != null ? row.avgFillPrice * row.filledQty : 0);
+  const cashFlow = buy ? -(notional + feesTotal) : notional - feesTotal;
+  // Realized P&L estimate for sells (buys have no realized P&L on entry).
+  const realizedPnl = !buy && row.holding && row.avgFillPrice != null && row.filledQty > 0
+    ? (row.avgFillPrice - row.holding.avg_cost) * row.filledQty - feesTotal
+    : null;
+  const fillCurrency = row.fills[0]?.currency ?? "";
+
   const details = (
     <div className="space-y-3">
       {row.order.reject_reason && (
@@ -390,6 +399,21 @@ function TradeCard({ row }: { row: TradeRow }) {
           Reject reason: {row.order.reject_reason}
         </div>
       )}
+
+      {row.filledQty > 0 && (
+        <ImpactBreakdown
+          buy={buy}
+          priorQty={priorQty ?? 0}
+          nowQty={nowQty}
+          filledQty={row.filledQty}
+          notional={notional}
+          fees={feesTotal}
+          cashFlow={cashFlow}
+          realizedPnl={realizedPnl}
+          currency={fillCurrency}
+        />
+      )}
+
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {/* Lifecycle timeline */}
@@ -542,3 +566,127 @@ function ImpactCell({ label, value, tone }: { label: string; value: string; tone
     </div>
   );
 }
+
+function ImpactBreakdown({
+  buy, priorQty, nowQty, filledQty, notional, fees, cashFlow, realizedPnl, currency,
+}: {
+  buy: boolean;
+  priorQty: number;
+  nowQty: number;
+  filledQty: number;
+  notional: number;
+  fees: number;
+  cashFlow: number;
+  realizedPnl: number | null;
+  currency: string;
+}) {
+  const cur = currency ? `${currency} ` : "";
+  const feesPct = notional > 0 ? (fees / notional) * 100 : 0;
+  // Position bar chart: before vs after, scaled to the larger of the two.
+  const maxQty = Math.max(Math.abs(priorQty), Math.abs(nowQty), 1);
+  const beforePct = Math.max(2, (Math.abs(priorQty) / maxQty) * 100);
+  const afterPct = Math.max(2, (Math.abs(nowQty) / maxQty) * 100);
+  // Notional vs fees stacked bar (fees are usually tiny — enforce a min visible width).
+  const totalCost = notional + fees;
+  const notionalPct = totalCost > 0 ? (notional / totalCost) * 100 : 100;
+  const feesPctBar = totalCost > 0 ? Math.max(fees > 0 ? 2 : 0, (fees / totalCost) * 100) : 0;
+
+  const cashTone = cashFlow >= 0 ? "text-emerald-500" : "text-red-500";
+  const pnlTone = realizedPnl == null ? "text-foreground" : realizedPnl >= 0 ? "text-emerald-500" : "text-red-500";
+
+  return (
+    <div className="rounded-md border border-border bg-background p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Impact breakdown
+        </h4>
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {buy ? "Buy" : "Sell"} · {fmtNum(filledQty, 0)} filled
+        </span>
+      </div>
+
+      {/* Numeric tiles */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <MetricTile label="Notional" value={`${cur}${fmtNum(notional)}`} />
+        <MetricTile
+          label="Fees"
+          value={`${cur}${fmtNum(fees)}`}
+          sub={notional > 0 ? `${feesPct.toFixed(2)}% of notional` : undefined}
+        />
+        <MetricTile
+          label={buy ? "Cash used" : "Cash received"}
+          value={`${cashFlow >= 0 ? "+" : "−"}${cur}${fmtNum(Math.abs(cashFlow))}`}
+          toneClass={cashTone}
+        />
+        <MetricTile
+          label="Realized P&L"
+          value={realizedPnl == null ? "—" : `${realizedPnl >= 0 ? "+" : "−"}${cur}${fmtNum(Math.abs(realizedPnl))}`}
+          toneClass={pnlTone}
+          sub={realizedPnl == null && buy ? "Recognised on exit" : undefined}
+        />
+      </div>
+
+      {/* Position before → after */}
+      <div className="mt-3">
+        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>Position size</span>
+          <span className="tabular-nums text-foreground">
+            {fmtNum(priorQty, 0)} → {fmtNum(nowQty, 0)}
+            <span className={`ml-1.5 ${buy ? "text-emerald-500" : "text-red-500"}`}>
+              ({buy ? "+" : "−"}{fmtNum(filledQty, 0)})
+            </span>
+          </span>
+        </div>
+        <div className="space-y-1">
+          <BarRow label="Before" pct={beforePct} tone="muted" />
+          <BarRow label="After"  pct={afterPct}  tone={buy ? "good" : "bad"} />
+        </div>
+      </div>
+
+      {/* Notional vs fees stacked bar */}
+      <div className="mt-3">
+        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>Cost composition</span>
+          <span className="tabular-nums text-foreground">
+            {cur}{fmtNum(totalCost)}
+          </span>
+        </div>
+        <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-full bg-sky-500" style={{ width: `${notionalPct}%` }} />
+          <div className="h-full bg-amber-500" style={{ width: `${feesPctBar}%` }} />
+        </div>
+        <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm bg-sky-500" /> Notional
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-sm bg-amber-500" /> Fees
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricTile({ label, value, sub, toneClass }: { label: string; value: string; sub?: string; toneClass?: string }) {
+  return (
+    <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`text-sm font-semibold tabular-nums ${toneClass ?? "text-foreground"}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-[10px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function BarRow({ label, pct, tone }: { label: string; pct: number; tone: "good" | "bad" | "muted" }) {
+  const fill = tone === "good" ? "bg-emerald-500" : tone === "bad" ? "bg-red-500" : "bg-muted-foreground/40";
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-12 shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <div className={`h-full ${fill}`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+      </div>
+    </div>
+  );
+}
+
