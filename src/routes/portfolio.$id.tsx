@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
