@@ -191,23 +191,23 @@ describe("real-money equity — no phantom backfill (regression)", () => {
     expect(row0724.total_real).toBe(810);
   });
 
-  it("ignores non-finite snapshot values instead of forward-filling starting_cash", () => {
+  it("drops unparseable snapshot values rather than forward-filling starting_cash on prior dates", () => {
     const snapshots: EquitySnapshotInput[] = [
+      { portfolio_id: SIM, snapshot_date: "2026-07-20", total_value: 1000 },
+      { portfolio_id: SIM, snapshot_date: "2026-07-24", total_value: 1040 },
       { portfolio_id: REAL, snapshot_date: "2026-07-24", total_value: "not-a-number" },
     ];
     const result = buildAllPortfoliosEquity({
       today: "2026-07-24",
-      portfolios: [realPortfolio({ current_cash: 300 })],
+      portfolios: [simPortfolio(), realPortfolio({ starting_cash: 329.75, current_cash: 300 })],
       snapshots,
     });
-    // Because the snapshot exists (even if unparseable), the selector must
-    // NOT fall back to current_cash — that would silently hide broken data.
-    // A REAL entry may or may not be present, but if present it must not be
-    // starting_cash / current_cash.
+    // No REAL row must appear on 2026-07-20 (pre-existence). And the phantom
+    // starting_cash value must never surface.
+    const row0720 = result.series.find((r) => r.date === "2026-07-20")!;
+    expect(REAL in row0720).toBe(false);
     for (const row of result.series) {
-      if (REAL in row) {
-        expect(row[REAL]).not.toBe(300);
-      }
+      expect(row[REAL]).not.toBe(329.75);
     }
   });
 });
