@@ -1123,33 +1123,37 @@ function PortfolioPage() {
                       </table>
                     </div>
 
-                    {/* Mobile: stacked cards */}
-                    <div className="md:hidden space-y-3">
+                    {/* Mobile: accordion cards — tap to expand full details */}
+                    <div className="md:hidden space-y-2">
                       {sortedTrades.map((t) => {
                         const executedAt = t.executed_at ? new Date(t.executed_at) : null;
                         const timeGmt = executedAt && !isNaN(executedAt.getTime())
                           ? `${String(executedAt.getUTCHours()).padStart(2, "0")}:${String(executedAt.getUTCMinutes()).padStart(2, "0")}:${String(executedAt.getUTCSeconds()).padStart(2, "0")}`
                           : null;
                         return (
-                          <div key={t.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Badge className={t.side === "buy" ? "bg-primary/15 text-primary hover:bg-primary/15" : "bg-accent/15 text-accent hover:bg-accent/15"}>
-                                  {t.side.toUpperCase()}
-                                </Badge>
-                                <span className="font-medium truncate">{t.symbol}</span>
+                          <details
+                            key={t.id}
+                            className="group rounded-lg border border-border bg-card text-sm [&_summary::-webkit-details-marker]:hidden"
+                          >
+                            <summary className="flex cursor-pointer list-none items-center gap-2 p-3">
+                              <Badge className={`shrink-0 ${t.side === "buy" ? "bg-primary/15 text-primary hover:bg-primary/15" : "bg-accent/15 text-accent hover:bg-accent/15"}`}>
+                                {t.side.toUpperCase()}
+                              </Badge>
+                              <span className="min-w-0 flex-1 truncate font-medium">{t.symbol}</span>
+                              <span className="shrink-0 tabular-nums font-semibold">{Number(t.value).toFixed(2)}</span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                            </summary>
+                            <div className="border-t border-border px-3 py-2 space-y-1.5">
+                              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
+                                <span>{t.trade_date}{timeGmt ? ` · ${timeGmt} GMT` : ""}</span>
+                                <span>Qty {Number(t.quantity).toFixed(4)}</span>
+                                <span>@ {Number(t.price).toFixed(2)}</span>
                               </div>
-                              <span className="tabular-nums font-semibold shrink-0">{Number(t.value).toFixed(2)}</span>
+                              {t.reason && (
+                                <p className="text-xs text-muted-foreground break-words">{t.reason}</p>
+                              )}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
-                              <span>{t.trade_date}{timeGmt ? ` · ${timeGmt} GMT` : ""}</span>
-                              <span>Qty {Number(t.quantity).toFixed(4)}</span>
-                              <span>@ {Number(t.price).toFixed(2)}</span>
-                            </div>
-                            {t.reason && (
-                              <p className="mt-2 text-xs text-muted-foreground">{t.reason}</p>
-                            )}
-                          </div>
+                          </details>
                         );
                       })}
                     </div>
