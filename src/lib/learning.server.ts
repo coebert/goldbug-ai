@@ -26,7 +26,16 @@ export type LessonOverrideEntry = {
   original_text: string;
   action: string;
   replacement_text: string | null;
+  helpful_count: number;
+  unhelpful_count: number;
+  feedback_score: number;
 };
+
+// Lessons whose net feedback (helpful - unhelpful) is at or below this
+// threshold are auto-suppressed before reaching the AI prompt, same as an
+// explicit "disabled" override.
+export const LESSON_AUTO_SUPPRESS_SCORE = -2;
+
 
 export type LearningContext = {
   stats: LearningStats;
@@ -230,26 +239,47 @@ async function fetchLatestLessons(userId: string, currentRegime: string | null) 
 
   // Apply user overrides so lessons flagged as unhelpful are dropped
   // or replaced with the user's revised wording before the AI sees them.
+  // Feedback ratings (helpful/unhelpful) also raise or lower each lesson's
+  // priority in the final prompt.
   const { data: overrides } = await supabaseAdmin
     .from("lesson_overrides")
-    .select("original_text, action, replacement_text")
+    .select("original_text, action, replacement_text, helpful_count, unhelpful_count, feedback_score")
     .eq("user_id", userId);
-  const overrideMap = new Map<string, { action: string; replacement_text: string | null }>();
+  const overrideMap = new Map<string, {
+    action: string;
+    replacement_text: string | null;
+    helpful_count: number;
+    unhelpful_count: number;
+    feedback_score: number;
+  }>();
   for (const o of overrides ?? []) {
     overrideMap.set(o.original_text as string, {
-      action: o.action as string,
+      action: (o.action as string) ?? "neutral",
       replacement_text: (o.replacement_text as string | null) ?? null,
+      helpful_count: Number(o.helpful_count ?? 0),
+      unhelpful_count: Number(o.unhelpful_count ?? 0),
+      feedback_score: Number(o.feedback_score ?? 0),
     });
   }
-  const lessons: string[] = [];
+  type Scored = { text: string; score: number };
+  const scored: Scored[] = [];
   for (const l of raw) {
     const o = overrideMap.get(l);
-    if (!o) { lessons.push(l); continue; }
-    if (o.action === "disabled") continue;
-    if (o.action === "edited" && o.replacement_text && o.replacement_text.trim().length > 0) {
-      lessons.push(o.replacement_text.trim());
-    }
+    if (o?.action === "disabled") continue;
+    if (o && o.feedback_score <= LESSON_AUTO_SUPPRESS_SCORE) continue;
+    const text =
+      o?.action === "edited" && o.replacement_text && o.replacement_text.trim().length > 0
+        ? o.replacement_text.trim()
+        : l;
+    scored.push({ text, score: o?.feedback_score ?? 0 });
   }
+  // Highest-priority (most helpful) lessons first.
+  scored.sort((a, b) => b.score - a.score);
+  const lessons = scored.map((s) => {
+    if (s.score >= 2) return `[user-priority: high, +${s.score}] ${s.text}`;
+    if (s.score <= -1) return `[user-priority: low, ${s.score}] ${s.text}`;
+    return s.text;
+  });
 
   return {
     lessons,
@@ -260,9 +290,13 @@ async function fetchLatestLessons(userId: string, currentRegime: string | null) 
       original_text,
       action: v.action,
       replacement_text: v.replacement_text,
+      helpful_count: v.helpful_count,
+      unhelpful_count: v.unhelpful_count,
+      feedback_score: v.feedback_score,
     })),
   };
 }
+
 
 async function currentRegimeFor(asOf: string): Promise<string | null> {
   const { data } = await supabaseAdmin
@@ -339,7 +373,7 @@ export function formatLearningBlock(ctx: LearningContext): string {
 - By side — buys: ${s.per_side.buy.n} (win ${s.per_side.buy.win_rate != null ? `${(s.per_side.buy.win_rate * 100).toFixed(0)}%` : "n/a"}), sells: ${s.per_side.sell.n} (win ${s.per_side.sell.win_rate != null ? `${(s.per_side.sell.win_rate * 100).toFixed(0)}%` : "n/a"})
 ${lessonsBlock}
 
-Apply these lessons carefully: they were derived from the regime named above, so weight them heavier when the current regime matches and treat them as weaker priors when it doesn't. Double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge in this regime. State in your rationale whenever a decision was directly informed by a specific lesson.`;
+Apply these lessons carefully: they were derived from the regime named above, so weight them heavier when the current regime matches and treat them as weaker priors when it doesn't. Lessons are listed in the user's priority order — those tagged [user-priority: high] have been explicitly upvoted and MUST be weighted more strongly, while [user-priority: low] tags mean the user has partially disagreed and you should require stronger evidence before acting on them. Double-check any move that repeats a losing pattern, and lean into approaches with a demonstrated edge in this regime. State in your rationale whenever a decision was directly informed by a specific lesson.`;
 }
 
 const LessonsSchema = z.object({

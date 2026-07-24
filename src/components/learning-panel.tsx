@@ -5,6 +5,7 @@ import {
   getPortfolioLearning,
   setLessonOverride,
   clearLessonOverride,
+  rateLessonFeedback,
 } from "@/lib/trading.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,21 +23,29 @@ import {
   RotateCcw,
   Check,
   X,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 
 type OverrideAction = "disabled" | "edited";
 
 type OverrideView = {
   original_text: string;
-  action: OverrideAction;
+  action: OverrideAction | "neutral";
   replacement_text: string | null;
+  helpful_count: number;
+  unhelpful_count: number;
+  feedback_score: number;
 } | undefined;
+
 
 export function LearningPanel({ portfolioId }: { portfolioId: string }) {
   const qc = useQueryClient();
   const fn = useServerFn(getPortfolioLearning);
   const setOverride = useServerFn(setLessonOverride);
   const clearOverride = useServerFn(clearLessonOverride);
+  const rateFeedback = useServerFn(rateLessonFeedback);
+
 
   const q = useQuery({
     queryKey: ["learning", portfolioId],
@@ -83,6 +92,19 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to restore lesson"),
   });
+
+  const rateMut = useMutation({
+    mutationFn: (input: { original_text: string; vote: "helpful" | "unhelpful" | "clear" }) =>
+      rateFeedback({ data: input }),
+    onSuccess: (_data, vars) => {
+      if (vars.vote === "helpful") toast.success("Marked helpful — the AI will weight this lesson more strongly.");
+      else if (vars.vote === "unhelpful") toast.success("Marked unhelpful — the AI will require stronger evidence before acting on it.");
+      else toast.success("Feedback cleared.");
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to record feedback"),
+  });
+
 
   if (q.isLoading) {
     return (
@@ -155,8 +177,9 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
             )}
           </div>
           <p className="mb-2 text-xs text-muted-foreground">
-            Edit a lesson to reword it, or mark it as unhelpful to stop the AI applying it. Changes take effect on the next run.
+            Rate each lesson helpful or unhelpful — the AI uses these scores to prioritise or down-weight it in future decisions. You can also edit or fully disable a lesson. Changes take effect on the next run.
           </p>
+
           {lessons_raw.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Not enough trade outcomes yet — the AI needs at least 5 evaluable trades before it writes lessons.
@@ -169,26 +192,49 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
                 const busy =
                   (disableMut.isPending && disableMut.variables === l) ||
                   (restoreMut.isPending && restoreMut.variables === l) ||
-                  (editMut.isPending && editMut.variables?.original_text === l);
+                  (editMut.isPending && editMut.variables?.original_text === l) ||
+                  (rateMut.isPending && rateMut.variables?.original_text === l);
+                const score = ov?.feedback_score ?? 0;
+                const helpful = ov?.helpful_count ?? 0;
+                const unhelpful = ov?.unhelpful_count ?? 0;
+                const autoSuppressed = score <= -2 && ov?.action !== "disabled";
+                const priorityTone =
+                  score >= 2
+                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
+                    : score <= -1
+                      ? "border-red-500/50 bg-red-500/10 text-red-300"
+                      : "border-border bg-muted text-muted-foreground";
 
                 return (
                   <li key={i} className="rounded-md border bg-muted/40 p-2">
                     <div className="flex items-start gap-2">
                       <span className="text-muted-foreground">{i + 1}.</span>
                       <div className="flex-1 space-y-1">
-                        {ov?.action === "disabled" && (
-                          <div className="flex items-center gap-2">
-                            <Badge variant="destructive" className="text-[10px]">Disabled</Badge>
-                            <span className="text-xs text-muted-foreground">Not applied by the AI.</span>
-                          </div>
-                        )}
-                        {ov?.action === "edited" && (
-                          <div className="flex items-center gap-2">
-                            <Badge className="text-[10px]">Edited</Badge>
-                            <span className="text-xs text-muted-foreground">AI uses your revised wording.</span>
-                          </div>
-                        )}
-                        <div className={ov?.action === "disabled" ? "line-through text-muted-foreground" : ""}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {ov?.action === "disabled" && (
+                            <>
+                              <Badge variant="destructive" className="text-[10px]">Disabled</Badge>
+                              <span className="text-xs text-muted-foreground">Not applied by the AI.</span>
+                            </>
+                          )}
+                          {ov?.action === "edited" && (
+                            <>
+                              <Badge className="text-[10px]">Edited</Badge>
+                              <span className="text-xs text-muted-foreground">AI uses your revised wording.</span>
+                            </>
+                          )}
+                          {autoSuppressed && (
+                            <>
+                              <Badge variant="destructive" className="text-[10px]">Auto-suppressed</Badge>
+                              <span className="text-xs text-muted-foreground">Score too low — dropped from AI prompt.</span>
+                            </>
+                          )}
+                          <span className={`ml-auto rounded border px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${priorityTone}`}
+                            title={`${helpful} helpful · ${unhelpful} unhelpful`}>
+                            Priority {score > 0 ? `+${score}` : score}
+                          </span>
+                        </div>
+                        <div className={ov?.action === "disabled" || autoSuppressed ? "line-through text-muted-foreground" : ""}>
                           {l}
                         </div>
                         {ov?.action === "edited" && ov.replacement_text && (
@@ -238,7 +284,42 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex flex-wrap gap-1 pt-1">
+                          <div className="flex flex-wrap items-center gap-1 pt-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs text-emerald-400 hover:text-emerald-300"
+                              disabled={busy}
+                              onClick={() => rateMut.mutate({ original_text: l, vote: "helpful" })}
+                              title="Increase this lesson's priority"
+                            >
+                              <ThumbsUp className="mr-1 h-3 w-3" />
+                              Helpful{helpful > 0 ? ` · ${helpful}` : ""}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs text-red-400 hover:text-red-300"
+                              disabled={busy}
+                              onClick={() => rateMut.mutate({ original_text: l, vote: "unhelpful" })}
+                              title="Reduce this lesson's priority"
+                            >
+                              <ThumbsDown className="mr-1 h-3 w-3" />
+                              Unhelpful{unhelpful > 0 ? ` · ${unhelpful}` : ""}
+                            </Button>
+                            {(helpful > 0 || unhelpful > 0) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                disabled={busy}
+                                onClick={() => rateMut.mutate({ original_text: l, vote: "clear" })}
+                                title="Reset feedback score to 0"
+                              >
+                                Reset score
+                              </Button>
+                            )}
+                            <span className="mx-1 hidden h-4 w-px bg-border sm:inline-block" />
                             <Button
                               size="sm"
                               variant="ghost"
@@ -262,10 +343,10 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
                                 disabled={busy}
                                 onClick={() => disableMut.mutate(l)}
                               >
-                                <Ban className="mr-1 h-3 w-3" /> Mark unhelpful
+                                <Ban className="mr-1 h-3 w-3" /> Disable
                               </Button>
                             )}
-                            {ov && (
+                            {ov && (ov.action === "disabled" || ov.action === "edited") && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -283,6 +364,7 @@ export function LearningPanel({ portfolioId }: { portfolioId: string }) {
                   </li>
                 );
               })}
+
             </ol>
           )}
         </div>

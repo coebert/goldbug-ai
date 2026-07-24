@@ -330,30 +330,39 @@ export type Database = {
         Row: {
           action: string
           created_at: string
+          feedback_score: number | null
+          helpful_count: number
           id: string
           original_text: string
           reason: string | null
           replacement_text: string | null
+          unhelpful_count: number
           updated_at: string
           user_id: string
         }
         Insert: {
           action: string
           created_at?: string
+          feedback_score?: number | null
+          helpful_count?: number
           id?: string
           original_text: string
           reason?: string | null
           replacement_text?: string | null
+          unhelpful_count?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           action?: string
           created_at?: string
+          feedback_score?: number | null
+          helpful_count?: number
           id?: string
           original_text?: string
           reason?: string | null
           replacement_text?: string | null
+          unhelpful_count?: number
           updated_at?: string
           user_id?: string
         }
