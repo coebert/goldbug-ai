@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TradesRouteImport } from './routes/trades'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
 import { Route as LearnRouteImport } from './routes/learn'
@@ -32,6 +33,11 @@ import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
 
+const TradesRoute = TradesRouteImport.update({
+  id: '/trades',
+  path: '/trades',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SaxoStatusRoute = SaxoStatusRouteImport.update({
   id: '/saxo-status',
   path: '/saxo-status',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
+  '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
+  '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
+  '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
+    | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/news-preview'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
+    | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/news-preview'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
+    | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/news-preview'
@@ -305,6 +317,7 @@ export interface RootRouteChildren {
   LearnRoute: typeof LearnRoute
   SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
+  TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
@@ -320,6 +333,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trades': {
+      id: '/trades'
+      path: '/trades'
+      fullPath: '/trades'
+      preLoaderRoute: typeof TradesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/saxo-status': {
       id: '/saxo-status'
       path: '/saxo-status'
@@ -502,6 +522,7 @@ const rootRouteChildren: RootRouteChildren = {
   LearnRoute: LearnRoute,
   SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
+  TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,

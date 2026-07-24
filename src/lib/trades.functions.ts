@@ -76,22 +76,31 @@ export const getTradesDashboard = createServerFn({ method: "POST" })
     const [fillsRes, portfoliosRes, holdingsRes] = await Promise.all([
       orderIds.length
         ? supabase.from("live_fills").select("*").in("order_id", orderIds)
-        : Promise.resolve({ data: [], error: null } as const),
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
       portfolioIds.length
         ? supabase.from("portfolios").select("id, name, mode").in("id", portfolioIds)
-        : Promise.resolve({ data: [], error: null } as const),
+        : Promise.resolve({ data: [] as Array<{ id: string; name: string; mode: string }>, error: null }),
       portfolioIds.length
         ? supabase.from("holdings")
             .select("portfolio_id, symbol, quantity, avg_cost, updated_at")
             .in("portfolio_id", portfolioIds)
-        : Promise.resolve({ data: [], error: null } as const),
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
     ]);
 
-    const fills = fillsRes.data ?? [];
-    const portfolios = portfoliosRes.data ?? [];
-    const holdings = (holdingsRes.data ?? []).filter(h =>
+    type FillRow = {
+      id: string; order_id: string; portfolio_id: string; quantity: number;
+      fill_price: number; fee: number; currency: string; filled_at: string;
+      broker_fill_id: string | null;
+    };
+    type HoldingRow = {
+      portfolio_id: string; symbol: string; quantity: number; avg_cost: number; updated_at: string;
+    };
+    const fills = (fillsRes.data ?? []) as unknown as FillRow[];
+    const portfolios = (portfoliosRes.data ?? []) as Array<{ id: string; name: string; mode: string }>;
+    const holdings = ((holdingsRes.data ?? []) as unknown as HoldingRow[]).filter(h =>
       symbolByPortfolio.has(`${h.portfolio_id}::${h.symbol}`)
     );
+
 
     const portfolioById = new Map(portfolios.map(p => [p.id, p]));
     const fillsByOrder = new Map<string, typeof fills>();
