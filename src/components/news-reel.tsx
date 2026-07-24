@@ -481,9 +481,16 @@ export function NewsReel() {
                 const rec = recencyFor(item.date, now);
                 const cited = item.decisions_count > 0;
                 const isNew = highlightIds.has(item.id);
+                const prev = idx > 0 ? loop[idx - 1] : null;
+                const showDayHeader = !prev || prev.date !== item.date;
                 return (
+                  <div key={`${item.id}-${idx}`}>
+                    {showDayHeader && item.date && (
+                      <li className="sticky top-0 z-10 -mx-2 mb-2 border-y border-border bg-card/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+                        {item.date}
+                      </li>
+                    )}
                   <li
-                    key={`${item.id}-${idx}`}
                     className={`relative rounded-md border p-3 transition-colors ${
                       isNew
                         ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)] ring-2 ring-primary/40 animate-pulse"
