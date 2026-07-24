@@ -130,12 +130,10 @@ describe("writeCashSyncSnapshot", () => {
     // Still exactly ONE row for that (portfolio, date), even though the fake
     // client has no unique constraint to fall back on.
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: "r1",
-      cash: 124.6,
-      holdings_value: 175.86,
-      total_value: 300.46,
-    });
+    expect(rows[0].id).toBe("r1");
+    expect(rows[0].cash).toBe(124.6);
+    expect(rows[0].holdings_value).toBe(175.86);
+    expect(rows[0].total_value).toBeCloseTo(300.46, 10);
   });
 
   it("never produces duplicate rows for the same date across repeated syncs", async () => {
