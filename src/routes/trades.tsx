@@ -304,6 +304,7 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
 }
 
 function TradeCard({ row }: { row: TradeRow }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const buy = row.order.side.toLowerCase() === "buy";
   const fillPct = row.order.quantity > 0
@@ -314,128 +315,207 @@ function TradeCard({ row }: { row: TradeRow }) {
   const priorQty = row.holding ? row.holding.quantity - signedDelta : (signedDelta === 0 ? null : -signedDelta);
   const nowQty = row.holding?.quantity ?? (signedDelta === 0 ? 0 : signedDelta);
 
+  // Track horizontal swipe on the summary row so a left-swipe opens details
+  // as an alternative to tapping. Vertical scroll must still win.
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const swipeHandlers = isMobile
+    ? {
+        onTouchStart: (e: React.TouchEvent) => {
+          const t = e.touches[0];
+          touchStart.current = { x: t.clientX, y: t.clientY };
+        },
+        onTouchEnd: (e: React.TouchEvent) => {
+          const start = touchStart.current;
+          touchStart.current = null;
+          if (!start) return;
+          const t = e.changedTouches[0];
+          const dx = t.clientX - start.x;
+          const dy = t.clientY - start.y;
+          if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            setOpen(true);
+          }
+        },
+      }
+    : {};
+
+  const summary = (
+    <div
+      className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+      {...swipeHandlers}
+    >
+      <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${buy ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>
+        {buy ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">{row.order.symbol}</span>
+          <span className="text-xs uppercase text-muted-foreground">{row.order.side}</span>
+          <span className="text-xs text-muted-foreground">{fmtNum(row.order.quantity, 0)} @ {row.order.order_type}{row.order.limit_price ? ` ${fmtNum(row.order.limit_price)}` : ""}</span>
+          {statusBadge(row.order.status)}
+          {row.portfolio && (
+            <Badge variant="outline" className="text-[10px]">
+              {row.portfolio.name} · {row.portfolio.mode}
+            </Badge>
+          )}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+          <span>Created {fmtTime(row.order.created_at)}</span>
+          {row.order.submitted_at && <span>· Submitted {fmtTime(row.order.submitted_at)}</span>}
+          <span>· Filled {fmtNum(row.filledQty, 0)}/{fmtNum(row.order.quantity, 0)}</span>
+          {row.avgFillPrice != null && <span>· Avg {fmtNum(row.avgFillPrice)}</span>}
+          {row.holding
+            ? <span>· Position now {fmtNum(row.holding.quantity, 0)} @ {fmtNum(row.holding.avg_cost)}</span>
+            : <span>· No open position</span>}
+        </div>
+        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full ${fillPct >= 100 ? "bg-emerald-500" : fillPct > 0 ? "bg-amber-500" : "bg-muted-foreground/30"}`}
+            style={{ width: `${Math.max(2, fillPct)}%` }}
+          />
+        </div>
+        {isMobile && (
+          <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+            Tap or swipe ← for details
+          </p>
+        )}
+      </div>
+      <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open && !isMobile ? "rotate-180" : ""}`} />
+    </div>
+  );
+
+  const details = (
+    <div className="space-y-3">
+      {row.order.reject_reason && (
+        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
+          Reject reason: {row.order.reject_reason}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {/* Lifecycle timeline */}
+        <div>
+          <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lifecycle</h4>
+          <ol className="space-y-1 text-xs">
+            <Step label="Created" at={row.order.created_at} state="done" />
+            <Step label="Submitted to broker" at={row.order.submitted_at} state={row.order.submitted_at ? "done" : "pending"} />
+            {row.fills.length > 0
+              ? row.fills.map((f, i) => (
+                  <Step
+                    key={f.id}
+                    label={`Fill ${i + 1} · ${fmtNum(f.quantity, 0)} @ ${fmtNum(f.fill_price)} ${f.currency}`}
+                    at={f.filled_at}
+                    state="done"
+                  />
+                ))
+              : classifyStatus(row.order.status) === "rejected"
+                ? <Step label="Rejected" at={row.order.updated_at} state="bad" />
+                : classifyStatus(row.order.status) === "errored"
+                  ? <Step label="Errored" at={row.order.updated_at} state="bad" />
+                  : <Step label="Awaiting fills" at={null} state="pending" />}
+            <Step label={`Final · ${row.order.status}`} at={row.order.updated_at} state={
+              ["filled", "partial"].includes(classifyStatus(row.order.status)) ? "done"
+                : ["rejected", "errored"].includes(classifyStatus(row.order.status)) ? "bad"
+                : "pending"
+            } />
+          </ol>
+        </div>
+
+        {/* Position impact */}
+        <div>
+          <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Position impact</h4>
+          <div className="rounded-md border border-border bg-background px-2.5 py-2 text-xs">
+            <div className="grid grid-cols-3 gap-2">
+              <ImpactCell label="Before" value={priorQty != null ? fmtNum(priorQty, 0) : "—"} />
+              <ImpactCell
+                label={buy ? "Bought" : "Sold"}
+                value={row.filledQty > 0 ? `${buy ? "+" : "−"}${fmtNum(row.filledQty, 0)}` : "0"}
+                tone={buy ? "good" : "bad"}
+              />
+              <ImpactCell label="After" value={fmtNum(nowQty, 0)} />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+              <div>Avg cost now: <span className="text-foreground">{row.holding ? fmtNum(row.holding.avg_cost) : "—"}</span></div>
+              <div>Fill notional: <span className="text-foreground">{row.notional != null ? fmtNum(row.notional) : "—"}</span></div>
+              <div>Fees: <span className="text-foreground">{fmtNum(row.fills.reduce((s, f) => s + f.fee, 0))}</span></div>
+              <div>Last update: <span className="text-foreground">{fmtTime(row.holding?.updated_at ?? row.order.updated_at)}</span></div>
+            </div>
+            {!row.holding && row.filledQty > 0 && (
+              <p className="mt-2 text-[11px] text-amber-500">
+                Order shows fills but no matching holding row — position may still be syncing.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+            <div>Broker: <span className="text-foreground">{row.order.broker}</span></div>
+            {row.order.broker_order_id && <div>Broker ID: <span className="font-mono text-foreground">{row.order.broker_order_id}</span></div>}
+            {row.order.client_order_id && <div>Client ID: <span className="font-mono text-foreground">{row.order.client_order_id}</span></div>}
+            {row.portfolio && (
+              <div>
+                <Link to="/portfolio/$id" params={{ id: row.portfolio.id }} className="text-primary underline-offset-2 hover:underline">
+                  Open portfolio →
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        <Card className="overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="block w-full hover:bg-muted/40"
+          >
+            {summary}
+          </button>
+        </Card>
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerContent className="max-h-[90dvh]">
+            <DrawerHeader className="text-left">
+              <DrawerTitle className="flex items-center gap-2 text-base">
+                <span className={buy ? "text-emerald-500" : "text-red-500"}>
+                  {row.order.side.toUpperCase()}
+                </span>
+                <span>{row.order.symbol}</span>
+                {statusBadge(row.order.status)}
+              </DrawerTitle>
+              <DrawerDescription className="text-xs">
+                {fmtNum(row.order.quantity, 0)} @ {row.order.order_type}
+                {row.order.limit_price ? ` ${fmtNum(row.order.limit_price)}` : ""}
+                {row.portfolio ? ` · ${row.portfolio.name} (${row.portfolio.mode})` : ""}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="overflow-y-auto px-4 pb-6">{details}</div>
+          </DrawerContent>
+        </Drawer>
+      </>
+    );
+  }
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <Card className="overflow-hidden">
         <CollapsibleTrigger asChild>
-          <button className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/40">
-            <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${buy ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>
-              {buy ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">{row.order.symbol}</span>
-                <span className="text-xs uppercase text-muted-foreground">{row.order.side}</span>
-                <span className="text-xs text-muted-foreground">{fmtNum(row.order.quantity, 0)} @ {row.order.order_type}{row.order.limit_price ? ` ${fmtNum(row.order.limit_price)}` : ""}</span>
-                {statusBadge(row.order.status)}
-                {row.portfolio && (
-                  <Badge variant="outline" className="text-[10px]">
-                    {row.portfolio.name} · {row.portfolio.mode}
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                <span>Created {fmtTime(row.order.created_at)}</span>
-                {row.order.submitted_at && <span>· Submitted {fmtTime(row.order.submitted_at)}</span>}
-                <span>· Filled {fmtNum(row.filledQty, 0)}/{fmtNum(row.order.quantity, 0)}</span>
-                {row.avgFillPrice != null && <span>· Avg {fmtNum(row.avgFillPrice)}</span>}
-                {row.holding
-                  ? <span>· Position now {fmtNum(row.holding.quantity, 0)} @ {fmtNum(row.holding.avg_cost)}</span>
-                  : <span>· No open position</span>}
-              </div>
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full ${fillPct >= 100 ? "bg-emerald-500" : fillPct > 0 ? "bg-amber-500" : "bg-muted-foreground/30"}`}
-                  style={{ width: `${Math.max(2, fillPct)}%` }}
-                />
-              </div>
-            </div>
-            <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+          <button className="block w-full text-left hover:bg-muted/40">
+            {summary}
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="border-t border-border px-3 py-3 space-y-3 bg-muted/20">
-            {row.order.reject_reason && (
-              <div className="rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
-                Reject reason: {row.order.reject_reason}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {/* Lifecycle timeline */}
-              <div>
-                <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lifecycle</h4>
-                <ol className="space-y-1 text-xs">
-                  <Step label="Created" at={row.order.created_at} state="done" />
-                  <Step label="Submitted to broker" at={row.order.submitted_at} state={row.order.submitted_at ? "done" : "pending"} />
-                  {row.fills.length > 0
-                    ? row.fills.map((f, i) => (
-                        <Step
-                          key={f.id}
-                          label={`Fill ${i + 1} · ${fmtNum(f.quantity, 0)} @ ${fmtNum(f.fill_price)} ${f.currency}`}
-                          at={f.filled_at}
-                          state="done"
-                        />
-                      ))
-                    : classifyStatus(row.order.status) === "rejected"
-                      ? <Step label="Rejected" at={row.order.updated_at} state="bad" />
-                      : classifyStatus(row.order.status) === "errored"
-                        ? <Step label="Errored" at={row.order.updated_at} state="bad" />
-                        : <Step label="Awaiting fills" at={null} state="pending" />}
-                  <Step label={`Final · ${row.order.status}`} at={row.order.updated_at} state={
-                    ["filled", "partial"].includes(classifyStatus(row.order.status)) ? "done"
-                      : ["rejected", "errored"].includes(classifyStatus(row.order.status)) ? "bad"
-                      : "pending"
-                  } />
-                </ol>
-              </div>
-
-              {/* Position impact */}
-              <div>
-                <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Position impact</h4>
-                <div className="rounded-md border border-border bg-background px-2.5 py-2 text-xs">
-                  <div className="grid grid-cols-3 gap-2">
-                    <ImpactCell label="Before" value={priorQty != null ? fmtNum(priorQty, 0) : "—"} />
-                    <ImpactCell
-                      label={buy ? "Bought" : "Sold"}
-                      value={row.filledQty > 0 ? `${buy ? "+" : "−"}${fmtNum(row.filledQty, 0)}` : "0"}
-                      tone={buy ? "good" : "bad"}
-                    />
-                    <ImpactCell label="After" value={fmtNum(nowQty, 0)} />
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
-                    <div>Avg cost now: <span className="text-foreground">{row.holding ? fmtNum(row.holding.avg_cost) : "—"}</span></div>
-                    <div>Fill notional: <span className="text-foreground">{row.notional != null ? fmtNum(row.notional) : "—"}</span></div>
-                    <div>Fees: <span className="text-foreground">{fmtNum(row.fills.reduce((s, f) => s + f.fee, 0))}</span></div>
-                    <div>Last update: <span className="text-foreground">{fmtTime(row.holding?.updated_at ?? row.order.updated_at)}</span></div>
-                  </div>
-                  {!row.holding && row.filledQty > 0 && (
-                    <p className="mt-2 text-[11px] text-amber-500">
-                      Order shows fills but no matching holding row — position may still be syncing.
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                  <div>Broker: <span className="text-foreground">{row.order.broker}</span></div>
-                  {row.order.broker_order_id && <div>Broker ID: <span className="font-mono text-foreground">{row.order.broker_order_id}</span></div>}
-                  {row.order.client_order_id && <div>Client ID: <span className="font-mono text-foreground">{row.order.client_order_id}</span></div>}
-                  {row.portfolio && (
-                    <div>
-                      <Link to="/portfolio/$id" params={{ id: row.portfolio.id }} className="text-primary underline-offset-2 hover:underline">
-                        Open portfolio →
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+          <div className="border-t border-border bg-muted/20 px-3 py-3">
+            {details}
           </div>
         </CollapsibleContent>
       </Card>
     </Collapsible>
   );
 }
+
 
 function Step({ label, at, state }: { label: string; at: string | null | undefined; state: "done" | "pending" | "bad" }) {
   const dot =
