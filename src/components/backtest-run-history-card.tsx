@@ -81,6 +81,48 @@ function toneClass(v: number | null | undefined, invert = false) {
   return good ? "text-emerald-500" : "text-red-500";
 }
 
+function ReasonRow({
+  label,
+  raw,
+  norm,
+  weight,
+  contribution,
+  tone,
+  hint,
+}: {
+  label: string;
+  raw: string;
+  norm: number;
+  weight: number;
+  contribution: number;
+  tone: string;
+  hint?: string;
+}) {
+  const pct = Math.max(0, Math.min(1, norm)) * 100;
+  return (
+    <div className="rounded border border-border/50 bg-background/60 px-2 py-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className={`text-sm font-medium ${tone}`}>{raw}</span>
+      </div>
+      <div className="mt-1 h-1 w-full overflow-hidden rounded bg-border/50">
+        <div
+          className="h-full bg-primary/70"
+          style={{ width: `${pct.toFixed(1)}%` }}
+          aria-hidden
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+        <span>
+          norm {norm.toFixed(2)} × w {(weight * 100).toFixed(0)}%
+        </span>
+        <span className="font-mono">+{contribution.toFixed(3)}</span>
+      </div>
+      {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
+    </div>
+  );
+}
+
 type RiskTolerance = "conservative" | "balanced" | "aggressive";
 
 // Weights sum to 1. MDD is treated as "lower is better" — inverted before
