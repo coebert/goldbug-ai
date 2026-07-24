@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -163,6 +163,9 @@ export function NewsReel() {
   const [riskFilter, setRiskFilter] = useState<Set<string>>(new Set());
   const [onlyCited, setOnlyCited] = useState(false);
   const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount =
+    assetFilter.size + riskFilter.size + (onlyCited ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const toggleExpanded = (id: string) => {
@@ -358,7 +361,25 @@ export function NewsReel() {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+        <div className="mt-3 flex items-center justify-between gap-2 md:hidden">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+            aria-expanded={filtersOpen}
+          >
+            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${filtersOpen ? "rotate-90" : ""}`} />
+            Filters & sort
+            {activeFilterCount > 0 && (
+              <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <span className="text-[11px] text-muted-foreground">{items.length} of {allItems.length}</span>
+        </div>
+
+        <div className={`mt-3 flex-wrap items-center gap-2 text-[11px] ${filtersOpen ? "flex" : "hidden"} md:flex`}>
           <span className="text-muted-foreground uppercase tracking-wide">Asset:</span>
           {ASSET_CLASSES.map((c) => {
             const active = assetFilter.has(c);
@@ -460,9 +481,16 @@ export function NewsReel() {
                 const rec = recencyFor(item.date, now);
                 const cited = item.decisions_count > 0;
                 const isNew = highlightIds.has(item.id);
+                const prev = idx > 0 ? loop[idx - 1] : null;
+                const showDayHeader = !prev || prev.date !== item.date;
                 return (
+                  <Fragment key={`${item.id}-${idx}`}>
+                    {showDayHeader && item.date && (
+                      <li className="sticky top-0 z-10 -mx-2 mb-2 border-y border-border bg-card/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+                        {item.date}
+                      </li>
+                    )}
                   <li
-                    key={`${item.id}-${idx}`}
                     className={`relative rounded-md border p-3 transition-colors ${
                       isNew
                         ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)] ring-2 ring-primary/40 animate-pulse"
@@ -726,6 +754,7 @@ export function NewsReel() {
                       </div>
                     </div>
                   </li>
+                  </Fragment>
                 );
               })}
             </ul>

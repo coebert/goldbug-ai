@@ -20,6 +20,7 @@ import {
   RefreshCw,
   LogOut,
 } from "lucide-react";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 const NAV = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
@@ -70,7 +71,8 @@ export function AppHeader({ email }: { email?: string | null }) {
           </Link>
         </nav>
 
-        <div className="hidden items-center gap-3 text-sm md:flex">
+        <div className="hidden items-center gap-2 text-sm md:flex">
+          {email && <NotificationsBell />}
           {email && (
             <span className="hidden max-w-[180px] truncate text-muted-foreground lg:inline">
               {email}
@@ -89,8 +91,9 @@ export function AppHeader({ email }: { email?: string | null }) {
           ) : null}
         </div>
 
-        {/* Mobile: Admin + hamburger */}
+        {/* Mobile: notifications + Admin + hamburger */}
         <div className="flex shrink-0 items-center gap-1 md:hidden">
+          {email && <NotificationsBell />}
           <Link
             to="/admin"
             aria-label="Admin"
