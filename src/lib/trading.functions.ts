@@ -30,6 +30,12 @@ export { getPerformanceReport } from "./reports.functions";
 export { getComparison } from "./reports.functions";
 export { getTradeComparison } from "./reports.functions";
 export { getDiagnostics } from "./diagnostics.functions";
+export { runBacktest } from "./backtest.functions";
+export { runBacktestMany } from "./backtest.functions";
+export { runLongHorizonBacktest } from "./backtest.functions";
+export { addSimFunds } from "./sim-funds.functions";
+export { listSimFundEvents } from "./sim-funds.functions";
+export { addSimFundsHandler } from "./sim-funds.server";
 
 
 

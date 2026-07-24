@@ -3,7 +3,7 @@
 // derived from equity_snapshots) reflects the top-up immediately, rather
 // than waiting for the next hourly run.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addSimFundsHandler } from "../trading.functions";
+import { addSimFundsHandler } from "../sim-funds.server";
 
 const PF = "11111111-1111-4111-8111-111111111111";
 const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
