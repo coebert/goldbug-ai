@@ -348,5 +348,7 @@ export function computeBacktestMetrics(
     avgWin,
     avgLoss,
     grossRealizedPnl: grossRealized,
+    sharpeCI: cis.sharpe,
+    maxDrawdownCI: cis.maxDrawdown,
   };
 }
