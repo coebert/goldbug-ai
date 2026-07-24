@@ -5,6 +5,7 @@ import {
   getPortfolioLearning,
   setLessonOverride,
   clearLessonOverride,
+  rateLessonFeedback,
 } from "@/lib/trading.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,15 +23,21 @@ import {
   RotateCcw,
   Check,
   X,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 
 type OverrideAction = "disabled" | "edited";
 
 type OverrideView = {
   original_text: string;
-  action: OverrideAction;
+  action: OverrideAction | "neutral";
   replacement_text: string | null;
+  helpful_count: number;
+  unhelpful_count: number;
+  feedback_score: number;
 } | undefined;
+
 
 export function LearningPanel({ portfolioId }: { portfolioId: string }) {
   const qc = useQueryClient();
