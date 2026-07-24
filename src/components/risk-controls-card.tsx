@@ -616,6 +616,8 @@ export function RiskControlsCard({
                 </div>
               )}
             </div>
+            )}
+
 
             <div className="flex items-center gap-3 border-t border-border pt-4">
               <Button
