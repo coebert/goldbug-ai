@@ -47,6 +47,13 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
     enabled: showAudit,
   });
 
+  const tradeAlertFn = useServerFn(getLiveTradeAlert);
+  const alertQ = useQuery({
+    queryKey: ["live-trade-alert", portfolioId],
+    queryFn: () => tradeAlertFn({ data: { portfolioId, windowRuns: 5 } }),
+    refetchInterval: 5 * 60 * 1000,
+  });
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
     qc.invalidateQueries({ queryKey: ["live-audit", portfolioId] });
