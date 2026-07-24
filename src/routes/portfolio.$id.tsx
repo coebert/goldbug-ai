@@ -325,20 +325,49 @@ function PortfolioPage() {
     });
   }, [equityData, benchQ.data, benchmark, startingCashForChart]);
 
+  const depositEvents = useMemo(
+    () => (q.data?.deposits ?? []) as Array<{ date: string; amount: number }>,
+    [q.data?.deposits],
+  );
+  // Cumulative post-start deposit map so every chart-value calc uses
+  // the same deposit-adjusted baseline as ModeSummaryTile. When
+  // deposits is empty this is a no-op.
+  const cumulativeDepositsByDate = useMemo(() => {
+    const startDate = equityData[0]?.date;
+    if (!startDate) return new Map<string, number>();
+    const byDate = new Map<string, number>();
+    for (const d of depositEvents) {
+      if (!d || d.date <= startDate) continue;
+      const amt = Number(d.amount);
+      if (!Number.isFinite(amt)) continue;
+      byDate.set(d.date, (byDate.get(d.date) ?? 0) + amt);
+    }
+    const out = new Map<string, number>();
+    let cum = 0;
+    for (const row of equityData) {
+      cum += byDate.get(row.date) ?? 0;
+      out.set(row.date, cum);
+    }
+    return out;
+  }, [depositEvents, equityData]);
+
   const displayChartData = useMemo(() => {
     if (compareMode === "raw" || startingCashForChart <= 0) return chartData;
     const base = startingCashForChart;
     return chartData.map((row) => {
       const r = row as typeof row & { benchmark?: number | null };
+      const dep = cumulativeDepositsByDate.get(row.date) ?? 0;
+      const adjValue = row.value - dep;
+      const adjPeak = row.peak - dep;
       return {
         ...row,
-        value: ((row.value - base) / base) * 100,
-        peak: ((row.peak - base) / base) * 100,
+        value: ((adjValue - base) / base) * 100,
+        peak: ((adjPeak - base) / base) * 100,
         drawdown: row.drawdown,
         benchmark: r.benchmark != null ? ((r.benchmark - base) / base) * 100 : r.benchmark ?? null,
       };
     });
-  }, [chartData, compareMode, startingCashForChart]);
+  }, [chartData, compareMode, startingCashForChart, cumulativeDepositsByDate]);
 
   const perfMetrics = useMemo(() => {
     const rows = chartData.filter((r) => Number.isFinite(r.value));
@@ -912,7 +941,11 @@ function PortfolioPage() {
                             const fmtVal = (v: number) => isPct
                               ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
                               : `${p.currency} ${v.toFixed(2)}`;
-                            const pnlFromStart = isPct ? row.value : row.value - startingCash;
+                            // Net cumulative deposits out of the raw
+                            // tooltip pnl so it never shows a top-up
+                            // as profit (matches ModeSummaryTile).
+                            const dep = cumulativeDepositsByDate.get(String(label)) ?? 0;
+                            const pnlFromStart = isPct ? row.value : row.value - dep - startingCash;
                             const pnlPctFromStart = isPct
                               ? row.value
                               : startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
@@ -937,6 +970,11 @@ function PortfolioPage() {
                                   <div className="tabular-nums text-muted-foreground pl-3.5">
                                     vs start: {pnlFromStart >= 0 ? "+" : ""}
                                     {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
+                                    {dep !== 0 && (
+                                      <span className="ml-1" title={`Excludes ${p.currency} ${dep.toFixed(2)} of ${dep >= 0 ? "deposits" : "withdrawals"}`}>
+                                        · trading only
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                                 {row.benchmark != null && (

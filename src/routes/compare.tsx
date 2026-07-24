@@ -140,7 +140,38 @@ function ComparePage() {
     results.forEach((r) => r.series.forEach((s) => dateSet.add(s.snapshot_date)));
     const dates = Array.from(dateSet).sort();
 
-    // Track running peak per portfolio for drawdown
+    // Precompute a deposit-adjusted %-vs-start series per portfolio.
+    // The equity curve is normalised to the portfolio's OWN starting
+    // cash, and any mid-window deposit is subtracted so a top-up
+    // doesn't visually beat portfolios that received no funding.
+    const adjustedByName = new Map<string, Map<string, number>>();
+    for (const r of results) {
+      const pts = r.series.map((s) => ({ date: s.snapshot_date, equity: s.total_value }));
+      const deposits = (r as { deposits?: Array<{ date: string; amount: number }> }).deposits ?? [];
+      const start = r.portfolio.starting_cash;
+      const inner = new Map<string, number>();
+      // Anchor pct on the portfolio's declared starting cash rather
+      // than the first snapshot so all portfolios share the same
+      // baseline meaning ("0% = deposited principal").
+      let cumulative = 0;
+      const depByDate = new Map<string, number>();
+      for (const d of deposits) {
+        const amt = Number(d.amount);
+        if (!Number.isFinite(amt)) continue;
+        depByDate.set(d.date, (depByDate.get(d.date) ?? 0) + amt);
+      }
+      for (const s of r.series) {
+        cumulative += depByDate.get(s.snapshot_date) ?? 0;
+        const adjusted = s.total_value - cumulative;
+        const pct = start > 0 ? ((adjusted - start) / start) * 100 : 0;
+        inner.set(s.snapshot_date, pct);
+      }
+      adjustedByName.set(r.portfolio.name, inner);
+    }
+
+    // Track running peak per portfolio for drawdown (using raw equity —
+    // drawdown is a peak-to-trough loss and is unaffected by deposits
+    // at first order because both peak and value shift together).
     const peaks: Record<string, number> = {};
     const chart: Record<string, number | string>[] = [];
     const dd: Record<string, number | string>[] = [];
@@ -150,8 +181,8 @@ function ComparePage() {
       for (const r of results) {
         const point = r.series.find((s) => s.snapshot_date === d);
         if (point) {
-          const pct = ((point.total_value - r.portfolio.starting_cash) / r.portfolio.starting_cash) * 100;
-          row[r.portfolio.name] = pct;
+          const adjPct = adjustedByName.get(r.portfolio.name)?.get(d);
+          if (adjPct != null) row[r.portfolio.name] = adjPct;
           peaks[r.portfolio.name] = Math.max(peaks[r.portfolio.name] ?? -Infinity, point.total_value);
           const drawdownPct = peaks[r.portfolio.name] > 0
             ? ((point.total_value - peaks[r.portfolio.name]) / peaks[r.portfolio.name]) * 100
