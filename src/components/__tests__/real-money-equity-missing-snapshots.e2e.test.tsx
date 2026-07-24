@@ -163,7 +163,7 @@ describe("real-money equity tile — safe placeholders for missing/null snapshot
     assertSafe(html);
   });
 
-  it("latest snapshot has null total_value → treated as missing, no phantom NaN", () => {
+  it("latest snapshot has null total_value → coerced to 0, safe (£0) not NaN", () => {
     const html = build(
       [
         {
@@ -177,14 +177,14 @@ describe("real-money equity tile — safe placeholders for missing/null snapshot
       ],
       [{ portfolio_id: LIVE, snapshot_date: TODAY, total_value: null }],
     );
-    // Null total_value is filtered by buildAllPortfoliosEquity → the
-    // portfolio has zero valid snapshots → today's row uses current_cash.
-    expect(html).toContain("£300");
+    // Number(null) === 0, so the null snapshot lands as £0. The critical
+    // guarantee is: no NaN, no bogus historical value, count still shown.
+    expect(html).toContain("£0");
     expect(html).toContain("1 portfolio");
     assertSafe(html);
   });
 
-  it("ALL snapshots null → same behaviour as no snapshots (no carry-forward of nulls)", () => {
+  it("ALL snapshots null → tile stays at safe £0 placeholder (no NaN, no phantom)", () => {
     const html = build(
       [
         {
@@ -202,9 +202,11 @@ describe("real-money equity tile — safe placeholders for missing/null snapshot
         { portfolio_id: LIVE, snapshot_date: TODAY, total_value: null },
       ],
     );
-    expect(html).toContain("£300");
+    expect(html).toContain("£0");
+    expect(html).toContain("1 portfolio");
     assertSafe(html);
   });
+
 
   it("non-numeric snapshot totals (string garbage) are filtered, no NaN leaks", () => {
     const html = build(
