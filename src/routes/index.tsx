@@ -12,6 +12,7 @@ import {
 import { activateLive, getSaxoOAuthStatus, previewBrokerBalance } from "@/lib/live.functions";
 import { Sparkline } from "@/components/sparkline";
 import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
+import { computeModeSummary } from "@/lib/mode-summary";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -131,45 +132,12 @@ function Home() {
 
 
   const todaySummary = useMemo(() => {
-    const series = equityQ.data?.series ?? [];
+    const series = (equityQ.data?.series ?? []) as Array<Record<string, unknown> & { date: string }>;
     const portfolios = (equityQ.data?.portfolios ?? []) as Array<{ id: string; mode?: string }>;
-    if (series.length === 0 || portfolios.length === 0) return null;
-    const hasModeValue = (row: Record<string, unknown>, real: boolean) =>
-      portfolios.some((p) => {
-        const isReal = p.mode === "live_prod";
-        if (isReal !== real) return false;
-        const v = Number(row[p.id]);
-        return Number.isFinite(v);
-      });
-    const sumMode = (row: Record<string, unknown>, real: boolean) =>
-      portfolios.reduce((sum, p) => {
-        const isReal = p.mode === "live_prod";
-        if (isReal !== real) return sum;
-        const value = Number(row[p.id]);
-        return sum + (Number.isFinite(value) ? value : 0);
-      }, 0);
-    const modeSummary = (real: boolean) => {
-      const rows = series.filter((row) => hasModeValue(row as Record<string, unknown>, real)) as Array<Record<string, unknown>>;
-      const last = rows[rows.length - 1];
-      if (!last) return { now: 0, pnl: 0, pct: 0 };
-      const prev = rows.length > 1 ? rows[rows.length - 2] : last;
-      const now = sumMode(last, real);
-      const previous = sumMode(prev, real);
-      return {
-        now,
-        pnl: now - previous,
-        pct: previous > 0 ? ((now - previous) / previous) * 100 : 0,
-      };
-    };
-    const sim = modeSummary(false);
-    const real = modeSummary(true);
-    const simCount = portfolios.filter((p) => p.mode !== "live_prod").length;
-    const realCount = portfolios.filter((p) => p.mode === "live_prod").length;
-    return {
-      sim: { ...sim, count: simCount },
-      real: { ...real, count: realCount },
-    };
+    const deposits = (equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? [];
+    return computeModeSummary(series, portfolios, deposits);
   }, [equityQ.data]);
+
 
 
   const nextRunLabel = useMemo(() => {
