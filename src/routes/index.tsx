@@ -31,6 +31,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AppHeader } from "@/components/app-header";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
@@ -45,7 +52,7 @@ const DecisionNewsBreakdown = lazy(() =>
 );
 
 import { toast } from "sonner";
-import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Trash2, PlayCircle, PlusCircle, Sparkles, BookOpen, X, FlaskConical, Beaker, Banknote, AlertTriangle, ExternalLink, RefreshCw, Loader2, CheckCircle2, AlertCircle, MoreVertical, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 export const Route = createFileRoute("/")({
