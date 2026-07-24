@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -175,47 +175,74 @@ function TradesPage() {
           </div>
         )}
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">Filters</CardTitle>
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Select value={portfolioId} onValueChange={setPortfolioId}>
-                  <SelectTrigger className="h-8 w-[200px] text-xs"><SelectValue placeholder="Portfolio" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All portfolios</SelectItem>
-                    {options.map(o => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.name} <span className="text-muted-foreground">({o.mode})</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="filled">Filled</SelectItem>
-                    <SelectItem value="partial">Partial</SelectItem>
-                    <SelectItem value="submitted">Submitted</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="error">Errored</SelectItem>
-                    <SelectItem value="skipped">Skipped</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
-                  <SelectTrigger className="h-8 w-[110px] text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="50">Last 50</SelectItem>
-                    <SelectItem value="100">Last 100</SelectItem>
-                    <SelectItem value="250">Last 250</SelectItem>
-                    <SelectItem value="500">Last 500</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="sticky top-0 z-30 -mx-4 border-b border-border bg-background/90 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:inline">
+              Filters
+            </span>
+            <div className="grid flex-1 grid-cols-2 gap-2 sm:ml-auto sm:flex sm:flex-1-none sm:flex-wrap sm:justify-end">
+              <Select value={portfolioId} onValueChange={setPortfolioId}>
+                <SelectTrigger className="h-9 w-full text-xs sm:w-[200px]">
+                  <SelectValue placeholder="Portfolio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All portfolios</SelectItem>
+                  {options.map(o => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name} <span className="text-muted-foreground">({o.mode})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-9 w-full text-xs sm:w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="filled">Filled</SelectItem>
+                  <SelectItem value="partial">Partial</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="error">Errored</SelectItem>
+                  <SelectItem value="skipped">Skipped</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
+                <SelectTrigger className="col-span-2 h-9 w-full text-xs sm:col-span-1 sm:w-[110px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50">Last 50</SelectItem>
+                  <SelectItem value="100">Last 100</SelectItem>
+                  <SelectItem value="250">Last 250</SelectItem>
+                  <SelectItem value="500">Last 500</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </CardHeader>
-        </Card>
+          </div>
+          {(portfolioId !== "all" || status !== "all") && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span>Active:</span>
+              {portfolioId !== "all" && (
+                <Badge variant="outline" className="text-[10px]">
+                  {options.find(o => o.id === portfolioId)?.name ?? "Portfolio"}
+                </Badge>
+              )}
+              {status !== "all" && (
+                <Badge variant="outline" className="text-[10px]">{status}</Badge>
+              )}
+              <button
+                type="button"
+                onClick={() => { setPortfolioId("all"); setStatus("all"); }}
+                className="ml-auto text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+
 
         {query.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading trades…</p>
