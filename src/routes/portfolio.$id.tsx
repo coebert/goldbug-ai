@@ -81,6 +81,7 @@ import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { BacktestResultsCard } from "@/components/backtest-results-card";
+import { BacktestRunHistoryCard, saveRun as saveBacktestRun } from "@/components/backtest-run-history-card";
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
@@ -274,6 +275,14 @@ function PortfolioPage() {
         toast.success(
           `Backtest done. Return ${m.totalReturnPct.toFixed(2)}% · MDD ${m.maxDrawdownPct.toFixed(2)}% · Sharpe ${m.sharpe.toFixed(2)}${winPart}`,
         );
+        saveBacktestRun({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          ranAt: new Date().toISOString(),
+          portfolioId: id,
+          riskLevel: (q.data?.portfolio?.risk_level as string | undefined) ?? "unknown",
+          days,
+          metrics: m,
+        });
       } else {
         toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
       }
@@ -739,6 +748,10 @@ function PortfolioPage() {
                 currency={p?.currency ?? "USD"}
               />
             )}
+
+            <BacktestRunHistoryCard portfolioId={id} />
+
+
 
 
             {(() => {
