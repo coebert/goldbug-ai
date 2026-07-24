@@ -233,6 +233,37 @@ export const addSimFunds = createServerFn({ method: "POST" })
       currency: p.currency,
       balance_after: newCurrent,
     });
+
+    // Keep the equity snapshot for today in sync so the dashboard's
+    // "Simulated equity" summary (derived from equity_snapshots) reflects
+    // the top-up immediately, not after the next hourly run.
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: latest } = await context.supabase
+      .from("equity_snapshots")
+      .select("snapshot_date, cash, holdings_value, total_value")
+      .eq("portfolio_id", data.id)
+      .order("snapshot_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const holdingsValue = Number(latest?.holdings_value ?? 0);
+    const snapshotCash =
+      latest && latest.snapshot_date === today
+        ? Number(latest.cash) + data.amount
+        : newCurrent;
+    const snapshotTotal = snapshotCash + holdingsValue;
+    await context.supabase
+      .from("equity_snapshots")
+      .upsert(
+        {
+          portfolio_id: data.id,
+          snapshot_date: today,
+          cash: snapshotCash,
+          holdings_value: holdingsValue,
+          total_value: snapshotTotal,
+        },
+        { onConflict: "portfolio_id,snapshot_date" },
+      );
+
     return { ok: true, portfolio: updated };
   });
 
