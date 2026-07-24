@@ -30,6 +30,7 @@ import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/pu
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/public/hooks/daily-summary'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
+import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
 
 const SaxoStatusRoute = SaxoStatusRouteImport.update({
   id: '/saxo-status',
@@ -140,6 +141,12 @@ const ApiPublicHooksDailyRunRoute = ApiPublicHooksDailyRunRouteImport.update({
   path: '/api/public/hooks/daily-run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksBatchRetrainRoute =
+  ApiPublicHooksBatchRetrainRouteImport.update({
+    id: '/api/public/hooks/batch-retrain',
+    path: '/api/public/hooks/batch-retrain',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
@@ -179,6 +187,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
@@ -203,6 +212,7 @@ export interface FileRoutesById {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
@@ -274,6 +286,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
@@ -295,6 +308,7 @@ export interface RootRouteChildren {
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
+  ApiPublicHooksBatchRetrainRoute: typeof ApiPublicHooksBatchRetrainRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
   ApiPublicHooksDailySummaryRoute: typeof ApiPublicHooksDailySummaryRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
@@ -453,6 +467,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksDailyRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/batch-retrain': {
+      id: '/api/public/hooks/batch-retrain'
+      path: '/api/public/hooks/batch-retrain'
+      fullPath: '/api/public/hooks/batch-retrain'
+      preLoaderRoute: typeof ApiPublicHooksBatchRetrainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -484,6 +505,7 @@ const rootRouteChildren: RootRouteChildren = {
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
+  ApiPublicHooksBatchRetrainRoute: ApiPublicHooksBatchRetrainRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
   ApiPublicHooksDailySummaryRoute: ApiPublicHooksDailySummaryRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,

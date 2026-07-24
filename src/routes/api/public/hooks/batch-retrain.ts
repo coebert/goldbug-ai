@@ -97,7 +97,7 @@ export const Route = createFileRoute("/api/public/hooks/batch-retrain")({
                 user_id: r.user_id,
                 ok: true,
                 lessons_written: out.lessons_written,
-                regimes: out.regimes_written,
+                regimes: out.regimes_covered,
               });
             } catch (e) {
               const msg = e instanceof Error ? e.message : String(e);
