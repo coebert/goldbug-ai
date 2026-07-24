@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
 
 type Holding = {
