@@ -445,9 +445,20 @@ function PortfolioPage() {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
+                  {p.mode !== "live_prod" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1"
+                      onClick={() => setAddFundsOpen(true)}
+                    >
+                      <Banknote className="h-4 w-4" /> Add funds
+                    </Button>
+                  )}
                   <ModeBadge mode={p.mode} />
                   <LiveToggle portfolioId={p.id} mode={p.mode} livePaused={(p as { live_paused?: boolean | null }).live_paused} />
                 </div>
+
                 <p className="text-sm text-muted-foreground">
                   {p.currency} {startingCash.toFixed(0)} <Explain term="starting_pot">starting pot</Explain> · <Explain term="risk_level">{p.risk_level} risk</Explain>
                 </p>
