@@ -7,6 +7,7 @@
 // squares it against actual broker positions.
 
 import type { BrokerOrderResult } from "@/lib/brokers/adapter";
+import { asJson } from "@/lib/_server/db-json";
 import { createHash } from "node:crypto";
 
 export interface ExecutedOrderLike {
@@ -65,7 +66,7 @@ export async function routeOrdersToBroker(params: {
         method: "ROUTE_SKIPPED_PAPER_ONLY",
         path: "/route/paper-only",
         status: 0,
-        request: { asOf, decisionId, count: executed.length } as never,
+        request: asJson({ asOf, decisionId, count: executed.length }),
         response: null,
         error: "LIVE_SIM_PAPER_ONLY env flag active",
       });
@@ -103,7 +104,7 @@ export async function routeOrdersToBroker(params: {
       method: "ROUTE_SKIPPED",
       path: "/route/adapter-unavailable",
       status: 503,
-      request: { asOf, count: routable.length } as never,
+      request: asJson({ asOf, count: routable.length }),
       response: null,
       error: msg,
     });
@@ -151,8 +152,8 @@ export async function routeOrdersToBroker(params: {
       method: "FX_CAPTURE",
       path: `/fx/${portfolioCurrency}->${accountCurrency}`,
       status: fxStale ? 206 : 200,
-      request: { asOf, decisionId, count: routable.length } as never,
-      response: { rate: fxRate, source: fxSource, stale: fxStale } as never,
+      request: asJson({ asOf, decisionId, count: routable.length }),
+      response: asJson({ rate: fxRate, source: fxSource, stale: fxStale }),
       error: fxStale ? "fx rate stale or fallback" : null,
     });
   }
@@ -184,8 +185,8 @@ export async function routeOrdersToBroker(params: {
       method: "PREFLIGHT_BLOCKED",
       path: "/route/preflight",
       status: 424,
-      request: { asOf, decisionId, symbols: uniqueSymbols } as never,
-      response: { preflight } as never,
+      request: asJson({ asOf, decisionId, symbols: uniqueSymbols }),
+      response: asJson({ preflight }),
       error: `Unresolved Saxo instrument(s): ${missing.map((m) => m.symbol).join(", ")}`,
     });
     const missingSet = new Set(missing.map((m) => m.symbol));
@@ -255,7 +256,7 @@ export async function routeOrdersToBroker(params: {
         order_type: "market",
         status: "pending",
         submitted_at: new Date().toISOString(),
-      } as never)
+      })
       .select("id")
       .single();
 
@@ -265,7 +266,7 @@ export async function routeOrdersToBroker(params: {
         const existing = await supabaseAdmin
           .from("live_orders")
           .select("id, status, broker_order_id")
-          .eq("client_order_id" as never, clientOrderId as never)
+          .eq("client_order_id", clientOrderId)
           .maybeSingle();
         results.push({
           symbol: order.symbol,
@@ -333,7 +334,7 @@ export async function routeOrdersToBroker(params: {
         quantity: brokerRes.filledQuantity,
         fill_price: brokerRes.avgFillPrice,
         broker_fill_id: brokerRes.brokerOrderId || null,
-      } as never);
+      });
     }
 
     results.push({

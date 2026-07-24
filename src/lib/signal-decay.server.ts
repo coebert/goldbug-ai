@@ -116,7 +116,7 @@ export async function updateSignalPerformance(portfolioId: string, asOf: string)
   }));
   await supabaseAdmin
     .from("signal_performance")
-    .upsert(persist as unknown as never, { onConflict: "portfolio_id,signal_name,window_days" });
+    .upsert(persist, { onConflict: "portfolio_id,signal_name,window_days" });
 
   return rows;
 }

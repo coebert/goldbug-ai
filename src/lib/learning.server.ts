@@ -4,6 +4,7 @@
 
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
+import { asJson } from "@/lib/_server/db-json";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { getPriceOn } from "./market-data.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -462,7 +463,7 @@ Return { lessons: string[] } with 3–5 items, each under 180 characters. Use pl
         portfolio_id: portfolioId,
         as_of: asOf,
         lessons,
-        stats: ctx.stats as unknown as never,
+        stats: asJson(ctx.stats),
         window_days: ctx.stats.window_days,
         regime: b.regime,
       });

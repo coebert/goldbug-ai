@@ -3,6 +3,7 @@
 
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
+import { asJson } from "@/lib/_server/db-json";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import { HEDGE_FUND_PLAYBOOK } from "./hedge-fund-playbook.server";
@@ -1229,7 +1230,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     rationale: decision.rationale,
     model: "google/gemini-3.6-flash",
     portfolio_value: newTotal,
-    raw: {
+    raw: asJson({
       orders: decision.orders,
       executed,
       signals: features,
@@ -1278,7 +1279,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         lessons: learning.lessons,
         lessons_as_of: learning.lessons_as_of,
       },
-    } as unknown as never,
+    }),
   }).select("id").single();
   const decisionId = decisionInsert.data?.id ?? null;
 

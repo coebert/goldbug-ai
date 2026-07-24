@@ -11,6 +11,7 @@ import type {
   BrokerPingResult,
   BrokerPosition,
 } from "./adapter";
+import { asJson } from "@/lib/_server/db-json";
 
 const BASE = {
   sim: "https://gateway.saxobank.com/sim/openapi",
@@ -40,8 +41,8 @@ async function log(args: {
       method: args.method,
       path: args.path,
       status: args.status,
-      request: (args.request as never) ?? null,
-      response: (args.response as never) ?? null,
+      request: args.request == null ? null : asJson(args.request),
+      response: args.response == null ? null : asJson(args.response),
       error: args.error ?? null,
     });
   } catch (e) {
@@ -420,7 +421,7 @@ export class SaxoAdapter implements BrokerAdapter {
           method: "INSTRUMENT_LOOKUP_EMPTY",
           path: "/ref/v1/instruments",
           status: 404,
-          request: { symbol, normalized: { upper, base, suffix, preferredExchanges }, attempts } as never,
+          request: asJson({ symbol, normalized: { upper, base, suffix, preferredExchanges }, attempts }),
           response: null,
           error: `Saxo instrument not found for symbol ${symbol}`,
         });
@@ -435,7 +436,7 @@ export class SaxoAdapter implements BrokerAdapter {
     await supabaseAdmin.from("saxo_instrument_cache").upsert({
       symbol, env: this.env, uic: hit.Identifier, asset_type: hit.AssetType,
       currency: hit.CurrencyCode ?? null, exchange_id: hit.ExchangeId ?? null,
-      raw: hit as never, refreshed_at: new Date().toISOString(),
+      raw: asJson(hit), refreshed_at: new Date().toISOString(),
     });
     return {
       uic: hit.Identifier, assetType: hit.AssetType,
@@ -667,8 +668,8 @@ export class SaxoAdapter implements BrokerAdapter {
           method: "ACCOUNT_KEY_DISCOVERED",
           path: "/port/v1/accounts/me",
           status: 200,
-          request: { configuredProvided: true } as never,
-          response: { selected: !!this.resolvedAccountKey, accountCount: accounts.length } as never,
+          request: asJson({ configuredProvided: true }),
+          response: asJson({ selected: !!this.resolvedAccountKey, accountCount: accounts.length }),
           error: "Configured SAXO_ACCOUNT_KEY did not match this broker environment; using discovered active account.",
         });
       }

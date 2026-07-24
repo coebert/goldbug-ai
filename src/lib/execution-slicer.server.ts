@@ -10,6 +10,7 @@
 // does not own. Never expose these helpers to unauthenticated code paths.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Update } from "@/lib/_server/db-json";
 import { z } from "zod";
 import {
   SliceInputSchema,
@@ -201,7 +202,7 @@ export async function maybeSliceOrder(input: SliceInput) {
       expires_at: expiresAt.toISOString(),
       status: "active",
       idempotency_key: clean.idempotencyKey ?? null,
-    } as unknown as never)
+    })
     .select("id")
     .single();
   if (error) {
@@ -239,7 +240,7 @@ export async function tickSlicer(portfolioId: string, ownerUserId: string) {
   // Expire past-due slices
   await supabaseAdmin
     .from("pending_slices")
-    .update({ status: "expired" } as unknown as never)
+    .update({ status: "expired" })
     .eq("portfolio_id", clean.portfolioId)
     .eq("status", "active")
     .lt("expires_at", now);
@@ -301,7 +302,7 @@ export async function recordSliceFill(
         idempotency_key: clean.idempotencyKey,
         filled_qty: clean.filledQty,
         note: clean.note ?? null,
-      } as unknown as never);
+      });
     if (logErr) {
       if (/duplicate key|unique/i.test(logErr.message ?? "")) {
         return { applied: false, reason: "duplicate" };
@@ -316,7 +317,7 @@ export async function recordSliceFill(
   const nextAt = status === "active"
     ? new Date(Date.now() + 20 * 60_000).toISOString() // next slice in ~20 min
     : null;
-  const patch: Record<string, unknown> = {
+  const patch: Update<"pending_slices"> = {
     remaining_qty: remaining,
     slices_done: done,
     status,
@@ -325,7 +326,7 @@ export async function recordSliceFill(
   if (nextAt) patch.next_at = nextAt;
   await supabaseAdmin
     .from("pending_slices")
-    .update(patch as unknown as never)
+    .update(patch)
     .eq("id", clean.sliceId)
     .eq("portfolio_id", typed.portfolio_id); // belt-and-braces scope
   return { applied: true };

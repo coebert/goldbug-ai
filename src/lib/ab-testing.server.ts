@@ -3,6 +3,7 @@
 // Fire-and-forget from trading-engine; never affects live execution.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/_server/db-json";
 import type { DecisionOutput } from "./trading-engine.server";
 import { callAiForDecision } from "./trading-engine.server";
 
@@ -91,21 +92,21 @@ export async function runShadowVariant(args: {
     decision_id: args.decisionId,
     run_date: args.asOf,
     variant_name: VARIANT_NAME,
-    primary_summary: {
+    primary_summary: asJson({
       briefing: args.primary.briefing,
       rationale: args.primary.rationale,
       orders: primaryOrders,
-    },
-    shadow_summary: {
+    }),
+    shadow_summary: asJson({
       briefing: shadow.briefing,
       rationale: shadow.rationale,
       orders: shadowOrders,
-    },
+    }),
     agreement,
     primary_order_count: primaryOrders.length,
     shadow_order_count: shadowOrders.length,
-    divergences,
-  } as never);
+    divergences: asJson(divergences),
+  });
 }
 
 export async function getShadowReport(portfolioId: string, limit = 30) {

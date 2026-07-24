@@ -16,6 +16,7 @@
 // Cost: only cached prices — no external calls. Bounded grid (2*3*3 = 18).
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/_server/db-json";
 import { getDailyCandlesRange, sma as smaOf, rsi as rsiOf } from "./market-data.server";
 import { filterUniverse, type AssetClass } from "./universe.server";
 
@@ -216,7 +217,7 @@ export async function tunePortfolioHyperparams(
 
   await supabaseAdmin
     .from("portfolios")
-    .update({ hyperparams: tuned as unknown as never })
+    .update({ hyperparams: asJson(tuned) })
     .eq("id", portfolioId);
 
   return tuned;

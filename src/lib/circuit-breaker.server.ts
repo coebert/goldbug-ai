@@ -5,6 +5,7 @@
 // Also tightens per-symbol cap and stop-loss when regime is bear/crisis.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/_server/db-json";
 import type { PersistedRegime } from "./regime-detector.server";
 import { SIGNAL_KEYS, type SignalKey } from "./attribution.server";
 import { parseRiskConfig, riskProfile, type RiskConfig } from "./universe.server";
@@ -149,7 +150,7 @@ export async function evaluateBreaker(
 export async function persistCircuit(portfolioId: string, state: CircuitState) {
   await supabaseAdmin
     .from("portfolios")
-    .update({ circuit_breaker: state as unknown as never })
+    .update({ circuit_breaker: asJson(state) })
     .eq("id", portfolioId);
 }
 

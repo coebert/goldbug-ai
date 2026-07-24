@@ -16,7 +16,12 @@
 // are still applied because the broker is authoritative here; only true
 // broker read failures leave local state alone.
 
+import { asJson, type Insert } from "@/lib/_server/db-json";
+import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
+
+type AssetClass = Database["public"]["Enums"]["asset_class"];
+
 
 export type LiveHoldingsSyncResult =
   | { skipped: true; reason: string }
@@ -29,20 +34,22 @@ export type LiveHoldingsSyncResult =
       newTotalValue: number;
       currency: string;
     };
-
-const ALLOWED_ASSET_CLASSES = new Set([
-  "stock", "etf", "fund", "bond", "fx", "crypto", "commodity",
+// asset_class is a Postgres enum — restrict to the values the DB accepts so
+// TS enforces the mapping. Anything else falls back to "stock".
+const ALLOWED_ASSET_CLASSES = new Set<AssetClass>([
+  "stock", "etf", "fx", "crypto", "commodity",
 ]);
 
-function saxoAssetToClass(assetType: string | undefined): string {
+function saxoAssetToClass(assetType: string | undefined): AssetClass {
   const a = (assetType ?? "").toLowerCase();
   if (a === "stock") return "stock";
   if (a === "etf" || a === "etc") return "etf";
-  if (a === "fund") return "fund";
-  if (a === "bond") return "bond";
   if (a.includes("fx")) return "fx";
+  if (a === "crypto") return "crypto";
+  if (a === "commodity") return "commodity";
   return "stock";
 }
+
 
 export async function reconcileLiveHoldingsFromBroker(
   portfolioId: string,
@@ -106,7 +113,7 @@ export async function reconcileLiveHoldingsFromBroker(
       broker: "saxo", env,
       method: "HOLDINGS_SYNC", path: "/sync/holdings",
       status: 502,
-      request: {} as never, response: null,
+      request: asJson({}), response: null,
       error: `broker read failed: ${msg}`,
     });
     return { skipped: true, reason: `broker read failed: ${msg}` };
@@ -134,21 +141,23 @@ export async function reconcileLiveHoldingsFromBroker(
   }
 
   // Upsert broker positions as local holdings.
-  const rowsToUpsert = positions
+  const rowsToUpsert: Insert<"holdings">[] = positions
     .filter((p) => p.symbol && Math.abs(p.quantity) > 1e-8)
-    .map((p) => ({
-      portfolio_id: portfolioId,
-      symbol: p.symbol,
-      asset_class: (ALLOWED_ASSET_CLASSES.has(saxoAssetToClass(p.assetType))
-        ? saxoAssetToClass(p.assetType)
-        : "stock") as never,
-      quantity: p.quantity,
-      avg_cost: p.avgPrice || p.marketPrice || 0,
-      high_water_mark: p.avgPrice || p.marketPrice || 0,
-    }));
+    .map((p) => {
+      const mapped = saxoAssetToClass(p.assetType);
+      const asset_class: AssetClass = ALLOWED_ASSET_CLASSES.has(mapped) ? mapped : "stock";
+      return {
+        portfolio_id: portfolioId,
+        symbol: p.symbol,
+        asset_class,
+        quantity: p.quantity,
+        avg_cost: p.avgPrice || p.marketPrice || 0,
+        high_water_mark: p.avgPrice || p.marketPrice || 0,
+      };
+    });
   if (rowsToUpsert.length > 0) {
     await db.from("holdings").upsert(
-      rowsToUpsert as never,
+      rowsToUpsert,
       { onConflict: "portfolio_id,symbol" },
     );
   }
@@ -181,13 +190,13 @@ export async function reconcileLiveHoldingsFromBroker(
     broker: "saxo", env,
     method: "HOLDINGS_SYNC", path: "/sync/holdings",
     status: 200,
-    request: { localSymbols } as never,
-    response: {
+    request: asJson({ localSymbols }),
+    response: asJson({
       brokerCash, currency, holdingsValue, newTotal,
       brokerPositions: positions.length,
       removedSymbols,
       keptSymbols: Array.from(brokerSymbols),
-    } as never,
+    }),
     error: null,
   });
 

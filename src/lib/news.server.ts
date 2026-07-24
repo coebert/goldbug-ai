@@ -191,7 +191,7 @@ async function persistTranslations(
     }));
     const { error } = await supabaseAdmin
       .from("headline_translation_cache")
-      .upsert(rows as never, { onConflict: "source_headline" });
+      .upsert(rows, { onConflict: "source_headline" });
     if (error) {
       console.warn("news: translation cache upsert failed", error.message);
     }
@@ -440,7 +440,7 @@ export function backfillTranslations(
             original_headline: originalHeadline,
             original_language: t.lang,
             translation_confidence: t.confidence,
-          } as never)
+          })
           .eq("news_date", dateISO)
           .eq("headline", originalHeadline);
 

@@ -4,6 +4,7 @@
 // transitions vs the previously stored day.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/_server/db-json";
 import { getDailyCandles, sma, dailyVolatility, pctChange } from "./market-data.server";
 
 export type RegimeLabel =
@@ -208,7 +209,7 @@ export async function detectAndPersistRegime(asOf: string): Promise<PersistedReg
       confidence: assessment.confidence,
       previous_regime: previous,
       transitioned,
-      signals: assessment.signals as unknown as never,
+      signals: asJson(assessment.signals),
       notes: assessment.notes,
     },
     { onConflict: "as_of" },

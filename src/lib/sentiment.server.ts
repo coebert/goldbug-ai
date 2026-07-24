@@ -7,6 +7,7 @@ import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/_server/db-json";
 import type { NewsItem } from "./news.server";
 
 // Source reputation weights. Tier-1 wires get the highest signal;
@@ -152,10 +153,10 @@ export async function ensureSentimentScored(
     await supabaseAdmin
       .from("news_cache")
       .update({
-        sentiment: e.sentiment as unknown as number,
-        entities: e.entities,
+        sentiment: e.sentiment as unknown as string,
+        entities: asJson(e.entities),
         source_weight: e.source_weight as unknown as number,
-      } as never)
+      })
       .eq("news_date", dateISO)
       .eq("headline", e.headline);
   }

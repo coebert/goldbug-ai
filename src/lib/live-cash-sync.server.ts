@@ -19,6 +19,7 @@
 // keep working without churn.
 export type { ScopedDbClient, OwnedDbClient } from "@/lib/_server/owned-client";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
+import { asJson } from "@/lib/_server/db-json";
 
 const DRIFT_EPSILON = 0.5;
 
@@ -82,7 +83,7 @@ export async function syncLiveCashFromBroker(
       broker: "saxo", env,
       method: "CASH_SYNC", path: "/sync/cash",
       status: 502,
-      request: {} as never, response: null,
+      request: asJson({}), response: null,
       error: `broker read failed: ${msg}`,
     });
     return { skipped: true, reason: `broker read failed: ${msg}` };
@@ -136,15 +137,15 @@ export async function syncLiveCashFromBroker(
     broker: "saxo", env,
     method: "CASH_SYNC", path: "/sync/cash",
     status: upd.error ? 500 : 200,
-    request: { previousCash: prevCash, previousStarting: prevStarting, hasLocalHoldings } as never,
-    response: {
+    request: asJson({ previousCash: prevCash, previousStarting: prevStarting, hasLocalHoldings }),
+    response: asJson({
       brokerCash,
       delta,
       newCash: brokerCash,
       newStarting,
       startingCashAdjusted: !hasLocalHoldings,
       currency,
-    } as never,
+    }),
     error: upd.error?.message ?? null,
   });
 

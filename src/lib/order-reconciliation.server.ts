@@ -11,6 +11,7 @@
 // the missing loop.
 
 import type { SaxoAdapter } from "./brokers/saxo.server";
+import { asJson } from "@/lib/_server/db-json";
 
 export type OrderReconcileOutcome =
   | "filled"
@@ -83,7 +84,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     .from("live_orders")
     .select("id, symbol, side, quantity, status, broker_order_id, submitted_at, created_at")
     .eq("portfolio_id", portfolioId)
-    .in("status", ["pending", "submitted", "partial"] as never)
+    .in("status", ["pending", "submitted", "partial"])
     .gte("created_at", sinceIso)
     .order("created_at", { ascending: true });
 
@@ -205,7 +206,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         currency: "GBP",
         broker_fill_id: brokerOrderId,
         filled_at: hist.filledAt ?? new Date().toISOString(),
-      } as never);
+      });
       if (ins.error && ins.error.code !== "23505") {
         // Non-duplicate insert failures should surface in the log but not fail
         // the whole reconcile pass.
@@ -213,7 +214,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           portfolio_id: portfolioId, user_id: userId, broker: "saxo",
           env: adapter.env, method: "ORDER_RECON_FILL_INSERT_FAILED",
           path: "live_fills", status: null,
-          request: { orderId: row.id, brokerOrderId } as never,
+          request: asJson({ orderId: row.id, brokerOrderId }),
           error: ins.error.message,
         });
       }
@@ -241,11 +242,11 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     portfolio_id: portfolioId, user_id: userId, broker: "saxo",
     env: adapter.env, method: "ORDER_RECON",
     path: "/reconcile/orders", status: 200,
-    request: { lookbackHours, scanned: summary.scanned } as never,
-    response: {
+    request: asJson({ lookbackHours, scanned: summary.scanned }),
+    response: asJson({
       filled: summary.filled, partial: summary.partial, rejected: summary.rejected,
       cancelled: summary.cancelled, stillWorking: summary.stillWorking, unknown: summary.unknown,
-    } as never,
+    }),
   });
 
   return summary;
