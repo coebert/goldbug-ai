@@ -300,6 +300,8 @@ export function computeBacktestMetrics(
       avgWin: null,
       avgLoss: null,
       grossRealizedPnl: 0,
+      sharpeCI: null,
+      maxDrawdownCI: null,
     };
   }
 
