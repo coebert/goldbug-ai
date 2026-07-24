@@ -92,15 +92,18 @@ describe("selectSaxoInstrument", () => {
     expect(hit?.ExchangeId).toBe("LSE_ETF");
   });
 
-  it("prefers an exact Symbol match on a preferred exchange over prefix-only", () => {
+  it("prefers a symMatches hit on a preferred exchange over a non-preferred exchange", () => {
     const hits: SaxoInstrumentHit[] = [
-      { Identifier: 1, AssetType: "Stock", Symbol: "LLOY:xlon", ExchangeId: "LSE", CurrencyCode: "GBP" },
-      { Identifier: 2, AssetType: "Stock", Symbol: "LLOY", ExchangeId: "LSE_SETSMM", CurrencyCode: "GBP" },
+      // Same base ticker on a non-preferred exchange must lose.
+      { Identifier: 1, AssetType: "Stock", Symbol: "LLOY", ExchangeId: "NYSE", CurrencyCode: "USD" },
+      // The real LSE listing — must win via rule 1 (symMatches + preferred).
+      { Identifier: 2, AssetType: "Stock", Symbol: "LLOY:xlon", ExchangeId: "LSE", CurrencyCode: "GBP" },
     ];
     const hit = selectSaxoInstrument("LLOY.L", hits);
-    // Rule 1 (exact + preferred) beats rule 2 (prefix + preferred).
     expect(hit?.Identifier).toBe(2);
+    expect(hit?.ExchangeId).toBe("LSE");
   });
+
 
   it("falls back to any preferred-exchange hit if no symbol match", () => {
     const hits: SaxoInstrumentHit[] = [
