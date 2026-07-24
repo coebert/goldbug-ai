@@ -393,6 +393,22 @@ function PortfolioPage() {
   const trades = q.data?.trades ?? [];
   const decisions = q.data?.decisions ?? [];
 
+  const holdingsSeries = useMemo(() => {
+    const map: Record<string, HoldingSeriesInfo> = {};
+    for (const h of holdingsHistoryQ.data ?? []) {
+      map[h.symbol] = {
+        closes: h.closes,
+        currentPrice: h.currentPrice,
+        pctChangeSincePurchase: h.pctChangeSincePurchase,
+        valueChangeSincePurchase: h.valueChangeSincePurchase,
+        opened_at: h.opened_at,
+      };
+    }
+    return map;
+  }, [holdingsHistoryQ.data]);
+
+
+
   const holdingsValue = useMemo(() => {
     // Approx: use avg_cost as fallback (real value shown in dashboard when snapshots exist)
     return holdings.reduce((s, h) => s + Number(h.quantity) * Number(h.avg_cost), 0);
