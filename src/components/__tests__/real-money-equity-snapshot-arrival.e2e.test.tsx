@@ -42,7 +42,7 @@ function runPipeline(snapshots: EquitySnapshotInput[], today: string) {
     snapshots,
     today,
   });
-  const summary = computeModeSummary(data.series, data.portfolios, []);
+  const summary = computeModeSummary(data.series as Array<{ date: string } & Record<string, number | string>>, data.portfolios, []);
   if (!summary) throw new Error("expected non-null summary");
   const html = renderToStaticMarkup(
     <ModeSummaryTile
