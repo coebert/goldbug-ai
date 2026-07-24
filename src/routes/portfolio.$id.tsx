@@ -152,6 +152,8 @@ function PortfolioPage() {
   const qc = useQueryClient();
   const runDayFn = useServerFn(runOneDay);
   const runBtFn = useServerFn(runBacktest);
+  const getBtSeriesFn = useServerFn(getBacktestSeries);
+
   const resetFn = useServerFn(resetPortfolio);
   const [days, setDays] = useState(7);
   const [eventsOn, setEventsOn] = useState(true);
