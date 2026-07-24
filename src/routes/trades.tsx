@@ -96,7 +96,8 @@ function fmtTime(iso: string | null | undefined) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString("en-GB", {
+    timeZone: "Europe/London",
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }

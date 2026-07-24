@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listSimFundEvents } from "@/lib/trading.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Banknote } from "lucide-react";
+import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 
 function fmt(currency: string, n: number) {
   try {
@@ -14,9 +15,9 @@ function fmt(currency: string, n: number) {
 
 function fmtWhen(iso: string) {
   const d = new Date(iso);
-  const date = d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
-  const time = d.toUTCString().slice(17, 25); // HH:MM:SS
-  return `${date} · ${time} GMT`;
+  const date = formatUk(d, { year: "numeric", month: "short", day: "2-digit" });
+  const time = formatUk(d, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  return `${date} · ${time} ${ukZoneAbbr(d)}`;
 }
 
 export function SimFundHistoryCard({ portfolioId, currency }: { portfolioId: string; currency: string }) {

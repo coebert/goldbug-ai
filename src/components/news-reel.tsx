@@ -354,7 +354,7 @@ export function NewsReel() {
                 {q.isFetching ? "Refreshing…" : "Refresh now"}
               </Button>
             </div>
-            <div className="text-[10px] text-muted-foreground" title={lastUpdated ? new Date(lastUpdated).toLocaleString() : "Not yet loaded"}>
+            <div className="text-[10px] text-muted-foreground" title={lastUpdated ? new Date(lastUpdated).toLocaleString("en-GB", { timeZone: "Europe/London" }) : "Not yet loaded"}>
               {q.isFetching ? "Refreshing…" : `Updated ${formatAgo(lastUpdated, now)}`}
               {refreshMs === 0 ? " · auto-refresh off" : ""}
             </div>

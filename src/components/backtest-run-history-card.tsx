@@ -300,7 +300,7 @@ export function BacktestRunHistoryCard({
         const ddPct = peak > 0 ? (p.total_value / peak - 1) * 100 : 0;
         return { t: i, date: p.snapshot_date, equity: equityPct, drawdown: ddPct };
       });
-      const label = `${new Date(r.ranAt).toLocaleDateString()} · ${r.riskLevel} · ${r.days}d`;
+      const label = `${new Date(r.ranAt).toLocaleDateString("en-GB", { timeZone: "Europe/London" })} · ${r.riskLevel} · ${r.days}d`;
       return {
         id: r.id,
         label,
@@ -424,7 +424,7 @@ export function BacktestRunHistoryCard({
                 <div className="mt-3">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <div className="text-sm font-semibold">
-                      {new Date(recommendation.best.run.ranAt).toLocaleString()}
+                      {new Date(recommendation.best.run.ranAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}
                     </div>
                     <Badge variant="secondary" className="capitalize">
                       {recommendation.best.run.riskLevel || "unknown"} risk
@@ -669,7 +669,7 @@ export function BacktestRunHistoryCard({
                           />
                         </td>
                         <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">
-                          {new Date(r.ranAt).toLocaleString()}
+                          {new Date(r.ranAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}
                         </td>
                         <td className="py-2 pr-3">
                           <Badge variant="secondary" className="uppercase">{r.riskLevel}</Badge>

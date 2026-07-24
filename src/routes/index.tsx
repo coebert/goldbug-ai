@@ -64,6 +64,7 @@ import { Explain } from "@/components/explain";
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
+import { ukHour, ukZoneAbbr, formatUkTime } from "@/lib/uk-time";
 
 
 
@@ -146,17 +147,8 @@ function Home() {
 
   const nextRunLabel = useMemo(() => {
     const now = new Date();
-    const next = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        now.getUTCHours() + 1,
-        0,
-        0,
-      ),
-    );
-    return `${String(next.getUTCHours()).padStart(2, "0")}:00 GMT`;
+    const nextHour = (ukHour(now) + 1) % 24;
+    return `${String(nextHour).padStart(2, "0")}:00 ${ukZoneAbbr(now)}`;
   }, [equityQ.dataUpdatedAt]);
 
   if (!ready || !session) {
@@ -1080,7 +1072,7 @@ function BrokerBalancePreview(props: {
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <span>
                 Account {data.accountId ?? "—"} · fetched{" "}
-                {new Date(data.fetchedAt).toLocaleTimeString()}
+                {formatUkTime(data.fetchedAt)}
               </span>
               {justUpdated && (
                 <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/15 px-1 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
@@ -1176,7 +1168,7 @@ function BrokerBalancePreview(props: {
               {data && (
                 <span className="text-[10px] opacity-80">
                   Showing last known balance from{" "}
-                  {new Date(data.fetchedAt).toLocaleTimeString()}.
+                  {formatUkTime(data.fetchedAt)}.
                 </span>
               )}
             </div>

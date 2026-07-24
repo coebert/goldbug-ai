@@ -164,7 +164,7 @@ export function SecurityAuditCard() {
                 {rows.map((r) => (
                   <tr key={r.id} className="border-t align-top">
                     <td className="whitespace-nowrap p-2 text-muted-foreground">
-                      {new Date(r.created_at).toLocaleString()}
+                      {new Date(r.created_at).toLocaleString("en-GB", { timeZone: "Europe/London" })}
                     </td>
                     <td className="p-2">
                       <Badge variant="outline">{r.event}</Badge>
