@@ -73,6 +73,9 @@ export function AppHeader({ email }: { email?: string | null }) {
         </nav>
 
         <div className="hidden items-center gap-2 text-sm md:flex">
+          <span data-coach="help-button">
+            <HelpDrawer />
+          </span>
           {email && <NotificationsBell />}
           {email && (
             <span className="hidden max-w-[180px] truncate text-muted-foreground lg:inline">
