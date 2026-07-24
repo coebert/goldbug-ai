@@ -12,6 +12,7 @@ import {
 import { activateLive, getSaxoOAuthStatus, previewBrokerBalance } from "@/lib/live.functions";
 import { Sparkline } from "@/components/sparkline";
 import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
+import { computeModeSummary } from "@/lib/mode-summary";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
