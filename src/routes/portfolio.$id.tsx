@@ -33,7 +33,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles, Pencil, Banknote } from "lucide-react";
+import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles, Pencil, Banknote, AlertTriangle } from "lucide-react";
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
@@ -417,6 +417,31 @@ function PortfolioPage() {
     return arr;
   }, [trades, tradeSort]);
 
+  const underfunded = useMemo(() => {
+    const latest = decisions[0] as { raw?: unknown } | undefined;
+    if (!latest) return null;
+    const raw = (latest.raw ?? {}) as {
+      guardrails?: {
+        affordability?: {
+          per_symbol_budget?: number;
+          min_trade_value?: number;
+          universe_total?: number;
+          candidates_kept?: number;
+          notes?: string[];
+        };
+      };
+    };
+    const a = raw.guardrails?.affordability;
+    if (!a) return null;
+    if ((a.candidates_kept ?? 0) > 0) return null;
+    if ((a.universe_total ?? 0) === 0) return null;
+    return {
+      budget: a.per_symbol_budget ?? 0,
+      minTradeValue: a.min_trade_value ?? 0,
+      notes: a.notes ?? [],
+    };
+  }, [decisions]);
+
   if (!ready) return null;
 
   return (
@@ -487,6 +512,36 @@ function PortfolioPage() {
                 </span>
               </div>
             </div>
+
+            {underfunded && (
+              <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">Portfolio underfunded — no affordable instruments</p>
+                    <p className="text-muted-foreground">
+                      The latest AI run found no tradeable symbols. Per-symbol budget is{" "}
+                      <span className="font-medium text-foreground">
+                        {p.currency} {underfunded.budget.toFixed(2)}
+                      </span>{" "}
+                      and the minimum trade value is{" "}
+                      <span className="font-medium text-foreground">
+                        {p.currency} {underfunded.minTradeValue.toFixed(2)}
+                      </span>
+                      . Try adding funds{p.mode !== "live_prod" ? " to this portfolio" : " to your broker account"}, raising the max position size, or lowering the minimum trade value in Risk controls.
+                    </p>
+                    {underfunded.notes.length > 0 && (
+                      <p className="text-xs text-muted-foreground">{underfunded.notes.slice(0, 2).join(" · ")}</p>
+                    )}
+                    <div className="pt-1">
+                      <Button size="sm" variant="outline" onClick={() => setTab("risk")}>Open Risk controls</Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
               <TabsList className="flex w-full flex-wrap justify-start gap-1 h-auto p-1 md:flex-nowrap md:overflow-x-auto">
