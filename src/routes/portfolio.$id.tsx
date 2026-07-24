@@ -326,14 +326,17 @@ function PortfolioPage() {
     });
   }, [equityData, benchQ.data, benchmark, startingCashForChart]);
 
+  const [includeDeposits, setIncludeDeposits] = useIncludeDeposits();
+
   const depositEvents = useMemo(
     () => (q.data?.deposits ?? []) as Array<{ date: string; amount: number }>,
     [q.data?.deposits],
   );
-  // Cumulative post-start deposit map so every chart-value calc uses
-  // the same deposit-adjusted baseline as ModeSummaryTile. When
-  // deposits is empty this is a no-op.
+  // Cumulative post-start deposit map. When `includeDeposits` is true
+  // we short-circuit to an empty map so the raw equity curve shows
+  // through unchanged.
   const cumulativeDepositsByDate = useMemo(() => {
+    if (includeDeposits) return new Map<string, number>();
     const startDate = equityData[0]?.date;
     if (!startDate) return new Map<string, number>();
     const byDate = new Map<string, number>();
@@ -350,7 +353,7 @@ function PortfolioPage() {
       out.set(row.date, cum);
     }
     return out;
-  }, [depositEvents, equityData]);
+  }, [depositEvents, equityData, includeDeposits]);
 
   const displayChartData = useMemo(() => {
     if (compareMode === "raw" || startingCashForChart <= 0) return chartData;
