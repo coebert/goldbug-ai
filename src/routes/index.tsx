@@ -13,6 +13,8 @@ import { activateLive, getSaxoOAuthStatus, previewBrokerBalance } from "@/lib/li
 import { Sparkline } from "@/components/sparkline";
 import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
 import { computeModeSummary } from "@/lib/mode-summary";
+import { useIncludeDeposits } from "@/lib/use-include-deposits";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -131,12 +133,14 @@ function Home() {
 
 
 
+  const [includeDeposits, setIncludeDeposits] = useIncludeDeposits();
+
   const todaySummary = useMemo(() => {
     const series = (equityQ.data?.series ?? []) as Array<Record<string, unknown> & { date: string }>;
     const portfolios = (equityQ.data?.portfolios ?? []) as Array<{ id: string; mode?: string }>;
     const deposits = (equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? [];
-    return computeModeSummary(series, portfolios, deposits);
-  }, [equityQ.data]);
+    return computeModeSummary(series, portfolios, deposits, { includeDeposits });
+  }, [equityQ.data, includeDeposits]);
 
 
 
@@ -202,9 +206,26 @@ function Home() {
 
         {/* Today summary strip — real and simulated kept strictly separate */}
         {todaySummary && (
-          <div className="mb-6 grid gap-2 sm:grid-cols-3">
-            <ModeSummaryTile
-              label="Simulated equity"
+          <>
+            <div className="mb-2 flex items-center justify-end gap-2 text-[11px] text-muted-foreground sm:text-xs">
+              <label htmlFor="include-deposits-toggle" className="cursor-pointer select-none">
+                Include deposits in % change
+              </label>
+              <Switch
+                id="include-deposits-toggle"
+                checked={includeDeposits}
+                onCheckedChange={setIncludeDeposits}
+                aria-label="Include deposits in equity percent change"
+              />
+              <span className="hidden sm:inline text-muted-foreground/70" title={includeDeposits
+                ? "Percentages reflect raw equity change, including deposits/withdrawals."
+                : "Percentages reflect trading PnL only — external deposits/withdrawals are netted out."}>
+                {includeDeposits ? "raw" : "trading only"}
+              </span>
+            </div>
+            <div className="mb-6 grid gap-2 sm:grid-cols-3">
+              <ModeSummaryTile
+                label="Simulated equity"
               sublabel="SIM · paper + live-sim"
               tone="sim"
               money={todaySummary.sim.now}
@@ -231,7 +252,8 @@ function Home() {
               </div>
               <div className="text-[10px] text-muted-foreground sm:text-xs">hourly cycle</div>
             </div>
-          </div>
+            </div>
+          </>
         )}
 
 
