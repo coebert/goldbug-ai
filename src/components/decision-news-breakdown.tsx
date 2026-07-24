@@ -5,7 +5,7 @@ import { getDecisionNewsBreakdown } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, Layers, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Layers, RefreshCw } from "lucide-react";
 
 function tone(v: number | null) {
   if (v == null) return { label: "unscored", cls: "text-muted-foreground bg-muted" };
