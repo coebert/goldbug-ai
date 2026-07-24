@@ -4,6 +4,7 @@
 // reconciliation core that the cron route imports directly.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { ScopedDbClient } from "@/lib/live-cash-sync.server";
 
 export async function logAudit(params: {
   userId: string;
@@ -51,14 +52,21 @@ export function detectPositionDrift(
 
 // Shared reconciliation core (also called from the cron route at
 // src/routes/api/public/hooks/live-reconcile.ts).
-export async function runReconciliation(userId: string, portfolioId: string) {
+export async function runReconciliation(
+  userId: string,
+  portfolioId: string,
+  client?: ScopedDbClient,
+) {
+  // Same pattern as the sidecars: pass the caller's user-scoped client through
+  // so every write below is enforced by RLS. Cron paths omit the arg → admin.
+  const db = client ?? supabaseAdmin;
   const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
-  await syncLiveCashFromBroker(portfolioId);
+  await syncLiveCashFromBroker(portfolioId, client);
   const { reconcileLiveHoldingsFromBroker } = await import(
     "@/lib/live-holdings-sync.server"
   );
-  await reconcileLiveHoldingsFromBroker(portfolioId);
-  const p = await supabaseAdmin.from("portfolios")
+  await reconcileLiveHoldingsFromBroker(portfolioId, client);
+  const p = await db.from("portfolios")
     .select("id, user_id, mode, current_cash").eq("id", portfolioId).maybeSingle();
   if (p.error || !p.data) throw new Error("Portfolio not found");
   if (p.data.user_id !== userId) throw new Error("Not owned by caller");
@@ -72,7 +80,7 @@ export async function runReconciliation(userId: string, portfolioId: string) {
   const [bal, pos, hold] = await Promise.all([
     adapter.getBalance(),
     adapter.getPositions(),
-    supabaseAdmin.from("holdings").select("symbol, quantity, avg_cost").eq("portfolio_id", portfolioId),
+    db.from("holdings").select("symbol, quantity, avg_cost").eq("portfolio_id", portfolioId),
   ]);
   const localPositions = (hold.data ?? []).map((h) => ({
     symbol: h.symbol, quantity: Number(h.quantity), avgPrice: Number(h.avg_cost),
@@ -80,7 +88,7 @@ export async function runReconciliation(userId: string, portfolioId: string) {
   const cashDrift = Math.abs(bal.cash - Number(p.data.current_cash ?? 0));
   const symDrift = detectPositionDrift(pos, localPositions);
   const drift = cashDrift > 1 || symDrift.length > 0;
-  await supabaseAdmin.from("live_reconciliation").insert({
+  await db.from("live_reconciliation").insert({
     portfolio_id: portfolioId, user_id: userId,
     broker_cash: bal.cash,
     broker_positions: pos as never,
