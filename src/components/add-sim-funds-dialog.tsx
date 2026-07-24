@@ -68,6 +68,7 @@ export function AddSimFundsDialog({
       toast.success(`Added ${fmt(currency, parsed)} to ${portfolioName}`);
       qc.invalidateQueries({ queryKey: ["portfolios"] });
       qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+      qc.invalidateQueries({ queryKey: ["sim-fund-events", portfolioId] });
       onAdded?.(parsed);
       onOpenChange(false);
     },
