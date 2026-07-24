@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   activateLive, deactivateLive, pauseLive, killAllLive, resumeAllLive, getAuditLog,
-  pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio,
+  pingBroker, syncBrokerBalance, getLiveStatus, reconcilePortfolio, reconcileOrders,
   startSaxoOAuth, getSaxoOAuthStatus, getLiveTradeAlert,
 } from "@/lib/live.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -31,6 +31,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const ping = useServerFn(pingBroker);
   const syncBal = useServerFn(syncBrokerBalance);
   const reconcile = useServerFn(reconcilePortfolio);
+  const reconcileOrdersFn = useServerFn(reconcileOrders);
 
   const [ackRisk, setAckRisk] = useState(false);
   const [targetEnv, setTargetEnv] = useState<"sim" | "prod">("sim");
@@ -120,6 +121,22 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const mReconOrders = useMutation({
+    mutationFn: () => reconcileOrdersFn({ data: { portfolioId } }),
+    onSuccess: (r) => {
+      if ("skipped" in r && r.skipped) {
+        toast.info("Order reconciliation skipped (not a live portfolio)");
+      } else {
+        const s = r as { scanned: number; filled: number; partial: number; rejected: number; stillWorking: number; unknown: number };
+        toast.success(
+          `Reconciled ${s.scanned} order${s.scanned === 1 ? "" : "s"} — ${s.filled} filled, ${s.partial} partial, ${s.rejected} rejected, ${s.stillWorking} working${s.unknown ? `, ${s.unknown} unknown` : ""}`,
+        );
+      }
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const s = q.data;
   const mode = s?.portfolio.mode ?? "paper";
   const isLive = mode === "live_sim" || mode === "live_prod";
@@ -173,6 +190,10 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
           </Button>
           <Button size="sm" variant="outline" onClick={() => mRecon.mutate()} disabled={mRecon.isPending || !isLive}>
             Reconcile now
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => mReconOrders.mutate()} disabled={mReconOrders.isPending || !isLive}>
+            {mReconOrders.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            Reconcile orders
           </Button>
           {isLive && (
             <Button size="sm" variant="outline" onClick={() => mPause.mutate({ paused: !paused, reason: promptReason(paused ? "Resume" : "Pause") })} disabled={mPause.isPending}>
@@ -236,17 +257,20 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
         )}
 
         {s && (s.orders.length > 0 || s.fills.length > 0 || s.reconciliation.length > 0) && (
-          <div className="grid gap-3 md:grid-cols-3 text-xs">
-            <OrderTimelineList orders={s.orders} fills={s.fills} />
-            <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
-              key: f.id,
-              text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
-            }))} />
-            <MiniList title="Reconciliation" rows={s.reconciliation.map((r) => ({
-              key: r.id,
-              text: `${new Date(r.as_of).toLocaleString()} · ${r.drift_flag ? "DRIFT" : "OK"}${r.drift_notes ? ` · ${r.drift_notes}` : ""}`,
-            }))} />
-          </div>
+          <>
+            <OrderOutcomeSummary orders={s.orders} />
+            <div className="grid gap-3 md:grid-cols-3 text-xs">
+              <OrderTimelineList orders={s.orders} fills={s.fills} />
+              <MiniList title={`Fills (${s.fills.length})`} rows={s.fills.map((f) => ({
+                key: f.id,
+                text: `${new Date(f.filled_at).toLocaleString()} · ${f.side} ${f.quantity} @ ${Number(f.fill_price).toFixed(2)}`,
+              }))} />
+              <MiniList title="Reconciliation" rows={s.reconciliation.map((r) => ({
+                key: r.id,
+                text: `${new Date(r.as_of).toLocaleString()} · ${r.drift_flag ? "DRIFT" : "OK"}${r.drift_notes ? ` · ${r.drift_notes}` : ""}`,
+              }))} />
+            </div>
+          </>
         )}
 
         <div className="pt-2 border-t border-border">
@@ -393,6 +417,39 @@ function NoTradesAlert({ data }: { data: TradeAlertData }) {
         ))}
       </AlertDescription>
     </Alert>
+  );
+}
+
+function OrderOutcomeSummary({ orders }: { orders: OrderRow[] }) {
+  const buckets = { filled: 0, partial: 0, working: 0, rejected: 0, errored: 0, cancelled: 0, skipped: 0, pending: 0 };
+  for (const o of orders) {
+    const key = classifyOutcome(o).key;
+    if (key === "accepted") buckets.working++;
+    else if (key === "filled") buckets.filled++;
+    else if (key === "partial") buckets.partial++;
+    else if (key === "rejected") buckets.rejected++;
+    else if (key === "errored") buckets.errored++;
+    else if (key === "cancelled") buckets.cancelled++;
+    else if (key === "skipped") buckets.skipped++;
+    else buckets.pending++;
+  }
+  const tile = (label: string, count: number, cls: string) => (
+    <div className={`rounded-md border px-2 py-1.5 text-center ${cls}`}>
+      <div className="text-base font-semibold leading-tight">{count}</div>
+      <div className="text-[10px] uppercase tracking-wide opacity-80">{label}</div>
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-4 gap-1.5 text-xs sm:grid-cols-8">
+      {tile("Filled", buckets.filled, "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")}
+      {tile("Partial", buckets.partial, "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400")}
+      {tile("Working", buckets.working, "border-sky-500/40 bg-sky-500/10 text-sky-600 dark:text-sky-400")}
+      {tile("Rejected", buckets.rejected, "border-destructive/40 bg-destructive/10 text-destructive")}
+      {tile("Errored", buckets.errored, "border-destructive/30 bg-destructive/5 text-destructive")}
+      {tile("Cancelled", buckets.cancelled, "border-muted-foreground/30 bg-muted/30 text-muted-foreground")}
+      {tile("Skipped", buckets.skipped, "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400")}
+      {tile("Pending", buckets.pending, "border-border bg-muted/20 text-muted-foreground")}
+    </div>
   );
 }
 
