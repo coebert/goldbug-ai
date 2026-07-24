@@ -191,7 +191,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       logSnapshotTimingMismatches(mismatches);
     }
 
-    return { ...built, mismatches };
+    return { ...built, mismatches, deposits };
   });
 
 
