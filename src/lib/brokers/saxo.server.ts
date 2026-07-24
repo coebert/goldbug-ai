@@ -154,30 +154,50 @@ export class SaxoAdapter implements BrokerAdapter {
       TotalValue?: number;
       Currency?: string;
       CashAvailableForTrading?: number;
+      SpendingPower?: number;
       TransactionsNotBooked?: number;
       UnrealizedMarginProfitLoss?: number;
       UnrealizedPositionsValue?: number;
       OpenPositionsCount?: number;
       InitialMargin?: { CollateralAvailable?: number };
     }>("GET", "/port/v1/balances/me");
-    const cash = Number(bal.CashBalance ?? 0);
-    const cashAvailable =
-      bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : undefined;
-    const reservedCash =
-      cashAvailable != null ? Math.max(0, cash - cashAvailable) : undefined;
+    // Saxo reports several money fields. CashBalance is settled cash only, so a
+    // brand-new account with a pending deposit shows 0 there even though the
+    // funds are visible in SpendingPower / TotalValue / TransactionsNotBooked.
+    // Treat the actual tradable amount as the max of the sources Saxo confirms
+    // are usable, so the portfolio's starting pot matches what the user
+    // actually deposited (e.g. £100 pending shows as £100, not £0).
+    const settled = Number(bal.CashBalance ?? 0);
+    const notBooked = Number(bal.TransactionsNotBooked ?? 0);
+    const spending = bal.SpendingPower != null ? Number(bal.SpendingPower) : null;
+    const total = bal.TotalValue != null ? Number(bal.TotalValue) : null;
+    const availTrading =
+      bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : null;
+    // Effective cash = the largest of the fields Saxo tells us we can trade
+    // with, so a pending deposit counts even before it settles.
+    const cash = Math.max(
+      settled,
+      settled + notBooked,
+      spending ?? 0,
+      availTrading ?? 0,
+      total ?? 0,
+    );
+    // Preserve availability semantics for guardrails: what's tradable *right now*.
+    const cashAvailable = spending ?? availTrading ?? cash;
+    const reservedCash = Math.max(0, cash - cashAvailable);
     return {
       cash,
-      totalValue: Number(bal.TotalValue ?? bal.CashBalance ?? 0),
+      totalValue: Number(bal.TotalValue ?? cash),
       currency: bal.Currency ?? "GBP",
       cashAvailable,
-      transactionsNotBooked:
-        bal.TransactionsNotBooked != null ? Number(bal.TransactionsNotBooked) : undefined,
+      transactionsNotBooked: notBooked,
       reservedCash,
       unrealizedPnl:
         bal.UnrealizedMarginProfitLoss != null
           ? Number(bal.UnrealizedMarginProfitLoss)
           : undefined,
     };
+
   }
 
   async getPositions(): Promise<BrokerPosition[]> {
