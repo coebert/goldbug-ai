@@ -36,19 +36,30 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
 
         // Concurrency guard: only one hourly cycle at a time (cron OR manual).
         let manualTrigger = false;
+        let forceClear = false;
         try {
           const bodyText = await request.clone().text();
           if (bodyText) {
             const parsed = JSON.parse(bodyText);
             manualTrigger = parsed?.manual === true;
+            forceClear = parsed?.force === true;
           }
         } catch { /* body optional */ }
+
+        // Manual triggers always force-clear any existing hourly-run lock:
+        // this is a single-user app, worker time limits can kill a prior run
+        // before `finally` releases the lock, and the operator explicitly
+        // asked for a new run. Cron never force-clears — it defers to whoever
+        // is currently running.
+        if (manualTrigger || forceClear) {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await supabaseAdmin.from("run_locks").delete().eq("name", "hourly-run");
+        }
+
         const lock = await acquireRunLock("hourly-run", {
           owner: manualTrigger ? "manual" : "cron",
-          // Worker wall/CPU limits can kill the run before `finally` releases
-          // the lock. Evict anything older than 5 min so a crashed run cannot
-          // permanently block manual/cron triggers.
-          staleMs: 5 * 60 * 1000,
+          // Fallback stale eviction if a run dies without releasing.
+          staleMs: 3 * 60 * 1000,
         });
         if (!lock.acquired) {
           return new Response(
@@ -62,6 +73,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
             { status: 409, headers: { "Content-Type": "application/json" } },
           );
         }
+
 
         try {
         const classesFromUniverse = (u: unknown): Array<"stock" | "etf" | "crypto" | "commodity" | "fx"> => {
