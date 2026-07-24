@@ -26,7 +26,16 @@ export type LessonOverrideEntry = {
   original_text: string;
   action: string;
   replacement_text: string | null;
+  helpful_count: number;
+  unhelpful_count: number;
+  feedback_score: number;
 };
+
+// Lessons whose net feedback (helpful - unhelpful) is at or below this
+// threshold are auto-suppressed before reaching the AI prompt, same as an
+// explicit "disabled" override.
+export const LESSON_AUTO_SUPPRESS_SCORE = -2;
+
 
 export type LearningContext = {
   stats: LearningStats;
