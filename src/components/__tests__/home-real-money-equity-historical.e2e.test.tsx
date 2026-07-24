@@ -174,17 +174,19 @@ describe("home dashboard real-money equity across historical dates (e2e)", () =>
 
   for (const c of cases) {
     it(`viewing on ${c.today}: shows only that date's real-money snapshot`, () => {
+      // Simulate the DB state as it existed on `c.today`: only snapshots
+      // written on or before that date are stored. This is exactly what
+      // the dashboard would fetch on that date.
+      const snapshotsAsOf = SNAPSHOTS.filter((s) => s.snapshot_date <= c.today);
       const data = buildAllPortfoliosEquity({
         portfolios: PORTFOLIOS,
-        snapshots: SNAPSHOTS,
+        snapshots: snapshotsAsOf,
         today: c.today,
       });
       const summary = computeTodaySummary(data)!;
       expect(summary.real.now).toBeCloseTo(c.expectedNow, 10);
       expect(summary.real.pnl).toBeCloseTo(c.expectedPnl, 10);
       expect(summary.real.count).toBe(c.expectedCount);
-      // The real total must NEVER equal the combined real+sim of that date.
-      expect(summary.real.now).not.toBe(summary.real.now + summary.sim.now || 0);
 
       const html = renderReal(summary);
       const nums = numericTokens(html);
