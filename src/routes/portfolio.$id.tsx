@@ -59,6 +59,7 @@ import { StressPanelCard } from "@/components/stress-panel-card";
 import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
+import { LiveHoldingsCard } from "@/components/live-holdings-card";
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
