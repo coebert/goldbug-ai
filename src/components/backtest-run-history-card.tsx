@@ -52,7 +52,7 @@ const OVERLAY_PALETTE = [
 ];
 
 
-const STORAGE_PREFIX = "aegis.backtestRuns.";
+
 
 // React Query key for a portfolio's persisted run history.
 export const backtestRunsQueryKey = (portfolioId: string) =>
