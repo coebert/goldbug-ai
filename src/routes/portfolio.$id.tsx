@@ -1182,6 +1182,7 @@ function PortfolioPage() {
             currency={p.currency}
             currentCash={Number(p.current_cash)}
             startingCash={Number(p.starting_cash)}
+            holdingsValue={holdingsValue}
           />
         </>
       )}
