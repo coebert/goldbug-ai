@@ -13,9 +13,19 @@ const InputSchema = z.object({
   days: z.number().int().min(1).max(3650),
 });
 
+export type BacktestTradeMarker = {
+  date: string;
+  executed_at: string | null;
+  side: "buy" | "sell";
+  symbol: string;
+  quantity: number;
+  price: number;
+};
+
 export type BacktestSeriesResult = {
   equity: EquityRow[];
   holdings: HoldingsOverTime;
+  trades: BacktestTradeMarker[];
   startingCash: number;
   from: string | null;
   to: string | null;
@@ -54,6 +64,7 @@ export const getBacktestSeries = createServerFn({ method: "GET" })
       return {
         equity,
         holdings: { symbols: [], points: [] },
+        trades: [],
         startingCash,
         from,
         to,
@@ -99,5 +110,16 @@ export const getBacktestSeries = createServerFn({ method: "GET" })
       startingCash,
     );
 
-    return { equity, holdings, startingCash, from, to };
+    const tradeMarkers: BacktestTradeMarker[] = trades
+      .filter((t) => t.trade_date >= from && t.trade_date <= to)
+      .map((t) => ({
+        date: t.trade_date,
+        executed_at: t.executed_at,
+        side: t.side,
+        symbol: t.symbol,
+        quantity: t.quantity,
+        price: t.price,
+      }));
+
+    return { equity, holdings, trades: tradeMarkers, startingCash, from, to };
   });
