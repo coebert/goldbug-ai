@@ -116,6 +116,14 @@ function PortfolioPage() {
     enabled: ready,
   });
 
+  const getHistory = useServerFn(getHoldingsHistory);
+  const holdingsHistoryQ = useQuery({
+    queryKey: ["holdings-history", id],
+    queryFn: () => getHistory({ data: { portfolioId: id } }),
+    enabled: ready,
+    refetchInterval: 60 * 60 * 1000,
+  });
+
   const qc = useQueryClient();
   const runDayFn = useServerFn(runOneDay);
   const runBtFn = useServerFn(runBacktest);
