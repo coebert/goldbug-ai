@@ -216,53 +216,32 @@ function Home() {
           </a>
         </div>
 
-        {/* Today summary strip */}
+        {/* Today summary strip — real and simulated kept strictly separate */}
         {todaySummary && (
-          <div className="mb-6 grid grid-cols-3 gap-2 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
-                Total equity
-              </div>
-              <div className="truncate text-base font-semibold tabular-nums sm:text-lg">
-                {new Intl.NumberFormat(undefined, {
-                  style: "currency",
-                  currency: "GBP",
-                  maximumFractionDigits: 0,
-                }).format(todaySummary.totalEquity)}
-              </div>
-              <div className="text-[10px] text-muted-foreground sm:text-xs">
-                {todaySummary.count} portfolio{todaySummary.count === 1 ? "" : "s"}
-              </div>
-            </div>
-            <div className="min-w-0 border-l border-border pl-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
-                Day P&amp;L
-              </div>
-              <div
-                className={`flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg ${todaySummary.dayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
-              >
-                {todaySummary.dayPnl >= 0 ? (
-                  <TrendingUp className="h-4 w-4 shrink-0" aria-hidden="true" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-                )}
-                <span className="truncate">
-                  {todaySummary.dayPnl >= 0 ? "+" : ""}
-                  {todaySummary.dayPct.toFixed(2)}%
-                </span>
-              </div>
-              <div className="text-[10px] tabular-nums text-muted-foreground sm:text-xs">
-                {todaySummary.dayPnl >= 0 ? "+" : ""}
-                {new Intl.NumberFormat(undefined, {
-                  maximumFractionDigits: 0,
-                }).format(todaySummary.dayPnl)}
-              </div>
-            </div>
-            <div className="min-w-0 border-l border-border pl-3">
+          <div className="mb-6 grid gap-2 sm:grid-cols-3">
+            <ModeSummaryTile
+              label="Simulated equity"
+              sublabel="SIM · paper + live-sim"
+              tone="sim"
+              money={todaySummary.sim.now}
+              pnl={todaySummary.sim.pnl}
+              pct={todaySummary.sim.pct}
+              count={todaySummary.sim.count}
+            />
+            <ModeSummaryTile
+              label="Real-money equity"
+              sublabel="REAL · live Saxo"
+              tone="real"
+              money={todaySummary.real.now}
+              pnl={todaySummary.real.pnl}
+              pct={todaySummary.real.pct}
+              count={todaySummary.real.count}
+            />
+            <div className="min-w-0 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
                 Next run
               </div>
-              <div className="flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg">
+              <div className="mt-1 flex items-center gap-1 text-base font-semibold tabular-nums sm:text-lg">
                 <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span className="truncate">{nextRunLabel}</span>
               </div>
@@ -270,6 +249,7 @@ function Home() {
             </div>
           </div>
         )}
+
 
         <NewHereBanner />
 
