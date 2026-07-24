@@ -66,6 +66,8 @@ import {
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import {
   filterUniverse,
+  filterUniverseByAffordability,
+
   findSymbol,
   riskProfile,
   parseRiskConfig,
