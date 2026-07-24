@@ -424,6 +424,9 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const isSim = portfolio.mode !== "live_prod";
+
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => {
