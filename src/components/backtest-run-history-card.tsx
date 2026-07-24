@@ -81,10 +81,48 @@ function toneClass(v: number | null | undefined, invert = false) {
   return good ? "text-emerald-500" : "text-red-500";
 }
 
-export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string }) {
+type RiskTolerance = "conservative" | "balanced" | "aggressive";
+
+// Weights sum to 1. MDD is treated as "lower is better" — inverted before
+// weighting. Conservative punishes drawdowns hardest; aggressive rewards
+// return most. Sharpe is always meaningful so it never drops below 0.2.
+const TOLERANCE_WEIGHTS: Record<RiskTolerance, { ret: number; mdd: number; sharpe: number }> = {
+  conservative: { ret: 0.2, mdd: 0.55, sharpe: 0.25 },
+  balanced:     { ret: 0.35, mdd: 0.35, sharpe: 0.3 },
+  aggressive:   { ret: 0.6, mdd: 0.1, sharpe: 0.3 },
+};
+
+function inferTolerance(riskLevel: string | undefined): RiskTolerance {
+  const s = (riskLevel ?? "").toLowerCase();
+  if (s.includes("low") || s.includes("conserv")) return "conservative";
+  if (s.includes("high") || s.includes("aggress")) return "aggressive";
+  return "balanced";
+}
+
+// Min-max normalize into [0,1]. When all values are equal, everyone scores 1
+// (nothing differentiates them on this axis, so it shouldn't drag anyone down).
+function normalize(values: number[]): number[] {
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (!finite.length) return values.map(() => 0);
+  const lo = Math.min(...finite);
+  const hi = Math.max(...finite);
+  if (hi === lo) return values.map((v) => (Number.isFinite(v) ? 1 : 0));
+  return values.map((v) => (Number.isFinite(v) ? (v - lo) / (hi - lo) : 0));
+}
+
+export function BacktestRunHistoryCard({
+  portfolioId,
+  portfolioRiskLevel,
+}: {
+  portfolioId: string;
+  portfolioRiskLevel?: string;
+}) {
   const [runs, setRuns] = useState<BacktestRunRecord[]>(() => loadRuns(portfolioId));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupByRisk, setGroupByRisk] = useState(true);
+  const [tolerance, setTolerance] = useState<RiskTolerance>(() =>
+    inferTolerance(portfolioRiskLevel),
+  );
 
   useEffect(() => {
     const refresh = (e: Event) => {
