@@ -172,23 +172,35 @@ describe("home dashboard real-money equity across historical dates (e2e)", () =>
     },
   ];
 
+  // Simulate the DB as of `today`: only portfolios that have any snapshot
+  // on/before that date are in the DB, and only their snapshots up to that
+  // date exist. This mirrors what the dashboard would actually fetch when
+  // rendered on that historical date.
+  function stateAsOf(today: string) {
+    const snapshots = SNAPSHOTS.filter((s) => s.snapshot_date <= today);
+    const existingIds = new Set(snapshots.map((s) => s.portfolio_id));
+    const portfolios = PORTFOLIOS.filter((p) => existingIds.has(p.id));
+    return { portfolios, snapshots };
+  }
+
   for (const c of cases) {
     it(`viewing on ${c.today}: shows only that date's real-money snapshot`, () => {
-      // Simulate the DB state as it existed on `c.today`: only snapshots
-      // written on or before that date are stored. This is exactly what
-      // the dashboard would fetch on that date.
-      const snapshotsAsOf = SNAPSHOTS.filter((s) => s.snapshot_date <= c.today);
+      const { portfolios, snapshots } = stateAsOf(c.today);
       const data = buildAllPortfoliosEquity({
-        portfolios: PORTFOLIOS,
-        snapshots: snapshotsAsOf,
+        portfolios,
+        snapshots,
         today: c.today,
       });
-      const summary = computeTodaySummary(data)!;
-      expect(summary.real.now).toBeCloseTo(c.expectedNow, 10);
-      expect(summary.real.pnl).toBeCloseTo(c.expectedPnl, 10);
-      expect(summary.real.count).toBe(c.expectedCount);
+      const summary = computeTodaySummary(data);
+      const real = summary?.real ?? { now: 0, pnl: 0, pct: 0, count: 0 };
+      expect(real.now).toBeCloseTo(c.expectedNow, 10);
+      expect(real.pnl).toBeCloseTo(c.expectedPnl, 10);
+      expect(real.count).toBe(c.expectedCount);
 
-      const html = renderReal(summary);
+      const html = renderReal({
+        real,
+        sim: summary?.sim ?? { now: 0, pnl: 0, pct: 0, count: 0 },
+      });
       const nums = numericTokens(html);
       for (const forbidden of c.forbidden) {
         expect(
@@ -201,13 +213,14 @@ describe("home dashboard real-money equity across historical dates (e2e)", () =>
 
   it("re-rendering across all dates yields the exact per-date snapshot sequence (no cross-date bleed)", () => {
     const timeline = cases.map((c) => {
-      const snapshotsAsOf = SNAPSHOTS.filter((s) => s.snapshot_date <= c.today);
+      const { portfolios, snapshots } = stateAsOf(c.today);
       const data = buildAllPortfoliosEquity({
-        portfolios: PORTFOLIOS,
-        snapshots: snapshotsAsOf,
+        portfolios,
+        snapshots,
         today: c.today,
       });
-      return computeTodaySummary(data)!.real.now;
+      const summary = computeTodaySummary(data);
+      return summary?.real.now ?? 0;
     });
     expect(timeline).toEqual([0, 0, 300, 300.46, 320.5]);
   });
