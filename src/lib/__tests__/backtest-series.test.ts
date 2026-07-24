@@ -88,12 +88,14 @@ describe("buildHoldingsOverTime", () => {
     const trades: TradeRow[] = [
       { trade_date: "2024-01-02", executed_at: "2024-01-02T12:00:00Z", side: "sell", symbol: "AAA", quantity: 5, price: 100 },
       { trade_date: "2024-01-02", executed_at: "2024-01-02T09:00:00Z", side: "buy", symbol: "AAA", quantity: 5, price: 100 },
+      // Keep AAA visible in the series by also holding some overnight.
+      { trade_date: "2024-01-02", executed_at: "2024-01-02T09:30:00Z", side: "buy", symbol: "AAA", quantity: 1, price: 100 },
     ];
     const prices: PriceRow[] = [price("AAA", "2024-01-02", 100)];
     const { points } = buildHoldingsOverTime(trades, ["2024-01-02"], prices, 500);
-    // Net-flat by end-of-day: 5 bought then 5 sold at same price.
-    expect(points[0].AAA).toBe(0);
-    expect(points[0].cash).toBe(500);
+    // Net position: +5 -5 +1 = 1 share @ 100 = 100.
+    expect(points[0].AAA).toBe(100);
+    expect(points[0].cash).toBe(400);
   });
 });
 
