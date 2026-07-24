@@ -151,6 +151,62 @@ export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string })
     };
   });
 
+  // Overlay data for the equity + drawdown charts.
+  // Runs are aligned by day-index (t = 0..N) because they may span different
+  // absolute date ranges; comparing them at the same *elapsed day* is the
+  // apples-to-apples view. Equity is normalized to % change vs the run's own
+  // starting equity; drawdown is (v / running-peak - 1) * 100.
+  const overlayRuns = useMemo(
+    () =>
+      compareRuns.filter(
+        (r): r is BacktestRunRecord & { equity: BacktestEquityPoint[] } =>
+          Array.isArray(r.equity) && r.equity.length >= 2,
+      ),
+    [compareRuns],
+  );
+
+  const overlaySeries = useMemo(() => {
+    return overlayRuns.map((r, idx) => {
+      const start = r.equity[0].total_value;
+      const safeStart = start !== 0 && Number.isFinite(start) ? start : 1;
+      let peak = start;
+      const points = r.equity.map((p, i) => {
+        peak = Math.max(peak, p.total_value);
+        const equityPct = ((p.total_value - safeStart) / Math.abs(safeStart)) * 100;
+        const ddPct = peak > 0 ? (p.total_value / peak - 1) * 100 : 0;
+        return { t: i, date: p.snapshot_date, equity: equityPct, drawdown: ddPct };
+      });
+      const label = `${new Date(r.ranAt).toLocaleDateString()} · ${r.riskLevel} · ${r.days}d`;
+      return {
+        id: r.id,
+        label,
+        color: OVERLAY_PALETTE[idx % OVERLAY_PALETTE.length],
+        points,
+      };
+    });
+  }, [overlayRuns]);
+
+  // Recharts wants a single dataset when overlaying series that share an
+  // x-axis; key each run's series by its id so multiple lines coexist.
+  const mergedOverlay = useMemo(() => {
+    const maxLen = overlaySeries.reduce((m, s) => Math.max(m, s.points.length), 0);
+    const rows: Array<Record<string, number | string>> = [];
+    for (let t = 0; t < maxLen; t++) {
+      const row: Record<string, number | string> = { t };
+      for (const s of overlaySeries) {
+        const p = s.points[t];
+        if (p) {
+          row[`eq_${s.id}`] = p.equity;
+          row[`dd_${s.id}`] = p.drawdown;
+        }
+      }
+      rows.push(row);
+    }
+    return rows;
+  }, [overlaySeries]);
+
+
+
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
