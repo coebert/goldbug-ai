@@ -20,7 +20,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ChevronDown, ShieldCheck, Gauge } from "lucide-react";
+import { ChevronDown, ShieldCheck, Gauge, SlidersHorizontal } from "lucide-react";
 import { Explain } from "@/components/explain";
 
 type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
