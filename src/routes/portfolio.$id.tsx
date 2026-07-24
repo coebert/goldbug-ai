@@ -459,6 +459,17 @@ function PortfolioPage() {
               </div>
             </div>
 
+            <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
+              <TabsList className="flex w-full flex-wrap justify-start gap-1 h-auto p-1 md:flex-nowrap md:overflow-x-auto">
+                <TabsTrigger value="overview" className="min-h-10">Overview</TabsTrigger>
+                <TabsTrigger value="trades" className="min-h-10">Trades ({trades.length})</TabsTrigger>
+                <TabsTrigger value="decisions" className="min-h-10">Decisions ({decisions.length})</TabsTrigger>
+                <TabsTrigger value="risk" className="min-h-10">Risk</TabsTrigger>
+                <TabsTrigger value="diagnostics" className="min-h-10">Diagnostics</TabsTrigger>
+                <TabsTrigger value="reports" className="min-h-10">Reports</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="mt-4">
             <Card className="mb-6">
               <CardContent className="flex flex-wrap items-center gap-3 py-4">
                 <UITooltipProvider delayDuration={100}>
