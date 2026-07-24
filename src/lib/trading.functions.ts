@@ -196,6 +196,41 @@ export const renamePortfolio = createServerFn({ method: "POST" })
     return { ok: true, portfolio: row };
   });
 
+export const addSimFunds = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        amount: z.number().positive("Amount must be greater than 0").max(1_000_000, "Max 1,000,000 per top-up"),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: p, error: readErr } = await context.supabase
+      .from("portfolios")
+      .select("id, mode, currency, starting_cash, current_cash")
+      .eq("id", data.id)
+      .single();
+    if (readErr) throw new Error(readErr.message);
+    if (!p) throw new Error("Portfolio not found");
+    if (p.mode === "live_prod") {
+      throw new Error("Real-money portfolios are funded via your broker account, not from here.");
+    }
+    const newStarting = Number(p.starting_cash) + data.amount;
+    const newCurrent = Number(p.current_cash) + data.amount;
+    const { data: updated, error } = await context.supabase
+      .from("portfolios")
+      .update({ starting_cash: newStarting, current_cash: newCurrent })
+      .eq("id", data.id)
+      .select("id, starting_cash, current_cash, currency")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true, portfolio: updated };
+  });
+
+
+
 
 const RiskConfigSchema = z.object({
   asset_class_limits: z
