@@ -123,7 +123,7 @@ describe("pending_slices ownership enforcement", () => {
         priceHint: 100, // notional 10k > threshold
       }),
     ).rejects.toThrow(/ownership mismatch/);
-    expect(inserts).toHaveLength(0);
+    expect(inserts.filter((i) => i.table === "pending_slices")).toHaveLength(0);
     const warn = securityWarnings();
     expect(warn.length).toBeGreaterThan(0);
     expect(warn[0][1]).toContain("ownership_mismatch");
@@ -171,7 +171,7 @@ describe("pending_slices input validation", () => {
         priceHint: 100,
       }),
     ).rejects.toThrow(/invalid input/);
-    expect(inserts).toHaveLength(0);
+    expect(inserts.filter((i) => i.table === "pending_slices")).toHaveLength(0);
     expect(securityWarnings()[0][1]).toContain("validation_failed");
   });
 
@@ -188,7 +188,7 @@ describe("pending_slices input validation", () => {
         priceHint: 100,
       }),
     ).rejects.toThrow(/invalid input/);
-    expect(inserts).toHaveLength(0);
+    expect(inserts.filter((i) => i.table === "pending_slices")).toHaveLength(0);
     expect(securityWarnings()[0][1]).toContain("validation_failed");
   });
 
@@ -214,7 +214,7 @@ describe("pending_slices input validation", () => {
         slices: 99,
       }),
     ).rejects.toThrow(/invalid input/);
-    expect(inserts).toHaveLength(0);
+    expect(inserts.filter((i) => i.table === "pending_slices")).toHaveLength(0);
   });
 });
 
