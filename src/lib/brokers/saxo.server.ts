@@ -532,17 +532,24 @@ export class SaxoAdapter implements BrokerAdapter {
   private cachedClientKey: string | undefined;
   private async getClientKey(): Promise<string | undefined> {
     if (this.cachedClientKey) return this.cachedClientKey;
+    // Prefer discovering ClientKey from the live session — SAXO_CLIENT_KEY
+    // env var historically held an AccountKey by mistake, which caused
+    // /hist/v3/orders/{key} lookups to 404 and left successful orders
+    // stuck on "submitted" because reconciliation could not resolve them.
+    try {
+      const me = await this.req<{ ClientKey?: string }>("GET", "/port/v1/users/me");
+      if (me.ClientKey) {
+        this.cachedClientKey = me.ClientKey;
+        return this.cachedClientKey;
+      }
+    } catch {
+      // fall through to env fallback
+    }
     if (this.clientKey) {
       this.cachedClientKey = this.clientKey;
       return this.cachedClientKey;
     }
-    try {
-      const me = await this.req<{ ClientKey?: string }>("GET", "/port/v1/users/me");
-      if (me.ClientKey) this.cachedClientKey = me.ClientKey;
-      return this.cachedClientKey;
-    } catch {
-      return undefined;
-    }
+    return undefined;
   }
 
   async cancelOrder(brokerOrderId: string): Promise<{ ok: boolean; reason?: string }> {
