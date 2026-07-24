@@ -118,7 +118,7 @@ export function computeModeSummary(
     }
 
     const rawDelta = now - previous;
-    const pnl = rawDelta - netDeposits;
+    const pnl = includeDeposits ? rawDelta : rawDelta - netDeposits;
     const pct = previous > 0 ? (pnl / previous) * 100 : 0;
     return { now, pnl, pct, count };
   };
