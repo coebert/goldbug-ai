@@ -166,7 +166,9 @@ describe("real-money equity tile — negative equity & negative PnL formatting",
     // Headline is negative; percent uses prev>0 guard → 0 when prev<=0.
     expect(html).toContain(gbpWhole.format(-40));
     expect(summary.pct).toBe(0); // guarded because previous <= 0
-    expect(html).toContain("-0.00%"); // -30 pnl → red branch, -0.00
+    // pnl<0 → no "+" prefix; pct guarded to 0 → "0.00%" (no sign).
+    expect(html).toContain("0.00%");
+    expect(html).not.toContain("+0.00%");
     expect(html).toContain("text-red-400");
     expect(html).toContain(numWhole.format(-30));
   });
