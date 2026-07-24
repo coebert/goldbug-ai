@@ -1,0 +1,254 @@
+// News-reel and decision-news-breakdown server functions. Split out of
+// trading.functions.ts during Phase 3; helpers live in ./news-reel.server.
+// The legacy "@/lib/trading.functions" barrel re-exports these for
+// backwards compatibility.
+
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  toExcerpt,
+  type NewsReelInfluence,
+  type NewsReelItem,
+  type DecisionBreakdownItem,
+} from "./news-reel.server";
+
+export const getGlobalNewsReel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { sinceDays?: number; limit?: number } | undefined) => {
+    const s = Math.max(1, Math.min(120, Math.round(Number(input?.sinceDays ?? 5))));
+    const l = Math.max(10, Math.min(400, Math.round(Number(input?.limit ?? 40))));
+    return { sinceDays: s, limit: l };
+  })
+  .handler(async ({ context, data }): Promise<{ items: NewsReelItem[]; as_of: string; has_more: boolean; since_days: number; limit: number }> => {
+    const { sinceDays, limit } = data;
+    const asOf = new Date();
+    const since = new Date(asOf.getTime() - sinceDays * 86_400_000).toISOString().slice(0, 10);
+
+    // 1. Recent global news (auth-readable cache). Fetch limit+1 to detect has_more.
+    const fetchCap = Math.min(500, limit + 60);
+    const readNews = async () =>
+      (
+        await context.supabase
+          .from("news_cache")
+          .select("id, news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
+          .gte("news_date", since)
+          .order("news_date", { ascending: false })
+          .order("fetched_at", { ascending: false })
+          .limit(fetchCap)
+      ).data ?? [];
+    let news = await readNews();
+    if (news.length === 0) return { items: [], as_of: asOf.toISOString(), has_more: false, since_days: sinceDays, limit };
+
+    // Opportunistic translation repair: cached non-English rows with no
+    // translation yet get filled in synchronously (Workers cancel background
+    // promises the moment the response returns, so `void`-style backfill did
+    // nothing in production). Bounded to the dates actually shown, capped
+    // to a few LLM calls per request.
+    const { looksNonEnglish } = await import("@/lib/news.server");
+    const needsTranslation = news.filter(
+      (r) => !r.original_language && looksNonEnglish((r.headline as string) ?? ""),
+    );
+    if (needsTranslation.length > 0) {
+      const { backfillTranslations } = await import("@/lib/news.server");
+      const dates = Array.from(new Set(needsTranslation.map((r) => r.news_date as string))).slice(0, 5);
+      await Promise.all(dates.map((d) => backfillTranslations(d).catch(() => null)));
+      news = await readNews();
+    }
+
+    // 2. Recent decisions across the user's own portfolios.
+    const { data: portfolios } = await context.supabase
+      .from("portfolios")
+      .select("id, name, universe, risk_level");
+    const pMap = new Map(
+      (portfolios ?? []).map((p) => [
+        p.id,
+        {
+          name: p.name,
+          universe: (Array.isArray(p.universe) ? p.universe : []) as string[],
+          risk_level: (p.risk_level ?? "balanced") as string,
+        },
+      ]),
+    );
+    const { data: decisions } = await context.supabase
+      .from("decisions")
+      .select("id, portfolio_id, run_date, rationale, raw")
+      .gte("run_date", since)
+      .order("run_date", { ascending: false })
+      .limit(120);
+
+    // 3. Build headline -> influences lookup.
+    const infl = new Map<
+      string,
+      {
+        sum: number;
+        n: number;
+        rows: NewsReelInfluence[];
+        assetClasses: Set<string>;
+        riskLevels: Set<string>;
+        symbols: Set<string>;
+      }
+    >();
+    for (const d of decisions ?? []) {
+      const p = pMap.get(d.portfolio_id);
+      const name = p?.name ?? "Portfolio";
+      const raw = (d.raw ?? {}) as {
+        news?: Array<{ headline?: string; sentiment?: number | null; source_weight?: number | null }>;
+        executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+        orders?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+      };
+      const usedNews = raw.news ?? [];
+      if (usedNews.length === 0) continue;
+      const acts = (raw.executed && raw.executed.length > 0 ? raw.executed : raw.orders) ?? [];
+      const trimmed = acts
+        .filter((a) => a && a.action && a.symbol && a.action !== "HOLD")
+        .slice(0, 4)
+        .map((a) => ({ action: String(a.action), symbol: String(a.symbol), qty: a.qty ?? null }));
+
+      // Pre-compute per-decision impact = |sentiment| * source_weight, and total for normalization.
+      const impacts = usedNews.map((n) => {
+        const s = typeof n.sentiment === "number" ? Math.abs(n.sentiment) : 0;
+        const w = typeof n.source_weight === "number" ? Math.max(0, n.source_weight) : 0.4;
+        return s * w;
+      });
+      const impactTotal = impacts.reduce((a, b) => a + b, 0);
+
+      for (let i = 0; i < usedNews.length; i++) {
+        const n = usedNews[i];
+        const head = (n.headline ?? "").trim();
+        if (!head) continue;
+        const bucket = infl.get(head) ?? {
+          sum: 0, n: 0, rows: [],
+          assetClasses: new Set<string>(), riskLevels: new Set<string>(), symbols: new Set<string>(),
+        };
+        if (typeof n.sentiment === "number") { bucket.sum += n.sentiment; bucket.n += 1; }
+        const impact = impacts[i];
+        const impactPct = impactTotal > 0 ? (impact / impactTotal) * 100 : null;
+        bucket.rows.push({
+          decision_id: d.id,
+          portfolio_id: d.portfolio_id,
+          portfolio_name: name,
+          run_date: d.run_date,
+          sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
+          source_weight: typeof n.source_weight === "number" ? n.source_weight : null,
+          impact: Number.isFinite(impact) ? Number(impact.toFixed(3)) : null,
+          impact_pct: impactPct != null ? Number(impactPct.toFixed(1)) : null,
+          rationale: (d.rationale ?? null) as string | null,
+          actions: trimmed,
+        });
+        if (p) {
+          for (const c of p.universe) bucket.assetClasses.add(c);
+          bucket.riskLevels.add(p.risk_level);
+        }
+        for (const a of trimmed) bucket.symbols.add(a.symbol);
+        infl.set(head, bucket);
+      }
+    }
+
+    // 4. Assemble reel items with a plain-English note per headline.
+    const items: NewsReelItem[] = news.map((r) => {
+      const bucket = infl.get(r.headline.trim());
+      const rows = bucket?.rows ?? [];
+      const avg = bucket && bucket.n > 0 ? bucket.sum / bucket.n : null;
+      let note: string;
+      if (rows.length === 0) {
+        note = "Logged in the AI's briefing pool; no active decision has cited it yet.";
+      } else {
+        const tone = avg == null ? "neutral" : avg > 0.15 ? "bullish" : avg < -0.15 ? "bearish" : "neutral";
+        const acts = rows.flatMap((x) => x.actions);
+        const actSummary = acts.length === 0
+          ? "reinforced a HOLD across affected positions"
+          : Array.from(new Set(acts.map((a) => `${a.action} ${a.symbol}`))).slice(0, 3).join(", ");
+        const portfolioNames = Array.from(new Set(rows.map((r) => r.portfolio_name))).slice(0, 3).join(", ");
+        note = `Scored ${tone}${avg != null ? ` (${avg >= 0 ? "+" : ""}${avg.toFixed(2)})` : ""} and fed into ${rows.length} decision${rows.length === 1 ? "" : "s"} on ${portfolioNames} — ${actSummary}.`;
+      }
+      return {
+        id: r.id,
+        date: r.news_date,
+        source: r.source,
+        headline: r.headline,
+        url: r.url,
+        original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+        original_language: (r as { original_language?: string | null }).original_language ?? null,
+        translation_confidence: (() => {
+          const c = (r as { translation_confidence?: number | string | null }).translation_confidence;
+          return c == null ? null : Number(c);
+        })(),
+
+        avg_sentiment: avg,
+        decisions_count: rows.length,
+        influences: rows.slice(0, 6),
+        note,
+        excerpt: toExcerpt((r as { summary?: string | null }).summary),
+        asset_classes: bucket ? Array.from(bucket.assetClasses).sort() : [],
+        risk_levels: bucket ? Array.from(bucket.riskLevels).sort() : [],
+        symbols: bucket ? Array.from(bucket.symbols).sort() : [],
+      };
+    });
+
+    // Sort: cited items first, then newest.
+    items.sort((a, b) => {
+      if ((b.decisions_count > 0 ? 1 : 0) !== (a.decisions_count > 0 ? 1 : 0)) {
+        return (b.decisions_count > 0 ? 1 : 0) - (a.decisions_count > 0 ? 1 : 0);
+      }
+      return a.date < b.date ? 1 : -1;
+    });
+
+    const sliced = items.slice(0, limit);
+    return { items: sliced, as_of: asOf.toISOString(), has_more: items.length > limit, since_days: sinceDays, limit };
+  });
+
+export const getDecisionNewsBreakdown = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ items: DecisionBreakdownItem[]; as_of: string }> => {
+    const asOf = new Date();
+    const since = new Date(asOf.getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+
+    const { data: portfolios } = await context.supabase
+      .from("portfolios")
+      .select("id, name");
+    const pMap = new Map((portfolios ?? []).map((p) => [p.id, p.name]));
+
+    const { data: decisions } = await context.supabase
+      .from("decisions")
+      .select("id, portfolio_id, run_date, rationale, raw")
+      .gte("run_date", since)
+      .order("run_date", { ascending: false })
+      .limit(30);
+
+    const items: DecisionBreakdownItem[] = (decisions ?? []).map((d) => {
+      const raw = (d.raw ?? {}) as {
+        news?: Array<{ headline?: string; source?: string | null; url?: string | null; sentiment?: number | null }>;
+        executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+        orders?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+      };
+      const news = (raw.news ?? []).filter((n) => (n.headline ?? "").trim().length > 0);
+      const ranked = [...news].sort((a, b) => {
+        const av = typeof a.sentiment === "number" ? Math.abs(a.sentiment) : -1;
+        const bv = typeof b.sentiment === "number" ? Math.abs(b.sentiment) : -1;
+        return bv - av;
+      });
+      const top = ranked.slice(0, 5).map((n) => ({
+        headline: String(n.headline),
+        source: n.source ?? null,
+        url: n.url ?? null,
+        sentiment: typeof n.sentiment === "number" ? n.sentiment : null,
+      }));
+      const acts = (raw.executed && raw.executed.length > 0 ? raw.executed : raw.orders) ?? [];
+      const actions = acts
+        .filter((a) => a && a.action && a.symbol)
+        .slice(0, 8)
+        .map((a) => ({ action: String(a.action), symbol: String(a.symbol), qty: a.qty ?? null }));
+      return {
+        decision_id: d.id,
+        portfolio_id: d.portfolio_id,
+        portfolio_name: pMap.get(d.portfolio_id) ?? "Portfolio",
+        run_date: d.run_date,
+        rationale: d.rationale ?? null,
+        actions,
+        top_news: top,
+        total_news_considered: news.length,
+      };
+    });
+
+    return { items, as_of: asOf.toISOString() };
+  });
