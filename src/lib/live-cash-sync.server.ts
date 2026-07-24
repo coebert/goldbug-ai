@@ -103,12 +103,13 @@ export async function syncLiveCashFromBroker(
   const latestSnapshot = await latestSnapshotQuery;
   const holdingsValue = Number(latestSnapshot.data?.holdings_value ?? 0);
   const today = new Date().toISOString().slice(0, 10);
-  await writeCashSyncSnapshot(supabaseAdmin, {
+  await writeCashSyncSnapshot(supabaseAdmin as unknown as CashSyncSnapshotClient, {
     portfolioId,
     snapshotDate: today,
     cash: brokerCash,
     holdingsValue,
   });
+
 
 
   await supabaseAdmin.from("live_broker_log").insert({
