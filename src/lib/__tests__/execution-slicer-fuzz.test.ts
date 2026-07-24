@@ -223,8 +223,16 @@ describe("execution-slicer schemas: mutated inputs are rejected", () => {
 
 describe("execution-slicer server: logging is never skipped on invalid input", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
-  const fromMock = vi.fn(() => {
-    throw new Error("DB must not be reached on invalid input");
+  // The mock tolerates writes to `security_audit_log` (the structured logger
+  // fire-and-forgets an insert on every SECURITY warning) but throws for
+  // any other table so validation-first rejection is enforced: the slicer
+  // must never reach `pending_slices` / `portfolios` on bad input.
+  const auditChain = {
+    insert: () => Promise.resolve({ data: null, error: null }),
+  };
+  const fromMock = vi.fn((table: string) => {
+    if (table === "security_audit_log") return auditChain;
+    throw new Error(`DB must not be reached on invalid input (table=${table})`);
   });
 
   beforeEach(() => {
@@ -262,8 +270,11 @@ describe("execution-slicer server: logging is never skipped on invalid input", (
           ).catch(() => null),
         ]);
 
-        // DB was never touched — validation rejected first.
-        expect(fromMock).not.toHaveBeenCalled();
+        // Data tables were never touched — only the audit log insert (if any).
+        const dataTableCalls = fromMock.mock.calls.filter(
+          (c) => c[0] !== "security_audit_log",
+        );
+        expect(dataTableCalls).toHaveLength(0);
 
         // Every rejection emitted a structured SECURITY warning.
         const securityCalls = warnSpy.mock.calls.filter((call: unknown[]) =>

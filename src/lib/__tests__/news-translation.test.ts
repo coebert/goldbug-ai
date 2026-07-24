@@ -27,28 +27,35 @@ const llmCalls: LlmCall[] = [];
 // and translation. Anything not registered defaults to English/no-op.
 const translations = new Map<string, { lang: string | null; translation: string | null; confidence?: number | null }>();
 
-vi.mock("ai", async () => {
-  const actual = await vi.importActual<typeof import("ai")>("ai");
-  return {
-    ...actual,
-    generateText: vi.fn(async ({ prompt }: { prompt: string }) => {
-      // Parse the numbered list back out. Matches the "i. text" shape
-      // built inside callTranslateLLM.
-      const lines = prompt.split("\n").filter((l) => /^\d+\.\s/.test(l));
-      llmCalls.push({ prompt, count: lines.length });
-      const results = lines.map((l) => {
-        const m = l.match(/^(\d+)\.\s(.+)$/);
-        const i = Number(m?.[1] ?? 0);
-        const text = (m?.[2] ?? "").trim();
-        const t = translations.get(text) ?? { lang: "English", translation: null };
-        return { i, lang: t.lang, translation: t.translation, confidence: t.confidence ?? null };
-      });
-      return { output: { results } };
-    }),
-    // Output.object is only used to declare the schema; passthrough is fine.
-    Output: { object: (opts: unknown) => opts },
-    NoObjectGeneratedError: { isInstance: () => false },
-  };
+// news.server calls the Lovable AI gateway directly via fetch. Stub the
+// global fetch so we never hit the network; parse the prompt to build a
+// deterministic response from the `translations` map.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (!url.includes("ai.gateway.lovable.dev")) {
+      return originalFetch(input as RequestInfo, init);
+    }
+    const body = JSON.parse((init?.body as string) ?? "{}");
+    const prompt: string = body.messages?.[0]?.content ?? "";
+    const lines = prompt.split("\n").filter((l) => /^\d+\.\s/.test(l));
+    llmCalls.push({ prompt, count: lines.length });
+    const results = lines.map((l) => {
+      const m = l.match(/^(\d+)\.\s(.+)$/);
+      const i = Number(m?.[1] ?? 0);
+      const text = (m?.[2] ?? "").trim();
+      const t = translations.get(text) ?? { lang: "English", translation: null };
+      return { i, lang: t.lang, translation: t.translation, confidence: t.confidence ?? null };
+    });
+    return new Response(
+      JSON.stringify({ choices: [{ message: { content: JSON.stringify({ results }) } }] }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof fetch;
+});
+afterEach(() => {
+  globalThis.fetch = originalFetch;
 });
 
 
