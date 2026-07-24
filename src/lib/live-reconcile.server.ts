@@ -4,7 +4,8 @@
 // reconciliation core that the cron route imports directly.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { ScopedDbClient } from "@/lib/live-cash-sync.server";
+import { withOwnedClient } from "@/lib/_server/owned-client";
+import type { ScopedDbClient } from "@/lib/_server/owned-client";
 
 export async function logAudit(params: {
   userId: string;
