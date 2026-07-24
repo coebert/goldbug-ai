@@ -18,6 +18,10 @@
 
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import type { Database } from "@/integrations/supabase/types";
+import type { OwnedDbClient } from "@/lib/_server/owned-client";
+
+type AssetClass = Database["public"]["Enums"]["asset_class"];
+
 
 export type LiveHoldingsSyncResult =
   | { skipped: true; reason: string }
@@ -30,20 +34,22 @@ export type LiveHoldingsSyncResult =
       newTotalValue: number;
       currency: string;
     };
-
-const ALLOWED_ASSET_CLASSES = new Set([
-  "stock", "etf", "fund", "bond", "fx", "crypto", "commodity",
+// asset_class is a Postgres enum — restrict to the values the DB accepts so
+// TS enforces the mapping. Anything else falls back to "stock".
+const ALLOWED_ASSET_CLASSES = new Set<AssetClass>([
+  "stock", "etf", "fx", "crypto", "commodity",
 ]);
 
-function saxoAssetToClass(assetType: string | undefined): string {
+function saxoAssetToClass(assetType: string | undefined): AssetClass {
   const a = (assetType ?? "").toLowerCase();
   if (a === "stock") return "stock";
   if (a === "etf" || a === "etc") return "etf";
-  if (a === "fund") return "fund";
-  if (a === "bond") return "bond";
   if (a.includes("fx")) return "fx";
+  if (a === "crypto") return "crypto";
+  if (a === "commodity") return "commodity";
   return "stock";
 }
+
 
 export async function reconcileLiveHoldingsFromBroker(
   portfolioId: string,
