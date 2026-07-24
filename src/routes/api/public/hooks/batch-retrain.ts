@@ -10,17 +10,13 @@ export const Route = createFileRoute("/api/public/hooks/batch-retrain")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const provided =
-          request.headers.get("x-cron-secret") ??
-          request.headers.get("X-Cron-Secret");
-        const expected = process.env.CRON_SECRET;
-        if (!expected || provided !== expected) {
-          return new Response(JSON.stringify({ error: "unauthorized" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
+        const { verifyCronRequest } = await import("@/lib/_server/cron");
+        const verified = await verifyCronRequest(request, {
+          bucket: "hooks:batch-retrain",
+          capacity: 5,
+          refillPerSec: 5/3600,
+        });
+        if (!verified.ok) return verified.response;
         const { supabaseAdmin } = await import(
           "@/integrations/supabase/client.server"
         );
