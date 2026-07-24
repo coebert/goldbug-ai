@@ -432,6 +432,15 @@ function PortfolioPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight">{p.name}</h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    aria-label="Rename portfolio"
+                    onClick={() => setRenameOpen(true)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <ModeBadge mode={p.mode} />
                   <LiveToggle portfolioId={p.id} mode={p.mode} livePaused={(p as { live_paused?: boolean | null }).live_paused} />
                 </div>
