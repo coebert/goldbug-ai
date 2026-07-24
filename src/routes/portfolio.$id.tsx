@@ -61,8 +61,15 @@ import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
 
 
+type PortfolioTab = "overview" | "trades" | "decisions" | "risk" | "diagnostics" | "reports";
+const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk", "diagnostics", "reports"];
+
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>): { tab: PortfolioTab } => {
+    const t = String(search.tab ?? "overview") as PortfolioTab;
+    return { tab: PORTFOLIO_TABS.includes(t) ? t : "overview" };
+  },
   head: ({ params }) => ({
     meta: [
       { title: `Portfolio ${params.id.slice(0, 6)} — Aegis` },
