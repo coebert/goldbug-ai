@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppHeader } from "@/components/app-header";
+import { PageLoading } from "@/components/page-loading";
 import {
   Select,
   SelectContent,
@@ -165,16 +166,14 @@ function LongHorizonPage() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
+      <PageLoading />
     );
   }
 
   const portfolio = pQ.data?.portfolio;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
+import { PageLoading } from "@/components/page-loading";
 import { toast } from "sonner";
 import {
   Shield,
@@ -169,16 +170,14 @@ function GetStarted() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
+      <PageLoading />
     );
   }
 
   const totalSteps = 4;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-3xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between">

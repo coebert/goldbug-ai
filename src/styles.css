@@ -141,4 +141,20 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+
+  /* Standardised keyboard focus ring across all interactive elements.
+   * Individual components can still opt out with `focus-visible:outline-none`
+   * when they render their own ring (e.g. shadcn Button, Input). */
+  :where(a, button, [role="button"], [role="tab"], [role="menuitem"], summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Use dynamic viewport units so full-height layouts don't get clipped by
+   * mobile Safari's URL bar. */
+  html, body {
+    min-height: 100dvh;
+  }
 }
+

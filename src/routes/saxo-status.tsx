@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getSaxoOAuthStatus, startSaxoOAuth } from "@/lib/live.functions";
 import { AppHeader } from "@/components/app-header";
+import { PageLoading } from "@/components/page-loading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -237,12 +238,12 @@ function SaxoStatusPage() {
 
   if (!ready || !session) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>
+      <PageLoading />
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <AppHeader email={session.user.email} />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
         <div className="flex flex-wrap items-start justify-between gap-3">

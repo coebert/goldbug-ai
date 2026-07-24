@@ -28,7 +28,7 @@ function LearnPage() {
   }, []);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <AppHeader email={email} />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <div className="mb-8">
