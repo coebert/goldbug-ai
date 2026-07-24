@@ -317,7 +317,7 @@ function Home() {
     </div>
   );
 }
-function ModeSummaryTile({
+export function ModeSummaryTile({
   label,
   sublabel,
   tone,
