@@ -41,6 +41,7 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
+import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
 const AllPortfoliosChart = lazy(() =>
@@ -174,7 +175,9 @@ function Home() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
+      <HomeCoachMarks />
       <main className="mx-auto max-w-6xl px-4 py-8">
+
         <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:mb-8 sm:flex sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Your Portfolios</h1>
@@ -268,11 +271,12 @@ function Home() {
           </Suspense>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6" data-coach="news-reel">
           <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
             <NewsReel />
           </Suspense>
         </div>
+
 
         <div className="mb-6">
           <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
@@ -684,7 +688,8 @@ function CreatePortfolioCard() {
   const liveReserved = liveBal?.reservedCash ?? 0;
 
   return (
-    <Card>
+    <Card data-coach="new-portfolio">
+
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <PlusCircle className="h-4 w-4 text-primary" /> New portfolio

@@ -43,6 +43,65 @@ function LearnPage() {
           </p>
         </div>
 
+        <section
+          aria-labelledby="tour-heading"
+          className="mb-10 rounded-xl border border-primary/40 bg-primary/5 p-4 sm:p-6"
+        >
+          <h2
+            id="tour-heading"
+            className="text-lg font-semibold tracking-tight text-foreground"
+          >
+            5-minute tour
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The shortest possible path from "what is this?" to a live simulated portfolio.
+          </p>
+          <ol className="mt-4 grid gap-3 sm:grid-cols-2">
+            {[
+              {
+                n: 1,
+                title: "Create a demo portfolio",
+                body: "On Home, tap New portfolio. Pick a name, keep Money type on Simulated cash, and set a risk level. No broker connection needed.",
+              },
+              {
+                n: 2,
+                title: "Watch the hourly loop",
+                body: "Aegis reads market prices and global headlines every hour. Each decision shows which signals and news items drove it.",
+              },
+              {
+                n: 3,
+                title: "Adjust risk anytime",
+                body: "Use the low-to-high risk slider on the portfolio page. Advanced fine-tuning lives behind a Fine-tune toggle.",
+              },
+              {
+                n: 4,
+                title: "Compare & review",
+                body: "Compare overlays portfolios across time ranges. Reports export a plain-English summary of every trade.",
+              },
+              {
+                n: 5,
+                title: "Go real when ready",
+                body: "Only when you're comfortable, connect Saxo on the Broker page and create a live_prod portfolio. Everything can stay paper-traded via the LIVE_SIM_PAPER_ONLY switch.",
+              },
+            ].map((s) => (
+              <li key={s.n} className="rounded-lg border border-border bg-card p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs text-primary">
+                    {s.n}
+                  </span>
+                  {s.title}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Prefer to skim first? Every trading term below is explained in one short paragraph.
+          </p>
+        </section>
+
+
+
         <nav aria-label="Section jump links" className="mb-8 flex flex-wrap gap-2">
           {LEARN_GROUPS.map((g) => (
             <a

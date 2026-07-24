@@ -21,6 +21,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { HelpDrawer } from "@/components/help-drawer";
 
 const NAV = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
@@ -72,6 +73,9 @@ export function AppHeader({ email }: { email?: string | null }) {
         </nav>
 
         <div className="hidden items-center gap-2 text-sm md:flex">
+          <span data-coach="help-button">
+            <HelpDrawer />
+          </span>
           {email && <NotificationsBell />}
           {email && (
             <span className="hidden max-w-[180px] truncate text-muted-foreground lg:inline">
@@ -93,6 +97,9 @@ export function AppHeader({ email }: { email?: string | null }) {
 
         {/* Mobile: notifications + Admin + hamburger */}
         <div className="flex shrink-0 items-center gap-1 md:hidden">
+          <span data-coach="help-button">
+            <HelpDrawer />
+          </span>
           {email && <NotificationsBell />}
           <Link
             to="/admin"
