@@ -33,10 +33,10 @@ import {
 
 export type { SlicerResult } from "./execution-slicer-handlers";
 
-// Client-facing input schemas — server injects the trusted ownerUserId.
-const EnqueueClientSchema = SliceInputSchema.omit({ ownerUserId: true });
-const TickClientSchema = TickInputSchema.omit({ ownerUserId: true });
-const FillClientSchema = FillInputSchema.omit({ ownerUserId: true });
+// Client-facing input schemas — server injects the trusted ownerUserId, so
+// each schema drops that field. Inlined into `.inputValidator` bodies below
+// because the TanStack server-fn splitter can otherwise strip module-scope
+// helper consts from the server chunk (see tanstack-serverfn-splitting).
 
 // ---- enqueue -----------------------------------------------------------
 
