@@ -236,17 +236,22 @@ export class SaxoAdapter implements BrokerAdapter {
       Data?: Array<{
         NetPositionBase?: {
           Amount?: number;
+          AmountLong?: number;
+          AmountShort?: number;
           AverageOpenPrice?: number;
           Uic?: number;
           AssetType?: string;
         };
         NetPositionView?: {
           CurrentPrice?: number;
+          Exposure?: number;
+          ExposureInBaseCurrency?: number;
           MarketValue?: number;
           MarketValueInBaseCurrency?: number;
           MarketValueOpen?: number;
           MarketValueOpenInBaseCurrency?: number;
           AverageOpenPrice?: number;
+          AverageOpenPriceIncludingCosts?: number;
           PositionsAverageBuyPrice?: number;
           ProfitLossOnTrade?: number;
           ProfitLossOnTradeInBaseCurrency?: number;
@@ -271,18 +276,20 @@ export class SaxoAdapter implements BrokerAdapter {
       const assetType = String(base.AssetType ?? p.AssetType ?? "Stock");
       let symbol = df.Symbol ?? "";
       let currency = df.Currency ?? "GBP";
-      const quantity = Number(base.Amount ?? 0);
+      const quantity = firstFiniteNumber(base.Amount, base.AmountLong) ?? 0;
       const absQuantity = Math.abs(quantity);
+      const perUnit = (value: number | undefined | null) => {
+        if (value == null || absQuantity <= 0) return undefined;
+        const n = Math.abs(Number(value));
+        return Number.isFinite(n) ? n / absQuantity : undefined;
+      };
       const avgPrice = firstPositiveNumber(
         base.AverageOpenPrice,
         view.AverageOpenPrice,
+        view.AverageOpenPriceIncludingCosts,
         view.PositionsAverageBuyPrice,
-        absQuantity > 0 && view.MarketValueOpen != null
-          ? Math.abs(Number(view.MarketValueOpen)) / absQuantity
-          : undefined,
-        absQuantity > 0 && view.MarketValueOpenInBaseCurrency != null
-          ? Math.abs(Number(view.MarketValueOpenInBaseCurrency)) / absQuantity
-          : undefined,
+        perUnit(view.MarketValueOpen),
+        perUnit(view.MarketValueOpenInBaseCurrency),
       );
       const pnl = firstFiniteNumber(view.ProfitLossOnTrade, view.ProfitLossOnTradeInBaseCurrency) ?? 0;
       const priceFromOpenValue = avgPrice > 0 && absQuantity > 0
@@ -290,12 +297,10 @@ export class SaxoAdapter implements BrokerAdapter {
         : 0;
       const marketPrice = firstPositiveNumber(
         view.CurrentPrice,
-        view.MarketValue != null && absQuantity > 0
-          ? Math.abs(Number(view.MarketValue)) / absQuantity
-          : undefined,
-        view.MarketValueInBaseCurrency != null && absQuantity > 0
-          ? Math.abs(Number(view.MarketValueInBaseCurrency)) / absQuantity
-          : undefined,
+        perUnit(view.Exposure),
+        perUnit(view.ExposureInBaseCurrency),
+        perUnit(view.MarketValue),
+        perUnit(view.MarketValueInBaseCurrency),
         priceFromOpenValue,
         avgPrice,
       );
