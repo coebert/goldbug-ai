@@ -600,7 +600,19 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
         portfolioId={portfolio.id}
         currentName={portfolio.name}
       />
+      {isSim && (
+        <AddSimFundsDialog
+          open={addFundsOpen}
+          onOpenChange={setAddFundsOpen}
+          portfolioId={portfolio.id}
+          portfolioName={portfolio.name}
+          currency={portfolio.currency}
+          currentCash={Number(portfolio.current_cash)}
+          startingCash={Number(portfolio.starting_cash)}
+        />
+      )}
     </Card>
+
   );
 }
 
