@@ -367,7 +367,7 @@ function PortfolioPage() {
         benchmark: r.benchmark != null ? ((r.benchmark - base) / base) * 100 : r.benchmark ?? null,
       };
     });
-  }, [chartData, compareMode, startingCashForChart]);
+  }, [chartData, compareMode, startingCashForChart, cumulativeDepositsByDate]);
 
   const perfMetrics = useMemo(() => {
     const rows = chartData.filter((r) => Number.isFinite(r.value));
