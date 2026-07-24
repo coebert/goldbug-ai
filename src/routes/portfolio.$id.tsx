@@ -266,7 +266,7 @@ function PortfolioPage() {
   const [lastBtDays, setLastBtDays] = useState<number | null>(null);
   const runBt = useMutation({
     mutationFn: () => runBtFn({ data: { portfolio_id: id, days } }),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       const m = r.metrics;
       setLastBtMetrics(m ?? null);
       setLastBtDays(days);
@@ -277,6 +277,17 @@ function PortfolioPage() {
         toast.success(
           `Backtest done. Return ${m.totalReturnPct.toFixed(2)}% · MDD ${m.maxDrawdownPct.toFixed(2)}% · Sharpe ${m.sharpe.toFixed(2)}${winPart}`,
         );
+        // Fetch the equity series for this window so the run-history overlay
+        // charts have per-run points to draw. We snapshot into localStorage
+        // because there is no per-run entity server-side — each backtest
+        // recomputes off the shared equity_snapshots table.
+        let equity: { snapshot_date: string; total_value: number }[] | undefined;
+        try {
+          const series = await getBacktestSeries({ data: { portfolio_id: id, days } });
+          equity = series.equity ?? undefined;
+        } catch {
+          // Overlay is a nice-to-have; falling back to metrics-only is fine.
+        }
         saveBacktestRun({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           ranAt: new Date().toISOString(),
@@ -284,6 +295,7 @@ function PortfolioPage() {
           riskLevel: (q.data?.portfolio?.risk_level as string | undefined) ?? "unknown",
           days,
           metrics: m,
+          equity,
         });
       } else {
         toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
@@ -292,6 +304,7 @@ function PortfolioPage() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   const reset = useMutation({
     mutationFn: () => resetFn({ data: { id } }),
