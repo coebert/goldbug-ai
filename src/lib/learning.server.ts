@@ -385,6 +385,7 @@ Return { lessons: string[] } with 3–5 items, each under 180 characters. Use pl
       if (lessons.length === 0) continue;
 
       await supabaseAdmin.from("portfolio_lessons").insert({
+        user_id: userId,
         portfolio_id: portfolioId,
         as_of: asOf,
         lessons,
