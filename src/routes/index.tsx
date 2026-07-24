@@ -130,6 +130,39 @@ function Home() {
     return map;
   }, [equityQ.data]);
 
+  const todaySummary = useMemo(() => {
+    const series = equityQ.data?.series ?? [];
+    const portfolios = equityQ.data?.portfolios ?? [];
+    if (series.length === 0 || portfolios.length === 0) return null;
+    const sumRow = (row: Record<string, unknown>) =>
+      portfolios.reduce((s, p) => {
+        const v = Number((row as Record<string, unknown>)[p.id]);
+        return s + (Number.isFinite(v) ? v : 0);
+      }, 0);
+    const last = series[series.length - 1] as Record<string, unknown>;
+    const prev = (series[series.length - 2] as Record<string, unknown>) ?? last;
+    const totalEquity = sumRow(last);
+    const prevEquity = sumRow(prev);
+    const dayPnl = totalEquity - prevEquity;
+    const dayPct = prevEquity > 0 ? (dayPnl / prevEquity) * 100 : 0;
+    return { totalEquity, dayPnl, dayPct, count: portfolios.length };
+  }, [equityQ.data]);
+
+  const nextRunLabel = useMemo(() => {
+    const now = new Date();
+    const next = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        now.getUTCHours() + 1,
+        0,
+        0,
+      ),
+    );
+    return `${String(next.getUTCHours()).padStart(2, "0")}:00 GMT`;
+  }, [equityQ.dataUpdatedAt]);
+
   if (!ready || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
