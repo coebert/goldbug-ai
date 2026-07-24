@@ -16,7 +16,6 @@
 // are still applied because the broker is authoritative here; only true
 // broker read failures leave local state alone.
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
 
 export type LiveHoldingsSyncResult =
