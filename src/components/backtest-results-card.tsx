@@ -71,6 +71,45 @@ export function BacktestResultsCard({
     [q.data?.equity],
   );
 
+  const drawdownData = useMemo(() => {
+    let peak = -Infinity;
+    return equityData.map((p) => {
+      peak = Math.max(peak, p.value);
+      const dd = peak > 0 ? ((p.value - peak) / peak) * 100 : 0;
+      return { date: p.date, drawdown: Number(dd.toFixed(4)) };
+    });
+  }, [equityData]);
+
+  const equityByDate = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of equityData) m.set(p.date, p.value);
+    return m;
+  }, [equityData]);
+
+  const buyMarkers = useMemo(
+    () =>
+      (q.data?.trades ?? [])
+        .filter((t) => t.side === "buy" && equityByDate.has(t.date))
+        .map((t) => ({
+          date: t.date,
+          value: equityByDate.get(t.date)!,
+          label: `BUY ${t.quantity} ${t.symbol} @ ${t.price}`,
+        })),
+    [q.data?.trades, equityByDate],
+  );
+
+  const sellMarkers = useMemo(
+    () =>
+      (q.data?.trades ?? [])
+        .filter((t) => t.side === "sell" && equityByDate.has(t.date))
+        .map((t) => ({
+          date: t.date,
+          value: equityByDate.get(t.date)!,
+          label: `SELL ${t.quantity} ${t.symbol} @ ${t.price}`,
+        })),
+    [q.data?.trades, equityByDate],
+  );
+
   const holdingsPoints = q.data?.holdings.points ?? [];
   const holdingsSymbols = q.data?.holdings.symbols ?? [];
 
