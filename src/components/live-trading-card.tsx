@@ -31,6 +31,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const ping = useServerFn(pingBroker);
   const syncBal = useServerFn(syncBrokerBalance);
   const reconcile = useServerFn(reconcilePortfolio);
+  const reconcileOrdersFn = useServerFn(reconcileOrders);
 
   const [ackRisk, setAckRisk] = useState(false);
   const [targetEnv, setTargetEnv] = useState<"sim" | "prod">("sim");
@@ -120,6 +121,22 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const mReconOrders = useMutation({
+    mutationFn: () => reconcileOrdersFn({ data: { portfolioId } }),
+    onSuccess: (r) => {
+      if ("skipped" in r && r.skipped) {
+        toast.info("Order reconciliation skipped (not a live portfolio)");
+      } else {
+        const s = r as { scanned: number; filled: number; partial: number; rejected: number; stillWorking: number; unknown: number };
+        toast.success(
+          `Reconciled ${s.scanned} order${s.scanned === 1 ? "" : "s"} — ${s.filled} filled, ${s.partial} partial, ${s.rejected} rejected, ${s.stillWorking} working${s.unknown ? `, ${s.unknown} unknown` : ""}`,
+        );
+      }
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const s = q.data;
   const mode = s?.portfolio.mode ?? "paper";
   const isLive = mode === "live_sim" || mode === "live_prod";
@@ -173,6 +190,10 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
           </Button>
           <Button size="sm" variant="outline" onClick={() => mRecon.mutate()} disabled={mRecon.isPending || !isLive}>
             Reconcile now
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => mReconOrders.mutate()} disabled={mReconOrders.isPending || !isLive}>
+            {mReconOrders.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            Reconcile orders
           </Button>
           {isLive && (
             <Button size="sm" variant="outline" onClick={() => mPause.mutate({ paused: !paused, reason: promptReason(paused ? "Resume" : "Pause") })} disabled={mPause.isPending}>
