@@ -103,16 +103,14 @@ export async function syncLiveCashFromBroker(
   const latestSnapshot = await latestSnapshotQuery;
   const holdingsValue = Number(latestSnapshot.data?.holdings_value ?? 0);
   const today = new Date().toISOString().slice(0, 10);
-  await supabaseAdmin.from("equity_snapshots").upsert(
-    {
-      portfolio_id: portfolioId,
-      snapshot_date: today,
-      cash: brokerCash,
-      holdings_value: holdingsValue,
-      total_value: brokerCash + holdingsValue,
-    },
-    { onConflict: "portfolio_id,snapshot_date" },
-  );
+  await writeCashSyncSnapshot(supabaseAdmin as unknown as CashSyncSnapshotClient, {
+    portfolioId,
+    snapshotDate: today,
+    cash: brokerCash,
+    holdingsValue,
+  });
+
+
 
   await supabaseAdmin.from("live_broker_log").insert({
     portfolio_id: portfolioId, user_id: p.user_id,
@@ -138,3 +136,98 @@ export async function syncLiveCashFromBroker(
     previousCash: prevCash, newCash: brokerCash, newStartingCash: newStarting,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Snapshot write path — extracted so it can be integration-tested without a
+// live database and, crucially, without depending on the
+// (portfolio_id, snapshot_date) UNIQUE constraint existing. Older environments
+// were seen without the constraint, which silently turned upserts into
+// duplicate inserts. This implementation does an explicit read-then-
+// update-or-insert so behaviour is identical either way.
+// ---------------------------------------------------------------------------
+
+export type CashSyncSnapshotInput = {
+  portfolioId: string;
+  snapshotDate: string; // YYYY-MM-DD
+  cash: number;
+  holdingsValue: number;
+};
+
+export type CashSyncSnapshotWriteResult =
+  | { action: "inserted"; totalValue: number }
+  | { action: "updated"; totalValue: number; previousTotalValue: number }
+  | { action: "error"; message: string };
+
+// Minimal structural type of the Supabase client surface we use, so tests can
+// hand in a lightweight fake without pulling in the real client.
+export type CashSyncSnapshotClient = {
+  from: (table: "equity_snapshots") => {
+    select: (cols: string) => {
+      eq: (col: "portfolio_id", val: string) => {
+        eq: (col: "snapshot_date", val: string) => {
+          maybeSingle: () => Promise<{
+            data: { id: string; total_value: number | null } | null;
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    };
+    update: (patch: { cash: number; holdings_value: number; total_value: number }) => {
+      eq: (col: "id", val: string) => Promise<{ error: { message: string } | null }>;
+    };
+    insert: (row: {
+      portfolio_id: string;
+      snapshot_date: string;
+      cash: number;
+      holdings_value: number;
+      total_value: number;
+    }) => Promise<{ error: { message: string } | null }>;
+  };
+};
+
+export async function writeCashSyncSnapshot(
+  client: CashSyncSnapshotClient,
+  input: CashSyncSnapshotInput,
+): Promise<CashSyncSnapshotWriteResult> {
+  const cash = Number(input.cash);
+  const holdingsValue = Number(input.holdingsValue);
+  if (!Number.isFinite(cash) || !Number.isFinite(holdingsValue)) {
+    return { action: "error", message: "cash and holdingsValue must be finite" };
+  }
+  const totalValue = cash + holdingsValue;
+
+  const existing = await client
+    .from("equity_snapshots")
+    .select("id, total_value")
+    .eq("portfolio_id", input.portfolioId)
+    .eq("snapshot_date", input.snapshotDate)
+    .maybeSingle();
+
+  if (existing.error) {
+    return { action: "error", message: existing.error.message };
+  }
+
+  if (existing.data) {
+    const upd = await client
+      .from("equity_snapshots")
+      .update({ cash, holdings_value: holdingsValue, total_value: totalValue })
+      .eq("id", existing.data.id);
+    if (upd.error) return { action: "error", message: upd.error.message };
+    return {
+      action: "updated",
+      totalValue,
+      previousTotalValue: Number(existing.data.total_value ?? 0),
+    };
+  }
+
+  const ins = await client.from("equity_snapshots").insert({
+    portfolio_id: input.portfolioId,
+    snapshot_date: input.snapshotDate,
+    cash,
+    holdings_value: holdingsValue,
+    total_value: totalValue,
+  });
+  if (ins.error) return { action: "error", message: ins.error.message };
+  return { action: "inserted", totalValue };
+}
+
