@@ -281,6 +281,104 @@ export function BacktestRunHistoryCard({ portfolioId }: { portfolioId: string })
               </div>
             )}
 
+            {overlaySeries.length > 0 && (
+              <div className="mb-6">
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Overlay ({overlaySeries.length} run{overlaySeries.length === 1 ? "" : "s"})
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Aligned by elapsed day; equity shown as % vs each run's start.
+                  </div>
+                </div>
+                <div className="mb-1 text-xs text-muted-foreground">Equity curve</div>
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={mergedOverlay} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis
+                        dataKey="t"
+                        tick={{ fontSize: 10 }}
+                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                        width={44}
+                      />
+                      <Tooltip
+                        formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
+                        labelFormatter={(t: number) => `Day ${t}`}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      {overlaySeries.map((s) => (
+                        <Line
+                          key={s.id}
+                          type="monotone"
+                          dataKey={`eq_${s.id}`}
+                          name={s.label}
+                          stroke={s.color}
+                          strokeWidth={2}
+                          dot={false}
+                          isAnimationActive={false}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mb-1 mt-4 text-xs text-muted-foreground">Drawdown curve</div>
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={mergedOverlay} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis
+                        dataKey="t"
+                        tick={{ fontSize: 10 }}
+                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                        width={44}
+                        domain={["auto", 0]}
+                      />
+                      <Tooltip
+                        formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
+                        labelFormatter={(t: number) => `Day ${t}`}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      {overlaySeries.map((s) => (
+                        <Line
+                          key={s.id}
+                          type="monotone"
+                          dataKey={`dd_${s.id}`}
+                          name={s.label}
+                          stroke={s.color}
+                          strokeWidth={2}
+                          dot={false}
+                          isAnimationActive={false}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {compareRuns.length > 0 && overlaySeries.length === 0 && (
+              <div className="mb-4 rounded-md border border-dashed border-border/60 p-3 text-xs text-muted-foreground">
+                No equity series stored for the selected runs. Newer runs record
+                their equity curve automatically; re-run a backtest to populate
+                the overlay charts.
+              </div>
+            )}
+
+
+
             <div className="overflow-x-auto">
               <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 All runs (select rows to narrow the comparison above)
