@@ -56,10 +56,9 @@ export default defineConfig({
         extends: true,
         test: {
           name: "ci",
-          environment: "jsdom",
+          environment: "node",
           include: heavyGlobs,
           exclude: ["**/node_modules/**"],
-          setupFiles: ["src/test/setup-jsdom.ts"],
         },
       },
     ],
