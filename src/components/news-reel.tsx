@@ -361,7 +361,25 @@ export function NewsReel() {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+        <div className="mt-3 flex items-center justify-between gap-2 md:hidden">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+            aria-expanded={filtersOpen}
+          >
+            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${filtersOpen ? "rotate-90" : ""}`} />
+            Filters & sort
+            {activeFilterCount > 0 && (
+              <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <span className="text-[11px] text-muted-foreground">{items.length} of {allItems.length}</span>
+        </div>
+
+        <div className={`mt-3 flex-wrap items-center gap-2 text-[11px] ${filtersOpen ? "flex" : "hidden"} md:flex`}>
           <span className="text-muted-foreground uppercase tracking-wide">Asset:</span>
           {ASSET_CLASSES.map((c) => {
             const active = assetFilter.has(c);
