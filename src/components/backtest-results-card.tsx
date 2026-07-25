@@ -269,7 +269,7 @@ export function BacktestResultsCard({
           {holdingsPoints.length === 0 ? (
             <p className="text-sm text-muted-foreground">No holdings in this window.</p>
           ) : (
-            <div className="h-64 w-full">
+            <div className="h-52 w-full sm:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={holdingsPoints} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                   <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
