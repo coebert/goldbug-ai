@@ -1284,7 +1284,7 @@ function PortfolioPage() {
                                 <td className="px-3 py-2 text-right tabular-nums">{Number(t.quantity).toFixed(4)}</td>
                                 <td className="px-3 py-2 text-right tabular-nums">{Number(t.price).toFixed(2)}</td>
                                 <td className="px-3 py-2 text-right tabular-nums">{Number(t.value).toFixed(2)}</td>
-                                <td className="px-3 py-2 text-xs text-muted-foreground">{t.reason}</td>
+                                <td className="px-3 py-2 text-xs text-muted-foreground"><JargonText>{t.reason}</JargonText></td>
                               </tr>
                             );
                           })}
