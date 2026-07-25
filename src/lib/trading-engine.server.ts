@@ -568,6 +568,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         `[trading-engine] partial-exec: dropped ${closedSkipped.length}/${beforeCount} closed-venue symbols: ${closedSkipped.slice(0, 12).join(", ")}${closedSkipped.length > 12 ? "…" : ""}`,
       );
     }
+  }
+
+
 
   // Price the entire (asset-class-filtered) universe up front so we can pick a
   // candidate list the portfolio's cash can actually trade. Held symbols are
