@@ -2,10 +2,14 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDecisionNewsBreakdown } from "@/lib/trading.functions";
+import { SectionCard, SectionCardBody } from "@/components/ui/section-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { ListSkeleton } from "@/components/ui/card-skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Layers, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Layers, Newspaper, RefreshCw } from "lucide-react";
 
 function tone(v: number | null) {
   if (v == null) return { label: "unscored", cls: "text-muted-foreground bg-muted" };
@@ -59,7 +63,7 @@ export function DecisionNewsBreakdown() {
   }
 
   return (
-    <Card>
+    <SectionCard>
       <button
         type="button"
         onClick={() => setSectionOpen((v) => !v)}
@@ -141,14 +145,33 @@ export function DecisionNewsBreakdown() {
       )}
       {sectionOpen && (
       <CardContent>
-        {q.isLoading ? (
-          <div className="h-40 animate-pulse rounded-md bg-muted/40" />
+        {q.isError ? (
+          <ErrorState
+            description={
+              q.error instanceof Error
+                ? q.error.message
+                : "The decisions feed returned an error."
+            }
+            onRetry={() => q.refetch()}
+            retrying={q.isFetching}
+          />
+        ) : q.isLoading ? (
+          <ListSkeleton rows={4} withAvatar={false} />
         ) : visible.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {items.length === 0
-              ? "No recent decisions yet. The next scheduled run will populate this panel."
-              : "No decisions match the current filters."}
-          </p>
+          <EmptyState
+            icon={<Newspaper />}
+            title={
+              items.length === 0
+                ? "No recent decisions yet"
+                : "No decisions match the current filters"
+            }
+            description={
+              items.length === 0
+                ? "The next scheduled AI run will populate this panel."
+                : "Clear filters or wait for the next AI run."
+            }
+            compact
+          />
         ) : (
           <ul className="space-y-3">
             {visible.map((it) => {
@@ -255,6 +278,6 @@ export function DecisionNewsBreakdown() {
         )}
       </CardContent>
       )}
-    </Card>
+    </SectionCard>
   );
 }
