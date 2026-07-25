@@ -138,12 +138,12 @@ describe("compileFxIntents — guardrails", () => {
     }
   });
 
-  it("skips when the base wallet has too little for a pre_fund even at 40% cap", () => {
+  it("skips when the base wallet has less than min notional to spend", () => {
     const [r] = compileFxIntents(
       [{ kind: "pre_fund", ccy: "USD", notional_base: 5_000, reason: "buy" }],
-      baseCtx({ wallet: { GBP: 50, USD: 0, EUR: 0 }, guardrails: { ...DEFAULT_GUARDRAILS, navBase: 25_000 } }),
+      baseCtx({ wallet: { GBP: 20, USD: 0, EUR: 0 }, guardrails: { ...DEFAULT_GUARDRAILS, navBase: 25_000 } }),
     );
-    // 40% of 50 = 20 < min notional 25 → skip
+    // Base bal 20 GBP < min notional 25 → skip
     expect(r.order).toBeUndefined();
     expect(r.skipped).toMatch(/base gbp wallet too low/i);
   });
