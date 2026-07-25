@@ -100,6 +100,22 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
     staleTime: 20_000,
   });
 
+  const [drift, setDrift] = useState<DriftSettings>(DEFAULT_DRIFT);
+  const [driftHydrated, setDriftHydrated] = useState(false);
+  useEffect(() => {
+    setDrift(loadDriftSettings(portfolioId));
+    setDriftHydrated(true);
+  }, [portfolioId]);
+  useEffect(() => {
+    if (!driftHydrated || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(driftKey(portfolioId), JSON.stringify(drift));
+    } catch {
+      /* ignore quota */
+    }
+  }, [drift, driftHydrated, portfolioId]);
+
+
   if (q.isLoading) {
     return (
       <Card>
