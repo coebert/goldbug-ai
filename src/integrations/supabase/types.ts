@@ -1160,6 +1160,66 @@ export type Database = {
         }
         Relationships: []
       }
+      run_metrics: {
+        Row: {
+          budget_exceeded_count: number
+          created_at: string
+          duration_ms: number
+          error: string | null
+          id: string
+          news_headlines: number
+          portfolios_error: number
+          portfolios_ok: number
+          portfolios_total: number
+          price_errors: number
+          prices_refreshed: number
+          saxo_calls_error: number
+          saxo_calls_ok: number
+          saxo_calls_total: number
+          saxo_retries_429: number
+          success: boolean
+          triggered_by: string
+        }
+        Insert: {
+          budget_exceeded_count?: number
+          created_at?: string
+          duration_ms: number
+          error?: string | null
+          id?: string
+          news_headlines?: number
+          portfolios_error?: number
+          portfolios_ok?: number
+          portfolios_total?: number
+          price_errors?: number
+          prices_refreshed?: number
+          saxo_calls_error?: number
+          saxo_calls_ok?: number
+          saxo_calls_total?: number
+          saxo_retries_429?: number
+          success: boolean
+          triggered_by: string
+        }
+        Update: {
+          budget_exceeded_count?: number
+          created_at?: string
+          duration_ms?: number
+          error?: string | null
+          id?: string
+          news_headlines?: number
+          portfolios_error?: number
+          portfolios_ok?: number
+          portfolios_total?: number
+          price_errors?: number
+          prices_refreshed?: number
+          saxo_calls_error?: number
+          saxo_calls_ok?: number
+          saxo_calls_total?: number
+          saxo_retries_429?: number
+          success?: boolean
+          triggered_by?: string
+        }
+        Relationships: []
+      }
       saxo_instrument_cache: {
         Row: {
           asset_type: string

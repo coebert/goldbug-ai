@@ -131,6 +131,8 @@ export class SaxoAdapter implements BrokerAdapter {
     const maxAttempts = opts?.maxAttempts ?? 3;
     const retryCapMs = opts?.retryCapMs ?? 5000;
     const silentStatuses = new Set(opts?.silentStatuses ?? []);
+    let retries429 = 0;
+    const { bumpSaxo } = await import("@/lib/run-metrics.server");
     try {
       let res: Response | null = null;
       let text = "";
@@ -140,6 +142,7 @@ export class SaxoAdapter implements BrokerAdapter {
         text = await res.text();
         response = text ? safeJson(text) : null;
         if (res.status !== 429 || attempt === maxAttempts) break;
+        retries429 += 1;
         const retryAfterHeader = res.headers.get("retry-after");
         const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : NaN;
         // Exponential backoff with jitter when Saxo doesn't send Retry-After.
@@ -158,12 +161,14 @@ export class SaxoAdapter implements BrokerAdapter {
             method, path, status, request: opts?.body ?? opts?.query ?? null, response, error: msg,
           });
         }
+        bumpSaxo("error", retries429);
         throw new Error(msg);
       }
       await log({
         portfolioId: this.portfolioId, userId: this.userId, env: this.env,
         method, path, status, request: opts?.body ?? opts?.query ?? null, response,
       });
+      bumpSaxo("ok", retries429);
       return response as T;
     } catch (err) {
       if (status == null) {
@@ -172,6 +177,7 @@ export class SaxoAdapter implements BrokerAdapter {
           method, path, status: null, request: opts?.body ?? opts?.query ?? null,
           error: err instanceof Error ? err.message : String(err),
         });
+        bumpSaxo("error", retries429);
       }
       throw err;
     }

@@ -1,4 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withRunMetrics, snapshot, bumpBudgetExceeded, bumpPortfolio } from "@/lib/run-metrics.server";
+
+export type RunMetricsSnapshot = ReturnType<typeof snapshot>;
 
 export type HourlyRunResult = {
   success: true;
@@ -14,6 +17,7 @@ export type HourlyRunResult = {
   saxo_refresh: Record<string, { ok: boolean; error?: string; skipped?: string }>;
   triggered_by: "manual" | "cron";
   results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number; skipped?: string }>;
+  metrics: RunMetricsSnapshot;
 };
 
 export class RunInProgressError extends Error {
@@ -42,6 +46,13 @@ export async function runHourlyCycle(opts: {
   triggeredBy: "manual" | "cron";
   force?: boolean;
 }): Promise<HourlyRunResult> {
+  return withRunMetrics((metrics) => runHourlyCycleInner(opts, metrics));
+}
+
+async function runHourlyCycleInner(
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean },
+  metrics: import("@/lib/run-metrics.server").RunMetrics,
+): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
   const RUN_BUDGET_MS = 115 * 1000;
   const { acquireRunLock } = await import("@/lib/run-lock.server");
@@ -169,6 +180,7 @@ export async function runHourlyCycle(opts: {
       try {
         const elapsed = Date.now() - runStartedAt;
         if (elapsed > RUN_BUDGET_MS) {
+          bumpBudgetExceeded();
           results.push({
             id: p.id,
             mode: p.mode,
@@ -198,12 +210,36 @@ export async function runHourlyCycle(opts: {
         }
 
         const r = await runDailyTick(p.id, today);
+        bumpPortfolio("ok");
         results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
+        bumpPortfolio("error");
         results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
       }
+    }
+
+    const metricsSnap = snapshot(metrics);
+    try {
+      await supabaseAdmin.from("run_metrics").insert({
+        triggered_by: manualTrigger ? "manual" : "cron",
+        success: true,
+        duration_ms: metricsSnap.duration_ms,
+        portfolios_total: portfolios.length,
+        portfolios_ok: metricsSnap.portfolios_ok,
+        portfolios_error: metricsSnap.portfolios_error,
+        budget_exceeded_count: metricsSnap.budget_exceeded_count,
+        saxo_calls_total: metricsSnap.saxo_calls_total,
+        saxo_calls_ok: metricsSnap.saxo_calls_ok,
+        saxo_calls_error: metricsSnap.saxo_calls_error,
+        saxo_retries_429: metricsSnap.saxo_retries_429,
+        news_headlines: newsCount,
+        prices_refreshed: priceRefresh.refreshed,
+        price_errors: priceRefresh.errors,
+      });
+    } catch (e) {
+      console.error("hourly-run: failed to persist run_metrics", e);
     }
 
     return {
@@ -220,6 +256,7 @@ export async function runHourlyCycle(opts: {
       saxo_refresh: saxoRefresh,
       triggered_by: manualTrigger ? "manual" : "cron",
       results,
+      metrics: metricsSnap,
     };
   } finally {
     await lock.release();
