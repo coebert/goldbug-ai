@@ -157,7 +157,13 @@ export type RiskConfig = {
   reentry_atr_days_mult: number;
   reentry_min_days: number;
   reentry_max_days: number;
+  // Phase 2 + 5 — sizing bonuses & risk-parity target construction.
+  alpha_bonus_enabled: boolean;
+  alpha_bonus_cap: number;
+  risk_parity_enabled: boolean;
+  risk_parity_nav_cap: number;
 };
+
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = {
   asset_class_limits: { stock: 0.6, etf: 0.8, crypto: 0.2, commodity: 0.3, fx: 0.3 },
@@ -193,6 +199,10 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   reentry_atr_days_mult: 0.05,
   reentry_min_days: 5,
   reentry_max_days: 30,
+  alpha_bonus_enabled: true,
+  alpha_bonus_cap: 1.5,
+  risk_parity_enabled: false,
+  risk_parity_nav_cap: 0.2,
 };
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
@@ -303,6 +313,10 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("reentry_atr_days_mult", 0, 5);
   num("reentry_min_days", 0, 365);
   num("reentry_max_days", 0, 365);
+  bool("alpha_bonus_enabled");
+  num("alpha_bonus_cap", 1, 3);
+  bool("risk_parity_enabled");
+  num("risk_parity_nav_cap", 0.01, 1);
   return out;
 }
 

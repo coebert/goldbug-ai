@@ -98,6 +98,7 @@ import {
   reentryLockoutDays,
 } from "./exits";
 import { scoreUniverse, formatAlphaPriorsForPrompt } from "./alpha";
+import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
 import type { Database } from "@/integrations/supabase/types";
 
 
@@ -693,6 +694,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     return null;
   });
 
+  // Alpha priors: composite scores per symbol, blended by regime. We hoist
+  // these out of the AI-decision IIFE so the sizing pipeline can also
+  // reference them (Phase 2 bonus + Phase 5 risk parity).
+  const alphaScores = scoreUniverse(
+    features as unknown as Parameters<typeof scoreUniverse>[0],
+    effectiveRegime.regime,
+  );
+  const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
+  const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
+
   // If circuit breaker is tripped, skip the AI call entirely.
   const decision: DecisionOutput = breakerTripped
     ? {
@@ -700,10 +711,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
         orders: [],
       }
-    : await (async () => {
-        const alphaScores = scoreUniverse(features as unknown as Parameters<typeof scoreUniverse>[0], effectiveRegime.regime);
-        const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
-        return callAiForDecision({
+    : await callAiForDecision({
         portfolio,
         holdings: holdings ?? [],
         cashValue: cash,
@@ -733,7 +741,6 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
       });
-      })();
 
 
 
@@ -1202,6 +1209,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         sizingNotes.push(`calib×${calibration.global_size_mult.toFixed(2)}`);
       }
 
+      // Phase 2 — two-sided sizing bonus. Lifts spend (up to cap) when the
+      // regime-blended alpha prior and AI conviction both strongly agree with
+      // the trade side. Never shrinks below the current spend.
+      if (order.side === "buy" && cfg.alpha_bonus_enabled) {
+        const alphaComp = alphaCompositeBySymbol.get(meta.symbol) ?? 0;
+        const bonus = alphaConvictionBonus({
+          side: "buy",
+          alphaComposite: alphaComp,
+          conviction: order.conviction,
+          cap: cfg.alpha_bonus_cap,
+          enabled: true,
+        });
+        if (bonus.mult > 1) {
+          spend *= bonus.mult;
+          if (bonus.note) sizingNotes.push(bonus.note);
+        }
+      }
+
       // J. Ensemble second opinion — halve on strong disagreement, log to journal
       {
         const feat = featureBySymbol.get(meta.symbol);
@@ -1318,16 +1343,29 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
-      // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue
+      // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue.
+      // Phase 5 — when risk_parity_enabled, scale the vol budget by |alpha|
+      // so higher-conviction systematic setups earn a bigger share of the
+      // vol budget (still bounded by risk_parity_nav_cap).
       let volCapped = false;
       if (cfg.volatility_sizing) {
         const vol = featureBySymbol.get(meta.symbol)?.vol20d ?? null;
         if (vol && vol > 0) {
-          const targetPositionVal = (cfg.vol_target_pct * totalValue) / vol;
+          let targetPositionVal = (cfg.vol_target_pct * totalValue) / vol;
+          if (cfg.risk_parity_enabled) {
+            const alphaMag = Math.abs(alphaCompositeBySymbol.get(meta.symbol) ?? 0);
+            const rp = riskParityTargetSpend({
+              alphaMag, vol, totalValue,
+              targetVolPct: cfg.vol_target_pct,
+              navCap: cfg.risk_parity_nav_cap,
+            });
+            if (rp > 0) targetPositionVal = rp;
+          }
           const volRoom = Math.max(0, targetPositionVal - existingVal);
           if (spend > volRoom) {
             spend = volRoom;
             volCapped = true;
+            if (cfg.risk_parity_enabled) sizingNotes.push(`risk-parity α=${(alphaCompositeBySymbol.get(meta.symbol) ?? 0).toFixed(2)}`);
           }
         }
       }
