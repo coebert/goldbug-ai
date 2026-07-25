@@ -40,10 +40,9 @@ describe("riskParityTargetSpend", () => {
   });
 
   it("scales target by alpha magnitude", () => {
-    const weak = riskParityTargetSpend({ alphaMag: 0, vol: 0.02, totalValue: 10_000, targetVolPct: 0.015 });
-    const strong = riskParityTargetSpend({ alphaMag: 1, vol: 0.02, totalValue: 10_000, targetVolPct: 0.015 });
+    const weak = riskParityTargetSpend({ alphaMag: 0, vol: 0.05, totalValue: 10_000, targetVolPct: 0.015, navCap: 1 });
+    const strong = riskParityTargetSpend({ alphaMag: 1, vol: 0.05, totalValue: 10_000, targetVolPct: 0.015, navCap: 1 });
     expect(strong).toBeGreaterThan(weak);
-    // strong is 3x weak (scale 1.5 vs 0.5) unless nav-capped
     expect(strong / weak).toBeCloseTo(3, 5);
   });
 
