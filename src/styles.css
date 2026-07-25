@@ -376,3 +376,30 @@
   font-variant-numeric: tabular-nums slashed-zero;
 }
 
+/* Phase 5 — motion. Standardised tween helpers; automatically disabled
+ * when the user has requested reduced motion. Apply to any element whose
+ * value or transform changes ("hover lift", "value flip", etc.). */
+@utility tween {
+  transition-property: transform, opacity, color, background-color, border-color, box-shadow;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+@utility tween-slow {
+  transition-property: transform, opacity, color, background-color, border-color, box-shadow;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-duration: 320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
