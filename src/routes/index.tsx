@@ -564,7 +564,21 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Sparkline values={values} width={120} height={32} />
-              {rangePct != null && (
+              {equityLoading ? (
+                <Skeleton
+                  data-testid="range-pct-skeleton"
+                  aria-label="Loading equity change"
+                  className="h-4 w-12"
+                />
+              ) : equityEmpty || rangePct == null ? (
+                <span
+                  data-testid="range-pct-empty"
+                  aria-label="No equity change data"
+                  className="text-sm font-semibold tabular-nums text-muted-foreground"
+                >
+                  —
+                </span>
+              ) : (
                 <span
                   className={`text-sm font-semibold tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}
                 >
