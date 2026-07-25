@@ -40,7 +40,7 @@ export function maybeNotifyPrecheckCashReject(params: {
   message: string | null;
 }) {
   const userId = params.userId;
-  const portfolioId = params.portfolioId;
+  const portfolioId = portfolioId;
   if (!userId || !portfolioId) return;
   if (!isCashReject(params.code, params.message)) return;
 
@@ -57,7 +57,7 @@ export function maybeNotifyPrecheckCashReject(params: {
       const { data: rows, error } = await supabaseAdmin
         .from("live_broker_log")
         .select("created_at, error, response")
-        .eq("portfolio_id", params.portfolioId)
+        .eq("portfolio_id", portfolioId)
         .eq("method", "PRECHECK_REJECT")
         .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
@@ -78,7 +78,7 @@ export function maybeNotifyPrecheckCashReject(params: {
         .select("id")
         .eq("user_id", userId)
         .eq("category", "precheck_cash")
-        .eq("portfolio_id", params.portfolioId)
+        .eq("portfolio_id", portfolioId)
         .gte("created_at", cooldownSince)
         .limit(1);
       if (recent && recent.length > 0) return;
@@ -94,7 +94,7 @@ export function maybeNotifyPrecheckCashReject(params: {
         severity: cashCount >= THRESHOLD * 2 ? "critical" : "warning",
         title,
         body,
-        portfolio_id: params.portfolioId,
+        portfolio_id: portfolioId,
         details: {
           count: cashCount,
           window_hours: WINDOW_HOURS,
@@ -119,7 +119,7 @@ export function maybeNotifyPrecheckCashReject(params: {
             signal: ctrl.signal,
             body: JSON.stringify({
               event: "precheck.cash_reject_threshold",
-              portfolioId: params.portfolioId,
+              portfolioId: portfolioId,
               userId: userId,
               cashRejects: cashCount,
               windowHours: WINDOW_HOURS,
