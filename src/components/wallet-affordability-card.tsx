@@ -298,10 +298,112 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
             )}
           </div>
 
+          {/* FX-rate sensitivity */}
+          {d.sensitivity && d.sensitivity.length > 0 && (
+            <div>
+              <div className="mb-2 flex items-center gap-1 text-xs uppercase text-muted-foreground">
+                <span>FX-rate sensitivity</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Re-runs the same trimmer with each pair's rate shocked by ±2/5/10%
+                    (holding other pairs fixed). Shows how affordability and skip
+                    counts move if the currency weakens (+) or strengthens (−) vs {d.baseCcy}.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="space-y-4">
+                {d.sensitivity.map((s) => (
+                  <div key={s.ccy} className="rounded-md border p-3">
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <div className="font-medium">
+                        {d.baseCcy}/{s.ccy}
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          spot {s.baseRate ? s.baseRate.toFixed(4) : "n/a"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        baseline allowed{" "}
+                        {fmt(s.baselineAllowedBase, d.baseCcy)}
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-muted-foreground">
+                            <th className="py-1 pr-3">Shock</th>
+                            <th className="py-1 pr-3 text-right">Shocked rate</th>
+                            <th className="py-1 pr-3 text-right">Allowed ({s.ccy})</th>
+                            <th className="py-1 pr-3 text-right">Allowed (≈ {d.baseCcy})</th>
+                            <th className="py-1 pr-3 text-right">Δ vs base</th>
+                            <th className="py-1 pr-3 text-right">Skipped</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {s.scenarios.map((sc) => {
+                            const up = sc.deltaAllowedBase > 0.005;
+                            const down = sc.deltaAllowedBase < -0.005;
+                            return (
+                              <tr key={sc.shockPct} className="border-t">
+                                <td className="py-1 pr-3 font-medium tabular-nums">
+                                  {sc.shockPct > 0 ? "+" : ""}
+                                  {(sc.shockPct * 100).toFixed(0)}%
+                                </td>
+                                <td className="py-1 pr-3 text-right tabular-nums">
+                                  {sc.shockedRate ? sc.shockedRate.toFixed(4) : "—"}
+                                </td>
+                                <td className="py-1 pr-3 text-right tabular-nums">
+                                  {fmtN(sc.allowedNative)}
+                                </td>
+                                <td className="py-1 pr-3 text-right tabular-nums">
+                                  {fmt(sc.allowedBase, d.baseCcy)}
+                                </td>
+                                <td
+                                  className={`py-1 pr-3 text-right tabular-nums ${
+                                    up
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : down
+                                        ? "text-destructive"
+                                        : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {sc.deltaAllowedBase >= 0 ? "+" : ""}
+                                  {fmt(sc.deltaAllowedBase, d.baseCcy)}
+                                </td>
+                                <td className="py-1 pr-3 text-right tabular-nums">
+                                  {sc.skippedCount}
+                                  {sc.deltaSkipped !== 0 && (
+                                    <span
+                                      className={`ml-1 text-[10px] ${
+                                        sc.deltaSkipped > 0
+                                          ? "text-destructive"
+                                          : "text-emerald-600 dark:text-emerald-400"
+                                      }`}
+                                    >
+                                      ({sc.deltaSkipped > 0 ? "+" : ""}
+                                      {sc.deltaSkipped})
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <p className="text-[11px] text-muted-foreground">
             Preview runs the same <code>trimBuysToBudgetByCurrency</code> logic as the executor, with a 1% safety buffer per currency.
             Missing prices are backfilled from the daily price cache.
           </p>
+
         </CardContent>
       </Card>
     </TooltipProvider>
