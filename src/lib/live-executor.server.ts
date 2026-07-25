@@ -54,6 +54,12 @@ export async function routeOrdersToBroker(params: {
   const { portfolio, userId, asOf, decisionId, executed } = params;
   const results: RouteResult[] = [];
 
+  // Post-broker reconciliation state. Populated by the buys branch so the
+  // reconciler at the end of routing can verify each buy landed with the
+  // FX legs the trimmer planned. Empty for sells-only / non-fx runs.
+  const reconPlannedLegs: import("./post-broker-reconciliation").PlannedFxLegLite[] = [];
+  const reconFxOutcomes: import("./post-broker-reconciliation").FxLegOutcome[] = [];
+
   if (portfolio.mode !== "live_sim" && portfolio.mode !== "live_prod") return results;
   if (portfolio.live_paused) return results;
 
