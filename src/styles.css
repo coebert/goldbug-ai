@@ -303,3 +303,26 @@
 }
 
 
+
+/* Phase 1 — numeric utility. Apply to any element rendering money,
+ * percentages or counts so column alignment holds across rows and
+ * digits share a consistent width. `tabular-nums` gives fixed-width
+ * digits; `slashed-zero` disambiguates 0 from O in dense tables. */
+@utility num {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum", "zero";
+}
+
+/* Phase 1 — display face for headline numerics (equity, PnL). Pair
+ * with `text-2xl`+ / `font-semibold` on money headlines. Body copy
+ * continues to use the sans stack. */
+@utility font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+  }
+}
