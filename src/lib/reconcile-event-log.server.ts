@@ -40,6 +40,9 @@ export type ReconcileReasonCode =
   | "sim_presumed_rejected_stale"
   | "sim_presumed_cancelled_limit_stale"
   | "sim_keep_awaiting_broker"
+  // Market-hours awareness (venue was closed for the entire life of the order):
+  | "sim_keep_market_closed"
+  | "sim_defer_stale_market_closed"
   // Local-state guards:
   | "no_broker_id"
   | "invalid_timestamp"
