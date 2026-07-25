@@ -54,6 +54,10 @@ const ConfidenceTimelineCard = lazy(() =>
 const TradeErrorDashboardCard = lazy(() =>
   import("@/components/trade-error-dashboard-card").then((m) => ({ default: m.TradeErrorDashboardCard })),
 );
+const FxHealthCard = lazy(() =>
+  import("@/components/fx-health-card").then((m) => ({ default: m.FxHealthCard })),
+);
+
 
 
 
