@@ -190,23 +190,46 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         const hourStartUtc = new Date();
         hourStartUtc.setUTCMinutes(0, 0, 0);
         const hourStartIso = hourStartUtc.toISOString();
+        // Manual retriggers within a few minutes of a completed cycle were
+        // re-running the full AI + routing loop across every portfolio and
+        // exceeding the Worker's per-request budget (observed: status 0 with
+        // `stalled HTTP response` warnings). Manual triggers now still bypass
+        // the whole-hour dedupe, but reuse any tick that ran in the last
+        // 10 minutes unless the caller explicitly sends `force: true`.
+        const recentWindowIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        // Soft wall-clock budget: return partial results (with a clear
+        // `budget-exceeded` skip reason) instead of being killed silently by
+        // the Worker runtime mid-loop.
+        const loopStartedAt = Date.now();
+        const LOOP_BUDGET_MS = 3 * 60 * 1000;
         const results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number; skipped?: string }> = [];
         for (const p of portfolios) {
           try {
+            const elapsed = Date.now() - loopStartedAt;
+            if (elapsed > LOOP_BUDGET_MS) {
+              results.push({ id: p.id, mode: p.mode, ok: true, skipped: `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up` });
+              continue;
+            }
             // Cron runs skip portfolios already ticked in the current UTC hour
             // to avoid duplicate AI calls when the schedule fires twice.
-            // Manual triggers intentionally bypass this so the operator can
-            // force a fresh decision cycle on demand.
-            if (!manualTrigger) {
+            // Manual runs skip portfolios ticked in the last 10 minutes unless
+            // `force: true` was sent, so double-clicking Trigger Now does not
+            // burn a whole worker slot on redundant AI cycles.
+            const sinceIso = manualTrigger ? recentWindowIso : hourStartIso;
+            if (!(manualTrigger && forceClear)) {
               const recent = await supabaseAdmin
                 .from("decisions")
-                .select("id")
+                .select("id, created_at")
                 .eq("portfolio_id", p.id)
-                .gte("created_at", hourStartIso)
+                .gte("created_at", sinceIso)
+                .order("created_at", { ascending: false })
                 .limit(1)
                 .maybeSingle();
               if (recent.data) {
-                results.push({ id: p.id, mode: p.mode, ok: true, skipped: "already ticked this hour" });
+                const label = manualTrigger
+                  ? `already ticked at ${recent.data.created_at} — pass force:true to override`
+                  : "already ticked this hour";
+                results.push({ id: p.id, mode: p.mode, ok: true, skipped: label });
                 continue;
               }
             }
