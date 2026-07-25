@@ -403,26 +403,54 @@ async function currentPrices(symbols: string[], asOf: string): Promise<Map<strin
 
 export async function runDailyTick(portfolioId: string, asOf: string, opts?: { skipNews?: boolean }) {
   // For live portfolios, pick up external Saxo deposits/withdrawals before we
-  // read current_cash. Failures here are logged and non-blocking — the tick
-  // proceeds with the last-known local cash so a transient broker outage can't
-  // stop trading logic from running.
-  try {
-    // Cron path: no authenticated session, so resolve the owning user first
-    // and hand syncLiveCashFromBroker an admin-mode OwnedDbClient. That flips
-    // isAdmin=true inside the sidecar so it re-scopes the portfolio lookup
-    // by user_id (RLS is bypassed on this branch).
-    const ownerLookup = await supabaseAdmin
-      .from("portfolios").select("user_id").eq("id", portfolioId).maybeSingle();
-    if (ownerLookup.data?.user_id) {
+  // read current_cash. Cron path: no authenticated session, so resolve the
+  // owning user first and hand syncLiveCashFromBroker an admin-mode
+  // OwnedDbClient. That flips isAdmin=true inside the sidecar so it re-scopes
+  // the portfolio lookup by user_id (RLS is bypassed on this branch).
+  //
+  // For live_sim / live_prod portfolios this is a HARD guard: if the broker
+  // read fails we abort the tick rather than sizing trades against stale
+  // cash assumptions. The abort surfaces as a decision row so the user can
+  // see why nothing traded.
+  const ownerLookup = await supabaseAdmin
+    .from("portfolios").select("user_id, mode").eq("id", portfolioId).maybeSingle();
+  const ownerMode = ownerLookup.data?.mode;
+  const isLiveMode = ownerMode === "live_sim" || ownerMode === "live_prod";
+  let cashSyncFailure: string | null = null;
+  if (ownerLookup.data?.user_id) {
+    try {
       const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
       const { withOwnedClient } = await import("./_server/owned-client");
-      await syncLiveCashFromBroker(
+      const res = await syncLiveCashFromBroker(
         portfolioId,
         withOwnedClient(ownerLookup.data.user_id),
       );
+      // A "skipped" result on a live portfolio for any reason other than
+      // "no material drift" means we couldn't confirm broker cash. Treat as
+      // failure so we don't size against stale local cash.
+      if (isLiveMode && res.skipped && res.reason !== "no material drift") {
+        cashSyncFailure = res.reason;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("cash sync failed", portfolioId, msg);
+      if (isLiveMode) cashSyncFailure = msg;
     }
-  } catch (e) {
-    console.error("cash sync failed", portfolioId, e);
+  }
+
+  if (cashSyncFailure) {
+    const briefing = "Skipped: could not reconcile broker cash before sizing trades.";
+    const rationale = `Pre-sizing cash reconciliation failed (${cashSyncFailure}). No trades were sized or placed to avoid acting on stale cash assumptions. The next tick will retry.`;
+    await supabaseAdmin.from("decisions").insert({
+      portfolio_id: portfolioId,
+      run_date: asOf,
+      briefing,
+      rationale,
+      model: "cash-reconcile-guard",
+      portfolio_value: null,
+      raw: asJson({ orders: [], executed: [], reconciliation_failed: true, reason: cashSyncFailure }),
+    });
+    return { skipped: true, reason: "cash-reconcile-failed", detail: cashSyncFailure };
   }
 
   const { data: portfolio, error: pErr } = await supabaseAdmin
@@ -431,6 +459,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     .eq("id", portfolioId)
     .single();
   if (pErr || !portfolio) throw new Error(pErr?.message ?? "Portfolio not found");
+
 
   const { data: holdings } = await supabaseAdmin
     .from("holdings")
