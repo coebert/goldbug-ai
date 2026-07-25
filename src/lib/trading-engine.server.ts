@@ -701,7 +701,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         orders: [],
       }
     : await (async () => {
-        const alphaScores = scoreUniverse(features, effectiveRegime.regime);
+        const alphaScores = scoreUniverse(features as unknown as Parameters<typeof scoreUniverse>[0], effectiveRegime.regime);
         const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
         return callAiForDecision({
         portfolio,
