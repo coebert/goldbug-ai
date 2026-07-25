@@ -1276,6 +1276,11 @@ function PortfolioPage() {
               />
             </div>
 
+            <div className="mt-6">
+              <CommodityLiquiditySimulatorCard />
+            </div>
+
+
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <RegimePanel />
