@@ -128,11 +128,12 @@ describe("computeCardRangePct — deposit exclusion contract", () => {
       5,
     );
 
-    // 1M-ish slice: baseline pre-deposit → deposit netted out.
-    const mo = full.slice(-4); // starts 2026-07-15 (on-baseline deposit)
-    // The 2026-07-15 deposit is dated on the mo baseline → baked in.
+    // 1M-ish slice: baseline pre-deposit → mid-window deposit netted.
+    // slice(-4) starts at 2026-07-01 (value 1100); adjusted last =
+    // 1320 - 200 = 1120 → (1120-1100)/1100 * 100.
+    const mo = full.slice(-4);
     expect(computeCardRangePct(mo, deposits, false)).toBeCloseTo(
-      ((1320 - 1300) / 1300) * 100,
+      ((1120 - 1100) / 1100) * 100,
       5,
     );
 
