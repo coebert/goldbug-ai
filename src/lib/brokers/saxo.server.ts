@@ -220,7 +220,7 @@ export class SaxoAdapter implements BrokerAdapter {
     const settled = Number(bal.CashBalance ?? 0);
     const notBooked = Number(bal.TransactionsNotBooked ?? 0);
     const spending = bal.SpendingPower != null ? Number(bal.SpendingPower) : null;
-    const total = bal.TotalValue != null ? Number(bal.TotalValue) : null;
+    const _totalDeclaredButNotUsedForCash = bal.TotalValue != null ? Number(bal.TotalValue) : null;
     const availTrading =
       bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : null;
     const cash = Math.max(
