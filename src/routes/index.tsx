@@ -677,10 +677,10 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             ) : (
               <>
                 <div className="text-2xl font-bold leading-tight tabular-nums">
-                  {portfolio.currency} {formatMoneyAmount(totalEquity)}
+                  {portfolio.currency} {formatMoneyAmount(totalEquity, equityDecimals)}
                 </div>
                 <div className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {formatMoney(Number(portfolio.current_cash), portfolio.currency)}
+                  {formatMoney(Number(portfolio.current_cash), portfolio.currency, equityDecimals)}
                   <span className="ml-1 text-[10px]">cash</span>
                 </div>
                 <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
