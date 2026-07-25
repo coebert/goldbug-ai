@@ -32,7 +32,7 @@ interface Props {
     id: string;
     currency: string | null;
     current_cash: number | null;
-    cash_by_ccy?: Record<string, number> | null;
+    cash_by_ccy?: unknown;
     fx_enabled?: boolean | null;
     fx_execution_mode?: string | null;
   };
@@ -42,14 +42,20 @@ export function ManualFxConvertCard({ portfolio }: Props) {
   const qc = useQueryClient();
   const convert = useServerFn(convertPortfolioCash);
 
+  const rawCashByCcy = portfolio.cash_by_ccy;
+  const cashByCcy =
+    rawCashByCcy && typeof rawCashByCcy === "object" && !Array.isArray(rawCashByCcy)
+      ? (rawCashByCcy as Record<string, number>)
+      : null;
+
   const wallet = useMemo(
     () =>
       readWallet({
         currency: portfolio.currency,
         current_cash: portfolio.current_cash,
-        cash_by_ccy: portfolio.cash_by_ccy ?? null,
+        cash_by_ccy: cashByCcy,
       }),
-    [portfolio.currency, portfolio.current_cash, portfolio.cash_by_ccy],
+    [portfolio.currency, portfolio.current_cash, cashByCcy],
   );
 
   const walletCurrencies = Object.keys(wallet).sort();
