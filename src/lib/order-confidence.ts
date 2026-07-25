@@ -78,8 +78,10 @@ function computeRegimeFactor(regime: ConfidenceRegime): { factor: number; item: 
       },
     };
   }
-  // Stable regime: 0.85 (low classifier confidence) → 1.05 (high).
-  const factor = 0.85 + 0.20 * conf;
+  // Stable regime, centred at 1.0: low classifier confidence trims
+  // to 0.90, high boosts to 1.10. Symmetric so gains and losses read
+  // the same way in the breakdown.
+  const factor = 1 + 0.20 * (conf - 0.5);
   return {
     factor,
     item: {
@@ -117,8 +119,8 @@ function computeNewsFactor(
     };
   }
   const aligned = clamp(weightedSum / weightTotal, -1, 1);
-  // Aligned: −1 (dead against) → 0.70, 0 → 0.85, +1 (fully with) → 1.00.
-  const factor = 0.85 + 0.15 * aligned;
+  // Centred at 1.0: −1 (dead against) → 0.85, +1 (fully with) → 1.15.
+  const factor = 1 + 0.15 * aligned;
   const verdict = aligned > 0.15 ? "aligns with" : aligned < -0.15 ? "runs against" : "is mixed on";
   return {
     factor,
