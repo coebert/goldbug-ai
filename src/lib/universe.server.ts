@@ -157,7 +157,13 @@ export type RiskConfig = {
   reentry_atr_days_mult: number;
   reentry_min_days: number;
   reentry_max_days: number;
+  // Phase 2 + 5 — sizing bonuses & risk-parity target construction.
+  alpha_bonus_enabled: boolean;
+  alpha_bonus_cap: number;
+  risk_parity_enabled: boolean;
+  risk_parity_nav_cap: number;
 };
+
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = {
   asset_class_limits: { stock: 0.6, etf: 0.8, crypto: 0.2, commodity: 0.3, fx: 0.3 },
