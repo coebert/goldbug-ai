@@ -484,6 +484,25 @@ export class SaxoAdapter implements BrokerAdapter {
       const errCode = pre.ErrorInfo?.ErrorCode;
       const errMsg = pre.ErrorInfo?.Message;
       if (errCode || (outcome && outcome !== "ok")) {
+        // Persist a structured PRECHECK_REJECT row so the UI can count
+        // repeated cash-side rejections (InsufficientCash / InsufficientBuyingPower)
+        // and surface a banner prompting the user to correct cash or risk
+        // settings. Keyed by ErrorCode to make aggregation trivial.
+        await log({
+          portfolioId: this.portfolioId,
+          userId: this.userId,
+          env: this.env,
+          method: "PRECHECK_REJECT",
+          path: "/trade/v2/orders/precheck",
+          status: 200,
+          request: { symbol: req.symbol, side: req.side, quantity: req.quantity },
+          response: {
+            PreCheckResult: pre.PreCheckResult ?? null,
+            ErrorCode: errCode ?? null,
+            Message: errMsg ?? null,
+          },
+          error: errCode ?? errMsg ?? "precheck-failed",
+        });
         return {
           brokerOrderId: "",
           status: "rejected",
@@ -495,6 +514,7 @@ export class SaxoAdapter implements BrokerAdapter {
       // Precheck itself failed (network, auth, endpoint variance). Fall through
       // to the real POST so we don't drop otherwise-valid orders on the floor.
     }
+
 
     // Load the operator-configurable 400-code policy once per placement.
     // Business rejections stay silent; codes flagged as "error" bubble up
