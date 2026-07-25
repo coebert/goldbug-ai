@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SOURCE = readFileSync(resolve(__dirname, "../index.tsx"), "utf8");
+const SOURCE = readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
 
 describe("portfolio card — dedicated loading/empty rendering", () => {
   it("derives equityLoading and equityEmpty from the same inputs", () => {
@@ -29,7 +29,7 @@ describe("portfolio card — dedicated loading/empty rendering", () => {
     // Skeleton branch is gated on equityLoading — same flag as the
     // headline skeleton — so the two cannot render out of phase.
     expect(SOURCE).toMatch(
-      /\{equityLoading \? \(\s*<Skeleton\s+variant="shimmer"\s+data-testid="range-pct-skeleton"/,
+      /[{:]\s*equityLoading \? \(\s*<Skeleton\s+variant="shimmer"\s+data-testid="range-pct-skeleton"/,
     );
   });
 
@@ -56,7 +56,7 @@ describe("portfolio card — dedicated loading/empty rendering", () => {
     // condition (e.g. `isLoadingEquity && !sparkSeries.length`) that
     // could disagree with the % pill's condition.
     expect(SOURCE).toMatch(
-      /\{equityLoading \? \(\s*<div[\s\S]{0,400}data-testid="total-equity-loading"[\s\S]{0,600}data-testid="total-equity-skeleton"/,
+      /[{:]\s*equityLoading \? \(\s*<div[\s\S]{0,400}data-testid="total-equity-loading"[\s\S]{0,600}data-testid="total-equity-skeleton"/,
     );
   });
 
