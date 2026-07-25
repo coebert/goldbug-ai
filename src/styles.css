@@ -186,7 +186,9 @@
   pre {
     overflow-wrap: anywhere;
     word-break: break-word;
+  }
 }
+
 
 /* Shimmer keyframe used by the loading-state skeleton to signal
  * "value inbound" without shifting layout. The gradient sweeps left

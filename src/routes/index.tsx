@@ -14,6 +14,7 @@ import { Sparkline } from "@/components/sparkline";
 import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
 import { computeModeSummary } from "@/lib/mode-summary";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
+import { useEquityDecimals, EQUITY_DECIMALS_MIN, EQUITY_DECIMALS_MAX } from "@/lib/use-equity-decimals";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
 import { deriveCardEquity } from "@/lib/derive-card-equity";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
@@ -139,6 +140,7 @@ function Home() {
 
 
   const [includeDeposits, setIncludeDeposits] = useIncludeDeposits();
+  const [equityDecimals, setEquityDecimals] = useEquityDecimals();
 
   const todaySummary = useMemo(() => {
     const series = (equityQ.data?.series ?? []) as Array<Record<string, unknown> & { date: string }>;
@@ -218,6 +220,21 @@ function Home() {
                 : "Percentages reflect trading PnL only — external deposits/withdrawals are netted out."}>
                 {includeDeposits ? "raw" : "trading only"}
               </span>
+              <span aria-hidden className="mx-1 text-muted-foreground/40">·</span>
+              <label htmlFor="equity-decimals-select" className="cursor-pointer select-none">
+                Decimals
+              </label>
+              <select
+                id="equity-decimals-select"
+                aria-label="Decimal places shown for total equity"
+                value={equityDecimals}
+                onChange={(e) => setEquityDecimals(Number.parseInt(e.target.value, 10))}
+                className="h-6 rounded border border-input bg-background px-1 text-[11px] tabular-nums focus-visible:outline-none sm:text-xs"
+              >
+                {Array.from({ length: EQUITY_DECIMALS_MAX - EQUITY_DECIMALS_MIN + 1 }, (_, i) => EQUITY_DECIMALS_MIN + i).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
             </div>
             <div className="mb-6 grid gap-2 sm:grid-cols-3">
               <ModeSummaryTile
@@ -303,6 +320,7 @@ function Home() {
                 deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
                 includeDeposits={includeDeposits}
                 isLoadingEquity={equityQ.isLoading}
+                equityDecimals={equityDecimals}
               />
             ))}
           </div>
@@ -417,7 +435,7 @@ const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
-function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean }) {
+function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false, equityDecimals = 2 }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean; equityDecimals?: number }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
   const sliced = useMemo(() => {
     const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
@@ -659,10 +677,10 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             ) : (
               <>
                 <div className="text-2xl font-bold leading-tight tabular-nums">
-                  {portfolio.currency} {formatMoneyAmount(totalEquity)}
+                  {portfolio.currency} {formatMoneyAmount(totalEquity, equityDecimals)}
                 </div>
                 <div className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {formatMoney(Number(portfolio.current_cash), portfolio.currency)}
+                  {formatMoney(Number(portfolio.current_cash), portfolio.currency, equityDecimals)}
                   <span className="ml-1 text-[10px]">cash</span>
                 </div>
                 <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
