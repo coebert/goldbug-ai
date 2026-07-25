@@ -737,6 +737,10 @@ export class SaxoAdapter implements BrokerAdapter {
       status: string;
       amount: number;
       filledAmount: number;
+      buySell?: "Buy" | "Sell";
+      price?: number;
+      currency?: string;
+      assetType?: string;
     }>
   > {
     const res = await this.req<{
@@ -745,16 +749,28 @@ export class SaxoAdapter implements BrokerAdapter {
         Status?: string;
         Amount?: number;
         FilledAmount?: number;
-        DisplayAndFormat?: { Symbol?: string };
+        BuySell?: string;
+        Price?: number;
+        OrderPrice?: number;
+        AssetType?: string;
+        DisplayAndFormat?: { Symbol?: string; Currency?: string };
       }>;
     }>("GET", "/port/v1/orders/me", { query: { FieldGroups: "DisplayAndFormat" } });
-    return (res.Data ?? []).map((o) => ({
-      brokerOrderId: String(o.OrderId ?? ""),
-      symbol: o.DisplayAndFormat?.Symbol ?? "",
-      status: String(o.Status ?? "Working"),
-      amount: Number(o.Amount ?? 0),
-      filledAmount: Number(o.FilledAmount ?? 0),
-    })).filter((o) => o.brokerOrderId);
+    return (res.Data ?? []).map((o) => {
+      const bs = String(o.BuySell ?? "");
+      const p = Number(o.Price ?? o.OrderPrice ?? 0);
+      return {
+        brokerOrderId: String(o.OrderId ?? ""),
+        symbol: o.DisplayAndFormat?.Symbol ?? "",
+        status: String(o.Status ?? "Working"),
+        amount: Number(o.Amount ?? 0),
+        filledAmount: Number(o.FilledAmount ?? 0),
+        buySell: bs === "Buy" || bs === "Sell" ? (bs as "Buy" | "Sell") : undefined,
+        price: Number.isFinite(p) && p > 0 ? p : undefined,
+        currency: o.DisplayAndFormat?.Currency ?? undefined,
+        assetType: o.AssetType ?? undefined,
+      };
+    }).filter((o) => o.brokerOrderId);
   }
 
   /**

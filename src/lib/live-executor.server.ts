@@ -247,6 +247,85 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
+  // ---------- Subtract cash reserved by open working buy orders.
+  // Saxo's `SpendingPower` / `CashAvailableForTrading` does NOT deduct the
+  // notional of open working orders, so a buy that "fits" against
+  // brokerCashAvailable can still be rejected at precheck with
+  // InsufficientCash when prior day-old GTC orders are queued. Pull the
+  // working-order book once per batch and reduce our headroom accordingly so
+  // the affordability trim skips buys before we ever hit precheck.
+  const reservedByCcy: Record<string, number> = {};
+  let reservedTotalAcctCcy = 0;
+  try {
+    if (typeof adapter.listWorkingOrders === "function") {
+      const working = await adapter.listWorkingOrders();
+      for (const wo of working) {
+        if (wo.buySell !== "Buy") continue;
+        const remaining = Math.max(0, Number(wo.amount ?? 0) - Number(wo.filledAmount ?? 0));
+        const px = Number(wo.price ?? 0);
+        if (!(remaining > 0) || !(px > 0)) continue;
+        const notional = remaining * px;
+        const ccy = (wo.currency ?? accountCurrency ?? portfolioCurrency).toUpperCase();
+        reservedByCcy[ccy] = (reservedByCcy[ccy] ?? 0) + notional;
+        // Rough conversion into account currency for the scalar cash gate.
+        // If we don't know a rate here, treat notional as already in account
+        // ccy — under-estimation is safer than ignoring the reservation.
+        reservedTotalAcctCcy += notional;
+      }
+      if (reservedTotalAcctCcy > 0) {
+        const before = brokerCashAvailable;
+        if (brokerCashAvailable != null) {
+          brokerCashAvailable = Math.max(0, brokerCashAvailable - reservedTotalAcctCcy);
+        }
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_OPEN_ORDER_RESERVATION",
+          path: "/port/v1/orders/me",
+          status: 200,
+          request: asJson({ asOf, decisionId, count: working.length }),
+          response: asJson({
+            reservedByCcy,
+            reservedTotalAcctCcy,
+            brokerCashBefore: before,
+            brokerCashAfter: brokerCashAvailable,
+          }),
+          error: null,
+        });
+      }
+    }
+  } catch (err) {
+    // Non-blocking: if we can't read working orders we fall through with the
+    // raw broker cash number and rely on precheck to catch overspends.
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "PRE_PLACE_OPEN_ORDER_RESERVATION",
+      path: "/port/v1/orders/me",
+      status: 502,
+      request: asJson({ asOf, decisionId }),
+      response: null,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // Build per-currency cash view for the multi-ccy trim path, net of the
+  // open-order reservations captured above.
+  const cashByCcyRaw = pfRowData?.cash_by_ccy ?? null;
+  const cashByCcyAdjusted: Record<string, number> | null = cashByCcyRaw
+    ? Object.fromEntries(
+        Object.entries(cashByCcyRaw).map(([ccy, amt]) => {
+          const reserved = reservedByCcy[ccy.toUpperCase()] ?? 0;
+          return [ccy, Math.max(0, Number(amt) - reserved)];
+        }),
+      )
+    : null;
+
+
   // If broker and portfolio currencies differ but FX resolution collapsed to
   // the identity fallback (both live FX providers unreachable and no cached
   // rate available), the affordability trim would badly under-estimate the
@@ -456,7 +535,7 @@ export async function routeOrdersToBroker(params: {
       const wallet = readWallet({
         currency: portfolioCurrency,
         current_cash: brokerCashAvailable ?? undefined,
-        cash_by_ccy: pfRowData?.cash_by_ccy ?? null,
+        cash_by_ccy: cashByCcyAdjusted,
       });
 
       const fxLookup = (from: string, to: string): number | null => {
