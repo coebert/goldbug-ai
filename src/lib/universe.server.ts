@@ -176,7 +176,29 @@ export type RiskConfig = {
   // Per-venue overrides on top of the tod_* defaults. Any subset of fields
   // may be set per venue; missing fields fall back to the global defaults.
   tod_venue_overrides: import("./alpha/execution-alpha").TodVenueOverrides | null;
+  // Optional override for the minimum-cash floor. When set (0..1), it replaces
+  // the risk-level preset from `riskProfile()` so users can allow the AI to
+  // deploy up to 100% of cash (cash_floor_pct = 0) without changing the risk
+  // level. `null` means "use the preset for the current risk level".
+  cash_floor_pct: number | null;
 };
+
+/**
+ * Effective cash-floor fraction (0..1). Prefers the per-portfolio override on
+ * `risk_config.cash_floor_pct` when set; otherwise falls back to the risk-
+ * level preset. Keep this in one place so every engine (live tick, long-
+ * horizon, commodity backtest, prompt) stays consistent.
+ */
+export function effectiveCashFloorPct(
+  cfg: Pick<RiskConfig, "cash_floor_pct">,
+  level: Database["public"]["Enums"]["risk_level"],
+): number {
+  const override = cfg.cash_floor_pct;
+  if (override != null && Number.isFinite(override)) {
+    return Math.max(0, Math.min(1, override));
+  }
+  return riskProfile(level).cashFloorPct;
+}
 
 
 
