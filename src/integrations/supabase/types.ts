@@ -951,6 +951,7 @@ export type Database = {
           currency: string
           current_cash: number
           fx_enabled: boolean
+          fx_execution_mode: string
           hyperparams: Json
           id: string
           last_run_date: string | null
@@ -976,6 +977,7 @@ export type Database = {
           currency?: string
           current_cash?: number
           fx_enabled?: boolean
+          fx_execution_mode?: string
           hyperparams?: Json
           id?: string
           last_run_date?: string | null
@@ -1001,6 +1003,7 @@ export type Database = {
           currency?: string
           current_cash?: number
           fx_enabled?: boolean
+          fx_execution_mode?: string
           hyperparams?: Json
           id?: string
           last_run_date?: string | null

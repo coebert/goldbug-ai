@@ -1,0 +1,1 @@
+ALTER TABLE public.portfolios ADD COLUMN IF NOT EXISTS fx_execution_mode text NOT NULL DEFAULT 'synthetic' CHECK (fx_execution_mode IN ('synthetic','spot'));

@@ -51,6 +51,25 @@ export interface BrokerPingResult {
   reason?: string;
 }
 
+/**
+ * FX spot conversion request. `amountFrom` is expressed in `fromCcy`; the
+ * broker chooses the fill rate. Callers must apply wallet deltas from the
+ * returned `amountTo`, not from a locally-computed value.
+ */
+export interface BrokerFxSpotRequest {
+  fromCcy: string;
+  toCcy: string;
+  amountFrom: number;
+  clientOrderId: string;
+}
+
+export interface BrokerFxSpotResult extends BrokerOrderResult {
+  fillRate?: number;
+  amountTo?: number;
+  /** Pair symbol the broker actually routed against (e.g. "GBPUSD"). */
+  pairSymbol?: string;
+}
+
 export interface BrokerAdapter {
   readonly name: string;
   readonly env: BrokerEnv;
@@ -59,4 +78,9 @@ export interface BrokerAdapter {
   getPositions(): Promise<BrokerPosition[]>;
   placeOrder(req: BrokerOrderRequest): Promise<BrokerOrderResult>;
   cancelOrder(brokerOrderId: string): Promise<{ ok: boolean; reason?: string }>;
+  /**
+   * Optional: place a real spot FX conversion. Adapters that don't implement
+   * it force the executor to fall back to synthetic (wallet-only) FX legs.
+   */
+  placeFxSpot?(req: BrokerFxSpotRequest): Promise<BrokerFxSpotResult>;
 }

@@ -6,6 +6,8 @@ import type {
   BrokerAdapter,
   BrokerBalance,
   BrokerEnv,
+  BrokerFxSpotRequest,
+  BrokerFxSpotResult,
   BrokerOrderRequest,
   BrokerOrderResult,
   BrokerPingResult,
@@ -589,6 +591,137 @@ export class SaxoAdapter implements BrokerAdapter {
     }
 
 
+  }
+
+  /**
+   * Look up an FX pair (AssetType=FxSpot). Tries `${a}${b}` first, then
+   * `${b}${a}`, since Saxo lists each pair under only one canonical ordering
+   * (e.g. GBPUSD exists, USDGBP does not). Returns { uic, pairFirstCcy }
+   * where `pairFirstCcy` is the currency you must express Amount in.
+   */
+  private async lookupFxPair(
+    a: string,
+    b: string,
+  ): Promise<{ uic: number; pair: string; pairFirstCcy: string; pairSecondCcy: string } | null> {
+    const candidates = [`${a}${b}`, `${b}${a}`];
+    for (const pair of candidates) {
+      const search = await this.req<{
+        Data?: Array<{ Identifier: number; Symbol?: string; AssetType?: string; CurrencyCode?: string }>;
+      }>("GET", "/ref/v1/instruments", {
+        query: { Keywords: pair, AssetTypes: "FxSpot" },
+      });
+      const hit = (search.Data ?? []).find(
+        (h) => h.AssetType === "FxSpot" && (h.Symbol ?? "").toUpperCase() === pair,
+      );
+      if (hit) {
+        return {
+          uic: hit.Identifier,
+          pair,
+          pairFirstCcy: pair.slice(0, 3),
+          pairSecondCcy: pair.slice(3, 6),
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Place a real spot FX conversion. `amountFrom` is expressed in `fromCcy`.
+   * We choose Buy/Sell so the net effect debits `fromCcy` and credits `toCcy`
+   * regardless of which currency happens to be the "first" side of the pair.
+   *
+   * Amount semantics (Saxo): for an FxSpot order on pair XXXYYY,
+   *   Buy  Amount=N ⇒ receive N XXX, pay N * rate YYY
+   *   Sell Amount=N ⇒ pay N XXX, receive N * rate YYY
+   * So to convert FROM → TO:
+   *   if FROM is the first ccy of the pair → Sell Amount=amountFrom
+   *   else                                  → Buy  Amount=amountFrom / rate ≈ amountTo
+   * Because we do not know the pre-trade rate, when `toCcy` is the first ccy
+   * we skip the trade rather than send an under-sized order — the executor
+   * treats that as a leg failure and drops the dependent buy.
+   */
+  async placeFxSpot(req: BrokerFxSpotRequest): Promise<BrokerFxSpotResult> {
+    const from = req.fromCcy.toUpperCase();
+    const to = req.toCcy.toUpperCase();
+    if (from === to) {
+      return { brokerOrderId: "", status: "filled", amountTo: req.amountFrom, fillRate: 1, pairSymbol: `${from}${to}` };
+    }
+    if (!(req.amountFrom > 0) || !Number.isFinite(req.amountFrom)) {
+      return { brokerOrderId: "", status: "rejected", reason: "amountFrom must be positive" };
+    }
+    const pair = await this.lookupFxPair(from, to);
+    if (!pair) {
+      return { brokerOrderId: "", status: "rejected", reason: `FX pair ${from}/${to} not tradable on Saxo` };
+    }
+    // Only support the case where FROM is the first-ccy side of the pair,
+    // because Saxo Amount is denominated in the first ccy and we don't have
+    // a trusted pre-trade rate to size the reverse case safely.
+    if (pair.pairFirstCcy !== from) {
+      return {
+        brokerOrderId: "",
+        status: "rejected",
+        reason: `FX pair only tradable as ${pair.pairFirstCcy}${pair.pairSecondCcy}; cannot size a ${from}->${to} spot order safely without pre-trade rate`,
+      };
+    }
+    const accountKey = await this.getDefaultAccountKey();
+    const body: Record<string, unknown> = {
+      Uic: pair.uic,
+      AssetType: "FxSpot",
+      BuySell: "Sell",
+      Amount: req.amountFrom,
+      AmountType: "Quantity",
+      OrderType: "Market",
+      OrderDuration: { DurationType: "DayOrder" },
+      ExternalReference: req.clientOrderId,
+      ManualOrder: true,
+    };
+    if (accountKey) body.AccountKey = accountKey;
+
+    const { getSaxoErrorPolicy, classifySaxoError, extractSaxoErrorInfo } = await import(
+      "./saxo-error-policy"
+    );
+    const policy = getSaxoErrorPolicy();
+    try {
+      const MIN_ORDER_GAP_MS = 1100;
+      const wait = Math.max(0, this.lastOrderPostAt + MIN_ORDER_GAP_MS - Date.now());
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      this.lastOrderPostAt = Date.now();
+      const res = await this.req<{
+        OrderId?: string;
+        Price?: number;
+        ErrorInfo?: { Message?: string; ErrorCode?: string };
+      }>("POST", "/trade/v2/orders", {
+        body,
+        maxAttempts: 5,
+        retryCapMs: 10_000,
+        silentStatuses: [400],
+      });
+      this.lastOrderPostAt = Date.now();
+      if (res.ErrorInfo) {
+        const outcome = classifySaxoError(policy, res.ErrorInfo.ErrorCode, res.ErrorInfo.Message);
+        const reason = res.ErrorInfo.Message ?? res.ErrorInfo.ErrorCode ?? "unknown";
+        return { brokerOrderId: "", status: outcome === "error" ? "error" : "rejected", reason, raw: res, pairSymbol: pair.pair };
+      }
+      const fillRate = Number(res.Price ?? 0);
+      const amountTo = fillRate > 0 ? req.amountFrom * fillRate : undefined;
+      return {
+        brokerOrderId: res.OrderId ?? "",
+        status: "submitted",
+        raw: res,
+        pairSymbol: pair.pair,
+        fillRate: fillRate > 0 ? fillRate : undefined,
+        amountTo,
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/\[400\]/.test(msg)) {
+        const { code, message } = extractSaxoErrorInfo(msg);
+        const outcome = classifySaxoError(policy, code, message);
+        const reason = message ?? code ?? msg;
+        return { brokerOrderId: "", status: outcome === "error" ? "error" : "rejected", reason, pairSymbol: pair.pair };
+      }
+      return { brokerOrderId: "", status: "error", reason: msg, pairSymbol: pair.pair };
+    }
   }
 
   /**
