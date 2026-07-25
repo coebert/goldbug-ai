@@ -181,6 +181,14 @@ export type RiskConfig = {
   // deploy up to 100% of cash (cash_floor_pct = 0) without changing the risk
   // level. `null` means "use the preset for the current risk level".
   cash_floor_pct: number | null;
+  // User setting: how aggressively to push exposure into commodities and FX
+  // above the baseline risk-and-regime ranking. "off" is neutral (today's
+  // behaviour); "balanced" nudges the AI to consider commodity/FX ideas when
+  // current exposure sits below a moderate target; "strong" applies a firmer
+  // tilt with higher target exposure and a more explicit instruction to
+  // propose diversifiers whenever the guardrail room is available. Purely a
+  // prompt-level bias — it never overrides hard `asset_class_limits`.
+  diversification_tilt: "off" | "balanced" | "strong";
 };
 
 /**
