@@ -140,14 +140,16 @@ export async function routeOrdersToBroker(params: {
   }
   const pfRow = await supabaseAdmin
     .from("portfolios")
-    .select("currency, fx_enabled, cash_by_ccy")
+    .select("currency, fx_enabled, cash_by_ccy, fx_execution_mode")
     .eq("id", portfolio.id)
     .maybeSingle();
   const pfRowData = pfRow.data as
-    | { currency?: string; fx_enabled?: boolean; cash_by_ccy?: Record<string, number> | null }
+    | { currency?: string; fx_enabled?: boolean; cash_by_ccy?: Record<string, number> | null; fx_execution_mode?: string }
     | null;
   const portfolioCurrency = pfRowData?.currency?.toUpperCase() ?? "GBP";
   const fxEnabled = pfRowData?.fx_enabled === true;
+  const fxExecutionMode: "synthetic" | "spot" =
+    pfRowData?.fx_execution_mode === "spot" ? "spot" : "synthetic";
 
 
   let fxRate = 1;
