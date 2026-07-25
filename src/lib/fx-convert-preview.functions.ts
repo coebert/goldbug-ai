@@ -88,9 +88,12 @@ export const previewFxConversion = createServerFn({ method: "POST" })
     // in the portfolio's base currency using the current FX matrix.
     let baseCcyDelta: number | null = null;
     try {
-      const matrix = await getFxMatrix([fromCcy, toCcy, baseCcy]);
-      const fromToBase = matrix[`${fromCcy}:${baseCcy}`]?.rate;
-      const toToBase = matrix[`${toCcy}:${baseCcy}`]?.rate;
+      const matrix = await getFxMatrix([
+        { from: fromCcy, to: baseCcy },
+        { from: toCcy, to: baseCcy },
+      ]);
+      const fromToBase = matrix.get(`${fromCcy}${baseCcy}`)?.rate;
+      const toToBase = matrix.get(`${toCcy}${baseCcy}`)?.rate;
       if (Number.isFinite(fromToBase) && Number.isFinite(toToBase)) {
         const debitBase = plan.amountFrom * (fromToBase as number);
         const creditBase = plan.amountTo * (toToBase as number);
@@ -99,6 +102,7 @@ export const previewFxConversion = createServerFn({ method: "POST" })
     } catch {
       baseCcyDelta = null;
     }
+
 
     return {
       ok: true as const,
