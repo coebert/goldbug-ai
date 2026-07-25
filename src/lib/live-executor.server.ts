@@ -17,7 +17,14 @@ export interface ExecutedOrderLike {
   price: number;
   reason?: string;
   rejected?: string;
+  /**
+   * Phase B: currency the price is quoted in (e.g. "USD" for AAPL). When
+   * omitted the executor resolves it from `saxo_instrument_cache` for
+   * fx_enabled portfolios, and falls back to the portfolio base currency.
+   */
+  instrument_ccy?: string;
 }
+
 
 export interface RouteResult {
   symbol: string;
