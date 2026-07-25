@@ -123,6 +123,7 @@ import {
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
+import { CommodityExposureCard } from "@/components/commodity-exposure-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 const BacktestResultsCard = lazy(() =>
