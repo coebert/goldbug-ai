@@ -39,7 +39,7 @@ export function maybeNotifyPrecheckCashReject(params: {
   code: string | null;
   message: string | null;
 }) {
-  const userId = params.userId;
+  const userId = userId;
   if (!userId) return;
   if (!isCashReject(params.code, params.message)) return;
 
@@ -74,7 +74,7 @@ export function maybeNotifyPrecheckCashReject(params: {
       const { data: recent } = await supabaseAdmin
         .from("notifications")
         .select("id")
-        .eq("user_id", params.userId)
+        .eq("user_id", userId)
         .eq("category", "precheck_cash")
         .eq("portfolio_id", params.portfolioId)
         .gte("created_at", cooldownSince)
@@ -87,7 +87,7 @@ export function maybeNotifyPrecheckCashReject(params: {
         `Latest: ${params.message ?? params.code ?? "InsufficientCash"}.`;
 
       await supabaseAdmin.from("notifications").insert({
-        user_id: params.userId,
+        user_id: userId,
         category: "precheck_cash",
         severity: cashCount >= THRESHOLD * 2 ? "critical" : "warning",
         title,
@@ -118,7 +118,7 @@ export function maybeNotifyPrecheckCashReject(params: {
             body: JSON.stringify({
               event: "precheck.cash_reject_threshold",
               portfolioId: params.portfolioId,
-              userId: params.userId,
+              userId: userId,
               cashRejects: cashCount,
               windowHours: WINDOW_HOURS,
               threshold: THRESHOLD,
