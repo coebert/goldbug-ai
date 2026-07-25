@@ -332,8 +332,8 @@ export async function routeOrdersToBroker(params: {
       const targetCcys = Array.from(new Set(symToCcy.values())).filter(
         (c) => c !== portfolioCurrency,
       );
-      const { getFxMatrix } = await import("@/lib/fx.server");
-      const matrix =
+      const { getFxMatrix, refreshFxMatrix } = await import("@/lib/fx.server");
+      let matrix =
         targetCcys.length > 0
           ? await getFxMatrix(targetCcys.map((c) => ({ from: portfolioCurrency, to: c })))
           : new Map<string, { rate: number; stale: boolean; source: string }>();
@@ -345,9 +345,76 @@ export async function routeOrdersToBroker(params: {
       // buffer. When the operator's expectation is "no trades on bad FX",
       // this pre-empts that path deterministically and gives one audit row
       // per blocked pair.
+      //
+      // Refresh-and-retry: when the first pass blocks any pair, evict just
+      // those pairs from the FX cache and re-query the live providers once.
+      // Blocks that recover (e.g. a rate that was stale because the TTL
+      // elapsed while providers were momentarily slow) then route normally
+      // in this same tick instead of waiting for the next one. Pairs that
+      // are still bad on the retry fall through to the original skip path
+      // with a `retriedAt` marker so the audit row records both attempts.
       if (targetCcys.length > 0) {
         const { guardFxMatrix } = await import("./fx-matrix-guard");
-        const guard = guardFxMatrix(portfolioCurrency, targetCcys, matrix);
+        let guard = guardFxMatrix(portfolioCurrency, targetCcys, matrix);
+        let retriedAt: string | null = null;
+        if (guard.hasBlock) {
+          const refreshPairs = guard.blocked.map((b) => ({ from: b.from, to: b.to }));
+          const before = guard.blocked.map((b) => ({
+            to: b.to,
+            reason: b.reason,
+            source: b.source ?? null,
+          }));
+          retriedAt = new Date().toISOString();
+          try {
+            const refreshed = await refreshFxMatrix(refreshPairs);
+            for (const [k, v] of refreshed) matrix.set(k, v);
+          } catch (err) {
+            // Refresh itself failed (network); keep the original matrix and
+            // let the guard block as before. Record why.
+            await supabaseAdmin.from("live_broker_log").insert({
+              portfolio_id: portfolio.id,
+              user_id: userId,
+              broker: "saxo",
+              env: portfolio.mode === "live_prod" ? "live" : "sim",
+              method: "PRE_PLACE_FX_MATRIX_REFRESH",
+              path: `/fx/refresh`,
+              status: 502,
+              request: asJson({ asOf, decisionId, pairs: refreshPairs }),
+              response: asJson({ before }),
+              error: `fx refresh failed: ${err instanceof Error ? err.message : String(err)}`,
+            });
+          }
+          const guardAfter = guardFxMatrix(portfolioCurrency, targetCcys, matrix);
+          const recovered = guard.blocked
+            .filter((b) => !guardAfter.blockedCcys.has(b.to))
+            .map((b) => b.to);
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolio.id,
+            user_id: userId,
+            broker: "saxo",
+            env: portfolio.mode === "live_prod" ? "live" : "sim",
+            method: "PRE_PLACE_FX_MATRIX_REFRESH",
+            path: `/fx/refresh`,
+            status: recovered.length > 0 ? 200 : 424,
+            request: asJson({ asOf, decisionId, pairs: refreshPairs }),
+            response: asJson({
+              before,
+              after: guardAfter.blocked.map((b) => ({
+                to: b.to,
+                reason: b.reason,
+                source: b.source ?? null,
+              })),
+              recovered,
+            }),
+            error:
+              recovered.length > 0
+                ? null
+                : `fx refresh did not recover any of: ${refreshPairs
+                    .map((p) => `${p.from}->${p.to}`)
+                    .join(", ")}`,
+          });
+          guard = guardAfter;
+        }
         if (guard.hasBlock) {
           for (const b of guard.blocked) {
             await supabaseAdmin.from("live_broker_log").insert({
@@ -358,7 +425,7 @@ export async function routeOrdersToBroker(params: {
               method: "PRE_PLACE_FX_MATRIX_BLOCK",
               path: `/fx/${b.from}->${b.to}`,
               status: 424,
-              request: asJson({ asOf, decisionId, reason: b.reason }),
+              request: asJson({ asOf, decisionId, reason: b.reason, retriedAt }),
               response: asJson({ source: b.source ?? null }),
               error: b.detail,
             });
@@ -374,6 +441,7 @@ export async function routeOrdersToBroker(params: {
           }
         }
       }
+
 
 
       const { readWallet, writeWalletFields } = await import("./portfolio-wallet");
