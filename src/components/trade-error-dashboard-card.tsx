@@ -80,6 +80,8 @@ export function TradeErrorDashboardCard({ portfolioId, active = true }: Props) {
             No failed trades in the last 72 hours. 🎉
           </p>
         )}
+        {rows.length > 0 && <FxBlockBanner rows={rows} />}
+
         {rows.length > 0 && (
           <TooltipProvider delayDuration={150}>
             {/* Desktop / tablet table */}
