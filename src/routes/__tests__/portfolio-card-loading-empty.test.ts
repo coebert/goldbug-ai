@@ -29,7 +29,7 @@ describe("portfolio card — dedicated loading/empty rendering", () => {
     // Skeleton branch is gated on equityLoading — same flag as the
     // headline skeleton — so the two cannot render out of phase.
     expect(SOURCE).toMatch(
-      /\{equityLoading \? \(\s*<Skeleton\s+data-testid="range-pct-skeleton"/,
+      /\{equityLoading \? \(\s*<Skeleton\s+variant="shimmer"\s+data-testid="range-pct-skeleton"/,
     );
   });
 
