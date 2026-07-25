@@ -81,6 +81,38 @@ export const DEFAULT_GUARDRAILS: FxGuardrails = {
   perCurrencyMaxPct: 40,
 };
 
+// Per-risk-level guardrail presets used by the risk simulator card.
+// These do NOT override live tick execution (which uses DEFAULT_GUARDRAILS);
+// they document how each risk profile *would* shape the next tick if wired
+// through. Keep in sync with universe.riskProfile ordering.
+export type RiskLevelKey = "conservative" | "balanced" | "aggressive";
+export const GUARDRAIL_PRESETS: Record<RiskLevelKey, Omit<FxGuardrails, "navBase">> = {
+  conservative: {
+    maxTurnoverPctOfNav: 10,
+    minNotionalBase: 50,
+    maxTiltExposurePctOfNav: 10,
+    perCurrencyMaxPct: 25,
+  },
+  balanced: {
+    maxTurnoverPctOfNav: 25,
+    minNotionalBase: 25,
+    maxTiltExposurePctOfNav: 20,
+    perCurrencyMaxPct: 40,
+  },
+  aggressive: {
+    maxTurnoverPctOfNav: 50,
+    minNotionalBase: 10,
+    maxTiltExposurePctOfNav: 35,
+    perCurrencyMaxPct: 60,
+  },
+};
+
+export function presetForRiskLevel(level: string | null | undefined, navBase: number): FxGuardrails {
+  const key = (level ?? "balanced").toLowerCase() as RiskLevelKey;
+  const p = GUARDRAIL_PRESETS[key] ?? GUARDRAIL_PRESETS.balanced;
+  return { ...p, navBase };
+}
+
 // -------- Compiler -------------------------------------------------------
 
 export interface CompileFxContext {
