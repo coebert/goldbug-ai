@@ -39,10 +39,12 @@ export function maybeNotifyPrecheckCashReject(params: {
   code: string | null;
   message: string | null;
 }) {
-  if (!params.userId) return;
+  const userId = params.userId;
+  if (!userId) return;
   if (!isCashReject(params.code, params.message)) return;
 
   void (async () => {
+
     try {
       const now = Date.now();
       const sinceIso = new Date(now - WINDOW_HOURS * 3600_000).toISOString();
