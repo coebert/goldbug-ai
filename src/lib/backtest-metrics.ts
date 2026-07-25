@@ -270,6 +270,95 @@ export function realizedPnlPerRoundTrip(trades: TradeRow[]): number[] {
   return roundTrips;
 }
 
+export type PerAssetContribution = {
+  symbol: string;
+  realizedPnl: number;
+  roundTrips: number;
+  wins: number;
+  losses: number;
+  winRatePct: number | null;
+  bought: number;      // cash outflow across all buys (qty*price)
+  sold: number;        // cash inflow across all sells (qty*price)
+  openQty: number;     // FIFO-remaining open quantity after replaying trades
+  openCostBasis: number; // remaining open lots' cost basis (qty*avgLotPrice)
+};
+
+/**
+ * Per-symbol contribution to strategy P&L: FIFO round-trip realized PnL,
+ * win/loss counts, gross flows, and any open exposure left over after
+ * replaying the trade log. Pure — no I/O, safe to run in the browser.
+ */
+export function perAssetContribution(trades: TradeRow[]): PerAssetContribution[] {
+  const sorted = [...trades].sort((a, b) => {
+    if (a.trade_date !== b.trade_date) return a.trade_date.localeCompare(b.trade_date);
+    return (a.executed_at ?? "").localeCompare(b.executed_at ?? "");
+  });
+  type Agg = {
+    lots: Lot[];
+    realized: number;
+    wins: number;
+    losses: number;
+    roundTrips: number;
+    bought: number;
+    sold: number;
+  };
+  const bySym = new Map<string, Agg>();
+  const getAgg = (s: string): Agg => {
+    let a = bySym.get(s);
+    if (!a) {
+      a = { lots: [], realized: 0, wins: 0, losses: 0, roundTrips: 0, bought: 0, sold: 0 };
+      bySym.set(s, a);
+    }
+    return a;
+  };
+  for (const t of sorted) {
+    const qty = Number(t.quantity);
+    const price = Number(t.price);
+    if (!Number.isFinite(qty) || !Number.isFinite(price) || qty <= 0) continue;
+    const a = getAgg(t.symbol);
+    if (t.side === "buy") {
+      a.bought += qty * price;
+      a.lots.push({ qty, price });
+      continue;
+    }
+    a.sold += qty * price;
+    let remaining = qty;
+    let pnl = 0;
+    while (remaining > 0 && a.lots.length > 0) {
+      const lot = a.lots[0];
+      const take = Math.min(lot.qty, remaining);
+      pnl += (price - lot.price) * take;
+      lot.qty -= take;
+      remaining -= take;
+      if (lot.qty <= 1e-9) a.lots.shift();
+    }
+    if (remaining < qty) {
+      a.realized += pnl;
+      a.roundTrips += 1;
+      if (pnl > 0) a.wins += 1;
+      else if (pnl < 0) a.losses += 1;
+    }
+  }
+  return Array.from(bySym.entries())
+    .map(([symbol, a]) => {
+      const openQty = a.lots.reduce((n, l) => n + l.qty, 0);
+      const openCostBasis = a.lots.reduce((n, l) => n + l.qty * l.price, 0);
+      return {
+        symbol,
+        realizedPnl: a.realized,
+        roundTrips: a.roundTrips,
+        wins: a.wins,
+        losses: a.losses,
+        winRatePct: a.roundTrips > 0 ? (a.wins / a.roundTrips) * 100 : null,
+        bought: a.bought,
+        sold: a.sold,
+        openQty,
+        openCostBasis,
+      };
+    })
+    .sort((a, b) => b.realizedPnl - a.realizedPnl);
+}
+
 export function computeBacktestMetrics(
   equity: EquityPoint[],
   trades: TradeRow[],
