@@ -221,6 +221,9 @@ export function runCommodityRejectionBacktest(
   let totalSignalDays = 0;
   let accepted = 0;
   let rejected = 0;
+  const advSamples: number[] = [];
+  const atrSamples: number[] = [];
+
 
   // Cache: for each symbol, closes[] and candles[] up to (and including) each
   // date. Precompute an index-by-date once.
