@@ -557,25 +557,30 @@ export function tiltTargets(
 export function buildDiversificationTiltBlock(args: {
   tilt: DiversificationTilt;
   cfg: Pick<RiskConfig, "asset_class_limits">;
-  currentExposure: { commodity: number; fx: number };
+  currentExposure?: { commodity: number; fx: number };
 }): string {
   const t = tiltTargets(args.tilt, args.cfg);
   if (!t) return "";
   const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
-  const gapC = Math.max(0, t.commodity - args.currentExposure.commodity);
-  const gapF = Math.max(0, t.fx - args.currentExposure.fx);
-  const gapLine =
-    gapC + gapF <= 0.005
-      ? "Current commodity/FX exposure already meets or exceeds the tilt target — no extra nudge needed this cycle."
-      : `Room to tilt: commodities +${pct(gapC)} to target, FX +${pct(gapF)} to target (soft — hard caps still apply).`;
-  return [
+  const lines = [
     `DIVERSIFICATION TILT — ${t.label}`,
-    `Current exposure: commodity ${pct(args.currentExposure.commodity)}, FX ${pct(args.currentExposure.fx)}.`,
-    `Soft targets: commodity ${pct(t.commodity)}, FX ${pct(t.fx)} (fraction of user's own asset-class caps).`,
-    gapLine,
-    t.instruction,
-  ].join("\n");
+    `Soft targets (fraction of your asset-class caps): commodity ${pct(t.commodity)}, FX ${pct(t.fx)}.`,
+  ];
+  if (args.currentExposure) {
+    const gapC = Math.max(0, t.commodity - args.currentExposure.commodity);
+    const gapF = Math.max(0, t.fx - args.currentExposure.fx);
+    lines.push(
+      `Current exposure: commodity ${pct(args.currentExposure.commodity)}, FX ${pct(args.currentExposure.fx)}.`,
+      gapC + gapF <= 0.005
+        ? "Current commodity/FX exposure already meets or exceeds the tilt target — no extra nudge needed this cycle."
+        : `Room to tilt: commodities +${pct(gapC)}, FX +${pct(gapF)} (soft — hard caps still apply).`,
+    );
+  }
+  lines.push(t.instruction);
+  lines.push("This is a soft bias only — it never overrides asset-class caps, per-symbol caps, or affordability checks.");
+  return lines.join("\n");
 }
+
 
 
 
