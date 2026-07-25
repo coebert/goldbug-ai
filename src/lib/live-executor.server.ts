@@ -160,6 +160,23 @@ export async function routeOrdersToBroker(params: {
       response: asJson({ rate: fxRate, source: fxSource, stale: fxStale }),
       error: fxStale ? "fx rate stale or fallback" : null,
     });
+    // Fire an out-of-UI alert when the FX providers are actually down
+    // (rate=1 identity fallback) so the operator hears about it even if
+    // they don't have the portfolio page open.
+    try {
+      const { maybeNotifyFxUnhealthy } = await import("./fx-health-notify.server");
+      maybeNotifyFxUnhealthy({
+        portfolioId: portfolio.id,
+        userId,
+        pair: `${portfolioCurrency}->${accountCurrency}`,
+        rate: fxRate,
+        source: fxSource,
+        stale: fxStale,
+      });
+    } catch {
+      // never let a notifier crash the tick
+    }
+
   }
 
   // ---------- Pre-placement cash reconciliation.
