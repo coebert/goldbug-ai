@@ -12,6 +12,7 @@
 
 import type { SaxoAdapter } from "./brokers/saxo.server";
 import { asJson } from "@/lib/_server/db-json";
+import { logReconcileEvent, type ReconcileReasonCode } from "./reconcile-event-log.server";
 
 export type OrderReconcileOutcome =
   | "filled"
@@ -95,9 +96,11 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
   // Fetch the whole working-order list once — cheaper than one call per order.
   let working: Awaited<ReturnType<SaxoAdapter["listWorkingOrders"]>> = [];
+  let workingListError: string | null = null;
   try {
     working = await adapter.listWorkingOrders();
   } catch (e) {
+    workingListError = e instanceof Error ? e.message : String(e);
     // If we can't reach the endpoint, log once and treat everything as unknown
     await supabaseAdmin.from("live_broker_log").insert({
       portfolio_id: portfolioId,
@@ -107,7 +110,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       method: "ORDER_RECON_LIST_FAILED",
       path: "/port/v1/orders/me",
       status: null,
-      error: e instanceof Error ? e.message : String(e),
+      error: workingListError,
     });
   }
   const workingById = new Map(working.map((w) => [w.brokerOrderId, w]));
@@ -119,6 +122,20 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
   for (const row of rows) {
     const brokerOrderId = row.broker_order_id ? String(row.broker_order_id) : null;
+    const submittedAtIso = (row.submitted_at as string | null) ?? (row.created_at as string | null);
+    const commonEvent = {
+      orderId: row.id as string,
+      portfolioId,
+      userId,
+      env: adapter.env,
+      brokerOrderId,
+      symbol: row.symbol as string,
+      side: (row.side as string | null) ?? null,
+      orderType: (row.order_type as string | null) ?? null,
+      previousStatus: row.status as string,
+      submittedAt: submittedAtIso,
+    } as const;
+
     if (!brokerOrderId) {
       summary.rows.push({
         orderId: row.id as string,
@@ -131,6 +148,13 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         avgFillPrice: null,
         reason: "order never received a broker id",
       });
+      await logReconcileEvent({
+        ...commonEvent,
+        newStatus: row.status as string,
+        outcome: "no_broker_id",
+        reasonCode: "no_broker_id",
+        reason: "order has no broker_order_id — never routed to Saxo",
+      });
       continue;
     }
 
@@ -138,15 +162,36 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     if (w) {
       // Still open. Only patch if partial fill made progress.
       if (w.filledAmount > 0 && w.filledAmount < w.amount) {
-        await supabaseAdmin
+        const upd = await supabaseAdmin
           .from("live_orders")
           .update({ status: "partial" })
           .eq("id", row.id as string);
+        if (upd.error) {
+          await logReconcileEvent({
+            ...commonEvent,
+            newStatus: row.status as string,
+            outcome: "error",
+            reasonCode: "status_update_failed",
+            reason: `failed to mark partial: ${upd.error.message}`,
+            filledQuantity: w.filledAmount,
+            saxoResponse: w,
+          });
+        }
         summary.partial++;
         summary.rows.push({
           orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
           outcome: "partial", previousStatus: row.status as string, newStatus: "partial",
           filledQuantity: w.filledAmount, avgFillPrice: null,
+        });
+        await logReconcileEvent({
+          ...commonEvent,
+          newStatus: "partial",
+          outcome: "partial",
+          reasonCode: "broker_open_partial_progress",
+          reason: `order still open on Saxo with ${w.filledAmount}/${w.amount} filled`,
+          filledQuantity: w.filledAmount,
+          saxoStatus: "working",
+          saxoResponse: w,
         });
       } else {
         summary.stillWorking++;
@@ -155,12 +200,39 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           outcome: "still_working", previousStatus: row.status as string, newStatus: row.status as string,
           filledQuantity: w.filledAmount, avgFillPrice: null,
         });
+        await logReconcileEvent({
+          ...commonEvent,
+          newStatus: row.status as string,
+          outcome: "still_working",
+          reasonCode: "broker_open_working",
+          reason: "order is in Saxo's open-orders list; awaiting fill",
+          filledQuantity: w.filledAmount,
+          saxoStatus: "working",
+          saxoResponse: w,
+        });
       }
       continue;
     }
 
     // Not in working list → ask history what happened.
-    const hist = await adapter.getHistoricalOrder(brokerOrderId, sinceIso);
+    let hist: Awaited<ReturnType<SaxoAdapter["getHistoricalOrder"]>> = null;
+    let histError: string | null = null;
+    try {
+      hist = await adapter.getHistoricalOrder(brokerOrderId, sinceIso);
+    } catch (e) {
+      histError = e instanceof Error ? e.message : String(e);
+    }
+
+    if (histError) {
+      await logReconcileEvent({
+        ...commonEvent,
+        newStatus: row.status as string,
+        outcome: "error",
+        reasonCode: "history_fetch_failed",
+        reason: `Saxo /hist call threw: ${histError}`,
+      });
+    }
+
     if (!hist) {
       // Saxo `/hist/v3/orders` is not exposed in some environments (notably
       // SIM), so history returns null even for orders that clearly completed.
@@ -171,7 +243,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       // status so operators aren't left with a permanent "submitted" tile
       // for orders the broker has already executed.
       const orderType = String(row.order_type ?? "market").toLowerCase();
-      const submittedAt = row.submitted_at ? new Date(row.submitted_at as string).getTime() : 0;
+      const submittedAt = submittedAtIso ? new Date(submittedAtIso).getTime() : 0;
       const ageMs = submittedAt ? Date.now() - submittedAt : Number.POSITIVE_INFINITY;
       if (orderType === "market" && ageMs > 2 * 60 * 1000) {
         const qty = Number(row.quantity ?? 0);
@@ -190,6 +262,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           .update({ status: "filled" })
           .eq("id", row.id as string);
 
+        let fillInsertError: string | null = null;
         if (qty > 0) {
           const ins = await supabaseAdmin.from("live_fills").insert({
             order_id: row.id as string,
@@ -205,6 +278,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
             filled_at: new Date().toISOString(),
           });
           if (ins.error && ins.error.code !== "23505") {
+            fillInsertError = ins.error.message;
             await supabaseAdmin.from("live_broker_log").insert({
               portfolio_id: portfolioId, user_id: userId, broker: "saxo",
               env: adapter.env, method: "ORDER_RECON_PRESUMED_FILL_INSERT_FAILED",
@@ -222,6 +296,19 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           filledQuantity: qty, avgFillPrice: fillPrice || null,
           reason: "presumed filled — market order absent from open list; /hist unsupported on this env",
         });
+        await logReconcileEvent({
+          ...commonEvent,
+          source: "presumed_fill",
+          newStatus: "filled",
+          outcome: "filled",
+          reasonCode: "sim_presumed_filled_market",
+          reason: `market order aged ${Math.round(ageMs / 1000)}s, absent from Saxo open list, /hist unavailable — presumed filled`,
+          filledQuantity: qty,
+          avgFillPrice: fillPrice || null,
+          saxoStatus: workingListError ? "open_list_unavailable" : "absent_from_open_list",
+          saxoReason: fillInsertError ? `live_fills insert failed: ${fillInsertError}` : null,
+          saxoResponse: { workingListError, histError, priceUsed: fillPrice },
+        });
         continue;
       }
 
@@ -231,6 +318,18 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         outcome: "unknown", previousStatus: row.status as string, newStatus: row.status as string,
         filledQuantity: 0, avgFillPrice: null,
         reason: "not in open orders and history endpoint returned nothing",
+      });
+      await logReconcileEvent({
+        ...commonEvent,
+        newStatus: row.status as string,
+        outcome: "unknown",
+        reasonCode: orderType === "market" ? "sim_keep_awaiting_broker" : "sim_keep_awaiting_broker",
+        reason:
+          orderType === "market"
+            ? `market order too fresh (${Math.round(ageMs / 1000)}s) to presume filled`
+            : `${orderType} order silent; SIM cannot confirm — leaving as ${row.status}`,
+        saxoStatus: "absent_from_open_list",
+        saxoResponse: { workingListError, histError, ageMs },
       });
       continue;
     }
@@ -244,17 +343,42 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         filledQuantity: hist.filledAmount, avgFillPrice: hist.avgPrice,
         reason: `unrecognised Saxo status "${hist.status}"`,
       });
+      await logReconcileEvent({
+        ...commonEvent,
+        newStatus: row.status as string,
+        outcome: "unknown",
+        reasonCode: "broker_history_unknown_status",
+        reason: `Saxo returned unrecognised status "${hist.status}"`,
+        filledQuantity: hist.filledAmount,
+        avgFillPrice: hist.avgPrice,
+        saxoStatus: hist.status,
+        saxoReason: hist.reason ?? null,
+        saxoFilledAt: hist.filledAt ?? null,
+        saxoResponse: hist,
+      });
       continue;
     }
 
-    await supabaseAdmin
+    const upd = await supabaseAdmin
       .from("live_orders")
       .update({
         status: mapped,
         reject_reason: mapped === "rejected" ? (hist.reason ?? "rejected by broker") : null,
       })
       .eq("id", row.id as string);
+    if (upd.error) {
+      await logReconcileEvent({
+        ...commonEvent,
+        newStatus: row.status as string,
+        outcome: "error",
+        reasonCode: "status_update_failed",
+        reason: `failed to update live_orders.status to ${mapped}: ${upd.error.message}`,
+        saxoStatus: hist.status,
+        saxoResponse: hist,
+      });
+    }
 
+    let fillInsertError: string | null = null;
     if ((mapped === "filled" || mapped === "partial") && hist.filledAmount > 0) {
       // Insert (idempotent-ish): broker_fill_id = brokerOrderId means one row
       // per broker order. If the row already exists we skip on unique-violation.
@@ -273,6 +397,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         filled_at: hist.filledAt ?? new Date().toISOString(),
       });
       if (ins.error && ins.error.code !== "23505") {
+        fillInsertError = ins.error.message;
         // Non-duplicate insert failures should surface in the log but not fail
         // the whole reconcile pass.
         await supabaseAdmin.from("live_broker_log").insert({
@@ -281,6 +406,17 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           path: "live_fills", status: null,
           request: asJson({ orderId: row.id, brokerOrderId }),
           error: ins.error.message,
+        });
+        await logReconcileEvent({
+          ...commonEvent,
+          newStatus: mapped,
+          outcome: "error",
+          reasonCode: "fill_insert_failed",
+          reason: `live_fills insert failed: ${ins.error.message}`,
+          filledQuantity: hist.filledAmount,
+          avgFillPrice: hist.avgPrice,
+          saxoStatus: hist.status,
+          saxoResponse: hist,
         });
       }
     }
@@ -300,6 +436,35 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       filledQuantity: hist.filledAmount,
       avgFillPrice: hist.avgPrice,
       reason: mapped === "rejected" ? hist.reason : undefined,
+    });
+
+    const reasonCode: ReconcileReasonCode =
+      mapped === "filled" ? "broker_history_filled"
+      : mapped === "partial" ? "broker_history_partial"
+      : mapped === "rejected" ? "broker_history_rejected"
+      : mapped === "cancelled" ? "broker_history_cancelled"
+      : "broker_open_working";
+    await logReconcileEvent({
+      ...commonEvent,
+      newStatus: mapped,
+      outcome: mapped === "submitted" ? "still_working" : mapped,
+      reasonCode,
+      reason:
+        mapped === "rejected"
+          ? `broker rejected order: ${hist.reason ?? "no reason provided"}`
+          : mapped === "cancelled"
+            ? `broker cancelled order${hist.reason ? `: ${hist.reason}` : ""}`
+            : mapped === "filled"
+              ? `broker confirmed full fill of ${hist.filledAmount} @ ${hist.avgPrice ?? "n/a"}`
+              : mapped === "partial"
+                ? `broker confirmed partial fill of ${hist.filledAmount}/${hist.amount} @ ${hist.avgPrice ?? "n/a"}`
+                : `broker still working ${hist.filledAmount}/${hist.amount}`,
+      filledQuantity: hist.filledAmount,
+      avgFillPrice: hist.avgPrice,
+      saxoStatus: hist.status,
+      saxoReason: hist.reason ?? null,
+      saxoFilledAt: hist.filledAt ?? null,
+      saxoResponse: fillInsertError ? { ...hist, fillInsertError } : hist,
     });
   }
 
