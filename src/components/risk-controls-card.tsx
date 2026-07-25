@@ -34,6 +34,8 @@ type RiskConfig = {
   max_hold_days: number;
   volatility_sizing: boolean;
   vol_target_pct: number;
+  max_daily_loss_pct: number;
+  max_drawdown_halt_pct: number;
   risk_level?: number;
 };
 
@@ -46,6 +48,8 @@ const DEFAULTS: RiskConfig = {
   max_hold_days: 0,
   volatility_sizing: true,
   vol_target_pct: 0.015,
+  max_daily_loss_pct: 0.05,
+  max_drawdown_halt_pct: 0.20,
 };
 
 function parseCfg(raw: unknown): RiskConfig {
@@ -68,6 +72,8 @@ function parseCfg(raw: unknown): RiskConfig {
         ? r.volatility_sizing
         : DEFAULTS.volatility_sizing,
     vol_target_pct: Number(r.vol_target_pct ?? DEFAULTS.vol_target_pct),
+    max_daily_loss_pct: Number(r.max_daily_loss_pct ?? DEFAULTS.max_daily_loss_pct),
+    max_drawdown_halt_pct: Number(r.max_drawdown_halt_pct ?? DEFAULTS.max_drawdown_halt_pct),
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
   };
 }
@@ -96,6 +102,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 60,
       volatility_sizing: true,
       vol_target_pct: 0.007,
+      max_daily_loss_pct: 0.02,
+      max_drawdown_halt_pct: 0.08,
     },
   },
   2: {
@@ -110,6 +118,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 90,
       volatility_sizing: true,
       vol_target_pct: 0.01,
+      max_daily_loss_pct: 0.03,
+      max_drawdown_halt_pct: 0.12,
     },
   },
   3: {
@@ -129,6 +139,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 0,
       volatility_sizing: true,
       vol_target_pct: 0.02,
+      max_daily_loss_pct: 0.06,
+      max_drawdown_halt_pct: 0.25,
     },
   },
   5: {
@@ -143,6 +155,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 0,
       volatility_sizing: false,
       vol_target_pct: 0.03,
+      max_daily_loss_pct: 0.10,
+      max_drawdown_halt_pct: 0.35,
     },
   },
 };
@@ -555,6 +569,58 @@ export function RiskControlsCard({
                 </div>
               </div>
             </div>
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Hard halts</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Circuit-breakers that block <strong>all new buys</strong> when the portfolio has already lost too much
+                today, or is too far below its all-time peak. Automatic stop-loss / take-profit sells still fire so the
+                portfolio can de-risk. Set 0 to disable either halt.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs font-medium">Max daily loss</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={90}
+                      step={0.5}
+                      value={Number((cfg.max_daily_loss_pct * 100).toFixed(2))}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          max_daily_loss_pct: Math.max(0, Math.min(0.9, Number(e.target.value) / 100 || 0)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">% vs yesterday → pause buys</span>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Max drawdown halt</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={90}
+                      step={0.5}
+                      value={Number((cfg.max_drawdown_halt_pct * 100).toFixed(2))}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          max_drawdown_halt_pct: Math.max(0, Math.min(0.9, Number(e.target.value) / 100 || 0)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">% from peak → pause buys</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
 
 
             <div>
