@@ -57,6 +57,9 @@ const TradeErrorDashboardCard = lazy(() =>
 const FxHealthCard = lazy(() =>
   import("@/components/fx-health-card").then((m) => ({ default: m.FxHealthCard })),
 );
+const FxIntentsCard = lazy(() =>
+  import("@/components/fx-intents-card").then((m) => ({ default: m.FxIntentsCard })),
+);
 const ManualFxConvertCard = lazy(() =>
   import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
 );
