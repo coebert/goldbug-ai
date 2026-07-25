@@ -40,7 +40,7 @@ export function maybeNotifyPrecheckCashReject(params: {
   message: string | null;
 }) {
   const userId = params.userId;
-  const portfolioId = portfolioId;
+  const portfolioId = params.portfolioId;
   if (!userId || !portfolioId) return;
   if (!isCashReject(params.code, params.message)) return;
 
