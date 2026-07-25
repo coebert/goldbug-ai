@@ -43,6 +43,7 @@ import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, Shield
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
+import { TradeAuditLogCard } from "@/components/trade-audit-log-card";
 
 import {
   Collapsible,
