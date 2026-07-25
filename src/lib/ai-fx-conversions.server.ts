@@ -1,0 +1,374 @@
+// FX strategy support for the AI trading engine.
+//
+// Gives the model a per-currency wallet snapshot, exposure-by-currency,
+// live FX rates, and the FX circuit-breaker status, plus a compact playbook
+// for when to shift cash between currencies (pre-funding foreign buys,
+// hedging unwanted exposure, closing idle non-base cash pockets, staying out
+// of FX while the circuit is open or rates are stale).
+//
+// Conversions the AI proposes are applied here in wallet-book mode:
+// planFxConversion computes the resulting wallet and we update
+// portfolios.cash_by_ccy + current_cash under the admin client. Broker-side
+// spot FX during a daily tick is intentionally out of scope; the executor
+// handles broker legs when placing dependent buys.
+
+import { z } from "zod";
+import { getFxMatrix, getFxRate } from "./fx.server";
+import { planFxConversion } from "./fx-convert-plan";
+import { readWallet, walletBalance, writeWalletFields, type Wallet } from "./portfolio-wallet";
+import { getFxCircuitState } from "./fx-circuit.server";
+import { asJson } from "./_server/db-json";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+export const FxConversionOrderSchema = z.object({
+  from_ccy: z.string().length(3),
+  to_ccy: z.string().length(3),
+  // Percent of the from-currency wallet balance to convert (1..100).
+  amount_percent: z.number().min(1).max(100),
+  reason: z.string(),
+});
+export type FxConversionOrder = z.infer<typeof FxConversionOrderSchema>;
+
+const SUPPORTED = ["GBP", "USD", "EUR", "CHF", "JPY", "CAD", "AUD"] as const;
+
+/**
+ * Best-effort mapping from a Yahoo-style ticker to its trading currency.
+ * Matches the assumptions used in live-executor.server.ts for symToCcy.
+ */
+export function inferSymbolCurrency(symbol: string, portfolioCcy: string): string {
+  const s = symbol.toUpperCase();
+  if (s.endsWith(".L")) return "GBP";
+  if (s.endsWith("-USD")) return "USD";
+  if (s.endsWith("=F")) return "USD";
+  if (s.endsWith("=X")) return "USD"; // FX pairs settle via quote ccy — treat as USD-denominated notional here
+  if (/^[A-Z.]+$/.test(s)) return "USD"; // US-listed default
+  return (portfolioCcy || "USD").toUpperCase();
+}
+
+export interface FxContext {
+  active: boolean;              // portfolio.fx_enabled === true
+  circuitOpen: boolean;
+  circuitReason: string | null;
+  baseCcy: string;
+  wallet: Wallet;
+  matrix: Map<string, { rate: number; source: string; stale?: boolean }>;
+  currenciesInPlay: string[];
+  exposureByCcy: Record<string, number>; // in base ccy
+  block: string;                // system-prompt block (playbook + status)
+  contextBlock: string;         // user-prompt block (numbers)
+}
+
+/**
+ * Build the FX context block for the AI prompt. Safe to call even when
+ * fx_enabled is false — returns an inactive context and a short message
+ * telling the model FX is disabled.
+ */
+export async function buildFxContext(args: {
+  portfolio: {
+    id: string;
+    currency: string | null;
+    current_cash: number | null;
+    cash_by_ccy?: unknown;
+    fx_enabled?: boolean | null;
+  };
+  holdings: Array<{ symbol: string; quantity: number | string }>;
+  priceMap: Map<string, number>;
+  candidateSymbols: string[];
+}): Promise<FxContext> {
+  const baseCcy = (args.portfolio.currency || "GBP").toUpperCase();
+  const rawCash = args.portfolio.cash_by_ccy;
+  const cashByCcy =
+    rawCash && typeof rawCash === "object" && !Array.isArray(rawCash)
+      ? (rawCash as Record<string, number>)
+      : null;
+  const wallet = readWallet({
+    currency: baseCcy,
+    current_cash: args.portfolio.current_cash,
+    cash_by_ccy: cashByCcy,
+  });
+
+  const active = args.portfolio.fx_enabled === true;
+
+  const holdingCcys = new Set<string>();
+  const exposureByCcy: Record<string, number> = {};
+  for (const h of args.holdings) {
+    const ccy = inferSymbolCurrency(h.symbol, baseCcy);
+    holdingCcys.add(ccy);
+    const price = args.priceMap.get(h.symbol) ?? 0;
+    const nativeValue = price * Number(h.quantity);
+    exposureByCcy[ccy] = (exposureByCcy[ccy] ?? 0) + nativeValue;
+  }
+  const candidateCcys = new Set(args.candidateSymbols.map((s) => inferSymbolCurrency(s, baseCcy)));
+  const walletCcys = new Set(Object.keys(wallet));
+  const all = new Set<string>([baseCcy, ...walletCcys, ...holdingCcys, ...candidateCcys, ...SUPPORTED]);
+  const currenciesInPlay = Array.from(all).sort();
+
+  // Build the FX matrix vs base currency (both directions) and pair-vs-pair
+  // for anything the model might rebalance between.
+  const pairs: Array<{ from: string; to: string }> = [];
+  for (const c of currenciesInPlay) {
+    if (c !== baseCcy) {
+      pairs.push({ from: c, to: baseCcy });
+      pairs.push({ from: baseCcy, to: c });
+    }
+  }
+  let matrix: FxContext["matrix"] = new Map();
+  try {
+    matrix = await getFxMatrix(pairs);
+  } catch {
+    matrix = new Map();
+  }
+
+  // Convert native exposure → base ccy for the summary.
+  const exposureBase: Record<string, number> = {};
+  for (const [ccy, native] of Object.entries(exposureByCcy)) {
+    if (ccy === baseCcy) {
+      exposureBase[ccy] = Math.round(native * 100) / 100;
+      continue;
+    }
+    const q = matrix.get(`${ccy}${baseCcy}`);
+    if (q && Number.isFinite(q.rate)) {
+      exposureBase[ccy] = Math.round(native * q.rate * 100) / 100;
+    }
+  }
+
+  let circuitOpen = false;
+  let circuitReason: string | null = null;
+  try {
+    const c = await getFxCircuitState(supabaseAdmin, args.portfolio.id);
+    circuitOpen = c.open;
+    circuitReason = c.reason;
+  } catch {
+    // treat unknown as closed — the executor's own guards remain in force
+  }
+
+  if (!active) {
+    return {
+      active: false,
+      circuitOpen,
+      circuitReason,
+      baseCcy,
+      wallet,
+      matrix,
+      currenciesInPlay,
+      exposureByCcy: exposureBase,
+      block: "FX STRATEGY: multi-currency wallet is disabled on this portfolio. Do not propose fx_conversions; they will be rejected.",
+      contextBlock: "",
+    };
+  }
+
+  const walletRows = Object.entries(wallet)
+    .filter(([, v]) => Math.abs(v) > 0.005 || Object.keys(wallet).length <= 2)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([c, v]) => `- ${c}: ${v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+    .join("\n");
+
+  const ratesRows = Array.from(matrix.entries())
+    .filter(([k]) => k.endsWith(baseCcy) && !k.startsWith(baseCcy))
+    .sort()
+    .map(([k, v]) => {
+      const from = k.slice(0, 3);
+      const flags: string[] = [];
+      if (v.stale) flags.push("STALE");
+      if (v.source?.startsWith("fallback")) flags.push("FALLBACK");
+      return `- ${from}→${baseCcy} ${v.rate.toFixed(4)}${flags.length ? ` [${flags.join(",")}]` : ""} (src: ${v.source ?? "?"})`;
+    })
+    .join("\n");
+
+  const exposureRows = Object.entries(exposureBase)
+    .filter(([, v]) => Math.abs(v) > 0.5)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .map(([c, v]) => `- ${c}: ${v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${baseCcy}`)
+    .join("\n");
+
+  const circuitLine = circuitOpen
+    ? `- FX CIRCUIT: OPEN (${circuitReason ?? "identity-fallback in effect"}). Do NOT propose fx_conversions this tick — they will be rejected.`
+    : `- FX CIRCUIT: closed. Conversions are allowed subject to rate quality.`;
+
+  const contextBlock = `FX WALLET & EXPOSURE (base = ${baseCcy}):
+Wallet balances:
+${walletRows || "- (empty)"}
+
+Native exposure of current holdings converted to ${baseCcy}:
+${exposureRows || "- (none)"}
+
+FX rates vs base:
+${ratesRows || "- (unavailable)"}
+${circuitLine}`;
+
+  const playbook = `FX STRATEGY (multi-currency wallet is enabled):
+- Propose fx_conversions when doing so improves execution or risk. Typical uses:
+  1. PRE-FUND FOREIGN BUYS: if you plan to buy an instrument denominated in USD/EUR/etc. and the wallet in that ccy is short, convert enough ${baseCcy} up front (small buffer for slippage).
+  2. HEDGE UNWANTED EXPOSURE: if non-base exposure has grown beyond ~60% of portfolio value and the regime is risk-off (bear_volatile / crisis), trim by converting foreign cash back to ${baseCcy}. Do NOT sell equities purely to raise FX.
+  3. CLOSE IDLE POCKETS: any non-base cash balance below ~1% of portfolio value with no upcoming buys in that ccy should be swept back to ${baseCcy}.
+  4. CARRY / MOMENTUM: only shift cash on FX-pair momentum when the base pair rate is fresh (not STALE / FALLBACK) and the move is aligned with the current macro regime.
+- SAFETY:
+  - Skip fx_conversions entirely if FX CIRCUIT is OPEN or the required pair is flagged STALE or FALLBACK.
+  - Never convert more than 40% of any single currency's balance in a single tick.
+  - Conversions are book-entry against our internal quote; expect a ~25 bps effective spread.
+- Format: fx_conversions is an array of { from_ccy, to_ccy, amount_percent (1..100 of the from balance), reason }.`;
+
+  return {
+    active: true,
+    circuitOpen,
+    circuitReason,
+    baseCcy,
+    wallet,
+    matrix,
+    currenciesInPlay,
+    exposureByCcy: exposureBase,
+    block: playbook,
+    contextBlock,
+  };
+}
+
+export interface AppliedFxConversion {
+  from_ccy: string;
+  to_ccy: string;
+  amount_from: number;
+  amount_to: number;
+  rate: number;
+  source: string;
+  reason: string;
+  rejected?: string;
+}
+
+export interface ApplyFxResult {
+  applied: AppliedFxConversion[];
+  newWallet: Wallet;
+  baseCashDelta: number; // change in base-ccy wallet balance (for updating workingCash)
+}
+
+/**
+ * Apply the AI's fx_conversions to the wallet in book-entry mode.
+ * Uses the same quote source and math as the manual convert flow. Persists
+ * the resulting cash_by_ccy + current_cash under the admin client.
+ */
+export async function applyAiFxConversions(args: {
+  portfolioId: string;
+  userId: string;
+  baseCcy: string;
+  wallet: Wallet;
+  conversions: FxConversionOrder[];
+  fxContext: FxContext;
+  buyHalts: boolean;
+  persist: boolean;
+}): Promise<ApplyFxResult> {
+  const applied: AppliedFxConversion[] = [];
+  let wallet: Wallet = { ...args.wallet };
+  const startingBase = walletBalance(wallet, args.baseCcy);
+
+  for (const raw of args.conversions) {
+    const from = raw.from_ccy.toUpperCase();
+    const to = raw.to_ccy.toUpperCase();
+    const base: AppliedFxConversion = {
+      from_ccy: from,
+      to_ccy: to,
+      amount_from: 0,
+      amount_to: 0,
+      rate: 0,
+      source: "",
+      reason: raw.reason,
+    };
+
+    if (!args.fxContext.active) {
+      applied.push({ ...base, rejected: "fx wallet disabled on portfolio" });
+      continue;
+    }
+    if (args.fxContext.circuitOpen) {
+      applied.push({ ...base, rejected: `fx circuit open: ${args.fxContext.circuitReason ?? "identity-fallback"}` });
+      continue;
+    }
+    if (args.buyHalts) {
+      // Risk-halts pause de-risking-adjacent activity; keep FX moves off too.
+      applied.push({ ...base, rejected: "risk halt active" });
+      continue;
+    }
+    if (from === to) {
+      applied.push({ ...base, rejected: "from and to currencies match" });
+      continue;
+    }
+
+    const balance = walletBalance(wallet, from);
+    const pct = Math.min(100, Math.max(1, raw.amount_percent));
+    // Enforce the playbook cap of 40% per currency per tick regardless of what
+    // the model asks for; still respect an explicit lower percent.
+    const cappedPct = Math.min(pct, 40);
+    const amountFrom = Math.floor(balance * (cappedPct / 100) * 100) / 100;
+    if (amountFrom < 1) {
+      applied.push({ ...base, rejected: `insufficient ${from} balance (${balance.toFixed(2)})` });
+      continue;
+    }
+
+    let rate = 0;
+    let source = "";
+    try {
+      const q = await getFxRate(from, to);
+      if (!Number.isFinite(q.rate) || q.rate <= 0) {
+        applied.push({ ...base, rejected: `no rate for ${from}->${to}` });
+        continue;
+      }
+      if (q.stale) {
+        applied.push({ ...base, rate: q.rate, source: q.source, rejected: `stale rate (${q.source})` });
+        continue;
+      }
+      // Apply the same 25 bps effective spread as the manual preview so book
+      // math and the UI stay consistent.
+      rate = q.rate * (1 - 25 / 10_000);
+      source = `ai:${q.source}`;
+    } catch (e) {
+      applied.push({ ...base, rejected: e instanceof Error ? e.message : "fx quote failed" });
+      continue;
+    }
+
+    const plan = planFxConversion({ wallet, from, to, amountFrom, rate });
+    if (!plan.ok) {
+      applied.push({ ...base, rate, source, rejected: plan.detail });
+      continue;
+    }
+
+    wallet = plan.newWallet;
+    applied.push({
+      ...base,
+      amount_from: plan.amountFrom,
+      amount_to: plan.amountTo,
+      rate,
+      source,
+    });
+  }
+
+  const endingBase = walletBalance(wallet, args.baseCcy);
+  const baseCashDelta = endingBase - startingBase;
+
+  if (args.persist && applied.some((a) => !a.rejected)) {
+    const fields = writeWalletFields(wallet, args.baseCcy);
+    try {
+      await supabaseAdmin
+        .from("portfolios")
+        .update({
+          cash_by_ccy: asJson(fields.cash_by_ccy),
+        })
+        .eq("id", args.portfolioId);
+      // Best-effort audit trail (same log surface as the manual convert flow).
+      for (const a of applied) {
+        if (a.rejected) continue;
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: args.portfolioId,
+          user_id: args.userId,
+          broker: "internal",
+          env: "sim",
+          method: "FX_CONVERT_AI_WALLET",
+          path: `/ai-fx/${a.from_ccy}->${a.to_ccy}`,
+          status: 200,
+          request: asJson({ amount_from: a.amount_from, reason: a.reason }),
+          response: asJson({ amount_to: a.amount_to, rate: a.rate, source: a.source }),
+          error: null,
+        });
+      }
+    } catch (e) {
+      console.warn("ai-fx persist failed", e);
+    }
+  }
+
+  return { applied, newWallet: wallet, baseCashDelta };
+}
