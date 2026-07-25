@@ -582,13 +582,20 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-sm font-semibold tabular-nums">
-              {portfolio.currency} {Number(portfolio.current_cash).toFixed(2)}
+            <div className="text-base font-semibold tabular-nums">
+              {portfolio.currency} {totalEquity.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              total equity
+            </div>
+            <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+              {portfolio.currency} {Number(portfolio.current_cash).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span className="ml-1 text-[10px]">cash</span>
             </div>
             <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
               {pnl >= 0 ? "+" : ""}
               {pnlPct.toFixed(2)}%
-              <span className="ml-1 text-[10px] text-muted-foreground">cash</span>
+              <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
             </div>
           </div>
         </div>
