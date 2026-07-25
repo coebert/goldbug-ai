@@ -130,7 +130,7 @@ async function runHourlyCycleInner(
 
     const { data: allPortfolios, error } = await supabaseAdmin
       .from("portfolios")
-      .select("id, name, universe, mode, live_paused")
+      .select("id, name, user_id, universe, mode, live_paused")
       .in("mode", ["paper", "live_sim", "live_prod"]);
 
     if (error) throw new Error(error.message);
