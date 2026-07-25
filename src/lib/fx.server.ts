@@ -32,10 +32,15 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
     return { from: f, to: t, rate: cached.rate, stale: false, source: "cache" };
   }
 
-  // Yahoo Finance FX symbol format: e.g. "GBPEUR=X"
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${key}=X`;
+  // Try Yahoo Finance first (fastest, widest coverage), then Frankfurter
+  // (ECB reference rates, no auth, very reliable) as a fallback. Yahoo has
+  // been known to 401 sporadically for unauthenticated callers, which used
+  // to silently collapse the rate to 1 and cause the pre-placement trim to
+  // under-estimate cross-currency notionals — orders that "fit" the budget
+  // then got rejected at the broker as InsufficientCash.
+  const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${key}=X`;
   try {
-    const res = await fetch(url, {
+    const res = await fetch(yahooUrl, {
       headers: { "user-agent": "Mozilla/5.0 (aegis-fx)" },
       signal: AbortSignal.timeout(5000),
     });
@@ -49,18 +54,36 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
       return { from: f, to: t, rate, stale: false, source: "yahoo" };
     }
     throw new Error("no rate in response");
-  } catch (err) {
-    if (cached) {
-      return { from: f, to: t, rate: cached.rate, stale: true, source: "cache-stale" };
+  } catch (yahooErr) {
+    // Frankfurter: ECB reference rates via api.frankfurter.dev, no auth, no
+    // rate limits documented. Response shape: { rates: { [to]: number } }.
+    try {
+      const fUrl = `https://api.frankfurter.dev/v1/latest?base=${f}&symbols=${t}`;
+      const res = await fetch(fUrl, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error(`frankfurter ${res.status}`);
+      const json = (await res.json()) as { rates?: Record<string, number> };
+      const rate = json?.rates?.[t];
+      if (typeof rate === "number" && rate > 0 && Number.isFinite(rate)) {
+        cache.set(key, { rate, ts: now });
+        return { from: f, to: t, rate, stale: false, source: "frankfurter" };
+      }
+      throw new Error("no rate in frankfurter response");
+    } catch (frankfurterErr) {
+      if (cached) {
+        return { from: f, to: t, rate: cached.rate, stale: true, source: "cache-stale" };
+      }
+      const yMsg = yahooErr instanceof Error ? yahooErr.message : "yahoo-error";
+      const fMsg = frankfurterErr instanceof Error ? frankfurterErr.message : "frankfurter-error";
+      return {
+        from: f,
+        to: t,
+        rate: 1,
+        stale: true,
+        source: `fallback:yahoo(${yMsg})+frankfurter(${fMsg})`,
+      };
     }
-    return {
-      from: f,
-      to: t,
-      rate: 1,
-      stale: true,
-      source: `fallback:${err instanceof Error ? err.message : "error"}`,
-    };
   }
+
 }
 
 /** Convenience: convert an amount. */
