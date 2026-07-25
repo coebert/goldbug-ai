@@ -67,3 +67,41 @@ export const runCommodityBacktest = createServerFn({ method: "POST" })
       symbolCoverage: symbols.map((s) => ({ symbol: s.symbol, bars: s.candles.length })),
     };
   });
+
+// Apply suggested liquidity/ATR thresholds to the portfolio's risk_config.
+// Merges only the two commodity fields so nothing else is disturbed.
+export const applyCommodityThresholds = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        portfolio_id: z.string().uuid(),
+        min_adv_usd: z.number().min(0).max(1_000_000_000),
+        max_atr_pct: z.number().min(0).max(1),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: p, error } = await context.supabase
+      .from("portfolios")
+      .select("risk_config")
+      .eq("id", data.portfolio_id)
+      .single();
+    if (error || !p) throw new Error("Portfolio not found");
+    const current =
+      (p.risk_config && typeof p.risk_config === "object" && !Array.isArray(p.risk_config)
+        ? (p.risk_config as Record<string, unknown>)
+        : {});
+    const next = {
+      ...current,
+      commodity_min_adv_usd: data.min_adv_usd,
+      commodity_max_atr_pct: data.max_atr_pct,
+    };
+    const { error: upErr } = await context.supabase
+      .from("portfolios")
+      .update({ risk_config: next })
+      .eq("id", data.portfolio_id);
+    if (upErr) throw new Error(upErr.message);
+    return { ok: true as const, applied: { min_adv_usd: data.min_adv_usd, max_atr_pct: data.max_atr_pct } };
+  });
+
