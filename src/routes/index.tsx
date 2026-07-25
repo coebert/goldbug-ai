@@ -337,6 +337,8 @@ function Home() {
                 includeDeposits={includeDeposits}
                 isLoadingEquity={equityQ.isLoading}
                 isRefreshingEquity={isRefreshingEquity}
+                equityError={equityErrored ? equityErrorMessage : null}
+                onRetryEquity={() => equityQ.refetch()}
                 equityDecimals={equityDecimals}
               />
             ))}
