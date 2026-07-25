@@ -447,6 +447,11 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
   // (the sparkline series). Falling back to current_cash only when the series
   // is empty guarantees the two numbers can never disagree on source.
   const totalEquity = sparkSeries.length > 0 ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
+  // Dedicated states so the headline and % pill can never render
+  // mismatched (loaded £ + stale/empty %, or vice versa). Both slots
+  // pivot on the SAME (isLoadingEquity, sparkSeries) inputs.
+  const equityLoading = isLoadingEquity && sparkSeries.length === 0;
+  const equityEmpty = !isLoadingEquity && sparkSeries.length === 0;
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -559,7 +564,21 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Sparkline values={values} width={120} height={32} />
-              {rangePct != null && (
+              {equityLoading ? (
+                <Skeleton
+                  data-testid="range-pct-skeleton"
+                  aria-label="Loading equity change"
+                  className="h-4 w-12"
+                />
+              ) : equityEmpty || rangePct == null ? (
+                <span
+                  data-testid="range-pct-empty"
+                  aria-label="No equity change data"
+                  className="text-sm font-semibold tabular-nums text-muted-foreground"
+                >
+                  —
+                </span>
+              ) : (
                 <span
                   className={`text-sm font-semibold tabular-nums ${rangePct >= 0 ? "text-emerald-400" : "text-red-400"}`}
                 >
@@ -593,7 +612,7 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Total equity
             </div>
-            {isLoadingEquity && sparkSeries.length === 0 ? (
+            {equityLoading ? (
               <>
                 <Skeleton
                   data-testid="total-equity-skeleton"
@@ -601,6 +620,19 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
                   className="ml-auto mt-1 h-7 w-28"
                 />
                 <Skeleton className="ml-auto mt-2 h-3 w-20" />
+              </>
+            ) : equityEmpty ? (
+              <>
+                <div
+                  data-testid="total-equity-empty"
+                  aria-label="Total equity unavailable"
+                  className="text-2xl font-bold leading-tight tabular-nums text-muted-foreground"
+                >
+                  {portfolio.currency} —
+                </div>
+                <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  No equity snapshots yet
+                </div>
               </>
             ) : (
               <>
