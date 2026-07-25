@@ -98,6 +98,7 @@ import {
   reentryLockoutDays,
 } from "./exits";
 import { scoreUniverse, formatAlphaPriorsForPrompt } from "./alpha";
+import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
 import type { Database } from "@/integrations/supabase/types";
 
 
