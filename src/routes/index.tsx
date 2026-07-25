@@ -440,6 +440,9 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
   );
   const values = adjusted.length > 0 ? adjusted.map((p) => p.adjusted) : sliced.map((p) => p.value);
   const rangePct = computeCardRangePct(sliced, deposits, includeDeposits);
+  // Total equity MUST use the same valuation series that feeds the % change
+  // (the sparkline series). Falling back to current_cash only when the series
+  // is empty guarantees the two numbers can never disagree on source.
   const totalEquity = sparkSeries.length > 0 ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
@@ -584,11 +587,11 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-base font-semibold tabular-nums">
-              {portfolio.currency} {totalEquity.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              total equity
+              Total equity
+            </div>
+            <div className="text-2xl font-bold leading-tight tabular-nums">
+              {portfolio.currency} {totalEquity.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="mt-1 text-xs tabular-nums text-muted-foreground">
               {portfolio.currency} {Number(portfolio.current_cash).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
