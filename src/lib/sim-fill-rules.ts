@@ -30,6 +30,17 @@ export interface SimFillInput {
   quantity: number;
   hasBrokerOrderId: boolean;
   now?: number;
+  /**
+   * Market-hours awareness. When `false` we know the venue has not been open
+   * at any point between submission and `now`, so we cannot presume the
+   * order filled — it's simply queued for the next session. When `true` or
+   * omitted (backwards-compat default) the original age-based rules apply.
+   */
+  marketHadOpenPeriod?: boolean;
+  /** Short venue label used in the "keep" reason for logs/UI (e.g. "LSE"). */
+  venueLabel?: string;
+  /** ISO of the next scheduled session open — surfaced in the reason so the audit trail explains the wait. */
+  nextOpenIso?: string | null;
 }
 
 export const SIM_PRESUMED_FILL_AFTER_MS = 2 * 60 * 1000; // 2 minutes
