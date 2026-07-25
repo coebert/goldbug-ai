@@ -162,6 +162,17 @@ export type RiskConfig = {
   alpha_bonus_cap: number;
   risk_parity_enabled: boolean;
   risk_parity_nav_cap: number;
+  // Phase 6 — execution alpha (slicing + time-of-day filter).
+  execution_slicing_enabled: boolean;
+  execution_max_child_notional: number;
+  execution_participation_cap: number; // fraction of 20d ADV per child
+  tod_filter_enabled: boolean;
+  tod_avoid_open_min: number;
+  tod_avoid_close_min: number;
+  tod_open_haircut: number; // 0..1 multiplier inside soft open window
+  tod_close_haircut: number;
+  tod_hard_block_open_min: number;
+  tod_hard_block_close_min: number;
 };
 
 
@@ -203,6 +214,16 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   alpha_bonus_cap: 1.5,
   risk_parity_enabled: false,
   risk_parity_nav_cap: 0.2,
+  execution_slicing_enabled: true,
+  execution_max_child_notional: 5_000,
+  execution_participation_cap: 0.05,
+  tod_filter_enabled: true,
+  tod_avoid_open_min: 15,
+  tod_avoid_close_min: 15,
+  tod_open_haircut: 0.5,
+  tod_close_haircut: 0.5,
+  tod_hard_block_open_min: 0,
+  tod_hard_block_close_min: 0,
 };
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
@@ -317,6 +338,16 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("alpha_bonus_cap", 1, 3);
   bool("risk_parity_enabled");
   num("risk_parity_nav_cap", 0.01, 1);
+  bool("execution_slicing_enabled");
+  num("execution_max_child_notional", 100, 1_000_000);
+  num("execution_participation_cap", 0.001, 0.5);
+  bool("tod_filter_enabled");
+  num("tod_avoid_open_min", 0, 120);
+  num("tod_avoid_close_min", 0, 120);
+  num("tod_open_haircut", 0, 1);
+  num("tod_close_haircut", 0, 1);
+  num("tod_hard_block_open_min", 0, 120);
+  num("tod_hard_block_close_min", 0, 120);
   return out;
 }
 
