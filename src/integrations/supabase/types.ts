@@ -816,6 +816,108 @@ export type Database = {
         }
         Relationships: []
       }
+      order_reconcile_events: {
+        Row: {
+          age_ms: number | null
+          avg_fill_price: number | null
+          broker: string
+          broker_order_id: string | null
+          created_at: string
+          env: string
+          filled_quantity: number
+          id: string
+          new_status: string
+          occurred_at: string
+          order_id: string
+          order_type: string | null
+          outcome: string
+          portfolio_id: string
+          previous_status: string
+          reason: string | null
+          reason_code: string
+          saxo_filled_at: string | null
+          saxo_reason: string | null
+          saxo_response: Json | null
+          saxo_status: string | null
+          side: string | null
+          source: string
+          submitted_at: string | null
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          age_ms?: number | null
+          avg_fill_price?: number | null
+          broker?: string
+          broker_order_id?: string | null
+          created_at?: string
+          env?: string
+          filled_quantity?: number
+          id?: string
+          new_status: string
+          occurred_at?: string
+          order_id: string
+          order_type?: string | null
+          outcome: string
+          portfolio_id: string
+          previous_status: string
+          reason?: string | null
+          reason_code: string
+          saxo_filled_at?: string | null
+          saxo_reason?: string | null
+          saxo_response?: Json | null
+          saxo_status?: string | null
+          side?: string | null
+          source?: string
+          submitted_at?: string | null
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          age_ms?: number | null
+          avg_fill_price?: number | null
+          broker?: string
+          broker_order_id?: string | null
+          created_at?: string
+          env?: string
+          filled_quantity?: number
+          id?: string
+          new_status?: string
+          occurred_at?: string
+          order_id?: string
+          order_type?: string | null
+          outcome?: string
+          portfolio_id?: string
+          previous_status?: string
+          reason?: string | null
+          reason_code?: string
+          saxo_filled_at?: string | null
+          saxo_reason?: string | null
+          saxo_response?: Json | null
+          saxo_status?: string | null
+          side?: string | null
+          source?: string
+          submitted_at?: string | null
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_reconcile_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "live_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_reconcile_events_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_slices: {
         Row: {
           created_at: string
