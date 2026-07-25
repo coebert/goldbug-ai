@@ -173,10 +173,70 @@ export const getFxHealth = createServerFn({ method: "POST" })
       }
     }
 
+    // Time-bucketed availability timeline (hourly) so the UI can render a
+    // sparkline of provider availability, staleness, and fallback usage.
+    const bucketMs = 3600_000; // 1h
+    const now = Date.now();
+    const startMs = now - data.sinceHours * bucketMs;
+    const buckets = new Map<
+      number,
+      { hour: string; ok: number; cache: number; stale: number; fallback: number; total: number }
+    >();
+    for (let t = Math.floor(startMs / bucketMs) * bucketMs; t <= now; t += bucketMs) {
+      buckets.set(t, {
+        hour: new Date(t).toISOString(),
+        ok: 0,
+        cache: 0,
+        stale: 0,
+        fallback: 0,
+        total: 0,
+      });
+    }
+    for (const r of rows) {
+      const t = new Date(r.created_at as string).getTime();
+      const key = Math.floor(t / bucketMs) * bucketMs;
+      const b = buckets.get(key);
+      if (!b) continue;
+      const resp = (r.response ?? {}) as { source?: string; stale?: boolean };
+      const source = classify(resp.source ?? null);
+      b.total += 1;
+      if (source === "yahoo" || source === "frankfurter") b.ok += 1;
+      else if (source === "fallback") b.fallback += 1;
+      else if (source === "cache-stale" || resp.stale) b.stale += 1;
+      else if (source === "cache") b.cache += 1;
+    }
+    const timeline = Array.from(buckets.values()).sort((a, b) =>
+      a.hour.localeCompare(b.hour),
+    );
+
+    // Availability rollups across window.
+    const totals = timeline.reduce(
+      (acc, b) => {
+        acc.ok += b.ok;
+        acc.cache += b.cache;
+        acc.stale += b.stale;
+        acc.fallback += b.fallback;
+        acc.total += b.total;
+        return acc;
+      },
+      { ok: 0, cache: 0, stale: 0, fallback: 0, total: 0 },
+    );
+    const pct = (n: number) =>
+      totals.total > 0 ? Math.round((n / totals.total) * 1000) / 10 : 0;
+    const availability = {
+      liveProviderPct: pct(totals.ok),
+      cachePct: pct(totals.cache),
+      stalePct: pct(totals.stale),
+      fallbackPct: pct(totals.fallback),
+      total: totals.total,
+    };
+
     return {
       overall,
       windowHours: data.sinceHours,
       pairs,
       providerCounts,
+      timeline,
+      availability,
     };
   });

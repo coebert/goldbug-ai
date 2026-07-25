@@ -6,6 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 interface Props {
   portfolioId: string;
@@ -89,6 +98,12 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
           <p className="text-sm text-muted-foreground">
             No cross-currency FX activity in the window — nothing to monitor.
           </p>
+        )}
+        {data && (
+          <>
+            <AvailabilityStrip availability={data.availability} />
+            <TimelineChart timeline={data.timeline} />
+          </>
         )}
         {data && data.pairs.length > 0 && (
           <>
@@ -190,5 +205,140 @@ function ProviderChip({
     <Badge variant="outline" className={cls}>
       {label}: {n}
     </Badge>
+  );
+}
+
+type Availability = {
+  liveProviderPct: number;
+  cachePct: number;
+  stalePct: number;
+  fallbackPct: number;
+  total: number;
+};
+
+function AvailabilityStrip({ availability }: { availability: Availability }) {
+  if (availability.total === 0) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
+        No FX captures in window yet.
+      </div>
+    );
+  }
+  const items = [
+    {
+      label: "Live provider",
+      value: availability.liveProviderPct,
+      cls: "text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      label: "Cache",
+      value: availability.cachePct,
+      cls: "text-muted-foreground",
+    },
+    {
+      label: "Stale",
+      value: availability.stalePct,
+      cls: "text-amber-600 dark:text-amber-400",
+    },
+    {
+      label: "Fallback",
+      value: availability.fallbackPct,
+      cls: "text-destructive",
+    },
+  ];
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {items.map((it) => (
+          <div
+            key={it.label}
+            className="rounded-lg border bg-card p-2 text-center"
+          >
+            <div className={`text-lg font-semibold tabular-nums ${it.cls}`}>
+              {it.value.toFixed(1)}%
+            </div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {it.label}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div
+        className="mt-2 flex h-2 w-full overflow-hidden rounded-full border bg-muted"
+        aria-label="FX source share"
+      >
+        <div
+          className="bg-emerald-500"
+          style={{ width: `${availability.liveProviderPct}%` }}
+        />
+        <div
+          className="bg-muted-foreground/40"
+          style={{ width: `${availability.cachePct}%` }}
+        />
+        <div
+          className="bg-amber-500"
+          style={{ width: `${availability.stalePct}%` }}
+        />
+        <div
+          className="bg-destructive"
+          style={{ width: `${availability.fallbackPct}%` }}
+        />
+      </div>
+      <div className="mt-1 text-[10px] text-muted-foreground">
+        {availability.total} FX captures analysed
+      </div>
+    </div>
+  );
+}
+
+type TimelineBucket = {
+  hour: string;
+  ok: number;
+  cache: number;
+  stale: number;
+  fallback: number;
+  total: number;
+};
+
+function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
+  const data = timeline.map((b) => ({
+    ...b,
+    label: new Date(b.hour).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      timeZone: "Europe/London",
+    }),
+  }));
+  const hasAny = data.some((b) => b.total > 0);
+  if (!hasAny) return null;
+  return (
+    <div className="rounded-lg border p-2">
+      <div className="mb-1 px-1 text-xs font-medium">
+        Provider availability by hour
+      </div>
+      <div className="h-32 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10 }}
+              interval="preserveStartEnd"
+            />
+            <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+            <Tooltip
+              contentStyle={{ fontSize: 11 }}
+              labelFormatter={(_, payload) => {
+                const iso = payload?.[0]?.payload?.hour as string | undefined;
+                return iso ? formatUkTime(iso) : "";
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 10 }} iconSize={8} />
+            <Bar dataKey="ok" name="Live" stackId="s" fill="hsl(var(--chart-2, 142 71% 45%))" />
+            <Bar dataKey="cache" name="Cache" stackId="s" fill="hsl(var(--muted-foreground))" />
+            <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
+            <Bar dataKey="fallback" name="Fallback" stackId="s" fill="hsl(var(--destructive))" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
