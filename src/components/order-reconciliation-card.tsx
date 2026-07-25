@@ -113,6 +113,16 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
               {r.label}
             </Button>
           ))}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => backfill.mutate()}
+            disabled={backfill.isPending}
+            title="Re-check every open/error order against Saxo over the last 60 days"
+          >
+            <PlayCircle className={`mr-1 h-3.5 w-3.5 ${backfill.isPending ? "animate-pulse" : ""}`} />
+            {backfill.isPending ? "Backfilling…" : "Backfill"}
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
             <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} />
           </Button>
