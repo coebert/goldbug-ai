@@ -322,6 +322,8 @@ ${HISTORICAL_PLAYBOOK}
 
 ${HEDGE_FUND_PLAYBOOK}
 
+${args.fxSystemBlock ?? ""}
+
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
 Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
 ${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== END VARIANT ===` : ""}`;
@@ -343,6 +345,8 @@ Cash: ${args.cashValue.toFixed(2)} ${args.portfolio.currency}
 Current holdings: ${JSON.stringify(holdingsSummary)}
 
 ${budgetBlock}
+
+${args.fxUserBlock ?? ""}
 
 Candidate assets (extended technicals, sentiment, cooldown flag):
 ${JSON.stringify(args.features, null, 2)}
@@ -371,6 +375,7 @@ Return:
       price_change    — recent price change (5d/30d) AND volume-weighted momentum
       news_sentiment  — weighted LLM sentiment for this symbol, INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL or skip.
       volatility      — 20d vol, ATR%, Bollinger width
+- fx_conversions (OPTIONAL, only if the FX WALLET & EXPOSURE block above is present and the FX CIRCUIT is closed): array of { from_ccy, to_ccy, amount_percent (1..100 of the from-currency balance), reason }. Follow the FX STRATEGY playbook. Omit or return [] if no FX action is warranted.
 If no action is warranted, return an empty orders array.`;
 
 
