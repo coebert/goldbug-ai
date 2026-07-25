@@ -592,8 +592,17 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
           </div>
         </div>
 
-        {/* Row 2 — Trend + balance */}
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3">
+        {/* Row 2 — Trend + balance. `aria-busy` marks the whole block as
+            refreshing so assistive tech users know the values are being
+            revalidated in the background. We deliberately keep the
+            existing headline + % pill visible (SWR): both share the same
+            snapshot in `sparkSeries`, so they can never diverge. */}
+        <div
+          className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3 transition-opacity ${isRefreshingEquity ? "opacity-90" : ""}`}
+          aria-busy={isRefreshingEquity || undefined}
+          data-refreshing={isRefreshingEquity ? "true" : undefined}
+          data-testid="portfolio-row-equity"
+        >
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Sparkline values={values} width={120} height={32} />
