@@ -140,6 +140,7 @@ function Home() {
 
 
   const [includeDeposits, setIncludeDeposits] = useIncludeDeposits();
+  const [equityDecimals, setEquityDecimals] = useEquityDecimals();
 
   const todaySummary = useMemo(() => {
     const series = (equityQ.data?.series ?? []) as Array<Record<string, unknown> & { date: string }>;
