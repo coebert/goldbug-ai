@@ -8,8 +8,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Wrench } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { JargonText } from "@/components/jargon-text";
 import { getPrecheckCashRejects } from "@/lib/precheck-alerts.functions";
 import { cn } from "@/lib/utils";
