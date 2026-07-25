@@ -355,7 +355,7 @@ function ModeChart({
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </SectionCardBody>
+    </SectionCard>
   );
 }
