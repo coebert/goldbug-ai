@@ -446,13 +446,12 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
   // Total equity MUST use the same valuation series that feeds the % change
   // (the sparkline series). Falling back to current_cash only when the series
   // is empty guarantees the two numbers can never disagree on source.
-  const hasSeries = sparkSeries.length > 0;
-  const totalEquity = hasSeries ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
+  const totalEquity = sparkSeries.length > 0 ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
   // Dedicated states so the headline and % pill can never render
   // mismatched (loaded £ + stale/empty %, or vice versa). Both slots
-  // pivot on the SAME (isLoadingEquity, hasSeries) inputs.
-  const equityLoading = isLoadingEquity && !hasSeries;
-  const equityEmpty = !isLoadingEquity && !hasSeries;
+  // pivot on the SAME (isLoadingEquity, sparkSeries) inputs.
+  const equityLoading = isLoadingEquity && sparkSeries.length === 0;
+  const equityEmpty = !isLoadingEquity && sparkSeries.length === 0;
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
