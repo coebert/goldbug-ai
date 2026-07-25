@@ -176,7 +176,7 @@ describe("Portfolio card headline: Skeleton → formatted GBP transition", () =>
     const src = readFileSync(resolve(__dirname, "../index.tsx"), "utf8");
     // Loading branch: skeleton with h-8, shimmer variant, matching testid.
     expect(src).toMatch(
-      /data-testid="total-equity-loading"[\s\S]*?data-testid="total-equity-skeleton"[\s\S]*?variant="shimmer"[\s\S]*?h-8/,
+      /data-testid="total-equity-loading"[\s\S]*?variant="shimmer"[\s\S]*?data-testid="total-equity-skeleton"[\s\S]*?h-8/,
     );
     // Loaded branch: same formatter + decimals prop pair used by the
     // harness above.
