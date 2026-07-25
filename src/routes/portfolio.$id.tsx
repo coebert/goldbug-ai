@@ -1567,6 +1567,8 @@ function SignalImportance({ weights }: { weights: SignalWeights }) {
 }
 
 function OrderPanel({
+  decisionId,
+  orderIndex,
   order,
   signal,
   news,
@@ -1574,6 +1576,8 @@ function OrderPanel({
   currency,
   weights,
 }: {
+  decisionId: string;
+  orderIndex: number;
   order: ExecutedRow;
   signal?: SignalRow;
   news: NewsRow[];
