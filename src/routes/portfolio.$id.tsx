@@ -99,8 +99,8 @@ import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 
 
-type PortfolioTab = "overview" | "trades" | "decisions" | "risk" | "diagnostics" | "reports";
-const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk", "diagnostics", "reports"];
+type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "risk" | "diagnostics" | "reports";
+const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "audit", "risk", "diagnostics", "reports"];
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
