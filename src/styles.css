@@ -402,4 +402,22 @@
   }
 }
 
+/* Phase 6 — Density modes. Comfortable (default) keeps the browser
+ * root at 16px. Compact drops the root to 14.5px so every rem-based
+ * padding, gap and row height scales down proportionally. */
+html[data-density="compact"] {
+  font-size: 14.5px;
+}
+
+/* Phase 6 — Frosted floating tab bar. */
+@utility floating-nav {
+  background-color: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  box-shadow:
+    0 12px 32px -12px color-mix(in oklab, black 65%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--border) 70%, transparent);
+}
+
+
 

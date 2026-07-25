@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { GlobalShortcutsHost } from "@/lib/keyboard-shortcuts";
+import { DensityHost } from "@/lib/use-density";
 
 function NotFoundComponent() {
   return (
