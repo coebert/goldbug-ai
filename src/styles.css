@@ -326,3 +326,53 @@
     font-family: var(--font-sans);
   }
 }
+
+
+/* Phase 4 — shared data-table primitives. Every dense list on the
+ * app (trades table, holdings, decisions, run history) should
+ * eventually adopt these so column alignment, header stickiness and
+ * zebra striping stay consistent. Numeric columns still need the
+ * `num` utility for tabular figures. */
+@utility data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+
+  & thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--color-surface-sunken);
+    color: var(--color-muted-foreground);
+    font-weight: 500;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  & tbody td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
+    vertical-align: middle;
+  }
+
+  & tbody tr:nth-child(even) td {
+    background-color: color-mix(in oklab, var(--color-muted) 40%, transparent);
+  }
+
+  & tbody tr:hover td {
+    background-color: color-mix(in oklab, var(--color-surface-3) 70%, transparent);
+  }
+}
+
+/* Right-align cells that hold numeric data. Combine with `num` for
+ * tabular figures: <td class="data-num num">…</td>. */
+@utility data-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
