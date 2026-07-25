@@ -1476,6 +1476,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
               requested: aiFxRequested,
               applied: aiFxApplied?.applied ?? [],
               base_cash_delta: aiFxApplied?.baseCashDelta ?? 0,
+              intents_raw: rawIntents,
+              intents_compiled: compiledIntents.map((c) => ({
+                intent: c.intent,
+                order: c.order ?? null,
+                skipped: c.skipped ?? null,
+                notional_base: c.notionalBase,
+              })),
             }
           : { skipped: true },
       },
