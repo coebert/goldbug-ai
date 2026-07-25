@@ -206,11 +206,13 @@ export function compileFxIntents(
       continue;
     }
 
-    // Apply per-currency single-tick cap (40% of `from` wallet).
-    const bal = ctx.wallet[from] ?? 0;
-    const perCurCap = bal * (g.perCurrencyMaxPct / 100);
-    if (bal > 0 && amountFromNative > perCurCap) {
-      amountFromNative = perCurCap;
+    // Per-currency single-tick cap (40% of `from` wallet) — applies to
+    // non-base currencies only. For the base currency the constraint is
+    // simply "don't spend what we don't have", handled below.
+    if (from !== ctx.baseCcy) {
+      const bal = ctx.wallet[from] ?? 0;
+      const perCurCap = bal * (g.perCurrencyMaxPct / 100);
+      if (bal > 0 && amountFromNative > perCurCap) amountFromNative = perCurCap;
     }
 
     // Convert to base for guardrail comparisons.
