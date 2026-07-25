@@ -12,6 +12,14 @@ type Cached = { rate: number; ts: number };
 const cache = new Map<string, Cached>();
 const TTL_MS = 10 * 60 * 1000;
 
+async function closeBody(res: Response): Promise<void> {
+  try {
+    await res.body?.cancel();
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 export interface FxResult {
   from: string;
   to: string;
@@ -39,7 +47,10 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
       headers: { "user-agent": "Mozilla/5.0 (aegis-fx)" },
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) throw new Error(`yahoo ${res.status}`);
+    if (!res.ok) {
+      await closeBody(res);
+      throw new Error(`yahoo ${res.status}`);
+    }
     const json = (await res.json()) as {
       quoteResponse?: { result?: Array<{ regularMarketPrice?: number }> };
     };
@@ -53,7 +64,10 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
     try {
       const fUrl = `https://api.frankfurter.dev/v1/latest?base=${f}&symbols=${t}`;
       const res = await fetch(fUrl, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) throw new Error(`frankfurter ${res.status}`);
+      if (!res.ok) {
+        await closeBody(res);
+        throw new Error(`frankfurter ${res.status}`);
+      }
       const json = (await res.json()) as { rates?: Record<string, number> };
       const rate = json?.rates?.[t];
       if (typeof rate === "number" && rate > 0 && Number.isFinite(rate)) {

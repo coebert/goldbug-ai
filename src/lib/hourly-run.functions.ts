@@ -16,7 +16,7 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
     const { runHourlyCycle, RunInProgressError } = await import("@/lib/hourly-run.server");
     let obj: Record<string, unknown>;
     try {
-      obj = await runHourlyCycle({ triggeredBy: "manual" });
+      obj = await runHourlyCycle({ triggeredBy: "manual" }) as unknown as Record<string, unknown>;
     } catch (error) {
       if (error instanceof RunInProgressError) {
         const err = new Error(error.message) as Error & { code?: string; heldBy?: string | null; ageMs?: number | null };
