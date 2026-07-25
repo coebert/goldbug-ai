@@ -256,15 +256,14 @@ export function compileFxIntents(
       tiltAddedBase += notionalBase;
     }
 
-    // For pre_fund / close_hedge, cap by base balance (can't convert what we don't have).
+    // Base-ccy source: cap by available balance (partial fund is fine — the
+    // buy trimmer downstream will size the equity order to the funded amount).
     if (from === ctx.baseCcy) {
       const baseBal = ctx.wallet[from] ?? 0;
-      const perCurBaseCap = baseBal * (g.perCurrencyMaxPct / 100);
-      if (amountFromNative > perCurBaseCap) amountFromNative = perCurBaseCap;
       if (amountFromNative > baseBal) amountFromNative = baseBal;
-      notionalBase = amountFromNative; // from-ccy is base
+      notionalBase = amountFromNative;
       if (notionalBase < g.minNotionalBase) {
-        out.push(skip(`base ${ctx.baseCcy} wallet too low for intent (has ${baseBal.toFixed(2)})`));
+        out.push(skip(`base ${ctx.baseCcy} wallet too low (${baseBal.toFixed(2)} < min ${g.minNotionalBase})`));
         continue;
       }
     }
