@@ -26,8 +26,10 @@ const MONEY_FMT = new Intl.NumberFormat("en-GB", {
 /** Format a bare number as "1,234.50" (no currency prefix). */
 export function formatMoneyAmount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  const safe = value === 0 ? 0 : value; // collapse -0
-  return MONEY_FMT.format(safe);
+  const out = MONEY_FMT.format(value === 0 ? 0 : value);
+  // Strip a "-" prefix that only sits in front of an all-zero body
+  // (e.g. -0.0001 rounds to "-0.00" — we render it as "0.00").
+  return out === "-0.00" ? "0.00" : out;
 }
 
 /**
