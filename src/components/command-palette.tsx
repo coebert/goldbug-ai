@@ -88,6 +88,7 @@ export function CommandPalette({
           "hidden h-9 min-w-[220px] justify-between gap-3 border-border/70 bg-surface-sunken text-muted-foreground hover:text-foreground md:inline-flex"
         }
         aria-label="Open command palette (Ctrl+K)"
+        data-shortcut="command-palette-trigger"
       >
         <span className="flex items-center gap-2 text-sm">
           <svg
