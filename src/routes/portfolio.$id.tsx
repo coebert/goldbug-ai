@@ -97,8 +97,14 @@ import {
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
-import { BacktestResultsCard } from "@/components/backtest-results-card";
-import { BacktestRunHistoryCard, saveRun as saveBacktestRun } from "@/components/backtest-run-history-card";
+const BacktestResultsCard = lazy(() =>
+  import("@/components/backtest-results-card").then((m) => ({ default: m.BacktestResultsCard })),
+);
+const BacktestRunHistoryCard = lazy(() =>
+  import("@/components/backtest-run-history-card").then((m) => ({ default: m.BacktestRunHistoryCard })),
+);
+import { saveRun as saveBacktestRun } from "@/lib/backtest-run-save";
+
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
 
 
