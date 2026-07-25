@@ -97,6 +97,7 @@ import {
   evaluateEventBlackout,
   reentryLockoutDays,
 } from "./exits";
+import { scoreUniverse, formatAlphaPriorsForPrompt } from "./alpha";
 import type { Database } from "@/integrations/supabase/types";
 
 
@@ -699,7 +700,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
         orders: [],
       }
-    : await callAiForDecision({
+    : await (async () => {
+        const alphaScores = scoreUniverse(features, effectiveRegime.regime);
+        const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
+        return callAiForDecision({
         portfolio,
         holdings: holdings ?? [],
         cashValue: cash,
@@ -727,7 +731,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         minTradeValue,
         fxSystemBlock: fxContext?.block ?? null,
         fxUserBlock: fxContext?.contextBlock ?? null,
+        alphaPriors,
       });
+      })();
+
 
 
   // Feature lookup for later use (volatility sizing, asset class)
