@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EQUITY_DECIMALS_MAX, EQUITY_DECIMALS_MIN } from "@/lib/use-equity-decimals";
+import { useDensity } from "@/lib/use-density";
 
 /**
  * Dashboard-level display settings. Consolidates the previously-inline
@@ -41,12 +42,13 @@ export function DashboardSettings({
     { length: EQUITY_DECIMALS_MAX - EQUITY_DECIMALS_MIN + 1 },
     (_, i) => EQUITY_DECIMALS_MIN + i,
   );
+  const [density, setDensity] = useDensity();
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 gap-1.5" aria-label="Dashboard display settings">
           <Settings2 className="h-3.5 w-3.5" /> Display
-          {(includeDeposits || focusMode) && (
+          {(includeDeposits || focusMode || density === "compact") && (
             <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
           )}
         </Button>
@@ -95,6 +97,24 @@ export function DashboardSettings({
                   {n}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+          <Label htmlFor="settings-density" className="text-sm">
+            Density
+          </Label>
+          <Select
+            value={density}
+            onValueChange={(v) => setDensity(v === "compact" ? "compact" : "comfortable")}
+          >
+            <SelectTrigger id="settings-density" className="h-8 w-32 text-xs" aria-label="UI density">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="comfortable">Comfortable</SelectItem>
+              <SelectItem value="compact">Compact</SelectItem>
             </SelectContent>
           </Select>
         </div>

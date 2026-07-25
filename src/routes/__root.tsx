@@ -149,6 +149,7 @@ function RootComponent() {
       </div>
       <MobileTabBar />
       <GlobalShortcutsHost />
+      <DensityHost />
       <Toaster />
     </QueryClientProvider>
   );
