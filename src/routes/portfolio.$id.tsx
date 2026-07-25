@@ -1567,6 +1567,18 @@ type SignalRow = {
   change30d: number | null;
 };
 
+type ExecutedLiquidity = {
+  adv_20d_usd: number | null;
+  atr_pct: number | null;
+  spread_bps: number | null;
+  est_slippage_bps: number;
+  est_turnover_pct_adv: number | null;
+  liquidity_cap_spend: number | null;
+  trim_fraction: number;
+  rejection_score: number;
+  rejection_bucket: "low" | "medium" | "high";
+};
+
 type ExecutedRow = {
   symbol: string;
   side: "buy" | "sell";
@@ -1575,6 +1587,7 @@ type ExecutedRow = {
   value: number;
   reason: string;
   rejected?: string;
+  liquidity?: ExecutedLiquidity;
 };
 
 type NewsRow = { headline: string; source: string | null; sentiment?: number | null; source_weight?: number | null };
