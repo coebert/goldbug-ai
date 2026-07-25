@@ -404,6 +404,8 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       }
 
       // decision.kind === "keep"
+      const keptForClosedMarket = !hadOpen && orderType === "market";
+      const keptForClosedMarketLimit = !hadOpen && orderType !== "market";
       summary.unknown++;
       summary.rows.push({
         orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
@@ -416,10 +418,23 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         source,
         newStatus: row.status as string,
         outcome: "unknown",
-        reasonCode: "sim_keep_awaiting_broker",
+        reasonCode: keptForClosedMarketLimit
+          ? "sim_defer_stale_market_closed"
+          : keptForClosedMarket
+            ? "sim_keep_market_closed"
+            : "sim_keep_awaiting_broker",
         reason: decision.reason,
         saxoStatus: "absent_from_open_list",
-        saxoResponse: { workingListError, histError, decision },
+        saxoResponse: {
+          workingListError, histError, decision,
+          marketStatus: {
+            venue: marketStatus.venue,
+            phase: marketStatus.phase,
+            isOpen: marketStatus.isOpen,
+            nextOpenIso: marketStatus.nextOpenIso,
+            marketHadOpenPeriodSinceSubmit: hadOpen,
+          },
+        },
       });
       continue;
     }
