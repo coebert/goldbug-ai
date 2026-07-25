@@ -1399,6 +1399,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
               final_holdings: brokerSimGuard.simulation.finalState.holdings,
             }
           : { skipped: true },
+        ai_fx: fxContext
+          ? {
+              active: fxContext.active,
+              circuit_open: fxContext.circuitOpen,
+              circuit_reason: fxContext.circuitReason,
+              base_ccy: fxContext.baseCcy,
+              exposure_by_ccy: fxContext.exposureByCcy,
+              requested: aiFxRequested,
+              applied: aiFxApplied?.applied ?? [],
+              base_cash_delta: aiFxApplied?.baseCashDelta ?? 0,
+            }
+          : { skipped: true },
       },
       regime: regime ?? null,
       learning: {
