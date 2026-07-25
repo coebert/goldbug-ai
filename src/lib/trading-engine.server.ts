@@ -1146,7 +1146,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      const qty = Number(cur.quantity) * pct;
+      let qty = Number(cur.quantity) * pct;
+      // Phase 6 — discretionary AI sell: apply TOD gate/haircut and slice plan.
+      const eaPreview = applyExecAlphaSell(meta.symbol, qty * price, price);
+      if (!eaPreview.allow) {
+        executed.push({
+          symbol: meta.symbol, side: "sell", quantity: 0, price, value: 0,
+          reason: order.reason, rejected: `TOD block: ${eaPreview.tod?.reason ?? "auction window"}`,
+          tod: eaPreview.tod,
+        });
+        continue;
+      }
+      // Scale qty by TOD multiplier if applied (adjNotional/(qty*price)).
+      if (eaPreview.tod && eaPreview.tod.multiplier < 1) {
+        qty = qty * eaPreview.tod.multiplier;
+      }
       const value = qty * price;
       workingCash += value;
       const remaining = Number(cur.quantity) - qty;
@@ -1165,13 +1179,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           );
         }
       }
+      // Recompute slice plan against the actual executed notional so telemetry matches fills.
+      const eaFinal = applyExecAlphaSell(meta.symbol, value, price);
       executed.push({
         symbol: meta.symbol,
         side: "sell",
         quantity: qty,
         price,
         value,
-        reason: order.reason,
+        reason: eaPreview.tod && eaPreview.tod.multiplier < 1
+          ? `${order.reason} [tod x${eaPreview.tod.multiplier.toFixed(2)}]`
+          : order.reason,
+        tod: eaPreview.tod,
+        slice_plan: eaFinal.slicePlan,
       });
     } else {
       // BUY
