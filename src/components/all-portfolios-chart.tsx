@@ -3,10 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAllPortfoliosEquity } from "@/lib/trading.functions";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  SectionCard,
+  SectionCardBody,
+  SectionCardHeader,
+} from "@/components/ui/section-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { ChartSkeleton } from "@/components/ui/card-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { LineChart, RefreshCw } from "lucide-react";
 import {
   Area,
   CartesianGrid,
@@ -65,7 +73,48 @@ export function AllPortfoliosChart() {
   const simPortfolios = portfolios.filter((p) => p.mode !== "live_prod");
   const realPortfolios = portfolios.filter((p) => p.mode === "live_prod");
 
-  if (!q.data || portfolios.length === 0) return null;
+  if (q.isError) {
+    return (
+      <SectionCard>
+        <SectionCardHeader
+          icon={<LineChart className="h-4 w-4" />}
+          title="Portfolio equity"
+          description="Combined equity across every portfolio, split by mode."
+        />
+        <SectionCardBody>
+          <ErrorState
+            description={
+              q.error instanceof Error
+                ? q.error.message
+                : "The equity feed returned an error."
+            }
+            onRetry={() => q.refetch()}
+            retrying={q.isFetching}
+          />
+        </SectionCardBody>
+      </SectionCard>
+    );
+  }
+
+  if (q.isLoading || !q.data) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[0, 1].map((i) => (
+          <SectionCard key={i}>
+            <SectionCardHeader
+              icon={<LineChart className="h-4 w-4" />}
+              title={i === 0 ? "Simulated portfolios" : "Real-money portfolios"}
+            />
+            <SectionCardBody>
+              <ChartSkeleton height="280px" />
+            </SectionCardBody>
+          </SectionCard>
+        ))}
+      </div>
+    );
+  }
+
+  if (portfolios.length === 0) return null;
 
   const allDeposits = q.data.deposits ?? [];
   const simIds = new Set(simPortfolios.map((p) => p.id));
@@ -175,36 +224,38 @@ function ModeChart({
   const fmt = (v: number) => `${currency}${v.toFixed(0)}`;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Badge variant={badgeTone}>{badgeLabel}</Badge>
-              <CardTitle className="text-base">{title}</CardTitle>
-            </div>
-            <CardDescription className="mt-1">{description}</CardDescription>
-          </div>
+    <SectionCard>
+      <SectionCardHeader
+        badge={<Badge variant={badgeTone}>{badgeLabel}</Badge>}
+        title={title}
+        description={description}
+        action={
           <ToggleGroup
             type="single"
             size="sm"
             value={range}
             onValueChange={(v) => v && setRange(v as Range)}
-            className="shrink-0"
           >
             {RANGE_OPTS.map((r) => (
-              <ToggleGroupItem key={r.value} value={r.value} className="px-2.5 text-xs">
+              <ToggleGroupItem
+                key={r.value}
+                value={r.value}
+                aria-label={`${r.label} range`}
+                className="px-2.5 text-xs"
+              >
                 {r.label}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-        </div>
-      </CardHeader>
-      <CardContent>
+        }
+      />
+      <SectionCardBody>
         {portfolios.length === 0 ? (
-          <div className="flex h-[280px] items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
-            No {badgeLabel === "REAL" ? "real-money" : "simulated"} portfolios yet.
-          </div>
+          <EmptyState
+            icon={<RefreshCw />}
+            title={`No ${badgeLabel === "REAL" ? "real-money" : "simulated"} portfolios yet`}
+            description="Create one from the dashboard to see its equity curve here."
+          />
         ) : (
           <>
             <div className="mb-3">
@@ -304,7 +355,7 @@ function ModeChart({
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </SectionCardBody>
+    </SectionCard>
   );
 }
