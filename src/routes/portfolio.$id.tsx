@@ -790,15 +790,20 @@ function PortfolioPage() {
             )}
 
             {backtestRunToken > 0 && lastBtDays != null && (
-              <BacktestResultsCard
-                portfolioId={id}
-                days={lastBtDays}
-                runToken={backtestRunToken}
-                currency={p?.currency ?? "USD"}
-              />
+              <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                <BacktestResultsCard
+                  portfolioId={id}
+                  days={lastBtDays}
+                  runToken={backtestRunToken}
+                  currency={p?.currency ?? "USD"}
+                />
+              </Suspense>
             )}
 
-            <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
+            <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+              <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
+            </Suspense>
+
 
 
 
