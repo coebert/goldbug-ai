@@ -8,8 +8,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Wrench } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { JargonText } from "@/components/jargon-text";
 import { getPrecheckCashRejects } from "@/lib/precheck-alerts.functions";
 import { cn } from "@/lib/utils";
@@ -83,6 +84,21 @@ export function PrecheckCashAlertBanner({
           </li>
           <li>Pause the portfolio if you're actively investigating.</li>
         </ul>
+        <div className="mt-3">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="border-amber-500/60 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 hover:text-amber-50"
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("lovable:reconcile-cash", { detail: { portfolioId } }),
+              );
+            }}
+          >
+            <Wrench className="mr-1 h-4 w-4" /> Reconcile cash now
+          </Button>
+        </div>
       </AlertDescription>
     </Alert>
   );
