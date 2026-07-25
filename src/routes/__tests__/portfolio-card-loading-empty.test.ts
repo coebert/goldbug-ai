@@ -56,7 +56,7 @@ describe("portfolio card — dedicated loading/empty rendering", () => {
     // condition (e.g. `isLoadingEquity && !sparkSeries.length`) that
     // could disagree with the % pill's condition.
     expect(SOURCE).toMatch(
-      /\{equityLoading \? \(\s*<>\s*<Skeleton\s+data-testid="total-equity-skeleton"/,
+      /\{equityLoading \? \(\s*<div[\s\S]{0,400}data-testid="total-equity-loading"[\s\S]{0,600}data-testid="total-equity-skeleton"/,
     );
   });
 
