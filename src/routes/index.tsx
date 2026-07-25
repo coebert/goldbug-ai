@@ -15,7 +15,6 @@ import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
 import { computeModeSummary } from "@/lib/mode-summary";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
-import { computeCardRangePct } from "@/lib/card-range-pct";
 import { deriveCardEquity } from "@/lib/derive-card-equity";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
 import { Skeleton } from "@/components/ui/skeleton";
