@@ -115,10 +115,13 @@ const OrderSchema = z.object({
 });
 
 
+import { FxConversionOrderSchema } from "./ai-fx-conversions.server";
+
 const DecisionSchema = z.object({
   briefing: z.string(),
   rationale: z.string(),
   orders: z.array(OrderSchema),
+  fx_conversions: z.array(FxConversionOrderSchema).optional(),
 });
 
 export type DecisionOutput = z.infer<typeof DecisionSchema>;
@@ -238,6 +241,8 @@ export async function callAiForDecision(args: {
   perSymbolBudget?: number;
   minTradeValue?: number;
   variantSuffix?: string | null;
+  fxSystemBlock?: string | null;
+  fxUserBlock?: string | null;
 }): Promise<DecisionOutput> {
 
   const key = process.env.LOVABLE_API_KEY;
