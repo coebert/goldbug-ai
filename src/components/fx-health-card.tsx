@@ -99,6 +99,35 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
             No cross-currency FX activity in the window — nothing to monitor.
           </p>
         )}
+        {data?.circuit?.open && (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            <div className="font-semibold">
+              Cross-currency buy circuit: OPEN
+            </div>
+            <p className="mt-1 text-xs">
+              New cross-currency buys are paused. Auto-resume when a live FX
+              provider (Yahoo / Frankfurter) capture arrives.
+              {data.circuit.lastFallbackAt && (
+                <>
+                  {" "}
+                  Last fallback: {formatUkTime(data.circuit.lastFallbackAt)}.
+                </>
+              )}
+              {data.circuit.lastOkAt && (
+                <> Last live capture: {formatUkTime(data.circuit.lastOkAt)}.</>
+              )}
+            </p>
+          </div>
+        )}
+        {data && !data.circuit?.open && data.circuit?.lastOkAt && (
+          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-2 text-xs text-emerald-700 dark:text-emerald-400">
+            Cross-currency buy circuit: CLOSED (allowing buys). Last live
+            capture {formatUkTime(data.circuit.lastOkAt)}.
+          </div>
+        )}
         {data && (
           <>
             <AvailabilityStrip availability={data.availability} />

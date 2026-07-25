@@ -231,6 +231,35 @@ export const getFxHealth = createServerFn({ method: "POST" })
       total: totals.total,
     };
 
+    // Persistent circuit breaker state — derived from the same rows so the
+    // UI shows the same view the executor uses to pause cross-currency buys.
+    // OPEN when the most recent fallback is newer than the most recent live
+    // provider capture; CLOSED once a fresh yahoo/frankfurter capture arrives.
+    let lastFallbackAt: string | null = null;
+    let lastOkAt: string | null = null;
+    for (const r of rows) {
+      const resp = (r.response ?? {}) as { source?: string };
+      const src = resp.source ?? "";
+      const t = r.created_at as string;
+      if (src.startsWith("fallback") && !lastFallbackAt) lastFallbackAt = t;
+      else if ((src === "yahoo" || src === "frankfurter") && !lastOkAt) lastOkAt = t;
+      if (lastFallbackAt && lastOkAt) break;
+    }
+    const circuitOpen =
+      !!lastFallbackAt &&
+      (!lastOkAt ||
+        new Date(lastOkAt).getTime() <= new Date(lastFallbackAt).getTime());
+    const circuit = {
+      open: circuitOpen,
+      lastFallbackAt,
+      lastOkAt,
+      reason: circuitOpen
+        ? `FX providers went to identity fallback${
+            lastFallbackAt ? ` at ${lastFallbackAt}` : ""
+          }; cross-currency buys paused until a live provider capture arrives.`
+        : null,
+    };
+
     return {
       overall,
       windowHours: data.sinceHours,
@@ -238,5 +267,6 @@ export const getFxHealth = createServerFn({ method: "POST" })
       providerCounts,
       timeline,
       availability,
+      circuit,
     };
   });
