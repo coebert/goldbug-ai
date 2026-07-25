@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/table";
 import { ClipboardCheck, PlayCircle, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import {
+  getMarketStatusForSymbol,
+  getMarketStatusOverview,
+  inferVenue,
+  type MarketStatus,
+} from "@/lib/market-hours";
 import { toast } from "sonner";
 
 const RANGES = [
