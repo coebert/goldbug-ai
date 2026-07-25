@@ -1116,6 +1116,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         spend = Math.min(spend, roomInClass);
       }
 
+      // Enforce per-commodity-group cap (e.g. max Gold %, max Basket %).
+      // Layers on top of the overall commodity asset-class cap.
+      let commodityGroupRejected: string | null = null;
+      let commodityGroupKey: string | null = null;
+      if (meta.asset_class === "commodity") {
+        const grp = classifyCommoditySymbol(meta.symbol);
+        if (grp) {
+          commodityGroupKey = grp;
+          const grpCap = cfg.commodity_group_limits?.[grp];
+          if (grpCap != null) {
+            const grpMax = totalValue * grpCap;
+            const roomInGroup = Math.max(0, grpMax - (commodityGroupExposure.get(grp) ?? 0));
+            if (roomInGroup <= 0) commodityGroupRejected = `commodity-group cap reached for ${grp} (max ${(grpCap * 100).toFixed(0)}%)`;
+            spend = Math.min(spend, roomInGroup);
+          }
+        }
+      }
+
       // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue
       let volCapped = false;
       if (cfg.volatility_sizing) {
