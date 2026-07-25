@@ -43,8 +43,15 @@ import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, Shield
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
-// Heavy tab bodies are code-split via React.lazy below to keep the
-// main portfolio route chunk lean on mobile.
+// Heavy tab bodies are code-split via React.lazy to keep the main
+// portfolio route chunk lean on mobile.
+const TradeAuditLogCard = lazy(() =>
+  import("@/components/trade-audit-log-card").then((m) => ({ default: m.TradeAuditLogCard })),
+);
+const ConfidenceTimelineCard = lazy(() =>
+  import("@/components/confidence-timeline-card").then((m) => ({ default: m.ConfidenceTimelineCard })),
+);
+
 
 
 import {
