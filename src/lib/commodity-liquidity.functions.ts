@@ -63,6 +63,10 @@ export const simulateCommodityLiquidity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data, context }) => {
+    const { UNIVERSE } = await import("@/lib/universe.server");
+    const { applyBuyExecution, DEFAULT_EXECUTION } = await import(
+      "@/lib/execution-realism.server"
+    );
     const commodities = UNIVERSE.filter((u) => u.asset_class === "commodity");
     const requested = data.symbols
       ? new Set(data.symbols.map((s) => s.toUpperCase()))
