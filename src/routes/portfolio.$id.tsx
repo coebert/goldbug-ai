@@ -665,7 +665,7 @@ function PortfolioPage() {
                       . Try adding funds{p.mode !== "live_prod" ? " to this portfolio" : " to your broker account"}, raising the max position size, or lowering the minimum trade value in Risk controls.
                     </p>
                     {underfunded.notes.length > 0 && (
-                      <p className="text-xs text-muted-foreground">{underfunded.notes.slice(0, 2).join(" · ")}</p>
+                      <p className="text-xs text-muted-foreground"><JargonText>{underfunded.notes.slice(0, 2).join(" · ")}</JargonText></p>
                     )}
                     <div className="pt-1">
                       <Button size="sm" variant="outline" onClick={() => setTab("risk")}>Open Risk controls</Button>
