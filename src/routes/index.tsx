@@ -428,6 +428,7 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
   // Deposit-adjusted percentage: unless the user opts in to include
   // cash-flows, subtract cumulative post-baseline deposits so the %
   // reflects trading PnL only (mirrors the dashboard tile behaviour).
+  // Shared with unit tests via computeCardRangePct.
   const adjusted = useMemo(
     () =>
       buildDepositAdjustedSeries(
@@ -437,7 +438,7 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
     [sliced, deposits, includeDeposits],
   );
   const values = adjusted.length > 0 ? adjusted.map((p) => p.adjusted) : sliced.map((p) => p.value);
-  const rangePct = adjusted.length > 0 ? adjusted[adjusted.length - 1].pct : null;
+  const rangePct = computeCardRangePct(sliced, deposits, includeDeposits);
   const totalEquity = sparkSeries.length > 0 ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
