@@ -249,13 +249,34 @@ export async function routeOrdersToBroker(params: {
     fxStale &&
     fxRate === 1 &&
     fxSource.startsWith("fallback:");
-  if (fxIsBroken) {
+
+  // Persistent circuit breaker: even if THIS tick's FX capture succeeded, a
+  // recent identity-fallback in the log keeps the breaker OPEN until we see a
+  // live provider capture strictly newer than the last fallback. This stops
+  // cross-currency buys from resuming during a flaky recovery window.
+  let fxCircuitOpen = false;
+  let fxCircuitReason: string | null = null;
+  if (
+    accountCurrency != null &&
+    accountCurrency.toUpperCase() !== portfolioCurrency
+  ) {
+    try {
+      const { getFxCircuitState } = await import("./fx-circuit.server");
+      const state = await getFxCircuitState(supabaseAdmin, portfolio.id, 24);
+      fxCircuitOpen = state.open;
+      fxCircuitReason = state.reason;
+    } catch {
+      /* fail-open on circuit lookup errors — the fxIsBroken check still guards */
+    }
+  }
+
+  if (fxIsBroken || fxCircuitOpen) {
+    const reason = fxIsBroken
+      ? `fx ${portfolioCurrency}->${accountCurrency} unavailable; buy skipped to avoid InsufficientCash reject`
+      : `fx circuit OPEN — pausing cross-currency buys until live FX provider recovers (${fxCircuitReason ?? "recent fallback"})`;
     for (const o of routable) {
       if (o.side === "buy") {
-        preSkips.set(
-          `${o.symbol}:${o.side}`,
-          `fx ${portfolioCurrency}->${accountCurrency} unavailable; buy skipped to avoid InsufficientCash reject`,
-        );
+        preSkips.set(`${o.symbol}:${o.side}`, reason);
       }
     }
     await supabaseAdmin.from("live_broker_log").insert({
@@ -263,12 +284,12 @@ export async function routeOrdersToBroker(params: {
       user_id: userId,
       broker: "saxo",
       env: portfolio.mode === "live_prod" ? "live" : "sim",
-      method: "PRE_PLACE_FX_BLOCK",
+      method: fxIsBroken ? "PRE_PLACE_FX_BLOCK" : "PRE_PLACE_FX_CIRCUIT_OPEN",
       path: `/fx/${portfolioCurrency}->${accountCurrency}`,
       status: 424,
       request: asJson({ asOf, decisionId, count: routable.length }),
-      response: asJson({ fxSource, fxStale }),
-      error: `fx unavailable — blocking cross-currency buys`,
+      response: asJson({ fxSource, fxStale, fxCircuitOpen, fxCircuitReason }),
+      error: reason,
     });
   } else if (fxEnabled) {
     // ---------- Phase B: per-currency wallet routing.
