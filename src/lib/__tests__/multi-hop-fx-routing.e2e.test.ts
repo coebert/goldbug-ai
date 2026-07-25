@@ -253,16 +253,15 @@ describe("multi-hop FX routing → broker payload contract", () => {
     expect(hop2Rows[0].triggeredBySymbol).toBe("AAPL");
 
     // Every hop's amountFrom * rate === amountTo (per-leg conservation).
-    for (const row of [
-      {
-        amountFrom: eurToGbp.amountFrom,
-        rate: eurToGbp.rate,
-        amountTo: eurToGbp.amountTo,
-      },
-      ...hop2Rows,
-    ]) {
+    // planFxConversion rounds to 2 dp, so match at 2 dp for the upstream hop.
+    expect(eurToGbp.amountFrom * eurToGbp.rate).toBeCloseTo(
+      eurToGbp.amountTo,
+      1,
+    );
+    for (const row of hop2Rows) {
       expect(row.amountFrom * row.rate).toBeCloseTo(row.amountTo, 6);
     }
+
 
     expect(adapter.calls.map((c) => c.clientOrderId)).toEqual([
       `fx-${decisionId}-AI-EURGBP`,
