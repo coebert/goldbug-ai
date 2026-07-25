@@ -13,6 +13,7 @@
 import type { SaxoAdapter } from "./brokers/saxo.server";
 import { asJson } from "@/lib/_server/db-json";
 import { logReconcileEvent, type ReconcileReasonCode } from "./reconcile-event-log.server";
+import { decideSimFill } from "./sim-fill-rules";
 
 export type OrderReconcileOutcome =
   | "filled"
@@ -75,10 +76,13 @@ export async function reconcileOrderStatusesForPortfolio(params: {
   adapter: SaxoAdapter;
   lookbackHours?: number;
   statuses?: string[];
+  /** Tagged onto every emitted reconcile event so backfills are distinguishable from the hourly loop. */
+  source?: string;
 }): Promise<OrderReconcileSummary> {
   const { portfolioId, userId, adapter } = params;
   const lookbackHours = params.lookbackHours ?? 72;
   const statuses = params.statuses ?? ["pending", "submitted", "partial"];
+  const source = params.source ?? "reconciler";
   const sinceIso = new Date(Date.now() - lookbackHours * 3600_000).toISOString();
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -134,6 +138,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       orderType: (row.order_type as string | null) ?? null,
       previousStatus: row.status as string,
       submittedAt: submittedAtIso,
+      source,
     } as const;
 
     if (!brokerOrderId) {
@@ -234,20 +239,26 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     }
 
     if (!hist) {
-      // Saxo `/hist/v3/orders` is not exposed in some environments (notably
-      // SIM), so history returns null even for orders that clearly completed.
-      // For market orders that vanished from the open list and are older than
-      // a couple of minutes we treat this as "presumed filled": the daily
-      // holdings/cash reconcile from `/port/v1/positions` is the source of
-      // truth for cash impact — this presumption only updates the display
-      // status so operators aren't left with a permanent "submitted" tile
-      // for orders the broker has already executed.
+      // Saxo `/hist/v3/orders` is unavailable (SIM tenants + some LIVE
+      // configurations). Delegate to the shared, unit-tested `decideSimFill`
+      // rule so the reconciler and the manual backfill agree on when a
+      // silent order can be presumed filled, presumed rejected, or must be
+      // left alone. This is the SINGLE place presumption logic lives — do
+      // not reintroduce inline age/type checks here.
       const orderType = String(row.order_type ?? "market").toLowerCase();
-      const submittedAt = submittedAtIso ? new Date(submittedAtIso).getTime() : 0;
-      const ageMs = submittedAt ? Date.now() - submittedAt : Number.POSITIVE_INFINITY;
-      if (orderType === "market" && ageMs > 2 * 60 * 1000) {
-        const qty = Number(row.quantity ?? 0);
-        // Use latest cached close as a best-effort fill price for display.
+      const qty = Number(row.quantity ?? 0);
+      const decision = decideSimFill({
+        orderType,
+        status: row.status as string,
+        submittedAt: (row.submitted_at as string | null) ?? null,
+        createdAt: (row.created_at as string | null) ?? null,
+        quantity: qty,
+        hasBrokerOrderId: true,
+      });
+
+      if (decision.kind === "presumed_filled") {
+        // Best-effort fill price for display only. Broker-side cash truth
+        // still comes from the /port/v1/positions reconcile.
         const priceRow = await supabaseAdmin
           .from("price_cache")
           .select("close")
@@ -257,7 +268,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           .maybeSingle();
         const fillPrice = Number(priceRow.data?.close ?? 0) || 0;
 
-        await supabaseAdmin
+        const upd = await supabaseAdmin
           .from("live_orders")
           .update({ status: "filled" })
           .eq("id", row.id as string);
@@ -294,45 +305,79 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
           outcome: "filled", previousStatus: row.status as string, newStatus: "filled",
           filledQuantity: qty, avgFillPrice: fillPrice || null,
-          reason: "presumed filled — market order absent from open list; /hist unsupported on this env",
+          reason: `presumed filled — ${decision.reason}`,
         });
         await logReconcileEvent({
           ...commonEvent,
-          source: "presumed_fill",
+          source: `${source}:presumed_fill`,
           newStatus: "filled",
           outcome: "filled",
-          reasonCode: "sim_presumed_filled_market",
-          reason: `market order aged ${Math.round(ageMs / 1000)}s, absent from Saxo open list, /hist unavailable — presumed filled`,
+          reasonCode:
+            (row.status as string).toLowerCase() === "partial"
+              ? "sim_presumed_filled_partial"
+              : "sim_presumed_filled_market",
+          reason: `${decision.reason} (age ${Math.round(decision.ageMs / 1000)}s)`,
           filledQuantity: qty,
           avgFillPrice: fillPrice || null,
           saxoStatus: workingListError ? "open_list_unavailable" : "absent_from_open_list",
-          saxoReason: fillInsertError ? `live_fills insert failed: ${fillInsertError}` : null,
-          saxoResponse: { workingListError, histError, priceUsed: fillPrice },
+          saxoReason:
+            (upd.error ? `status update failed: ${upd.error.message}` : null) ??
+            (fillInsertError ? `live_fills insert failed: ${fillInsertError}` : null),
+          saxoResponse: { workingListError, histError, priceUsed: fillPrice, decision },
         });
         continue;
       }
 
+      if (decision.kind === "presumed_rejected") {
+        await supabaseAdmin
+          .from("live_orders")
+          .update({ status: "rejected", reject_reason: decision.reason })
+          .eq("id", row.id as string);
+
+        summary.rejected++;
+        summary.rows.push({
+          orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
+          outcome: "rejected", previousStatus: row.status as string, newStatus: "rejected",
+          filledQuantity: 0, avgFillPrice: null,
+          reason: `presumed rejected — ${decision.reason}`,
+        });
+        await logReconcileEvent({
+          ...commonEvent,
+          source: `${source}:presumed_reject`,
+          newStatus: "rejected",
+          outcome: "rejected",
+          reasonCode:
+            orderType === "market"
+              ? "sim_presumed_rejected_stale"
+              : "sim_presumed_cancelled_limit_stale",
+          reason: `${decision.reason} (age ${Math.round(decision.ageMs / 1000)}s)`,
+          saxoStatus: workingListError ? "open_list_unavailable" : "absent_from_open_list",
+          saxoResponse: { workingListError, histError, decision },
+        });
+        continue;
+      }
+
+      // decision.kind === "keep"
       summary.unknown++;
       summary.rows.push({
         orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
         outcome: "unknown", previousStatus: row.status as string, newStatus: row.status as string,
         filledQuantity: 0, avgFillPrice: null,
-        reason: "not in open orders and history endpoint returned nothing",
+        reason: decision.reason,
       });
       await logReconcileEvent({
         ...commonEvent,
+        source,
         newStatus: row.status as string,
         outcome: "unknown",
-        reasonCode: orderType === "market" ? "sim_keep_awaiting_broker" : "sim_keep_awaiting_broker",
-        reason:
-          orderType === "market"
-            ? `market order too fresh (${Math.round(ageMs / 1000)}s) to presume filled`
-            : `${orderType} order silent; SIM cannot confirm — leaving as ${row.status}`,
+        reasonCode: "sim_keep_awaiting_broker",
+        reason: decision.reason,
         saxoStatus: "absent_from_open_list",
-        saxoResponse: { workingListError, histError, ageMs },
+        saxoResponse: { workingListError, histError, decision },
       });
       continue;
     }
+
 
     const mapped = mapSaxoStatus(hist.status, hist.filledAmount, hist.amount);
     if (mapped === "unknown") {
