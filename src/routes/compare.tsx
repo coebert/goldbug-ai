@@ -710,8 +710,8 @@ function TradeDivergenceCard({
               <tbody>
                 {grid.rows.map((r) => (
                   <tr key={`${r.date}|${r.symbol}`} className="border-b border-border/50 align-top">
-                    <td className="py-2 pr-3 tabular-nums text-muted-foreground">{r.date}</td>
-                    <td className="py-2 pr-3 font-medium">{r.symbol}</td>
+                    <td className="sticky left-0 z-10 bg-card py-2 pr-3 tabular-nums text-muted-foreground">{r.date}</td>
+                    <td className="sticky left-[72px] z-10 bg-card py-2 pr-3 font-medium">{r.symbol}</td>
                     {r.cells.map((cell, i) => (
                       <td key={i} className="py-2 pr-3">
                         <TradeCell cell={cell} />
