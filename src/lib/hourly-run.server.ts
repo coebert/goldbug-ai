@@ -1,4 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withRunMetrics, snapshot, bumpBudgetExceeded, bumpPortfolio } from "@/lib/run-metrics.server";
+
+export type RunMetricsSnapshot = ReturnType<typeof snapshot>;
 
 export type HourlyRunResult = {
   success: true;
@@ -14,6 +17,7 @@ export type HourlyRunResult = {
   saxo_refresh: Record<string, { ok: boolean; error?: string; skipped?: string }>;
   triggered_by: "manual" | "cron";
   results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number; skipped?: string }>;
+  metrics: RunMetricsSnapshot;
 };
 
 export class RunInProgressError extends Error {
