@@ -1,89 +1,96 @@
-# Improving the AI's Currency-Trading Strategies
+# Trading Strategy Review & Hardening Plan
 
-Today the AI receives a wallet snapshot, an exposure-by-currency map, a live FX matrix, and a short playbook (`src/lib/ai-fx-conversions.server.ts`). It can propose `fx_conversions` as a % of a wallet, applied in wallet-book mode. This is a solid foundation but is essentially **reactive pre-funding**. This plan turns it into an **intent-driven, signal-aware FX strategy** with proper risk controls, hedging, and a learning loop.
+## Where you are today (strengths)
+The engine is already unusually sophisticated for a single-user app:
+- **Signals:** MA/MACD/RSI/Bollinger/ATR, weekly multi-timeframe, volume-weighted momentum, cross-asset (SPY/VIX/GLD/TLT), options snapshot, cross-sectional ranking, news + sentiment momentum.
+- **Sizing/guardrails:** conviction-weighted Kelly cap, calibration multiplier, ensemble second-opinion, loss cooldowns, sector rotation multiplier, portfolio drawdown throttle, gross-exposure by regime, correlated-cluster cap, ATR trailing stop, stop-loss / take-profit / max-hold auto-exit, per-symbol / per-class / commodity-group caps, overnight-gap guard, FX matrix guard, commodity liquidity gates.
+- **Learning:** hyperparameter tuning + walk-forward, calibration snapshots, counterfactuals, per-signal decay tracking, portfolio lessons, shadow variant B.
+- **Playbooks:** historical, hedge-fund, commodity, FX — all injected into the system prompt.
 
-The plan is grouped into six phases. Each phase is independently shippable.
+## The core weaknesses to fix
+1. **Edge is diffuse.** Many signals feed a single LLM that decides everything. LLM output variance can dilute otherwise-good edges, and the five signal-weight buckets are the AI's *self-attribution*, not a measured edge.
+2. **Sizing is defensive-only.** Every multiplier can *shrink* a trade; almost none can *grow* a high-quality one. That structurally caps returns even when the setup is A+.
+3. **Exits are single-layer.** Stop-loss / take-profit / ATR trail are fixed % — no scale-out ladder, no chandelier trail, no time-stop tied to thesis half-life, no re-entry rule after a stop.
+4. **No explicit alpha model with an out-of-sample track record.** Signal-decay is tracked but not *acted on* — decayed signals still weigh the same in the prompt.
+5. **Regime → strategy mapping is soft.** The AI is *told* the regime; strategy switching (e.g. trend-follow vs. mean-revert vs. carry) is not enforced structurally.
+6. **Correlation & concentration.** 35% correlated-cluster cap is a hard number, not risk-parity based. No factor-tilt tracking (value/momo/quality/low-vol/carry) despite the playbook citing them.
+7. **FX & commodities** have playbooks but no dedicated systematic overlays (carry, trend, curve, real-yield-vs-gold beta).
+8. **No execution alpha.** All orders go as market with a simple ATR-vol slippage assumption; no VWAP/POV/passive posting, no time-of-day model, no earnings/event blackout override for exits.
 
----
+## The plan (6 phases, shippable independently)
 
-## Phase 1 — Give the AI a richer FX signal set
+### Phase 1 — Turn the LLM into an orchestrator, not the sole alpha
+Split decisions into **systematic candidates + LLM adjudication**:
+- Build `src/lib/alpha/` with four independent, testable models producing a score in [-1..+1] and a horizon (days) per symbol:
+  1. `trend.ts` — 12-1 momentum, 50/200 MA state, ADX-lite from ATR%.
+  2. `mean-reversion.ts` — z-score of price vs. 20d, RSI extremes, Bollinger %b — only fires inside 200d uptrend and low-vol regime.
+  3. `quality-value.ts` — proxy factors we can compute cheaply (drawdown-adjusted momentum, low realised vol, positive earnings drift via news sentiment slope).
+  4. `carry.ts` (FX + commodities) — real-yield diff proxy, gold-vs-real-yield beta, oil term structure heuristic.
+- **Ensemble score** = weight-blend by *live signal-decay hit-rate* (already tracked). Decayed signals lose weight automatically.
+- LLM receives ranked candidates with scores and only decides: pass, size up, size down, or hold; it must cite the model that fired.
 
-Right now the AI sees rates and balances but no market context. Add a lightweight FX signals block to the prompt.
+### Phase 2 — Two-sided sizing (grow winners, not just shrink losers)
+Currently every multiplier is ≤1. Introduce bounded up-multipliers:
+- **Conviction concurrence bonus:** if ≥3 of {trend, mean-rev, quality, cross-sectional top-decile, positive news momentum} agree → ×1.25 (capped by per-symbol cap).
+- **Regime tailwind bonus:** if regime playbook explicitly favours the asset class → ×1.15.
+- **Pyramid rule:** allow adding to an *existing winner* up to 1.5× original size when price makes new 20d high AND trailing stop has been raised twice.
+- Absolute ceiling stays the per-symbol cap; multipliers are stacked *inside* it.
 
-- **Trend & momentum per pair**: 5/20/60-day % change, 20d realised volatility, distance from 50d SMA. Computed server-side from cached FX closes (extend `fx.server.ts` with a `getFxSeries(pair, days)` helper backed by the existing price cache; fall back to synthesising from cross-rates through USD).
-- **Carry proxy**: static short-rate table per supported ccy (GBP, USD, EUR, CHF, JPY, CAD, AUD) refreshed weekly via an admin-editable `fx_carry_rates` table; expose annualised carry differential per pair.
-- **Regime tag reuse**: reuse `regime-detector.server.ts` output (risk-on / risk-off / neutral) and map to FX bias (e.g. risk-off → favour USD/CHF/JPY, fade AUD/CAD).
-- **Event calendar hook**: optional FOMC/BoE/ECB/BoJ dates as a static JSON in `src/lib/fx-events.ts` so the AI can flag "avoid conversions within 24h of event".
+### Phase 3 — Multi-layer exits
+Replace the single stop / TP with a ladder:
+- **Initial stop:** max(ATR×N, structural swing low).
+- **Chandelier trail:** highest close × (1 − k·ATR); k tightens as unrealised gain grows.
+- **Scale-out ladder:** sell 25% at 1R, 25% at 2R, let 50% run on trail.
+- **Time-stop tied to horizon:** if the alpha model's horizon expires with <0.5R progress, exit.
+- **Re-entry rule:** after a stop, block the symbol for `max(cooldown, 5×ATR days)` — you already have cooldowns; just wire ATR days in.
+- **Event blackout override:** force flat or hedged into earnings/FOMC if position is >5% of NAV.
 
-Deliverables: `src/lib/fx-signals.server.ts`, unit tests, and a new `fxSignals` section injected into `buildFxContext`.
+### Phase 4 — Real regime-conditional strategy switching
+Enforce (not just suggest) via the orchestrator:
+- **Risk-on / expansion:** trend + quality dominate; mean-rev muted; commodities cyclical.
+- **Late cycle / stagflation:** trend + carry; gold overweight; trim high-beta growth.
+- **Recession / risk-off:** de-risk cyclicals to zero, keep quality + gold + duration proxy (TLT), block new momentum buys.
+- **Deflation:** cash + quality only.
+- **Rising-rate shock:** kill duration; gold only if real yields *falling*.
+Implemented as a matrix `regime × strategy → weight` in `src/lib/regime-strategy-matrix.ts` that scales each alpha model's contribution before the ensemble.
 
-## Phase 2 — Structured strategy intents, not just conversions
+### Phase 5 — Portfolio construction on risk, not dollars
+- Add **volatility-weighted target position sizes** (already have `volatility_sizing` flag; make it default on).
+- Add **factor-exposure tracker** (momentum / value / quality / low-vol / carry) computed from current holdings; cap any single factor at 40% of gross risk.
+- Replace the 35% correlated-cluster $ cap with a **risk-parity cluster cap**: cluster gross vol ≤ 30% of portfolio target vol.
+- **Portfolio target vol:** each risk level maps to an annualised vol target (Conservative 6%, Balanced 10%, Aggressive 15%); scale total gross exposure to hit it.
 
-Extend the AI output schema from a flat `fx_conversions` array to a typed set of intents so the model reasons about *why*, not just *how much*.
+### Phase 6 — Execution alpha & measurement
+- **Order slicing:** for orders >0.5% of ADV, slice into 3–5 clips over the session.
+- **Time-of-day filter:** avoid the first & last 15 min unless exiting a stop; measured slippage is worst there.
+- **Post-trade attribution v2:** per-model P&L (not just per-signal). Feed back into the alpha-model weights (Phase 1) so bad models atrophy automatically.
+- **A/B live-shadow:** the existing "shadow variant B" becomes the new orchestrator — promote to primary only after 30 sessions of statistically better risk-adjusted return.
 
-```text
-FxIntent =
-  | { kind: "pre_fund",  target_ccy, cover_symbol, cover_notional, urgency }
-  | { kind: "hedge",     ccy, hedge_pct, horizon_days, rationale }
-  | { kind: "sweep_idle",from_ccy, min_balance_base, rationale }
-  | { kind: "carry_tilt",long_ccy, short_ccy, size_pct_of_nav, max_hold_days }
-  | { kind: "close_hedge",ccy, rationale }
-```
+## Technical section (for reference)
 
-Each intent is validated with Zod, then compiled into concrete `planFxConversion` / `planFxSpot` calls by a new `src/lib/fx-intent-compiler.server.ts`. This keeps the model's surface area small while letting us evolve execution safely.
+New files:
+- `src/lib/alpha/{trend,mean-reversion,quality-value,carry}.ts` — pure scorers, unit-tested.
+- `src/lib/alpha/orchestrator.server.ts` — combines scorers with signal-decay weights and regime-strategy matrix; produces `RankedCandidate[]`.
+- `src/lib/regime-strategy-matrix.ts` — the enforceable weights table.
+- `src/lib/exits/{chandelier,scale-out,time-stop,event-blackout}.ts` — layered exit logic.
+- `src/lib/sizing/pyramid.ts` and `src/lib/sizing/concurrence-bonus.ts`.
+- `src/lib/portfolio/factor-exposure.ts` and `src/lib/portfolio/vol-target.ts`.
+- `src/lib/execution/slicer.ts` and `src/lib/execution/tod-filter.ts`.
 
-## Phase 3 — Risk-aware sizing & guardrails
+Wiring points in `trading-engine.server.ts`:
+- Replace the current single-LLM decision path with: build `RankedCandidate[]` → LLM adjudicates → sizing pipeline (existing shrinks + new bonuses) → exit-ladder attached at order creation → factor/vol caps applied at portfolio level.
+- Keep every existing guardrail; they layer under the new logic.
 
-Prevent the AI from taking disproportionate FX bets.
+Tests to add:
+- Unit tests per alpha model with fixture candles.
+- Property tests: sizing pipeline never exceeds per-symbol cap even with all bonuses stacked.
+- E2E: regime transition flips strategy weights within one tick; scale-out ladder produces 3 sells at 1R/2R/trail.
 
-- **Per-ccy exposure cap**: max non-base exposure as % of NAV, defaulting to risk-level presets (low 20%, medium 40%, high 60%). Enforce in the compiler; log `FX_INTENT_CAPPED` when trimmed.
-- **Max daily FX turnover**: cap total converted notional per UTC day (e.g. 30% NAV) to stop pathological churn.
-- **Min conversion size**: reject dust (<0.5% NAV) to avoid fee drag; already have fee model in `fx-convert-preview.functions.ts` — reuse it inside the compiler.
-- **Carry-trade leash**: `max_hold_days` enforced by a nightly reviewer that emits a `close_hedge` intent when exceeded.
-- **Circuit / matrix guard**: continue honouring `getFxCircuitState` and `fx-matrix-guard.ts`; intents that require blocked pairs are dropped with an audit row rather than silently ignored.
+## Suggested rollout order
+1. Phase 3 (multi-layer exits) — biggest immediate risk win, isolated code.
+2. Phase 1 + 4 (alpha orchestrator + regime matrix) — biggest return win.
+3. Phase 5 (vol-target + factor caps) — makes returns *reliable*.
+4. Phase 2 (two-sided sizing) — unlocks upside once 1–4 are stable.
+5. Phase 6 (execution + measurement) — polish and self-improvement loop.
 
-## Phase 4 — Hedging & carry playbooks in the prompt
-
-Rewrite the playbook block in `ai-fx-conversions.server.ts` to give the model concrete decision rules instead of prose:
-
-```text
-PRE-FUND     : if planned foreign buy > wallet(target_ccy) → convert exactly the shortfall + 2% buffer.
-HEDGE        : if non-base exposure(ccy) > cap AND 20d vol(pair) > threshold → hedge 50–100% back to base.
-SWEEP IDLE   : if wallet(ccy) > 5% NAV AND no open/pending order in ccy for 3 days → sweep to base.
-CARRY TILT   : only if regime = risk-on AND carry_diff > 2% AND 60d trend agrees; size ≤ 10% NAV.
-STAND DOWN   : circuit open, matrix stale/identity, or event within 24h → no new intents; close_hedge allowed.
-```
-
-The prompt shows current values for each precondition so the model can cite them in `rationale`, which we already persist.
-
-## Phase 5 — Learning loop (post-trade attribution)
-
-Attribute P&L from FX intents so the model improves over time.
-
-- Extend `wallet_snapshots` writes to also record intent id + kind at conversion time.
-- Nightly job in `src/lib/fx-attribution.server.ts` computes realised P&L per closed intent (mark-to-market change in base ccy minus fees/spread).
-- Feed a rolling summary (last 30 intents: hit rate, avg bps, worst outcome) back into the prompt via a new `fxPerformanceBlock` — same pattern used by `batch-lessons.server.ts` for equity trades.
-- Surface in UI: extend `WalletHistoryCard` with an "FX intents" tab (kind, notional, rationale, realised P&L, status).
-
-## Phase 6 — Observability & operator controls
-
-- **FX Strategy card** on the portfolio page showing active intents, caps, remaining daily turnover, and a "pause FX strategy" toggle (`portfolios.fx_strategy_paused`).
-- Extend `FxHealthCard` timeline with intent markers so we can see *why* conversions happened, not just that they did.
-- Audit rows: `FX_INTENT_PROPOSED`, `FX_INTENT_COMPILED`, `FX_INTENT_CAPPED`, `FX_INTENT_EXECUTED`, `FX_INTENT_REJECTED` — all via `live_broker_log` for a single query surface.
-- Tests: unit tests for signal computation and compiler; e2e tests that (a) an over-cap hedge intent is trimmed and logged, (b) a carry tilt is refused in risk-off regime, (c) pre-fund shortfall matches subsequent buy leg exactly.
-
----
-
-## Technical notes
-
-- **Files to add**: `src/lib/fx-signals.server.ts`, `src/lib/fx-intent-compiler.server.ts`, `src/lib/fx-events.ts`, `src/lib/fx-attribution.server.ts`, `src/components/fx-strategy-card.tsx`, tests under `src/lib/__tests__/`.
-- **Files to edit**: `src/lib/ai-fx-conversions.server.ts` (schema + prompt), `src/lib/trading-engine.server.ts` (call compiler, persist intents), `src/lib/fx.server.ts` (`getFxSeries`), `src/components/wallet-history-card.tsx`, `src/components/fx-health-card.tsx`.
-- **DB migrations**: `fx_carry_rates(ccy pk, annual_rate, updated_at)`; `fx_intents(id, portfolio_id, kind, payload jsonb, status, realised_pnl_base, created_at, closed_at)` with RLS + explicit GRANTs, plus a foreign key onto `portfolios`.
-- **Prompt discipline**: keep the AI schema constraint-free (no Zod `.min/.max` inside `Output`) — enforce sizing/caps in the compiler, per AI SDK guidance.
-- **Rollout**: Phase 1–2 behind a `portfolios.fx_strategy_v2` flag so we can A/B against the current playbook via existing `ab-testing.server.ts`.
-
-## Rollout order (recommended)
-
-1. Phase 1 (signals) + Phase 4 (playbook rewrite) — biggest quality lift, no schema changes.
-2. Phase 2 (intents) + Phase 3 (guardrails) — structural refactor, one migration.
-3. Phase 5 (attribution) + Phase 6 (UI) — feedback loop once real intent data exists.
+Approve and I'll start with Phase 3 (exits) as the first shippable slice.

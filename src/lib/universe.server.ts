@@ -123,28 +123,40 @@ export type ExecutionCalibrationMeta = {
 import type { CommodityGroup } from "./commodity-groups";
 
 export type RiskConfig = {
-  asset_class_limits: Partial<Record<AssetClass, number>>; // max % of portfolio value per class
-  per_symbol_limit_pct: number | null; // if set, overrides base maxPositionPct
-  stop_loss_pct: number; // 0 disables. Positive number, e.g. 0.10 = -10% from avg cost
-  take_profit_pct: number; // 0 disables. e.g. 0.25 = +25% from avg cost
-  atr_trailing_mult: number; // 0 disables. e.g. 3 = trail stop 3×ATR below high-water mark
-  max_hold_days: number; // 0 disables. Force-exit positions held longer than N days
+  asset_class_limits: Partial<Record<AssetClass, number>>;
+  per_symbol_limit_pct: number | null;
+  stop_loss_pct: number;
+  take_profit_pct: number;
+  atr_trailing_mult: number;
+  max_hold_days: number;
   volatility_sizing: boolean;
-  vol_target_pct: number; // target daily volatility contribution per position (e.g. 0.015 = 1.5%)
-  // Hard halts — either can pause ALL new buys until the condition clears.
-  max_daily_loss_pct: number;    // 0 disables. e.g. 0.03 = pause buys if today's PnL ≤ -3%
-  max_drawdown_halt_pct: number; // 0 disables. e.g. 0.15 = pause buys if peak-to-current DD ≥ 15%
+  vol_target_pct: number;
+  max_daily_loss_pct: number;
+  max_drawdown_halt_pct: number;
   execution_params: Partial<ExecutionParamsConfig> | null;
   execution_calibration: ExecutionCalibrationMeta | null;
-  // Per-commodity-group NAV caps (Gold, Silver, Basket, …). Applied on top of
-  // the overall `commodity` asset-class cap. Unset group = no group cap.
   commodity_group_limits: Partial<Record<CommodityGroup, number>>;
-  // Minimum 20-day average daily $ volume required for a new commodity buy
-  // (0 disables). Rejects illiquid ETC/ETFs before sizing.
   commodity_min_adv_usd: number;
-  // Maximum 14-day ATR% (proxy for spread / round-trip cost) allowed on a
-  // new commodity buy. 0 disables the check.
   commodity_max_atr_pct: number;
+  // Phase 3 — multi-layer exits (all optional, defaults preserve existing behaviour when disabled).
+  chandelier_enabled: boolean;
+  chandelier_k_base: number;
+  chandelier_k_tight: number;
+  chandelier_tighten_after_r: number;
+  initial_stop_atr_mult: number;
+  scale_out_enabled: boolean;
+  scale_out_levels: Array<{ r: number; frac: number }>;
+  time_stop_enabled: boolean;
+  time_stop_horizon_days: number;
+  time_stop_min_progress_r: number;
+  event_blackout_enabled: boolean;
+  event_blackout_pct_nav: number;
+  event_blackout_target_pct_nav: number;
+  event_blackout_window_days: number;
+  reentry_lockout_enabled: boolean;
+  reentry_atr_days_mult: number;
+  reentry_min_days: number;
+  reentry_max_days: number;
 };
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = {
@@ -156,13 +168,31 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   max_hold_days: 0,
   volatility_sizing: true,
   vol_target_pct: 0.015,
-  max_daily_loss_pct: 0.05,      // pause buys on any -5% day
-  max_drawdown_halt_pct: 0.20,   // pause buys past -20% drawdown
+  max_daily_loss_pct: 0.05,
+  max_drawdown_halt_pct: 0.20,
   execution_params: null,
   execution_calibration: null,
   commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
   commodity_min_adv_usd: 250_000,
   commodity_max_atr_pct: 0.06,
+  chandelier_enabled: true,
+  chandelier_k_base: 3.0,
+  chandelier_k_tight: 1.5,
+  chandelier_tighten_after_r: 2.0,
+  initial_stop_atr_mult: 2.5,
+  scale_out_enabled: true,
+  scale_out_levels: [{ r: 1, frac: 0.25 }, { r: 2, frac: 0.25 }],
+  time_stop_enabled: true,
+  time_stop_horizon_days: 30,
+  time_stop_min_progress_r: 0.5,
+  event_blackout_enabled: true,
+  event_blackout_pct_nav: 0.06,
+  event_blackout_target_pct_nav: 0.03,
+  event_blackout_window_days: 3,
+  reentry_lockout_enabled: true,
+  reentry_atr_days_mult: 0.05,
+  reentry_min_days: 5,
+  reentry_max_days: 30,
 };
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
@@ -236,6 +266,43 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   if (Number.isFinite(Number(r.commodity_max_atr_pct))) {
     out.commodity_max_atr_pct = Math.max(0, Math.min(1, Number(r.commodity_max_atr_pct)));
   }
+  // Phase 3 — multi-layer exits.
+  const num = (k: keyof RiskConfig, min: number, max: number) => {
+    const n = Number((r as Record<string, unknown>)[k as string]);
+    if (Number.isFinite(n)) (out as unknown as Record<string, number>)[k as string] = Math.max(min, Math.min(max, n));
+  };
+  const bool = (k: keyof RiskConfig) => {
+    const v = (r as Record<string, unknown>)[k as string];
+    if (typeof v === "boolean") (out as unknown as Record<string, boolean>)[k as string] = v;
+  };
+  bool("chandelier_enabled");
+  num("chandelier_k_base", 0.5, 10);
+  num("chandelier_k_tight", 0.25, 10);
+  num("chandelier_tighten_after_r", 0.1, 20);
+  num("initial_stop_atr_mult", 0.25, 10);
+  bool("scale_out_enabled");
+  if (Array.isArray(r.scale_out_levels)) {
+    const lvls = (r.scale_out_levels as unknown[])
+      .map((v) => {
+        const o = (v ?? {}) as Record<string, unknown>;
+        const rv = Number(o.r), fv = Number(o.frac);
+        return { r: rv, frac: fv };
+      })
+      .filter((l) => Number.isFinite(l.r) && Number.isFinite(l.frac) && l.r > 0 && l.frac > 0 && l.frac <= 1)
+      .slice(0, 5);
+    if (lvls.length) out.scale_out_levels = lvls;
+  }
+  bool("time_stop_enabled");
+  num("time_stop_horizon_days", 0, 365);
+  num("time_stop_min_progress_r", -5, 10);
+  bool("event_blackout_enabled");
+  num("event_blackout_pct_nav", 0, 1);
+  num("event_blackout_target_pct_nav", 0, 1);
+  num("event_blackout_window_days", 0, 30);
+  bool("reentry_lockout_enabled");
+  num("reentry_atr_days_mult", 0, 5);
+  num("reentry_min_days", 0, 365);
+  num("reentry_max_days", 0, 365);
   return out;
 }
 
