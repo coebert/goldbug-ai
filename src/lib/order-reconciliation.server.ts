@@ -96,9 +96,11 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
   // Fetch the whole working-order list once — cheaper than one call per order.
   let working: Awaited<ReturnType<SaxoAdapter["listWorkingOrders"]>> = [];
+  let workingListError: string | null = null;
   try {
     working = await adapter.listWorkingOrders();
   } catch (e) {
+    workingListError = e instanceof Error ? e.message : String(e);
     // If we can't reach the endpoint, log once and treat everything as unknown
     await supabaseAdmin.from("live_broker_log").insert({
       portfolio_id: portfolioId,
@@ -108,7 +110,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       method: "ORDER_RECON_LIST_FAILED",
       path: "/port/v1/orders/me",
       status: null,
-      error: e instanceof Error ? e.message : String(e),
+      error: workingListError,
     });
   }
   const workingById = new Map(working.map((w) => [w.brokerOrderId, w]));
