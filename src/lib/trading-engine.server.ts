@@ -219,6 +219,9 @@ export type ExecutedTrade = {
   value: number;
   reason: string;
   rejected?: string;
+  // Sizing telemetry — populated for commodity trades so the decision/executed
+  // rows expose the same slippage/liquidity numbers the sizer used.
+  liquidity?: import("./commodity-liquidity-metrics").CommodityTradeLiquidity;
 };
 
 export async function callAiForDecision(args: {
