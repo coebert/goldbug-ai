@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/table";
 import { ClipboardCheck, PlayCircle, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import {
+  getMarketStatusForSymbol,
+  getMarketStatusOverview,
+  inferVenue,
+  type MarketStatus,
+} from "@/lib/market-hours";
 import { toast } from "sonner";
 
 const RANGES = [
@@ -134,6 +140,8 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
             Failed to load: {(q.error as Error).message}
           </div>
         )}
+        <MarketStatusStrip />
+
 
         {rows.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -215,8 +223,8 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
                         </>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground" title={r.reject_reason ?? undefined}>
-                      {r.reject_reason ?? (r.broker_order_id ? `#${r.broker_order_id}` : "")}
+                    <TableCell className="max-w-[240px] truncate text-xs text-muted-foreground" title={r.reject_reason ?? undefined}>
+                      <RowNotes row={r} />
                     </TableCell>
                   </TableRow>
                 );
@@ -228,3 +236,78 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
     </Card>
   );
 }
+
+// Compact market-status strip so operators can see at a glance which venues
+// were open when the reconciler last ran — the single most common reason a
+// working order hasn't moved.
+function MarketStatusStrip() {
+  const [now, setNow] = useState(() => new Date());
+  // Refresh the clock once a minute; expensive computations are still cheap.
+  useMemo(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const overview = useMemo(() => getMarketStatusOverview(now), [now]);
+  return (
+    <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/30 p-2">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground self-center mr-1">
+        Market hours
+      </span>
+      {overview.map((s) => (
+        <VenueBadge key={s.venue} status={s} />
+      ))}
+    </div>
+  );
+}
+
+function VenueBadge({ status }: { status: MarketStatus }) {
+  const cls =
+    status.isOpen
+      ? "bg-emerald-600 text-white hover:bg-emerald-600"
+      : status.phase === "weekend"
+        ? "bg-muted text-muted-foreground"
+        : "bg-amber-500 text-white hover:bg-amber-500";
+  const suffix =
+    status.phase === "always_open"
+      ? "24/7"
+      : status.isOpen
+        ? `open · ${status.localTime}`
+        : status.phase === "weekend"
+          ? "weekend"
+          : status.phase === "pre_open"
+            ? `pre-open · ${status.localTime}`
+            : `closed · ${status.localTime}`;
+  return (
+    <Badge className={`${cls} text-[10px]`} title={status.explanation}>
+      {status.venue} · {suffix}
+    </Badge>
+  );
+}
+
+// Row notes: shows reject reason if present, otherwise the broker id — and
+// tags orders whose venue is currently closed so operators immediately see
+// why a "working" order hasn't moved.
+function RowNotes({ row }: { row: ReconOrderRow }) {
+  const status = String(row.status ?? "").toLowerCase();
+  const inFlight = status === "working" || status === "submitted" || status === "pending" || status === "partial";
+  const market = inFlight ? getMarketStatusForSymbol(row.symbol) : null;
+  const marketClosed = market != null && !market.isOpen && market.phase !== "always_open";
+  if (row.reject_reason) {
+    return <span title={row.reject_reason}>{row.reject_reason}</span>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {row.broker_order_id && <span className="tabular-nums">#{row.broker_order_id}</span>}
+      {marketClosed && market && (
+        <Badge
+          variant="outline"
+          className="border-amber-500/40 text-amber-600 text-[10px]"
+          title={market.explanation}
+        >
+          {inferVenue(row.symbol)} closed
+        </Badge>
+      )}
+    </div>
+  );
+}
+

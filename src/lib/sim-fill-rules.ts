@@ -30,6 +30,17 @@ export interface SimFillInput {
   quantity: number;
   hasBrokerOrderId: boolean;
   now?: number;
+  /**
+   * Market-hours awareness. When `false` we know the venue has not been open
+   * at any point between submission and `now`, so we cannot presume the
+   * order filled — it's simply queued for the next session. When `true` or
+   * omitted (backwards-compat default) the original age-based rules apply.
+   */
+  marketHadOpenPeriod?: boolean;
+  /** Short venue label used in the "keep" reason for logs/UI (e.g. "LSE"). */
+  venueLabel?: string;
+  /** ISO of the next scheduled session open — surfaced in the reason so the audit trail explains the wait. */
+  nextOpenIso?: string | null;
 }
 
 export const SIM_PRESUMED_FILL_AFTER_MS = 2 * 60 * 1000; // 2 minutes
@@ -81,6 +92,14 @@ export function decideSimFill(input: SimFillInput): SimFillDecision {
     return { kind: "keep", reason: "submitted_at in the future — clock skew, wait" };
   }
 
+  // Market-hours awareness. If the caller has told us the venue has been
+  // closed for the entire life of the order, we cannot presume anything —
+  // there was literally no session in which Saxo could match a fill. Hold
+  // the order (or defer the stale-limit rejection) until the next session.
+  // Applies to normal-age orders only; the >7-day unrecoverable branch
+  // above still fires so genuinely-abandoned orders don't hang forever.
+  const marketClosedThroughout = input.marketHadOpenPeriod === false;
+
   // Absurdly stale orders with no broker footprint were almost certainly
   // rejected pre-fill (e.g. a SIM tenant issue). Don't mint a fake fill for
   // them; presume rejected so the dashboard stops showing them as in-flight.
@@ -99,6 +118,14 @@ export function decideSimFill(input: SimFillInput): SimFillDecision {
         reason: `market order too fresh (${Math.round(ageMs / 1000)}s) — wait for the working list`,
       };
     }
+    if (marketClosedThroughout) {
+      const venue = input.venueLabel ? `${input.venueLabel} ` : "";
+      const nextOpen = input.nextOpenIso ? ` (next open ${input.nextOpenIso})` : "";
+      return {
+        kind: "keep",
+        reason: `${venue}market closed since submission — presumption deferred until session opens${nextOpen}`,
+      };
+    }
     return {
       kind: "presumed_filled",
       ageMs,
@@ -114,6 +141,14 @@ export function decideSimFill(input: SimFillInput): SimFillDecision {
   // stale-quote or session reasons. Only after 24h with no signal do we mark
   // them as presumed cancelled/rejected so operators can act.
   if (ageMs > SIM_LIMIT_STALE_AFTER_MS) {
+    if (marketClosedThroughout) {
+      const venue = input.venueLabel ? `${input.venueLabel} ` : "";
+      const nextOpen = input.nextOpenIso ? ` (next open ${input.nextOpenIso})` : "";
+      return {
+        kind: "keep",
+        reason: `${orderType} order silent >24h but ${venue}market closed throughout — deferring stale-reject until session opens${nextOpen}`,
+      };
+    }
     return {
       kind: "presumed_rejected",
       ageMs,
@@ -125,3 +160,4 @@ export function decideSimFill(input: SimFillInput): SimFillDecision {
     reason: `${orderType} order silent — SIM cannot confirm; leaving as ${status}`,
   };
 }
+

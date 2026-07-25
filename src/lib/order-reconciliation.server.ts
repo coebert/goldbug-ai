@@ -14,6 +14,7 @@ import type { SaxoAdapter } from "./brokers/saxo.server";
 import { asJson } from "@/lib/_server/db-json";
 import { logReconcileEvent, type ReconcileReasonCode } from "./reconcile-event-log.server";
 import { decideSimFill } from "./sim-fill-rules";
+import { getMarketStatusForSymbol, inferVenue, marketHadOpenPeriod } from "./market-hours";
 
 export type OrderReconcileOutcome =
   | "filled"
@@ -280,6 +281,15 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       // not reintroduce inline age/type checks here.
       const orderType = String(row.order_type ?? "market").toLowerCase();
       const qty = Number(row.quantity ?? 0);
+      // Market-hours context. If the venue has not been open at all since
+      // the order was submitted, we defer any presumption — the reconciler
+      // physically cannot infer a fill from a session that never happened.
+      const marketStatus = getMarketStatusForSymbol(row.symbol as string);
+      const submittedIso = (row.submitted_at as string | null) ?? (row.created_at as string | null);
+      const submittedMs = submittedIso ? new Date(submittedIso).getTime() : null;
+      const hadOpen = submittedMs != null
+        ? marketHadOpenPeriod(inferVenue(row.symbol as string), submittedMs, Date.now())
+        : true; // if we can't age the order, don't block on market hours
       const decision = decideSimFill({
         orderType,
         status: row.status as string,
@@ -287,6 +297,9 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         createdAt: (row.created_at as string | null) ?? null,
         quantity: qty,
         hasBrokerOrderId: true,
+        marketHadOpenPeriod: hadOpen,
+        venueLabel: marketStatus.venue,
+        nextOpenIso: marketStatus.nextOpenIso,
       });
 
       if (decision.kind === "presumed_filled") {
@@ -391,6 +404,8 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       }
 
       // decision.kind === "keep"
+      const keptForClosedMarket = !hadOpen && orderType === "market";
+      const keptForClosedMarketLimit = !hadOpen && orderType !== "market";
       summary.unknown++;
       summary.rows.push({
         orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
@@ -403,10 +418,23 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         source,
         newStatus: row.status as string,
         outcome: "unknown",
-        reasonCode: "sim_keep_awaiting_broker",
+        reasonCode: keptForClosedMarketLimit
+          ? "sim_defer_stale_market_closed"
+          : keptForClosedMarket
+            ? "sim_keep_market_closed"
+            : "sim_keep_awaiting_broker",
         reason: decision.reason,
         saxoStatus: "absent_from_open_list",
-        saxoResponse: { workingListError, histError, decision },
+        saxoResponse: {
+          workingListError, histError, decision,
+          marketStatus: {
+            venue: marketStatus.venue,
+            phase: marketStatus.phase,
+            isOpen: marketStatus.isOpen,
+            nextOpenIso: marketStatus.nextOpenIso,
+            marketHadOpenPeriodSinceSubmit: hadOpen,
+          },
+        },
       });
       continue;
     }
