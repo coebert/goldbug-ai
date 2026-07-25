@@ -63,6 +63,9 @@ const FxIntentsCard = lazy(() =>
 const FxIntentPnlCard = lazy(() =>
   import("@/components/fx-intent-pnl-card").then((m) => ({ default: m.FxIntentPnlCard })),
 );
+const RiskSimulatorCard = lazy(() =>
+  import("@/components/risk-simulator-card").then((m) => ({ default: m.RiskSimulatorCard })),
+);
 const ManualFxConvertCard = lazy(() =>
   import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
 );
@@ -1309,6 +1312,9 @@ function PortfolioPage() {
                     )}
                     {p.fx_enabled === true && (
                       <FxIntentPnlCard portfolioId={p.id} active={tab === "errors"} />
+                    )}
+                    {p.fx_enabled === true && (
+                      <RiskSimulatorCard portfolioId={p.id} active={tab === "errors"} />
                     )}
                     {p.fx_enabled === true && (
                       <ManualFxConvertCard portfolio={p} />
