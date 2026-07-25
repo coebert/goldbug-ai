@@ -546,6 +546,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   }
 
+  // Partial execution: drop symbols whose venue is currently closed so the
+  // AI sizes trades only against instruments that could actually fill this
+  // tick. Held symbols are preserved so sells/stops remain visible even if
+  // their venue is closed (they'll only fill on the next open, but keeping
+  // them in the universe lets risk logic still see the position). Always-open
+  // venues (crypto, FX) pass through untouched.
+  {
+    const { getMarketStatusForSymbol } = await import("./market-hours");
+    const heldSet = new Set((holdings ?? []).map((h) => h.symbol));
+    const closedSkipped: string[] = [];
+    const beforeCount = fullUniverse.length;
+    fullUniverse = fullUniverse.filter((u) => {
+      if (heldSet.has(u.symbol)) return true;
+      const open = getMarketStatusForSymbol(u.symbol).isOpen;
+      if (!open) closedSkipped.push(u.symbol);
+      return open;
+    });
+    if (closedSkipped.length > 0) {
+      console.info(
+        `[trading-engine] partial-exec: dropped ${closedSkipped.length}/${beforeCount} closed-venue symbols: ${closedSkipped.slice(0, 12).join(", ")}${closedSkipped.length > 12 ? "…" : ""}`,
+      );
+    }
+  }
+
+
+
   // Price the entire (asset-class-filtered) universe up front so we can pick a
   // candidate list the portfolio's cash can actually trade. Held symbols are
   // always included so sells remain possible even if now unaffordable.
