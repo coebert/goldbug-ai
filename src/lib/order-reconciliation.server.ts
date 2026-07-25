@@ -281,6 +281,15 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       // not reintroduce inline age/type checks here.
       const orderType = String(row.order_type ?? "market").toLowerCase();
       const qty = Number(row.quantity ?? 0);
+      // Market-hours context. If the venue has not been open at all since
+      // the order was submitted, we defer any presumption — the reconciler
+      // physically cannot infer a fill from a session that never happened.
+      const marketStatus = getMarketStatusForSymbol(row.symbol as string);
+      const submittedIso = (row.submitted_at as string | null) ?? (row.created_at as string | null);
+      const submittedMs = submittedIso ? new Date(submittedIso).getTime() : null;
+      const hadOpen = submittedMs != null
+        ? marketHadOpenPeriod(inferVenue(row.symbol as string), submittedMs, Date.now())
+        : true; // if we can't age the order, don't block on market hours
       const decision = decideSimFill({
         orderType,
         status: row.status as string,
@@ -288,6 +297,9 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         createdAt: (row.created_at as string | null) ?? null,
         quantity: qty,
         hasBrokerOrderId: true,
+        marketHadOpenPeriod: hadOpen,
+        venueLabel: marketStatus.venue,
+        nextOpenIso: marketStatus.nextOpenIso,
       });
 
       if (decision.kind === "presumed_filled") {
