@@ -10,6 +10,8 @@ import {
   resetPortfolio,
   getBenchmarkSeries,
 } from "@/lib/trading.functions";
+import { explainDecisionOrder, type ExplainOrderInput } from "@/lib/order-explanations.functions";
+import { Sparkle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
