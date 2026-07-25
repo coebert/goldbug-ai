@@ -117,7 +117,7 @@ describe("portfolio card headline — layout contract (source-level)", () => {
     // the layout doesn't jump when data arrives. Right-alignment
     // now comes from the enclosing `items-end` flex column.
     expect(SOURCE).toMatch(
-      /data-testid="total-equity-skeleton"[\s\S]*?variant="shimmer"[\s\S]*?h-8/,
+      /<Skeleton\b[\s\S]*?variant="shimmer"[\s\S]*?data-testid="total-equity-skeleton"[\s\S]*?h-8/,
     );
   });
 });
