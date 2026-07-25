@@ -82,7 +82,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
   const openOrders = await supabaseAdmin
     .from("live_orders")
-    .select("id, symbol, side, quantity, status, broker_order_id, submitted_at, created_at")
+    .select("id, symbol, side, quantity, order_type, status, broker_order_id, submitted_at, created_at")
     .eq("portfolio_id", portfolioId)
     .in("status", ["pending", "submitted", "partial"])
     .gte("created_at", sinceIso)
