@@ -691,6 +691,7 @@ function PortfolioPage() {
 
               <TabsContent value="overview" className="mt-4">
             <RiskHaltBanner portfolioId={id} className="mb-4" />
+            <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
             <Card className="mb-6">
               <CardContent className="flex flex-wrap items-center gap-3 py-4">
                 <UITooltipProvider delayDuration={100}>
