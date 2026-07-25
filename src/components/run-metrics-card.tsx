@@ -46,7 +46,7 @@ export function RunMetricsCard() {
     // oldest → newest for the line/bar charts
     return [...rows].reverse().map((r) => ({
       ts: r.created_at,
-      label: formatUkTime(r.created_at, { dateStyle: "short", timeStyle: "short" }),
+      label: formatUkTime(r.created_at),
       duration_s: Math.round(r.duration_ms / 100) / 10,
       budget_exceeded: r.budget_exceeded_count,
       ok: r.portfolios_ok,
@@ -206,7 +206,7 @@ export function RunMetricsCard() {
                 {rows.slice(0, 30).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap text-xs">
-                      {formatUkTime(r.created_at, { dateStyle: "short", timeStyle: "medium" })}
+                      {formatUkTime(r.created_at)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">{r.triggered_by}</Badge>
