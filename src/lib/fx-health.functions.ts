@@ -292,6 +292,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
       pairs,
       providerCounts,
       timeline,
+      pairTimelines,
       availability,
       circuit,
     };
