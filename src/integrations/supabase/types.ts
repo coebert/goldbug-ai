@@ -1583,6 +1583,44 @@ export type Database = {
           },
         ]
       }
+      wallet_snapshots: {
+        Row: {
+          base_ccy: string
+          base_total: number
+          cash_by_ccy: Json
+          created_at: string
+          id: string
+          portfolio_id: string
+          snapshot_date: string
+        }
+        Insert: {
+          base_ccy: string
+          base_total?: number
+          cash_by_ccy?: Json
+          created_at?: string
+          id?: string
+          portfolio_id: string
+          snapshot_date: string
+        }
+        Update: {
+          base_ccy?: string
+          base_total?: number
+          cash_by_ccy?: Json
+          created_at?: string
+          id?: string
+          portfolio_id?: string
+          snapshot_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_snapshots_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       portfolio_latest_totals: {

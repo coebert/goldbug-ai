@@ -1,63 +1,37 @@
-## Goal
+# Per-currency wallet time-series chart
 
-Make the app currency-aware end-to-end so it can:
+Add a chart on the portfolio Overview that plots each currency's wallet balance and the total base-currency cash over time, so you can see how the multi-currency wallet drifts across a sim run.
 
-1. Trade spot FX pairs as instruments (EURUSD, GBPUSD, USDJPY, …) through Saxo.
-2. Run portfolios denominated in USD/EUR/JPY (not just GBP) with equity, cash, and P&L in that currency.
-3. Place non-native equity trades reliably (e.g. buy US stocks from a GBP portfolio) with real FX sizing.
-4. Offer a manual "Convert cash" tool inside each portfolio.
+## What you'll see
 
-## Phased delivery
+A new card, "Wallet balances over time", on the portfolio Overview tab (next to Wallet & Affordability). Contents:
 
-Four scoped phases, each independently valuable and shippable. Each phase ends with tests + a UI surface so nothing hides in the backend.
+- Stacked-area chart (or line-per-currency toggle) with one series per currency present in the wallet (GBP, USD, EUR, ...), plus a separate line for `total base cash` (base-currency-equivalent of the whole wallet using each day's FX matrix).
+- X-axis: date. Y-axis: amount in each currency's native units for the areas; the base-cash line is on a secondary axis in the portfolio currency.
+- Tooltip shows every currency's balance for that day plus the base-cash total.
+- Toggle between "native units per currency" and "each currency converted to base".
+- Empty state: "No wallet history yet — snapshots start recording from the next tick."
 
-### Phase A — Currency foundations (no user-visible behaviour change yet)
+## How it will work
 
-- Add `base_ccy` (text, default `'GBP'`) to `portfolios`. Existing rows stay GBP.
-- Add `cash_by_ccy jsonb` to `portfolios` (e.g. `{ "GBP": 12000, "USD": 4500 }`) alongside the existing scalar `cash`. Existing scalar remains the base-currency wallet.
-- Add `instrument_ccy text` to `holdings`, `live_orders`, `pending_slices`, `trades`, and `decisions` so every row records the currency it was priced in.
-- Extend `getFxRate` (already in `src/lib/fx.server.ts`) with a small `convert(amount, from, to)` helper and a bulk `getFxMatrix(pairs[])` used by the pricing layer.
-- Refactor `src/lib/derive-card-equity.ts` and equity-snapshot writers to accept multi-currency holdings and convert into `base_ccy` at snapshot time; the equity headline stays in `base_ccy`.
-- Tests: unit tests for `convert`, matrix caching, multi-ccy holdings valuation, and a golden-file test that GBP-only portfolios produce identical equity numbers post-migration.
+Wallet history isn't recorded today. We will start capturing a daily snapshot going forward (reconstructing prior days from logs is unreliable once FX conversions and trades interleave).
 
-### Phase B — Cross-currency equity trades (biggest cause of current InsufficientCash errors)
+1. **New table** `wallet_snapshots` (RLS + grants like our other portfolio-scoped tables):
+   - `portfolio_id uuid`, `snapshot_date date`, `cash_by_ccy jsonb`, `base_ccy text`, `base_total numeric`, `created_at timestamptz`.
+   - `UNIQUE (portfolio_id, snapshot_date)` for idempotent upserts.
+2. **Write on every tick** — in `runDailyTick` (trading engine), right next to the existing `equity_snapshots` upsert, upsert a row with the post-tick `cash_by_ccy`, base currency, and base-total (using the FX matrix already fetched this tick).
+3. **Server function** `getWalletHistory({ portfolioId, sinceDays? })` returns rows sorted by date, plus the list of currencies seen.
+4. **Chart component** `WalletHistoryCard` in `src/components/wallet-history-card.tsx` using Recharts (same styling as the FX health / equity charts), lazy-loaded from `portfolio.$id.tsx` under Overview.
 
-- In `src/lib/live-executor.server.ts`, before sizing a buy in a foreign currency, look up broker cash in that currency; if zero, plan an auto-conversion leg from `base_ccy` using Saxo's `/trade/v2/orders` with FX SPOT AssetType.
-- Extend `trimBuysToBudget` with a `perCurrencyBudget` mode: instead of one scalar budget it takes `{ "USD": … , "EUR": … }` and trims each currency independently. Existing single-currency callers keep working via a thin wrapper.
-- Add a `fx-conversion.server.ts` module that submits FX conversion orders through Saxo, waits for fill, and logs `FX_CONVERT` broker-log entries (source, rate, fee, net delivered).
-- Surface FX legs in the **Errors** tab and **Audit** tab so any auto-conversion appears next to the equity trade it enabled.
-- Tests: `pre-place-budget-per-currency.test.ts`, a mocked-broker integration test that a USD buy from a GBP-only wallet triggers a GBP→USD conversion first, and a failure-path test (FX conversion rejected → equity buy skipped, not attempted with insufficient USD).
+## Files
 
-### Phase C — Spot FX pairs as tradable instruments
+- Migration: new `wallet_snapshots` table + policies + grants.
+- `src/lib/trading-engine.server.ts`: upsert snapshot alongside `equity_snapshots`.
+- `src/lib/wallet-history.functions.ts`: new server fn.
+- `src/components/wallet-history-card.tsx`: new chart card.
+- `src/routes/portfolio.$id.tsx`: lazy-mount the new card on Overview.
 
-- New symbol format `FX:EURUSD` recognised across the AI proposer, the broker adapter, the Saxo instrument-search cache, and the confidence pipeline. Mapped to Saxo `AssetType=FxSpot` and the matching Uic.
-- Update `saxo.server.ts` `placeOrder` to build FX orders (Amount is base-currency units of the pair's base leg; no `Ccy` conversion needed).
-- Extend `src/lib/risk-halts.server.ts` with an FX-notional cap so the AI can't take an FX position larger than a configurable % of NAV.
-- Add an FX watchlist section on the portfolio page and let the AI include FX pairs in its decision set (behind a per-portfolio `fx_enabled` flag defaulting to off — you opt each portfolio in).
-- Tests: FX order shape contract test against a recorded Saxo request, position-tracking round-trip (open EURUSD, close EURUSD, realised P&L in `base_ccy`), and a rejection test for an FX pair not in the enabled list.
+## Notes
 
-### Phase D — Manual "Convert cash" tool
-
-- A small dialog on each portfolio card: pick from-ccy, to-ccy, amount → shows live rate (from `getFxRate`), a fee estimate, and the delivered amount → posts an FX SPOT conversion via the Phase B FX-conversion module.
-- Logs to `sim_fund_events` (for SIM) or `live_broker_log` + `FX_CONVERT` (for live) so the ledger stays consistent.
-- Guardrail: dialog is blocked while risk halts are active or while another FX leg is in flight for the same portfolio.
-- Tests: component test (dialog validation), and a wiring test that a successful conversion updates `cash_by_ccy` and appears in the audit log.
-
-## What I would not do in this pass
-
-- No leveraged FX or margin — plain spot conversions only. Margin FX changes risk math significantly and warrants its own phase.
-- No new charting for FX pairs beyond re-using the existing price chart component with the FX symbol.
-- No changes to backtest engine to include FX pair PnL — flagged as a Phase E if you want it later.
-
-## Technical notes
-
-- Every new numeric column is `numeric` (not `double precision`) to keep FX math exact.
-- `cash_by_ccy` is authoritative once populated; the scalar `cash` becomes a derived view (`cash_by_ccy ->> base_ccy`) to avoid two sources of truth.
-- Saxo FX SPOT uses `AssetType='FxSpot'`, `Uic` from `/ref/v1/instruments`, and `Amount` in the base leg — I'll cache Uics in `saxo_instrument_cache` alongside equities.
-- All FX conversion decisions go through the existing `provider-circuit` breaker so a Saxo FX outage cannot cascade into equity trading errors.
-
-## Where to start
-
-I recommend shipping **Phase A + Phase B first** — those directly kill the InsufficientCash class of errors you have been seeing, without introducing a brand-new asset class. Phase C (spot FX trading) and Phase D (manual convert) can then land as separate approvals.
-
-Please confirm and tell me which phase(s) to start with.
+- No historical backfill — the chart begins populating from the next tick after this ships. This avoids fabricating balances from partial log evidence.
+- If you'd rather I also attempt a best-effort reconstruction from `live_broker_log` FX events + `trades` and stitch it onto the front of the series, say so and I'll add it as an optional server-side reconstruction pass.

@@ -1347,6 +1347,46 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     { onConflict: "portfolio_id,snapshot_date" },
   );
 
+  // Per-currency wallet snapshot for the wallet-history chart.
+  try {
+    const { readWallet, walletBalance } = await import("@/lib/portfolio-wallet");
+    const { getFxMatrix } = await import("@/lib/fx.server");
+    const { data: pRow } = await admin
+      .from("portfolios")
+      .select("currency, current_cash, cash_by_ccy")
+      .eq("id", portfolioId)
+      .single();
+    if (pRow) {
+      const baseCcy = (pRow.currency || "GBP").toUpperCase();
+      const wallet = readWallet({
+        currency: pRow.currency,
+        current_cash: Number(pRow.current_cash ?? workingCash),
+        cash_by_ccy: (pRow.cash_by_ccy as Record<string, number> | null) ?? null,
+      });
+      const foreign = Object.keys(wallet).filter((c) => c !== baseCcy);
+      const fx = foreign.length
+        ? await getFxMatrix(foreign.map((c) => ({ from: c, to: baseCcy })))
+        : new Map();
+      let baseTotal = walletBalance(wallet, baseCcy);
+      for (const c of foreign) {
+        const r = fx.get(`${c}${baseCcy}`);
+        baseTotal += walletBalance(wallet, c) * (r?.rate ?? 1);
+      }
+      await admin.from("wallet_snapshots").upsert(
+        {
+          portfolio_id: portfolioId,
+          snapshot_date: asOf,
+          cash_by_ccy: wallet as unknown as Record<string, number>,
+          base_ccy: baseCcy,
+          base_total: baseTotal,
+        },
+        { onConflict: "portfolio_id,snapshot_date" },
+      );
+    }
+  } catch (e) {
+    console.warn("wallet_snapshots upsert skipped:", e);
+  }
+
   const decisionInsert = await admin.from("decisions").insert({
     portfolio_id: portfolioId,
     run_date: asOf,

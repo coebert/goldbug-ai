@@ -63,6 +63,9 @@ const ManualFxConvertCard = lazy(() =>
 const WalletAffordabilityCard = lazy(() =>
   import("@/components/wallet-affordability-card").then((m) => ({ default: m.WalletAffordabilityCard })),
 );
+const WalletHistoryCard = lazy(() =>
+  import("@/components/wallet-history-card").then((m) => ({ default: m.WalletHistoryCard })),
+);
 
 
 
@@ -804,6 +807,14 @@ function PortfolioPage() {
               <div className="mb-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
+                </Suspense>
+              </div>
+            )}
+
+            {p && (
+              <div className="mb-4">
+                <Suspense fallback={<div className="h-64 rounded-xl border bg-card" aria-hidden />}>
+                  <WalletHistoryCard portfolioId={id} active={tab === "overview"} />
                 </Suspense>
               </div>
             )}
