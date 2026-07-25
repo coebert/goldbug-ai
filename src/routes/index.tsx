@@ -140,6 +140,14 @@ function Home() {
     placeholderData: keepPreviousData,
   });
   const isRefreshingEquity = equityQ.isFetching && !equityQ.isLoading;
+  // Error state: surface only when the fetch failed AND we have no
+  // cached data to fall back on. If a previous snapshot is still in
+  // `equityQ.data` (SWR), we keep showing it; the refresh dot signals
+  // the background retry. This keeps error UX consistent with the SWR
+  // contract enforced by the tests above.
+  const equityErrored = equityQ.isError && !equityQ.data;
+  const equityErrorMessage =
+    equityQ.error instanceof Error ? equityQ.error.message : "Failed to load equity";
   const sparkByPortfolio = useMemo(
     () => computeSparkByPortfolio(equityQ.data),
     [equityQ.data],
