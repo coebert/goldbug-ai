@@ -140,6 +140,14 @@ type Cached = { closes: number[]; ts: number; source: string };
 const cache = new Map<string, Cached>();
 const TTL_MS = 30 * 60 * 1000;
 
+async function closeBody(res: Response): Promise<void> {
+  try {
+    await res.body?.cancel();
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 async function fetchYahooCloses(from: string, to: string): Promise<number[]> {
   const symbol = `${from}${to}=X`;
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=6mo&interval=1d`;
@@ -147,7 +155,10 @@ async function fetchYahooCloses(from: string, to: string): Promise<number[]> {
     headers: { "user-agent": "Mozilla/5.0 (aegis-fx-signals)" },
     signal: AbortSignal.timeout(6000),
   });
-  if (!res.ok) throw new Error(`yahoo chart ${res.status}`);
+  if (!res.ok) {
+    await closeBody(res);
+    throw new Error(`yahoo chart ${res.status}`);
+  }
   const json = (await res.json()) as {
     chart?: { result?: Array<{ indicators?: { quote?: Array<{ close?: (number | null)[] }> } }> };
   };

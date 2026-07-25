@@ -16,6 +16,24 @@ function toISODate(ts: number): string {
   return new Date(ts * 1000).toISOString().slice(0, 10);
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function closeBody(res: Response): Promise<void> {
+  try {
+    await res.body?.cancel();
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> {
   // range picks: buffer to ensure we get `days` trading days back
   const range = days <= 30 ? "3mo" : days <= 180 ? "1y" : days <= 365 ? "2y" : "5y";
@@ -24,17 +42,19 @@ async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> 
   )}?interval=1d&range=${range}`;
   const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
   const res = await runWithBreaker("yahoo", () =>
-    fetch(url, {
+    fetchWithTimeout(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
-    }).then((r) => {
+    }, 6_000).then(async (r) => {
       // Treat retryable/upstream failures as breaker faults so a Yahoo outage
       // trips fast instead of burning the request budget on repeated timeouts.
       if (!r.ok && (r.status >= 500 || r.status === 429)) {
+        await closeBody(r);
         throw new Error(`Yahoo transient ${r.status} for ${symbol}`);
       }
       return r;
     }));
   if (!res.ok) {
+    await closeBody(res);
     throw new Error(`Yahoo fetch failed for ${symbol}: ${res.status}`);
   }
   const json = (await res.json()) as {
@@ -187,15 +207,19 @@ export async function getDailyCandlesRange(
   try {
     const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
     const res = await runWithBreaker("yahoo", () =>
-      fetch(url, {
+      fetchWithTimeout(url, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
-      }).then((r) => {
+      }, 6_000).then(async (r) => {
         if (!r.ok && (r.status >= 500 || r.status === 429)) {
+          await closeBody(r);
           throw new Error(`Yahoo transient ${r.status}`);
         }
         return r;
       }));
-    if (!res.ok) throw new Error(`Yahoo ${res.status}`);
+    if (!res.ok) {
+      await closeBody(res);
+      throw new Error(`Yahoo ${res.status}`);
+    }
     const json = (await res.json()) as {
       chart?: {
         result?: Array<{
@@ -312,7 +336,7 @@ export function dailyVolatility(closes: number[], period = 20): number | null {
 export async function refreshLatestCandles(symbols: string[]): Promise<{ refreshed: number; errors: number }> {
   let refreshed = 0;
   let errors = 0;
-  for (const symbol of symbols) {
+  for (const symbol of symbols.slice(0, 36)) {
     try {
       const fresh = await fetchYahooDaily(symbol, 5);
       if (fresh.length === 0) continue;

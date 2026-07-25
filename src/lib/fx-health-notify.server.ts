@@ -119,6 +119,7 @@ export function maybeNotifyFxUnhealthy(params: {
             }),
           });
           if (!res.ok) console.warn("fx-health-notify webhook non-2xx", res.status);
+          await res.body?.cancel().catch(() => undefined);
         } finally {
           clearTimeout(timer);
         }
