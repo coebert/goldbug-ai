@@ -251,14 +251,27 @@ function AffordabilityCell({ row }: { row: TradeErrorRow }) {
   }
   if (a.kind === "fx_blocked") {
     return (
-      <div>
-        <Badge variant="destructive">fx blocked</Badge>
-        <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
-          {a.reason}
+      <div className="space-y-1">
+        <Badge variant="destructive">FX blocked</Badge>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Cross-currency buy blocked — the app couldn't get a trustworthy
+          {row.fx?.from && row.fx?.to ? ` ${row.fx.from}→${row.fx.to}` : ""} FX
+          rate, so it refused to size the order against the broker's cash to
+          avoid a real cash shortfall.
+        </p>
+        {row.fx && (
+          <p className="text-[11px] font-mono text-muted-foreground">
+            rate used: {row.fx.rate != null ? row.fx.rate.toFixed(4) : "?"} · source: {row.fx.source ?? "unknown"}
+            {row.fx.stale ? " · stale" : ""}
+          </p>
+        )}
+        <p className="text-[11px] text-muted-foreground line-clamp-3">
+          Reason: {a.reason}
         </p>
       </div>
     );
   }
+
   // skipped
   return (
     <div>
