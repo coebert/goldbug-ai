@@ -612,7 +612,7 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Total equity
             </div>
-            {isLoadingEquity && sparkSeries.length === 0 ? (
+            {equityLoading ? (
               <>
                 <Skeleton
                   data-testid="total-equity-skeleton"
@@ -620,6 +620,19 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
                   className="ml-auto mt-1 h-7 w-28"
                 />
                 <Skeleton className="ml-auto mt-2 h-3 w-20" />
+              </>
+            ) : equityEmpty ? (
+              <>
+                <div
+                  data-testid="total-equity-empty"
+                  aria-label="Total equity unavailable"
+                  className="text-2xl font-bold leading-tight tabular-nums text-muted-foreground"
+                >
+                  {portfolio.currency} —
+                </div>
+                <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  No equity snapshots yet
+                </div>
               </>
             ) : (
               <>
