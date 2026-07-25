@@ -60,6 +60,10 @@ const FxHealthCard = lazy(() =>
 const ManualFxConvertCard = lazy(() =>
   import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
 );
+const WalletAffordabilityCard = lazy(() =>
+  import("@/components/wallet-affordability-card").then((m) => ({ default: m.WalletAffordabilityCard })),
+);
+
 
 
 
@@ -795,6 +799,15 @@ function PortfolioPage() {
                 />
               </div>
             )}
+
+            {p && (
+              <div className="mb-4">
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
+                </Suspense>
+              </div>
+            )}
+
 
 
 
