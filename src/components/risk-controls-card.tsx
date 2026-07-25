@@ -692,6 +692,89 @@ export function RiskControlsCard({
               </div>
             </div>
 
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Commodity sub-limits</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Fine-grained caps on top of the overall <em>Commodities</em> asset-class limit above. Blank = no per-group cap for that bucket.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {COMMODITY_GROUPS.map((g) => {
+                  const v = cfg.commodity_group_limits[g];
+                  return (
+                    <div key={g}>
+                      <Label className="text-xs">Max {g} %</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          className="w-24"
+                          min={0}
+                          max={100}
+                          step={1}
+                          placeholder="—"
+                          value={v == null ? "" : Number((v * 100).toFixed(0))}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setCfg((cur) => {
+                              const next = { ...cur.commodity_group_limits };
+                              if (raw === "") delete next[g];
+                              else next[g] = Math.max(0, Math.min(100, Number(raw) || 0)) / 100;
+                              return { ...cur, commodity_group_limits: next };
+                            });
+                          }}
+                        />
+                        <span className="text-xs text-muted-foreground">% of NAV</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs font-medium">Min 20-day average daily $ volume</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-32"
+                      min={0}
+                      max={1_000_000_000}
+                      step={10_000}
+                      value={cfg.commodity_min_adv_usd}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          commodity_min_adv_usd: Math.max(0, Math.min(1e9, Number(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">$ — reject illiquid commodity ETC/ETFs (0 disables)</span>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Max 14-day ATR (spread proxy)</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={Number((cfg.commodity_max_atr_pct * 100).toFixed(2))}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          commodity_max_atr_pct: Math.max(0, Math.min(1, (Number(e.target.value) || 0) / 100)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">% — block choppy/thin commodities (0 disables)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+
+
 
             <div>
               <h4 className="mb-2 text-sm font-medium"><Explain term="inverse_vol_sizing">Volatility-based sizing</Explain></h4>
