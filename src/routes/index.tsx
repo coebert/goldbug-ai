@@ -126,12 +126,20 @@ function Home() {
     queryFn: () => list(),
     enabled: !!session,
   });
+  // Stale-while-revalidate: `keepPreviousData` guarantees that every
+  // refetch (manual invalidation, window focus, interval) keeps the
+  // last successful snapshot in `equityQ.data` until the new payload
+  // lands atomically. Because both the GBP headline and the % pill on
+  // every card derive from that single snapshot via `deriveCardEquity`,
+  // they can never render mid-refresh with mismatched values.
   const equityQ = useQuery({
     queryKey: ["all-portfolios-equity"],
     queryFn: () => fetchEquity(),
     enabled: !!session,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
+  const isRefreshingEquity = equityQ.isFetching && !equityQ.isLoading;
   const sparkByPortfolio = useMemo(
     () => computeSparkByPortfolio(equityQ.data),
     [equityQ.data],
