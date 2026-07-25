@@ -969,6 +969,28 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           });
           continue;
         }
+        // Liquidity / spread threshold gates for commodity buys. These are
+        // separate from the per-group NAV cap and operate on candidate
+        // symbol quality rather than portfolio composition.
+        const cfeat = featureBySymbol.get(meta.symbol);
+        const advUsd = (cfeat?.adv_20d ?? 0) * price;
+        if (cfg.commodity_min_adv_usd > 0 && advUsd > 0 && advUsd < cfg.commodity_min_adv_usd) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `commodity ${meta.symbol} blocked: 20d ADV $${Math.round(advUsd).toLocaleString()} below min $${Math.round(cfg.commodity_min_adv_usd).toLocaleString()}`,
+          });
+          continue;
+        }
+        const atrP = cfeat?.atr_pct ?? null;
+        if (cfg.commodity_max_atr_pct > 0 && atrP != null && atrP > cfg.commodity_max_atr_pct) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `commodity ${meta.symbol} blocked: 14d ATR ${(atrP * 100).toFixed(2)}% exceeds max ${(cfg.commodity_max_atr_pct * 100).toFixed(2)}%`,
+          });
+          continue;
+        }
       }
 
       const spendableCash = Math.max(0, workingCash - cashFloor);
