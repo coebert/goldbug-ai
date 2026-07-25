@@ -791,7 +791,7 @@ function PortfolioPage() {
                   currency={String(p.currency ?? "GBP")}
                   equity={equity as { snapshot_date: string; total_value: number }[]}
                   trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
-                  deposits={deposits}
+                  deposits={depositEvents}
                 />
               </div>
             )}
