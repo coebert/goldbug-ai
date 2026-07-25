@@ -1314,6 +1314,9 @@ function PortfolioPage() {
                       <FxIntentPnlCard portfolioId={p.id} active={tab === "errors"} />
                     )}
                     {p.fx_enabled === true && (
+                      <RiskSimulatorCard portfolioId={p.id} active={tab === "errors"} />
+                    )}
+                    {p.fx_enabled === true && (
                       <ManualFxConvertCard portfolio={p} />
                     )}
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
