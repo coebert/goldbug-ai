@@ -1813,7 +1813,7 @@ function DecisionCard({
             <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
               Market briefing
             </div>
-            <p className="text-sm text-muted-foreground">{decision.briefing}</p>
+            <p className="text-sm text-muted-foreground"><JargonText>{decision.briefing}</JargonText></p>
           </div>
         )}
         {decision.rationale && (
@@ -1821,7 +1821,7 @@ function DecisionCard({
             <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
               Rationale
             </div>
-            <p className="text-sm">{decision.rationale}</p>
+            <p className="text-sm"><JargonText>{decision.rationale}</JargonText></p>
           </div>
         )}
 
