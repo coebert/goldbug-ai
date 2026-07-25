@@ -268,6 +268,160 @@ export async function routeOrdersToBroker(params: {
       response: asJson({ fxSource, fxStale }),
       error: `fx unavailable — blocking cross-currency buys`,
     });
+  } else if (fxEnabled) {
+    // ---------- Phase B: per-currency wallet routing.
+    // Rather than measure every buy against a single broker-cash number, walk
+    // the portfolio's per-currency wallet (`cash_by_ccy`) and pay each buy
+    // from its instrument's own quote currency. When the target currency is
+    // short, top it up from the base currency via a synthetic FX conversion
+    // leg captured at the same rate the AI sized against.
+    const buys = routable
+      .filter((o) => o.side === "buy")
+      .slice()
+      .sort((a, b) => b.quantity * b.price - a.quantity * a.price);
+
+    if (buys.length > 0) {
+      // Resolve instrument currency per symbol. Prefer the value the caller
+      // passed on the ExecutedOrder; fall back to saxo_instrument_cache; then
+      // to the portfolio base currency so we never crash on an unknown row.
+      const symbols = Array.from(new Set(buys.map((o) => o.symbol)));
+      const symToCcy = new Map<string, string>();
+      for (const o of buys) {
+        if (o.instrument_ccy) symToCcy.set(o.symbol, o.instrument_ccy.toUpperCase());
+      }
+      const missing = symbols.filter((s) => !symToCcy.has(s));
+      if (missing.length > 0) {
+        const cache = await supabaseAdmin
+          .from("saxo_instrument_cache")
+          .select("symbol, currency")
+          .in("symbol", missing);
+        for (const row of cache.data ?? []) {
+          if (row.currency) symToCcy.set(row.symbol, row.currency.toUpperCase());
+        }
+      }
+      for (const s of symbols) if (!symToCcy.has(s)) symToCcy.set(s, portfolioCurrency);
+
+      // Bulk FX matrix: base_ccy -> every instrument currency we'll spend in.
+      const targetCcys = Array.from(new Set(symToCcy.values())).filter(
+        (c) => c !== portfolioCurrency,
+      );
+      const { getFxMatrix } = await import("@/lib/fx.server");
+      const matrix =
+        targetCcys.length > 0
+          ? await getFxMatrix(targetCcys.map((c) => ({ from: portfolioCurrency, to: c })))
+          : new Map<string, { rate: number; stale: boolean; source: string }>();
+
+      const { readWallet, writeWalletFields } = await import("./portfolio-wallet");
+      const { trimBuysToBudgetByCurrency } = await import("./pre-place-budget-multi-ccy");
+
+      const wallet = readWallet({
+        currency: portfolioCurrency,
+        current_cash: brokerCashAvailable ?? undefined,
+        cash_by_ccy: pfRowData?.cash_by_ccy ?? null,
+      });
+
+      const fxLookup = (from: string, to: string): number | null => {
+        if (from === to) return 1;
+        const hit = matrix.get(`${from}${to}`);
+        if (!hit) return null;
+        // A rate=1 identity fallback (both providers down) is unusable —
+        // let the trimmer skip the buy instead of amplifying the reject.
+        if (hit.source.startsWith("fallback:")) return null;
+        return hit.rate;
+      };
+      const isStale = (from: string, to: string) => matrix.get(`${from}${to}`)?.stale === true;
+
+      const anyStale = targetCcys.some((c) => matrix.get(`${portfolioCurrency}${c}`)?.stale);
+      const safetyBufferPct = anyStale ? 0.05 : 0.01;
+
+      const trim = trimBuysToBudgetByCurrency(
+        buys.map((o) => ({
+          symbol: o.symbol,
+          side: o.side,
+          quantity: o.quantity,
+          price: o.price,
+          instrument_ccy: symToCcy.get(o.symbol) ?? portfolioCurrency,
+        })),
+        wallet,
+        portfolioCurrency,
+        fxLookup,
+        { safetyBufferPct, allowFxConversion: true, isRateStale: isStale },
+      );
+
+      for (const d of trim.decisions) {
+        if (d.kind === "skip") preSkips.set(`${d.order.symbol}:${d.order.side}`, d.reason);
+      }
+
+      // Persist wallet updates (FX conversion legs + buy debits are all
+      // reflected in `finalWallet`). Sells will be credited by the fill
+      // handler later; this write only reflects the pre-placement state.
+      if (trim.fxLegs.length > 0) {
+        const fields = writeWalletFields(trim.finalWallet, portfolioCurrency);
+        await supabaseAdmin
+          .from("portfolios")
+          .update({ cash_by_ccy: asJson(fields.cash_by_ccy), current_cash: fields.current_cash })
+          .eq("id", portfolio.id);
+
+        for (const leg of trim.fxLegs) {
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolio.id,
+            user_id: userId,
+            broker: "saxo",
+            env: portfolio.mode === "live_prod" ? "live" : "sim",
+            method: "FX_LEG",
+            path: `/fx/${leg.fromCcy}->${leg.toCcy}`,
+            status: leg.stale ? 206 : 200,
+            request: asJson({ asOf, decisionId, triggeredBySymbol: leg.triggeredBySymbol }),
+            response: asJson({
+              fromCcy: leg.fromCcy,
+              toCcy: leg.toCcy,
+              amountFrom: leg.amountFrom,
+              amountTo: leg.amountTo,
+              rate: leg.rate,
+              stale: leg.stale,
+            }),
+            error: leg.stale ? "fx leg used stale rate" : null,
+          });
+        }
+      }
+
+      if (trim.skippedCount > 0 || trim.fxLegs.length > 0) {
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_MULTI_CCY_TRIM",
+          path: "/reconcile/pre-place/trim-multi-ccy",
+          status: 200,
+          request: asJson({
+            asOf,
+            decisionId,
+            baseCcy: portfolioCurrency,
+            wallet,
+            safetyBufferPct,
+            targetCcys,
+            requestedByCcy: trim.totalRequestedByCcy,
+            allowedByCcy: trim.totalAllowedByCcy,
+          }),
+          response: asJson({
+            skippedCount: trim.skippedCount,
+            fxLegs: trim.fxLegs,
+            skipped: trim.decisions
+              .filter((d) => d.kind === "skip")
+              .map((d) => ({
+                symbol: d.order.symbol,
+                side: d.order.side,
+                instrument_ccy: d.order.instrument_ccy,
+                notionalNative: d.notionalNative,
+                reason: d.reason,
+              })),
+            finalWallet: trim.finalWallet,
+          }),
+          error: null,
+        });
+      }
+    }
   } else if (brokerCashAvailable != null) {
     const { trimBuysToBudget } = await import("./pre-place-budget");
     // Rank buys by broker-ccy notional so the biggest, most conviction-heavy
@@ -322,6 +476,7 @@ export async function routeOrdersToBroker(params: {
       }
     }
   }
+
 
 
 
