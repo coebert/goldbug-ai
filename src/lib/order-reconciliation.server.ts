@@ -189,10 +189,10 @@ export async function reconcileOrderStatusesForPortfolio(params: {
               : "working";
 
       if (mappedFromSaxo !== previousStatusLc) {
-        const patch: Record<string, unknown> = { status: mappedFromSaxo };
-        if (mappedFromSaxo === "rejected") {
-          patch.reject_reason = "rejected by broker";
-        }
+        const patch =
+          mappedFromSaxo === "rejected"
+            ? { status: mappedFromSaxo, reject_reason: "rejected by broker" }
+            : { status: mappedFromSaxo };
         const upd = await supabaseAdmin
           .from("live_orders")
           .update(patch)
