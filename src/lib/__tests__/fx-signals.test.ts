@@ -27,7 +27,8 @@ describe("fx-signals pure math", () => {
 
   it("dailyReturns skips non-positive prices and NaNs", () => {
     expect(dailyReturns([100, 110, 121])).toEqual([0.1, 0.1]);
-    expect(dailyReturns([100, 0, 110])).toEqual([]);
+    // A zero price skips only the return whose *previous* price is 0.
+    expect(dailyReturns([100, 0, 110])).toEqual([-1]);
   });
 
   it("annualisedVolPct returns null when insufficient data, otherwise scales √252", () => {
