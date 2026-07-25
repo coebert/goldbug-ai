@@ -158,6 +158,7 @@ export type Database = {
           briefing: string
           created_at: string
           id: string
+          instrument_ccy: string
           model: string | null
           portfolio_id: string
           portfolio_value: number | null
@@ -169,6 +170,7 @@ export type Database = {
           briefing?: string
           created_at?: string
           id?: string
+          instrument_ccy?: string
           model?: string | null
           portfolio_id: string
           portfolio_value?: number | null
@@ -180,6 +182,7 @@ export type Database = {
           briefing?: string
           created_at?: string
           id?: string
+          instrument_ccy?: string
           model?: string | null
           portfolio_id?: string
           portfolio_value?: number | null
@@ -268,6 +271,7 @@ export type Database = {
           avg_cost: number
           high_water_mark: number | null
           id: string
+          instrument_ccy: string
           opened_at: string
           portfolio_id: string
           quantity: number
@@ -279,6 +283,7 @@ export type Database = {
           avg_cost?: number
           high_water_mark?: number | null
           id?: string
+          instrument_ccy?: string
           opened_at?: string
           portfolio_id: string
           quantity?: number
@@ -290,6 +295,7 @@ export type Database = {
           avg_cost?: number
           high_water_mark?: number | null
           id?: string
+          instrument_ccy?: string
           opened_at?: string
           portfolio_id?: string
           quantity?: number
@@ -528,6 +534,7 @@ export type Database = {
           created_at: string
           decision_id: string | null
           id: string
+          instrument_ccy: string
           limit_price: number | null
           order_type: string
           portfolio_id: string
@@ -547,6 +554,7 @@ export type Database = {
           created_at?: string
           decision_id?: string | null
           id?: string
+          instrument_ccy?: string
           limit_price?: number | null
           order_type?: string
           portfolio_id: string
@@ -566,6 +574,7 @@ export type Database = {
           created_at?: string
           decision_id?: string | null
           id?: string
+          instrument_ccy?: string
           limit_price?: number | null
           order_type?: string
           portfolio_id?: string
@@ -814,6 +823,7 @@ export type Database = {
           expires_at: string
           id: string
           idempotency_key: string | null
+          instrument_ccy: string
           limit_price: number | null
           next_at: string
           notes: string | null
@@ -834,6 +844,7 @@ export type Database = {
           expires_at: string
           id?: string
           idempotency_key?: string | null
+          instrument_ccy?: string
           limit_price?: number | null
           next_at?: string
           notes?: string | null
@@ -854,6 +865,7 @@ export type Database = {
           expires_at?: string
           id?: string
           idempotency_key?: string | null
+          instrument_ccy?: string
           limit_price?: number | null
           next_at?: string
           notes?: string | null
@@ -933,10 +945,12 @@ export type Database = {
         Row: {
           broker: string | null
           broker_account_id: string | null
+          cash_by_ccy: Json
           circuit_breaker: Json
           created_at: string
           currency: string
           current_cash: number
+          fx_enabled: boolean
           hyperparams: Json
           id: string
           last_run_date: string | null
@@ -956,10 +970,12 @@ export type Database = {
         Insert: {
           broker?: string | null
           broker_account_id?: string | null
+          cash_by_ccy?: Json
           circuit_breaker?: Json
           created_at?: string
           currency?: string
           current_cash?: number
+          fx_enabled?: boolean
           hyperparams?: Json
           id?: string
           last_run_date?: string | null
@@ -979,10 +995,12 @@ export type Database = {
         Update: {
           broker?: string | null
           broker_account_id?: string | null
+          cash_by_ccy?: Json
           circuit_breaker?: Json
           created_at?: string
           currency?: string
           current_cash?: number
+          fx_enabled?: boolean
           hyperparams?: Json
           id?: string
           last_run_date?: string | null
@@ -1514,6 +1532,7 @@ export type Database = {
           asset_class: Database["public"]["Enums"]["asset_class"]
           executed_at: string
           id: string
+          instrument_ccy: string
           portfolio_id: string
           price: number
           quantity: number
@@ -1527,6 +1546,7 @@ export type Database = {
           asset_class: Database["public"]["Enums"]["asset_class"]
           executed_at?: string
           id?: string
+          instrument_ccy?: string
           portfolio_id: string
           price: number
           quantity: number
@@ -1540,6 +1560,7 @@ export type Database = {
           asset_class?: Database["public"]["Enums"]["asset_class"]
           executed_at?: string
           id?: string
+          instrument_ccy?: string
           portfolio_id?: string
           price?: number
           quantity?: number
