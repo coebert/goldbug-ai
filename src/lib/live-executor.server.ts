@@ -313,10 +313,24 @@ export async function routeOrdersToBroker(params: {
   let firstOrder = true;
 
   for (const order of routable) {
+    // Pre-placement affordability trim: buys that don't fit the freshly
+    // reconciled broker cash are skipped before we ever call placeOrder.
+    const skipReason = preSkips.get(`${order.symbol}:${order.side}`);
+    if (skipReason) {
+      results.push({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: order.quantity,
+        status: "skipped",
+        skipped: skipReason,
+      });
+      continue;
+    }
     if (!firstOrder) {
       await new Promise((resolve) => setTimeout(resolve, ORDER_SPACING_MS));
     }
     firstOrder = false;
+
     const clientOrderId = makeClientOrderId({
       portfolioId: portfolio.id,
       attemptSeed,
