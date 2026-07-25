@@ -985,7 +985,7 @@ function PortfolioPage() {
                   </div>
                 )}
                 <CardContent
-                  className="h-64"
+                  className="h-56 sm:h-64"
                   style={chartTheme.surface !== "transparent" ? { background: chartTheme.surface, borderRadius: 8 } : undefined}
                 >
                   {equityData.length < 2 ? (
