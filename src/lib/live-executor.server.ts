@@ -555,6 +555,11 @@ export async function routeOrdersToBroker(params: {
               ? { kind: "ok", triggerSymbol: leg.triggeredBySymbol, fillRate: spot.fillRate ?? leg.rate, amountTo: spot.amountTo ?? leg.amountTo }
               : { kind: "failed", triggerSymbol: leg.triggeredBySymbol, reason: spot.reason ?? "fx spot rejected" },
           );
+          reconFxOutcomes.push(
+            ok
+              ? { triggerSymbol: leg.triggeredBySymbol, kind: "ok" }
+              : { triggerSymbol: leg.triggeredBySymbol, kind: "failed", reason: spot.reason ?? "fx spot rejected" },
+          );
         }
         const { survivors, droppedSymbols } = survivingBuysAfterFxSpot(buyOrders, trim, outcomes);
         if (droppedSymbols.size > 0) {
@@ -573,9 +578,25 @@ export async function routeOrdersToBroker(params: {
         }
       }
 
+      // Snapshot the final, actually-submitted FX legs for the post-broker
+      // reconciler. This is the set the reconciler expects to see reflected
+      // in successful outcomes, one entry per triggered symbol.
+      for (const leg of trim.fxLegs) {
+        reconPlannedLegs.push({
+          triggeredBySymbol: leg.triggeredBySymbol,
+          fromCcy: leg.fromCcy,
+          toCcy: leg.toCcy,
+          amountFrom: leg.amountFrom,
+          amountTo: leg.amountTo,
+          rate: leg.rate,
+          stale: leg.stale,
+        });
+      }
+
       for (const d of trim.decisions) {
         if (d.kind === "skip") preSkips.set(`${d.order.symbol}:${d.order.side}`, d.reason);
       }
+
 
       // Persist wallet updates (FX conversion legs + buy debits are all
       // reflected in `finalWallet`). Sells will be credited by the fill
