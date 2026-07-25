@@ -103,7 +103,9 @@ import {
   planOrderSlices,
   todExecutionAdjustment,
   inferVenueFromSymbol,
+  resolveVenueTodConfig,
 } from "./alpha/execution-alpha";
+
 import type { Database } from "@/integrations/supabase/types";
 
 
