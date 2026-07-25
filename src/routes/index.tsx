@@ -14,6 +14,7 @@ import { Sparkline } from "@/components/sparkline";
 import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
 import { computeModeSummary } from "@/lib/mode-summary";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
+import { useEquityDecimals, EQUITY_DECIMALS_MIN, EQUITY_DECIMALS_MAX } from "@/lib/use-equity-decimals";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
 import { deriveCardEquity } from "@/lib/derive-card-equity";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
