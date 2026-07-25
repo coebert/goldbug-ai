@@ -99,7 +99,7 @@ export function TradeErrorDashboardCard({ portfolioId, active = true }: Props) {
                   {rows.map((r) => (
                     <tr key={r.id} className="border-t align-top">
                       <td className="p-2 whitespace-nowrap text-xs text-muted-foreground">
-                        {formatUkTime(r.createdAt, { includeSeconds: false })}
+                        {formatUkTime(r.createdAt)}
                       </td>
                       <td className="p-2">
                         <div className="font-medium">{r.symbol}</div>
@@ -135,7 +135,7 @@ export function TradeErrorDashboardCard({ portfolioId, active = true }: Props) {
                         {r.symbol} <span className="text-muted-foreground">{r.side} {r.quantity}</span>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatUkTime(r.createdAt, { includeSeconds: false })}
+                        {formatUkTime(r.createdAt)}
                       </div>
                     </div>
                     <StatusBadge status={r.status} />
