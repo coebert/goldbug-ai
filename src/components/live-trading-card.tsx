@@ -142,9 +142,26 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const isLive = mode === "live_sim" || mode === "live_prod";
   const paused = !!s?.portfolio.live_paused;
 
+  // One-click hook: the precheck cash alert banner dispatches this event so
+  // the user can jump straight from "broker keeps rejecting buys" to a live
+  // sync + reconcile without hunting for the button.
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ portfolioId?: string }>).detail;
+      if (detail?.portfolioId && detail.portfolioId !== portfolioId) return;
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (s?.hasToken && !mSync.isPending) mSync.mutate();
+      if (isLive && !mRecon.isPending) mRecon.mutate();
+    };
+    window.addEventListener("lovable:reconcile-cash", handler as EventListener);
+    return () => window.removeEventListener("lovable:reconcile-cash", handler as EventListener);
+  }, [portfolioId, s?.hasToken, isLive, mSync, mRecon]);
+
   return (
-    <Card>
+    <Card ref={cardRef}>
       <CardHeader>
+
         <div className="flex items-start justify-between gap-2">
           <div>
             <CardTitle className="flex items-center gap-2">
