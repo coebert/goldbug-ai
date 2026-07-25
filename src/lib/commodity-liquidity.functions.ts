@@ -1,11 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { UNIVERSE } from "@/lib/universe.server";
-import {
-  applyBuyExecution,
-  DEFAULT_EXECUTION,
-} from "@/lib/execution-realism.server";
+
 
 // Simulate slippage and liquidity impact for commodity trades. Reads recent
 // price_cache rows to estimate ADV$, spread proxy (high-low as % of close),
