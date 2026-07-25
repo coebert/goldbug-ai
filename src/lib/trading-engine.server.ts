@@ -116,12 +116,14 @@ const OrderSchema = z.object({
 
 
 import { FxConversionOrderSchema } from "./ai-fx-conversions.server";
+import { FxIntentSchema } from "./fx-intents";
 
 const DecisionSchema = z.object({
   briefing: z.string(),
   rationale: z.string(),
   orders: z.array(OrderSchema),
   fx_conversions: z.array(FxConversionOrderSchema).optional(),
+  fx_intents: z.array(FxIntentSchema).optional(),
 });
 
 export type DecisionOutput = z.infer<typeof DecisionSchema>;
