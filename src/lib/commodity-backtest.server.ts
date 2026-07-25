@@ -271,6 +271,9 @@ export function runCommodityRejectionBacktest(
 
       totalProposals++;
       agg.proposals++;
+      advSamples.push(adv);
+      if (atr != null) atrSamples.push(atr);
+
 
       // Evaluate guardrails in priority order. First failure wins so the
       // sample-rejection table shows the primary reason a live executor
