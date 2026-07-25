@@ -1209,6 +1209,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         sizingNotes.push(`calib×${calibration.global_size_mult.toFixed(2)}`);
       }
 
+      // Phase 2 — two-sided sizing bonus. Lifts spend (up to cap) when the
+      // regime-blended alpha prior and AI conviction both strongly agree with
+      // the trade side. Never shrinks below the current spend.
+      if (order.side === "buy" && cfg.alpha_bonus_enabled) {
+        const alphaComp = alphaCompositeBySymbol.get(meta.symbol) ?? 0;
+        const bonus = alphaConvictionBonus({
+          side: "buy",
+          alphaComposite: alphaComp,
+          conviction: order.conviction,
+          cap: cfg.alpha_bonus_cap,
+          enabled: true,
+        });
+        if (bonus.mult > 1) {
+          spend *= bonus.mult;
+          if (bonus.note) sizingNotes.push(bonus.note);
+        }
+      }
+
       // J. Ensemble second opinion — halve on strong disagreement, log to journal
       {
         const feat = featureBySymbol.get(meta.symbol);
