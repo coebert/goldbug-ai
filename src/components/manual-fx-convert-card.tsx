@@ -149,8 +149,9 @@ export function ManualFxConvertCard({ portfolio }: Props) {
   };
 
   const previewData = previewQ.data;
-  const previewOk = previewData?.ok === true ? previewData : null;
-  const previewErr = previewData?.ok === false ? previewData : null;
+  const previewOk = previewData && previewData.ok === true ? previewData : null;
+  const previewErr = previewData && previewData.ok === false ? previewData : null;
+
 
   return (
     <Card>
