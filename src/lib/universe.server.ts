@@ -181,6 +181,14 @@ export type RiskConfig = {
   // deploy up to 100% of cash (cash_floor_pct = 0) without changing the risk
   // level. `null` means "use the preset for the current risk level".
   cash_floor_pct: number | null;
+  // User setting: how aggressively to push exposure into commodities and FX
+  // above the baseline risk-and-regime ranking. "off" is neutral (today's
+  // behaviour); "balanced" nudges the AI to consider commodity/FX ideas when
+  // current exposure sits below a moderate target; "strong" applies a firmer
+  // tilt with higher target exposure and a more explicit instruction to
+  // propose diversifiers whenever the guardrail room is available. Purely a
+  // prompt-level bias — it never overrides hard `asset_class_limits`.
+  diversification_tilt: "off" | "balanced" | "strong";
 };
 
 /**
@@ -252,6 +260,7 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   tod_hard_block_close_min: 0,
   tod_venue_overrides: null,
   cash_floor_pct: null,
+  diversification_tilt: "off",
 
 };
 
@@ -386,6 +395,13 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
     out.cash_floor_pct = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
   }
 
+  // Diversification-tilt user setting. Unknown / missing values fall back to
+  // the neutral default so upgrades don't silently change AI behaviour.
+  if (r.diversification_tilt === "off" || r.diversification_tilt === "balanced" || r.diversification_tilt === "strong") {
+    out.diversification_tilt = r.diversification_tilt;
+  }
+
+
   // Per-venue TOD overrides.
   if (r.tod_venue_overrides && typeof r.tod_venue_overrides === "object") {
     const allowedVenues = new Set(["LSE", "NYSE", "NASDAQ", "CRYPTO", "OTHER"]);
@@ -498,6 +514,74 @@ export function filterUniverseByAffordability(args: {
   }
   return { candidates, dropped, perSymbolBudget, minTradeValue, notes, fellBackToCheapest };
 }
+
+
+// ---------------------------------------------------------------------------
+// Diversification tilt: prompt-level nudge toward commodities / FX.
+//
+// Purely a soft bias layered on top of the ranker. It NEVER raises the hard
+// `asset_class_limits` caps and NEVER forces a trade — the buy-side guardrails
+// downstream still reject anything that would breach the cap or affordability
+// checks. The block simply tells the AI "you currently hold X% commodities vs
+// an Y% target for this tilt; consider proposing diversifiers if the setup is
+// there". Baseline ("off") emits no block, so behaviour is unchanged for
+// users who don't opt in.
+// ---------------------------------------------------------------------------
+
+export type DiversificationTilt = "off" | "balanced" | "strong";
+
+type TiltTargets = { commodity: number; fx: number; label: string; instruction: string };
+
+export function tiltTargets(
+  tilt: DiversificationTilt,
+  cfg: Pick<RiskConfig, "asset_class_limits">,
+): TiltTargets | null {
+  if (tilt === "off") return null;
+  const commodityCap = cfg.asset_class_limits.commodity ?? 0;
+  const fxCap = cfg.asset_class_limits.fx ?? 0;
+  // Target is a fraction of the user's own cap: "balanced" aims for ~40% of
+  // the cap, "strong" aims for ~70%. This keeps the tilt proportional to the
+  // risk-preset caps the user already chose.
+  const frac = tilt === "balanced" ? 0.4 : 0.7;
+  return {
+    commodity: Math.max(0, Math.min(commodityCap, commodityCap * frac)),
+    fx: Math.max(0, Math.min(fxCap, fxCap * frac)),
+    label: tilt === "balanced" ? "Balanced diversification tilt" : "Strong diversification tilt",
+    instruction:
+      tilt === "balanced"
+        ? "When the setup supports it, prefer adding a commodity or FX name over doubling up on an existing stock/ETF exposure."
+        : "Actively look for the best commodity and FX ideas each cycle. Propose them ahead of marginal stock/ETF adds whenever the risk/technical picture is at least neutral.",
+  };
+}
+
+export function buildDiversificationTiltBlock(args: {
+  tilt: DiversificationTilt;
+  cfg: Pick<RiskConfig, "asset_class_limits">;
+  currentExposure?: { commodity: number; fx: number };
+}): string {
+  const t = tiltTargets(args.tilt, args.cfg);
+  if (!t) return "";
+  const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
+  const lines = [
+    `DIVERSIFICATION TILT — ${t.label}`,
+    `Soft targets (fraction of your asset-class caps): commodity ${pct(t.commodity)}, FX ${pct(t.fx)}.`,
+  ];
+  if (args.currentExposure) {
+    const gapC = Math.max(0, t.commodity - args.currentExposure.commodity);
+    const gapF = Math.max(0, t.fx - args.currentExposure.fx);
+    lines.push(
+      `Current exposure: commodity ${pct(args.currentExposure.commodity)}, FX ${pct(args.currentExposure.fx)}.`,
+      gapC + gapF <= 0.005
+        ? "Current commodity/FX exposure already meets or exceeds the tilt target — no extra nudge needed this cycle."
+        : `Room to tilt: commodities +${pct(gapC)}, FX +${pct(gapF)} (soft — hard caps still apply).`,
+    );
+  }
+  lines.push(t.instruction);
+  lines.push("This is a soft bias only — it never overrides asset-class caps, per-symbol caps, or affordability checks.");
+  return lines.join("\n");
+}
+
+
 
 
 

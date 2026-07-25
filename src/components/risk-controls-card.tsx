@@ -41,6 +41,7 @@ type RiskConfig = {
   commodity_group_limits: Partial<Record<CommodityGroup, number>>;
   commodity_min_adv_usd: number;
   commodity_max_atr_pct: number;
+  diversification_tilt?: "off" | "balanced" | "strong";
   risk_level?: number;
 };
 
@@ -98,6 +99,10 @@ function parseCfg(raw: unknown): RiskConfig {
       ? Number(r.commodity_max_atr_pct)
       : DEFAULTS.commodity_max_atr_pct,
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
+    diversification_tilt:
+      r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
+        ? r.diversification_tilt
+        : "off",
   };
 }
 
@@ -256,6 +261,7 @@ function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
       fmtPct(next.asset_class_limits[c.key] ?? 0),
     );
   }
+  push("Diversification tilt", prev.diversification_tilt ?? "off", next.diversification_tilt ?? "off");
   return out;
 }
 
@@ -657,6 +663,41 @@ export function RiskControlsCard({
             </div>
 
 
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Diversification tilt</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Nudges the AI toward commodities and FX <em>on top of</em> the
+                baseline risk-and-regime ranking. Purely a soft bias — hard
+                asset-class caps above still apply.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { key: "off", label: "Off", blurb: "Neutral — rank by risk and regime only." },
+                    { key: "balanced", label: "Balanced", blurb: "Prefer a commodity/FX add over doubling up when the setup is there." },
+                    { key: "strong", label: "Strong", blurb: "Actively hunt for the best commodity/FX ideas each cycle." },
+                  ] as const
+                ).map((opt) => {
+                  const active = (cfg.diversification_tilt ?? "off") === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setCfg((c) => ({ ...c, diversification_tilt: opt.key }))}
+                      className={`rounded-md border px-3 py-2 text-left text-xs transition ${
+                        active
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-background hover:bg-muted"
+                      }`}
+                    >
+                      <div className="font-medium">{opt.label}</div>
+                      <div className="text-muted-foreground">{opt.blurb}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <div>
               <h4 className="mb-2 text-sm font-medium">Per-asset-class limits</h4>
