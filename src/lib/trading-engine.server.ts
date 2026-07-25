@@ -325,6 +325,8 @@ ${HISTORICAL_PLAYBOOK}
 
 ${HEDGE_FUND_PLAYBOOK}
 
+${COMMODITY_PLAYBOOK}
+
 ${args.fxSystemBlock ?? ""}
 
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
