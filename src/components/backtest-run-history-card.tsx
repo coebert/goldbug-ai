@@ -3,11 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listBacktestRuns,
-  saveBacktestRun as saveBacktestRunFn,
   deleteBacktestRun as deleteBacktestRunFn,
   clearBacktestRuns as clearBacktestRunsFn,
   type PersistedBacktestRun,
 } from "@/lib/backtest-runs.functions";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,35 +58,11 @@ const OVERLAY_PALETTE = [
 export const backtestRunsQueryKey = (portfolioId: string) =>
   ["backtestRuns", portfolioId] as const;
 
-// Called from the portfolio route after a successful backtest. Writes to
-// the `backtest_runs` table via a server function, then dispatches an
-// event so any mounted history card refreshes without prop-drilling a
-// setter. Kept as a plain async function so existing imperative callers
-// (`onSuccess` in the run mutation) don't need to become hooks.
-export async function saveRun(record: {
-  portfolioId: string;
-  riskLevel?: string;
-  days: number;
-  ranAt?: string;
-  metrics: BacktestMetrics;
-  equity?: BacktestEquityPoint[];
-}) {
-  await saveBacktestRunFn({
-    data: {
-      portfolioId: record.portfolioId,
-      riskLevel: record.riskLevel ?? null,
-      days: record.days,
-      ranAt: record.ranAt,
-      metrics: record.metrics as unknown as Parameters<typeof saveBacktestRunFn>[0]["data"]["metrics"],
-      equity: (record.equity ?? null) as unknown as Parameters<typeof saveBacktestRunFn>[0]["data"]["equity"],
-    },
-  });
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent("aegis:backtest-runs-updated", { detail: record.portfolioId }),
-    );
-  }
-}
+// `saveRun` was moved to `@/lib/backtest-run-save` so imperative callers
+// can persist a run without importing this heavy card module. Re-exported
+// here for backwards compatibility with any lingering callers.
+export { saveRun } from "@/lib/backtest-run-save";
+
 
 function fmt(n: number | null | undefined, digits = 2, suffix = "") {
   if (n == null || !Number.isFinite(n)) return "—";

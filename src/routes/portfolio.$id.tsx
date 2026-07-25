@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -43,8 +43,16 @@ import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, Shield
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
-import { TradeAuditLogCard } from "@/components/trade-audit-log-card";
-import { ConfidenceTimelineCard } from "@/components/confidence-timeline-card";
+// Heavy tab bodies are code-split via React.lazy to keep the main
+// portfolio route chunk lean on mobile.
+const TradeAuditLogCard = lazy(() =>
+  import("@/components/trade-audit-log-card").then((m) => ({ default: m.TradeAuditLogCard })),
+);
+const ConfidenceTimelineCard = lazy(() =>
+  import("@/components/confidence-timeline-card").then((m) => ({ default: m.ConfidenceTimelineCard })),
+);
+
+
 
 import {
   Collapsible,
@@ -89,8 +97,14 @@ import {
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
-import { BacktestResultsCard } from "@/components/backtest-results-card";
-import { BacktestRunHistoryCard, saveRun as saveBacktestRun } from "@/components/backtest-run-history-card";
+const BacktestResultsCard = lazy(() =>
+  import("@/components/backtest-results-card").then((m) => ({ default: m.BacktestResultsCard })),
+);
+const BacktestRunHistoryCard = lazy(() =>
+  import("@/components/backtest-run-history-card").then((m) => ({ default: m.BacktestRunHistoryCard })),
+);
+import { saveRun as saveBacktestRun } from "@/lib/backtest-run-save";
+
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
 
 
@@ -776,15 +790,20 @@ function PortfolioPage() {
             )}
 
             {backtestRunToken > 0 && lastBtDays != null && (
-              <BacktestResultsCard
-                portfolioId={id}
-                days={lastBtDays}
-                runToken={backtestRunToken}
-                currency={p?.currency ?? "USD"}
-              />
+              <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                <BacktestResultsCard
+                  portfolioId={id}
+                  days={lastBtDays}
+                  runToken={backtestRunToken}
+                  currency={p?.currency ?? "USD"}
+                />
+              </Suspense>
             )}
 
-            <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
+            <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+              <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
+            </Suspense>
+
 
 
 
@@ -1213,16 +1232,21 @@ function PortfolioPage() {
               </TabsContent>
 
               <TabsContent value="audit" className="mt-4">
-                <TradeAuditLogCard
-                  portfolioId={p.id}
-                  portfolioName={p.name}
-                  active={tab === "audit"}
-                />
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <TradeAuditLogCard
+                    portfolioId={p.id}
+                    portfolioName={p.name}
+                    active={tab === "audit"}
+                  />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="confidence" className="mt-4">
-                <ConfidenceTimelineCard decisions={decisions} />
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <ConfidenceTimelineCard decisions={decisions} />
+                </Suspense>
               </TabsContent>
+
 
 
               <TabsContent value="trades" className="mt-4">
