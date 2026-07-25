@@ -112,11 +112,13 @@ describe("portfolio card headline — layout contract (source-level)", () => {
     );
     // "cash vs start" label sits under the pnl%.
     expect(SOURCE).toMatch(/cash vs start/);
-    // Loading state uses skeletons of the RIGHT size (h-7 for the
-    // headline so the layout doesn't jump when data arrives) and is
-    // aligned right (ml-auto).
-    expect(SOURCE).toMatch(/className="ml-auto mt-1 h-7 w-28"/);
-    expect(SOURCE).toMatch(/data-testid="total-equity-skeleton"/);
+    // Loading state uses a shimmer skeleton sized to match the
+    // headline's typography box (h-8 ≈ text-2xl leading-tight) so
+    // the layout doesn't jump when data arrives. Right-alignment
+    // now comes from the enclosing `items-end` flex column.
+    expect(SOURCE).toMatch(
+      /<Skeleton\b[\s\S]*?variant="shimmer"[\s\S]*?data-testid="total-equity-skeleton"[\s\S]*?h-8/,
+    );
   });
 });
 

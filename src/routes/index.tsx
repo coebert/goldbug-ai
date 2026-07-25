@@ -572,9 +572,13 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
               <Sparkline values={values} width={120} height={32} />
               {equityLoading ? (
                 <Skeleton
+                  variant="shimmer"
                   data-testid="range-pct-skeleton"
                   aria-label="Loading equity change"
-                  className="h-4 w-12"
+                  role="status"
+                  aria-busy="true"
+                  /* Matches the rendered pill: text-sm (h-5) + tabular width of "+00.0%". */
+                  className="h-5 w-14"
                 />
               ) : equityEmpty || rangePct == null ? (
                 <span
@@ -619,14 +623,26 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
               Total equity
             </div>
             {equityLoading ? (
-              <>
+              <div
+                role="status"
+                aria-busy="true"
+                aria-label="Loading total equity"
+                data-testid="total-equity-loading"
+                className="flex flex-col items-end gap-1"
+              >
+                {/* Headline: matches `text-2xl font-bold leading-tight`
+                    box (1.5rem × 1.25 line-height ≈ 1.875rem → h-8),
+                    width sized to a typical "GBP 1,234,567.89" glyph run. */}
                 <Skeleton
+                  variant="shimmer"
                   data-testid="total-equity-skeleton"
-                  aria-label="Loading total equity"
-                  className="ml-auto mt-1 h-7 w-28"
+                  className="mt-1 h-8 w-40"
                 />
-                <Skeleton className="ml-auto mt-2 h-3 w-20" />
-              </>
+                {/* Cash sub-line: text-xs → h-4. */}
+                <Skeleton variant="shimmer" className="h-4 w-24" />
+                {/* PnL sub-line: text-xs → h-4, narrower. */}
+                <Skeleton variant="shimmer" className="h-4 w-16" />
+              </div>
             ) : equityEmpty ? (
               <>
                 <div
