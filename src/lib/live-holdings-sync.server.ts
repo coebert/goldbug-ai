@@ -168,12 +168,22 @@ export async function reconcileLiveHoldingsFromBroker(
     );
   }
 
-  // Recompute equity from broker prices + broker cash.
-  const holdingsValue = positions.reduce(
+  // Recompute equity from broker prices + broker cash, but PREFER Saxo's
+  // authoritative TotalValue when it's present so the headline number in Aegis
+  // matches the account summary shown in the Saxo app (which folds in bits our
+  // per-position math can miss — currency conversion at Saxo's rate, cash sub-
+  // accounts, un-booked corporate actions, etc.).
+  const holdingsValueLocal = positions.reduce(
     (sum, p) => sum + (p.marketPrice || p.avgPrice || 0) * p.quantity,
     0,
   );
-  const newTotal = brokerCash + holdingsValue;
+  const newTotal =
+    brokerTotalValue != null && brokerTotalValue > 0
+      ? brokerTotalValue
+      : brokerCash + holdingsValueLocal;
+  // Derive holdings_value from the authoritative total so cash + holdings_value
+  // always reconciles to total_value (avoids double-counting or off-by-one drift).
+  const holdingsValue = Math.max(0, newTotal - brokerCash);
 
   await db.from("portfolios")
     .update({ current_cash: brokerCash })
@@ -198,13 +208,15 @@ export async function reconcileLiveHoldingsFromBroker(
     status: 200,
     request: asJson({ localSymbols }),
     response: asJson({
-      brokerCash, currency, holdingsValue, newTotal,
+      brokerCash, currency, holdingsValue, holdingsValueLocal,
+      brokerTotalValue, newTotal,
       brokerPositions: positions.length,
       removedSymbols,
       keptSymbols: Array.from(brokerSymbols),
     }),
     error: null,
   });
+
 
   return {
     skipped: false,
