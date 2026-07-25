@@ -173,7 +173,11 @@ export type RiskConfig = {
   tod_close_haircut: number;
   tod_hard_block_open_min: number;
   tod_hard_block_close_min: number;
+  // Per-venue overrides on top of the tod_* defaults. Any subset of fields
+  // may be set per venue; missing fields fall back to the global defaults.
+  tod_venue_overrides: import("./alpha/execution-alpha").TodVenueOverrides | null;
 };
+
 
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = {
