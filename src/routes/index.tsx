@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listPortfolios,
@@ -126,12 +126,20 @@ function Home() {
     queryFn: () => list(),
     enabled: !!session,
   });
+  // Stale-while-revalidate: `keepPreviousData` guarantees that every
+  // refetch (manual invalidation, window focus, interval) keeps the
+  // last successful snapshot in `equityQ.data` until the new payload
+  // lands atomically. Because both the GBP headline and the % pill on
+  // every card derive from that single snapshot via `deriveCardEquity`,
+  // they can never render mid-refresh with mismatched values.
   const equityQ = useQuery({
     queryKey: ["all-portfolios-equity"],
     queryFn: () => fetchEquity(),
     enabled: !!session,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
+  const isRefreshingEquity = equityQ.isFetching && !equityQ.isLoading;
   const sparkByPortfolio = useMemo(
     () => computeSparkByPortfolio(equityQ.data),
     [equityQ.data],
@@ -320,6 +328,7 @@ function Home() {
                 deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
                 includeDeposits={includeDeposits}
                 isLoadingEquity={equityQ.isLoading}
+                isRefreshingEquity={isRefreshingEquity}
                 equityDecimals={equityDecimals}
               />
             ))}
@@ -435,7 +444,7 @@ const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
-function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false, equityDecimals = 2 }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean; equityDecimals?: number }) {
+function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false, isRefreshingEquity = false, equityDecimals = 2 }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean; isRefreshingEquity?: boolean; equityDecimals?: number }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
   const sliced = useMemo(() => {
     const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
@@ -583,8 +592,17 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
           </div>
         </div>
 
-        {/* Row 2 — Trend + balance */}
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3">
+        {/* Row 2 — Trend + balance. `aria-busy` marks the whole block as
+            refreshing so assistive tech users know the values are being
+            revalidated in the background. We deliberately keep the
+            existing headline + % pill visible (SWR): both share the same
+            snapshot in `sparkSeries`, so they can never diverge. */}
+        <div
+          className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3 transition-opacity ${isRefreshingEquity ? "opacity-90" : ""}`}
+          aria-busy={isRefreshingEquity || undefined}
+          data-refreshing={isRefreshingEquity ? "true" : undefined}
+          data-testid="portfolio-row-equity"
+        >
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Sparkline values={values} width={120} height={32} />
@@ -637,8 +655,16 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
               Total equity
+              {isRefreshingEquity && !equityLoading ? (
+                <span
+                  data-testid="equity-refreshing-dot"
+                  aria-label="Refreshing equity"
+                  title="Refreshing"
+                  className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70"
+                />
+              ) : null}
             </div>
             {equityLoading ? (
               <div
