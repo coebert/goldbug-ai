@@ -102,6 +102,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 60,
       volatility_sizing: true,
       vol_target_pct: 0.007,
+      max_daily_loss_pct: 0.02,
+      max_drawdown_halt_pct: 0.08,
     },
   },
   2: {
@@ -116,6 +118,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 90,
       volatility_sizing: true,
       vol_target_pct: 0.01,
+      max_daily_loss_pct: 0.03,
+      max_drawdown_halt_pct: 0.12,
     },
   },
   3: {
@@ -135,6 +139,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 0,
       volatility_sizing: true,
       vol_target_pct: 0.02,
+      max_daily_loss_pct: 0.06,
+      max_drawdown_halt_pct: 0.25,
     },
   },
   5: {
@@ -149,6 +155,8 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       max_hold_days: 0,
       volatility_sizing: false,
       vol_target_pct: 0.03,
+      max_daily_loss_pct: 0.10,
+      max_drawdown_halt_pct: 0.35,
     },
   },
 };
