@@ -791,7 +791,7 @@ function PortfolioPage() {
                 <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
                   <div className="font-medium text-destructive">Circuit breaker active — AI paused</div>
                   <div className="mt-1 text-muted-foreground">
-                    {cb.reason ?? "Auto-paused"}{cb.tripped_at ? ` (since ${cb.tripped_at.slice(0, 10)})` : ""}. Stop-loss/take-profit still enforced. Adjust risk controls or clear the breaker to resume new trades.
+                    <JargonText>{`${cb.reason ?? "Auto-paused"}${cb.tripped_at ? ` (since ${cb.tripped_at.slice(0, 10)})` : ""}. Stop-loss/take-profit still enforced. Adjust risk controls or clear the breaker to resume new trades.`}</JargonText>
                   </div>
                 </div>
               );
