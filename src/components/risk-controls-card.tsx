@@ -170,6 +170,9 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       vol_target_pct: 0.02,
       max_daily_loss_pct: 0.06,
       max_drawdown_halt_pct: 0.25,
+      commodity_group_limits: { Gold: 0.3, Basket: 0.2 },
+      commodity_min_adv_usd: 150_000,
+      commodity_max_atr_pct: 0.08,
     },
   },
   5: {
