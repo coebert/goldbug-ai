@@ -218,6 +218,24 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
       notes,
     };
   }
+  if (r.commodity_group_limits && typeof r.commodity_group_limits === "object") {
+    const src = r.commodity_group_limits as Record<string, unknown>;
+    const groups = ["Gold", "Silver", "Platinum", "Oil", "Gas", "Copper", "Agriculture", "Basket"] as const;
+    const limits: Partial<Record<CommodityGroup, number>> = {};
+    for (const g of groups) {
+      const v = src[g];
+      if (v == null || v === "") continue;
+      const n = Number(v);
+      if (Number.isFinite(n)) limits[g] = Math.max(0, Math.min(1, n));
+    }
+    out.commodity_group_limits = limits;
+  }
+  if (Number.isFinite(Number(r.commodity_min_adv_usd))) {
+    out.commodity_min_adv_usd = Math.max(0, Math.min(1e9, Number(r.commodity_min_adv_usd)));
+  }
+  if (Number.isFinite(Number(r.commodity_max_atr_pct))) {
+    out.commodity_max_atr_pct = Math.max(0, Math.min(1, Number(r.commodity_max_atr_pct)));
+  }
   return out;
 }
 
