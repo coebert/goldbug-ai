@@ -45,15 +45,32 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "VMID.L", name: "Vanguard FTSE 250 ETF", asset_class: "etf" },
   { symbol: "VWRL.L", name: "Vanguard FTSE All-World ETF", asset_class: "etf" },
   { symbol: "VUSA.L", name: "Vanguard S&P 500 ETF (LON)", asset_class: "etf" },
-  { symbol: "SGLN.L", name: "iShares Physical Gold ETC (LON)", asset_class: "commodity" },
   // Crypto
   { symbol: "BTC-USD", name: "Bitcoin", asset_class: "crypto" },
   { symbol: "ETH-USD", name: "Ethereum", asset_class: "crypto" },
   { symbol: "SOL-USD", name: "Solana", asset_class: "crypto" },
-  // Commodities
-  { symbol: "GC=F", name: "Gold Futures", asset_class: "commodity" },
-  { symbol: "SI=F", name: "Silver Futures", asset_class: "commodity" },
-  { symbol: "CL=F", name: "Crude Oil Futures", asset_class: "commodity" },
+  // Commodities — LSE-listed physically-backed ETCs/ETFs (Saxo-tradable
+  // AssetType=Etc/Etf). Futures pseudo-symbols like GC=F/SI=F/CL=F are
+  // intentionally excluded because Saxo cash accounts cannot route them.
+  { symbol: "SGLN.L", name: "iShares Physical Gold ETC (LON)", asset_class: "commodity" },
+  { symbol: "SGLD.L", name: "Invesco Physical Gold ETC (LON)", asset_class: "commodity" },
+  { symbol: "PHAU.L", name: "WisdomTree Physical Gold (LON)", asset_class: "commodity" },
+  { symbol: "SSLN.L", name: "iShares Physical Silver ETC (LON)", asset_class: "commodity" },
+  { symbol: "PHAG.L", name: "WisdomTree Physical Silver (LON)", asset_class: "commodity" },
+  { symbol: "SPLT.L", name: "WisdomTree Physical Platinum (LON)", asset_class: "commodity" },
+  { symbol: "CRUD.L", name: "WisdomTree WTI Crude Oil (LON)", asset_class: "commodity" },
+  { symbol: "BRNT.L", name: "WisdomTree Brent Crude Oil (LON)", asset_class: "commodity" },
+  { symbol: "NGAS.L", name: "WisdomTree Natural Gas (LON)", asset_class: "commodity" },
+  { symbol: "COPA.L", name: "WisdomTree Copper (LON)", asset_class: "commodity" },
+  { symbol: "AGCP.L", name: "WisdomTree Agriculture (LON)", asset_class: "commodity" },
+  { symbol: "AIGB.L", name: "WisdomTree Broad Commodities (LON)", asset_class: "commodity" },
+  // US-listed commodity ETFs (USD) so USD-funded portfolios can also gain
+  // commodity exposure via Saxo cash.
+  { symbol: "GLD", name: "SPDR Gold Shares (NYSE)", asset_class: "commodity" },
+  { symbol: "IAU", name: "iShares Gold Trust (NYSE)", asset_class: "commodity" },
+  { symbol: "SLV", name: "iShares Silver Trust (NYSE)", asset_class: "commodity" },
+  { symbol: "USO", name: "United States Oil Fund (NYSE)", asset_class: "commodity" },
+  { symbol: "DBC", name: "Invesco DB Commodity Index (NYSE)", asset_class: "commodity" },
   // FX
   { symbol: "GBPUSD=X", name: "GBP/USD", asset_class: "fx" },
   { symbol: "EURUSD=X", name: "EUR/USD", asset_class: "fx" },
