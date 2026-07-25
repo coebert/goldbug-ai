@@ -292,7 +292,13 @@ function Home() {
               </Card>
             )}
             {q.data?.map((p) => (
-              <PortfolioRow key={p.id} portfolio={p} sparkSeries={sparkByPortfolio[p.id] ?? []} />
+              <PortfolioRow
+                key={p.id}
+                portfolio={p}
+                sparkSeries={sparkByPortfolio[p.id] ?? []}
+                deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
+                includeDeposits={includeDeposits}
+              />
             ))}
           </div>
           <div id="create-portfolio" className="scroll-mt-24">
