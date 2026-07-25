@@ -128,6 +128,7 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
             capture {formatUkTime(data.circuit.lastOkAt)}.
           </div>
         )}
+        {data && <SkipCounters skips={data.skipCounters} />}
         {data && (
           <>
             <AvailabilityStrip availability={data.availability} />
@@ -429,6 +430,124 @@ function PairTimelineChart({
             <Bar dataKey="fallback" name="Fallback" stackId="s" fill="hsl(var(--destructive))" />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+type SkipCountersData = {
+  fxBroken: { events: number; orders: number; lastAt: string | null };
+  circuit: { events: number; orders: number; lastAt: string | null };
+  recent: Array<{
+    method: "PRE_PLACE_FX_BLOCK" | "PRE_PLACE_FX_CIRCUIT_OPEN";
+    at: string;
+    pair: string | null;
+    orderCount: number;
+    reason: string | null;
+  }>;
+};
+
+function SkipCounters({ skips }: { skips: SkipCountersData }) {
+  const total = skips.fxBroken.events + skips.circuit.events;
+  if (total === 0) {
+    return (
+      <div className="rounded-lg border bg-muted/20 p-2 text-xs text-muted-foreground">
+        No cross-currency buys have been skipped in this window.
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="mb-2 text-xs font-medium">
+        Cross-currency buy skips
+        <span className="ml-1 text-muted-foreground">
+          (this window)
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <SkipTile
+          label="fxIsBroken (this tick)"
+          events={skips.fxBroken.events}
+          orders={skips.fxBroken.orders}
+          lastAt={skips.fxBroken.lastAt}
+          tone="destructive"
+        />
+        <SkipTile
+          label="Persistent circuit"
+          events={skips.circuit.events}
+          orders={skips.circuit.orders}
+          lastAt={skips.circuit.lastAt}
+          tone="amber"
+        />
+      </div>
+      {skips.recent.length > 0 && (
+        <ul className="mt-2 space-y-1 text-[11px]">
+          {skips.recent.slice(0, 6).map((e, i) => (
+            <li
+              key={`${e.at}-${i}`}
+              className="flex flex-wrap items-center gap-2 border-t pt-1 first:border-t-0 first:pt-0"
+            >
+              <Badge
+                variant="outline"
+                className={
+                  e.method === "PRE_PLACE_FX_BLOCK"
+                    ? "border-destructive/50 text-destructive"
+                    : "border-amber-500/50 text-amber-600 dark:text-amber-400"
+                }
+              >
+                {e.method === "PRE_PLACE_FX_BLOCK" ? "fxBroken" : "circuit"}
+              </Badge>
+              <span className="font-mono text-muted-foreground">
+                {e.pair ?? "—"}
+              </span>
+              <span className="text-muted-foreground">
+                {e.orderCount} order{e.orderCount === 1 ? "" : "s"}
+              </span>
+              <span className="ml-auto text-muted-foreground">
+                {formatUkTime(e.at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function SkipTile({
+  label,
+  events,
+  orders,
+  lastAt,
+  tone,
+}: {
+  label: string;
+  events: number;
+  orders: number;
+  lastAt: string | null;
+  tone: "destructive" | "amber";
+}) {
+  const toneCls =
+    tone === "destructive"
+      ? "border-destructive/40"
+      : "border-amber-500/40";
+  const numCls =
+    tone === "destructive"
+      ? "text-destructive"
+      : "text-amber-600 dark:text-amber-400";
+  return (
+    <div className={`rounded-md border p-2 ${toneCls}`}>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className={`text-lg font-semibold tabular-nums ${numCls}`}>
+        {events}
+        <span className="ml-1 text-xs font-normal text-muted-foreground">
+          tick{events === 1 ? "" : "s"} · {orders} order{orders === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="text-[10px] text-muted-foreground">
+        {lastAt ? `Last: ${formatUkTime(lastAt)}` : "No skips in window"}
       </div>
     </div>
   );
