@@ -33,22 +33,47 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
     const list = (holdings ?? []).filter((h) => Number(h.quantity) > 0);
     if (list.length === 0) return [];
 
-    // Earliest purchase across all holdings caps the price_cache scan.
+    // Holdings may store broker-native symbols (e.g. "VUKE:xlon") while the
+    // price_cache is keyed by Yahoo-style tickers ("VUKE.L"). Map the MIC
+    // suffix locally so LSE / XETR / US holdings all resolve to the right
+    // price series without an extra round-trip.
+    const MIC_TO_YAHOO: Record<string, string> = {
+      xlon: "L", xetr: "DE", xpar: "PA", xams: "AS", xmil: "MI",
+      xmad: "MC", xswx: "SW", xtse: "TO", xhkg: "HK", xtks: "T",
+      xasx: "AX", xsto: "ST", xcse: "CO", xhel: "HE", xose: "OL",
+      xnas: "", xnys: "", arcx: "", bats: "",
+    };
+    const resolve = (sym: string): string => {
+      const colon = sym.lastIndexOf(":");
+      if (colon < 0) return sym;
+      const base = sym.slice(0, colon);
+      const mic = sym.slice(colon + 1).toLowerCase();
+      const yahoo = MIC_TO_YAHOO[mic];
+      if (yahoo == null) return sym;
+      return yahoo ? `${base}.${yahoo}` : base;
+    };
+
+
+
+    // Window: at least 30 days of context so a fresh purchase still renders a
+    // sparkline on Day 1 (purchase point is highlighted by pct/value math
+    // below, which stays anchored to avg_cost).
     const now = new Date();
     const earliest = list.reduce<Date>((acc, h) => {
       const t = h.opened_at ? new Date(h.opened_at) : now;
       return t < acc ? t : acc;
     }, now);
-    // Guard against absurd ranges — 2 years max, at least 30 days.
+    const contextStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const minSince = new Date(now.getTime() - 730 * 24 * 60 * 60 * 1000);
-    const since = earliest < minSince ? minSince : earliest;
+    const rawSince = earliest < contextStart ? earliest : contextStart;
+    const since = rawSince < minSince ? minSince : rawSince;
     const sinceIso = since.toISOString().slice(0, 10);
 
-    const symbols = Array.from(new Set(list.map((h) => h.symbol)));
+    const lookupSymbols = Array.from(new Set(list.map((h) => resolve(h.symbol))));
     const { data: prices } = await context.supabase
       .from("price_cache")
       .select("symbol, price_date, close")
-      .in("symbol", symbols)
+      .in("symbol", lookupSymbols)
       .gte("price_date", sinceIso)
       .order("price_date", { ascending: true });
 
@@ -62,10 +87,12 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
     return list.map((h) => {
       const avg = Number(h.avg_cost);
       const openedAt = h.opened_at ?? null;
-      const openedDate = openedAt ? openedAt.slice(0, 10) : sinceIso;
-      const all = bySymbol.get(h.symbol) ?? [];
-      const series = all.filter((p) => p.date >= openedDate);
-      const closes = series.map((p) => p.close);
+      const yahoo = resolve(h.symbol);
+      const all = bySymbol.get(yahoo) ?? [];
+      // Show up to ~30 days of context ending today. Do NOT clip to
+      // opened_at — a same-day purchase would otherwise leave only one
+      // close and hide the trend entirely.
+      const closes = all.map((p) => p.close);
       const currentPrice = closes.length > 0 ? closes[closes.length - 1] : null;
       const pct =
         currentPrice != null && avg > 0 ? (currentPrice - avg) / avg : null;
@@ -84,3 +111,4 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
       };
     });
   });
+
