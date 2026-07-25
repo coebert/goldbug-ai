@@ -73,7 +73,48 @@ export function AllPortfoliosChart() {
   const simPortfolios = portfolios.filter((p) => p.mode !== "live_prod");
   const realPortfolios = portfolios.filter((p) => p.mode === "live_prod");
 
-  if (!q.data || portfolios.length === 0) return null;
+  if (q.isError) {
+    return (
+      <SectionCard>
+        <SectionCardHeader
+          icon={<LineChart className="h-4 w-4" />}
+          title="Portfolio equity"
+          description="Combined equity across every portfolio, split by mode."
+        />
+        <SectionCardBody>
+          <ErrorState
+            description={
+              q.error instanceof Error
+                ? q.error.message
+                : "The equity feed returned an error."
+            }
+            onRetry={() => q.refetch()}
+            retrying={q.isFetching}
+          />
+        </SectionCardBody>
+      </SectionCard>
+    );
+  }
+
+  if (q.isLoading || !q.data) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[0, 1].map((i) => (
+          <SectionCard key={i}>
+            <SectionCardHeader
+              icon={<LineChart className="h-4 w-4" />}
+              title={i === 0 ? "Simulated portfolios" : "Real-money portfolios"}
+            />
+            <SectionCardBody>
+              <ChartSkeleton height="280px" />
+            </SectionCardBody>
+          </SectionCard>
+        ))}
+      </div>
+    );
+  }
+
+  if (portfolios.length === 0) return null;
 
   const allDeposits = q.data.deposits ?? [];
   const simIds = new Set(simPortfolios.map((p) => p.id));
