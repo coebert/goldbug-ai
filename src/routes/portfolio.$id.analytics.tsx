@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { PerformanceAnalyticsCard } from "@/components/performance-analytics-card";
+import { ExecutionQualityCard } from "@/components/execution-quality-card";
 
 export const Route = createFileRoute("/portfolio/$id/analytics")({
   head: () => ({
@@ -38,6 +39,7 @@ function AnalyticsPage() {
         </Link>
         <h1 className="text-xl font-semibold">Performance analytics</h1>
         <PerformanceAnalyticsCard portfolioId={id} />
+        <ExecutionQualityCard portfolioId={id} />
       </main>
     </div>
   );
