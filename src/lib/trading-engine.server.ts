@@ -451,13 +451,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       raw: asJson({ orders: [], executed: [], reconciliation_failed: true, reason: cashSyncFailure }),
     });
     return {
-      decision: { briefing, rationale, orders: [] as unknown[] },
-      executed: [] as unknown[],
+      decision: { briefing, rationale, orders: [] as { symbol: string; side: "buy" | "sell"; quantity: number }[] },
+      executed: [] as { symbol: string; side: "buy" | "sell"; quantity: number; price: number; value: number; reason?: string; rejected?: string }[],
       totalValue: 0,
       cash: 0,
       routedOrders: null as unknown,
       skipped: true as const,
-      skippedReason: "cash-reconcile-failed",
+      skippedReason: "cash-reconcile-failed" as const,
       skippedDetail: cashSyncFailure,
     };
   }
