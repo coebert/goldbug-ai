@@ -310,6 +310,10 @@ function AdminPage() {
 
       <RunMetricsCard />
 
+      <OrderReconciliationCard />
+
+
+
 
       <BatchLessonsCard />
 
