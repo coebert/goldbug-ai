@@ -223,8 +223,8 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
                         </>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground" title={r.reject_reason ?? undefined}>
-                      {r.reject_reason ?? (r.broker_order_id ? `#${r.broker_order_id}` : "")}
+                    <TableCell className="max-w-[240px] truncate text-xs text-muted-foreground" title={r.reject_reason ?? undefined}>
+                      <RowNotes row={r} />
                     </TableCell>
                   </TableRow>
                 );
