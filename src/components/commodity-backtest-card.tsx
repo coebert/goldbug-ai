@@ -5,7 +5,10 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { runCommodityBacktest } from "@/lib/commodity-backtest.functions";
+import {
+  runCommodityBacktest,
+  applyCommodityThresholds,
+} from "@/lib/commodity-backtest.functions";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,6 +18,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 
 type Props = { portfolioId: string };
+
+
 
 const REASON_LABEL: Record<string, string> = {
   illiquid_adv: "ADV below floor",
@@ -29,6 +34,7 @@ const REASON_LABEL: Record<string, string> = {
 export function CommodityBacktestCard({ portfolioId }: Props) {
   const [years, setYears] = useState(3);
   const run = useServerFn(runCommodityBacktest);
+  const apply = useServerFn(applyCommodityThresholds);
   const mut = useMutation({
     mutationFn: () => run({ data: { portfolio_id: portfolioId, years } }),
     onError: (e: unknown) =>
@@ -36,8 +42,25 @@ export function CommodityBacktestCard({ portfolioId }: Props) {
         description: e instanceof Error ? e.message : "Unknown error",
       }),
   });
+  const applyMut = useMutation({
+    mutationFn: (v: { min_adv_usd: number; max_atr_pct: number }) =>
+      apply({ data: { portfolio_id: portfolioId, ...v } }),
+    onSuccess: (res) => {
+      toast.success("Risk thresholds updated", {
+        description: `ADV floor $${res.applied.min_adv_usd.toLocaleString("en-GB")} · ATR cap ${(res.applied.max_atr_pct * 100).toFixed(1)}%`,
+      });
+      // Re-run backtest so before/after refreshes.
+      mut.mutate();
+    },
+    onError: (e: unknown) =>
+      toast.error("Could not apply thresholds", {
+        description: e instanceof Error ? e.message : "Unknown error",
+      }),
+  });
 
   const report = mut.data?.report;
+  const suggestion = mut.data?.suggestion;
+
 
   return (
     <Card>
@@ -114,6 +137,87 @@ export function CommodityBacktestCard({ portfolioId }: Props) {
                 </TableBody>
               </Table>
             </div>
+
+            {suggestion && (
+              <div className="rounded-md border p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">Suggested threshold adjustments</div>
+                  <Button
+                    size="sm"
+                    disabled={!suggestion.hasChange || applyMut.isPending}
+                    onClick={() =>
+                      applyMut.mutate({
+                        min_adv_usd: suggestion.min_adv_usd.suggested,
+                        max_atr_pct: suggestion.max_atr_pct.suggested,
+                      })
+                    }
+                  >
+                    {applyMut.isPending
+                      ? "Applying…"
+                      : suggestion.hasChange
+                        ? "Apply to risk settings"
+                        : "No change suggested"}
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Setting</TableHead>
+                      <TableHead className="text-right">Current</TableHead>
+                      <TableHead className="text-right">Suggested</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Rationale</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Min ADV (USD)</TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${suggestion.min_adv_usd.current.toLocaleString("en-GB")}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${suggestion.min_adv_usd.suggested.toLocaleString("en-GB")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            suggestion.min_adv_usd.action === "keep" ? "secondary" : "default"
+                          }
+                        >
+                          {suggestion.min_adv_usd.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {suggestion.min_adv_usd.rationale}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Max ATR (%)</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {(suggestion.max_atr_pct.current * 100).toFixed(2)}%
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {(suggestion.max_atr_pct.suggested * 100).toFixed(2)}%
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            suggestion.max_atr_pct.action === "keep" ? "secondary" : "default"
+                          }
+                        >
+                          {suggestion.max_atr_pct.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {suggestion.max_atr_pct.rationale}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+
 
             <div>
               <div className="mb-2 text-sm font-medium">By commodity group</div>
