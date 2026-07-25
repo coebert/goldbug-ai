@@ -51,6 +51,10 @@ const TradeAuditLogCard = lazy(() =>
 const ConfidenceTimelineCard = lazy(() =>
   import("@/components/confidence-timeline-card").then((m) => ({ default: m.ConfidenceTimelineCard })),
 );
+const TradeErrorDashboardCard = lazy(() =>
+  import("@/components/trade-error-dashboard-card").then((m) => ({ default: m.TradeErrorDashboardCard })),
+);
+
 
 
 
