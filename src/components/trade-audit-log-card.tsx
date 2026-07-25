@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
-import { Download, FileJson, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, FileJson, Loader2, Search } from "lucide-react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -19,27 +22,44 @@ import {
   type AuditEntry,
   type AuditRuleTag,
 } from "@/lib/audit-log";
-
-type Decision = {
-  id: string;
-  run_date: string;
-  portfolio_value: number | string | null;
-  raw: unknown;
-};
+import { listAuditDecisions, type AuditDecisionPage } from "@/lib/audit.functions";
 
 type StatusFilter = "all" | "executed" | "rejected";
 
+const PAGE_SIZE = 50;
+
 export function TradeAuditLogCard({
-  decisions,
+  portfolioId,
   portfolioName,
+  active = true,
 }: {
-  decisions: Decision[];
+  portfolioId: string;
   portfolioName: string;
+  /** Only fetch when the Audit tab is actually visible. */
+  active?: boolean;
 }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [symbol, setSymbol] = useState("");
   const [rule, setRule] = useState<AuditRuleTag | "all">("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  const listFn = useServerFn(listAuditDecisions);
+
+  const query = useInfiniteQuery({
+    queryKey: ["audit-decisions", portfolioId, PAGE_SIZE],
+    enabled: active && !!portfolioId,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      listFn({ data: { portfolioId, page: pageParam as number, pageSize: PAGE_SIZE } }) as Promise<AuditDecisionPage>,
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    staleTime: 30_000,
+  });
+
+  const decisions = useMemo(
+    () => (query.data?.pages ?? []).flatMap((p) => p.rows),
+    [query.data],
+  );
+  const totalDecisions = query.data?.pages?.[0]?.total ?? 0;
 
   const entries = useMemo(() => buildAuditEntries(decisions), [decisions]);
 
@@ -56,8 +76,29 @@ export function TradeAuditLogCard({
   const summary = useMemo(() => {
     const executed = entries.filter((e) => e.status === "executed").length;
     const rejected = entries.length - executed;
-    return { total: entries.length, executed, rejected };
+    return { loaded: entries.length, executed, rejected };
   }, [entries]);
+
+  // IntersectionObserver-driven lazy fetch for the next page.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    if (!query.hasNextPage || query.isFetchingNextPage) return;
+    const io = new IntersectionObserver(
+      (entries2) => {
+        for (const en of entries2) {
+          if (en.isIntersecting) {
+            query.fetchNextPage();
+            break;
+          }
+        }
+      },
+      { rootMargin: "300px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage, query]);
 
   const exportCsv = () => {
     const stamp = new Date().toISOString().slice(0, 10);
@@ -71,6 +112,8 @@ export function TradeAuditLogCard({
     downloadBlob(JSON.stringify(filtered, null, 2), `audit-${slug}-${stamp}.json`, "application/json");
   };
 
+  const initialLoading = query.isLoading;
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -78,7 +121,16 @@ export function TradeAuditLogCard({
           <div>
             <CardTitle className="text-base">Trade audit log</CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {summary.total} entries · {summary.executed} executed · {summary.rejected} blocked
+              {totalDecisions > 0 ? (
+                <>
+                  {summary.loaded} loaded of ~{totalDecisions} decisions · {summary.executed} executed ·{" "}
+                  {summary.rejected} blocked
+                </>
+              ) : initialLoading ? (
+                <>Loading audit history…</>
+              ) : (
+                <>No decisions yet.</>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -121,9 +173,22 @@ export function TradeAuditLogCard({
           </Select>
         </div>
 
-        {filtered.length === 0 ? (
+        {initialLoading ? (
+          <div className="space-y-2 py-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </div>
+        ) : query.isError ? (
+          <div className="py-6 text-center text-sm text-destructive">
+            Failed to load audit history.{" "}
+            <Button size="sm" variant="outline" onClick={() => query.refetch()}>Retry</Button>
+          </div>
+        ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">
-            No audit entries match these filters.
+            {entries.length === 0
+              ? "No audit entries recorded yet."
+              : "No loaded entries match these filters. Load more below to keep searching."}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-border">
@@ -155,6 +220,31 @@ export function TradeAuditLogCard({
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Lazy-load sentinel + explicit fallback */}
+        {!initialLoading && query.hasNextPage && (
+          <div ref={sentinelRef} className="flex justify-center py-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => query.fetchNextPage()}
+              disabled={query.isFetchingNextPage}
+            >
+              {query.isFetchingNextPage ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Loading…
+                </>
+              ) : (
+                <>Load more ({totalDecisions - summary.loaded} remaining)</>
+              )}
+            </Button>
+          </div>
+        )}
+        {!initialLoading && !query.hasNextPage && summary.loaded > 0 && (
+          <p className="text-center text-xs text-muted-foreground py-2">
+            End of audit history.
+          </p>
         )}
       </CardContent>
     </Card>
