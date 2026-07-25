@@ -16,6 +16,8 @@ import { computeModeSummary } from "@/lib/mode-summary";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
 import { computeCardRangePct } from "@/lib/card-range-pct";
+import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -300,6 +302,7 @@ function Home() {
                 sparkSeries={sparkByPortfolio[p.id] ?? []}
                 deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
                 includeDeposits={includeDeposits}
+                isLoadingEquity={equityQ.isLoading}
               />
             ))}
           </div>
@@ -414,7 +417,7 @@ const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
-function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean }) {
+function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
   const sliced = useMemo(() => {
     const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
@@ -590,18 +593,31 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Total equity
             </div>
-            <div className="text-2xl font-bold leading-tight tabular-nums">
-              {portfolio.currency} {totalEquity.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="mt-1 text-xs tabular-nums text-muted-foreground">
-              {portfolio.currency} {Number(portfolio.current_cash).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              <span className="ml-1 text-[10px]">cash</span>
-            </div>
-            <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {pnl >= 0 ? "+" : ""}
-              {pnlPct.toFixed(2)}%
-              <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
-            </div>
+            {isLoadingEquity && sparkSeries.length === 0 ? (
+              <>
+                <Skeleton
+                  data-testid="total-equity-skeleton"
+                  aria-label="Loading total equity"
+                  className="ml-auto mt-1 h-7 w-28"
+                />
+                <Skeleton className="ml-auto mt-2 h-3 w-20" />
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold leading-tight tabular-nums">
+                  {portfolio.currency} {formatMoneyAmount(totalEquity)}
+                </div>
+                <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  {formatMoney(Number(portfolio.current_cash), portfolio.currency)}
+                  <span className="ml-1 text-[10px]">cash</span>
+                </div>
+                <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {pnl >= 0 ? "+" : ""}
+                  {pnlPct.toFixed(2)}%
+                  <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </CardContent>
