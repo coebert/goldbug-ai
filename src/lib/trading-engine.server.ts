@@ -7,6 +7,7 @@ import { asJson } from "@/lib/_server/db-json";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import { HEDGE_FUND_PLAYBOOK } from "./hedge-fund-playbook.server";
+import { COMMODITY_PLAYBOOK } from "./commodity-playbook.server";
 import {
   buildLearningContext,
   formatLearningBlock,
@@ -323,6 +324,8 @@ ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 ${HISTORICAL_PLAYBOOK}
 
 ${HEDGE_FUND_PLAYBOOK}
+
+${COMMODITY_PLAYBOOK}
 
 ${args.fxSystemBlock ?? ""}
 
