@@ -138,6 +138,87 @@ export function CommodityBacktestCard({ portfolioId }: Props) {
               </Table>
             </div>
 
+            {suggestion && (
+              <div className="rounded-md border p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">Suggested threshold adjustments</div>
+                  <Button
+                    size="sm"
+                    disabled={!suggestion.hasChange || applyMut.isPending}
+                    onClick={() =>
+                      applyMut.mutate({
+                        min_adv_usd: suggestion.min_adv_usd.suggested,
+                        max_atr_pct: suggestion.max_atr_pct.suggested,
+                      })
+                    }
+                  >
+                    {applyMut.isPending
+                      ? "Applying…"
+                      : suggestion.hasChange
+                        ? "Apply to risk settings"
+                        : "No change suggested"}
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Setting</TableHead>
+                      <TableHead className="text-right">Current</TableHead>
+                      <TableHead className="text-right">Suggested</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Rationale</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Min ADV (USD)</TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${suggestion.min_adv_usd.current.toLocaleString("en-GB")}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${suggestion.min_adv_usd.suggested.toLocaleString("en-GB")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            suggestion.min_adv_usd.action === "keep" ? "secondary" : "default"
+                          }
+                        >
+                          {suggestion.min_adv_usd.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {suggestion.min_adv_usd.rationale}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Max ATR (%)</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {(suggestion.max_atr_pct.current * 100).toFixed(2)}%
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {(suggestion.max_atr_pct.suggested * 100).toFixed(2)}%
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            suggestion.max_atr_pct.action === "keep" ? "secondary" : "default"
+                          }
+                        >
+                          {suggestion.max_atr_pct.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {suggestion.max_atr_pct.rationale}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+
+
             <div>
               <div className="mb-2 text-sm font-medium">By commodity group</div>
               <Table>
