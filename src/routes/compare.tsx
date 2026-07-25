@@ -525,7 +525,7 @@ function ComparePage() {
                         const m = r.metrics;
                         return (
                           <tr key={r.portfolio.id} className="border-b border-border/60">
-                            <td className="py-2 pr-3">
+                            <td className="sticky left-0 z-10 bg-card py-2 pr-3">
                               <span
                                 className="mr-2 inline-block h-2 w-2 rounded-full align-middle"
                                 style={{ background: COLORS[i % COLORS.length] }}
