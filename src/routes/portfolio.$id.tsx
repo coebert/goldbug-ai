@@ -1232,16 +1232,21 @@ function PortfolioPage() {
               </TabsContent>
 
               <TabsContent value="audit" className="mt-4">
-                <TradeAuditLogCard
-                  portfolioId={p.id}
-                  portfolioName={p.name}
-                  active={tab === "audit"}
-                />
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <TradeAuditLogCard
+                    portfolioId={p.id}
+                    portfolioName={p.name}
+                    active={tab === "audit"}
+                  />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="confidence" className="mt-4">
-                <ConfidenceTimelineCard decisions={decisions} />
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <ConfidenceTimelineCard decisions={decisions} />
+                </Suspense>
               </TabsContent>
+
 
 
               <TabsContent value="trades" className="mt-4">
