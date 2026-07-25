@@ -755,6 +755,62 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Feature lookup for later use (volatility sizing, asset class)
   const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
 
+  // Phase 6 — execution-alpha helper for sells. Mirrors the buy-path wiring
+  // (TOD haircut/hard-block + slice plan) so protective and discretionary
+  // sells surface the same telemetry and respect the same auction windows.
+  // `protective=true` skips the TOD gate so stop-losses / event-blackout
+  // liquidations can always fire; slicing still applies for the audit trail.
+  const applyExecAlphaSell = (
+    symbol: string,
+    notional: number,
+    fillPrice: number,
+    opts: { protective?: boolean } = {},
+  ): {
+    allow: boolean;
+    adjNotional: number;
+    tod?: { multiplier: number; allow: boolean; reason: string };
+    slicePlan?: { childCount: number; childNotional: number; advParticipationPct: number | null; reason: string };
+  } => {
+    let adjNotional = notional;
+    let tod: { multiplier: number; allow: boolean; reason: string } | undefined;
+    if (cfg.tod_filter_enabled && !opts.protective) {
+      const venue = inferVenueFromSymbol(symbol);
+      tod = todExecutionAdjustment({
+        venue,
+        avoidOpenMin: cfg.tod_avoid_open_min,
+        avoidCloseMin: cfg.tod_avoid_close_min,
+        openHaircut: cfg.tod_open_haircut,
+        closeHaircut: cfg.tod_close_haircut,
+        hardBlockOpenMin: cfg.tod_hard_block_open_min,
+        hardBlockCloseMin: cfg.tod_hard_block_close_min,
+      });
+      if (!tod.allow) return { allow: false, adjNotional: 0, tod };
+      if (tod.multiplier < 1) adjNotional = adjNotional * tod.multiplier;
+    }
+    const slicePlan = cfg.execution_slicing_enabled && adjNotional > 0
+      ? planOrderSlices({
+          parentNotional: adjNotional,
+          price: fillPrice,
+          adv20d: featureBySymbol.get(symbol)?.adv_20d ?? null,
+          participationCap: cfg.execution_participation_cap,
+          maxChildNotional: cfg.execution_max_child_notional,
+        })
+      : undefined;
+    return {
+      allow: true,
+      adjNotional,
+      tod,
+      slicePlan: slicePlan
+        ? {
+            childCount: slicePlan.childCount,
+            childNotional: slicePlan.childNotional,
+            advParticipationPct: slicePlan.advParticipationPct,
+            reason: slicePlan.reason,
+          }
+        : undefined,
+    };
+  };
+
 
   let workingCash = cash;
   const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
@@ -957,7 +1013,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     } else {
       holdingsByS.set(sym, { ...h, quantity: remaining } as Holding);
     }
-    executed.push({ symbol: sym, side: "sell", quantity: sellQty, price, value, reason: trigger });
+    // Protective exit — TOD hard-blocks are bypassed; slicing telemetry still attached.
+    const ea = applyExecAlphaSell(sym, value, price, { protective: true });
+    executed.push({
+      symbol: sym, side: "sell", quantity: sellQty, price, value,
+      reason: trigger, tod: ea.tod, slice_plan: ea.slicePlan,
+    });
 
     // Re-entry lockout for adverse exits only (stop / trail / time / event-blackout / max-hold).
     // Take-profit and scale-out are constructive — they don't trigger lockout.
@@ -1085,7 +1146,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      const qty = Number(cur.quantity) * pct;
+      let qty = Number(cur.quantity) * pct;
+      // Phase 6 — discretionary AI sell: apply TOD gate/haircut and slice plan.
+      const eaPreview = applyExecAlphaSell(meta.symbol, qty * price, price);
+      if (!eaPreview.allow) {
+        executed.push({
+          symbol: meta.symbol, side: "sell", quantity: 0, price, value: 0,
+          reason: order.reason, rejected: `TOD block: ${eaPreview.tod?.reason ?? "auction window"}`,
+          tod: eaPreview.tod,
+        });
+        continue;
+      }
+      // Scale qty by TOD multiplier if applied (adjNotional/(qty*price)).
+      if (eaPreview.tod && eaPreview.tod.multiplier < 1) {
+        qty = qty * eaPreview.tod.multiplier;
+      }
       const value = qty * price;
       workingCash += value;
       const remaining = Number(cur.quantity) - qty;
@@ -1104,13 +1179,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           );
         }
       }
+      // Recompute slice plan against the actual executed notional so telemetry matches fills.
+      const eaFinal = applyExecAlphaSell(meta.symbol, value, price);
       executed.push({
         symbol: meta.symbol,
         side: "sell",
         quantity: qty,
         price,
         value,
-        reason: order.reason,
+        reason: eaPreview.tod && eaPreview.tod.multiplier < 1
+          ? `${order.reason} [tod x${eaPreview.tod.multiplier.toFixed(2)}]`
+          : order.reason,
+        tod: eaPreview.tod,
+        slice_plan: eaFinal.slicePlan,
       });
     } else {
       // BUY
@@ -1569,13 +1650,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   for (const t of trims) {
     const cur = holdingsByS.get(t.symbol);
     if (!cur) continue;
-    const qty = Math.min(Number(cur.quantity), t.qtyToTrim);
+    let qty = Math.min(Number(cur.quantity), t.qtyToTrim);
     if (qty <= 0) continue;
+    // Phase 6 — discretionary trim: gate on TOD and record slice plan.
+    const eaPreview = applyExecAlphaSell(t.symbol, qty * t.price, t.price);
+    if (!eaPreview.allow) {
+      executed.push({
+        symbol: t.symbol, side: "sell", quantity: 0, price: t.price, value: 0,
+        reason: `rebalance-band trim skipped: ${eaPreview.tod?.reason ?? "auction window"}`,
+        rejected: `TOD block: ${eaPreview.tod?.reason ?? "auction window"}`,
+        tod: eaPreview.tod,
+      });
+      continue;
+    }
+    if (eaPreview.tod && eaPreview.tod.multiplier < 1) qty = qty * eaPreview.tod.multiplier;
     const value = qty * t.price;
     workingCash += value;
     const remaining = Number(cur.quantity) - qty;
     if (remaining <= 1e-8) holdingsByS.delete(t.symbol);
     else holdingsByS.set(t.symbol, { ...cur, quantity: remaining });
+    const eaFinal = applyExecAlphaSell(t.symbol, value, t.price);
     executed.push({
       symbol: t.symbol,
       side: "sell",
@@ -1583,6 +1677,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       price: t.price,
       value,
       reason: `rebalance-band trim: ${(t.currentPct * 100).toFixed(1)}% → target ${(t.targetPct * 100).toFixed(1)}%`,
+      tod: eaPreview.tod,
+      slice_plan: eaFinal.slicePlan,
     });
   }
 
