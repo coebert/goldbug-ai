@@ -60,6 +60,9 @@ const FxHealthCard = lazy(() =>
 const FxIntentsCard = lazy(() =>
   import("@/components/fx-intents-card").then((m) => ({ default: m.FxIntentsCard })),
 );
+const FxIntentPnlCard = lazy(() =>
+  import("@/components/fx-intent-pnl-card").then((m) => ({ default: m.FxIntentPnlCard })),
+);
 const ManualFxConvertCard = lazy(() =>
   import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
 );
@@ -1303,6 +1306,9 @@ function PortfolioPage() {
                     <FxHealthCard portfolioId={p.id} active={tab === "errors"} />
                     {p.fx_enabled === true && (
                       <FxIntentsCard portfolioId={p.id} active={tab === "errors"} />
+                    )}
+                    {p.fx_enabled === true && (
+                      <FxIntentPnlCard portfolioId={p.id} active={tab === "errors"} />
                     )}
                     {p.fx_enabled === true && (
                       <ManualFxConvertCard portfolio={p} />
