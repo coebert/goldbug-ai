@@ -666,7 +666,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     portfolio,
     holdings: holdings ?? [],
     priceMap,
-    candidateSymbols,
+    candidateSymbols: candidateSymbols.map((c) => c.symbol),
   }).catch((e) => {
     console.warn("fx context build failed", e);
     return null;
