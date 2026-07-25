@@ -1579,6 +1579,8 @@ function OrderPanel({
   guardrails,
   currency,
   weights,
+  conviction,
+  regime,
 }: {
   decisionId: string;
   orderIndex: number;
@@ -1588,12 +1590,16 @@ function OrderPanel({
   guardrails?: Guardrails;
   currency: string;
   weights?: SignalWeights | null;
+  conviction?: number | null;
+  regime?: ConfidenceRegime;
 }) {
   const approved = !order.rejected;
   const side = order.side;
   const relatedNews = signal
     ? news.filter((n) => keywordMatch(n.headline, signal.symbol, signal.name)).slice(0, 3)
     : [];
+
+
 
 
   return (
@@ -1616,15 +1622,28 @@ function OrderPanel({
               : `intended · ${currency} ${fmtNum(order.price)}`}
           </span>
         </div>
-        {approved ? (
-          <Badge variant="outline" className="border-primary/40 text-primary">
-            <ShieldCheck className="mr-1 h-3 w-3" /> Guardrails passed
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="border-destructive/40 text-destructive">
-            <ShieldAlert className="mr-1 h-3 w-3" /> Blocked · {order.rejected}
-          </Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <OrderConfidenceBadge
+            side={side}
+            conviction={conviction ?? null}
+            regime={regime ?? null}
+            relatedNews={relatedNews.map((n) => ({
+              headline: n.headline,
+              sentiment: n.sentiment ?? null,
+              source_weight: (n as { source_weight?: number | null }).source_weight ?? 1,
+            }))}
+          />
+          {approved ? (
+            <Badge variant="outline" className="border-primary/40 text-primary">
+              <ShieldCheck className="mr-1 h-3 w-3" /> Guardrails passed
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="border-destructive/40 text-destructive">
+              <ShieldAlert className="mr-1 h-3 w-3" /> Blocked · {order.rejected}
+            </Badge>
+          )}
+        </div>
+
       </div>
 
       <p className="mb-2 text-sm">
