@@ -318,7 +318,7 @@ HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
 - Cash balance must never go negative.
 - No single position may exceed ${(perSymbolCap * 100).toFixed(0)}% of portfolio value.
-- Keep at least ${(risk.cashFloorPct * 100).toFixed(0)}% of portfolio value in cash.
+- Keep at least ${(effectiveCashFloorPct(cfg, args.portfolio.risk_level) * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
 - Asset-class exposure caps: ${classLimitsStr}.
 - Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
