@@ -1227,6 +1227,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         adv20d: featExec?.adv_20d ?? null,
         params: cfg.execution_params ?? undefined,
       });
+      const commodityLiq = meta.asset_class === "commodity"
+        ? computeCommodityTradeLiquidity({
+            requestedSpend: spend,
+            price,
+            atrPct: featExec?.atr_pct ?? null,
+            adv20d: featExec?.adv_20d ?? null,
+            liquidityCappedSpend: outcome.liquidityCappedSpend,
+          })
+        : undefined;
       if (outcome.belowMinTrade || outcome.qty <= 0) {
         executed.push({
           symbol: meta.symbol,
@@ -1236,6 +1245,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           value: 0,
           reason: order.reason,
           rejected: outcome.notes.join("; ") || "trade too small after execution costs",
+          liquidity: commodityLiq,
         });
         continue;
       }
@@ -1287,6 +1297,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         price: fillPrice,
         value: outcome.effectiveSpend,
         reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
+        liquidity: commodityLiq,
       });
 
     }
