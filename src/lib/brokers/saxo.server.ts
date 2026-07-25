@@ -503,6 +503,17 @@ export class SaxoAdapter implements BrokerAdapter {
           },
           error: errCode ?? errMsg ?? "precheck-failed",
         });
+        // Fire an out-of-UI alert (in-app notification row + optional
+        // webhook) once cash-side rejects cross the same threshold the
+        // banner uses. Fire-and-forget; safe to run for non-cash rejects
+        // — the helper filters by code/message itself.
+        const { maybeNotifyPrecheckCashReject } = await import("@/lib/precheck-notify.server");
+        maybeNotifyPrecheckCashReject({
+          portfolioId: this.portfolioId,
+          userId: this.userId,
+          code: errCode ?? null,
+          message: errMsg ?? null,
+        });
         return {
           brokerOrderId: "",
           status: "rejected",
