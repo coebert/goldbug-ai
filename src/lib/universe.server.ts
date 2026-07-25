@@ -266,6 +266,43 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   if (Number.isFinite(Number(r.commodity_max_atr_pct))) {
     out.commodity_max_atr_pct = Math.max(0, Math.min(1, Number(r.commodity_max_atr_pct)));
   }
+  // Phase 3 — multi-layer exits.
+  const num = (k: keyof RiskConfig, min: number, max: number) => {
+    const n = Number((r as Record<string, unknown>)[k as string]);
+    if (Number.isFinite(n)) (out as unknown as Record<string, number>)[k as string] = Math.max(min, Math.min(max, n));
+  };
+  const bool = (k: keyof RiskConfig) => {
+    const v = (r as Record<string, unknown>)[k as string];
+    if (typeof v === "boolean") (out as unknown as Record<string, boolean>)[k as string] = v;
+  };
+  bool("chandelier_enabled");
+  num("chandelier_k_base", 0.5, 10);
+  num("chandelier_k_tight", 0.25, 10);
+  num("chandelier_tighten_after_r", 0.1, 20);
+  num("initial_stop_atr_mult", 0.25, 10);
+  bool("scale_out_enabled");
+  if (Array.isArray(r.scale_out_levels)) {
+    const lvls = (r.scale_out_levels as unknown[])
+      .map((v) => {
+        const o = (v ?? {}) as Record<string, unknown>;
+        const rv = Number(o.r), fv = Number(o.frac);
+        return { r: rv, frac: fv };
+      })
+      .filter((l) => Number.isFinite(l.r) && Number.isFinite(l.frac) && l.r > 0 && l.frac > 0 && l.frac <= 1)
+      .slice(0, 5);
+    if (lvls.length) out.scale_out_levels = lvls;
+  }
+  bool("time_stop_enabled");
+  num("time_stop_horizon_days", 0, 365);
+  num("time_stop_min_progress_r", -5, 10);
+  bool("event_blackout_enabled");
+  num("event_blackout_pct_nav", 0, 1);
+  num("event_blackout_target_pct_nav", 0, 1);
+  num("event_blackout_window_days", 0, 30);
+  bool("reentry_lockout_enabled");
+  num("reentry_atr_days_mult", 0, 5);
+  num("reentry_min_days", 0, 365);
+  num("reentry_max_days", 0, 365);
   return out;
 }
 
