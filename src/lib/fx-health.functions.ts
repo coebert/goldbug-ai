@@ -178,36 +178,62 @@ export const getFxHealth = createServerFn({ method: "POST" })
     const bucketMs = 3600_000; // 1h
     const now = Date.now();
     const startMs = now - data.sinceHours * bucketMs;
-    const buckets = new Map<
-      number,
-      { hour: string; ok: number; cache: number; stale: number; fallback: number; total: number }
-    >();
+    const emptyBucket = (t: number) => ({
+      hour: new Date(t).toISOString(),
+      ok: 0,
+      cache: 0,
+      stale: 0,
+      fallback: 0,
+      total: 0,
+    });
+    type Bucket = ReturnType<typeof emptyBucket>;
+    const buckets = new Map<number, Bucket>();
+    // Per-pair hourly buckets so the UI can render one timeline chart per
+    // pair showing provider health + identity-fallback occurrences over time.
+    const perPairBuckets = new Map<string, Map<number, Bucket>>();
     for (let t = Math.floor(startMs / bucketMs) * bucketMs; t <= now; t += bucketMs) {
-      buckets.set(t, {
-        hour: new Date(t).toISOString(),
-        ok: 0,
-        cache: 0,
-        stale: 0,
-        fallback: 0,
-        total: 0,
-      });
+      buckets.set(t, emptyBucket(t));
     }
     for (const r of rows) {
       const t = new Date(r.created_at as string).getTime();
       const key = Math.floor(t / bucketMs) * bucketMs;
       const b = buckets.get(key);
-      if (!b) continue;
       const resp = (r.response ?? {}) as { source?: string; stale?: boolean };
       const source = classify(resp.source ?? null);
-      b.total += 1;
-      if (source === "yahoo" || source === "frankfurter") b.ok += 1;
-      else if (source === "fallback") b.fallback += 1;
-      else if (source === "cache-stale" || resp.stale) b.stale += 1;
-      else if (source === "cache") b.cache += 1;
+      const path = (r.path as string | null) ?? "";
+      const m = /\/fx\/([A-Z]{3}->[A-Z]{3})/.exec(path);
+      const pair = m?.[1] ?? "unknown";
+      let pairMap = perPairBuckets.get(pair);
+      if (!pairMap) {
+        pairMap = new Map();
+        for (let t2 = Math.floor(startMs / bucketMs) * bucketMs; t2 <= now; t2 += bucketMs) {
+          pairMap.set(t2, emptyBucket(t2));
+        }
+        perPairBuckets.set(pair, pairMap);
+      }
+      const pb = pairMap.get(key);
+      const bump = (bkt: Bucket | undefined) => {
+        if (!bkt) return;
+        bkt.total += 1;
+        if (source === "yahoo" || source === "frankfurter") bkt.ok += 1;
+        else if (source === "fallback") bkt.fallback += 1;
+        else if (source === "cache-stale" || resp.stale) bkt.stale += 1;
+        else if (source === "cache") bkt.cache += 1;
+      };
+      bump(b);
+      bump(pb);
     }
     const timeline = Array.from(buckets.values()).sort((a, b) =>
       a.hour.localeCompare(b.hour),
     );
+    const pairTimelines = Array.from(perPairBuckets.entries())
+      .map(([pair, m]) => ({
+        pair,
+        buckets: Array.from(m.values()).sort((a, b) =>
+          a.hour.localeCompare(b.hour),
+        ),
+      }))
+      .sort((a, b) => a.pair.localeCompare(b.pair));
 
     // Availability rollups across window.
     const totals = timeline.reduce(
@@ -266,6 +292,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
       pairs,
       providerCounts,
       timeline,
+      pairTimelines,
       availability,
       circuit,
     };

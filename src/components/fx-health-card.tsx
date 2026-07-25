@@ -151,41 +151,47 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
               </div>
             )}
             <ul className="space-y-2">
-              {data.pairs.map((p) => (
-                <li key={p.pair} className="rounded-lg border p-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium">{p.pair}</span>
-                      <StatusPill status={p.status} />
+              {data.pairs.map((p) => {
+                const pt = data.pairTimelines?.find((t) => t.pair === p.pair);
+                return (
+                  <li key={p.pair} className="rounded-lg border p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-medium">{p.pair}</span>
+                        <StatusPill status={p.status} />
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        last: {p.lastRate != null ? p.lastRate.toFixed(4) : "?"}{" "}
+                        <Badge variant="outline" className="ml-1 font-mono text-[10px]">
+                          {p.lastSource}
+                        </Badge>
+                        {p.lastAt && (
+                          <span className="ml-2">{formatUkTime(p.lastAt)}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      last: {p.lastRate != null ? p.lastRate.toFixed(4) : "?"}{" "}
-                      <Badge variant="outline" className="ml-1 font-mono text-[10px]">
-                        {p.lastSource}
-                      </Badge>
-                      {p.lastAt && (
-                        <span className="ml-2">{formatUkTime(p.lastAt)}</span>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                      <ProviderChip label="yahoo" n={p.counts.yahoo} good />
+                      <ProviderChip label="frankfurter" n={p.counts.frankfurter} good />
+                      <ProviderChip label="cache" n={p.counts.cache} />
+                      {p.counts["cache-stale"] > 0 && (
+                        <ProviderChip label="cache-stale" n={p.counts["cache-stale"]} warn />
+                      )}
+                      {p.counts.fallback > 0 && (
+                        <ProviderChip label="identity fallback" n={p.counts.fallback} bad />
                       )}
                     </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                    <ProviderChip label="yahoo" n={p.counts.yahoo} good />
-                    <ProviderChip label="frankfurter" n={p.counts.frankfurter} good />
-                    <ProviderChip label="cache" n={p.counts.cache} />
-                    {p.counts["cache-stale"] > 0 && (
-                      <ProviderChip label="cache-stale" n={p.counts["cache-stale"]} warn />
+                    {pt && (
+                      <PairTimelineChart pair={p.pair} buckets={pt.buckets} />
                     )}
-                    {p.counts.fallback > 0 && (
-                      <ProviderChip label="identity fallback" n={p.counts.fallback} bad />
+                    {p.lastError && (
+                      <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
+                        {p.lastError}
+                      </p>
                     )}
-                  </div>
-                  {p.lastError && (
-                    <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
-                      {p.lastError}
-                    </p>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}
@@ -361,6 +367,62 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
               }}
             />
             <Legend wrapperStyle={{ fontSize: 10 }} iconSize={8} />
+            <Bar dataKey="ok" name="Live" stackId="s" fill="hsl(var(--chart-2, 142 71% 45%))" />
+            <Bar dataKey="cache" name="Cache" stackId="s" fill="hsl(var(--muted-foreground))" />
+            <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
+            <Bar dataKey="fallback" name="Fallback" stackId="s" fill="hsl(var(--destructive))" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function PairTimelineChart({
+  pair,
+  buckets,
+}: {
+  pair: string;
+  buckets: TimelineBucket[];
+}) {
+  const data = buckets.map((b) => ({
+    ...b,
+    label: new Date(b.hour).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      timeZone: "Europe/London",
+    }),
+  }));
+  const hasAny = data.some((b) => b.total > 0);
+  if (!hasAny) return null;
+  const totalFallback = data.reduce((n, b) => n + b.fallback, 0);
+  return (
+    <div className="mt-2 rounded-md border bg-muted/10 p-1.5">
+      <div className="flex items-center justify-between px-1 pb-1">
+        <div className="text-[11px] font-medium">
+          <span className="font-mono">{pair}</span> hourly health
+        </div>
+        {totalFallback > 0 && (
+          <span className="text-[10px] font-medium text-destructive">
+            {totalFallback} identity-fallback{totalFallback === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+      <div className="h-20 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 2, right: 6, left: -24, bottom: 0 }}>
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 9 }}
+              interval="preserveStartEnd"
+            />
+            <YAxis tick={{ fontSize: 9 }} allowDecimals={false} width={20} />
+            <Tooltip
+              contentStyle={{ fontSize: 11 }}
+              labelFormatter={(_, payload) => {
+                const iso = payload?.[0]?.payload?.hour as string | undefined;
+                return iso ? formatUkTime(iso) : "";
+              }}
+            />
             <Bar dataKey="ok" name="Live" stackId="s" fill="hsl(var(--chart-2, 142 71% 45%))" />
             <Bar dataKey="cache" name="Cache" stackId="s" fill="hsl(var(--muted-foreground))" />
             <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
