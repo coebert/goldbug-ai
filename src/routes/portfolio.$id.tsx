@@ -14,6 +14,7 @@ import { explainDecisionOrder, type ExplainOrderInput } from "@/lib/order-explan
 import { getCurrentRegime } from "@/lib/regime.functions";
 import { OrderConfidenceBadge } from "@/components/order-confidence-badge";
 import type { ConfidenceRegime } from "@/lib/order-confidence";
+import { JargonText } from "@/components/jargon-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
@@ -1813,7 +1814,7 @@ function DecisionCard({
             <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
               Market briefing
             </div>
-            <p className="text-sm text-muted-foreground">{decision.briefing}</p>
+            <p className="text-sm text-muted-foreground"><JargonText>{decision.briefing}</JargonText></p>
           </div>
         )}
         {decision.rationale && (
@@ -1821,7 +1822,7 @@ function DecisionCard({
             <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
               Rationale
             </div>
-            <p className="text-sm">{decision.rationale}</p>
+            <p className="text-sm"><JargonText>{decision.rationale}</JargonText></p>
           </div>
         )}
 
@@ -2017,7 +2018,7 @@ function PlainEnglishExplanation({
       )}
       {q.data && !q.isError && (
         <p className="text-sm leading-relaxed text-foreground/90">
-          {q.data.explanation}
+          <JargonText>{q.data.explanation}</JargonText>
         </p>
       )}
       {!q.data && !q.isError && !q.isFetching && (
