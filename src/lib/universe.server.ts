@@ -260,6 +260,7 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   tod_hard_block_close_min: 0,
   tod_venue_overrides: null,
   cash_floor_pct: null,
+  diversification_tilt: "off",
 
 };
 
