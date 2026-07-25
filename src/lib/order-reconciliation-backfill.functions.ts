@@ -88,6 +88,7 @@ export const backfillOrderReconciliation = createServerFn({ method: "POST" })
           adapter,
           lookbackHours: data.lookbackHours,
           statuses,
+          source: "backfill",
         });
         totals.scanned += s.scanned;
         totals.filled += s.filled;
