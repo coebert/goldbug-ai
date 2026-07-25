@@ -220,6 +220,21 @@ function Home() {
                 : "Percentages reflect trading PnL only — external deposits/withdrawals are netted out."}>
                 {includeDeposits ? "raw" : "trading only"}
               </span>
+              <span aria-hidden className="mx-1 text-muted-foreground/40">·</span>
+              <label htmlFor="equity-decimals-select" className="cursor-pointer select-none">
+                Decimals
+              </label>
+              <select
+                id="equity-decimals-select"
+                aria-label="Decimal places shown for total equity"
+                value={equityDecimals}
+                onChange={(e) => setEquityDecimals(Number.parseInt(e.target.value, 10))}
+                className="h-6 rounded border border-input bg-background px-1 text-[11px] tabular-nums focus-visible:outline-none sm:text-xs"
+              >
+                {Array.from({ length: EQUITY_DECIMALS_MAX - EQUITY_DECIMALS_MIN + 1 }, (_, i) => EQUITY_DECIMALS_MIN + i).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
             </div>
             <div className="mb-6 grid gap-2 sm:grid-cols-3">
               <ModeSummaryTile
