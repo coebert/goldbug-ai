@@ -655,6 +655,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
+  // -------- Hard risk halts (max daily loss, max drawdown) --------
+  // Evaluated once against pre-execution equity. If either trips, every BUY
+  // in this run is rejected with a halt reason — sells (including automatic
+  // stop-losses above) still fire so the portfolio can de-risk.
+  const { evaluateRiskHalts, loadEquityStats } = await import("./risk-halts.server");
+  const equityStats = await loadEquityStats(admin, portfolioId, asOf).catch(
+    () => ({ priorCloseEquity: null, peakEquity: null }),
+  );
+  const halts = evaluateRiskHalts({
+    startingEquity: Number(portfolio.starting_cash) || totalValue,
+    currentEquity: totalValue,
+    priorCloseEquity: equityStats.priorCloseEquity,
+    peakEquity: equityStats.peakEquity,
+    thresholds: {
+      max_position_pct: basePerSymbolPct,
+      max_daily_loss_pct: cfg.max_daily_loss_pct,
+      max_drawdown_halt_pct: cfg.max_drawdown_halt_pct,
+    },
+  });
+
   // ---- Auto-liquidation: stop-loss / take-profit / ATR-trailing / max-hold BEFORE the AI runs ----
   const atrPctBySymbol = new Map(features.map((f) => [f.symbol, f.atr_pct] as const));
   const nowMs = Date.parse(asOf + "T00:00:00Z") || Date.now();
