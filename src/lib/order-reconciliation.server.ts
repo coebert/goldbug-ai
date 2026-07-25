@@ -81,7 +81,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 }): Promise<OrderReconcileSummary> {
   const { portfolioId, userId, adapter } = params;
   const lookbackHours = params.lookbackHours ?? 72;
-  const statuses = params.statuses ?? ["pending", "submitted", "partial"];
+  const statuses = params.statuses ?? ["pending", "submitted", "working", "partial"];
   const source = params.source ?? "reconciler";
   const sinceIso = new Date(Date.now() - lookbackHours * 3600_000).toISOString();
 
