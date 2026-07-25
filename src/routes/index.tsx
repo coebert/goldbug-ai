@@ -572,9 +572,13 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
               <Sparkline values={values} width={120} height={32} />
               {equityLoading ? (
                 <Skeleton
+                  variant="shimmer"
                   data-testid="range-pct-skeleton"
                   aria-label="Loading equity change"
-                  className="h-4 w-12"
+                  role="status"
+                  aria-busy="true"
+                  /* Matches the rendered pill: text-sm (h-5) + tabular width of "+00.0%". */
+                  className="h-5 w-14"
                 />
               ) : equityEmpty || rangePct == null ? (
                 <span
