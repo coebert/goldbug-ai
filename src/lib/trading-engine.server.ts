@@ -935,6 +935,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
+      // Commodity-only pre-trade validation. Confirms Saxo tradability + that
+      // required market data is present before this proposal enters sizing.
+      if (meta.asset_class === "commodity") {
+        const cval = await validateCommodity({
+          symbol: meta.symbol,
+          side: "buy",
+          price,
+          hasFeatureRow: featureBySymbol.has(meta.symbol),
+        });
+        if (!cval.ok) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason, rejected: cval.reason ?? "commodity validation failed",
+          });
+          continue;
+        }
+      }
+
       const spendableCash = Math.max(0, workingCash - cashFloor);
       let spend = spendableCash * pct;
       const sizingNotes: string[] = [];
