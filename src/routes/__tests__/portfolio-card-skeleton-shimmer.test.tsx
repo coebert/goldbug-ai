@@ -15,17 +15,15 @@ const cssSrc = readFileSync(
 
 describe("Skeleton shimmer + headline typography contract", () => {
   it("Skeleton renders `skeleton-shimmer` utility when variant='shimmer'", () => {
-    const { container } = render(<Skeleton variant="shimmer" />);
-    const node = container.firstChild as HTMLElement;
-    expect(node.className).toContain("skeleton-shimmer");
-    expect(node.getAttribute("data-variant")).toBe("shimmer");
+    const html = renderToStaticMarkup(<Skeleton variant="shimmer" />);
+    expect(html).toContain("skeleton-shimmer");
+    expect(html).toContain('data-variant="shimmer"');
   });
 
   it("Skeleton default remains legacy pulse (no shimmer regression on other call-sites)", () => {
-    const { container } = render(<Skeleton />);
-    const node = container.firstChild as HTMLElement;
-    expect(node.className).toContain("animate-pulse");
-    expect(node.className).not.toContain("skeleton-shimmer");
+    const html = renderToStaticMarkup(<Skeleton />);
+    expect(html).toContain("animate-pulse");
+    expect(html).not.toContain("skeleton-shimmer");
   });
 
   it("styles.css defines the shimmer keyframe + utility + reduced-motion guard", () => {
