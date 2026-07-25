@@ -46,6 +46,13 @@ export async function runHourlyCycle(opts: {
   triggeredBy: "manual" | "cron";
   force?: boolean;
 }): Promise<HourlyRunResult> {
+  return withRunMetrics((metrics) => runHourlyCycleInner(opts, metrics));
+}
+
+async function runHourlyCycleInner(
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean },
+  metrics: import("@/lib/run-metrics.server").RunMetrics,
+): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
   const RUN_BUDGET_MS = 115 * 1000;
   const { acquireRunLock } = await import("@/lib/run-lock.server");
