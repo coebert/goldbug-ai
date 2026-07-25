@@ -90,6 +90,13 @@ import { computeRebalanceTrims } from "./rebalance-bands.server";
 import { refreshSectorScores, sectorSizeMultiplier, symbolSector } from "./sector-rotation.server";
 import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
+import {
+  evaluateChandelier,
+  evaluateScaleOut,
+  evaluateTimeStop,
+  evaluateEventBlackout,
+  reentryLockoutDays,
+} from "./exits";
 import type { Database } from "@/integrations/supabase/types";
 
 
