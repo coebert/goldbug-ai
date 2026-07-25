@@ -99,6 +99,10 @@ function parseCfg(raw: unknown): RiskConfig {
       ? Number(r.commodity_max_atr_pct)
       : DEFAULTS.commodity_max_atr_pct,
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
+    diversification_tilt:
+      r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
+        ? r.diversification_tilt
+        : "off",
   };
 }
 
