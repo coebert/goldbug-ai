@@ -149,8 +149,31 @@ export function ManualFxConvertCard({ portfolio }: Props) {
   };
 
   const previewData = previewQ.data;
-  const previewOk = previewData && previewData.ok === true ? previewData : null;
-  const previewErr = previewData && previewData.ok === false ? previewData : null;
+  type PreviewOk = {
+    ok: true;
+    fromCcy: string;
+    toCcy: string;
+    amountFrom: number;
+    amountTo: number;
+    midRate: number;
+    effectiveRate: number;
+    spreadBps: number;
+    feeFrom: number;
+    feeCcy: string;
+    rateSource: string;
+    rateStale: boolean;
+    baseCcy: string;
+    baseCcyDelta: number | null;
+    newWallet: Record<string, number>;
+    execution: "wallet" | "spot";
+  };
+  const previewOk: PreviewOk | null =
+    previewData && previewData.ok === true ? (previewData as PreviewOk) : null;
+  const previewErr =
+    previewData && previewData.ok === false
+      ? (previewData as { ok: false; reason: string; detail: string })
+      : null;
+
 
 
   return (
