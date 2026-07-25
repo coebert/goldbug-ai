@@ -120,6 +120,8 @@ export type ExecutionCalibrationMeta = {
   notes: string[];
 };
 
+import type { CommodityGroup } from "./commodity-groups";
+
 export type RiskConfig = {
   asset_class_limits: Partial<Record<AssetClass, number>>; // max % of portfolio value per class
   per_symbol_limit_pct: number | null; // if set, overrides base maxPositionPct
@@ -134,6 +136,15 @@ export type RiskConfig = {
   max_drawdown_halt_pct: number; // 0 disables. e.g. 0.15 = pause buys if peak-to-current DD ≥ 15%
   execution_params: Partial<ExecutionParamsConfig> | null;
   execution_calibration: ExecutionCalibrationMeta | null;
+  // Per-commodity-group NAV caps (Gold, Silver, Basket, …). Applied on top of
+  // the overall `commodity` asset-class cap. Unset group = no group cap.
+  commodity_group_limits: Partial<Record<CommodityGroup, number>>;
+  // Minimum 20-day average daily $ volume required for a new commodity buy
+  // (0 disables). Rejects illiquid ETC/ETFs before sizing.
+  commodity_min_adv_usd: number;
+  // Maximum 14-day ATR% (proxy for spread / round-trip cost) allowed on a
+  // new commodity buy. 0 disables the check.
+  commodity_max_atr_pct: number;
 };
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = {
@@ -149,6 +160,9 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   max_drawdown_halt_pct: 0.20,   // pause buys past -20% drawdown
   execution_params: null,
   execution_calibration: null,
+  commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
+  commodity_min_adv_usd: 250_000,
+  commodity_max_atr_pct: 0.06,
 };
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
