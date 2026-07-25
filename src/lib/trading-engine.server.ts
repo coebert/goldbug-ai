@@ -834,6 +834,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       });
     } else {
       // BUY
+      if (halts.any_halt) {
+        executed.push({
+          symbol: meta.symbol,
+          side: "buy",
+          quantity: 0,
+          price,
+          value: 0,
+          reason: order.reason,
+          rejected: `risk halt active: ${halts.reason}`,
+        });
+        continue;
+      }
       const isNewPosition = !holdingsByS.has(meta.symbol);
       if (isNewPosition && newPositions >= risk.maxNewPositionsPerDay) {
         executed.push({
