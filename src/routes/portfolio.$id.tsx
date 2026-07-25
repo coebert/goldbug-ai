@@ -54,6 +54,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
+import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
