@@ -141,6 +141,90 @@ export const getWalletAffordability = createServerFn({ method: "POST" })
       };
     });
 
+    // ---- FX-rate sensitivity ----------------------------------------------
+    // Re-run the trimmer with shocked FX rates for each non-base currency the
+    // pending buys touch. A positive shock means the target currency weakens
+    // vs base (more units per base unit), which cheapens foreign buys. Only
+    // the tested pair is shocked; other pairs stay at their captured rate.
+    const SHOCKS = [-0.1, -0.05, -0.02, 0.02, 0.05, 0.1];
+    const baselineAllowedByCcy: Record<string, number> = {};
+    for (const row of perCcy) baselineAllowedByCcy[row.ccy] = row.allowed;
+    const baselineSkipped = trim.skippedCount;
+
+    const shockedCcys = Array.from(
+      new Set(orders.map((o) => o.instrument_ccy).filter((c) => c !== baseCcy)),
+    );
+    const sensitivity: Array<{
+      ccy: string;
+      baseRate: number | null;
+      baselineAllowedNative: number;
+      baselineAllowedBase: number;
+      scenarios: Array<{
+        shockPct: number;
+        shockedRate: number;
+        allowedNative: number;
+        allowedBase: number;
+        deltaAllowedBase: number;
+        skippedCount: number;
+        deltaSkipped: number;
+      }>;
+    }> = shockedCcys.map((ccy) => {
+      const baseRate = fxRates[ccy]?.rate ?? null;
+      const baselineAllowedNative = baselineAllowedByCcy[ccy] ?? 0;
+      const baselineAllowedBase =
+        baseRate && baseRate > 0 ? baselineAllowedNative / baseRate : 0;
+
+      const scenarios = SHOCKS.map((shock) => {
+        if (!baseRate || baseRate <= 0) {
+          return {
+            shockPct: shock,
+            shockedRate: 0,
+            allowedNative: 0,
+            allowedBase: 0,
+            deltaAllowedBase: 0,
+            skippedCount: baselineSkipped,
+            deltaSkipped: 0,
+          };
+        }
+        const shockedRate = baseRate * (1 + shock);
+        const shockedFx = (from: string, to: string): number | null => {
+          if (from === to) return 1;
+          if (from === baseCcy && to === ccy) return shockedRate;
+          if (from === ccy && to === baseCcy) return 1 / shockedRate;
+          return fx(from, to);
+        };
+        const shockTrim = trimBuysToBudgetByCurrency(
+          orders,
+          wallet,
+          baseCcy,
+          shockedFx,
+          {
+            allowFxConversion: p.fx_enabled === true,
+            isRateStale,
+          },
+        );
+        const allowedNative = shockTrim.totalAllowedByCcy[ccy] ?? 0;
+        const allowedBase = allowedNative / shockedRate;
+        return {
+          shockPct: shock,
+          shockedRate,
+          allowedNative,
+          allowedBase,
+          deltaAllowedBase: allowedBase - baselineAllowedBase,
+          skippedCount: shockTrim.skippedCount,
+          deltaSkipped: shockTrim.skippedCount - baselineSkipped,
+        };
+      });
+
+      return {
+        ccy,
+        baseRate,
+        baselineAllowedNative,
+        baselineAllowedBase,
+        scenarios,
+      };
+    });
+
     return {
       baseCcy,
       currentCash: Number(p.current_cash ?? 0),
@@ -152,5 +236,6 @@ export const getWalletAffordability = createServerFn({ method: "POST" })
       perCcy,
       pendingBuys: orders,
       trim,
+      sensitivity,
     };
   });
