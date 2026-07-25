@@ -34,6 +34,8 @@ type RiskConfig = {
   max_hold_days: number;
   volatility_sizing: boolean;
   vol_target_pct: number;
+  max_daily_loss_pct: number;
+  max_drawdown_halt_pct: number;
   risk_level?: number;
 };
 
@@ -46,6 +48,8 @@ const DEFAULTS: RiskConfig = {
   max_hold_days: 0,
   volatility_sizing: true,
   vol_target_pct: 0.015,
+  max_daily_loss_pct: 0.05,
+  max_drawdown_halt_pct: 0.20,
 };
 
 function parseCfg(raw: unknown): RiskConfig {
@@ -68,6 +72,8 @@ function parseCfg(raw: unknown): RiskConfig {
         ? r.volatility_sizing
         : DEFAULTS.volatility_sizing,
     vol_target_pct: Number(r.vol_target_pct ?? DEFAULTS.vol_target_pct),
+    max_daily_loss_pct: Number(r.max_daily_loss_pct ?? DEFAULTS.max_daily_loss_pct),
+    max_drawdown_halt_pct: Number(r.max_drawdown_halt_pct ?? DEFAULTS.max_drawdown_halt_pct),
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
   };
 }
