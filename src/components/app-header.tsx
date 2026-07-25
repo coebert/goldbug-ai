@@ -40,13 +40,19 @@ import { UkClock } from "@/components/uk-clock";
 import { EnvBadge } from "@/components/env-badge";
 
 /** Primary destinations that appear in the desktop context row. */
-const NAV = [
+const NAV: ReadonlyArray<{
+  to: "/" | "/trades" | "/compare" | "/learn" | "/saxo-status";
+  label: string;
+  icon: typeof TrendingUp;
+  exact?: boolean;
+}> = [
   { to: "/", label: "Home", icon: TrendingUp, exact: true },
   { to: "/trades", label: "Trades", icon: Receipt },
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/saxo-status", label: "Broker", icon: Plug },
-] as const;
+];
+
 
 const MOBILE_EXTRAS = [
   { to: "/get-started", label: "Get started", icon: Sparkles },
