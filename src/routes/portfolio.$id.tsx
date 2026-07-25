@@ -1248,6 +1248,13 @@ function PortfolioPage() {
                 </Suspense>
               </TabsContent>
 
+              <TabsContent value="errors" className="mt-4">
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
+                </Suspense>
+              </TabsContent>
+
+
               <TabsContent value="confidence" className="mt-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <ConfidenceTimelineCard decisions={decisions} />
