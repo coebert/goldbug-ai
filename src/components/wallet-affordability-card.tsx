@@ -3,13 +3,31 @@
 // placing orders — how each pending buy is allowed, funded via an FX leg, or
 // skipped. Read-only preview.
 
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Wallet, ArrowRight, AlertTriangle, Info } from "lucide-react";
+import {
+  Wallet,
+  ArrowRight,
+  AlertTriangle,
+  Info,
+  Settings2,
+  BellRing,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { getWalletAffordability } from "@/lib/wallet-affordability.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -35,6 +53,135 @@ const fmtN = (n: number, dp = 2) =>
     maximumFractionDigits: dp,
   });
 
+type DriftSettings = {
+  enabled: boolean;
+  /** Absolute drift threshold in base currency. */
+  absBase: number;
+  /** Relative drift threshold as a fraction of current_cash (0.01 = 1%). */
+  pct: number;
+  /** Suppress toast when the same signed bucket has already been alerted. */
+  notify: boolean;
+};
+
+const DEFAULT_DRIFT: DriftSettings = {
+  enabled: true,
+  absBase: 25,
+  pct: 0.01,
+  notify: true,
+};
+
+const driftKey = (portfolioId: string) => `wallet-drift-alert:${portfolioId}`;
+
+function loadDriftSettings(portfolioId: string): DriftSettings {
+  if (typeof window === "undefined") return DEFAULT_DRIFT;
+  try {
+    const raw = window.localStorage.getItem(driftKey(portfolioId));
+    if (!raw) return DEFAULT_DRIFT;
+    const parsed = JSON.parse(raw) as Partial<DriftSettings>;
+    return {
+      enabled: parsed.enabled ?? DEFAULT_DRIFT.enabled,
+      absBase: Number.isFinite(parsed.absBase) ? Number(parsed.absBase) : DEFAULT_DRIFT.absBase,
+      pct: Number.isFinite(parsed.pct) ? Number(parsed.pct) : DEFAULT_DRIFT.pct,
+      notify: parsed.notify ?? DEFAULT_DRIFT.notify,
+    };
+  } catch {
+    return DEFAULT_DRIFT;
+  }
+}
+
+function DriftSettingsPopover({
+  value,
+  onChange,
+  baseCcy,
+}: {
+  value: DriftSettings;
+  onChange: (next: DriftSettings) => void;
+  baseCcy: string;
+}) {
+  const [absStr, setAbsStr] = useState(String(value.absBase));
+  const [pctStr, setPctStr] = useState(String((value.pct * 100).toFixed(2)));
+  useEffect(() => {
+    setAbsStr(String(value.absBase));
+    setPctStr(String((value.pct * 100).toFixed(2)));
+  }, [value.absBase, value.pct]);
+
+  const commit = () => {
+    const absBase = Math.max(0, Number(absStr) || 0);
+    const pct = Math.max(0, (Number(pctStr) || 0) / 100);
+    onChange({ ...value, absBase, pct });
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          aria-label="Wallet drift alert settings"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 space-y-3">
+        <div>
+          <div className="text-sm font-semibold">Drift alert</div>
+          <p className="text-xs text-muted-foreground">
+            Alert when <code>cash_by_ccy</code> (converted to {baseCcy}) drifts from{" "}
+            <code>current_cash</code> beyond either threshold.
+          </p>
+        </div>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="drift-enabled" className="text-xs">Enabled</Label>
+          <Switch
+            id="drift-enabled"
+            checked={value.enabled}
+            onCheckedChange={(v) => onChange({ ...value, enabled: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="drift-notify" className="text-xs">Toast on breach</Label>
+          <Switch
+            id="drift-notify"
+            checked={value.notify}
+            onCheckedChange={(v) => onChange({ ...value, notify: v })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drift-abs" className="text-xs">
+            Absolute threshold ({baseCcy})
+          </Label>
+          <Input
+            id="drift-abs"
+            inputMode="decimal"
+            value={absStr}
+            onChange={(e) => setAbsStr(e.target.value)}
+            onBlur={commit}
+            className="h-8"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drift-pct" className="text-xs">
+            Relative threshold (% of current_cash)
+          </Label>
+          <Input
+            id="drift-pct"
+            inputMode="decimal"
+            value={pctStr}
+            onChange={(e) => setPctStr(e.target.value)}
+            onBlur={commit}
+            className="h-8"
+          />
+        </div>
+        <Button size="sm" className="w-full" onClick={commit}>
+          Save thresholds
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
 export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
   const fetchFn = useServerFn(getWalletAffordability);
   const q = useQuery({
@@ -44,6 +191,22 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
     refetchInterval: active ? 30_000 : false,
     staleTime: 20_000,
   });
+
+  const [drift, setDrift] = useState<DriftSettings>(DEFAULT_DRIFT);
+  const [driftHydrated, setDriftHydrated] = useState(false);
+  useEffect(() => {
+    setDrift(loadDriftSettings(portfolioId));
+    setDriftHydrated(true);
+  }, [portfolioId]);
+  useEffect(() => {
+    if (!driftHydrated || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(driftKey(portfolioId), JSON.stringify(drift));
+    } catch {
+      /* ignore quota */
+    }
+  }, [drift, driftHydrated, portfolioId]);
+
 
   if (q.isLoading) {
     return (
@@ -86,6 +249,42 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
 
   const noWallet = !d.rawCashByCcy || Object.keys(d.rawCashByCcy).length === 0;
 
+  const driftPctActual = d.currentCash > 0 ? Math.abs(scalarDelta) / d.currentCash : 0;
+  const breachAbs = drift.enabled && Math.abs(scalarDelta) > drift.absBase;
+  const breachPct = drift.enabled && drift.pct > 0 && driftPctActual > drift.pct;
+  const breached = !noWallet && (breachAbs || breachPct);
+  const breachSign = scalarDelta >= 0 ? "over" : "under";
+
+  // Fire a toast once per (portfolio, signed bucket) breach transition.
+  useEffect(() => {
+    if (!breached || !drift.notify || typeof window === "undefined") return;
+    const flagKey = `${driftKey(portfolioId)}:last-alert`;
+    const bucket = `${breachSign}:${breachAbs ? "abs" : ""}${breachPct ? "pct" : ""}`;
+    try {
+      const last = window.sessionStorage.getItem(flagKey);
+      if (last === bucket) return;
+      window.sessionStorage.setItem(flagKey, bucket);
+    } catch {
+      /* ignore */
+    }
+    toast.warning(
+      `Wallet drift: ${scalarDelta >= 0 ? "+" : "−"}${fmt(Math.abs(scalarDelta), d.baseCcy)}`,
+      {
+        description: `${(driftPctActual * 100).toFixed(2)}% vs current_cash — exceeds your alert threshold.`,
+      },
+    );
+  }, [
+    breached,
+    breachAbs,
+    breachPct,
+    breachSign,
+    drift.notify,
+    portfolioId,
+    scalarDelta,
+    driftPctActual,
+    d.baseCcy,
+  ]);
+
   return (
     <TooltipProvider delayDuration={150}>
       <Card>
@@ -101,10 +300,31 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
               ) : (
                 <Badge variant="outline" className="text-[10px]">FX off</Badge>
               )}
+              <DriftSettingsPopover value={drift} onChange={setDrift} baseCcy={d.baseCcy} />
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
+          {breached && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <BellRing className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="flex-1">
+                <div className="font-semibold">
+                  Wallet drift alert — cash_by_ccy is {breachSign} current_cash by{" "}
+                  {fmt(Math.abs(scalarDelta), d.baseCcy)} ({(driftPctActual * 100).toFixed(2)}%)
+                </div>
+                <div className="mt-0.5 text-xs opacity-90">
+                  Threshold: {fmt(drift.absBase, d.baseCcy)} abs · {(drift.pct * 100).toFixed(2)}% relative.
+                  Likely causes: stale FX, an unmirrored write, or a broker fill that hasn't been
+                  reflected in per-currency balances yet.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Scalar vs wallet mapping */}
           <div className="rounded-md border p-3 text-sm">
             <div className="flex items-center justify-between gap-3">
@@ -138,14 +358,15 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
                 No <code>cash_by_ccy</code> stored yet — showing synthesized {d.baseCcy}-only wallet from the scalar balance.
               </div>
             )}
-            {!noWallet && Math.abs(scalarDelta) > 0.5 && (
+            {!noWallet && !breached && Math.abs(scalarDelta) > 0.5 && (
               <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                 Wallet {scalarDelta >= 0 ? "exceeds" : "trails"} scalar by{" "}
-                {fmt(Math.abs(scalarDelta), d.baseCcy)} — likely stale FX or an unmirrored write.
+                {fmt(Math.abs(scalarDelta), d.baseCcy)} — within your configured alert threshold.
               </div>
             )}
           </div>
+
 
           {/* Per-currency balances */}
           <div>
