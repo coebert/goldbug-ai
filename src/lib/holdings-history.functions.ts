@@ -34,19 +34,38 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
     if (list.length === 0) return [];
 
     // Holdings may store broker-native symbols (e.g. "VUKE:xlon") while the
-    // price_cache is keyed by Yahoo-style tickers ("VUKE.L"). Resolve via the
-    // Saxo instrument cache so LSE holdings pick up their real price series.
+    // price_cache is keyed by Yahoo-style tickers ("VUKE.L"). Try the Saxo
+    // instrument cache first, then fall back to a MIC → Yahoo-suffix map so
+    // LSE and other exchanges still resolve without a cache hit.
     const rawSymbols = Array.from(new Set(list.map((h) => h.symbol)));
     const { data: instr } = await context.supabase
       .from("saxo_instrument_cache")
-      .select("symbol, raw")
-      .in("raw->>Symbol", rawSymbols);
+      .select("symbol, raw");
     const brokerToYahoo = new Map<string, string>();
     for (const row of instr ?? []) {
       const raw = row.raw as { Symbol?: string } | null;
-      if (raw?.Symbol && row.symbol) brokerToYahoo.set(raw.Symbol, row.symbol as string);
+      if (raw?.Symbol && row.symbol && rawSymbols.includes(raw.Symbol)) {
+        brokerToYahoo.set(raw.Symbol, row.symbol as string);
+      }
     }
-    const resolve = (sym: string) => brokerToYahoo.get(sym) ?? sym;
+    // MIC/exchange suffix → Yahoo suffix. Empty string means "no suffix" (US).
+    const MIC_TO_YAHOO: Record<string, string> = {
+      xlon: "L", xetr: "DE", xpar: "PA", xams: "AS", xmil: "MI",
+      xmad: "MC", xswx: "SW", xtse: "TO", xhkg: "HK", xtks: "T",
+      xasx: "AX", xsto: "ST", xcse: "CO", xhel: "HE", xose: "OL",
+      xnas: "", xnys: "", arcx: "", bats: "",
+    };
+    const fallbackResolve = (sym: string): string => {
+      const colon = sym.lastIndexOf(":");
+      if (colon < 0) return sym;
+      const base = sym.slice(0, colon);
+      const mic = sym.slice(colon + 1).toLowerCase();
+      const yahoo = MIC_TO_YAHOO[mic];
+      if (yahoo == null) return sym;
+      return yahoo ? `${base}.${yahoo}` : base;
+    };
+    const resolve = (sym: string) => brokerToYahoo.get(sym) ?? fallbackResolve(sym);
+
 
     // Window: at least 30 days of context so a fresh purchase still renders a
     // sparkline on Day 1 (purchase point is highlighted by pct/value math
