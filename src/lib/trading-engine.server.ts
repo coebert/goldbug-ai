@@ -1244,6 +1244,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         meta.asset_class,
         (classExposure.get(meta.asset_class) ?? 0) + outcome.effectiveSpend,
       );
+      if (commodityGroupKey) {
+        commodityGroupExposure.set(
+          commodityGroupKey,
+          (commodityGroupExposure.get(commodityGroupKey) ?? 0) + outcome.effectiveSpend,
+        );
+      }
+      // Track sell reductions for group exposure too (mirrors classExposure sell path).
       executed.push({
         symbol: meta.symbol,
         side: "buy",
