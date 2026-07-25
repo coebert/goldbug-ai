@@ -8,11 +8,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+// `raw` is a Postgres jsonb column; keep it as a JSON-serializable value so the
+// server-fn RPC boundary accepts it.
+type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
+
 export type AuditDecisionRow = {
   id: string;
   run_date: string;
   portfolio_value: number | string | null;
-  raw: unknown;
+  raw: Json;
 };
 
 export type AuditDecisionPage = {
