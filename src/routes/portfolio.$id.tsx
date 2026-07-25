@@ -43,6 +43,7 @@ import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, Shield
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
+import { TradeAuditLogCard } from "@/components/trade-audit-log-card";
 
 import {
   Collapsible,
@@ -98,8 +99,8 @@ import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 
 
-type PortfolioTab = "overview" | "trades" | "decisions" | "risk" | "diagnostics" | "reports";
-const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk", "diagnostics", "reports"];
+type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "risk" | "diagnostics" | "reports";
+const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "audit", "risk", "diagnostics", "reports"];
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
@@ -680,6 +681,7 @@ function PortfolioPage() {
                 <TabsTrigger value="overview" className="min-h-10">Overview</TabsTrigger>
                 <TabsTrigger value="trades" className="min-h-10">Trades ({trades.length})</TabsTrigger>
                 <TabsTrigger value="decisions" className="min-h-10">Decisions ({decisions.length})</TabsTrigger>
+                <TabsTrigger value="audit" className="min-h-10">Audit</TabsTrigger>
                 <TabsTrigger value="risk" className="min-h-10">Risk</TabsTrigger>
                 <TabsTrigger value="diagnostics" className="min-h-10">Diagnostics</TabsTrigger>
                 <TabsTrigger value="reports" className="min-h-10">Reports</TabsTrigger>
@@ -1201,6 +1203,10 @@ function PortfolioPage() {
                 {decisions.map((d) => (
                   <DecisionCard key={d.id} decision={d} currency={p.currency} />
                 ))}
+              </TabsContent>
+
+              <TabsContent value="audit" className="mt-4">
+                <TradeAuditLogCard decisions={decisions} portfolioName={p.name} />
               </TabsContent>
 
               <TabsContent value="trades" className="mt-4">
