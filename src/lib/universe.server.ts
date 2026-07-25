@@ -395,6 +395,13 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
     out.cash_floor_pct = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
   }
 
+  // Diversification-tilt user setting. Unknown / missing values fall back to
+  // the neutral default so upgrades don't silently change AI behaviour.
+  if (r.diversification_tilt === "off" || r.diversification_tilt === "balanced" || r.diversification_tilt === "strong") {
+    out.diversification_tilt = r.diversification_tilt;
+  }
+
+
   // Per-venue TOD overrides.
   if (r.tod_venue_overrides && typeof r.tod_venue_overrides === "object") {
     const allowedVenues = new Set(["LSE", "NYSE", "NASDAQ", "CRYPTO", "OTHER"]);
