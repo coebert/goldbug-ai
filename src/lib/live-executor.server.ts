@@ -207,7 +207,40 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
-  if (brokerCashAvailable != null) {
+  // If broker and portfolio currencies differ but FX resolution collapsed to
+  // the identity fallback (both live FX providers unreachable and no cached
+  // rate available), the affordability trim would badly under-estimate the
+  // broker-currency cost of every buy, causing InsufficientCash rejects at
+  // the broker. Block cross-currency buys in that state rather than send
+  // them to certain rejection. Sells are unaffected — they free cash.
+  const fxIsBroken =
+    accountCurrency != null &&
+    accountCurrency.toUpperCase() !== portfolioCurrency &&
+    fxStale &&
+    fxRate === 1 &&
+    fxSource.startsWith("fallback:");
+  if (fxIsBroken) {
+    for (const o of routable) {
+      if (o.side === "buy") {
+        preSkips.set(
+          `${o.symbol}:${o.side}`,
+          `fx ${portfolioCurrency}->${accountCurrency} unavailable; buy skipped to avoid InsufficientCash reject`,
+        );
+      }
+    }
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "PRE_PLACE_FX_BLOCK",
+      path: `/fx/${portfolioCurrency}->${accountCurrency}`,
+      status: 424,
+      request: asJson({ asOf, decisionId, count: routable.length }),
+      response: asJson({ fxSource, fxStale }),
+      error: `fx unavailable — blocking cross-currency buys`,
+    });
+  } else if (brokerCashAvailable != null) {
     const { trimBuysToBudget } = await import("./pre-place-budget");
     // Rank buys by broker-ccy notional so the biggest, most conviction-heavy
     // buys get the budget first. Sells are never gated on cash.
@@ -216,7 +249,11 @@ export async function routeOrdersToBroker(params: {
       .slice()
       .sort((a, b) => b.quantity * b.price - a.quantity * a.price);
     if (buys.length > 0) {
-      const trim = trimBuysToBudget(buys, brokerCashAvailable, fxRate);
+      // When FX is stale (cached-stale) but non-identity, apply a wider
+      // safety buffer to absorb intra-day drift. Fresh FX keeps the 1%
+      // default; a stale non-identity rate widens to 5%.
+      const safetyBufferPct = fxStale ? 0.05 : 0.01;
+      const trim = trimBuysToBudget(buys, brokerCashAvailable, fxRate, { safetyBufferPct });
       for (const d of trim.decisions) {
         if (d.kind === "skip") {
           preSkips.set(`${d.order.symbol}:${d.order.side}`, d.reason);
@@ -236,6 +273,8 @@ export async function routeOrdersToBroker(params: {
             decisionId,
             brokerCashAvailable,
             fxRate,
+            fxStale,
+            safetyBufferPct,
             requested: trim.totalRequestedBrokerCcy,
             allowed: trim.totalAllowedBrokerCcy,
           }),
@@ -255,6 +294,7 @@ export async function routeOrdersToBroker(params: {
       }
     }
   }
+
 
 
   // ---------- Preflight: resolve every symbol to a Saxo instrument up front.
