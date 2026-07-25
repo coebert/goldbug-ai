@@ -336,19 +336,80 @@ export async function routeOrdersToBroker(params: {
       const anyStale = targetCcys.some((c) => matrix.get(`${portfolioCurrency}${c}`)?.stale);
       const safetyBufferPct = anyStale ? 0.05 : 0.01;
 
-      const trim = trimBuysToBudgetByCurrency(
-        buys.map((o) => ({
-          symbol: o.symbol,
-          side: o.side,
-          quantity: o.quantity,
-          price: o.price,
-          instrument_ccy: symToCcy.get(o.symbol) ?? portfolioCurrency,
-        })),
+      const buyOrders = buys.map((o) => ({
+        symbol: o.symbol,
+        side: o.side,
+        quantity: o.quantity,
+        price: o.price,
+        instrument_ccy: symToCcy.get(o.symbol) ?? portfolioCurrency,
+      }));
+
+      let trim = trimBuysToBudgetByCurrency(
+        buyOrders,
         wallet,
         portfolioCurrency,
         fxLookup,
         { safetyBufferPct, allowFxConversion: true, isRateStale: isStale },
       );
+
+      // Phase C: real spot FX. When fx_execution_mode='spot' and the adapter
+      // implements placeFxSpot, submit each planned leg to the broker and
+      // drop any buy whose leg failed. Then re-run the trimmer over the
+      // survivors so wallet math reflects only successful legs.
+      if (fxExecutionMode === "spot" && trim.fxLegs.length > 0 && typeof adapter.placeFxSpot === "function") {
+        const { survivingBuysAfterFxSpot } = await import("./fx-spot-plan");
+        type SpotOutcome = import("./fx-spot-plan").FxSpotOutcome;
+        const outcomes: SpotOutcome[] = [];
+        for (const leg of trim.fxLegs) {
+          const clientOrderId = `fx-${decisionId}-${leg.triggeredBySymbol}-${leg.fromCcy}${leg.toCcy}`;
+          const spot = await adapter.placeFxSpot!({
+            fromCcy: leg.fromCcy,
+            toCcy: leg.toCcy,
+            amountFrom: leg.amountFrom,
+            clientOrderId,
+          });
+          const ok = spot.status === "submitted" || spot.status === "filled";
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolio.id,
+            user_id: userId,
+            broker: "saxo",
+            env: portfolio.mode === "live_prod" ? "live" : "sim",
+            method: ok ? "FX_SPOT_PLACED" : "FX_SPOT_FAILED",
+            path: `/fx-spot/${leg.fromCcy}->${leg.toCcy}`,
+            status: ok ? 200 : 400,
+            request: asJson({ asOf, decisionId, clientOrderId, amountFrom: leg.amountFrom, plannedRate: leg.rate }),
+            response: asJson({
+              brokerOrderId: spot.brokerOrderId,
+              pairSymbol: spot.pairSymbol,
+              fillRate: spot.fillRate,
+              amountTo: spot.amountTo,
+              status: spot.status,
+              reason: spot.reason,
+            }),
+            error: ok ? null : (spot.reason ?? "fx spot failed"),
+          });
+          outcomes.push(
+            ok
+              ? { kind: "ok", triggerSymbol: leg.triggeredBySymbol, fillRate: spot.fillRate ?? leg.rate, amountTo: spot.amountTo ?? leg.amountTo }
+              : { kind: "failed", triggerSymbol: leg.triggeredBySymbol, reason: spot.reason ?? "fx spot rejected" },
+          );
+        }
+        const { survivors, droppedSymbols } = survivingBuysAfterFxSpot(buyOrders, trim, outcomes);
+        if (droppedSymbols.size > 0) {
+          // Re-plan against survivors so the persisted wallet & subsequent
+          // per-symbol skip list reflect only successful legs.
+          trim = trimBuysToBudgetByCurrency(
+            survivors,
+            wallet,
+            portfolioCurrency,
+            fxLookup,
+            { safetyBufferPct, allowFxConversion: true, isRateStale: isStale },
+          );
+          for (const [sym, reason] of droppedSymbols) {
+            preSkips.set(`${sym}:buy`, `fx spot failed: ${reason}`);
+          }
+        }
+      }
 
       for (const d of trim.decisions) {
         if (d.kind === "skip") preSkips.set(`${d.order.symbol}:${d.order.side}`, d.reason);
