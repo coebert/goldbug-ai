@@ -186,6 +186,41 @@
   pre {
     overflow-wrap: anywhere;
     word-break: break-word;
+}
+
+/* Shimmer keyframe used by the loading-state skeleton to signal
+ * "value inbound" without shifting layout. The gradient sweeps left
+ * to right across a masked block; pair with `.skeleton-shimmer`
+ * (defined via Tailwind v4 @utility) on a fixed-height container
+ * that matches the final headline's typography box. */
+@keyframes skeleton-shimmer {
+  0% { background-position: -150% 0; }
+  100% { background-position: 250% 0; }
+}
+
+@utility skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background-color: color-mix(in oklab, var(--primary) 10%, transparent);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--primary) 18%, transparent) 45%,
+    color-mix(in oklab, var(--primary) 28%, transparent) 50%,
+    color-mix(in oklab, var(--primary) 18%, transparent) 55%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+    background-image: none;
   }
 }
+
 
