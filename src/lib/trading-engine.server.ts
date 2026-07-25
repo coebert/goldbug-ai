@@ -658,6 +658,20 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
   const maxPosVal = totalValue * basePerSymbolPct;
 
+  // Build FX context (wallet, exposure by currency, live rates, circuit state).
+  // Safe to call even when fx_enabled is false — returns an inactive context
+  // that just tells the model FX is off. Never throws.
+  const { buildFxContext, applyAiFxConversions } = await import("./ai-fx-conversions.server");
+  const fxContext = await buildFxContext({
+    portfolio,
+    holdings: holdings ?? [],
+    priceMap,
+    candidateSymbols,
+  }).catch((e) => {
+    console.warn("fx context build failed", e);
+    return null;
+  });
+
   // If circuit breaker is tripped, skip the AI call entirely.
   const decision: DecisionOutput = breakerTripped
     ? {
@@ -691,6 +705,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         budgetNotes,
         perSymbolBudget,
         minTradeValue,
+        fxSystemBlock: fxContext?.block ?? null,
+        fxUserBlock: fxContext?.contextBlock ?? null,
       });
 
 
