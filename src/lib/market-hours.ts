@@ -269,8 +269,37 @@ export function getMarketStatusForVenue(venue: MarketVenue, now: Date = new Date
   };
 }
 
+// Symbol -> venue is a pure static mapping, so we can cache the venue lookup
+// permanently. The venue's MarketStatus itself changes over time (phase, next
+// open, minutes-until-open) so we bucket the cache by a coarse time slot —
+// within a slot repeated callers get the same object without recomputing the
+// timezone / session math. Slot = 60s keeps freshness tight enough for the
+// hourly runner and reconciler while eliminating redundant work when a loop
+// checks 20+ symbols in the same tick.
+const SYMBOL_VENUE_CACHE = new Map<string, MarketVenue>();
+const STATUS_SLOT_MS = 60_000;
+const STATUS_CACHE = new Map<string, { slot: number; status: MarketStatus }>();
+
 export function getMarketStatusForSymbol(symbol: string, now: Date = new Date()): MarketStatus {
-  return getMarketStatusForVenue(inferVenue(symbol), now);
+  let venue = SYMBOL_VENUE_CACHE.get(symbol);
+  if (venue === undefined) {
+    venue = inferVenue(symbol);
+    SYMBOL_VENUE_CACHE.set(symbol, venue);
+  }
+  const slot = Math.floor(now.getTime() / STATUS_SLOT_MS);
+  const key = `${venue}@${slot}`;
+  const hit = STATUS_CACHE.get(key);
+  if (hit && hit.slot === slot) return hit.status;
+  const status = getMarketStatusForVenue(venue, now);
+  // Cap the cache: only ever holds a handful of venues * a few slots.
+  if (STATUS_CACHE.size > 64) STATUS_CACHE.clear();
+  STATUS_CACHE.set(key, { slot, status });
+  return status;
+}
+
+export function _clearMarketStatusCache(): void {
+  SYMBOL_VENUE_CACHE.clear();
+  STATUS_CACHE.clear();
 }
 
 /**
