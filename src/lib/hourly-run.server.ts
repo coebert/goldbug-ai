@@ -180,6 +180,7 @@ async function runHourlyCycleInner(
       try {
         const elapsed = Date.now() - runStartedAt;
         if (elapsed > RUN_BUDGET_MS) {
+          bumpBudgetExceeded();
           results.push({
             id: p.id,
             mode: p.mode,
@@ -209,12 +210,36 @@ async function runHourlyCycleInner(
         }
 
         const r = await runDailyTick(p.id, today);
+        bumpPortfolio("ok");
         results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
+        bumpPortfolio("error");
         results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
       }
+    }
+
+    const metricsSnap = snapshot(metrics);
+    try {
+      await supabaseAdmin.from("run_metrics").insert({
+        triggered_by: manualTrigger ? "manual" : "cron",
+        success: true,
+        duration_ms: metricsSnap.duration_ms,
+        portfolios_total: portfolios.length,
+        portfolios_ok: metricsSnap.portfolios_ok,
+        portfolios_error: metricsSnap.portfolios_error,
+        budget_exceeded_count: metricsSnap.budget_exceeded_count,
+        saxo_calls_total: metricsSnap.saxo_calls_total,
+        saxo_calls_ok: metricsSnap.saxo_calls_ok,
+        saxo_calls_error: metricsSnap.saxo_calls_error,
+        saxo_retries_429: metricsSnap.saxo_retries_429,
+        news_headlines: newsCount,
+        prices_refreshed: priceRefresh.refreshed,
+        price_errors: priceRefresh.errors,
+      });
+    } catch (e) {
+      console.error("hourly-run: failed to persist run_metrics", e);
     }
 
     return {
@@ -231,6 +256,7 @@ async function runHourlyCycleInner(
       saxo_refresh: saxoRefresh,
       triggered_by: manualTrigger ? "manual" : "cron",
       results,
+      metrics: metricsSnap,
     };
   } finally {
     await lock.release();
