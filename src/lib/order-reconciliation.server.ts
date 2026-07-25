@@ -12,6 +12,7 @@
 
 import type { SaxoAdapter } from "./brokers/saxo.server";
 import { asJson } from "@/lib/_server/db-json";
+import { logReconcileEvent, type ReconcileReasonCode } from "./reconcile-event-log.server";
 
 export type OrderReconcileOutcome =
   | "filled"
