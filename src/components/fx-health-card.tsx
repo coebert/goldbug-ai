@@ -128,6 +128,7 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
             capture {formatUkTime(data.circuit.lastOkAt)}.
           </div>
         )}
+        {data && <SkipCounters skips={data.skipCounters} />}
         {data && (
           <>
             <AvailabilityStrip availability={data.availability} />
