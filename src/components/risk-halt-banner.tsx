@@ -7,6 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { AlertOctagon, ShieldCheck } from "lucide-react";
 import { getPortfolioRiskHalts } from "@/lib/risk-halts.functions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { JargonText } from "@/components/jargon-text";
 import { cn } from "@/lib/utils";
 
 function pct(n: number): string {
