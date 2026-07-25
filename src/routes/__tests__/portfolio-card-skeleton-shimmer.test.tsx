@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const routeSrc = readFileSync(
