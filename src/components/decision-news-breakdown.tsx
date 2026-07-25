@@ -219,7 +219,7 @@ export function DecisionNewsBreakdown() {
                       {it.rationale && (
                         <p className="mb-2 text-xs text-foreground/80">
                           <span className="mr-1 font-semibold text-primary">Rationale:</span>
-                          {it.rationale}
+                          <JargonText>{it.rationale}</JargonText>
                         </p>
                       )}
                       {it.top_news.length === 0 ? (
