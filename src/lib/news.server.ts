@@ -17,6 +17,14 @@ export type NewsItem = {
   translation_confidence: number | null; // 0..1, null when not translated
 };
 
+async function closeBody(res: Response): Promise<void> {
+  try {
+    await res.body?.cancel();
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 
 type GdeltArticle = {
   title?: string;
@@ -478,8 +486,9 @@ async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] 
   try {
     const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
     const res = await runWithBreaker("gdelt", () =>
-      fetch(dated, { headers }).then((r) => {
+      fetch(dated, { headers, signal: AbortSignal.timeout(6_000) }).then(async (r) => {
         if (!r.ok && (r.status >= 500 || r.status === 429)) {
+          await closeBody(r);
           throw new Error(`GDELT transient ${r.status}`);
         }
         return r;
@@ -491,6 +500,7 @@ async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] 
       // Fall through to fallback for today only.
     } else {
       console.warn(`news: gdelt dated request failed ${res.status}`);
+      await closeBody(res);
     }
   } catch (err) {
     console.error("news: gdelt dated fetch threw", err);
@@ -502,9 +512,10 @@ async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] 
   await new Promise((r) => setTimeout(r, 1200)); // brief pause before retry
   const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
   try {
-    const res = await fetch(fallback, { headers });
+    const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(6_000) });
     if (!res.ok) {
       console.warn(`news: gdelt fallback failed ${res.status}`);
+      await closeBody(res);
       return null;
     }
     const parsed = await parseGdeltResponse(res, dateISO);

@@ -131,6 +131,7 @@ export function maybeNotifyPrecheckCashReject(params: {
           if (!res.ok) {
             console.warn("precheck-notify webhook non-2xx", res.status);
           }
+          await res.body?.cancel().catch(() => undefined);
         } finally {
           clearTimeout(timer);
         }
