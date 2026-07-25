@@ -59,8 +59,9 @@ export function RiskHaltBanner({ portfolioId, className }: { portfolioId: string
           </div>
         )}
         <div className="mt-1 opacity-80">
-          Automatic sells (stop-loss, take-profit, trailing) still fire. Buys resume when the condition clears
-          or the caps are widened in Risk controls.
+          <JargonText>
+            Automatic sells (stop-loss, take-profit, trailing) still fire. Buys resume when the condition clears or the caps are widened in Risk controls.
+          </JargonText>
         </div>
       </AlertDescription>
     </Alert>
