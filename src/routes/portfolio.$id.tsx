@@ -14,6 +14,7 @@ import { explainDecisionOrder, type ExplainOrderInput } from "@/lib/order-explan
 import { getCurrentRegime } from "@/lib/regime.functions";
 import { OrderConfidenceBadge } from "@/components/order-confidence-badge";
 import type { ConfidenceRegime } from "@/lib/order-confidence";
+import { JargonText } from "@/components/jargon-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
