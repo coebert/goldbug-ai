@@ -516,4 +516,67 @@ export function filterUniverseByAffordability(args: {
 }
 
 
+// ---------------------------------------------------------------------------
+// Diversification tilt: prompt-level nudge toward commodities / FX.
+//
+// Purely a soft bias layered on top of the ranker. It NEVER raises the hard
+// `asset_class_limits` caps and NEVER forces a trade — the buy-side guardrails
+// downstream still reject anything that would breach the cap or affordability
+// checks. The block simply tells the AI "you currently hold X% commodities vs
+// an Y% target for this tilt; consider proposing diversifiers if the setup is
+// there". Baseline ("off") emits no block, so behaviour is unchanged for
+// users who don't opt in.
+// ---------------------------------------------------------------------------
+
+export type DiversificationTilt = "off" | "balanced" | "strong";
+
+type TiltTargets = { commodity: number; fx: number; label: string; instruction: string };
+
+export function tiltTargets(
+  tilt: DiversificationTilt,
+  cfg: Pick<RiskConfig, "asset_class_limits">,
+): TiltTargets | null {
+  if (tilt === "off") return null;
+  const commodityCap = cfg.asset_class_limits.commodity ?? 0;
+  const fxCap = cfg.asset_class_limits.fx ?? 0;
+  // Target is a fraction of the user's own cap: "balanced" aims for ~40% of
+  // the cap, "strong" aims for ~70%. This keeps the tilt proportional to the
+  // risk-preset caps the user already chose.
+  const frac = tilt === "balanced" ? 0.4 : 0.7;
+  return {
+    commodity: Math.max(0, Math.min(commodityCap, commodityCap * frac)),
+    fx: Math.max(0, Math.min(fxCap, fxCap * frac)),
+    label: tilt === "balanced" ? "Balanced diversification tilt" : "Strong diversification tilt",
+    instruction:
+      tilt === "balanced"
+        ? "When the setup supports it, prefer adding a commodity or FX name over doubling up on an existing stock/ETF exposure."
+        : "Actively look for the best commodity and FX ideas each cycle. Propose them ahead of marginal stock/ETF adds whenever the risk/technical picture is at least neutral.",
+  };
+}
+
+export function buildDiversificationTiltBlock(args: {
+  tilt: DiversificationTilt;
+  cfg: Pick<RiskConfig, "asset_class_limits">;
+  currentExposure: { commodity: number; fx: number };
+}): string {
+  const t = tiltTargets(args.tilt, args.cfg);
+  if (!t) return "";
+  const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
+  const gapC = Math.max(0, t.commodity - args.currentExposure.commodity);
+  const gapF = Math.max(0, t.fx - args.currentExposure.fx);
+  const gapLine =
+    gapC + gapF <= 0.005
+      ? "Current commodity/FX exposure already meets or exceeds the tilt target — no extra nudge needed this cycle."
+      : `Room to tilt: commodities +${pct(gapC)} to target, FX +${pct(gapF)} to target (soft — hard caps still apply).`;
+  return [
+    `DIVERSIFICATION TILT — ${t.label}`,
+    `Current exposure: commodity ${pct(args.currentExposure.commodity)}, FX ${pct(args.currentExposure.fx)}.`,
+    `Soft targets: commodity ${pct(t.commodity)}, FX ${pct(t.fx)} (fraction of user's own asset-class caps).`,
+    gapLine,
+    t.instruction,
+  ].join("\n");
+}
+
+
+
 
