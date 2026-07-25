@@ -1302,6 +1302,9 @@ function PortfolioPage() {
                   <div className="space-y-4">
                     <FxHealthCard portfolioId={p.id} active={tab === "errors"} />
                     {p.fx_enabled === true && (
+                      <FxIntentsCard portfolioId={p.id} active={tab === "errors"} />
+                    )}
+                    {p.fx_enabled === true && (
                       <ManualFxConvertCard portfolio={p} />
                     )}
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
