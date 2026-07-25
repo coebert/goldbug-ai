@@ -191,6 +191,31 @@ async function runHourlyCycleInner(
           continue;
         }
 
+        // Market-hours gate: skip AI decision cycles when every venue in this
+        // portfolio's universe is currently closed. Crypto/FX are always
+        // "open" so any portfolio that includes them will still tick.
+        // `force:true` (manual override) bypasses this to allow ad-hoc runs
+        // outside market hours (e.g. testing, backfills). This saves AI
+        // credits during nights and weekends when no order could fill anyway.
+        if (!forceClear) {
+          try {
+            const universe = filterUniverse(classesFromUniverse(p.universe));
+            const symbols = universe.slice(0, 22).map((u) => u.symbol);
+            const anyOpen = symbols.some((s) => getMarketStatusForSymbol(s).isOpen);
+            if (symbols.length > 0 && !anyOpen) {
+              results.push({
+                id: p.id,
+                mode: p.mode,
+                ok: true,
+                skipped: "all venues closed — AI tick skipped to save credits (pass force:true to override)",
+              });
+              continue;
+            }
+          } catch (e) {
+            console.warn("hourly-run: market-hours gate failed, running anyway", p.id, e);
+          }
+        }
+
         const sinceIso = manualTrigger ? recentWindowIso : hourStartIso;
         if (!(manualTrigger && forceClear)) {
           const recent = await supabaseAdmin
