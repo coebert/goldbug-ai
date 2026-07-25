@@ -140,6 +140,14 @@ function Home() {
     placeholderData: keepPreviousData,
   });
   const isRefreshingEquity = equityQ.isFetching && !equityQ.isLoading;
+  // Error state: surface only when the fetch failed AND we have no
+  // cached data to fall back on. If a previous snapshot is still in
+  // `equityQ.data` (SWR), we keep showing it; the refresh dot signals
+  // the background retry. This keeps error UX consistent with the SWR
+  // contract enforced by the tests above.
+  const equityErrored = equityQ.isError && !equityQ.data;
+  const equityErrorMessage =
+    equityQ.error instanceof Error ? equityQ.error.message : "Failed to load equity";
   const sparkByPortfolio = useMemo(
     () => computeSparkByPortfolio(equityQ.data),
     [equityQ.data],
@@ -329,6 +337,8 @@ function Home() {
                 includeDeposits={includeDeposits}
                 isLoadingEquity={equityQ.isLoading}
                 isRefreshingEquity={isRefreshingEquity}
+                equityError={equityErrored ? equityErrorMessage : null}
+                onRetryEquity={() => equityQ.refetch()}
                 equityDecimals={equityDecimals}
               />
             ))}
@@ -444,7 +454,7 @@ const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
-function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false, isRefreshingEquity = false, equityDecimals = 2 }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean; isRefreshingEquity?: boolean; equityDecimals?: number }) {
+function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false, isRefreshingEquity = false, equityError = null, onRetryEquity, equityDecimals = 2 }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean; isRefreshingEquity?: boolean; equityError?: string | null; onRetryEquity?: () => void; equityDecimals?: number }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
   const sliced = useMemo(() => {
     const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
@@ -606,7 +616,18 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Sparkline values={values} width={120} height={32} />
-              {equityLoading ? (
+              {equityError ? (
+                <span
+                  data-testid="range-pct-error"
+                  role="status"
+                  aria-label={`Equity change unavailable: ${equityError}`}
+                  title={equityError}
+                  className="inline-flex items-center gap-1 text-sm font-semibold tabular-nums text-destructive"
+                >
+                  <AlertCircle className="h-3.5 w-3.5" aria-hidden />
+                  n/a
+                </span>
+              ) : equityLoading ? (
                 <Skeleton
                   variant="shimmer"
                   data-testid="range-pct-skeleton"
@@ -666,7 +687,37 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
                 />
               ) : null}
             </div>
-            {equityLoading ? (
+            {equityError ? (
+              <div
+                role="alert"
+                aria-live="polite"
+                aria-label={`Total equity unavailable: ${equityError}`}
+                data-testid="total-equity-error"
+                className="flex flex-col items-end gap-1"
+              >
+                <div className="flex items-center gap-1 text-2xl font-bold leading-tight tabular-nums text-destructive">
+                  <AlertCircle className="h-5 w-5" aria-hidden />
+                  {portfolio.currency} n/a
+                </div>
+                <div
+                  data-testid="total-equity-error-message"
+                  className="mt-1 max-w-[14rem] truncate text-xs tabular-nums text-destructive/80"
+                  title={equityError}
+                >
+                  {equityError}
+                </div>
+                {onRetryEquity ? (
+                  <button
+                    type="button"
+                    data-testid="total-equity-retry"
+                    onClick={onRetryEquity}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <RefreshCw className="h-3 w-3" aria-hidden /> Retry
+                  </button>
+                ) : null}
+              </div>
+            ) : equityLoading ? (
               <div
                 role="status"
                 aria-busy="true"
