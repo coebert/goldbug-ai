@@ -1494,6 +1494,7 @@ function PortfolioPage() {
               <TabsContent value="reports" className="mt-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   {([
+                    { to: "/portfolio/$id/analytics", label: "Performance analytics", desc: "Equity, drawdown and PnL attribution across regime, sizing, exit and execution phases.", Icon: BarChart3 },
                     { to: "/portfolio/$id/attribution", label: "Attribution", desc: "Per-asset P&L contribution and factor breakdown.", Icon: BarChart3 },
                     { to: "/portfolio/$id/report", label: "Report", desc: "Downloadable performance report for this portfolio.", Icon: FileText },
                     { to: "/portfolio/$id/optimizer", label: "Optimizer", desc: "Re-run the AI with alternate risk profiles for comparison.", Icon: Settings2 },
