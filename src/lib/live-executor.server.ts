@@ -334,6 +334,44 @@ export async function routeOrdersToBroker(params: {
           ? await getFxMatrix(targetCcys.map((c) => ({ from: portfolioCurrency, to: c })))
           : new Map<string, { rate: number; stale: boolean; source: string }>();
 
+      // Pre-trade FX matrix guard: block buys whose required base->ccy
+      // conversion is missing, identity-fallback, or stale. The trimmer's
+      // per-order lookup already skips buys with a null rate, but a stale
+      // (non-null) rate would otherwise route with just a wider safety
+      // buffer. When the operator's expectation is "no trades on bad FX",
+      // this pre-empts that path deterministically and gives one audit row
+      // per blocked pair.
+      if (targetCcys.length > 0) {
+        const { guardFxMatrix } = await import("./fx-matrix-guard");
+        const guard = guardFxMatrix(portfolioCurrency, targetCcys, matrix);
+        if (guard.hasBlock) {
+          for (const b of guard.blocked) {
+            await supabaseAdmin.from("live_broker_log").insert({
+              portfolio_id: portfolio.id,
+              user_id: userId,
+              broker: "saxo",
+              env: portfolio.mode === "live_prod" ? "live" : "sim",
+              method: "PRE_PLACE_FX_MATRIX_BLOCK",
+              path: `/fx/${b.from}->${b.to}`,
+              status: 424,
+              request: asJson({ asOf, decisionId, reason: b.reason }),
+              response: asJson({ source: b.source ?? null }),
+              error: b.detail,
+            });
+          }
+          // Skip every buy whose instrument currency is blocked. Sells are
+          // unaffected — they free cash and don't need FX to route.
+          for (const o of buys) {
+            const ccy = (o.instrument_ccy ?? symToCcy.get(o.symbol) ?? portfolioCurrency).toUpperCase();
+            if (guard.blockedCcys.has(ccy)) {
+              const detail = guard.blocked.find((x) => x.to === ccy)?.detail ?? `fx ${portfolioCurrency}->${ccy} blocked`;
+              preSkips.set(`${o.symbol}:${o.side}`, detail);
+            }
+          }
+        }
+      }
+
+
       const { readWallet, writeWalletFields } = await import("./portfolio-wallet");
       const { trimBuysToBudgetByCurrency } = await import("./pre-place-budget-multi-ccy");
 
