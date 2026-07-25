@@ -1664,7 +1664,7 @@ function OrderPanel({
 
       <p className="mb-2 text-sm">
         <span className="text-muted-foreground">AI reason: </span>
-        {order.reason}
+        <JargonText>{order.reason}</JargonText>
       </p>
 
       <PlainEnglishExplanation
