@@ -76,6 +76,7 @@ import {
   riskProfile,
   parseRiskConfig,
   effectiveCashFloorPct,
+  buildDiversificationTiltBlock,
   type UniverseSymbol,
 } from "./universe.server";
 import {
