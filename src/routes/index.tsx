@@ -435,7 +435,7 @@ const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
-function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean }) {
+function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false, isLoadingEquity = false, equityDecimals = 2 }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean; isLoadingEquity?: boolean; equityDecimals?: number }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
   const sliced = useMemo(() => {
     const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
