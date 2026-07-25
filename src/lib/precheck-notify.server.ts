@@ -34,14 +34,16 @@ function isCashReject(code: string | null, message: string | null): boolean {
 }
 
 export function maybeNotifyPrecheckCashReject(params: {
-  portfolioId: string;
+  portfolioId: string | null;
   userId: string | null;
   code: string | null;
   message: string | null;
 }) {
   const userId = params.userId;
-  if (!userId) return;
+  const portfolioId = params.portfolioId;
+  if (!userId || !portfolioId) return;
   if (!isCashReject(params.code, params.message)) return;
+
 
   void (async () => {
 
