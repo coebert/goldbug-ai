@@ -13,6 +13,7 @@
 // handles broker legs when placing dependent buys.
 
 import { z } from "zod";
+import { getFxPairSignals, type FxPairSignals } from "./fx-signals.server";
 import { getFxMatrix, getFxRate } from "./fx.server";
 import { planFxConversion } from "./fx-convert-plan";
 import { readWallet, walletBalance, writeWalletFields, type Wallet } from "./portfolio-wallet";
