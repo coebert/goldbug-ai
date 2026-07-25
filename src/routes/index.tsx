@@ -687,7 +687,37 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
                 />
               ) : null}
             </div>
-            {equityLoading ? (
+            {equityError ? (
+              <div
+                role="alert"
+                aria-live="polite"
+                aria-label={`Total equity unavailable: ${equityError}`}
+                data-testid="total-equity-error"
+                className="flex flex-col items-end gap-1"
+              >
+                <div className="flex items-center gap-1 text-2xl font-bold leading-tight tabular-nums text-destructive">
+                  <AlertCircle className="h-5 w-5" aria-hidden />
+                  {portfolio.currency} n/a
+                </div>
+                <div
+                  data-testid="total-equity-error-message"
+                  className="mt-1 max-w-[14rem] truncate text-xs tabular-nums text-destructive/80"
+                  title={equityError}
+                >
+                  {equityError}
+                </div>
+                {onRetryEquity ? (
+                  <button
+                    type="button"
+                    data-testid="total-equity-retry"
+                    onClick={onRetryEquity}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <RefreshCw className="h-3 w-3" aria-hidden /> Retry
+                  </button>
+                ) : null}
+              </div>
+            ) : equityLoading ? (
               <div
                 role="status"
                 aria-busy="true"
