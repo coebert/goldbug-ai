@@ -535,7 +535,7 @@ export async function routeOrdersToBroker(params: {
       const wallet = readWallet({
         currency: portfolioCurrency,
         current_cash: brokerCashAvailable ?? undefined,
-        cash_by_ccy: pfRowData?.cash_by_ccy ?? null,
+        cash_by_ccy: cashByCcyAdjusted,
       });
 
       const fxLookup = (from: string, to: string): number | null => {
