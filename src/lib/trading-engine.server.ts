@@ -1343,16 +1343,29 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
-      // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue
+      // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue.
+      // Phase 5 — when risk_parity_enabled, scale the vol budget by |alpha|
+      // so higher-conviction systematic setups earn a bigger share of the
+      // vol budget (still bounded by risk_parity_nav_cap).
       let volCapped = false;
       if (cfg.volatility_sizing) {
         const vol = featureBySymbol.get(meta.symbol)?.vol20d ?? null;
         if (vol && vol > 0) {
-          const targetPositionVal = (cfg.vol_target_pct * totalValue) / vol;
+          let targetPositionVal = (cfg.vol_target_pct * totalValue) / vol;
+          if (cfg.risk_parity_enabled) {
+            const alphaMag = Math.abs(alphaCompositeBySymbol.get(meta.symbol) ?? 0);
+            const rp = riskParityTargetSpend({
+              alphaMag, vol, totalValue,
+              targetVolPct: cfg.vol_target_pct,
+              navCap: cfg.risk_parity_nav_cap,
+            });
+            if (rp > 0) targetPositionVal = rp;
+          }
           const volRoom = Math.max(0, targetPositionVal - existingVal);
           if (spend > volRoom) {
             spend = volRoom;
             volCapped = true;
+            if (cfg.risk_parity_enabled) sizingNotes.push(`risk-parity α=${(alphaCompositeBySymbol.get(meta.symbol) ?? 0).toFixed(2)}`);
           }
         }
       }
