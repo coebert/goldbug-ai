@@ -837,6 +837,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
 
 
+  // Commodity-tradability validator (cache-only, no network). Runs per
+  // proposed buy of a commodity ETC/ETF to confirm the symbol is Saxo-routable
+  // and that we have the market data the sizing pipeline expects.
+  const { makeCommodityValidator } = await import("./commodity-validation.server");
+  const validateCommodity = makeCommodityValidator({
+    supabaseAdmin,
+    env: (process.env.SAXO_ENV as string) || "sim",
+  });
+
   for (const order of sorted) {
     const sym = order.symbol.toUpperCase();
     const meta = findSymbol(sym);
