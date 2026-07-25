@@ -1427,7 +1427,7 @@ type ExecutedRow = {
   rejected?: string;
 };
 
-type NewsRow = { headline: string; source: string | null };
+type NewsRow = { headline: string; source: string | null; sentiment?: number | null; source_weight?: number | null };
 
 type Guardrails = {
   risk_level: string;
@@ -1630,7 +1630,7 @@ function OrderPanel({
             relatedNews={relatedNews.map((n) => ({
               headline: n.headline,
               sentiment: n.sentiment ?? null,
-              source_weight: (n as { source_weight?: number | null }).source_weight ?? 1,
+              source_weight: n.source_weight ?? 1,
             }))}
           />
           {approved ? (
