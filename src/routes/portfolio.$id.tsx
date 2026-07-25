@@ -1781,6 +1781,8 @@ function DecisionCard({
             {executed.map((o, i) => (
               <OrderPanel
                 key={i}
+                decisionId={decision.id}
+                orderIndex={i}
                 order={o}
                 signal={signalBySymbol.get(o.symbol.toUpperCase())}
                 news={news}
