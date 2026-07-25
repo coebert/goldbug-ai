@@ -2,10 +2,14 @@
 // oil/gas/copper ETCs and reports how often the current portfolio's risk
 // config would have rejected each proposed buy.
 
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { runCommodityBacktest } from "@/lib/commodity-backtest.functions";
+import {
+  runCommodityBacktest,
+  applyCommodityThresholds,
+} from "@/lib/commodity-backtest.functions";
+import { suggestCommodityThresholds } from "@/lib/commodity-backtest.server";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 
 type Props = { portfolioId: string };
+
 
 const REASON_LABEL: Record<string, string> = {
   illiquid_adv: "ADV below floor",
