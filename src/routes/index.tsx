@@ -655,8 +655,16 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
               Total equity
+              {isRefreshingEquity && !equityLoading ? (
+                <span
+                  data-testid="equity-refreshing-dot"
+                  aria-label="Refreshing equity"
+                  title="Refreshing"
+                  className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70"
+                />
+              ) : null}
             </div>
             {equityLoading ? (
               <div
