@@ -679,15 +679,18 @@ function PortfolioPage() {
 
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
-              <TabsList className="flex w-full flex-wrap justify-start gap-1 h-auto p-1 md:flex-nowrap md:overflow-x-auto">
-                <TabsTrigger value="overview" className="min-h-10">Overview</TabsTrigger>
-                <TabsTrigger value="trades" className="min-h-10">Trades ({trades.length})</TabsTrigger>
-                <TabsTrigger value="decisions" className="min-h-10">Decisions ({decisions.length})</TabsTrigger>
-                <TabsTrigger value="audit" className="min-h-10">Audit</TabsTrigger>
-                <TabsTrigger value="confidence" className="min-h-10">Confidence</TabsTrigger>
-                <TabsTrigger value="risk" className="min-h-10">Risk</TabsTrigger>
-                <TabsTrigger value="diagnostics" className="min-h-10">Diagnostics</TabsTrigger>
-                <TabsTrigger value="reports" className="min-h-10">Reports</TabsTrigger>
+              {/* Mobile: single-row horizontally scrollable strip with snap so
+                  the tab set doesn't consume 3–4 vertical rows on 375px.
+                  Desktop keeps the wrap-free flex layout. */}
+              <TabsList className="-mx-4 flex w-auto max-w-none justify-start gap-1 h-auto overflow-x-auto scroll-smooth snap-x snap-mandatory px-4 p-1 md:mx-0 md:w-full md:max-w-full md:flex-nowrap md:overflow-x-auto md:px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <TabsTrigger value="overview" className="min-h-10 shrink-0 snap-start">Overview</TabsTrigger>
+                <TabsTrigger value="trades" className="min-h-10 shrink-0 snap-start">Trades ({trades.length})</TabsTrigger>
+                <TabsTrigger value="decisions" className="min-h-10 shrink-0 snap-start">Decisions ({decisions.length})</TabsTrigger>
+                <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">Audit</TabsTrigger>
+                <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">Confidence</TabsTrigger>
+                <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">Risk</TabsTrigger>
+                <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">Diagnostics</TabsTrigger>
+                <TabsTrigger value="reports" className="min-h-10 shrink-0 snap-start">Reports</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="mt-4">
@@ -982,7 +985,7 @@ function PortfolioPage() {
                   </div>
                 )}
                 <CardContent
-                  className="h-64"
+                  className="h-56 sm:h-64"
                   style={chartTheme.surface !== "transparent" ? { background: chartTheme.surface, borderRadius: 8 } : undefined}
                 >
                   {equityData.length < 2 ? (

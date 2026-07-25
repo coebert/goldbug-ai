@@ -506,10 +506,10 @@ function ComparePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
-                        <th className="py-2 pr-3">Portfolio</th>
+                        <th className="sticky left-0 z-10 bg-card py-2 pr-3">Portfolio</th>
                         <th className="py-2 pr-3">Risk</th>
                         <th className="py-2 pr-3 text-right">Days</th>
                         <th className="py-2 pr-3 text-right"><Explain term="pnl">Return</Explain></th>
@@ -525,7 +525,7 @@ function ComparePage() {
                         const m = r.metrics;
                         return (
                           <tr key={r.portfolio.id} className="border-b border-border/60">
-                            <td className="py-2 pr-3">
+                            <td className="sticky left-0 z-10 bg-card py-2 pr-3">
                               <span
                                 className="mr-2 inline-block h-2 w-2 rounded-full align-middle"
                                 style={{ background: COLORS[i % COLORS.length] }}
@@ -691,11 +691,11 @@ function TradeDivergenceCard({
         )}
         {grid.rows.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[560px] text-xs">
               <thead>
                 <tr className="border-b border-border text-left uppercase text-muted-foreground">
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="py-2 pr-3">Symbol</th>
+                  <th className="sticky left-0 z-10 bg-card py-2 pr-3">Date</th>
+                  <th className="sticky left-[72px] z-10 bg-card py-2 pr-3">Symbol</th>
                   {names.map((n, i) => (
                     <th key={n} className="py-2 pr-3">
                       <span
@@ -710,8 +710,8 @@ function TradeDivergenceCard({
               <tbody>
                 {grid.rows.map((r) => (
                   <tr key={`${r.date}|${r.symbol}`} className="border-b border-border/50 align-top">
-                    <td className="py-2 pr-3 tabular-nums text-muted-foreground">{r.date}</td>
-                    <td className="py-2 pr-3 font-medium">{r.symbol}</td>
+                    <td className="sticky left-0 z-10 bg-card py-2 pr-3 tabular-nums text-muted-foreground">{r.date}</td>
+                    <td className="sticky left-[72px] z-10 bg-card py-2 pr-3 font-medium">{r.symbol}</td>
                     {r.cells.map((cell, i) => (
                       <td key={i} className="py-2 pr-3">
                         <TradeCell cell={cell} />
