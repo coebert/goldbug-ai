@@ -89,6 +89,98 @@ function loadDriftSettings(portfolioId: string): DriftSettings {
   }
 }
 
+function DriftSettingsPopover({
+  value,
+  onChange,
+  baseCcy,
+}: {
+  value: DriftSettings;
+  onChange: (next: DriftSettings) => void;
+  baseCcy: string;
+}) {
+  const [absStr, setAbsStr] = useState(String(value.absBase));
+  const [pctStr, setPctStr] = useState(String((value.pct * 100).toFixed(2)));
+  useEffect(() => {
+    setAbsStr(String(value.absBase));
+    setPctStr(String((value.pct * 100).toFixed(2)));
+  }, [value.absBase, value.pct]);
+
+  const commit = () => {
+    const absBase = Math.max(0, Number(absStr) || 0);
+    const pct = Math.max(0, (Number(pctStr) || 0) / 100);
+    onChange({ ...value, absBase, pct });
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          aria-label="Wallet drift alert settings"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 space-y-3">
+        <div>
+          <div className="text-sm font-semibold">Drift alert</div>
+          <p className="text-xs text-muted-foreground">
+            Alert when <code>cash_by_ccy</code> (converted to {baseCcy}) drifts from{" "}
+            <code>current_cash</code> beyond either threshold.
+          </p>
+        </div>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="drift-enabled" className="text-xs">Enabled</Label>
+          <Switch
+            id="drift-enabled"
+            checked={value.enabled}
+            onCheckedChange={(v) => onChange({ ...value, enabled: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="drift-notify" className="text-xs">Toast on breach</Label>
+          <Switch
+            id="drift-notify"
+            checked={value.notify}
+            onCheckedChange={(v) => onChange({ ...value, notify: v })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drift-abs" className="text-xs">
+            Absolute threshold ({baseCcy})
+          </Label>
+          <Input
+            id="drift-abs"
+            inputMode="decimal"
+            value={absStr}
+            onChange={(e) => setAbsStr(e.target.value)}
+            onBlur={commit}
+            className="h-8"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drift-pct" className="text-xs">
+            Relative threshold (% of current_cash)
+          </Label>
+          <Input
+            id="drift-pct"
+            inputMode="decimal"
+            value={pctStr}
+            onChange={(e) => setPctStr(e.target.value)}
+            onBlur={commit}
+            className="h-8"
+          />
+        </div>
+        <Button size="sm" className="w-full" onClick={commit}>
+          Save thresholds
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 
 export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
   const fetchFn = useServerFn(getWalletAffordability);
