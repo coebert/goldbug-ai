@@ -112,6 +112,9 @@ export type RiskConfig = {
   max_hold_days: number; // 0 disables. Force-exit positions held longer than N days
   volatility_sizing: boolean;
   vol_target_pct: number; // target daily volatility contribution per position (e.g. 0.015 = 1.5%)
+  // Hard halts — either can pause ALL new buys until the condition clears.
+  max_daily_loss_pct: number;    // 0 disables. e.g. 0.03 = pause buys if today's PnL ≤ -3%
+  max_drawdown_halt_pct: number; // 0 disables. e.g. 0.15 = pause buys if peak-to-current DD ≥ 15%
   execution_params: Partial<ExecutionParamsConfig> | null;
   execution_calibration: ExecutionCalibrationMeta | null;
 };
@@ -125,6 +128,8 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   max_hold_days: 0,
   volatility_sizing: true,
   vol_target_pct: 0.015,
+  max_daily_loss_pct: 0.05,      // pause buys on any -5% day
+  max_drawdown_halt_pct: 0.20,   // pause buys past -20% drawdown
   execution_params: null,
   execution_calibration: null,
 };
@@ -156,6 +161,8 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   if (Number.isFinite(Number(r.max_hold_days))) out.max_hold_days = Math.max(0, Math.min(3650, Math.floor(Number(r.max_hold_days))));
   if (typeof r.volatility_sizing === "boolean") out.volatility_sizing = r.volatility_sizing;
   if (Number.isFinite(Number(r.vol_target_pct))) out.vol_target_pct = Math.max(0.001, Math.min(0.1, Number(r.vol_target_pct)));
+  if (Number.isFinite(Number(r.max_daily_loss_pct))) out.max_daily_loss_pct = Math.max(0, Math.min(0.9, Number(r.max_daily_loss_pct)));
+  if (Number.isFinite(Number(r.max_drawdown_halt_pct))) out.max_drawdown_halt_pct = Math.max(0, Math.min(0.9, Number(r.max_drawdown_halt_pct)));
   if (r.execution_params && typeof r.execution_params === "object") {
     const e = r.execution_params as Record<string, unknown>;
     const ep: Partial<ExecutionParamsConfig> = {};
