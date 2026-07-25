@@ -691,11 +691,11 @@ function TradeDivergenceCard({
         )}
         {grid.rows.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[560px] text-xs">
               <thead>
                 <tr className="border-b border-border text-left uppercase text-muted-foreground">
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="py-2 pr-3">Symbol</th>
+                  <th className="sticky left-0 z-10 bg-card py-2 pr-3">Date</th>
+                  <th className="sticky left-[72px] z-10 bg-card py-2 pr-3">Symbol</th>
                   {names.map((n, i) => (
                     <th key={n} className="py-2 pr-3">
                       <span
