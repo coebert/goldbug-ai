@@ -4,13 +4,14 @@
 // with a "spot" toggle when the portfolio is configured for real
 // broker-side FX (`fx_execution_mode='spot'`).
 
-import { useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ArrowRightLeft, Loader2 } from "lucide-react";
 
 import { convertPortfolioCash } from "@/lib/fx-convert.functions";
+import { previewFxConversion } from "@/lib/fx-convert-preview.functions";
 import { readWallet } from "@/lib/portfolio-wallet";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,9 +39,14 @@ interface Props {
   };
 }
 
+const fmt = (n: number, ccy?: string) =>
+  `${n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${ccy ? ` ${ccy}` : ""}`;
+const signed = (n: number, ccy?: string) => `${n > 0 ? "+" : ""}${fmt(n, ccy)}`;
+
 export function ManualFxConvertCard({ portfolio }: Props) {
   const qc = useQueryClient();
   const convert = useServerFn(convertPortfolioCash);
+  const preview = useServerFn(previewFxConversion);
 
   const rawCashByCcy = portfolio.cash_by_ccy;
   const cashByCcy =
@@ -75,10 +81,37 @@ export function ManualFxConvertCard({ portfolio }: Props) {
 
   const spotAvailable =
     portfolio.fx_execution_mode === "spot" && portfolio.fx_enabled === true;
+  const execution: "wallet" | "spot" = useSpot && spotAvailable ? "spot" : "wallet";
+
+  // Debounce amount for preview requests.
+  const [debouncedAmount, setDebouncedAmount] = useState(amount);
+  useEffect(() => {
+    const h = setTimeout(() => setDebouncedAmount(amount), 300);
+    return () => clearTimeout(h);
+  }, [amount]);
+
+  const amt = Number(debouncedAmount);
+  const previewEnabled =
+    Number.isFinite(amt) && amt > 0 && from !== to && portfolio.fx_enabled === true;
+
+  const previewQ = useQuery({
+    queryKey: ["fx-convert-preview", portfolio.id, from, to, amt, execution],
+    enabled: previewEnabled,
+    staleTime: 15_000,
+    queryFn: () =>
+      preview({
+        data: {
+          portfolioId: portfolio.id,
+          from,
+          to,
+          amountFrom: amt,
+          execution,
+        },
+      }),
+  });
 
   const m = useMutation({
     mutationFn: async () => {
-      const amt = Number(amount);
       if (!Number.isFinite(amt) || amt <= 0) throw new Error("Enter a positive amount");
       return await convert({
         data: {
@@ -86,7 +119,7 @@ export function ManualFxConvertCard({ portfolio }: Props) {
           from,
           to,
           amountFrom: amt,
-          execution: useSpot && spotAvailable ? "spot" : "wallet",
+          execution,
         },
       });
     },
@@ -114,6 +147,34 @@ export function ManualFxConvertCard({ portfolio }: Props) {
     setFrom(to);
     setTo(from);
   };
+
+  const previewData = previewQ.data;
+  type PreviewOk = {
+    ok: true;
+    fromCcy: string;
+    toCcy: string;
+    amountFrom: number;
+    amountTo: number;
+    midRate: number;
+    effectiveRate: number;
+    spreadBps: number;
+    feeFrom: number;
+    feeCcy: string;
+    rateSource: string;
+    rateStale: boolean;
+    baseCcy: string;
+    baseCcyDelta: number | null;
+    newWallet: Record<string, number>;
+    execution: "wallet" | "spot";
+  };
+  const previewOk: PreviewOk | null =
+    previewData && previewData.ok === true ? (previewData as PreviewOk) : null;
+  const previewErr =
+    previewData && previewData.ok === false
+      ? (previewData as { ok: false; reason: string; detail: string })
+      : null;
+
+
 
   return (
     <Card>
@@ -188,9 +249,110 @@ export function ManualFxConvertCard({ portfolio }: Props) {
           </div>
         )}
 
+        {previewEnabled && (
+          <div className="rounded-md border bg-muted/30 p-3 space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <div className="font-medium">Conversion preview</div>
+              {previewQ.isFetching && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              )}
+            </div>
+
+            {previewErr && (
+              <div className="text-destructive text-xs">
+                {previewErr.reason}: {previewErr.detail}
+              </div>
+            )}
+
+            {previewOk && (
+              <>
+                <div className="grid grid-cols-2 gap-y-1 gap-x-4 text-xs">
+                  <span className="text-muted-foreground">Mid-market rate</span>
+                  <span className="text-right tabular-nums">
+                    {previewOk.midRate.toFixed(6)} {previewOk.toCcy}/{previewOk.fromCcy}
+                  </span>
+
+                  <span className="text-muted-foreground">
+                    Effective rate ({previewOk.spreadBps} bps {previewOk.execution === "spot" ? "spot" : "wallet"} spread)
+                  </span>
+                  <span className="text-right tabular-nums">
+                    {previewOk.effectiveRate.toFixed(6)}
+                  </span>
+
+                  <span className="text-muted-foreground">Estimated fee</span>
+                  <span className="text-right tabular-nums">
+                    {fmt(previewOk.feeFrom, previewOk.feeCcy)}
+                  </span>
+
+                  <span className="text-muted-foreground">You send</span>
+                  <span className="text-right tabular-nums">
+                    −{fmt(previewOk.amountFrom, previewOk.fromCcy)}
+                  </span>
+
+                  <span className="text-muted-foreground">You receive</span>
+                  <span className="text-right tabular-nums font-medium">
+                    +{fmt(previewOk.amountTo, previewOk.toCcy)}
+                  </span>
+
+                  {previewOk.baseCcyDelta !== null && previewOk.baseCcy !== previewOk.fromCcy && (
+                    <>
+                      <span className="text-muted-foreground">
+                        Change in base ({previewOk.baseCcy})
+                      </span>
+                      <span
+                        className={`text-right tabular-nums ${
+                          previewOk.baseCcyDelta < 0 ? "text-destructive" : "text-emerald-600"
+                        }`}
+                      >
+                        {signed(previewOk.baseCcyDelta, previewOk.baseCcy)}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t">
+                  <div className="text-xs font-medium mb-1">Post-conversion available cash</div>
+                  <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-0.5 text-xs tabular-nums">
+                    {Object.keys(previewOk.newWallet)
+                      .sort()
+                      .map((ccy) => {
+                        const before = wallet[ccy] ?? 0;
+                        const after = previewOk.newWallet[ccy] ?? 0;
+                        const delta = after - before;
+                        return (
+                          <div key={ccy} className="contents">
+                            <span className="text-muted-foreground">{ccy}</span>
+                            <span className="text-right">{fmt(after)}</span>
+                            <span
+                              className={
+                                Math.abs(delta) < 0.005
+                                  ? "text-muted-foreground text-right"
+                                  : delta > 0
+                                    ? "text-emerald-600 text-right"
+                                    : "text-destructive text-right"
+                              }
+                            >
+                              {Math.abs(delta) < 0.005 ? "—" : signed(delta)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {previewOk.rateStale && (
+                  <div className="text-xs text-amber-600">
+                    Rate is stale (source: {previewOk.rateSource}) — actual fill may differ.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <Button
           type="button"
-          disabled={m.isPending || from === to || !amount}
+          disabled={m.isPending || from === to || !amount || (previewEnabled && !previewOk)}
           onClick={() => m.mutate()}
           className="w-full"
         >
