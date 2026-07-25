@@ -34,6 +34,7 @@ const REASON_LABEL: Record<string, string> = {
 export function CommodityBacktestCard({ portfolioId }: Props) {
   const [years, setYears] = useState(3);
   const run = useServerFn(runCommodityBacktest);
+  const apply = useServerFn(applyCommodityThresholds);
   const mut = useMutation({
     mutationFn: () => run({ data: { portfolio_id: portfolioId, years } }),
     onError: (e: unknown) =>
@@ -41,8 +42,25 @@ export function CommodityBacktestCard({ portfolioId }: Props) {
         description: e instanceof Error ? e.message : "Unknown error",
       }),
   });
+  const applyMut = useMutation({
+    mutationFn: (v: { min_adv_usd: number; max_atr_pct: number }) =>
+      apply({ data: { portfolio_id: portfolioId, ...v } }),
+    onSuccess: (res) => {
+      toast.success("Risk thresholds updated", {
+        description: `ADV floor $${res.applied.min_adv_usd.toLocaleString("en-GB")} · ATR cap ${(res.applied.max_atr_pct * 100).toFixed(1)}%`,
+      });
+      // Re-run backtest so before/after refreshes.
+      mut.mutate();
+    },
+    onError: (e: unknown) =>
+      toast.error("Could not apply thresholds", {
+        description: e instanceof Error ? e.message : "Unknown error",
+      }),
+  });
 
   const report = mut.data?.report;
+  const suggestion = mut.data?.suggestion;
+
 
   return (
     <Card>
