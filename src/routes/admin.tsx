@@ -19,6 +19,7 @@ import { NotificationsPanel } from "@/components/notifications-panel";
 import { TranslationQualityCard } from "@/components/translation-quality-card";
 import { BatchLessonsCard } from "@/components/batch-lessons-card";
 import { RetrainScheduleCard } from "@/components/retrain-schedule-card";
+import { RunMetricsCard } from "@/components/run-metrics-card";
 
 
 export const Route = createFileRoute("/admin")({
