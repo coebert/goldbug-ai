@@ -1308,6 +1308,9 @@ function PortfolioPage() {
                       <FxIntentsCard portfolioId={p.id} active={tab === "errors"} />
                     )}
                     {p.fx_enabled === true && (
+                      <FxIntentPnlCard portfolioId={p.id} active={tab === "errors"} />
+                    )}
+                    {p.fx_enabled === true && (
                       <ManualFxConvertCard portfolio={p} />
                     )}
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
