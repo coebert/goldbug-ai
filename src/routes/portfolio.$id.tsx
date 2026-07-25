@@ -124,6 +124,8 @@ import {
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
+import { CommodityBacktestCard } from "@/components/commodity-backtest-card";
+
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
@@ -1279,6 +1281,11 @@ function PortfolioPage() {
             <div className="mt-6">
               <CommodityLiquiditySimulatorCard />
             </div>
+
+            <div className="mt-6">
+              <CommodityBacktestCard portfolioId={id} />
+            </div>
+
 
 
 
