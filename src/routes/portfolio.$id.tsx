@@ -784,6 +784,20 @@ function PortfolioPage() {
               </CardContent>
             </Card>
 
+            {p && (
+              <div className="mb-4">
+                <PerformanceDashboardCard
+                  startingCash={Number(p.starting_cash ?? 0)}
+                  currency={String(p.currency ?? "GBP")}
+                  equity={equity as { snapshot_date: string; total_value: number }[]}
+                  trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
+                  deposits={deposits}
+                />
+              </div>
+            )}
+
+
+
             {lastBtMetrics && (
               <Card className="mb-4">
                 <CardHeader className="pb-2">
