@@ -117,13 +117,17 @@ export async function routeOrdersToBroker(params: {
     }));
   }
 
-  // Fetch broker account currency once per batch so we can record the FX rate
-  // used to translate the portfolio-currency notional into the currency Saxo
-  // will actually clear against. Non-blocking: fallback records rate=1 stale.
+  // Fetch broker account currency + available cash once per batch. We use
+  // currency to record the FX rate the AI sized against, and cash to gate the
+  // pre-placement reconciliation below. Non-blocking: on failure we fall
+  // through with rate=1 stale and skip the affordability trim.
   let accountCurrency: string | null = null;
+  let brokerCashAvailable: number | null = null;
   try {
     const bal = await adapter.getBalance();
     accountCurrency = bal.currency;
+    const rawCash = Number(bal.cashAvailable ?? bal.cash);
+    brokerCashAvailable = Number.isFinite(rawCash) ? rawCash : null;
   } catch {
     /* best-effort */
   }
@@ -157,6 +161,101 @@ export async function routeOrdersToBroker(params: {
       error: fxStale ? "fx rate stale or fallback" : null,
     });
   }
+
+  // ---------- Pre-placement cash reconciliation.
+  // Refresh the local `current_cash` from the broker one more time immediately
+  // before we start placing orders — top-of-tick sync ran minutes ago and
+  // external deposits, withdrawals, or in-flight fills may have moved the
+  // real number. Then trim any buys whose combined broker-currency notional
+  // exceeds what the broker actually has available, so we never hand Saxo an
+  // order that will come straight back as InsufficientCash.
+  const preSkips = new Map<string, string>(); // clientOrderId key by symbol+side
+  try {
+    const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
+    const { withOwnedClient } = await import("./_server/owned-client");
+    const preSync = await syncLiveCashFromBroker(portfolio.id, withOwnedClient(userId));
+    // If the drift-update ran, capture the fresh broker cash so the
+    // affordability check below uses the same number the local DB just wrote.
+    if (!preSync.skipped && Number.isFinite(preSync.brokerCash)) {
+      brokerCashAvailable = Number(preSync.brokerCash);
+    }
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "PRE_PLACE_RECONCILE",
+      path: "/reconcile/pre-place",
+      status: preSync.skipped ? 206 : 200,
+      request: asJson({ asOf, decisionId, count: routable.length }),
+      response: asJson(preSync),
+      error: preSync.skipped ? preSync.reason : null,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "PRE_PLACE_RECONCILE",
+      path: "/reconcile/pre-place",
+      status: 500,
+      request: asJson({ asOf, decisionId, count: routable.length }),
+      response: null,
+      error: msg,
+    });
+  }
+
+  if (brokerCashAvailable != null) {
+    const { trimBuysToBudget } = await import("./pre-place-budget");
+    // Rank buys by broker-ccy notional so the biggest, most conviction-heavy
+    // buys get the budget first. Sells are never gated on cash.
+    const buys = routable
+      .filter((o) => o.side === "buy")
+      .slice()
+      .sort((a, b) => b.quantity * b.price - a.quantity * a.price);
+    if (buys.length > 0) {
+      const trim = trimBuysToBudget(buys, brokerCashAvailable, fxRate);
+      for (const d of trim.decisions) {
+        if (d.kind === "skip") {
+          preSkips.set(`${d.order.symbol}:${d.order.side}`, d.reason);
+        }
+      }
+      if (trim.skippedCount > 0) {
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_AFFORDABILITY",
+          path: "/reconcile/pre-place/trim",
+          status: 200,
+          request: asJson({
+            asOf,
+            decisionId,
+            brokerCashAvailable,
+            fxRate,
+            requested: trim.totalRequestedBrokerCcy,
+            allowed: trim.totalAllowedBrokerCcy,
+          }),
+          response: asJson({
+            skippedCount: trim.skippedCount,
+            skipped: trim.decisions
+              .filter((d) => d.kind === "skip")
+              .map((d) => ({
+                symbol: d.order.symbol,
+                side: d.order.side,
+                notionalBrokerCcy: d.notionalBrokerCcy,
+                reason: d.reason,
+              })),
+          }),
+          error: null,
+        });
+      }
+    }
+  }
+
 
   // ---------- Preflight: resolve every symbol to a Saxo instrument up front.
   // If any lookup fails, block the entire batch so we never place a partial
@@ -214,10 +313,24 @@ export async function routeOrdersToBroker(params: {
   let firstOrder = true;
 
   for (const order of routable) {
+    // Pre-placement affordability trim: buys that don't fit the freshly
+    // reconciled broker cash are skipped before we ever call placeOrder.
+    const skipReason = preSkips.get(`${order.symbol}:${order.side}`);
+    if (skipReason) {
+      results.push({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: order.quantity,
+        status: "skipped",
+        skipped: skipReason,
+      });
+      continue;
+    }
     if (!firstOrder) {
       await new Promise((resolve) => setTimeout(resolve, ORDER_SPACING_MS));
     }
     firstOrder = false;
+
     const clientOrderId = makeClientOrderId({
       portfolioId: portfolio.id,
       attemptSeed,
