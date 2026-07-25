@@ -3,10 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAllPortfoliosEquity } from "@/lib/trading.functions";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  SectionCard,
+  SectionCardBody,
+  SectionCardHeader,
+} from "@/components/ui/section-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { ChartSkeleton } from "@/components/ui/card-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { LineChart, RefreshCw } from "lucide-react";
 import {
   Area,
   CartesianGrid,
