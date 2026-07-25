@@ -1013,7 +1013,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     } else {
       holdingsByS.set(sym, { ...h, quantity: remaining } as Holding);
     }
-    executed.push({ symbol: sym, side: "sell", quantity: sellQty, price, value, reason: trigger });
+    // Protective exit — TOD hard-blocks are bypassed; slicing telemetry still attached.
+    const ea = applyExecAlphaSell(sym, value, price, { protective: true });
+    executed.push({
+      symbol: sym, side: "sell", quantity: sellQty, price, value,
+      reason: trigger, tod: ea.tod, slice_plan: ea.slicePlan,
+    });
 
     // Re-entry lockout for adverse exits only (stop / trail / time / event-blackout / max-hold).
     // Take-profit and scale-out are constructive — they don't trigger lockout.
