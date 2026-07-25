@@ -23,6 +23,7 @@ import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
+import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id.analytics'
 import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
@@ -103,6 +104,11 @@ const PortfolioIdAttributionRoute = PortfolioIdAttributionRouteImport.update({
   path: '/attribution',
   getParentRoute: () => PortfolioIdRoute,
 } as any)
+const PortfolioIdAnalyticsRoute = PortfolioIdAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => PortfolioIdRoute,
+} as any)
 const ApiPublicNewsPreviewRoute = ApiPublicNewsPreviewRouteImport.update({
   id: '/api/public/news-preview',
   path: '/api/public/news-preview',
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
+  '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
+  '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
+  '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/news-preview'
+    | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/news-preview'
+    | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/api/public/news-preview'
+    | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
@@ -431,6 +443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioIdAttributionRouteImport
       parentRoute: typeof PortfolioIdRoute
     }
+    '/portfolio/$id/analytics': {
+      id: '/portfolio/$id/analytics'
+      path: '/analytics'
+      fullPath: '/portfolio/$id/analytics'
+      preLoaderRoute: typeof PortfolioIdAnalyticsRouteImport
+      parentRoute: typeof PortfolioIdRoute
+    }
     '/api/public/news-preview': {
       id: '/api/public/news-preview'
       path: '/api/public/news-preview'
@@ -498,12 +517,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface PortfolioIdRouteChildren {
+  PortfolioIdAnalyticsRoute: typeof PortfolioIdAnalyticsRoute
   PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
   PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
   PortfolioIdReportRoute: typeof PortfolioIdReportRoute
 }
 
 const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
+  PortfolioIdAnalyticsRoute: PortfolioIdAnalyticsRoute,
   PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
   PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
   PortfolioIdReportRoute: PortfolioIdReportRoute,
