@@ -506,10 +506,10 @@ function ComparePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
-                        <th className="py-2 pr-3">Portfolio</th>
+                        <th className="sticky left-0 z-10 bg-card py-2 pr-3">Portfolio</th>
                         <th className="py-2 pr-3">Risk</th>
                         <th className="py-2 pr-3 text-right">Days</th>
                         <th className="py-2 pr-3 text-right"><Explain term="pnl">Return</Explain></th>
