@@ -1265,7 +1265,16 @@ function PortfolioPage() {
                 mode={p.mode}
                 series={holdingsSeries}
               />
+
+              <CommodityExposureCard
+                holdings={holdings}
+                decisions={decisions}
+                currency={p.currency}
+                totalValue={totalValue}
+                series={holdingsSeries}
+              />
             </div>
+
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <RegimePanel />
