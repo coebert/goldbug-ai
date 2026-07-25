@@ -66,8 +66,10 @@ export const runCommodityBacktest = createServerFn({ method: "POST" })
       ok: true as const,
       risk_level: p.risk_level,
       report,
+      suggestion: suggestCommodityThresholds(report),
       symbolCoverage: symbols.map((s) => ({ symbol: s.symbol, bars: s.candles.length })),
     };
+
   });
 
 // Apply suggested liquidity/ATR thresholds to the portfolio's risk_config.
