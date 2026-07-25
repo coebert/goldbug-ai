@@ -2018,7 +2018,7 @@ function PlainEnglishExplanation({
       )}
       {q.data && !q.isError && (
         <p className="text-sm leading-relaxed text-foreground/90">
-          {q.data.explanation}
+          <JargonText>{q.data.explanation}</JargonText>
         </p>
       )}
       {!q.data && !q.isError && !q.isFetching && (
