@@ -57,6 +57,9 @@ const TradeErrorDashboardCard = lazy(() =>
 const FxHealthCard = lazy(() =>
   import("@/components/fx-health-card").then((m) => ({ default: m.FxHealthCard })),
 );
+const ManualFxConvertCard = lazy(() =>
+  import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
+);
 
 
 
@@ -1256,6 +1259,9 @@ function PortfolioPage() {
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <div className="space-y-4">
                     <FxHealthCard portfolioId={p.id} active={tab === "errors"} />
+                    {p.fx_enabled === true && (
+                      <ManualFxConvertCard portfolio={p} />
+                    )}
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
                   </div>
                 </Suspense>
