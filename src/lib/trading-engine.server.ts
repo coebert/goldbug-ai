@@ -918,6 +918,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         meta.asset_class,
         Math.max(0, (classExposure.get(meta.asset_class) ?? 0) - value),
       );
+      if (meta.asset_class === "commodity") {
+        const grp = classifyCommoditySymbol(meta.symbol);
+        if (grp) {
+          commodityGroupExposure.set(
+            grp,
+            Math.max(0, (commodityGroupExposure.get(grp) ?? 0) - value),
+          );
+        }
+      }
       executed.push({
         symbol: meta.symbol,
         side: "sell",
