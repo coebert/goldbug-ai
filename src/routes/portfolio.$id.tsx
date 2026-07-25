@@ -1320,7 +1320,7 @@ function PortfolioPage() {
                                 <span>@ {Number(t.price).toFixed(2)}</span>
                               </div>
                               {t.reason && (
-                                <p className="text-xs text-muted-foreground break-words">{t.reason}</p>
+                                <p className="text-xs text-muted-foreground break-words"><JargonText>{t.reason}</JargonText></p>
                               )}
                             </div>
                           </details>
