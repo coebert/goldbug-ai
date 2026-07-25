@@ -1419,6 +1419,38 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         continue;
       }
 
+      // Phase 6 — time-of-day filter (haircut or hard-block during auction windows).
+      const venue = inferVenueFromSymbol(meta.symbol);
+      let todInfo: { multiplier: number; allow: boolean; reason: string } | undefined;
+      if (cfg.tod_filter_enabled) {
+        todInfo = todExecutionAdjustment({
+          venue,
+          avoidOpenMin: cfg.tod_avoid_open_min,
+          avoidCloseMin: cfg.tod_avoid_close_min,
+          openHaircut: cfg.tod_open_haircut,
+          closeHaircut: cfg.tod_close_haircut,
+          hardBlockOpenMin: cfg.tod_hard_block_open_min,
+          hardBlockCloseMin: cfg.tod_hard_block_close_min,
+        });
+        if (!todInfo.allow) {
+          executed.push({
+            symbol: meta.symbol,
+            side: "buy",
+            quantity: 0,
+            price,
+            value: 0,
+            reason: order.reason,
+            rejected: `TOD block: ${todInfo.reason}`,
+            tod: todInfo,
+          });
+          continue;
+        }
+        if (todInfo.multiplier < 1) {
+          spend = spend * todInfo.multiplier;
+          sizingNotes.push(`tod x${todInfo.multiplier.toFixed(2)}`);
+        }
+      }
+
       // Phase 5 — realistic execution (spread, slippage, commission, liquidity cap)
       const featExec = featureBySymbol.get(meta.symbol);
       const outcome = applyBuyExecution({
@@ -1490,6 +1522,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           (commodityGroupExposure.get(commodityGroupKey) ?? 0) + outcome.effectiveSpend,
         );
       }
+      // Phase 6 — slice plan telemetry (attached to executed row).
+      const slicePlan = cfg.execution_slicing_enabled
+        ? planOrderSlices({
+            parentNotional: outcome.effectiveSpend,
+            price: fillPrice,
+            adv20d: featExec?.adv_20d ?? null,
+            participationCap: cfg.execution_participation_cap,
+            maxChildNotional: cfg.execution_max_child_notional,
+          })
+        : undefined;
+      if (slicePlan && slicePlan.childCount > 1) {
+        sizingNotes.push(`sliced ${slicePlan.childCount}×`);
+      }
       // Track sell reductions for group exposure too (mirrors classExposure sell path).
       executed.push({
         symbol: meta.symbol,
@@ -1498,6 +1543,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         price: fillPrice,
         value: outcome.effectiveSpend,
         reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
+        liquidity: commodityLiq,
+        slice_plan: slicePlan
+          ? {
+              childCount: slicePlan.childCount,
+              childNotional: slicePlan.childNotional,
+              advParticipationPct: slicePlan.advParticipationPct,
+              reason: slicePlan.reason,
+            }
+          : undefined,
+        tod: todInfo,
+      });
         liquidity: commodityLiq,
       });
 
