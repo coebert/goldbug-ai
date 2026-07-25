@@ -1753,13 +1753,28 @@ function DecisionCard({
   const aiOrders = raw.orders ?? [];
   const signalBySymbol = new Map(signals.map((s) => [s.symbol, s]));
   const weightsByKey = new Map<string, SignalWeights>();
+  const convictionByKey = new Map<string, number>();
   for (const o of aiOrders) {
     if (!o?.symbol || !o?.side) continue;
+    const key = `${o.symbol.toUpperCase()}:${o.side}`;
     const w = normalizeWeights(o.signal_weights);
-    if (w) weightsByKey.set(`${o.symbol.toUpperCase()}:${o.side}`, w);
+    if (w) weightsByKey.set(key, w);
+    if (typeof o.conviction === "number") convictionByKey.set(key, o.conviction);
   }
   const approvedCount = executed.filter((e) => !e.rejected && e.quantity > 0).length;
   const rejectedCount = executed.filter((e) => e.rejected).length;
+
+  // Latest regime — fetched once per rendered decision card. React
+  // Query dedupes across cards on the same page so this is a single
+  // request even when many decisions are visible.
+  const getRegime = useServerFn(getCurrentRegime);
+  const regimeQ = useQuery({
+    queryKey: ["current-regime"],
+    queryFn: () => getRegime(),
+    staleTime: 5 * 60_000,
+  });
+  const regime = (regimeQ.data ?? null) as ConfidenceRegime;
+
 
 
   return (
