@@ -442,11 +442,17 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
     [sliced, deposits, includeDeposits],
   );
   const values = adjusted.length > 0 ? adjusted.map((p) => p.adjusted) : sliced.map((p) => p.value);
-  const rangePct = computeCardRangePct(sliced, deposits, includeDeposits);
-  // Total equity MUST use the same valuation series that feeds the % change
-  // (the sparkline series). Falling back to current_cash only when the series
-  // is empty guarantees the two numbers can never disagree on source.
-  const totalEquity = sparkSeries.length > 0 ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
+  // Total equity + range % come from a single derivation call whose
+  // runtime invariants guarantee both numbers share the same source
+  // (last point of `sparkSeries`). See `deriveCardEquity` for the
+  // three assertions enforced at render time.
+  const { totalEquity, rangePct } = deriveCardEquity(
+    sparkSeries,
+    sliced,
+    deposits,
+    includeDeposits,
+    Number(portfolio.current_cash),
+  );
   // Dedicated states so the headline and % pill can never render
   // mismatched (loaded £ + stale/empty %, or vice versa). Both slots
   // pivot on the SAME (isLoadingEquity, sparkSeries) inputs.
