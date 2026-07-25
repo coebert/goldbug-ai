@@ -11,6 +11,9 @@ import {
   getBenchmarkSeries,
 } from "@/lib/trading.functions";
 import { explainDecisionOrder, type ExplainOrderInput } from "@/lib/order-explanations.functions";
+import { getCurrentRegime } from "@/lib/regime.functions";
+import { OrderConfidenceBadge } from "@/components/order-confidence-badge";
+import type { ConfidenceRegime } from "@/lib/order-confidence";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
@@ -1424,7 +1427,7 @@ type ExecutedRow = {
   rejected?: string;
 };
 
-type NewsRow = { headline: string; source: string | null };
+type NewsRow = { headline: string; source: string | null; sentiment?: number | null; source_weight?: number | null };
 
 type Guardrails = {
   risk_level: string;
@@ -1448,6 +1451,7 @@ type SignalWeights = {
 type AiOrder = {
   symbol?: string;
   side?: "buy" | "sell";
+  conviction?: number | null;
   signal_weights?: Partial<SignalWeights>;
 };
 
@@ -1575,6 +1579,8 @@ function OrderPanel({
   guardrails,
   currency,
   weights,
+  conviction,
+  regime,
 }: {
   decisionId: string;
   orderIndex: number;
@@ -1584,12 +1590,16 @@ function OrderPanel({
   guardrails?: Guardrails;
   currency: string;
   weights?: SignalWeights | null;
+  conviction?: number | null;
+  regime?: ConfidenceRegime;
 }) {
   const approved = !order.rejected;
   const side = order.side;
   const relatedNews = signal
     ? news.filter((n) => keywordMatch(n.headline, signal.symbol, signal.name)).slice(0, 3)
     : [];
+
+
 
 
   return (
@@ -1612,15 +1622,28 @@ function OrderPanel({
               : `intended · ${currency} ${fmtNum(order.price)}`}
           </span>
         </div>
-        {approved ? (
-          <Badge variant="outline" className="border-primary/40 text-primary">
-            <ShieldCheck className="mr-1 h-3 w-3" /> Guardrails passed
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="border-destructive/40 text-destructive">
-            <ShieldAlert className="mr-1 h-3 w-3" /> Blocked · {order.rejected}
-          </Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <OrderConfidenceBadge
+            side={side}
+            conviction={conviction ?? null}
+            regime={regime ?? null}
+            relatedNews={relatedNews.map((n) => ({
+              headline: n.headline,
+              sentiment: n.sentiment ?? null,
+              source_weight: n.source_weight ?? 1,
+            }))}
+          />
+          {approved ? (
+            <Badge variant="outline" className="border-primary/40 text-primary">
+              <ShieldCheck className="mr-1 h-3 w-3" /> Guardrails passed
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="border-destructive/40 text-destructive">
+              <ShieldAlert className="mr-1 h-3 w-3" /> Blocked · {order.rejected}
+            </Badge>
+          )}
+        </div>
+
       </div>
 
       <p className="mb-2 text-sm">
@@ -1730,13 +1753,28 @@ function DecisionCard({
   const aiOrders = raw.orders ?? [];
   const signalBySymbol = new Map(signals.map((s) => [s.symbol, s]));
   const weightsByKey = new Map<string, SignalWeights>();
+  const convictionByKey = new Map<string, number>();
   for (const o of aiOrders) {
     if (!o?.symbol || !o?.side) continue;
+    const key = `${o.symbol.toUpperCase()}:${o.side}`;
     const w = normalizeWeights(o.signal_weights);
-    if (w) weightsByKey.set(`${o.symbol.toUpperCase()}:${o.side}`, w);
+    if (w) weightsByKey.set(key, w);
+    if (typeof o.conviction === "number") convictionByKey.set(key, o.conviction);
   }
   const approvedCount = executed.filter((e) => !e.rejected && e.quantity > 0).length;
   const rejectedCount = executed.filter((e) => e.rejected).length;
+
+  // Latest regime — fetched once per rendered decision card. React
+  // Query dedupes across cards on the same page so this is a single
+  // request even when many decisions are visible.
+  const getRegime = useServerFn(getCurrentRegime);
+  const regimeQ = useQuery({
+    queryKey: ["current-regime"],
+    queryFn: () => getRegime(),
+    staleTime: 5 * 60_000,
+  });
+  const regime = (regimeQ.data ?? null) as ConfidenceRegime;
+
 
 
   return (
@@ -1803,6 +1841,8 @@ function DecisionCard({
                 guardrails={guardrails}
                 currency={currency}
                 weights={weightsByKey.get(`${o.symbol.toUpperCase()}:${o.side}`)}
+                conviction={convictionByKey.get(`${o.symbol.toUpperCase()}:${o.side}`) ?? null}
+                regime={regime}
               />
             ))}
 
