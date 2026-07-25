@@ -1270,7 +1270,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         wallet: fxContext.wallet,
         conversions: aiFxRequested,
         fxContext,
-        buyHalts: halts.blockBuys,
+        buyHalts: halts.any_halt,
         persist: !breakerTripped,
       });
       // Reflect base-ccy delta into workingCash so the persisted current_cash
