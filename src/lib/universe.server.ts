@@ -228,7 +228,9 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   tod_close_haircut: 0.5,
   tod_hard_block_open_min: 0,
   tod_hard_block_close_min: 0,
+  tod_venue_overrides: null,
 };
+
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
   const base = { ...DEFAULT_RISK_CONFIG };
