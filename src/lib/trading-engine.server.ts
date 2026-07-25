@@ -990,11 +990,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         // symbol quality rather than portfolio composition.
         const cfeat = featureBySymbol.get(meta.symbol);
         const advUsd = (cfeat?.adv_20d ?? 0) * price;
+        // Sizing telemetry attached to this candidate — populated regardless of
+        // whether the buy is allowed, so the UI can explain the rejection.
+        const commodityLiquidity = meta.asset_class === "commodity"
+          ? computeCommodityTradeLiquidity({
+              requestedSpend: Math.max(0, workingCash - cashFloor) * pct,
+              price,
+              atrPct: cfeat?.atr_pct ?? null,
+              adv20d: cfeat?.adv_20d ?? null,
+              liquidityCappedSpend: null,
+            })
+          : undefined;
         if (cfg.commodity_min_adv_usd > 0 && advUsd > 0 && advUsd < cfg.commodity_min_adv_usd) {
           executed.push({
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
             reason: order.reason,
             rejected: `commodity ${meta.symbol} blocked: 20d ADV $${Math.round(advUsd).toLocaleString()} below min $${Math.round(cfg.commodity_min_adv_usd).toLocaleString()}`,
+            liquidity: commodityLiquidity,
           });
           continue;
         }
@@ -1004,6 +1016,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
             reason: order.reason,
             rejected: `commodity ${meta.symbol} blocked: 14d ATR ${(atrP * 100).toFixed(2)}% exceeds max ${(cfg.commodity_max_atr_pct * 100).toFixed(2)}%`,
+            liquidity: commodityLiquidity,
           });
           continue;
         }
