@@ -1259,8 +1259,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // rows (bad rate, circuit open, insufficient balance) are logged into the
   // decision guardrails for later inspection. Never mutates workingCash for
   // non-base currencies — those live in cash_by_ccy only.
+  //
+  // fx_intents (typed, guardrailed) are compiled first into equivalent
+  // FxConversionOrder rows and prepended, so intent-driven proposals get
+  // executed before any legacy fx_conversions the model still emits.
   let aiFxApplied: Awaited<ReturnType<typeof applyAiFxConversions>> | null = null;
-  const aiFxRequested = decision.fx_conversions ?? [];
+  const legacyFx = decision.fx_conversions ?? [];
+  const rawIntents = decision.fx_intents ?? [];
+  let compiledIntents: ReturnType<typeof import("./fx-intents").compileFxIntents> = [];
+  if (fxContext && rawIntents.length > 0) {
+    const { compileFxIntents, DEFAULT_GUARDRAILS } = await import("./fx-intents");
+    const ratesToBase: Record<string, number> = {};
+    for (const [pair, q] of fxContext.matrix) {
+      const [from, to] = pair.split("/");
+      if (to === fxContext.baseCcy) ratesToBase[from] = q.rate;
+    }
+    ratesToBase[fxContext.baseCcy] = 1;
+    compiledIntents = compileFxIntents(rawIntents, {
+      baseCcy: fxContext.baseCcy,
+      wallet: fxContext.wallet as unknown as Record<string, number>,
+      exposureBase: fxContext.exposureByCcy,
+      ratesToBase,
+      guardrails: { ...DEFAULT_GUARDRAILS, navBase: totalValue },
+    });
+  }
+  const intentOrders = compiledIntents.flatMap((c) => (c.order ? [c.order] : []));
+  const aiFxRequested = [...intentOrders, ...legacyFx];
   if (fxContext && aiFxRequested.length > 0) {
     try {
       aiFxApplied = await applyAiFxConversions({
