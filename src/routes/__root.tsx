@@ -84,7 +84,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      // Phase 1 — typography. Inter for body, Space Grotesk for
+      // display/numeric headlines. Loaded via <link> per Tailwind v4
+      // (Lightning CSS won't resolve remote @import from styles.css).
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap",
+      },
     ],
+
   }),
   shellComponent: RootShell,
   component: RootComponent,

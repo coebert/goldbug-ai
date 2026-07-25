@@ -1,100 +1,117 @@
-# Codebase Review & Improvement Plan
+# Aegis — UX, Visual Design & Ergonomics Improvement Plan
 
-A comprehensive review of Aegis. The app works well and has strong test coverage, but has grown organically: a handful of files are very large, server/client boundaries are inconsistently applied, and cross-cutting concerns (auth, logging, ownership, rate limits) are re-implemented per module. Below is what I found and a phased plan to fix it without behavioural changes.
+Grounded in a review of `src/routes/index.tsx` (the 1,488-line dashboard), `app-header.tsx`, `mobile-tab-bar.tsx`, `styles.css`, and the wider component library (backtest cards, live-trading card, news reel, decision breakdown, coach marks, help drawer, notifications, etc.).
 
-## What's already good
+The plan is deliberately staged: earlier phases pay off on every screen, later phases add polish and delight. Each phase is behaviour-preserving unless flagged.
 
-- Clear split of `.server.ts` / `.functions.ts` / client modules with import guards.
-- Zod validation at server-function boundaries (see `execution-slicer-*` — this is the gold standard to copy).
-- Strong test suite (fuzz, e2e, contract, visual, property, snapshot).
-- RLS + `has_role` pattern, dedicated `user_roles`, security audit log, security memory doc.
-- Idempotency keys on slicer, run-lock table, rate-limit token bucket function.
+---
 
-## Key issues found
+## Findings at a glance
 
-### 1. Mega-files hurting maintainability
-- `src/lib/trading.functions.ts` — **2,802 lines**, **34 server functions**. Single file owns backtest, live, sim, retrain, config, metrics, and holdings orchestration.
-- `src/lib/trading-engine.server.ts` — 1,396 lines mixing signal generation, sizing, execution routing.
-- `src/routes/portfolio.$id.tsx` — **1,866 lines**; `src/routes/index.tsx` — 1,293.
-- `src/components/news-reel.tsx` (962), `live-trading-card.tsx` (788), `backtest-run-history-card.tsx` (709), `risk-controls-card.tsx` (656).
+1. **The design system is under-used.** `styles.css` defines a rich oklch dark palette, but many components hard-code `text-emerald-400`, `bg-cyan-500/15`, `border-red-400`, `text-primary` on brand elements, etc. Tone is inconsistent between cards.
+2. **The home dashboard is a single 1,488-line component** rendering: header, mode-summary strip, controls row, snapshot mismatch alert, "new here" banner, all-portfolios chart, news reel, decision breakdown, portfolio list, create-portfolio card. There is no visible hierarchy — every section screams for attention.
+3. **Information density is high with weak grouping.** Headings are small (`text-xl`), muted-foreground body is `text-xs` in many places, and control affordances (deposit toggle, decimals `<select>`, range chips) live on cramped one-line strips.
+4. **Header + mobile tab bar duplicate destinations.** Admin lives in three places (desktop nav pill, mobile header pill, mobile tab bar). "Broker" appears in the tab bar and header. "Learn" appears in both. There is no persistent "Home".
+5. **Ergonomic gaps.** No global search / command palette. No breakpoint-aware sidebar for the dense dashboard. Sparkline range chips are per-card only; there is no dashboard-wide range selector. No compact/comfortable density toggle. Icon-only buttons in some places rely on `title=` only.
+6. **Empty, loading and error states are inconsistent.** `PortfolioRow` recently got a proper skeleton/error contract (good) but other cards (news reel, decision breakdown, all-portfolios chart) fall back to blank divs.
+7. **Typography is a single sans stack.** No display face for headline numbers; big money values compete with body copy at the same weight/family.
+8. **Mobile: primary CTAs are scattered.** Bottom tab bar is 5 items, but the primary action ("New portfolio") is a scroll-anchor. Header is heavy (safe-area, brand, tagline, help, notifications, admin pill, hamburger) — leaves little air on iPhone widths.
+9. **Accessibility.** Several icon-only interactive elements use `title` not `aria-label`; the "Include deposits" strip uses a native `<select>` for decimals with focus outline disabled; hard-coded `text-emerald-400`/`text-red-400` bypass theming and hurt contrast when re-themed.
+10. **Motion & feedback.** Skeleton shimmer exists (recently added) but is not applied to all loading surfaces; there are no subtle transitions when values update, no toast style variants tied to semantics.
 
-These are hard to review, slow to typecheck, and easy to regress. They also inflate route tree types (TanStack infers loader return types across all server fns pulled in).
+---
 
-### 2. Server/client boundary drift
-- 37 files under `src/lib/` import `supabaseAdmin`. Some are `.server.ts` (correct), but any `.functions.ts` that imports admin at module scope leaks into the client bundle chain via handler stubs. Needs an audit + dynamic `await import('@/integrations/supabase/client.server')` inside handlers only.
-- Several `.functions.ts` likely still contain sibling helpers/config next to `createServerFn` (violates `tss-serverfn-split` — causes `ReferenceError` at runtime post-transform). The slicer module was already refactored — apply the same shape everywhere.
+## Phase 1 — Design language & tokens (foundation)
 
-### 3. Repeated ownership + auth boilerplate
-Every server fn re-does: `requireSupabaseAuth` → look up portfolio → check `user_id === context.userId` → log to security audit. The slicer's `assertPortfolioOwnership` + `logUnexpectedAccess` is the right pattern, but it's copy-pasted (with variations) across trading, live, holdings-history, attribution, insights, etc. Small drift here is a security risk.
+Goal: one visual voice, tokenised. Every later phase depends on this.
 
-### 4. Security posture — real risks
-- **Public webhook routes** under `src/routes/api/public/hooks/*` (daily-run, hourly-run, batch-retrain, live-reconcile, saxo-refresh, translation-refresh). They should all: (a) verify `CRON_SECRET` in constant time, (b) enforce a rate limit via `consume_rate_limit`, (c) never echo input in errors. Needs a shared `verifyCronRequest()` helper so no route can forget.
-- **Service-role usage is broad** (37 files). Every admin-client call needs a documented reason — "reading own row" should use the RLS'd client instead. Reducing the admin surface area is the single highest-leverage security win.
-- **CORS / headers**: no evidence of a shared response-hardening layer (CSP, X-Content-Type-Options, Referrer-Policy). Add via server route middleware.
-- **Input validation coverage**: only a subset of server fns use Zod. Make Zod `.inputValidator` mandatory (lint rule or code review checklist).
-- **Password HIBP check**: verify `password_hibp_enabled` is on (`configure_auth`). Given single-user app it's low risk but trivial to enable.
-- **Error surfaces**: raw provider errors from Saxo/Yahoo/GDELT sometimes bubble to logs with payload fragments. Wrap in a `redactedError()` helper.
+- Extend `src/styles.css` with **semantic status tokens**: `--success`, `--success-foreground`, `--warning`, `--warning-foreground`, `--info`, `--info-foreground`, plus soft variants (`--success-soft`, etc.) registered in `@theme inline`. Retire ad-hoc `emerald-400`/`red-400`/`cyan-500` usage.
+- Add **surface tiers**: `--surface-1` (page bg), `--surface-2` (card), `--surface-3` (raised/hover), `--surface-sunken` (input/muted panels). Cards currently all sit on the same `--card` colour, killing hierarchy.
+- Add **typography scale** tokens: `--font-display` (a tighter display face for numeric headlines, e.g. Space Grotesk or Inter Display) plus `--font-sans` for body, wired through a `<link>` in `src/routes/__root.tsx` (never `@import` in CSS per Tailwind v4 rules).
+- Add **numeric utility**: `@utility num` → `font-variant-numeric: tabular-nums; font-feature-settings: "cv11","ss01"`. Apply on all money/percentage renderings.
+- Add **elevation & radius scale**: `--shadow-card`, `--shadow-card-hover`, `--shadow-popover`; standardise radii on `rounded-xl` for cards and `rounded-md` for chips.
+- Publish a short **component recipe file** (`src/styles/recipes.css`) with `@utility` classes for `tile-metric`, `chip-status`, `data-row`, `card-section-header` so ad-hoc styling stops proliferating.
 
-### 5. Elegance / consistency
-- Two overlapping formatting stacks (`portfolio-performance-format.ts` + ad-hoc `Intl.NumberFormat` in route files). Contract test locks one — route-level formatters should go through it.
-- `uk-time.ts` was added recently but multiple call sites still build `Intl.DateTimeFormat` inline. Migrate them all.
-- Route files fetch, format, chart, and manage local state in one component. Extract page-level containers + presentational components.
-- Local-storage-esque event bus (`aegis:backtest-runs-updated`) works but React Query `invalidateQueries` after the mutation is cleaner.
-- `as unknown as never` casts on Supabase inserts are a smell — regenerate types or use narrower helper wrappers.
+Deliverable: no behaviour change; a codemod PR that replaces hard-coded status colours with tokens.
 
-### 6. Tooling / DX
-- No ESLint rule preventing `supabaseAdmin` imports outside `*.server.ts`.
-- No boundary rule preventing `.server.ts` imports from route/component files.
-- Route tree type is large; several loaders return full Query results instead of `void`.
-- No pre-commit typecheck/lint script visible; test suite is heavy — split unit vs e2e.
+## Phase 2 — Information architecture & navigation
 
-## Phased plan
+Goal: the user always knows where they are and how to get to the three things they do most (open a portfolio, review today, run/inspect trades).
 
-### Phase 1 — Safety net (no behaviour change)
-1. Add ESLint rules:
-   - forbid `@/integrations/supabase/client.server` outside `**/*.server.ts` and inside `**/*.functions.ts` module scope (allowed only inside handler bodies).
-   - forbid `import ... from "@/lib/*.server"` in `src/routes/**` and `src/components/**`.
-   - require `.inputValidator(` on any `createServerFn` that accepts input.
-2. Add `scripts/check-serverfn-shape.ts` — walks `**/*.functions.ts`, fails if module scope has anything other than imports, type aliases, and exported `createServerFn` chains (prevents the `tss-serverfn-split` `ReferenceError` class).
-3. Enable Supabase auth `password_hibp_enabled` and re-run the security scan.
+- Reorganise the header to a **two-tier layout**:
+  - Row 1 (brand): logo · optional environment badge · global search input · notifications · help · account menu.
+  - Row 2 (context nav): route-aware breadcrumb + secondary actions (e.g. on `/` shows "Add portfolio", on `/portfolio/:id` shows "Backtest / Report / Optimizer").
+- De-duplicate destinations: Admin becomes an item in the account menu (not a permanently visible pill) unless the route is `/admin*`.
+- Redesign the **mobile tab bar** around user tasks, not routes: `Home`, `Trades`, `News/Decisions`, `Learn`, `More`. Reserve one slot for a floating primary action ("+ New") that swaps to "Run" on a portfolio detail page.
+- Introduce a **command palette** (`Cmd/Ctrl-K`) with actions: jump to portfolio by name, "Run backtest", "Open trades today", "Reconnect broker", "Toggle include deposits", "Toggle real/sim view". Uses shadcn `<Command>`.
+- Persistent **UK-time clock + next-run countdown** in the header (currently buried in the summary strip).
 
-### Phase 2 — Shared server primitives
-1. `src/lib/_server/ownership.ts` — extract `assertPortfolioOwnership`, `logUnexpectedAccess`, `PortfolioAccessError` from `execution-slicer.server.ts`; migrate all call sites.
-2. `src/lib/_server/with-owned-portfolio.ts` — a `createServerFn` builder helper: `.middleware([requireSupabaseAuth])` + auto-`assertPortfolioOwnership(context.userId, data.portfolioId)`.
-3. `src/lib/_server/cron.ts` — `verifyCronRequest(request)` (constant-time compare of `CRON_SECRET`, IP/UA logging, rate-limit via existing `consume_rate_limit` RPC). Update all `src/routes/api/public/hooks/*` handlers.
-4. `src/lib/_server/redact.ts` — `redactedError(e, { keep: ['status'] })` for third-party responses; adopt in Saxo, Yahoo, GDELT clients.
+## Phase 3 — Dashboard redesign (`/`)
 
-### Phase 3 — Break up mega-modules
-1. Split `trading.functions.ts` (~2,800 lines / 34 fns) into thin re-exporters under `src/lib/trading/`:
-   - `trading/backtest.functions.ts`, `trading/live.functions.ts`, `trading/sim.functions.ts`, `trading/config.functions.ts`, `trading/holdings.functions.ts`.
-   - Keep the public API stable via `src/lib/trading.functions.ts` re-exports so imports don't churn.
-2. Split `trading-engine.server.ts` into `engine/signals.ts`, `engine/sizing.ts`, `engine/router.ts`, `engine/orchestrator.ts`.
-3. Split `routes/portfolio.$id.tsx` and `routes/index.tsx` into `src/features/portfolio/*` and `src/features/home/*` (containers + presentational components + hooks). Route file becomes a shell.
-4. Split `news-reel.tsx`, `live-trading-card.tsx`, `backtest-run-history-card.tsx` along their internal `useMemo`/section boundaries.
+Goal: turn the wall-of-cards into a scan-first dashboard where the answer to "how am I doing today?" is above the fold.
 
-### Phase 4 — Reduce service-role surface
-Audit the 37 `supabaseAdmin` importers. For each call:
-- If the query is on a row owned by `context.userId`, replace with `context.supabase` (RLS client). Delete the ownership check that's now redundant.
-- If genuinely privileged, add a top-of-file comment `// service-role: <why>` and move admin import inside the handler.
+- Split the 1,488-line `index.tsx` into: `DashboardShell`, `TodayHeader`, `EquityOverviewChart`, `PortfolioList`, `SidePanel` (news + decisions), `CreatePortfolioCard`. Each in `src/components/home/`.
+- **Hero "Today" band**: one full-width band showing combined equity (large, display font), delta vs yesterday, sparkline, and a live "Next run in mm:ss" chip. Sim vs Real appears as two segmented pills with equity underneath — replaces the current 3-tile strip.
+- **Range selector at dashboard level** (`1D / 1W / 1M / 3M / 1Y / All`) that drives every sparkline and the overview chart in unison. Per-card overrides remain but default to the global range.
+- **PortfolioRow redesign**: 3-column grid on desktop (identity + status | sparkline + range delta | equity + actions), collapsing to a stacked mobile layout. Money uses the new display font at `text-3xl`; % pill uses status tokens; last-run and risk metadata become chips, not a long comma-separated line.
+- Move controls (`Include deposits`, `Decimals`, density toggle) into a **Settings popover** on the dashboard header, not an inline strip.
+- Introduce **section headers with icons and short one-line explanations** for News, Decisions, All-portfolios chart so the page reads like a briefing.
+- Add a **"Focus mode"**: hide news/decisions panels for a numbers-only view (persisted per user).
 
-Goal: ≤ 10 files touching `supabaseAdmin`, all `.server.ts`, all annotated.
+## Phase 4 — Cards & data density polish
 
-### Phase 5 — Type + UI hygiene
-1. Regenerate Supabase types; delete `as unknown as never` casts (write narrow `insertRow<'table'>()` wrapper if needed).
-2. Route loaders that only prime React Query should `await ensureQueryData(...); return;` (shrinks route tree types).
-3. Consolidate all UK formatting through `uk-time.ts` + `portfolio-performance-format.ts`. Add a lint rule flagging inline `new Intl.DateTimeFormat` / `NumberFormat` outside those two files.
-4. Replace the `aegis:backtest-runs-updated` window event with `queryClient.invalidateQueries({ queryKey: backtestRunsQueryKey(portfolioId) })`.
+Goal: every card looks like part of the same product.
 
-### Phase 6 — CI + observability
-1. Vitest projects split: `unit` (fast, on every commit), `integration` + `e2e` + `visual` (on push). Wire into `bun run test:unit` / `test:ci`.
-2. Structured logger (`src/lib/_server/log.ts`) with levels + JSON output; replace ad-hoc `console.warn("SECURITY:...")` strings while keeping the greppable prefix.
-3. Wrap Saxo/Yahoo/GDELT calls in circuit breaker (`circuit-breaker.server.ts` exists — extend and adopt uniformly).
+- Adopt a standard `<SectionCard>` primitive: header (title + tooltip + trailing action), body, footer (updated-at + refresh). Apply to backtest results, live holdings, live trading, correlation heatmap, regime, decision-news breakdown, risk controls, execution calibration, signal decay, learning panels, security cards.
+- Standardise **loading states**: shimmer skeleton matching final shape (already done for the equity headline — extend to chart, list rows, and tiles).
+- Standardise **empty states**: illustration slot + one-line description + primary action. E.g. "No trades today — the AI will re-evaluate at 15:00 BST" with a "Run now" button where applicable.
+- Standardise **error states**: destructive-tinted banner inside the card with a `Retry` button (mirrors the current PortfolioRow error contract).
+- Tables (`/trades`, portfolio detail): sticky header, zebra rows via `bg-muted/40`, right-aligned numeric columns with `num` utility, column-level filter chips, CSV export.
+- Charts: unify axis colours, gridline opacity, tooltip surface (`bg-popover` + `shadow-popover`), and a shared legend component.
 
-## Rollout
+## Phase 5 — Ergonomics, accessibility & motion
 
-Each phase is independently shippable and reversible. Suggested order matches priority: **Phase 1 → 2 → 4 → 3 → 5 → 6**. Phase 4 before 3 because reducing admin surface is the biggest security win and doesn't require touching mega-modules yet.
+Goal: the app feels considerate.
 
-## What I need from you
+- Replace every icon-only `<button>`/`<Link>` currently relying on `title=` with `aria-label`. Audit list: sparkline range chips, close-banner button, decimals `<select>` (swap to shadcn `<Select>`), mobile admin pill, header hamburger.
+- Ensure every interactive element hits **44×44 min tap target** on mobile; the sparkline range chips and mode-summary chip currently sit around 28px tall.
+- Add **skip-to-content** link, single `<main>` per route (already close), proper `<h1>` on every route.
+- **Keyboard shortcuts**: `g h` home, `g t` trades, `g c` compare, `n` new portfolio, `/` focus search, `?` open shortcut help.
+- **Motion**: use `prefers-reduced-motion` guarded fades on value changes (e.g. equity headline tweens between old→new). Standardise `duration-200 ease-out` for hovers, `duration-300` for enter, no bounce.
+- **Toasts**: theme by intent — success/warning/destructive tokens; group broker/AI/system toasts under distinct titles.
+- **Help drawer**: pin a "What am I looking at?" affordance next to every complex chart, opening pre-scrolled content in the drawer.
 
-1. Confirm you want me to proceed, and if so which phase(s) to start with — I'd recommend **Phase 1 + Phase 2** first (safety net + shared primitives) since they unblock everything else and change no behaviour.
-2. Any modules you consider off-limits for restructuring (e.g. Saxo integration during live trading hours).
+## Phase 6 — Cross-device & responsive refinement
+
+Goal: the desktop feels spacious, the phone feels native.
+
+- Introduce an **optional persistent left sidebar** on `≥ xl` breakpoints with primary nav + recent portfolios, freeing the top for context actions. Collapses to icon-rail at `lg`.
+- Bottom tab bar becomes a **frosted rounded pill** floating above the safe area with 4 tabs + a raised centre "+" (primary action).
+- Add **density modes** (`comfortable` default, `compact`) that swap padding tokens and row heights, persisted per user.
+- **Tablet-specific layout**: two-column dashboard (portfolio list + side panel), no bottom bar at `md`+.
+- Add a **first-run onboarding sheet** that walks brand-new users through: create portfolio → risk profile → connect broker (optional) → first backtest. Replaces the current mix of "New here" banner + coach marks + get-started page.
+
+---
+
+## Technical details
+
+- Styling: Tailwind v4 CSS-first (`@theme inline`, `@utility`, `@custom-variant`); tokens live in `src/styles.css`. Fonts loaded via `<link>` in `src/routes/__root.tsx`.
+- Components: extend shadcn/Radix primitives — no bespoke widget rebuilds. New primitives: `SectionCard`, `MetricTile`, `StatusPill`, `RangeSelector`, `CommandPalette`, `SettingsPopover`.
+- Structure: `src/components/home/*` for the split dashboard; `src/components/patterns/*` for the reusable primitives; no changes to server functions.
+- Testing: keep the existing headline/percent-pill invariants (`derive-card-equity`, `portfolio-card-*.e2e`). Add snapshot tests for new `SectionCard` and `MetricTile`. Update existing snapshots when Phase 3 lands.
+- Rollout: each phase is a self-contained PR. Phase 1 and 4 are safest; Phase 3 is the biggest visual change and should ship behind no flag but with a rollback plan (git revert of `src/routes/index.tsx` and `src/components/home/*`).
+
+---
+
+## Suggested order & rough sizing
+
+```text
+Phase 1  Tokens & type scale         ~1 day   foundation, low risk
+Phase 2  Nav & command palette       ~2 days  visible everywhere
+Phase 3  Dashboard redesign          ~3 days  highest-impact
+Phase 4  Card & table polish         ~2 days  cross-cutting
+Phase 5  A11y / motion / shortcuts   ~1 day   quality bar
+Phase 6  Responsive & density        ~2 days  finish
+```
+
+Recommend starting with **Phase 1 + Phase 2** in parallel: they unblock every later phase and change no business logic. Confirm and I'll begin.
