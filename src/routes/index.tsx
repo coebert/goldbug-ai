@@ -616,7 +616,18 @@ function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits =
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Sparkline values={values} width={120} height={32} />
-              {equityLoading ? (
+              {equityError ? (
+                <span
+                  data-testid="range-pct-error"
+                  role="status"
+                  aria-label={`Equity change unavailable: ${equityError}`}
+                  title={equityError}
+                  className="inline-flex items-center gap-1 text-sm font-semibold tabular-nums text-destructive"
+                >
+                  <AlertCircle className="h-3.5 w-3.5" aria-hidden />
+                  n/a
+                </span>
+              ) : equityLoading ? (
                 <Skeleton
                   variant="shimmer"
                   data-testid="range-pct-skeleton"
