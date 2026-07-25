@@ -1650,13 +1650,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   for (const t of trims) {
     const cur = holdingsByS.get(t.symbol);
     if (!cur) continue;
-    const qty = Math.min(Number(cur.quantity), t.qtyToTrim);
+    let qty = Math.min(Number(cur.quantity), t.qtyToTrim);
     if (qty <= 0) continue;
+    // Phase 6 — discretionary trim: gate on TOD and record slice plan.
+    const eaPreview = applyExecAlphaSell(t.symbol, qty * t.price, t.price);
+    if (!eaPreview.allow) {
+      executed.push({
+        symbol: t.symbol, side: "sell", quantity: 0, price: t.price, value: 0,
+        reason: `rebalance-band trim skipped: ${eaPreview.tod?.reason ?? "auction window"}`,
+        rejected: `TOD block: ${eaPreview.tod?.reason ?? "auction window"}`,
+        tod: eaPreview.tod,
+      });
+      continue;
+    }
+    if (eaPreview.tod && eaPreview.tod.multiplier < 1) qty = qty * eaPreview.tod.multiplier;
     const value = qty * t.price;
     workingCash += value;
     const remaining = Number(cur.quantity) - qty;
     if (remaining <= 1e-8) holdingsByS.delete(t.symbol);
     else holdingsByS.set(t.symbol, { ...cur, quantity: remaining });
+    const eaFinal = applyExecAlphaSell(t.symbol, value, t.price);
     executed.push({
       symbol: t.symbol,
       side: "sell",
@@ -1664,6 +1677,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       price: t.price,
       value,
       reason: `rebalance-band trim: ${(t.currentPct * 100).toFixed(1)}% → target ${(t.targetPct * 100).toFixed(1)}%`,
+      tod: eaPreview.tod,
+      slice_plan: eaFinal.slicePlan,
     });
   }
 
