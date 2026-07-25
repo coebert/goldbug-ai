@@ -111,6 +111,24 @@ export async function getFxMatrix(
   return new Map(entries);
 }
 
+/**
+ * Force a fresh fetch for the given pairs, bypassing the in-memory TTL cache.
+ * Used by the pre-trade FX-matrix guard's refresh-and-retry flow: when a
+ * batch is blocked because a rate is stale/missing/identity-fallback, we
+ * evict those entries and re-query the live providers before deciding
+ * whether to actually skip the affected buys. If providers are still down
+ * the returned entries stay stale/fallback and the guard blocks again on
+ * the second pass — deterministic and audit-friendly.
+ */
+export async function refreshFxMatrix(
+  pairs: Array<{ from: string; to: string }>,
+): Promise<Map<string, FxResult>> {
+  for (const p of pairs) {
+    cache.delete(`${p.from.toUpperCase()}${p.to.toUpperCase()}`);
+  }
+  return getFxMatrix(pairs);
+}
+
 // Test-only: reset the in-memory cache between tests to keep them isolated.
 export function __resetFxCacheForTests() {
   cache.clear();
