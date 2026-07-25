@@ -9,7 +9,7 @@
 // equal-weight universe portfolio) and slices metrics per historical regime.
 
 import { getDailyCandlesRange, sma, rsi, pctChange, dailyVolatility } from "./market-data.server";
-import { riskProfile, parseRiskConfig, type RiskConfig } from "./universe.server";
+import { riskProfile, parseRiskConfig, effectiveCashFloorPct, type RiskConfig } from "./universe.server";
 import type { Database } from "@/integrations/supabase/types";
 
 type AssetClass = Database["public"]["Enums"]["asset_class"];
