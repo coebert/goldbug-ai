@@ -14,6 +14,7 @@ import { Sparkline } from "@/components/sparkline";
 import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
 import { computeModeSummary } from "@/lib/mode-summary";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
+import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -292,7 +293,13 @@ function Home() {
               </Card>
             )}
             {q.data?.map((p) => (
-              <PortfolioRow key={p.id} portfolio={p} sparkSeries={sparkByPortfolio[p.id] ?? []} />
+              <PortfolioRow
+                key={p.id}
+                portfolio={p}
+                sparkSeries={sparkByPortfolio[p.id] ?? []}
+                deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
+                includeDeposits={includeDeposits}
+              />
             ))}
           </div>
           <div id="create-portfolio" className="scroll-mt-24">
@@ -406,7 +413,7 @@ const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
-function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[] }) {
+function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
   const sliced = useMemo(() => {
     const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
@@ -418,10 +425,20 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
     });
     return s.length >= 2 ? s : sparkSeries.slice(-2);
   }, [sparkSeries, sparkRange]);
-  const values = sliced.map((p) => p.value);
-  const first = values[0];
-  const last = values[values.length - 1];
-  const rangePct = first != null && first > 0 && last != null ? ((last - first) / first) * 100 : null;
+  // Deposit-adjusted percentage: unless the user opts in to include
+  // cash-flows, subtract cumulative post-baseline deposits so the %
+  // reflects trading PnL only (mirrors the dashboard tile behaviour).
+  const adjusted = useMemo(
+    () =>
+      buildDepositAdjustedSeries(
+        sliced.map((p) => ({ date: p.date, equity: p.value })),
+        includeDeposits ? [] : deposits,
+      ),
+    [sliced, deposits, includeDeposits],
+  );
+  const values = adjusted.length > 0 ? adjusted.map((p) => p.adjusted) : sliced.map((p) => p.value);
+  const rangePct = adjusted.length > 0 ? adjusted[adjusted.length - 1].pct : null;
+  const totalEquity = sparkSeries.length > 0 ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -440,7 +457,8 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
 
 
   const pnl = Number(portfolio.current_cash) - Number(portfolio.starting_cash);
-  const pnlPct = (pnl / Number(portfolio.starting_cash)) * 100;
+  const pnlPct = Number(portfolio.starting_cash) > 0 ? (pnl / Number(portfolio.starting_cash)) * 100 : 0;
+
 
   return (
     <Card>
@@ -564,13 +582,20 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-sm font-semibold tabular-nums">
-              {portfolio.currency} {Number(portfolio.current_cash).toFixed(2)}
+            <div className="text-base font-semibold tabular-nums">
+              {portfolio.currency} {totalEquity.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              total equity
+            </div>
+            <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+              {portfolio.currency} {Number(portfolio.current_cash).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span className="ml-1 text-[10px]">cash</span>
             </div>
             <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
               {pnl >= 0 ? "+" : ""}
               {pnlPct.toFixed(2)}%
-              <span className="ml-1 text-[10px] text-muted-foreground">cash</span>
+              <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
             </div>
           </div>
         </div>
