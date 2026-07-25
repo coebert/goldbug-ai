@@ -756,60 +756,198 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     },
   });
 
-  // ---- Auto-liquidation: stop-loss / take-profit / ATR-trailing / max-hold BEFORE the AI runs ----
+  // ---- Auto-liquidation: multi-layer exits BEFORE the AI runs ----
+  // Layers, in evaluation order:
+  //  1. Hard stop-loss / take-profit (fixed %)
+  //  2. Chandelier trailing stop (adaptive ATR, tightens as R grows) — replaces the
+  //     fixed atr_trailing_mult trail when cfg.chandelier_enabled is true.
+  //  3. Time-stop tied to horizon (exit when horizon elapsed with < min R progress)
+  //  4. Event blackout trim (partial sell of oversized positions into known events)
+  //  5. Scale-out ladder (25% @1R, 25% @2R by default) — partial sells only
+  //  6. Legacy max_hold_days hard exit
+  // Any exit that isn't a pure take-profit adds the symbol to the loss-cooldown
+  // map with an ATR-adaptive lockout so we don't re-enter into the same setup.
   const atrPctBySymbol = new Map(features.map((f) => [f.symbol, f.atr_pct] as const));
   const nowMs = Date.parse(asOf + "T00:00:00Z") || Date.now();
+
+  // Prior scale-out fills per symbol (since opened_at) — read from trades.reason.
+  const scaleOutTakenBySym = new Map<string, number>();
+  if (cfg.scale_out_enabled) {
+    try {
+      const { data: recentSells } = await supabaseAdmin
+        .from("trades")
+        .select("symbol, reason, trade_date")
+        .eq("portfolio_id", portfolioId)
+        .eq("side", "sell")
+        .ilike("reason", "scale-out%")
+        .gte("trade_date", (() => {
+          const d = new Date(nowMs); d.setUTCDate(d.getUTCDate() - 365);
+          return d.toISOString().slice(0, 10);
+        })());
+      for (const t of recentSells ?? []) {
+        // Only count fills after this position's opened_at.
+        const h = holdingsByS.get(String((t as { symbol: string }).symbol));
+        if (!h) continue;
+        const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
+        if (!openedAt) continue;
+        if (String((t as { trade_date: string }).trade_date) >= openedAt.slice(0, 10)) {
+          scaleOutTakenBySym.set(
+            String((t as { symbol: string }).symbol),
+            (scaleOutTakenBySym.get(String((t as { symbol: string }).symbol)) ?? 0) + 1,
+          );
+        }
+      }
+    } catch {
+      // best-effort; if the read fails, scale-out treats history as empty
+    }
+  }
+
+  const eventList = (args.events ?? []).map((e) => ({
+    event_date: String(e.event_date),
+    impact: (e.impact ?? null) as string | null,
+    kind: (e.kind ?? null) as string | null,
+    symbol: (e.symbol ?? null) as string | null,
+  }));
+
   for (const [sym, h] of Array.from(holdingsByS.entries())) {
     const price = priceMap.get(sym);
     const qty = Number(h.quantity);
     const cost = Number(h.avg_cost);
     if (!price || !(qty > 0) || !(cost > 0)) continue;
 
-    // Refresh high-water mark BEFORE trailing-stop check
+    // Refresh high-water mark BEFORE any trail check
     const prevHwm = Number((h as unknown as { high_water_mark?: number | null }).high_water_mark ?? cost);
     const hwm = Math.max(prevHwm || cost, price);
     (h as unknown as { high_water_mark: number }).high_water_mark = hwm;
 
     const change = (price - cost) / cost;
+    const atrPct = atrPctBySymbol.get(sym) ?? 0;
     let trigger: string | null = null;
+    let triggerKind: "stop" | "take_profit" | "trail" | "time" | "max_hold" = "stop";
+    let sellFraction = 1; // full liquidation unless a partial-exit layer overrides
 
+    // 1. Hard stop-loss / take-profit
     if (cfg.stop_loss_pct > 0 && change <= -cfg.stop_loss_pct) {
       trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(cfg.stop_loss_pct * 100).toFixed(1)}%)`;
+      triggerKind = "stop";
     } else if (cfg.take_profit_pct > 0 && change >= cfg.take_profit_pct) {
       trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(cfg.take_profit_pct * 100).toFixed(1)}%)`;
-    } else if (cfg.atr_trailing_mult > 0) {
-      const atrPct = atrPctBySymbol.get(sym);
-      if (atrPct && atrPct > 0) {
-        const stopPrice = hwm * (1 - cfg.atr_trailing_mult * atrPct);
-        if (price <= stopPrice) {
-          const dropFromHwm = ((price - hwm) / hwm) * 100;
-          trigger = `ATR trailing stop (${dropFromHwm.toFixed(2)}% from high, ${cfg.atr_trailing_mult}×ATR=${(cfg.atr_trailing_mult * atrPct * 100).toFixed(2)}%)`;
+      triggerKind = "take_profit";
+    } else if (cfg.chandelier_enabled && atrPct > 0) {
+      // 2. Chandelier trail — replaces the fixed atr_trailing_mult check when enabled.
+      const ch = evaluateChandelier({
+        avgCost: cost, price, highWaterMark: hwm, atrPct,
+        initialStopAtrMult: cfg.initial_stop_atr_mult,
+        kBase: cfg.chandelier_k_base,
+        kTight: cfg.chandelier_k_tight,
+        tightenAfterR: cfg.chandelier_tighten_after_r,
+      });
+      if (ch.breached) {
+        trigger = `chandelier trail (k=${ch.effectiveK.toFixed(2)}×ATR, ${ch.dropFromHwmPct.toFixed(2)}% from high, ${ch.unrealisedR.toFixed(2)}R held)`;
+        triggerKind = "trail";
+      }
+    } else if (cfg.atr_trailing_mult > 0 && atrPct > 0) {
+      // Legacy fixed-multiple trail (only when chandelier disabled).
+      const stopPrice = hwm * (1 - cfg.atr_trailing_mult * atrPct);
+      if (price <= stopPrice) {
+        const dropFromHwm = ((price - hwm) / hwm) * 100;
+        trigger = `ATR trailing stop (${dropFromHwm.toFixed(2)}% from high, ${cfg.atr_trailing_mult}×ATR=${(cfg.atr_trailing_mult * atrPct * 100).toFixed(2)}%)`;
+        triggerKind = "trail";
+      }
+    }
+
+    // 3. Time-stop tied to horizon
+    if (!trigger && cfg.time_stop_enabled && atrPct > 0) {
+      const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
+      if (openedAt) {
+        const ts = evaluateTimeStop({
+          avgCost: cost, price, atrPct,
+          initialStopAtrMult: cfg.initial_stop_atr_mult,
+          openedAtMs: Date.parse(openedAt) || nowMs,
+          nowMs,
+          horizonDays: cfg.time_stop_horizon_days,
+          minProgressR: cfg.time_stop_min_progress_r,
+        });
+        if (ts.triggered) {
+          trigger = ts.reason!;
+          triggerKind = "time";
         }
       }
     }
 
+    // 4. Event blackout trim (partial sell — does not fully close)
+    if (!trigger && cfg.event_blackout_enabled && eventList.length > 0) {
+      const positionValue = qty * price;
+      const eb = evaluateEventBlackout({
+        symbol: sym, positionValue, portfolioValue: totalValue,
+        events: eventList, asOf,
+        windowDays: cfg.event_blackout_window_days,
+        blackoutPctNav: cfg.event_blackout_pct_nav,
+        targetPctNav: cfg.event_blackout_target_pct_nav,
+        highImpactOnly: true,
+      });
+      if (eb.trim) {
+        trigger = eb.reason!;
+        triggerKind = "trail"; // partial defensive exit; treat as stop-like for cooldown
+        sellFraction = eb.sellFraction;
+      }
+    }
+
+    // 5. Scale-out ladder (partial sell)
+    if (!trigger && cfg.scale_out_enabled && atrPct > 0) {
+      const so = evaluateScaleOut({
+        avgCost: cost, price, atrPct,
+        initialStopAtrMult: cfg.initial_stop_atr_mult,
+        levels: cfg.scale_out_levels.map((l) => ({ rMultiple: l.r, fractionOfPosition: l.frac })),
+        levelsAlreadyTaken: scaleOutTakenBySym.get(sym) ?? 0,
+      });
+      if (so.fire) {
+        trigger = so.reason!;
+        triggerKind = "take_profit"; // partial take-profit; do NOT lock the symbol out
+        sellFraction = so.sellFraction;
+      }
+    }
+
+    // 6. Legacy max_hold_days
     if (!trigger && cfg.max_hold_days > 0) {
       const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
       if (openedAt) {
         const heldDays = Math.floor((nowMs - Date.parse(openedAt)) / 86_400_000);
         if (heldDays >= cfg.max_hold_days) {
           trigger = `max-hold reached (${heldDays}d ≥ ${cfg.max_hold_days}d)`;
+          triggerKind = "max_hold";
         }
       }
     }
 
     if (!trigger) continue;
-    const value = qty * price;
+
+    const sellQty = qty * Math.max(0, Math.min(1, sellFraction));
+    if (!(sellQty > 0)) continue;
+    const value = sellQty * price;
     workingCash += value;
-    holdingsByS.delete(sym);
-    executed.push({
-      symbol: sym,
-      side: "sell",
-      quantity: qty,
-      price,
-      value,
-      reason: trigger,
-    });
+    const remaining = qty - sellQty;
+    if (remaining <= 1e-8) {
+      holdingsByS.delete(sym);
+    } else {
+      holdingsByS.set(sym, { ...h, quantity: remaining } as Holding);
+    }
+    executed.push({ symbol: sym, side: "sell", quantity: sellQty, price, value, reason: trigger });
+
+    // Re-entry lockout for adverse exits only (stop / trail / time / event-blackout / max-hold).
+    // Take-profit and scale-out are constructive — they don't trigger lockout.
+    if (cfg.reentry_lockout_enabled && triggerKind !== "take_profit") {
+      const days = reentryLockoutDays({
+        atrPct,
+        baseCooldownDays: cfg.reentry_min_days,
+        atrDaysMult: cfg.reentry_atr_days_mult,
+        minDays: cfg.reentry_min_days,
+        maxDays: cfg.reentry_max_days,
+      });
+      const untilDate = new Date(nowMs);
+      untilDate.setUTCDate(untilDate.getUTCDate() + days);
+      cooldowns[sym] = untilDate.toISOString().slice(0, 10);
+    }
   }
 
   // Recompute per-asset-class exposure after auto-liquidation, based on live prices.
