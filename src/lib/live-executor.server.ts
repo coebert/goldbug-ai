@@ -54,6 +54,12 @@ export async function routeOrdersToBroker(params: {
   const { portfolio, userId, asOf, decisionId, executed } = params;
   const results: RouteResult[] = [];
 
+  // Post-broker reconciliation state. Populated by the buys branch so the
+  // reconciler at the end of routing can verify each buy landed with the
+  // FX legs the trimmer planned. Empty for sells-only / non-fx runs.
+  const reconPlannedLegs: import("./post-broker-reconciliation").PlannedFxLegLite[] = [];
+  const reconFxOutcomes: import("./post-broker-reconciliation").FxLegOutcome[] = [];
+
   if (portfolio.mode !== "live_sim" && portfolio.mode !== "live_prod") return results;
   if (portfolio.live_paused) return results;
 
@@ -549,6 +555,11 @@ export async function routeOrdersToBroker(params: {
               ? { kind: "ok", triggerSymbol: leg.triggeredBySymbol, fillRate: spot.fillRate ?? leg.rate, amountTo: spot.amountTo ?? leg.amountTo }
               : { kind: "failed", triggerSymbol: leg.triggeredBySymbol, reason: spot.reason ?? "fx spot rejected" },
           );
+          reconFxOutcomes.push(
+            ok
+              ? { triggerSymbol: leg.triggeredBySymbol, kind: "ok" }
+              : { triggerSymbol: leg.triggeredBySymbol, kind: "failed", reason: spot.reason ?? "fx spot rejected" },
+          );
         }
         const { survivors, droppedSymbols } = survivingBuysAfterFxSpot(buyOrders, trim, outcomes);
         if (droppedSymbols.size > 0) {
@@ -567,9 +578,25 @@ export async function routeOrdersToBroker(params: {
         }
       }
 
+      // Snapshot the final, actually-submitted FX legs for the post-broker
+      // reconciler. This is the set the reconciler expects to see reflected
+      // in successful outcomes, one entry per triggered symbol.
+      for (const leg of trim.fxLegs) {
+        reconPlannedLegs.push({
+          triggeredBySymbol: leg.triggeredBySymbol,
+          fromCcy: leg.fromCcy,
+          toCcy: leg.toCcy,
+          amountFrom: leg.amountFrom,
+          amountTo: leg.amountTo,
+          rate: leg.rate,
+          stale: leg.stale,
+        });
+      }
+
       for (const d of trim.decisions) {
         if (d.kind === "skip") preSkips.set(`${d.order.symbol}:${d.order.side}`, d.reason);
       }
+
 
       // Persist wallet updates (FX conversion legs + buy debits are all
       // reflected in `finalWallet`). Sells will be credited by the fill
@@ -902,8 +929,52 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
+  // ---------- Post-broker reconciliation.
+  // Verify every routed buy landed with the FX legs the trimmer planned.
+  // Each entry is written as its own audit row so the FX health card + trade
+  // error dashboard can render funded vs failed at a glance, and so a rerun
+  // never silently overwrites a prior verdict for the same buy.
+  if (results.some((r) => r.side === "buy")) {
+    const { reconcileBuysWithFxLegs } = await import("./post-broker-reconciliation");
+    const recon = reconcileBuysWithFxLegs(
+      results.map((r) => ({
+        symbol: r.symbol,
+        side: r.side,
+        status: r.status,
+        reason: r.reason,
+        skipped: r.skipped,
+      })),
+      reconPlannedLegs,
+      reconFxOutcomes,
+    );
+    for (const entry of recon) {
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "POST_BROKER_RECON",
+        path: `/reconcile/post-broker/${entry.symbol}`,
+        status: entry.status === "fully_funded" ? 200 : 424,
+        request: asJson({
+          asOf,
+          decisionId,
+          expectedFxLegs: entry.expectedFxLegs,
+          orderStatus: entry.orderStatus,
+        }),
+        response: asJson({
+          status: entry.status,
+          fulfilledFxLegs: entry.fulfilledFxLegs,
+          reason: entry.reason,
+        }),
+        error: entry.status === "failed" ? entry.reason : null,
+      });
+    }
+  }
+
   return results;
 }
+
 
 function makeClientOrderId(args: {
   portfolioId: string;
