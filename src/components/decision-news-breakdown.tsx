@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Layers, Newspaper, RefreshCw } from "lucide-react";
+import { JargonText } from "@/components/jargon-text";
 
 function tone(v: number | null) {
   if (v == null) return { label: "unscored", cls: "text-muted-foreground bg-muted" };
@@ -219,7 +220,7 @@ export function DecisionNewsBreakdown() {
                       {it.rationale && (
                         <p className="mb-2 text-xs text-foreground/80">
                           <span className="mr-1 font-semibold text-primary">Rationale:</span>
-                          {it.rationale}
+                          <JargonText>{it.rationale}</JargonText>
                         </p>
                       )}
                       {it.top_news.length === 0 ? (

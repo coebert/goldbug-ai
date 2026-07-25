@@ -665,7 +665,7 @@ function PortfolioPage() {
                       . Try adding funds{p.mode !== "live_prod" ? " to this portfolio" : " to your broker account"}, raising the max position size, or lowering the minimum trade value in Risk controls.
                     </p>
                     {underfunded.notes.length > 0 && (
-                      <p className="text-xs text-muted-foreground">{underfunded.notes.slice(0, 2).join(" · ")}</p>
+                      <p className="text-xs text-muted-foreground"><JargonText>{underfunded.notes.slice(0, 2).join(" · ")}</JargonText></p>
                     )}
                     <div className="pt-1">
                       <Button size="sm" variant="outline" onClick={() => setTab("risk")}>Open Risk controls</Button>
@@ -791,7 +791,7 @@ function PortfolioPage() {
                 <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
                   <div className="font-medium text-destructive">Circuit breaker active — AI paused</div>
                   <div className="mt-1 text-muted-foreground">
-                    {cb.reason ?? "Auto-paused"}{cb.tripped_at ? ` (since ${cb.tripped_at.slice(0, 10)})` : ""}. Stop-loss/take-profit still enforced. Adjust risk controls or clear the breaker to resume new trades.
+                    <JargonText>{`${cb.reason ?? "Auto-paused"}${cb.tripped_at ? ` (since ${cb.tripped_at.slice(0, 10)})` : ""}. Stop-loss/take-profit still enforced. Adjust risk controls or clear the breaker to resume new trades.`}</JargonText>
                   </div>
                 </div>
               );
@@ -1284,7 +1284,7 @@ function PortfolioPage() {
                                 <td className="px-3 py-2 text-right tabular-nums">{Number(t.quantity).toFixed(4)}</td>
                                 <td className="px-3 py-2 text-right tabular-nums">{Number(t.price).toFixed(2)}</td>
                                 <td className="px-3 py-2 text-right tabular-nums">{Number(t.value).toFixed(2)}</td>
-                                <td className="px-3 py-2 text-xs text-muted-foreground">{t.reason}</td>
+                                <td className="px-3 py-2 text-xs text-muted-foreground"><JargonText>{t.reason}</JargonText></td>
                               </tr>
                             );
                           })}
@@ -1320,7 +1320,7 @@ function PortfolioPage() {
                                 <span>@ {Number(t.price).toFixed(2)}</span>
                               </div>
                               {t.reason && (
-                                <p className="text-xs text-muted-foreground break-words">{t.reason}</p>
+                                <p className="text-xs text-muted-foreground break-words"><JargonText>{t.reason}</JargonText></p>
                               )}
                             </div>
                           </details>
@@ -1664,7 +1664,7 @@ function OrderPanel({
 
       <p className="mb-2 text-sm">
         <span className="text-muted-foreground">AI reason: </span>
-        {order.reason}
+        <JargonText>{order.reason}</JargonText>
       </p>
 
       <PlainEnglishExplanation
