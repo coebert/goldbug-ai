@@ -80,6 +80,8 @@ export function TradeErrorDashboardCard({ portfolioId, active = true }: Props) {
             No failed trades in the last 72 hours. 🎉
           </p>
         )}
+        {rows.length > 0 && <FxBlockBanner rows={rows} />}
+
         {rows.length > 0 && (
           <TooltipProvider delayDuration={150}>
             {/* Desktop / tablet table */}
@@ -249,14 +251,27 @@ function AffordabilityCell({ row }: { row: TradeErrorRow }) {
   }
   if (a.kind === "fx_blocked") {
     return (
-      <div>
-        <Badge variant="destructive">fx blocked</Badge>
-        <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
-          {a.reason}
+      <div className="space-y-1">
+        <Badge variant="destructive">FX blocked</Badge>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Cross-currency buy blocked — the app couldn't get a trustworthy
+          {row.fx?.from && row.fx?.to ? ` ${row.fx.from}→${row.fx.to}` : ""} FX
+          rate, so it refused to size the order against the broker's cash to
+          avoid a real cash shortfall.
+        </p>
+        {row.fx && (
+          <p className="text-[11px] font-mono text-muted-foreground">
+            rate used: {row.fx.rate != null ? row.fx.rate.toFixed(4) : "?"} · source: {row.fx.source ?? "unknown"}
+            {row.fx.stale ? " · stale" : ""}
+          </p>
+        )}
+        <p className="text-[11px] text-muted-foreground line-clamp-3">
+          Reason: {a.reason}
         </p>
       </div>
     );
   }
+
   // skipped
   return (
     <div>
@@ -274,3 +289,39 @@ function AffordabilityCell({ row }: { row: TradeErrorRow }) {
     </div>
   );
 }
+
+function FxBlockBanner({ rows }: { rows: TradeErrorRow[] }) {
+  const blocked = rows.filter((r) => r.affordability.kind === "fx_blocked");
+  if (blocked.length === 0) return null;
+  const symbols = Array.from(new Set(blocked.map((b) => b.symbol))).slice(0, 5);
+  const fx = blocked.find((b) => b.fx)?.fx ?? null;
+  const pair = fx?.from && fx?.to ? `${fx.from}→${fx.to}` : "cross-currency";
+  return (
+    <div
+      role="alert"
+      className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm"
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden />
+        <div className="space-y-1">
+          <p className="font-medium text-destructive">
+            {blocked.length} cross-currency {blocked.length === 1 ? "buy was" : "buys were"} blocked
+          </p>
+          <p className="text-xs text-muted-foreground leading-snug">
+            The app needed a live {pair} FX rate to check whether the broker
+            had enough cash. Every FX provider we tried failed{fx?.source ? ` (last source: ${fx.source})` : ""},
+            so the fallback rate was {fx?.rate != null ? fx.rate.toFixed(4) : "unavailable"}
+            {fx?.rate === 1 ? " — a 1:1 identity rate that would badly under-estimate the true cost" : ""}.
+            Rather than risk a real cash shortfall at the broker, these orders were
+            refused before placement.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Affected: <span className="font-mono">{symbols.join(", ")}</span>
+            {blocked.length > symbols.length ? ` +${blocked.length - symbols.length} more` : ""}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
