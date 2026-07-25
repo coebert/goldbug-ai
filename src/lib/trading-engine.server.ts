@@ -808,6 +808,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     );
   }
 
+  // Per-commodity-group exposure (Gold, Silver, Basket, …) recomputed for
+  // the enforcement pass below. Mirrors `classExposure` but keyed on the
+  // shared commodity classifier.
+  const { classifyCommoditySymbol } = await import("./commodity-groups");
+  const commodityGroupExposure = new Map<string, number>();
+  for (const h of holdingsByS.values()) {
+    if (h.asset_class !== "commodity") continue;
+    const grp = classifyCommoditySymbol(h.symbol);
+    if (!grp) continue;
+    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    commodityGroupExposure.set(
+      grp,
+      (commodityGroupExposure.get(grp) ?? 0) + price * Number(h.quantity),
+    );
+  }
+
+
+
   // Build correlation map covering current holdings + candidate buys
   const buySymbols = decision.orders
     .filter((o) => o.side === "buy")
@@ -900,6 +918,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         meta.asset_class,
         Math.max(0, (classExposure.get(meta.asset_class) ?? 0) - value),
       );
+      if (meta.asset_class === "commodity") {
+        const grp = classifyCommoditySymbol(meta.symbol);
+        if (grp) {
+          commodityGroupExposure.set(
+            grp,
+            Math.max(0, (commodityGroupExposure.get(grp) ?? 0) - value),
+          );
+        }
+      }
       executed.push({
         symbol: meta.symbol,
         side: "sell",
@@ -948,6 +975,28 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           executed.push({
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
             reason: order.reason, rejected: cval.reason ?? "commodity validation failed",
+          });
+          continue;
+        }
+        // Liquidity / spread threshold gates for commodity buys. These are
+        // separate from the per-group NAV cap and operate on candidate
+        // symbol quality rather than portfolio composition.
+        const cfeat = featureBySymbol.get(meta.symbol);
+        const advUsd = (cfeat?.adv_20d ?? 0) * price;
+        if (cfg.commodity_min_adv_usd > 0 && advUsd > 0 && advUsd < cfg.commodity_min_adv_usd) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `commodity ${meta.symbol} blocked: 20d ADV $${Math.round(advUsd).toLocaleString()} below min $${Math.round(cfg.commodity_min_adv_usd).toLocaleString()}`,
+          });
+          continue;
+        }
+        const atrP = cfeat?.atr_pct ?? null;
+        if (cfg.commodity_max_atr_pct > 0 && atrP != null && atrP > cfg.commodity_max_atr_pct) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `commodity ${meta.symbol} blocked: 14d ATR ${(atrP * 100).toFixed(2)}% exceeds max ${(cfg.commodity_max_atr_pct * 100).toFixed(2)}%`,
           });
           continue;
         }
@@ -1076,6 +1125,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         spend = Math.min(spend, roomInClass);
       }
 
+      // Enforce per-commodity-group cap (e.g. max Gold %, max Basket %).
+      // Layers on top of the overall commodity asset-class cap.
+      let commodityGroupRejected: string | null = null;
+      let commodityGroupKey: string | null = null;
+      if (meta.asset_class === "commodity") {
+        const grp = classifyCommoditySymbol(meta.symbol);
+        if (grp) {
+          commodityGroupKey = grp;
+          const grpCap = cfg.commodity_group_limits?.[grp];
+          if (grpCap != null) {
+            const grpMax = totalValue * grpCap;
+            const roomInGroup = Math.max(0, grpMax - (commodityGroupExposure.get(grp) ?? 0));
+            if (roomInGroup <= 0) commodityGroupRejected = `commodity-group cap reached for ${grp} (max ${(grpCap * 100).toFixed(0)}%)`;
+            spend = Math.min(spend, roomInGroup);
+          }
+        }
+      }
+
       // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue
       let volCapped = false;
       if (cfg.volatility_sizing) {
@@ -1118,13 +1185,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           price,
           value: 0,
           reason: order.reason,
-          rejected: classRejected
-            ? `asset-class cap reached for ${meta.asset_class}`
-            : corrCapped
-              ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
-              : volCapped
-                ? "volatility sizing leaves no room"
-                : "guardrails leave no room to buy",
+          rejected: commodityGroupRejected
+            ? commodityGroupRejected
+            : classRejected
+              ? `asset-class cap reached for ${meta.asset_class}`
+              : corrCapped
+                ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
+                : volCapped
+                  ? "volatility sizing leaves no room"
+                  : "guardrails leave no room to buy",
         });
         continue;
       }
@@ -1184,6 +1253,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         meta.asset_class,
         (classExposure.get(meta.asset_class) ?? 0) + outcome.effectiveSpend,
       );
+      if (commodityGroupKey) {
+        commodityGroupExposure.set(
+          commodityGroupKey,
+          (commodityGroupExposure.get(commodityGroupKey) ?? 0) + outcome.effectiveSpend,
+        );
+      }
+      // Track sell reductions for group exposure too (mirrors classExposure sell path).
       executed.push({
         symbol: meta.symbol,
         side: "buy",

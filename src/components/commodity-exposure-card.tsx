@@ -3,30 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Gem } from "lucide-react";
 import type { HoldingSeriesInfo } from "@/components/live-holdings-card";
+import {
+  classifyCommoditySymbol,
+  COMMODITY_GROUPS,
+  type CommodityGroup,
+} from "@/lib/commodity-groups";
 
-// Bucket a commodity ETF/ETC symbol into a human category. Symbols not in
-// this map are treated as non-commodity and excluded from the card.
-const COMMODITY_MAP: Record<string, CommodityGroup> = {
-  "SGLN.L": "Gold", "SGLD.L": "Gold", "PHAU.L": "Gold", GLD: "Gold", IAU: "Gold",
-  "SSLN.L": "Silver", "PHAG.L": "Silver", SLV: "Silver",
-  "SPLT.L": "Platinum",
-  "CRUD.L": "Oil", "BRNT.L": "Oil", USO: "Oil",
-  "NGAS.L": "Gas",
-  "COPA.L": "Copper",
-  "AGCP.L": "Agriculture",
-  "AIGB.L": "Basket", DBC: "Basket",
-};
-
-const GROUP_ORDER: CommodityGroup[] = [
-  "Gold", "Silver", "Platinum", "Oil", "Gas", "Copper", "Agriculture", "Basket",
-];
-
-type CommodityGroup =
-  | "Gold" | "Silver" | "Platinum" | "Oil" | "Gas"
-  | "Copper" | "Agriculture" | "Basket";
+const GROUP_ORDER: CommodityGroup[] = COMMODITY_GROUPS;
 
 function classify(symbol: string): CommodityGroup | null {
-  return COMMODITY_MAP[symbol.toUpperCase()] ?? null;
+  return classifyCommoditySymbol(symbol);
 }
 
 type Holding = {

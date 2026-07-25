@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import { ChevronDown, ShieldCheck, Gauge, SlidersHorizontal } from "lucide-react";
 import { Explain } from "@/components/explain";
 
+import { COMMODITY_GROUPS, type CommodityGroup } from "@/lib/commodity-groups";
+
 type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
 
 type RiskConfig = {
@@ -36,6 +38,9 @@ type RiskConfig = {
   vol_target_pct: number;
   max_daily_loss_pct: number;
   max_drawdown_halt_pct: number;
+  commodity_group_limits: Partial<Record<CommodityGroup, number>>;
+  commodity_min_adv_usd: number;
+  commodity_max_atr_pct: number;
   risk_level?: number;
 };
 
@@ -50,12 +55,23 @@ const DEFAULTS: RiskConfig = {
   vol_target_pct: 0.015,
   max_daily_loss_pct: 0.05,
   max_drawdown_halt_pct: 0.20,
+  commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
+  commodity_min_adv_usd: 250_000,
+  commodity_max_atr_pct: 0.06,
 };
 
 function parseCfg(raw: unknown): RiskConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULTS };
   const r = raw as Record<string, unknown>;
   const lvl = r.risk_level == null ? undefined : Number(r.risk_level);
+  const rawGroups = (r.commodity_group_limits ?? {}) as Record<string, unknown>;
+  const groups: Partial<Record<CommodityGroup, number>> = {};
+  for (const g of COMMODITY_GROUPS) {
+    const v = rawGroups[g];
+    if (v == null || v === "") continue;
+    const n = Number(v);
+    if (Number.isFinite(n)) groups[g] = Math.max(0, Math.min(1, n));
+  }
   return {
     asset_class_limits: {
       ...DEFAULTS.asset_class_limits,
@@ -74,6 +90,13 @@ function parseCfg(raw: unknown): RiskConfig {
     vol_target_pct: Number(r.vol_target_pct ?? DEFAULTS.vol_target_pct),
     max_daily_loss_pct: Number(r.max_daily_loss_pct ?? DEFAULTS.max_daily_loss_pct),
     max_drawdown_halt_pct: Number(r.max_drawdown_halt_pct ?? DEFAULTS.max_drawdown_halt_pct),
+    commodity_group_limits: Object.keys(groups).length ? groups : { ...DEFAULTS.commodity_group_limits },
+    commodity_min_adv_usd: Number.isFinite(Number(r.commodity_min_adv_usd))
+      ? Number(r.commodity_min_adv_usd)
+      : DEFAULTS.commodity_min_adv_usd,
+    commodity_max_atr_pct: Number.isFinite(Number(r.commodity_max_atr_pct))
+      ? Number(r.commodity_max_atr_pct)
+      : DEFAULTS.commodity_max_atr_pct,
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
   };
 }
@@ -104,6 +127,9 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       vol_target_pct: 0.007,
       max_daily_loss_pct: 0.02,
       max_drawdown_halt_pct: 0.08,
+      commodity_group_limits: { Gold: 0.1, Basket: 0.08 },
+      commodity_min_adv_usd: 1_000_000,
+      commodity_max_atr_pct: 0.04,
     },
   },
   2: {
@@ -120,6 +146,9 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       vol_target_pct: 0.01,
       max_daily_loss_pct: 0.03,
       max_drawdown_halt_pct: 0.12,
+      commodity_group_limits: { Gold: 0.15, Basket: 0.12 },
+      commodity_min_adv_usd: 500_000,
+      commodity_max_atr_pct: 0.05,
     },
   },
   3: {
@@ -141,6 +170,9 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       vol_target_pct: 0.02,
       max_daily_loss_pct: 0.06,
       max_drawdown_halt_pct: 0.25,
+      commodity_group_limits: { Gold: 0.3, Basket: 0.2 },
+      commodity_min_adv_usd: 150_000,
+      commodity_max_atr_pct: 0.08,
     },
   },
   5: {
@@ -157,6 +189,9 @@ const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfi
       vol_target_pct: 0.03,
       max_daily_loss_pct: 0.10,
       max_drawdown_halt_pct: 0.35,
+      commodity_group_limits: { Gold: 0.4, Basket: 0.3 },
+      commodity_min_adv_usd: 50_000,
+      commodity_max_atr_pct: 0.12,
     },
   },
 };
@@ -656,6 +691,89 @@ export function RiskControlsCard({
                 ))}
               </div>
             </div>
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Commodity sub-limits</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Fine-grained caps on top of the overall <em>Commodities</em> asset-class limit above. Blank = no per-group cap for that bucket.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {COMMODITY_GROUPS.map((g) => {
+                  const v = cfg.commodity_group_limits[g];
+                  return (
+                    <div key={g}>
+                      <Label className="text-xs">Max {g} %</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          className="w-24"
+                          min={0}
+                          max={100}
+                          step={1}
+                          placeholder="—"
+                          value={v == null ? "" : Number((v * 100).toFixed(0))}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setCfg((cur) => {
+                              const next = { ...cur.commodity_group_limits };
+                              if (raw === "") delete next[g];
+                              else next[g] = Math.max(0, Math.min(100, Number(raw) || 0)) / 100;
+                              return { ...cur, commodity_group_limits: next };
+                            });
+                          }}
+                        />
+                        <span className="text-xs text-muted-foreground">% of NAV</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs font-medium">Min 20-day average daily $ volume</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-32"
+                      min={0}
+                      max={1_000_000_000}
+                      step={10_000}
+                      value={cfg.commodity_min_adv_usd}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          commodity_min_adv_usd: Math.max(0, Math.min(1e9, Number(e.target.value) || 0)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">$ — reject illiquid commodity ETC/ETFs (0 disables)</span>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Max 14-day ATR (spread proxy)</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      className="w-24"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={Number((cfg.commodity_max_atr_pct * 100).toFixed(2))}
+                      onChange={(e) =>
+                        setCfg((c) => ({
+                          ...c,
+                          commodity_max_atr_pct: Math.max(0, Math.min(1, (Number(e.target.value) || 0) / 100)),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">% — block choppy/thin commodities (0 disables)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+
 
 
             <div>
