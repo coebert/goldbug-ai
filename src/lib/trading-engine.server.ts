@@ -1511,15 +1511,20 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const venue = inferVenueFromSymbol(meta.symbol);
       let todInfo: { multiplier: number; allow: boolean; reason: string } | undefined;
       if (cfg.tod_filter_enabled) {
-        todInfo = todExecutionAdjustment({
+        const venueCfg = resolveVenueTodConfig(
+          {
+            avoidOpenMin: cfg.tod_avoid_open_min,
+            avoidCloseMin: cfg.tod_avoid_close_min,
+            openHaircut: cfg.tod_open_haircut,
+            closeHaircut: cfg.tod_close_haircut,
+            hardBlockOpenMin: cfg.tod_hard_block_open_min,
+            hardBlockCloseMin: cfg.tod_hard_block_close_min,
+          },
           venue,
-          avoidOpenMin: cfg.tod_avoid_open_min,
-          avoidCloseMin: cfg.tod_avoid_close_min,
-          openHaircut: cfg.tod_open_haircut,
-          closeHaircut: cfg.tod_close_haircut,
-          hardBlockOpenMin: cfg.tod_hard_block_open_min,
-          hardBlockCloseMin: cfg.tod_hard_block_close_min,
-        });
+          cfg.tod_venue_overrides,
+        );
+        todInfo = todExecutionAdjustment({ venue, ...venueCfg });
+
         if (!todInfo.allow) {
           executed.push({
             symbol: meta.symbol,
