@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const routeSrc = readFileSync(
-  resolve(__dirname, "../index.tsx"),
+  resolve(__dirname, "../../components/home/portfolio-row.tsx"),
   "utf8",
 );
 const cssSrc = readFileSync(

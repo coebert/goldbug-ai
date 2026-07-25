@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SOURCE = readFileSync(resolve(__dirname, "../index.tsx"), "utf8");
+const SOURCE = readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
 
 describe("portfolio card — dedicated loading/empty rendering", () => {
   it("derives equityLoading and equityEmpty from the same inputs", () => {
