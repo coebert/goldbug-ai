@@ -138,6 +138,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
       orderType: (row.order_type as string | null) ?? null,
       previousStatus: row.status as string,
       submittedAt: submittedAtIso,
+      source,
     } as const;
 
     if (!brokerOrderId) {
