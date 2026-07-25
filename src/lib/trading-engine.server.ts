@@ -808,6 +808,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     );
   }
 
+  // Per-commodity-group exposure (Gold, Silver, Basket, …) recomputed for
+  // the enforcement pass below. Mirrors `classExposure` but keyed on the
+  // shared commodity classifier.
+  const { classifyCommoditySymbol } = await import("./commodity-groups");
+  const commodityGroupExposure = new Map<string, number>();
+  for (const h of holdingsByS.values()) {
+    if (h.asset_class !== "commodity") continue;
+    const grp = classifyCommoditySymbol(h.symbol);
+    if (!grp) continue;
+    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    commodityGroupExposure.set(
+      grp,
+      (commodityGroupExposure.get(grp) ?? 0) + price * Number(h.quantity),
+    );
+
   // Build correlation map covering current holdings + candidate buys
   const buySymbols = decision.orders
     .filter((o) => o.side === "buy")
