@@ -95,7 +95,8 @@ describe("Portfolio card headline: Skeleton → formatted GBP transition", () =>
     expect(html).toMatch(/role="status"/);
     expect(html).toMatch(/aria-busy="true"/);
     // Headline box height matches the final text-2xl typography.
-    expect(html).toMatch(/data-testid="total-equity-skeleton"[^>]*class="[^"]*\bh-8\b/);
+    expect(html).toMatch(/<[^>]*data-testid="total-equity-skeleton"[^>]*>/);
+    expect(html).toMatch(/class="[^"]*\bh-8\b[^"]*"[^>]*data-testid="total-equity-skeleton"|data-testid="total-equity-skeleton"[^>]*class="[^"]*\bh-8\b/);
     // No formatted value, no empty-state em-dash, no currency prefix leaks.
     expect(html).not.toMatch(/GBP\s*[\d,]/);
     expect(html).not.toContain("—");
