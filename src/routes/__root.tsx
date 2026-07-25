@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { GlobalShortcutsHost } from "@/lib/keyboard-shortcuts";
 
 function NotFoundComponent() {
   return (
@@ -132,10 +133,21 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        Skip to content
+      </a>
+      <div
+        id="main-content"
+        tabIndex={-1}
+        className="pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
+      >
         <Outlet />
       </div>
       <MobileTabBar />
+      <GlobalShortcutsHost />
       <Toaster />
     </QueryClientProvider>
   );
