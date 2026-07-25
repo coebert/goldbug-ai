@@ -61,6 +61,7 @@ async function runHourlyCycleInner(
   const { getNewsForDate } = await import("@/lib/news.server");
   const { refreshLatestCandles } = await import("@/lib/market-data.server");
   const { filterUniverse } = await import("@/lib/universe.server");
+  const { getMarketStatusForSymbol } = await import("@/lib/market-hours");
 
   const manualTrigger = opts.triggeredBy === "manual";
   const forceClear = opts.force === true;
