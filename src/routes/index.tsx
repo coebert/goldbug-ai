@@ -328,6 +328,7 @@ function Home() {
                 deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
                 includeDeposits={includeDeposits}
                 isLoadingEquity={equityQ.isLoading}
+                isRefreshingEquity={isRefreshingEquity}
                 equityDecimals={equityDecimals}
               />
             ))}
