@@ -412,7 +412,7 @@ const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
-function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[] }) {
+function PortfolioRow({ portfolio, sparkSeries, deposits = [], includeDeposits = false }: { portfolio: { id: string; name: string; starting_cash: number; current_cash: number; currency: string; risk_level: string; mode: string; live_paused?: boolean | null; last_run_date: string | null }; sparkSeries: SparkPoint[]; deposits?: Array<{ date: string; amount: number }>; includeDeposits?: boolean }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>("1M");
   const sliced = useMemo(() => {
     const opt = SPARK_RANGES.find((r) => r.key === sparkRange)!;
@@ -424,10 +424,20 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
     });
     return s.length >= 2 ? s : sparkSeries.slice(-2);
   }, [sparkSeries, sparkRange]);
-  const values = sliced.map((p) => p.value);
-  const first = values[0];
-  const last = values[values.length - 1];
-  const rangePct = first != null && first > 0 && last != null ? ((last - first) / first) * 100 : null;
+  // Deposit-adjusted percentage: unless the user opts in to include
+  // cash-flows, subtract cumulative post-baseline deposits so the %
+  // reflects trading PnL only (mirrors the dashboard tile behaviour).
+  const adjusted = useMemo(
+    () =>
+      buildDepositAdjustedSeries(
+        sliced.map((p) => ({ date: p.date, equity: p.value })),
+        includeDeposits ? [] : deposits,
+      ),
+    [sliced, deposits, includeDeposits],
+  );
+  const values = adjusted.length > 0 ? adjusted.map((p) => p.adjusted) : sliced.map((p) => p.value);
+  const rangePct = adjusted.length > 0 ? adjusted[adjusted.length - 1].pct : null;
+  const totalEquity = sparkSeries.length > 0 ? sparkSeries[sparkSeries.length - 1].value : Number(portfolio.current_cash);
   const del = useServerFn(deletePortfolio);
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -446,7 +456,8 @@ function PortfolioRow({ portfolio, sparkSeries }: { portfolio: { id: string; nam
 
 
   const pnl = Number(portfolio.current_cash) - Number(portfolio.starting_cash);
-  const pnlPct = (pnl / Number(portfolio.starting_cash)) * 100;
+  const pnlPct = Number(portfolio.starting_cash) > 0 ? (pnl / Number(portfolio.starting_cash)) * 100 : 0;
+
 
   return (
     <Card>
