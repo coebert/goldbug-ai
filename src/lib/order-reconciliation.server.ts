@@ -76,10 +76,13 @@ export async function reconcileOrderStatusesForPortfolio(params: {
   adapter: SaxoAdapter;
   lookbackHours?: number;
   statuses?: string[];
+  /** Tagged onto every emitted reconcile event so backfills are distinguishable from the hourly loop. */
+  source?: string;
 }): Promise<OrderReconcileSummary> {
   const { portfolioId, userId, adapter } = params;
   const lookbackHours = params.lookbackHours ?? 72;
   const statuses = params.statuses ?? ["pending", "submitted", "partial"];
+  const source = params.source ?? "reconciler";
   const sinceIso = new Date(Date.now() - lookbackHours * 3600_000).toISOString();
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
