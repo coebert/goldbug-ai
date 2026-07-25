@@ -307,6 +307,9 @@ function AdminPage() {
         </CardContent>
       </Card>
 
+      <RunMetricsCard />
+
+
       <BatchLessonsCard />
 
       <RetrainScheduleCard />
