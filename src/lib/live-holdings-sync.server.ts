@@ -89,6 +89,7 @@ export async function reconcileLiveHoldingsFromBroker(
 
   const env = p.mode === "live_prod" ? "live" : "sim";
   let brokerCash: number;
+  let brokerTotalValue: number | null = null;
   let currency: string;
   let positions: Array<{
     symbol: string; quantity: number; avgPrice: number;
@@ -103,7 +104,11 @@ export async function reconcileLiveHoldingsFromBroker(
       adapter.getBalance(),
       adapter.getPositions(),
     ]);
-    brokerCash = Number(bal.cashAvailable ?? bal.cash);
+    // Use settled cash (bal.cash) rather than cashAvailable for the ledger:
+    // cashAvailable can be reduced by pending orders, which would understate
+    // free cash relative to what the Saxo app shows on the account summary.
+    brokerCash = Number(bal.cash);
+    brokerTotalValue = Number.isFinite(Number(bal.totalValue)) ? Number(bal.totalValue) : null;
     currency = bal.currency;
     positions = pos;
   } catch (e) {
@@ -118,6 +123,7 @@ export async function reconcileLiveHoldingsFromBroker(
     });
     return { skipped: true, reason: `broker read failed: ${msg}` };
   }
+
 
   const brokerSymbols = new Set(
     positions
