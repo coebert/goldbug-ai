@@ -110,6 +110,23 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
                     : "border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
                 }`}
               >
+        {data && (
+          <>
+            <AvailabilityStrip availability={data.availability} />
+            <TimelineChart timeline={data.timeline} />
+          </>
+        )}
+        {data && data.pairs.length > 0 && (
+          <>
+            {overall !== "ok" && (
+              <div
+                role="alert"
+                className={`rounded-lg border p-3 text-sm ${
+                  overall === "critical"
+                    ? "border-destructive/40 bg-destructive/5 text-destructive"
+                    : "border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
+                }`}
+              >
                 {overall === "critical"
                   ? "FX providers are currently DOWN. Cross-currency buys will be refused. An in-app notification has been sent."
                   : "FX providers are degraded — some captures fell back to cache or stale rates. Trades continue with a wider safety buffer."}
