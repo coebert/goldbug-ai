@@ -23,13 +23,35 @@ const MONEY_FMT = new Intl.NumberFormat("en-GB", {
   roundingMode: "halfExpand",
 } as Intl.NumberFormatOptions);
 
+// Cache formatters for user-configurable decimal counts (0–4). Building an
+// Intl.NumberFormat per render is cheap-but-wasteful, so memoise by digits.
+const FMT_CACHE = new Map<number, Intl.NumberFormat>();
+function fmtFor(digits: number): Intl.NumberFormat {
+  const d = Math.max(0, Math.min(4, Math.trunc(digits)));
+  let f = FMT_CACHE.get(d);
+  if (!f) {
+    f = new Intl.NumberFormat("en-GB", {
+      minimumFractionDigits: d,
+      maximumFractionDigits: d,
+      useGrouping: true,
+      roundingMode: "halfExpand",
+    } as Intl.NumberFormatOptions);
+    FMT_CACHE.set(d, f);
+  }
+  return f;
+}
+
 /** Format a bare number as "1,234.50" (no currency prefix). */
-export function formatMoneyAmount(value: number | null | undefined): string {
+export function formatMoneyAmount(
+  value: number | null | undefined,
+  fractionDigits?: number,
+): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  const out = MONEY_FMT.format(value === 0 ? 0 : value);
+  const fmt = fractionDigits == null ? MONEY_FMT : fmtFor(fractionDigits);
+  const out = fmt.format(value === 0 ? 0 : value);
   // Strip a "-" prefix that only sits in front of an all-zero body
   // (e.g. -0.0001 rounds to "-0.00" — we render it as "0.00").
-  return out === "-0.00" ? "0.00" : out;
+  return /^-0\.?0*$|^-0$/.test(out) ? out.slice(1) : out;
 }
 
 /**
@@ -40,7 +62,9 @@ export function formatMoneyAmount(value: number | null | undefined): string {
 export function formatMoney(
   value: number | null | undefined,
   currency: string = "GBP",
+  fractionDigits?: number,
 ): string {
-  const body = formatMoneyAmount(value);
+  const body = formatMoneyAmount(value, fractionDigits);
   return body === "—" ? "—" : `${currency} ${body}`;
 }
+
