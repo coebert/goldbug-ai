@@ -419,7 +419,32 @@ export async function routeOrdersToBroker(params: {
       // implements placeFxSpot, submit each planned leg to the broker and
       // drop any buy whose leg failed. Then re-run the trimmer over the
       // survivors so wallet math reflects only successful legs.
+      if (fxExecutionMode === "spot" && trim.fxLegs.length > 0 && typeof adapter.placeFxSpot !== "function") {
+        // Spot FX is required to fund these buys, but the adapter can't
+        // place FX. Drop every dependent buy and log one row per leg so
+        // no order is submitted with an unfunded currency leg.
+        for (const leg of trim.fxLegs) {
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolio.id,
+            user_id: userId,
+            broker: "saxo",
+            env: portfolio.mode === "live_prod" ? "live" : "sim",
+            method: "FX_SPOT_UNSUPPORTED",
+            path: `/fx-spot/${leg.fromCcy}->${leg.toCcy}`,
+            status: 501,
+            request: asJson({ asOf, decisionId, amountFrom: leg.amountFrom, plannedRate: leg.rate }),
+            response: asJson({ reason: "adapter does not implement placeFxSpot" }),
+            error: "adapter does not implement placeFxSpot",
+          });
+          preSkips.set(`${leg.triggeredBySymbol}:buy`, "fx spot unsupported by adapter");
+        }
+        trim = { ...trim, fxLegs: [], decisions: trim.decisions.filter((d) => {
+          if (d.kind !== "allow") return true;
+          return !trim.fxLegs.some((l) => l.triggeredBySymbol === d.order.symbol);
+        }) };
+      }
       if (fxExecutionMode === "spot" && trim.fxLegs.length > 0 && typeof adapter.placeFxSpot === "function") {
+
         const { survivingBuysAfterFxSpot } = await import("./fx-spot-plan");
         type SpotOutcome = import("./fx-spot-plan").FxSpotOutcome;
         const outcomes: SpotOutcome[] = [];
