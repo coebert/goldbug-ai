@@ -42,6 +42,8 @@ export async function runHourlyCycle(opts: {
   triggeredBy: "manual" | "cron";
   force?: boolean;
 }): Promise<HourlyRunResult> {
+  const runStartedAt = Date.now();
+  const RUN_BUDGET_MS = 115 * 1000;
   const { acquireRunLock } = await import("@/lib/run-lock.server");
   const { runDailyTick } = await import("@/lib/trading-engine.server");
   const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
@@ -161,14 +163,12 @@ export async function runHourlyCycle(opts: {
     hourStartUtc.setUTCMinutes(0, 0, 0);
     const hourStartIso = hourStartUtc.toISOString();
     const recentWindowIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const loopStartedAt = Date.now();
-    const LOOP_BUDGET_MS = 150 * 1000;
     const results: HourlyRunResult["results"] = [];
 
     for (const p of portfolios) {
       try {
-        const elapsed = Date.now() - loopStartedAt;
-        if (elapsed > LOOP_BUDGET_MS) {
+        const elapsed = Date.now() - runStartedAt;
+        if (elapsed > RUN_BUDGET_MS) {
           results.push({
             id: p.id,
             mode: p.mode,
