@@ -1211,6 +1211,11 @@ function PortfolioPage() {
                 <TradeAuditLogCard decisions={decisions} portfolioName={p.name} />
               </TabsContent>
 
+              <TabsContent value="confidence" className="mt-4">
+                <ConfidenceTimelineCard decisions={decisions} />
+              </TabsContent>
+
+
               <TabsContent value="trades" className="mt-4">
                 {trades.length === 0 && (
                   <p className="text-sm text-muted-foreground">No trades yet.</p>
