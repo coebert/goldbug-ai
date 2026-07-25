@@ -378,6 +378,14 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("tod_close_haircut", 0, 1);
   num("tod_hard_block_open_min", 0, 120);
   num("tod_hard_block_close_min", 0, 120);
+  // Optional per-portfolio cash-floor override. Explicit `null` clears it.
+  if (r.cash_floor_pct === null) {
+    out.cash_floor_pct = null;
+  } else if (r.cash_floor_pct !== undefined) {
+    const n = Number(r.cash_floor_pct);
+    out.cash_floor_pct = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+  }
+
   // Per-venue TOD overrides.
   if (r.tod_venue_overrides && typeof r.tod_venue_overrides === "object") {
     const allowedVenues = new Set(["LSE", "NYSE", "NASDAQ", "CRYPTO", "OTHER"]);
