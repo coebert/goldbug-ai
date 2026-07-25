@@ -1628,6 +1628,16 @@ function OrderPanel({
         {order.reason}
       </p>
 
+      <PlainEnglishExplanation
+        decisionId={decisionId}
+        orderIndex={orderIndex}
+        order={order}
+        weights={weights ?? null}
+        relatedNews={relatedNews}
+        guardrails={guardrails}
+        currency={currency}
+      />
+
       {weights && (
         <div className="mb-3">
           <div className="mb-1.5 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
