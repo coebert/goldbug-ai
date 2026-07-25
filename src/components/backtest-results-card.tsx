@@ -227,7 +227,7 @@ export function BacktestResultsCard({
           <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Drawdown curve
           </div>
-          <div className="h-40 w-full">
+          <div className="h-32 w-full sm:h-40">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={drawdownData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
