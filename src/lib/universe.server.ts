@@ -173,7 +173,11 @@ export type RiskConfig = {
   tod_close_haircut: number;
   tod_hard_block_open_min: number;
   tod_hard_block_close_min: number;
+  // Per-venue overrides on top of the tod_* defaults. Any subset of fields
+  // may be set per venue; missing fields fall back to the global defaults.
+  tod_venue_overrides: import("./alpha/execution-alpha").TodVenueOverrides | null;
 };
+
 
 
 export const DEFAULT_RISK_CONFIG: RiskConfig = {
@@ -224,7 +228,9 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   tod_close_haircut: 0.5,
   tod_hard_block_open_min: 0,
   tod_hard_block_close_min: 0,
+  tod_venue_overrides: null,
 };
+
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
   const base = { ...DEFAULT_RISK_CONFIG };
@@ -348,8 +354,38 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("tod_close_haircut", 0, 1);
   num("tod_hard_block_open_min", 0, 120);
   num("tod_hard_block_close_min", 0, 120);
+  // Per-venue TOD overrides.
+  if (r.tod_venue_overrides && typeof r.tod_venue_overrides === "object") {
+    const allowedVenues = new Set(["LSE", "NYSE", "NASDAQ", "CRYPTO", "OTHER"]);
+    const clamp = (v: unknown, lo: number, hi: number): number | undefined => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : undefined;
+    };
+    const parsed: Record<string, Record<string, number>> = {};
+    for (const [venue, raw] of Object.entries(r.tod_venue_overrides as Record<string, unknown>)) {
+      if (!allowedVenues.has(venue) || !raw || typeof raw !== "object") continue;
+      const src = raw as Record<string, unknown>;
+      const entry: Record<string, number> = {};
+      const setIf = (k: string, lo: number, hi: number) => {
+        const n = clamp(src[k], lo, hi);
+        if (n !== undefined) entry[k] = n;
+      };
+      setIf("avoidOpenMin", 0, 120);
+      setIf("avoidCloseMin", 0, 120);
+      setIf("openHaircut", 0, 1);
+      setIf("closeHaircut", 0, 1);
+      setIf("hardBlockOpenMin", 0, 120);
+      setIf("hardBlockCloseMin", 0, 120);
+      // Session bounds are minutes-since-midnight local venue time (0..1440).
+      setIf("sessionOpenMin", 0, 24 * 60);
+      setIf("sessionCloseMin", 0, 24 * 60);
+      if (Object.keys(entry).length > 0) parsed[venue] = entry;
+    }
+    out.tod_venue_overrides = Object.keys(parsed).length > 0 ? (parsed as RiskConfig["tod_venue_overrides"]) : null;
+  }
   return out;
 }
+
 
 // ---------------------------------------------------------------------------
 // Cash-aware universe filter (pure). Extracted so it can be unit-tested and
