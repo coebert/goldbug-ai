@@ -683,6 +683,7 @@ function PortfolioPage() {
                 <TabsTrigger value="trades" className="min-h-10">Trades ({trades.length})</TabsTrigger>
                 <TabsTrigger value="decisions" className="min-h-10">Decisions ({decisions.length})</TabsTrigger>
                 <TabsTrigger value="audit" className="min-h-10">Audit</TabsTrigger>
+                <TabsTrigger value="confidence" className="min-h-10">Confidence</TabsTrigger>
                 <TabsTrigger value="risk" className="min-h-10">Risk</TabsTrigger>
                 <TabsTrigger value="diagnostics" className="min-h-10">Diagnostics</TabsTrigger>
                 <TabsTrigger value="reports" className="min-h-10">Reports</TabsTrigger>
