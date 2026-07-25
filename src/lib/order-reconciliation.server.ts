@@ -165,11 +165,37 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
     const w = workingById.get(brokerOrderId);
     if (w) {
-      // Still open. Only patch if partial fill made progress.
-      if (w.filledAmount > 0 && w.filledAmount < w.amount) {
+      // Still open. Two things to reflect:
+      //   1. Partial-fill progress → local status "partial".
+      //   2. Saxo's own status string ("Working", "Placed", "Parked",
+      //      "NotWorking", "PreCheck", …) → sync onto our local status so
+      //      the UI stops showing "submitted" indefinitely for orders that
+      //      the broker has actually acknowledged as working or queued.
+      const saxoStatusLc = String(w.status ?? "").toLowerCase();
+      const previousStatusLc = String(row.status ?? "").toLowerCase();
+      const isPartialProgress = w.filledAmount > 0 && w.filledAmount < w.amount;
+      // Map the raw Saxo Status onto our internal `live_orders.status` enum.
+      // Anything that isn't clearly rejected/cancelled/filled is treated as
+      // "working" — including "NotWorking"/"Parked" (queued for next open
+      // session), which is exactly what the user sees on the weekend.
+      const mappedFromSaxo: string = isPartialProgress
+        ? "partial"
+        : saxoStatusLc.includes("fill")
+          ? "filled"
+          : saxoStatusLc.includes("reject") || saxoStatusLc.includes("error")
+            ? "rejected"
+            : saxoStatusLc.includes("cancel")
+              ? "cancelled"
+              : "working";
+
+      if (mappedFromSaxo !== previousStatusLc) {
+        const patch: Record<string, unknown> = { status: mappedFromSaxo };
+        if (mappedFromSaxo === "rejected") {
+          patch.reject_reason = "rejected by broker";
+        }
         const upd = await supabaseAdmin
           .from("live_orders")
-          .update({ status: "partial" })
+          .update(patch)
           .eq("id", row.id as string);
         if (upd.error) {
           await logReconcileEvent({
@@ -177,11 +203,15 @@ export async function reconcileOrderStatusesForPortfolio(params: {
             newStatus: row.status as string,
             outcome: "error",
             reasonCode: "status_update_failed",
-            reason: `failed to mark partial: ${upd.error.message}`,
+            reason: `failed to sync status ${previousStatusLc}→${mappedFromSaxo}: ${upd.error.message}`,
             filledQuantity: w.filledAmount,
+            saxoStatus: w.status,
             saxoResponse: w,
           });
         }
+      }
+
+      if (isPartialProgress) {
         summary.partial++;
         summary.rows.push({
           orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
@@ -195,24 +225,27 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           reasonCode: "broker_open_partial_progress",
           reason: `order still open on Saxo with ${w.filledAmount}/${w.amount} filled`,
           filledQuantity: w.filledAmount,
-          saxoStatus: "working",
+          saxoStatus: w.status,
           saxoResponse: w,
         });
       } else {
         summary.stillWorking++;
         summary.rows.push({
           orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
-          outcome: "still_working", previousStatus: row.status as string, newStatus: row.status as string,
+          outcome: "still_working", previousStatus: row.status as string, newStatus: mappedFromSaxo,
           filledQuantity: w.filledAmount, avgFillPrice: null,
         });
+        const queued = saxoStatusLc.includes("notworking") || saxoStatusLc.includes("park");
         await logReconcileEvent({
           ...commonEvent,
-          newStatus: row.status as string,
+          newStatus: mappedFromSaxo,
           outcome: "still_working",
           reasonCode: "broker_open_working",
-          reason: "order is in Saxo's open-orders list; awaiting fill",
+          reason: queued
+            ? `order queued at Saxo ("${w.status}") — awaiting next session open`
+            : `order is in Saxo's open-orders list ("${w.status}"); awaiting fill`,
           filledQuantity: w.filledAmount,
-          saxoStatus: "working",
+          saxoStatus: w.status,
           saxoResponse: w,
         });
       }
