@@ -946,7 +946,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       });
       const untilDate = new Date(nowMs);
       untilDate.setUTCDate(untilDate.getUTCDate() + days);
-      cooldowns[sym] = untilDate.toISOString().slice(0, 10);
+      (cooldowns as Record<string, string>)[sym] = untilDate.toISOString().slice(0, 10);
     }
   }
 
