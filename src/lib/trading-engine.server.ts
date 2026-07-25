@@ -116,12 +116,14 @@ const OrderSchema = z.object({
 
 
 import { FxConversionOrderSchema } from "./ai-fx-conversions.server";
+import { FxIntentSchema } from "./fx-intents";
 
 const DecisionSchema = z.object({
   briefing: z.string(),
   rationale: z.string(),
   orders: z.array(OrderSchema),
   fx_conversions: z.array(FxConversionOrderSchema).optional(),
+  fx_intents: z.array(FxIntentSchema).optional(),
 });
 
 export type DecisionOutput = z.infer<typeof DecisionSchema>;
@@ -375,7 +377,8 @@ Return:
       price_change    — recent price change (5d/30d) AND volume-weighted momentum
       news_sentiment  — weighted LLM sentiment for this symbol, INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL or skip.
       volatility      — 20d vol, ATR%, Bollinger width
-- fx_conversions (OPTIONAL, only if the FX WALLET & EXPOSURE block above is present and the FX CIRCUIT is closed): array of { from_ccy, to_ccy, amount_percent (1..100 of the from-currency balance), reason }. Follow the FX STRATEGY playbook. Omit or return [] if no FX action is warranted.
+- fx_intents (PREFERRED when the FX WALLET & EXPOSURE block is present): array of typed intents (kind = "pre_fund" | "hedge" | "sweep_idle" | "carry_tilt" | "close_hedge") — see the FX STRATEGY playbook for the required fields per kind. Guardrails (per-tick turnover, min notional, tilt-exposure cap) are applied server-side; oversized intents are trimmed rather than rejected. Reason MUST cite the numbered rule and its numeric trigger.
+- fx_conversions (LEGACY, discouraged unless no intent kind fits): array of { from_ccy, to_ccy, amount_percent (1..100 of the from-currency balance), reason }. Prefer fx_intents. Omit both if no FX action is warranted.
 If no action is warranted, return an empty orders array.`;
 
 
@@ -1256,8 +1259,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // rows (bad rate, circuit open, insufficient balance) are logged into the
   // decision guardrails for later inspection. Never mutates workingCash for
   // non-base currencies — those live in cash_by_ccy only.
+  //
+  // fx_intents (typed, guardrailed) are compiled first into equivalent
+  // FxConversionOrder rows and prepended, so intent-driven proposals get
+  // executed before any legacy fx_conversions the model still emits.
   let aiFxApplied: Awaited<ReturnType<typeof applyAiFxConversions>> | null = null;
-  const aiFxRequested = decision.fx_conversions ?? [];
+  const legacyFx = decision.fx_conversions ?? [];
+  const rawIntents = decision.fx_intents ?? [];
+  let compiledIntents: ReturnType<typeof import("./fx-intents").compileFxIntents> = [];
+  if (fxContext && rawIntents.length > 0) {
+    const { compileFxIntents, DEFAULT_GUARDRAILS } = await import("./fx-intents");
+    const ratesToBase: Record<string, number> = {};
+    for (const [pair, q] of fxContext.matrix) {
+      const [from, to] = pair.split("/");
+      if (to === fxContext.baseCcy) ratesToBase[from] = q.rate;
+    }
+    ratesToBase[fxContext.baseCcy] = 1;
+    compiledIntents = compileFxIntents(rawIntents, {
+      baseCcy: fxContext.baseCcy,
+      wallet: fxContext.wallet as unknown as Record<string, number>,
+      exposureBase: fxContext.exposureByCcy,
+      ratesToBase,
+      guardrails: { ...DEFAULT_GUARDRAILS, navBase: totalValue },
+    });
+  }
+  const intentOrders = compiledIntents.flatMap((c) => (c.order ? [c.order] : []));
+  const aiFxRequested = [...intentOrders, ...legacyFx];
   if (fxContext && aiFxRequested.length > 0) {
     try {
       aiFxApplied = await applyAiFxConversions({
@@ -1449,6 +1476,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
               requested: aiFxRequested,
               applied: aiFxApplied?.applied ?? [],
               base_cash_delta: aiFxApplied?.baseCashDelta ?? 0,
+              intents_raw: rawIntents,
+              intents_compiled: compiledIntents.map((c) => ({
+                intent: c.intent,
+                order: c.order ?? null,
+                skipped: c.skipped ?? null,
+                notional_base: c.notionalBase,
+              })),
             }
           : { skipped: true },
       },
