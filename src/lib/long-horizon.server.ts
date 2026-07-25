@@ -391,7 +391,7 @@ export async function runLongHorizonBacktest(opts: {
       const picks = scored.slice(0, topK);
 
       const totalValue = valuePortfolio(day);
-      const cashFloor = totalValue * rp.cashFloorPct;
+      const cashFloor = totalValue * effectiveCashFloorPct(rc, opts.riskLevel);
       const investable = Math.max(0, totalValue - cashFloor);
 
       // Base target weight = equal-weight across picks, capped by per-symbol,
