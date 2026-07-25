@@ -160,6 +160,69 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     // Not in working list → ask history what happened.
     const hist = await adapter.getHistoricalOrder(brokerOrderId, sinceIso);
     if (!hist) {
+      // Saxo `/hist/v3/orders` is not exposed in some environments (notably
+      // SIM), so history returns null even for orders that clearly completed.
+      // For market orders that vanished from the open list and are older than
+      // a couple of minutes we treat this as "presumed filled": the daily
+      // holdings/cash reconcile from `/port/v1/positions` is the source of
+      // truth for cash impact — this presumption only updates the display
+      // status so operators aren't left with a permanent "submitted" tile
+      // for orders the broker has already executed.
+      const orderType = String(row.order_type ?? "market").toLowerCase();
+      const submittedAt = row.submitted_at ? new Date(row.submitted_at as string).getTime() : 0;
+      const ageMs = submittedAt ? Date.now() - submittedAt : Number.POSITIVE_INFINITY;
+      if (orderType === "market" && ageMs > 2 * 60 * 1000) {
+        const qty = Number(row.quantity ?? 0);
+        // Use latest cached close as a best-effort fill price for display.
+        const priceRow = await supabaseAdmin
+          .from("price_cache")
+          .select("close")
+          .eq("symbol", row.symbol as string)
+          .order("as_of", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const fillPrice = Number(priceRow.data?.close ?? 0) || 0;
+
+        await supabaseAdmin
+          .from("live_orders")
+          .update({ status: "filled" })
+          .eq("id", row.id as string);
+
+        if (qty > 0) {
+          const ins = await supabaseAdmin.from("live_fills").insert({
+            order_id: row.id as string,
+            portfolio_id: portfolioId,
+            user_id: userId,
+            symbol: row.symbol as string,
+            side: row.side as string,
+            quantity: qty,
+            fill_price: fillPrice,
+            fee: 0,
+            currency: "GBP",
+            broker_fill_id: brokerOrderId,
+            filled_at: new Date().toISOString(),
+          });
+          if (ins.error && ins.error.code !== "23505") {
+            await supabaseAdmin.from("live_broker_log").insert({
+              portfolio_id: portfolioId, user_id: userId, broker: "saxo",
+              env: adapter.env, method: "ORDER_RECON_PRESUMED_FILL_INSERT_FAILED",
+              path: "live_fills", status: null,
+              request: asJson({ orderId: row.id, brokerOrderId }),
+              error: ins.error.message,
+            });
+          }
+        }
+
+        summary.filled++;
+        summary.rows.push({
+          orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
+          outcome: "filled", previousStatus: row.status as string, newStatus: "filled",
+          filledQuantity: qty, avgFillPrice: fillPrice || null,
+          reason: "presumed filled — market order absent from open list; /hist unsupported on this env",
+        });
+        continue;
+      }
+
       summary.unknown++;
       summary.rows.push({
         orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
