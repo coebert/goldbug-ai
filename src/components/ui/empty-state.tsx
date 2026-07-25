@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * usual card content, so the layout does not collapse.
  */
 export interface EmptyStateProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   icon?: React.ReactNode;
   title: React.ReactNode;
   description?: React.ReactNode;

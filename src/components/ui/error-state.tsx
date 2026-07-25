@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
  * so every card responds to failure in the same visual language.
  */
 export interface ErrorStateProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   title?: React.ReactNode;
   description?: React.ReactNode;
   onRetry?: () => void;
