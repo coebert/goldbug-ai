@@ -13,6 +13,7 @@
 // handles broker legs when placing dependent buys.
 
 import { z } from "zod";
+import { getFxPairSignals, type FxPairSignals } from "./fx-signals.server";
 import { getFxMatrix, getFxRate } from "./fx.server";
 import { planFxConversion } from "./fx-convert-plan";
 import { readWallet, walletBalance, writeWalletFields, type Wallet } from "./portfolio-wallet";
@@ -185,6 +186,41 @@ export async function buildFxContext(args: {
     ? `- FX CIRCUIT: OPEN (${circuitReason ?? "identity-fallback in effect"}). Do NOT propose fx_conversions this tick — they will be rejected.`
     : `- FX CIRCUIT: closed. Conversions are allowed subject to rate quality.`;
 
+  // Signals: momentum + vol + event proximity for every non-base ccy vs base.
+  // Best-effort — failures degrade to null fields rather than blocking the tick.
+  const signalCcys = currenciesInPlay.filter((c) => c !== baseCcy).slice(0, 6);
+  const signals: FxPairSignals[] = await Promise.all(
+    signalCcys.map((c) =>
+      getFxPairSignals(c, baseCcy).catch(() =>
+        ({
+          from: c,
+          to: baseCcy,
+          latest: null,
+          ret5dPct: null,
+          ret20dPct: null,
+          ret60dPct: null,
+          vol20dPct: null,
+          distSma50Pct: null,
+          trendBias: "neutral",
+          eventWithin24h: [],
+          source: "error",
+          stale: true,
+        }) as FxPairSignals,
+      ),
+    ),
+  );
+  const fmt = (n: number | null, digits = 2) =>
+    n == null || !Number.isFinite(n) ? "n/a" : `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
+  const signalsRows = signals
+    .map((s) => {
+      const ev = s.eventWithin24h.length > 0
+        ? ` [EVENT ≤24h: ${s.eventWithin24h.map((e) => `${e.ccy} ${e.label}`).join(", ")}]`
+        : "";
+      const stale = s.stale ? " [STALE]" : "";
+      return `- ${s.from}→${s.to}: 5d ${fmt(s.ret5dPct)}, 20d ${fmt(s.ret20dPct)}, 60d ${fmt(s.ret60dPct)}, vol20 ${fmt(s.vol20dPct, 1)}, distSMA50 ${fmt(s.distSma50Pct)}, bias ${s.trendBias}${ev}${stale}`;
+    })
+    .join("\n");
+
   const contextBlock = `FX WALLET & EXPOSURE (base = ${baseCcy}):
 Wallet balances:
 ${walletRows || "- (empty)"}
@@ -194,19 +230,50 @@ ${exposureRows || "- (none)"}
 
 FX rates vs base:
 ${ratesRows || "- (unavailable)"}
-${circuitLine}`;
+${circuitLine}
 
-  const playbook = `FX STRATEGY (multi-currency wallet is enabled):
-- Propose fx_conversions when doing so improves execution or risk. Typical uses:
-  1. PRE-FUND FOREIGN BUYS: if you plan to buy an instrument denominated in USD/EUR/etc. and the wallet in that ccy is short, convert enough ${baseCcy} up front (small buffer for slippage).
-  2. HEDGE UNWANTED EXPOSURE: if non-base exposure has grown beyond ~60% of portfolio value and the regime is risk-off (bear_volatile / crisis), trim by converting foreign cash back to ${baseCcy}. Do NOT sell equities purely to raise FX.
-  3. CLOSE IDLE POCKETS: any non-base cash balance below ~1% of portfolio value with no upcoming buys in that ccy should be swept back to ${baseCcy}.
-  4. CARRY / MOMENTUM: only shift cash on FX-pair momentum when the base pair rate is fresh (not STALE / FALLBACK) and the move is aligned with the current macro regime.
-- SAFETY:
-  - Skip fx_conversions entirely if FX CIRCUIT is OPEN or the required pair is flagged STALE or FALLBACK.
-  - Never convert more than 40% of any single currency's balance in a single tick.
-  - Conversions are book-entry against our internal quote; expect a ~25 bps effective spread.
-- Format: fx_conversions is an array of { from_ccy, to_ccy, amount_percent (1..100 of the from balance), reason }.`;
+FX pair signals (vs ${baseCcy}):
+${signalsRows || "- (unavailable)"}`;
+
+  // Rewritten playbook: concrete, rule-based, references the fields the
+  // model actually sees above so its rationale can cite specific values.
+  const playbook = `FX STRATEGY (multi-currency wallet is enabled). Base = ${baseCcy}.
+Decision rules — evaluate in order, stop at the first that fires:
+
+1. STAND DOWN (no new conversions this tick) if ANY of:
+   • FX CIRCUIT is OPEN
+   • the required pair is flagged STALE, FALLBACK, or "unavailable"
+   • an EVENT ≤24h is flagged for either side of the pair (except close_hedge / sweep_idle)
+
+2. PRE-FUND FOREIGN BUYS
+   If you also propose a BUY denominated in ccy X and wallet[X] is below the
+   buy notional, convert exactly (shortfall × 1.02) from ${baseCcy}→X. Do
+   this even if the pair signals are neutral — funding beats waiting.
+
+3. HEDGE / REDUCE FX EXPOSURE
+   If exposureByCcy[X] > 60% of NAV AND (regime is bear_volatile/crisis OR
+   vol20 for X→${baseCcy} > 15%), convert 25–50% of wallet[X] back to
+   ${baseCcy}. Never sell equities purely to raise FX.
+
+4. SWEEP IDLE
+   If wallet[X] < 1% of NAV AND no BUY in X this tick AND no upcoming event,
+   convert 100% of wallet[X] back to ${baseCcy} (fee guard: skip if amount < ~£25 equivalent).
+
+5. CARRY / MOMENTUM TILT (only in regime = risk-on/neutral)
+   If trendBias for X→${baseCcy} is long_from AND 60d return > 2% AND vol20 < 12%,
+   tilt up to 10% of ${baseCcy} wallet into X. Cap total tilt exposure at 20% NAV.
+
+6. CLOSE HEDGE
+   If a prior hedge was opened and the trigger (exposure or vol) has cleared,
+   unwind it — allowed even inside STAND DOWN if pair quality is acceptable.
+
+SAFETY:
+- Never convert more than 40% of any single currency's balance in a single tick.
+- Book-entry conversions carry a ~25 bps effective spread — factor that in.
+- Every fx_conversion.reason MUST cite the rule number and the numeric trigger
+  (e.g. "rule 3: exposureUSD 63% of NAV, vol20 18.4%").
+
+Format: fx_conversions is an array of { from_ccy, to_ccy, amount_percent (1..100 of the from balance), reason }.`;
 
   return {
     active: true,
@@ -221,6 +288,7 @@ ${circuitLine}`;
     contextBlock,
   };
 }
+
 
 export interface AppliedFxConversion {
   from_ccy: string;
