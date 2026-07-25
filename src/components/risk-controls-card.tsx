@@ -261,6 +261,7 @@ function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
       fmtPct(next.asset_class_limits[c.key] ?? 0),
     );
   }
+  push("Diversification tilt", prev.diversification_tilt ?? "off", next.diversification_tilt ?? "off");
   return out;
 }
 
