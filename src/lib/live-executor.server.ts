@@ -929,8 +929,52 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
+  // ---------- Post-broker reconciliation.
+  // Verify every routed buy landed with the FX legs the trimmer planned.
+  // Each entry is written as its own audit row so the FX health card + trade
+  // error dashboard can render funded vs failed at a glance, and so a rerun
+  // never silently overwrites a prior verdict for the same buy.
+  if (results.some((r) => r.side === "buy")) {
+    const { reconcileBuysWithFxLegs } = await import("./post-broker-reconciliation");
+    const recon = reconcileBuysWithFxLegs(
+      results.map((r) => ({
+        symbol: r.symbol,
+        side: r.side,
+        status: r.status,
+        reason: r.reason,
+        skipped: r.skipped,
+      })),
+      reconPlannedLegs,
+      reconFxOutcomes,
+    );
+    for (const entry of recon) {
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "POST_BROKER_RECON",
+        path: `/reconcile/post-broker/${entry.symbol}`,
+        status: entry.status === "fully_funded" ? 200 : 424,
+        request: asJson({
+          asOf,
+          decisionId,
+          expectedFxLegs: entry.expectedFxLegs,
+          orderStatus: entry.orderStatus,
+        }),
+        response: asJson({
+          status: entry.status,
+          fulfilledFxLegs: entry.fulfilledFxLegs,
+          reason: entry.reason,
+        }),
+        error: entry.status === "failed" ? entry.reason : null,
+      });
+    }
+  }
+
   return results;
 }
+
 
 function makeClientOrderId(args: {
   portfolioId: string;
