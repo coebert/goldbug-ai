@@ -1733,6 +1733,47 @@ function SignalImportance({ weights }: { weights: SignalWeights }) {
   );
 }
 
+function LiquidityStrip({ lq }: { lq: ExecutedLiquidity }) {
+  const bucketClass =
+    lq.rejection_bucket === "high"
+      ? "border-destructive/40 text-destructive"
+      : lq.rejection_bucket === "medium"
+        ? "border-accent/40 text-accent"
+        : "border-primary/40 text-primary";
+  return (
+    <div className="mb-3 rounded-md border border-border/60 bg-background/40 p-2">
+      <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+        <Activity className="h-3 w-3" /> Liquidity &amp; slippage (used for sizing)
+      </div>
+      <div className="flex flex-wrap gap-1.5 text-xs tabular-nums">
+        <Badge variant="outline" className={bucketClass}>
+          Rejection risk {lq.rejection_score} · {lq.rejection_bucket}
+        </Badge>
+        <Badge variant="outline">
+          Slippage ~{lq.est_slippage_bps.toFixed(0)}bps
+        </Badge>
+        <Badge variant="outline">
+          Turnover {lq.est_turnover_pct_adv == null ? "—" : `${lq.est_turnover_pct_adv.toFixed(2)}% ADV`}
+        </Badge>
+        <Badge variant="outline">
+          20d ADV {lq.adv_20d_usd == null ? "—" : `$${Math.round(lq.adv_20d_usd).toLocaleString()}`}
+        </Badge>
+        <Badge variant="outline">
+          Spread {lq.spread_bps == null ? "—" : `${lq.spread_bps.toFixed(0)}bps`}
+        </Badge>
+        {lq.trim_fraction > 0 && (
+          <Badge variant="outline" className="border-accent/40 text-accent">
+            Trimmed {(lq.trim_fraction * 100).toFixed(0)}%
+            {lq.liquidity_cap_spend != null
+              ? ` → cap $${Math.round(lq.liquidity_cap_spend).toLocaleString()}`
+              : ""}
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OrderPanel({
   decisionId,
   orderIndex,
