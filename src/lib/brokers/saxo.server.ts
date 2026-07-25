@@ -468,6 +468,34 @@ export class SaxoAdapter implements BrokerAdapter {
     if (accountKey) body.AccountKey = accountKey;
     if (req.orderType === "limit" && req.limitPrice != null) body.OrderPrice = req.limitPrice;
 
+    // Pre-flight against Saxo's precheck endpoint. This validates the order
+    // against the *broker's* cash balance and position rules without actually
+    // submitting it. Historically we skipped this step and let InsufficientCash
+    // 400s from /trade/v2/orders spam the error log — the app's simulated cash
+    // is often much larger than the real Saxo SIM account, so buys that look
+    // fine to our engine get rejected downstream. Precheck lets us surface the
+    // rejection cleanly (status: "rejected", no error row) before the POST.
+    try {
+      const pre = await this.req<{
+        PreCheckResult?: string;
+        ErrorInfo?: { ErrorCode?: string; Message?: string };
+      }>("POST", "/trade/v2/orders/precheck", { body, maxAttempts: 2 });
+      const outcome = String(pre.PreCheckResult ?? "").toLowerCase();
+      const errCode = pre.ErrorInfo?.ErrorCode;
+      const errMsg = pre.ErrorInfo?.Message;
+      if (errCode || (outcome && outcome !== "ok")) {
+        return {
+          brokerOrderId: "",
+          status: "rejected",
+          reason: errMsg ?? errCode ?? `Precheck ${pre.PreCheckResult ?? "failed"}`,
+          raw: pre,
+        };
+      }
+    } catch {
+      // Precheck itself failed (network, auth, endpoint variance). Fall through
+      // to the real POST so we don't drop otherwise-valid orders on the floor.
+    }
+
     try {
       // Saxo throttles /trade/v2/orders at ~1 req/sec. Space consecutive
       // placeOrder calls on the same adapter to at least 1.1s apart so a
@@ -479,7 +507,16 @@ export class SaxoAdapter implements BrokerAdapter {
       const res = await this.req<{ OrderId?: string; ErrorInfo?: { Message?: string } }>(
         "POST",
         "/trade/v2/orders",
-        { body, maxAttempts: 5, retryCapMs: 10_000 },
+        {
+          body,
+          maxAttempts: 5,
+          retryCapMs: 10_000,
+          // 400 from /trade/v2/orders is almost always a business-rule
+          // rejection (InsufficientCash, PositionLimit, MarketClosed). Those
+          // aren't system errors — surface them as rejected without logging an
+          // error row that alarms the user on the portfolio page.
+          silentStatuses: [400],
+        },
       );
       this.lastOrderPostAt = Date.now();
       if (res.ErrorInfo) {
@@ -487,7 +524,27 @@ export class SaxoAdapter implements BrokerAdapter {
       }
       return { brokerOrderId: res.OrderId ?? "", status: "submitted", raw: res };
     } catch (e) {
-      return { brokerOrderId: "", status: "error", reason: e instanceof Error ? e.message : String(e) };
+      const msg = e instanceof Error ? e.message : String(e);
+      // Extract Saxo's business-rule rejection from the thrown error text so
+      // the caller sees a clean `rejected` outcome rather than a red "error"
+      // banner. The message body embedded by req() looks like
+      // `Saxo POST /trade/v2/orders failed [400]: {"ErrorInfo":{...}}`.
+      if (/\[400\]/.test(msg)) {
+        const jsonStart = msg.indexOf("{");
+        let reason = msg;
+        if (jsonStart >= 0) {
+          try {
+            const parsed = JSON.parse(msg.slice(jsonStart)) as {
+              ErrorInfo?: { Message?: string; ErrorCode?: string };
+            };
+            reason = parsed.ErrorInfo?.Message ?? parsed.ErrorInfo?.ErrorCode ?? msg;
+          } catch {
+            // fall through
+          }
+        }
+        return { brokerOrderId: "", status: "rejected", reason };
+      }
+      return { brokerOrderId: "", status: "error", reason: msg };
     }
 
   }
