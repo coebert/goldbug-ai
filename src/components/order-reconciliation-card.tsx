@@ -1,18 +1,23 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listRecentOrderReconciliation,
   type ReconOrderRow,
 } from "@/lib/order-reconciliation-view.functions";
+import {
+  backfillOrderReconciliation,
+  type BackfillResult,
+} from "@/lib/order-reconciliation-backfill.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { ClipboardCheck, RefreshCw } from "lucide-react";
+import { ClipboardCheck, PlayCircle, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import { toast } from "sonner";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -48,11 +53,30 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
   const fetchRows = useServerFn(listRecentOrderReconciliation);
   const [hours, setHours] = useState<number>(72);
   const [status, setStatus] = useState<StatusFilter>("all");
+  const queryClient = useQueryClient();
+  const runBackfill = useServerFn(backfillOrderReconciliation);
 
   const q = useQuery({
     queryKey: ["order-recon-view", hours, portfolioId ?? null],
     queryFn: () => fetchRows({ data: { hours, portfolioId } }),
     refetchInterval: 60_000,
+  });
+
+  const backfill = useMutation({
+    mutationFn: () =>
+      runBackfill({ data: { lookbackHours: 24 * 60, includeError: true, portfolioId } }),
+    onSuccess: (res: BackfillResult) => {
+      const t = res.totals;
+      const failed = res.portfolios.filter((p) => !p.ok).length;
+      toast.success(
+        `Backfill complete: ${t.filled} filled · ${t.partial} partial · ${t.rejected} rejected · ${t.cancelled} cancelled · ${t.stillWorking} still working · ${t.unknown} unknown` +
+          (failed ? ` · ${failed} portfolio error${failed === 1 ? "" : "s"}` : ""),
+        { duration: 8000 },
+      );
+      queryClient.invalidateQueries({ queryKey: ["order-recon-view"] });
+    },
+    onError: (e: unknown) =>
+      toast.error(`Backfill failed: ${e instanceof Error ? e.message : String(e)}`),
   });
 
   const rows: ReconOrderRow[] = q.data ?? [];
@@ -89,6 +113,16 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
               {r.label}
             </Button>
           ))}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => backfill.mutate()}
+            disabled={backfill.isPending}
+            title="Re-check every open/error order against Saxo over the last 60 days"
+          >
+            <PlayCircle className={`mr-1 h-3.5 w-3.5 ${backfill.isPending ? "animate-pulse" : ""}`} />
+            {backfill.isPending ? "Backfilling…" : "Backfill"}
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
             <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} />
           </Button>

@@ -73,9 +73,11 @@ export async function reconcileOrderStatusesForPortfolio(params: {
   userId: string;
   adapter: SaxoAdapter;
   lookbackHours?: number;
+  statuses?: string[];
 }): Promise<OrderReconcileSummary> {
   const { portfolioId, userId, adapter } = params;
   const lookbackHours = params.lookbackHours ?? 72;
+  const statuses = params.statuses ?? ["pending", "submitted", "partial"];
   const sinceIso = new Date(Date.now() - lookbackHours * 3600_000).toISOString();
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -84,7 +86,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     .from("live_orders")
     .select("id, symbol, side, quantity, order_type, status, broker_order_id, submitted_at, created_at")
     .eq("portfolio_id", portfolioId)
-    .in("status", ["pending", "submitted", "partial"])
+    .in("status", statuses)
     .gte("created_at", sinceIso)
     .order("created_at", { ascending: true });
 
