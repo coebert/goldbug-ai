@@ -124,6 +124,7 @@ import {
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
+import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 const BacktestResultsCard = lazy(() =>
@@ -1274,6 +1275,11 @@ function PortfolioPage() {
                 series={holdingsSeries}
               />
             </div>
+
+            <div className="mt-6">
+              <CommodityLiquiditySimulatorCard />
+            </div>
+
 
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
