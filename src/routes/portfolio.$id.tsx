@@ -1814,6 +1814,9 @@ function OrderPanel({
         <JargonText>{order.reason}</JargonText>
       </p>
 
+      {order.liquidity && <LiquidityStrip lq={order.liquidity} />}
+
+
       <PlainEnglishExplanation
         decisionId={decisionId}
         orderIndex={orderIndex}
