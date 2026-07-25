@@ -148,8 +148,12 @@ export async function routeOrdersToBroker(params: {
     | null;
   const portfolioCurrency = pfRowData?.currency?.toUpperCase() ?? "GBP";
   const fxEnabled = pfRowData?.fx_enabled === true;
+  // Default to "spot" so every planned FX leg is placed at the broker
+  // before the dependent buy is submitted. Only the explicit
+  // fx_execution_mode='synthetic' opt-out keeps the wallet-only path.
   const fxExecutionMode: "synthetic" | "spot" =
-    pfRowData?.fx_execution_mode === "spot" ? "spot" : "synthetic";
+    pfRowData?.fx_execution_mode === "synthetic" ? "synthetic" : "spot";
+
 
 
   let fxRate = 1;
