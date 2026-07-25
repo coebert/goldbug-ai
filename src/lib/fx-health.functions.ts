@@ -286,6 +286,60 @@ export const getFxHealth = createServerFn({ method: "POST" })
         : null,
     };
 
+    // Cross-currency buy skips: separately count PRE_PLACE_FX_BLOCK (the
+    // fxIsBroken guard — this tick's FX matrix collapsed to identity fallback)
+    // vs PRE_PLACE_FX_CIRCUIT_OPEN (the persistent circuit still open from a
+    // prior fallback). Each row is one tick where 1+ buys were skipped;
+    // request.count carries how many routable orders that covered.
+    const sq = await context.supabase
+      .from("live_broker_log")
+      .select("created_at, method, path, request, error")
+      .eq("portfolio_id", data.portfolioId)
+      .in("method", ["PRE_PLACE_FX_BLOCK", "PRE_PLACE_FX_CIRCUIT_OPEN"])
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const skipRows = sq.error ? [] : (sq.data ?? []);
+
+    type SkipEvent = {
+      method: "PRE_PLACE_FX_BLOCK" | "PRE_PLACE_FX_CIRCUIT_OPEN";
+      at: string;
+      pair: string | null;
+      orderCount: number;
+      reason: string | null;
+    };
+    const skipEvents: SkipEvent[] = skipRows.map((r) => {
+      const path = (r.path as string | null) ?? "";
+      const m = /\/fx\/([A-Z]{3}->[A-Z]{3})/.exec(path);
+      const req = (r.request ?? {}) as { count?: number };
+      return {
+        method: r.method as SkipEvent["method"],
+        at: r.created_at as string,
+        pair: m?.[1] ?? null,
+        orderCount: typeof req.count === "number" ? req.count : 0,
+        reason: (r.error as string | null) ?? null,
+      };
+    });
+    const skipCounters = {
+      fxBroken: {
+        events: skipEvents.filter((e) => e.method === "PRE_PLACE_FX_BLOCK").length,
+        orders: skipEvents
+          .filter((e) => e.method === "PRE_PLACE_FX_BLOCK")
+          .reduce((n, e) => n + e.orderCount, 0),
+        lastAt:
+          skipEvents.find((e) => e.method === "PRE_PLACE_FX_BLOCK")?.at ?? null,
+      },
+      circuit: {
+        events: skipEvents.filter((e) => e.method === "PRE_PLACE_FX_CIRCUIT_OPEN").length,
+        orders: skipEvents
+          .filter((e) => e.method === "PRE_PLACE_FX_CIRCUIT_OPEN")
+          .reduce((n, e) => n + e.orderCount, 0),
+        lastAt:
+          skipEvents.find((e) => e.method === "PRE_PLACE_FX_CIRCUIT_OPEN")?.at ?? null,
+      },
+      recent: skipEvents.slice(0, 10),
+    };
+
     return {
       overall,
       windowHours: data.sinceHours,
@@ -295,5 +349,6 @@ export const getFxHealth = createServerFn({ method: "POST" })
       pairTimelines,
       availability,
       circuit,
+      skipCounters,
     };
   });
