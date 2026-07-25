@@ -3,13 +3,31 @@
 // placing orders — how each pending buy is allowed, funded via an FX leg, or
 // skipped. Read-only preview.
 
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Wallet, ArrowRight, AlertTriangle, Info } from "lucide-react";
+import {
+  Wallet,
+  ArrowRight,
+  AlertTriangle,
+  Info,
+  Settings2,
+  BellRing,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { getWalletAffordability } from "@/lib/wallet-affordability.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -34,6 +52,43 @@ const fmtN = (n: number, dp = 2) =>
     minimumFractionDigits: dp,
     maximumFractionDigits: dp,
   });
+
+type DriftSettings = {
+  enabled: boolean;
+  /** Absolute drift threshold in base currency. */
+  absBase: number;
+  /** Relative drift threshold as a fraction of current_cash (0.01 = 1%). */
+  pct: number;
+  /** Suppress toast when the same signed bucket has already been alerted. */
+  notify: boolean;
+};
+
+const DEFAULT_DRIFT: DriftSettings = {
+  enabled: true,
+  absBase: 25,
+  pct: 0.01,
+  notify: true,
+};
+
+const driftKey = (portfolioId: string) => `wallet-drift-alert:${portfolioId}`;
+
+function loadDriftSettings(portfolioId: string): DriftSettings {
+  if (typeof window === "undefined") return DEFAULT_DRIFT;
+  try {
+    const raw = window.localStorage.getItem(driftKey(portfolioId));
+    if (!raw) return DEFAULT_DRIFT;
+    const parsed = JSON.parse(raw) as Partial<DriftSettings>;
+    return {
+      enabled: parsed.enabled ?? DEFAULT_DRIFT.enabled,
+      absBase: Number.isFinite(parsed.absBase) ? Number(parsed.absBase) : DEFAULT_DRIFT.absBase,
+      pct: Number.isFinite(parsed.pct) ? Number(parsed.pct) : DEFAULT_DRIFT.pct,
+      notify: parsed.notify ?? DEFAULT_DRIFT.notify,
+    };
+  } catch {
+    return DEFAULT_DRIFT;
+  }
+}
+
 
 export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
   const fetchFn = useServerFn(getWalletAffordability);
