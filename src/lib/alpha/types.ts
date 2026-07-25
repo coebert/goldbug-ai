@@ -25,7 +25,7 @@ export type FeatureLike = {
   weekly_rsi14: number | null;
   news_score: number | null;
   news_contributors: number;
-  news_momentum: { slope?: number | null } | null;
+  news_momentum: unknown | null;
   cooling: boolean;
   rank_info: { percentile?: number | null } | null;
 };
