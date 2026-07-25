@@ -1,0 +1,52 @@
+// Shared types for the systematic-alpha layer.
+// Each model consumes the same FeatureLike shape produced by
+// buildCandidateFeatures() in trading-engine.server.ts and returns a
+// bounded [-1, 1] score plus a short human-readable rationale.
+
+export type FeatureLike = {
+  symbol: string;
+  name: string;
+  asset_class: string;
+  price: number;
+  sma20: number | null;
+  sma50: number | null;
+  rsi14: number | null;
+  change5d: number | null;
+  change30d: number | null;
+  vol20d: number | null;
+  macd_hist: number | null;
+  macd_bull_cross: boolean;
+  macd_bear_cross: boolean;
+  bb_width: number | null;
+  atr_pct: number | null;
+  adv_20d: number | null;
+  vw_momentum_10d: number | null;
+  weekly_trend_up: boolean;
+  weekly_rsi14: number | null;
+  news_score: number | null;
+  news_contributors: number;
+  news_momentum: unknown | null;
+  cooling: boolean;
+  rank_info: { percentile?: number | null } | null;
+};
+
+export type AlphaModelKind = "trend" | "mean_reversion" | "quality" | "carry";
+
+export type AlphaScore = {
+  symbol: string;
+  kind: AlphaModelKind;
+  score: number; // bounded [-1, 1]; positive = long bias, negative = avoid/short
+  reason: string;
+};
+
+export type CompositeScore = {
+  symbol: string;
+  composite: number; // bounded [-1, 1]
+  perModel: Partial<Record<AlphaModelKind, number>>;
+  top_driver: AlphaModelKind | null;
+  reason: string;
+};
+
+// Clamp helper — all models must return values in [-1, 1].
+export const clamp1 = (x: number): number =>
+  Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
