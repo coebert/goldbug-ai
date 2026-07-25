@@ -1841,6 +1841,8 @@ function DecisionCard({
                 guardrails={guardrails}
                 currency={currency}
                 weights={weightsByKey.get(`${o.symbol.toUpperCase()}:${o.side}`)}
+                conviction={convictionByKey.get(`${o.symbol.toUpperCase()}:${o.side}`) ?? null}
+                regime={regime}
               />
             ))}
 
