@@ -224,36 +224,38 @@ function ModeChart({
   const fmt = (v: number) => `${currency}${v.toFixed(0)}`;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Badge variant={badgeTone}>{badgeLabel}</Badge>
-              <CardTitle className="text-base">{title}</CardTitle>
-            </div>
-            <CardDescription className="mt-1">{description}</CardDescription>
-          </div>
+    <SectionCard>
+      <SectionCardHeader
+        badge={<Badge variant={badgeTone}>{badgeLabel}</Badge>}
+        title={title}
+        description={description}
+        action={
           <ToggleGroup
             type="single"
             size="sm"
             value={range}
             onValueChange={(v) => v && setRange(v as Range)}
-            className="shrink-0"
           >
             {RANGE_OPTS.map((r) => (
-              <ToggleGroupItem key={r.value} value={r.value} className="px-2.5 text-xs">
+              <ToggleGroupItem
+                key={r.value}
+                value={r.value}
+                aria-label={`${r.label} range`}
+                className="px-2.5 text-xs"
+              >
                 {r.label}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-        </div>
-      </CardHeader>
-      <CardContent>
+        }
+      />
+      <SectionCardBody>
         {portfolios.length === 0 ? (
-          <div className="flex h-[280px] items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
-            No {badgeLabel === "REAL" ? "real-money" : "simulated"} portfolios yet.
-          </div>
+          <EmptyState
+            icon={<RefreshCw />}
+            title={`No ${badgeLabel === "REAL" ? "real-money" : "simulated"} portfolios yet`}
+            description="Create one from the dashboard to see its equity curve here."
+          />
         ) : (
           <>
             <div className="mb-3">
