@@ -377,3 +377,59 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
     </div>
   );
 }
+
+function PairTimelineChart({
+  pair,
+  buckets,
+}: {
+  pair: string;
+  buckets: TimelineBucket[];
+}) {
+  const data = buckets.map((b) => ({
+    ...b,
+    label: new Date(b.hour).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      timeZone: "Europe/London",
+    }),
+  }));
+  const hasAny = data.some((b) => b.total > 0);
+  if (!hasAny) return null;
+  const totalFallback = data.reduce((n, b) => n + b.fallback, 0);
+  return (
+    <div className="mt-2 rounded-md border bg-muted/10 p-1.5">
+      <div className="flex items-center justify-between px-1 pb-1">
+        <div className="text-[11px] font-medium">
+          <span className="font-mono">{pair}</span> hourly health
+        </div>
+        {totalFallback > 0 && (
+          <span className="text-[10px] font-medium text-destructive">
+            {totalFallback} identity-fallback{totalFallback === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+      <div className="h-20 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 2, right: 6, left: -24, bottom: 0 }}>
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 9 }}
+              interval="preserveStartEnd"
+            />
+            <YAxis tick={{ fontSize: 9 }} allowDecimals={false} width={20} />
+            <Tooltip
+              contentStyle={{ fontSize: 11 }}
+              labelFormatter={(_, payload) => {
+                const iso = payload?.[0]?.payload?.hour as string | undefined;
+                return iso ? formatUkTime(iso) : "";
+              }}
+            />
+            <Bar dataKey="ok" name="Live" stackId="s" fill="hsl(var(--chart-2, 142 71% 45%))" />
+            <Bar dataKey="cache" name="Cache" stackId="s" fill="hsl(var(--muted-foreground))" />
+            <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
+            <Bar dataKey="fallback" name="Fallback" stackId="s" fill="hsl(var(--destructive))" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
