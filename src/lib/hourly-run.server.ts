@@ -130,7 +130,7 @@ async function runHourlyCycleInner(
 
     const { data: allPortfolios, error } = await supabaseAdmin
       .from("portfolios")
-      .select("id, name, universe, mode, live_paused")
+      .select("id, name, user_id, universe, mode, live_paused")
       .in("mode", ["paper", "live_sim", "live_prod"]);
 
     if (error) throw new Error(error.message);
@@ -212,6 +212,35 @@ async function runHourlyCycleInner(
         const r = await runDailyTick(p.id, today);
         bumpPortfolio("ok");
         results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
+
+        // Post-tick order-status reconciliation for live portfolios.
+        // Without this, orders written as `submitted` at POST time never
+        // transition to `filled` in our DB — the market-order fills that
+        // Saxo executed simply vanish from `/port/v1/orders/me` and no
+        // subsequent local update happens. Runs best-effort; a failure
+        // here must not fail the tick.
+        if ((p.mode === "live_sim" || p.mode === "live_prod") && p.user_id) {
+          try {
+            const env = p.mode === "live_prod" ? "live" : "sim";
+            const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
+            const { reconcileOrderStatusesForPortfolio } = await import(
+              "@/lib/order-reconciliation.server"
+            );
+            const adapter = await buildSaxoAdapter({
+              userId: p.user_id as string,
+              portfolioId: p.id,
+              envOverride: env,
+            });
+            await reconcileOrderStatusesForPortfolio({
+              portfolioId: p.id,
+              userId: p.user_id as string,
+              adapter,
+              lookbackHours: 72,
+            });
+          } catch (e) {
+            console.warn("hourly-run: order reconcile failed", p.id, e);
+          }
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
