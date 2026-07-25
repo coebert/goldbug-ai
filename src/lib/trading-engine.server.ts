@@ -257,6 +257,8 @@ export async function callAiForDecision(args: {
   variantSuffix?: string | null;
   fxSystemBlock?: string | null;
   fxUserBlock?: string | null;
+  alphaPriors?: string | null;
+
 }): Promise<DecisionOutput> {
 
   const key = process.env.LOVABLE_API_KEY;
@@ -331,6 +333,7 @@ ${args.attribution ?? ""}
 ${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
 ${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
+${args.alphaPriors ?? ""}
 
 ${HISTORICAL_PLAYBOOK}
 
