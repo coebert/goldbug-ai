@@ -14,7 +14,7 @@
 import { sma, rsi, dailyVolatility, type Candle } from "./market-data.server";
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { classifyCommoditySymbol, type CommodityGroup } from "./commodity-groups";
-import { riskProfile, type RiskConfig } from "./universe.server";
+import { riskProfile, effectiveCashFloorPct, type RiskConfig } from "./universe.server";
 import type { Database } from "@/integrations/supabase/types";
 
 export type CommodityBacktestSymbol = {
@@ -169,7 +169,7 @@ export function runCommodityRejectionBacktest(
 
   const perSymCap = rc.per_symbol_limit_pct ?? rp.maxPositionPct;
   const commodityClassCap = rc.asset_class_limits.commodity ?? 1;
-  const cashFloorPct = rp.cashFloorPct;
+  const cashFloorPct = effectiveCashFloorPct(rc, opts.riskLevel);
   const minAdvUsd = rc.commodity_min_adv_usd;
   const maxAtr = rc.commodity_max_atr_pct;
 

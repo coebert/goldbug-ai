@@ -75,6 +75,7 @@ import {
   findSymbol,
   riskProfile,
   parseRiskConfig,
+  effectiveCashFloorPct,
   type UniverseSymbol,
 } from "./universe.server";
 import {
@@ -317,7 +318,7 @@ HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
 - Cash balance must never go negative.
 - No single position may exceed ${(perSymbolCap * 100).toFixed(0)}% of portfolio value.
-- Keep at least ${(risk.cashFloorPct * 100).toFixed(0)}% of portfolio value in cash.
+- Keep at least ${(effectiveCashFloorPct(cfg, args.portfolio.risk_level) * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
 - Asset-class exposure caps: ${classLimitsStr}.
 - Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
@@ -686,7 +687,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   };
   const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
   const cfg = tightened.cfg;
-  const cashFloor = totalValue * risk.cashFloorPct;
+  const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
+  const cashFloor = totalValue * cashFloorPctEff;
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
   const maxPosVal = totalValue * basePerSymbolPct;
 
@@ -1926,7 +1928,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       guardrails: {
         risk_level: portfolio.risk_level,
         max_position_pct: basePerSymbolPct,
-        cash_floor_pct: risk.cashFloorPct,
+        cash_floor_pct: cashFloorPctEff,
         max_new_positions_per_day: risk.maxNewPositionsPerDay,
         cash_floor_value: cashFloor,
         max_position_value: maxPosVal,

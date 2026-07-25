@@ -9,7 +9,7 @@
 // equal-weight universe portfolio) and slices metrics per historical regime.
 
 import { getDailyCandlesRange, sma, rsi, pctChange, dailyVolatility } from "./market-data.server";
-import { riskProfile, parseRiskConfig, type RiskConfig } from "./universe.server";
+import { riskProfile, parseRiskConfig, effectiveCashFloorPct, type RiskConfig } from "./universe.server";
 import type { Database } from "@/integrations/supabase/types";
 
 type AssetClass = Database["public"]["Enums"]["asset_class"];
@@ -391,7 +391,7 @@ export async function runLongHorizonBacktest(opts: {
       const picks = scored.slice(0, topK);
 
       const totalValue = valuePortfolio(day);
-      const cashFloor = totalValue * rp.cashFloorPct;
+      const cashFloor = totalValue * effectiveCashFloorPct(rc, opts.riskLevel);
       const investable = Math.max(0, totalValue - cashFloor);
 
       // Base target weight = equal-weight across picks, capped by per-symbol,
