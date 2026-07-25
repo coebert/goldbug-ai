@@ -362,6 +362,13 @@ export function runCommodityRejectionBacktest(
     rejectionCounts: v.counts,
   }));
 
+  const pct = (arr: number[], q: number): number => {
+    if (arr.length === 0) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const i = Math.min(s.length - 1, Math.max(0, Math.floor(q * (s.length - 1))));
+    return s[i];
+  };
+
   return {
     from: opts.from,
     to: opts.to,
@@ -375,8 +382,122 @@ export function runCommodityRejectionBacktest(
     bySymbol,
     byGroup,
     sampleRejections,
+    distributions: {
+      adv: {
+        p10: pct(advSamples, 0.1),
+        p25: pct(advSamples, 0.25),
+        p50: pct(advSamples, 0.5),
+        p75: pct(advSamples, 0.75),
+        n: advSamples.length,
+      },
+      atr: {
+        p25: pct(atrSamples, 0.25),
+        p50: pct(atrSamples, 0.5),
+        p75: pct(atrSamples, 0.75),
+        p90: pct(atrSamples, 0.9),
+        n: atrSamples.length,
+      },
+    },
+    currentThresholds: { min_adv_usd: minAdvUsd, max_atr_pct: maxAtr },
   };
 }
+
+// -----------------------------------------------------------------------
+// One-click threshold suggester. Uses the rejection mix + proposal-metric
+// distributions from a completed report to recommend new liquidity/ATR
+// thresholds. Pure; no I/O.
+// -----------------------------------------------------------------------
+export type CommodityThresholdSuggestion = {
+  min_adv_usd: {
+    current: number;
+    suggested: number;
+    action: "loosen" | "tighten" | "keep";
+    rationale: string;
+  };
+  max_atr_pct: {
+    current: number;
+    suggested: number;
+    action: "loosen" | "tighten" | "keep";
+    rationale: string;
+  };
+  hasChange: boolean;
+};
+
+function roundAdv(v: number): number {
+  if (v <= 0) return 0;
+  const step = v >= 1_000_000 ? 100_000 : 50_000;
+  return Math.max(step, Math.round(v / step) * step);
+}
+function roundAtr(v: number): number {
+  if (v <= 0) return 0;
+  return Math.round(v * 1000) / 1000; // nearest 0.1%
+}
+
+export function suggestCommodityThresholds(
+  report: CommodityBacktestReport,
+): CommodityThresholdSuggestion {
+  const { totalProposals, rejectionCounts, distributions, currentThresholds } = report;
+  const advCur = currentThresholds.min_adv_usd;
+  const atrCur = currentThresholds.max_atr_pct;
+
+  // ADV floor -----------------------------------------------------------
+  let advSuggested = advCur;
+  let advAction: "loosen" | "tighten" | "keep" = "keep";
+  let advRationale = "Rejection mix is balanced; keep current floor.";
+  const advRejRate = totalProposals > 0 ? rejectionCounts.illiquid_adv / totalProposals : 0;
+  if (totalProposals >= 20 && advRejRate >= 0.15 && distributions.adv.n > 0) {
+    // Too many illiquid rejections — drop floor toward the 25th percentile
+    // of observed ADVs, but never more than half of current.
+    const target = roundAdv(Math.max(distributions.adv.p10, advCur * 0.5));
+    if (target < advCur) {
+      advSuggested = target;
+      advAction = "loosen";
+      advRationale = `${(advRejRate * 100).toFixed(0)}% of proposals rejected as illiquid; lowering to p10 of observed ADV.`;
+    }
+  } else if (totalProposals >= 20 && advRejRate <= 0.02 && distributions.adv.n > 0) {
+    // Very few illiquid rejections — tighten floor toward p25 to avoid
+    // marginal names sneaking in.
+    const target = roundAdv(Math.max(advCur, distributions.adv.p25));
+    if (target > advCur) {
+      advSuggested = target;
+      advAction = "tighten";
+      advRationale = `Only ${(advRejRate * 100).toFixed(1)}% illiquid rejections; raising floor to p25 of observed ADV.`;
+    }
+  }
+
+  // ATR cap -------------------------------------------------------------
+  let atrSuggested = atrCur;
+  let atrAction: "loosen" | "tighten" | "keep" = "keep";
+  let atrRationale = "Rejection mix is balanced; keep current cap.";
+  const atrRejRate = totalProposals > 0 ? rejectionCounts.excess_atr / totalProposals : 0;
+  if (totalProposals >= 20 && atrRejRate >= 0.15 && distributions.atr.n > 0) {
+    // Too many volatile-name rejections — raise cap toward p90 of observed
+    // ATR to accept typical commodity vol.
+    const target = roundAtr(Math.max(atrCur, distributions.atr.p90));
+    if (target > atrCur) {
+      atrSuggested = target;
+      atrAction = "loosen";
+      atrRationale = `${(atrRejRate * 100).toFixed(0)}% of proposals rejected on ATR; raising cap to p90 of observed ATR.`;
+    }
+  } else if (totalProposals >= 20 && atrRejRate <= 0.02 && distributions.atr.n > 0) {
+    // Very few ATR rejections — tighten cap toward p75 to filter out
+    // unusually volatile bars.
+    const target = roundAtr(Math.min(atrCur, Math.max(distributions.atr.p75, 0.005)));
+    if (target < atrCur && target > 0) {
+      atrSuggested = target;
+      atrAction = "tighten";
+      atrRationale = `Only ${(atrRejRate * 100).toFixed(1)}% ATR rejections; lowering cap to p75 of observed ATR.`;
+    }
+  }
+
+  const hasChange = advSuggested !== advCur || atrSuggested !== atrCur;
+  return {
+    min_adv_usd: { current: advCur, suggested: advSuggested, action: advAction, rationale: advRationale },
+    max_atr_pct: { current: atrCur, suggested: atrSuggested, action: atrAction, rationale: atrRationale },
+    hasChange,
+  };
+}
+
 
 // Default replay universe: one representative liquid ETC per group covered
 // by the request (gold, silver, oil, gas, copper).
