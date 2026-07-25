@@ -1928,7 +1928,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       guardrails: {
         risk_level: portfolio.risk_level,
         max_position_pct: basePerSymbolPct,
-        cash_floor_pct: risk.cashFloorPct,
+        cash_floor_pct: cashFloorPctEff,
         max_new_positions_per_day: risk.maxNewPositionsPerDay,
         cash_floor_value: cashFloor,
         max_position_value: maxPosVal,
