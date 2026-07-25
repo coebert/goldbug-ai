@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
@@ -685,6 +686,7 @@ function PortfolioPage() {
               </TabsList>
 
               <TabsContent value="overview" className="mt-4">
+            <RiskHaltBanner portfolioId={id} className="mb-4" />
             <Card className="mb-6">
               <CardContent className="flex flex-wrap items-center gap-3 py-4">
                 <UITooltipProvider delayDuration={100}>
