@@ -99,6 +99,11 @@ import {
 } from "./exits";
 import { scoreUniverse, formatAlphaPriorsForPrompt } from "./alpha";
 import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
+import {
+  planOrderSlices,
+  todExecutionAdjustment,
+  inferVenueFromSymbol,
+} from "./alpha/execution-alpha";
 import type { Database } from "@/integrations/supabase/types";
 
 
@@ -232,6 +237,9 @@ export type ExecutedTrade = {
   // Sizing telemetry — populated for commodity trades so the decision/executed
   // rows expose the same slippage/liquidity numbers the sizer used.
   liquidity?: import("./commodity-liquidity-metrics").CommodityTradeLiquidity;
+  // Phase 6 — execution alpha telemetry.
+  slice_plan?: { childCount: number; childNotional: number; advParticipationPct: number | null; reason: string };
+  tod?: { multiplier: number; allow: boolean; reason: string };
 };
 
 export async function callAiForDecision(args: {
