@@ -755,6 +755,62 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Feature lookup for later use (volatility sizing, asset class)
   const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
 
+  // Phase 6 — execution-alpha helper for sells. Mirrors the buy-path wiring
+  // (TOD haircut/hard-block + slice plan) so protective and discretionary
+  // sells surface the same telemetry and respect the same auction windows.
+  // `protective=true` skips the TOD gate so stop-losses / event-blackout
+  // liquidations can always fire; slicing still applies for the audit trail.
+  const applyExecAlphaSell = (
+    symbol: string,
+    notional: number,
+    fillPrice: number,
+    opts: { protective?: boolean } = {},
+  ): {
+    allow: boolean;
+    adjNotional: number;
+    tod?: { multiplier: number; allow: boolean; reason: string };
+    slicePlan?: { childCount: number; childNotional: number; advParticipationPct: number | null; reason: string };
+  } => {
+    let adjNotional = notional;
+    let tod: { multiplier: number; allow: boolean; reason: string } | undefined;
+    if (cfg.tod_filter_enabled && !opts.protective) {
+      const venue = inferVenueFromSymbol(symbol);
+      tod = todExecutionAdjustment({
+        venue,
+        avoidOpenMin: cfg.tod_avoid_open_min,
+        avoidCloseMin: cfg.tod_avoid_close_min,
+        openHaircut: cfg.tod_open_haircut,
+        closeHaircut: cfg.tod_close_haircut,
+        hardBlockOpenMin: cfg.tod_hard_block_open_min,
+        hardBlockCloseMin: cfg.tod_hard_block_close_min,
+      });
+      if (!tod.allow) return { allow: false, adjNotional: 0, tod };
+      if (tod.multiplier < 1) adjNotional = adjNotional * tod.multiplier;
+    }
+    const slicePlan = cfg.execution_slicing_enabled && adjNotional > 0
+      ? planOrderSlices({
+          parentNotional: adjNotional,
+          price: fillPrice,
+          adv20d: featureBySymbol.get(symbol)?.adv_20d ?? null,
+          participationCap: cfg.execution_participation_cap,
+          maxChildNotional: cfg.execution_max_child_notional,
+        })
+      : undefined;
+    return {
+      allow: true,
+      adjNotional,
+      tod,
+      slicePlan: slicePlan
+        ? {
+            childCount: slicePlan.childCount,
+            childNotional: slicePlan.childNotional,
+            advParticipationPct: slicePlan.advParticipationPct,
+            reason: slicePlan.reason,
+          }
+        : undefined,
+    };
+  };
+
 
   let workingCash = cash;
   const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
