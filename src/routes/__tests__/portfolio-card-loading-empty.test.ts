@@ -29,7 +29,7 @@ describe("portfolio card — dedicated loading/empty rendering", () => {
     // Skeleton branch is gated on equityLoading — same flag as the
     // headline skeleton — so the two cannot render out of phase.
     expect(SOURCE).toMatch(
-      /\{equityLoading \? \(\s*<Skeleton\s+variant="shimmer"\s+data-testid="range-pct-skeleton"/,
+      /[{:]\s*equityLoading \? \(\s*<Skeleton\s+variant="shimmer"\s+data-testid="range-pct-skeleton"/,
     );
   });
 
@@ -56,7 +56,7 @@ describe("portfolio card — dedicated loading/empty rendering", () => {
     // condition (e.g. `isLoadingEquity && !sparkSeries.length`) that
     // could disagree with the % pill's condition.
     expect(SOURCE).toMatch(
-      /\{equityLoading \? \(\s*<div[\s\S]{0,400}data-testid="total-equity-loading"[\s\S]{0,600}data-testid="total-equity-skeleton"/,
+      /[{:]\s*equityLoading \? \(\s*<div[\s\S]{0,400}data-testid="total-equity-loading"[\s\S]{0,600}data-testid="total-equity-skeleton"/,
     );
   });
 
