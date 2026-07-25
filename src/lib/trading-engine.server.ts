@@ -450,7 +450,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       portfolio_value: null,
       raw: asJson({ orders: [], executed: [], reconciliation_failed: true, reason: cashSyncFailure }),
     });
-    return { skipped: true, reason: "cash-reconcile-failed", detail: cashSyncFailure };
+    return {
+      decision: { briefing, rationale, orders: [] as unknown[] },
+      executed: [] as unknown[],
+      totalValue: 0,
+      cash: 0,
+      routedOrders: null as unknown,
+      skipped: true as const,
+      skippedReason: "cash-reconcile-failed",
+      skippedDetail: cashSyncFailure,
+    };
   }
 
   const { data: portfolio, error: pErr } = await supabaseAdmin
