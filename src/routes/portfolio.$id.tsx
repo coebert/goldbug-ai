@@ -51,6 +51,10 @@ const TradeAuditLogCard = lazy(() =>
 const ConfidenceTimelineCard = lazy(() =>
   import("@/components/confidence-timeline-card").then((m) => ({ default: m.ConfidenceTimelineCard })),
 );
+const TradeErrorDashboardCard = lazy(() =>
+  import("@/components/trade-error-dashboard-card").then((m) => ({ default: m.TradeErrorDashboardCard })),
+);
+
 
 
 
@@ -115,8 +119,9 @@ import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 
 
-type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "confidence" | "risk" | "diagnostics" | "reports";
-const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "audit", "confidence", "risk", "diagnostics", "reports"];
+type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "errors" | "confidence" | "risk" | "diagnostics" | "reports";
+const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "audit", "errors", "confidence", "risk", "diagnostics", "reports"];
+
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
@@ -701,6 +706,8 @@ function PortfolioPage() {
                 <TabsTrigger value="trades" className="min-h-10 shrink-0 snap-start">Trades ({trades.length})</TabsTrigger>
                 <TabsTrigger value="decisions" className="min-h-10 shrink-0 snap-start">Decisions ({decisions.length})</TabsTrigger>
                 <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">Audit</TabsTrigger>
+                <TabsTrigger value="errors" className="min-h-10 shrink-0 snap-start">Errors</TabsTrigger>
+
                 <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">Confidence</TabsTrigger>
                 <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">Risk</TabsTrigger>
                 <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">Diagnostics</TabsTrigger>
@@ -1240,6 +1247,13 @@ function PortfolioPage() {
                   />
                 </Suspense>
               </TabsContent>
+
+              <TabsContent value="errors" className="mt-4">
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
+                </Suspense>
+              </TabsContent>
+
 
               <TabsContent value="confidence" className="mt-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
