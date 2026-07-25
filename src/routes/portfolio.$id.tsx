@@ -1208,7 +1208,11 @@ function PortfolioPage() {
               </TabsContent>
 
               <TabsContent value="audit" className="mt-4">
-                <TradeAuditLogCard decisions={decisions} portfolioName={p.name} />
+                <TradeAuditLogCard
+                  portfolioId={p.id}
+                  portfolioName={p.name}
+                  active={tab === "audit"}
+                />
               </TabsContent>
 
               <TabsContent value="confidence" className="mt-4">
