@@ -78,7 +78,15 @@ export type CommodityBacktestReport = {
     reason: CommodityRejectionReason;
     detail: string;
   }>;
+  // Distribution summaries used to derive one-click suggestions.
+  distributions: {
+    adv: { p10: number; p25: number; p50: number; p75: number; n: number };
+    atr: { p25: number; p50: number; p75: number; p90: number; n: number };
+  };
+  // Current thresholds echoed back so the UI can show before/after.
+  currentThresholds: { min_adv_usd: number; max_atr_pct: number };
 };
+
 
 const REASONS: CommodityRejectionReason[] = [
   "illiquid_adv",
