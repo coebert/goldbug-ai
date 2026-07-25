@@ -151,41 +151,47 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
               </div>
             )}
             <ul className="space-y-2">
-              {data.pairs.map((p) => (
-                <li key={p.pair} className="rounded-lg border p-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium">{p.pair}</span>
-                      <StatusPill status={p.status} />
+              {data.pairs.map((p) => {
+                const pt = data.pairTimelines?.find((t) => t.pair === p.pair);
+                return (
+                  <li key={p.pair} className="rounded-lg border p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-medium">{p.pair}</span>
+                        <StatusPill status={p.status} />
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        last: {p.lastRate != null ? p.lastRate.toFixed(4) : "?"}{" "}
+                        <Badge variant="outline" className="ml-1 font-mono text-[10px]">
+                          {p.lastSource}
+                        </Badge>
+                        {p.lastAt && (
+                          <span className="ml-2">{formatUkTime(p.lastAt)}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      last: {p.lastRate != null ? p.lastRate.toFixed(4) : "?"}{" "}
-                      <Badge variant="outline" className="ml-1 font-mono text-[10px]">
-                        {p.lastSource}
-                      </Badge>
-                      {p.lastAt && (
-                        <span className="ml-2">{formatUkTime(p.lastAt)}</span>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                      <ProviderChip label="yahoo" n={p.counts.yahoo} good />
+                      <ProviderChip label="frankfurter" n={p.counts.frankfurter} good />
+                      <ProviderChip label="cache" n={p.counts.cache} />
+                      {p.counts["cache-stale"] > 0 && (
+                        <ProviderChip label="cache-stale" n={p.counts["cache-stale"]} warn />
+                      )}
+                      {p.counts.fallback > 0 && (
+                        <ProviderChip label="identity fallback" n={p.counts.fallback} bad />
                       )}
                     </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                    <ProviderChip label="yahoo" n={p.counts.yahoo} good />
-                    <ProviderChip label="frankfurter" n={p.counts.frankfurter} good />
-                    <ProviderChip label="cache" n={p.counts.cache} />
-                    {p.counts["cache-stale"] > 0 && (
-                      <ProviderChip label="cache-stale" n={p.counts["cache-stale"]} warn />
+                    {pt && (
+                      <PairTimelineChart pair={p.pair} buckets={pt.buckets} />
                     )}
-                    {p.counts.fallback > 0 && (
-                      <ProviderChip label="identity fallback" n={p.counts.fallback} bad />
+                    {p.lastError && (
+                      <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
+                        {p.lastError}
+                      </p>
                     )}
-                  </div>
-                  {p.lastError && (
-                    <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
-                      {p.lastError}
-                    </p>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}
