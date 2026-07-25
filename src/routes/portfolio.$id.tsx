@@ -115,8 +115,9 @@ import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 
 
-type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "confidence" | "risk" | "diagnostics" | "reports";
-const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "audit", "confidence", "risk", "diagnostics", "reports"];
+type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "errors" | "confidence" | "risk" | "diagnostics" | "reports";
+const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "audit", "errors", "confidence", "risk", "diagnostics", "reports"];
+
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
