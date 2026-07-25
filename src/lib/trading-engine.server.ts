@@ -802,7 +802,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   }
 
-  const eventList = (args.events ?? []).map((e) => ({
+  const eventList = (events ?? []).map((e: { event_date: string; impact?: string | null; kind?: string | null; symbol?: string | null }) => ({
     event_date: String(e.event_date),
     impact: (e.impact ?? null) as string | null,
     kind: (e.kind ?? null) as string | null,
