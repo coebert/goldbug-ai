@@ -39,7 +39,7 @@ export function maybeNotifyPrecheckCashReject(params: {
   code: string | null;
   message: string | null;
 }) {
-  const userId = userId;
+  const userId = params.userId;
   if (!userId) return;
   if (!isCashReject(params.code, params.message)) return;
 
