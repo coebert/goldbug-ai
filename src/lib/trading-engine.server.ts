@@ -1251,7 +1251,35 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Persist state
 
 
-
+  // ---- AI-proposed FX conversions (book-entry on cash_by_ccy) --------------
+  // Applied after buys/sells so wallet math sees the latest cash. Rejected
+  // rows (bad rate, circuit open, insufficient balance) are logged into the
+  // decision guardrails for later inspection. Never mutates workingCash for
+  // non-base currencies — those live in cash_by_ccy only.
+  let aiFxApplied: Awaited<ReturnType<typeof applyAiFxConversions>> | null = null;
+  const aiFxRequested = decision.fx_conversions ?? [];
+  if (fxContext && aiFxRequested.length > 0) {
+    try {
+      aiFxApplied = await applyAiFxConversions({
+        portfolioId,
+        userId: portfolio.user_id,
+        baseCcy: fxContext.baseCcy,
+        // Start from wallet as it stands at the time of the AI decision.
+        // We don't mutate base cash intra-tick for foreign buys (executor
+        // handles those separately), so this is the right snapshot.
+        wallet: fxContext.wallet,
+        conversions: aiFxRequested,
+        fxContext,
+        buyHalts: halts.blockBuys,
+        persist: !breakerTripped,
+      });
+      // Reflect base-ccy delta into workingCash so the persisted current_cash
+      // and equity snapshot stay consistent with the wallet update above.
+      workingCash += aiFxApplied.baseCashDelta;
+    } catch (e) {
+      console.warn("ai-fx apply failed", e);
+    }
+  }
 
   const admin = supabaseAdmin;
   const executedAt = new Date().toISOString();
