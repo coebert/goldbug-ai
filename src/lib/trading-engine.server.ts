@@ -694,6 +694,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     return null;
   });
 
+  // Alpha priors: composite scores per symbol, blended by regime. We hoist
+  // these out of the AI-decision IIFE so the sizing pipeline can also
+  // reference them (Phase 2 bonus + Phase 5 risk parity).
+  const alphaScores = scoreUniverse(
+    features as unknown as Parameters<typeof scoreUniverse>[0],
+    effectiveRegime.regime,
+  );
+  const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
+  const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
+
   // If circuit breaker is tripped, skip the AI call entirely.
   const decision: DecisionOutput = breakerTripped
     ? {
@@ -701,10 +711,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
         orders: [],
       }
-    : await (async () => {
-        const alphaScores = scoreUniverse(features as unknown as Parameters<typeof scoreUniverse>[0], effectiveRegime.regime);
-        const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
-        return callAiForDecision({
+    : await callAiForDecision({
         portfolio,
         holdings: holdings ?? [],
         cashValue: cash,
@@ -734,7 +741,6 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
       });
-      })();
 
 
 
