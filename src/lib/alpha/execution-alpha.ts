@@ -92,7 +92,9 @@ export function inferVenueFromSymbol(symbol: string): Venue {
   return "OTHER";
 }
 
-// Session windows in minutes-since-midnight, local venue timezone.
+// Session windows in minutes-since-midnight, local venue timezone. These are
+// the defaults; per-venue overrides via `resolveVenueTodConfig` can widen or
+// narrow them at runtime.
 const SESSIONS: Record<Venue, { openMin: number; closeMin: number } | null> = {
   LSE: { openMin: 8 * 60, closeMin: 16 * 60 + 30 },
   NYSE: { openMin: 9 * 60 + 30, closeMin: 16 * 60 },
@@ -125,6 +127,70 @@ export type TodAdjustment = {
   reason: string;
 };
 
+// ---------------------------------------------------------------------------
+// Per-venue TOD configuration
+// ---------------------------------------------------------------------------
+// Each venue can override any subset of the TOD knobs (auction windows,
+// haircuts, hard-block minutes) AND the session open/close bounds themselves —
+// useful when a venue publishes an early close (e.g. LSE 12:30 close on
+// Christmas Eve) or when a shadow session should be treated as tradable.
+// Missing fields fall through to the global RiskConfig defaults.
+
+export type TodVenueOverride = {
+  avoidOpenMin?: number;
+  avoidCloseMin?: number;
+  openHaircut?: number;
+  closeHaircut?: number;
+  hardBlockOpenMin?: number;
+  hardBlockCloseMin?: number;
+  sessionOpenMin?: number;
+  sessionCloseMin?: number;
+};
+
+export type TodVenueOverrides = Partial<Record<Venue, TodVenueOverride>>;
+
+export type ResolvedVenueTodConfig = {
+  avoidOpenMin: number;
+  avoidCloseMin: number;
+  openHaircut: number;
+  closeHaircut: number;
+  hardBlockOpenMin: number;
+  hardBlockCloseMin: number;
+  sessionOpenMin?: number;
+  sessionCloseMin?: number;
+};
+
+/**
+ * Merge the venue-specific override (if any) on top of the global defaults so
+ * callers get a single flat object to feed into `todExecutionAdjustment`.
+ * Pure — safe to call per symbol per tick.
+ */
+export function resolveVenueTodConfig(
+  defaults: {
+    avoidOpenMin: number;
+    avoidCloseMin: number;
+    openHaircut: number;
+    closeHaircut: number;
+    hardBlockOpenMin: number;
+    hardBlockCloseMin: number;
+  },
+  venue: Venue,
+  overrides?: TodVenueOverrides | null,
+): ResolvedVenueTodConfig {
+  const o = overrides?.[venue];
+  if (!o) return { ...defaults };
+  return {
+    avoidOpenMin: o.avoidOpenMin ?? defaults.avoidOpenMin,
+    avoidCloseMin: o.avoidCloseMin ?? defaults.avoidCloseMin,
+    openHaircut: o.openHaircut ?? defaults.openHaircut,
+    closeHaircut: o.closeHaircut ?? defaults.closeHaircut,
+    hardBlockOpenMin: o.hardBlockOpenMin ?? defaults.hardBlockOpenMin,
+    hardBlockCloseMin: o.hardBlockCloseMin ?? defaults.hardBlockCloseMin,
+    sessionOpenMin: o.sessionOpenMin,
+    sessionCloseMin: o.sessionCloseMin,
+  };
+}
+
 export function todExecutionAdjustment(args: {
   now?: Date;
   venue: Venue;
@@ -134,6 +200,9 @@ export function todExecutionAdjustment(args: {
   closeHaircut?: number;
   hardBlockOpenMin?: number; // if set, buys are fully blocked in first N minutes
   hardBlockCloseMin?: number;
+  // Optional per-venue session overrides. When absent, fall back to SESSIONS.
+  sessionOpenMin?: number;
+  sessionCloseMin?: number;
 }): TodAdjustment {
   const {
     now = new Date(),
@@ -144,8 +213,14 @@ export function todExecutionAdjustment(args: {
     closeHaircut = 0.4,
     hardBlockOpenMin = 0,
     hardBlockCloseMin = 0,
+    sessionOpenMin,
+    sessionCloseMin,
   } = args;
-  const session = SESSIONS[venue];
+  const defaultSession = SESSIONS[venue];
+  const session =
+    sessionOpenMin != null && sessionCloseMin != null
+      ? { openMin: sessionOpenMin, closeMin: sessionCloseMin }
+      : defaultSession;
   const minute = venueMinuteOfDay(now, venue);
   if (!session || minute == null) {
     return { multiplier: 1, allow: true, reason: "no-session (24/7 or unknown venue)" };
@@ -171,3 +246,4 @@ export function todExecutionAdjustment(args: {
   }
   return { multiplier: 1, allow: true, reason: "mid-session" };
 }
+
