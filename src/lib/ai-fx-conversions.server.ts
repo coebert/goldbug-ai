@@ -246,6 +246,7 @@ export interface ApplyFxResult {
  */
 export async function applyAiFxConversions(args: {
   portfolioId: string;
+  userId: string;
   baseCcy: string;
   wallet: Wallet;
   conversions: FxConversionOrder[];
@@ -353,7 +354,7 @@ export async function applyAiFxConversions(args: {
         if (a.rejected) continue;
         await supabaseAdmin.from("live_broker_log").insert({
           portfolio_id: args.portfolioId,
-          user_id: null,
+          user_id: args.userId,
           broker: "internal",
           env: "sim",
           method: "FX_CONVERT_AI_WALLET",
