@@ -822,6 +822,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       grp,
       (commodityGroupExposure.get(grp) ?? 0) + price * Number(h.quantity),
     );
+  }
+
+
 
   // Build correlation map covering current holdings + candidate buys
   const buySymbols = decision.orders
