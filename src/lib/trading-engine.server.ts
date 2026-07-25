@@ -1176,13 +1176,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           price,
           value: 0,
           reason: order.reason,
-          rejected: classRejected
-            ? `asset-class cap reached for ${meta.asset_class}`
-            : corrCapped
-              ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
-              : volCapped
-                ? "volatility sizing leaves no room"
-                : "guardrails leave no room to buy",
+          rejected: commodityGroupRejected
+            ? commodityGroupRejected
+            : classRejected
+              ? `asset-class cap reached for ${meta.asset_class}`
+              : corrCapped
+                ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
+                : volCapped
+                  ? "volatility sizing leaves no room"
+                  : "guardrails leave no room to buy",
         });
         continue;
       }
