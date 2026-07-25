@@ -199,6 +199,10 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   reentry_atr_days_mult: 0.05,
   reentry_min_days: 5,
   reentry_max_days: 30,
+  alpha_bonus_enabled: true,
+  alpha_bonus_cap: 1.5,
+  risk_parity_enabled: false,
+  risk_parity_nav_cap: 0.2,
 };
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
