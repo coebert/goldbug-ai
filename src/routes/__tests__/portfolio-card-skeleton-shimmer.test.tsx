@@ -46,14 +46,20 @@ describe("Skeleton shimmer + headline typography contract", () => {
     // stack has the same line-count as the loaded render.
     const shimmerCount = (block.match(/variant="shimmer"/g) ?? []).length;
     expect(shimmerCount).toBe(3);
-    // ARIA loading semantics.
-    expect(block).toMatch(/role="status"/);
-    expect(block).toMatch(/aria-busy="true"/);
+    // Headline skeleton: h-8 (matches text-2xl leading-tight ≈ 1.875rem).
+    expect(block).toMatch(/data-testid="total-equity-skeleton"[\s\S]*?h-8/);
+    // ARIA loading semantics live on the enclosing container.
+    const container = routeSrc.match(
+      /<div\b[^>]*data-testid="total-equity-loading"[^>]*>/,
+    );
+    expect(container).toBeTruthy();
+    expect(container![0]).toMatch(/role="status"/);
+    expect(container![0]).toMatch(/aria-busy="true"/);
   });
 
   it("range-pct skeleton uses shimmer + h-5 to match the pct pill's text-sm box", () => {
     const branch = routeSrc.match(
-      /data-testid="range-pct-skeleton"[\s\S]*?\/>/,
+      /<Skeleton\b[\s\S]*?data-testid="range-pct-skeleton"[\s\S]*?\/>/,
     );
     expect(branch).toBeTruthy();
     expect(branch![0]).toMatch(/variant="shimmer"/);
