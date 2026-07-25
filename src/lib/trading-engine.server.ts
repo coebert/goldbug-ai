@@ -66,6 +66,7 @@ import {
   tightenForRegime,
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
+import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
   filterUniverse,
@@ -219,6 +220,9 @@ export type ExecutedTrade = {
   value: number;
   reason: string;
   rejected?: string;
+  // Sizing telemetry — populated for commodity trades so the decision/executed
+  // rows expose the same slippage/liquidity numbers the sizer used.
+  liquidity?: import("./commodity-liquidity-metrics").CommodityTradeLiquidity;
 };
 
 export async function callAiForDecision(args: {
@@ -986,11 +990,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         // symbol quality rather than portfolio composition.
         const cfeat = featureBySymbol.get(meta.symbol);
         const advUsd = (cfeat?.adv_20d ?? 0) * price;
+        // Sizing telemetry attached to this candidate — populated regardless of
+        // whether the buy is allowed, so the UI can explain the rejection.
+        const commodityLiquidity = meta.asset_class === "commodity"
+          ? computeCommodityTradeLiquidity({
+              requestedSpend: Math.max(0, workingCash - cashFloor) * pct,
+              price,
+              atrPct: cfeat?.atr_pct ?? null,
+              adv20d: cfeat?.adv_20d ?? null,
+              liquidityCappedSpend: null,
+            })
+          : undefined;
         if (cfg.commodity_min_adv_usd > 0 && advUsd > 0 && advUsd < cfg.commodity_min_adv_usd) {
           executed.push({
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
             reason: order.reason,
             rejected: `commodity ${meta.symbol} blocked: 20d ADV $${Math.round(advUsd).toLocaleString()} below min $${Math.round(cfg.commodity_min_adv_usd).toLocaleString()}`,
+            liquidity: commodityLiquidity,
           });
           continue;
         }
@@ -1000,6 +1016,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
             reason: order.reason,
             rejected: `commodity ${meta.symbol} blocked: 14d ATR ${(atrP * 100).toFixed(2)}% exceeds max ${(cfg.commodity_max_atr_pct * 100).toFixed(2)}%`,
+            liquidity: commodityLiquidity,
           });
           continue;
         }
@@ -1210,6 +1227,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         adv20d: featExec?.adv_20d ?? null,
         params: cfg.execution_params ?? undefined,
       });
+      const commodityLiq = meta.asset_class === "commodity"
+        ? computeCommodityTradeLiquidity({
+            requestedSpend: spend,
+            price,
+            atrPct: featExec?.atr_pct ?? null,
+            adv20d: featExec?.adv_20d ?? null,
+            liquidityCappedSpend: outcome.liquidityCappedSpend,
+          })
+        : undefined;
       if (outcome.belowMinTrade || outcome.qty <= 0) {
         executed.push({
           symbol: meta.symbol,
@@ -1219,6 +1245,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           value: 0,
           reason: order.reason,
           rejected: outcome.notes.join("; ") || "trade too small after execution costs",
+          liquidity: commodityLiq,
         });
         continue;
       }
@@ -1270,6 +1297,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         price: fillPrice,
         value: outcome.effectiveSpend,
         reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
+        liquidity: commodityLiq,
       });
 
     }
