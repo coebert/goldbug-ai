@@ -660,7 +660,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // in this run is rejected with a halt reason — sells (including automatic
   // stop-losses above) still fire so the portfolio can de-risk.
   const { evaluateRiskHalts, loadEquityStats } = await import("./risk-halts.server");
-  const equityStats = await loadEquityStats(admin, portfolioId, asOf).catch(
+  const equityStats = await loadEquityStats(supabaseAdmin, portfolioId, asOf).catch(
     () => ({ priorCloseEquity: null, peakEquity: null }),
   );
   const halts = evaluateRiskHalts({
