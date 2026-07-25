@@ -356,6 +356,9 @@ ${COMMODITY_PLAYBOOK}
 
 ${args.fxSystemBlock ?? ""}
 
+${buildDiversificationTiltBlock({ tilt: cfg.diversification_tilt, cfg })}
+
+
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
 Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
 ${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== END VARIANT ===` : ""}`;
