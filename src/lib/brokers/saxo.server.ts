@@ -6,6 +6,8 @@ import type {
   BrokerAdapter,
   BrokerBalance,
   BrokerEnv,
+  BrokerFxSpotRequest,
+  BrokerFxSpotResult,
   BrokerOrderRequest,
   BrokerOrderResult,
   BrokerPingResult,
