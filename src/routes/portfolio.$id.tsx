@@ -107,6 +107,7 @@ import {
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
+import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 const BacktestResultsCard = lazy(() =>
   import("@/components/backtest-results-card").then((m) => ({ default: m.BacktestResultsCard })),
@@ -782,6 +783,20 @@ function PortfolioPage() {
                 )}
               </CardContent>
             </Card>
+
+            {p && (
+              <div className="mb-4">
+                <PerformanceDashboardCard
+                  startingCash={Number(p.starting_cash ?? 0)}
+                  currency={String(p.currency ?? "GBP")}
+                  equity={equity as { snapshot_date: string; total_value: number }[]}
+                  trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
+                  deposits={depositEvents}
+                />
+              </div>
+            )}
+
+
 
             {lastBtMetrics && (
               <Card className="mb-4">
