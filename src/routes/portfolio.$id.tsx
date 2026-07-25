@@ -11,6 +11,9 @@ import {
   getBenchmarkSeries,
 } from "@/lib/trading.functions";
 import { explainDecisionOrder, type ExplainOrderInput } from "@/lib/order-explanations.functions";
+import { getCurrentRegime } from "@/lib/regime.functions";
+import { OrderConfidenceBadge } from "@/components/order-confidence-badge";
+import type { ConfidenceRegime } from "@/lib/order-confidence";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
@@ -1448,6 +1451,7 @@ type SignalWeights = {
 type AiOrder = {
   symbol?: string;
   side?: "buy" | "sell";
+  conviction?: number | null;
   signal_weights?: Partial<SignalWeights>;
 };
 
