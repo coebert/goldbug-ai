@@ -53,11 +53,30 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
   const fetchRows = useServerFn(listRecentOrderReconciliation);
   const [hours, setHours] = useState<number>(72);
   const [status, setStatus] = useState<StatusFilter>("all");
+  const queryClient = useQueryClient();
+  const runBackfill = useServerFn(backfillOrderReconciliation);
 
   const q = useQuery({
     queryKey: ["order-recon-view", hours, portfolioId ?? null],
     queryFn: () => fetchRows({ data: { hours, portfolioId } }),
     refetchInterval: 60_000,
+  });
+
+  const backfill = useMutation({
+    mutationFn: () =>
+      runBackfill({ data: { lookbackHours: 24 * 60, includeError: true, portfolioId } }),
+    onSuccess: (res: BackfillResult) => {
+      const t = res.totals;
+      const failed = res.portfolios.filter((p) => !p.ok).length;
+      toast.success(
+        `Backfill complete: ${t.filled} filled · ${t.partial} partial · ${t.rejected} rejected · ${t.cancelled} cancelled · ${t.stillWorking} still working · ${t.unknown} unknown` +
+          (failed ? ` · ${failed} portfolio error${failed === 1 ? "" : "s"}` : ""),
+        { duration: 8000 },
+      );
+      queryClient.invalidateQueries({ queryKey: ["order-recon-view"] });
+    },
+    onError: (e: unknown) =>
+      toast.error(`Backfill failed: ${e instanceof Error ? e.message : String(e)}`),
   });
 
   const rows: ReconOrderRow[] = q.data ?? [];
