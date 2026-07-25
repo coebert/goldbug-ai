@@ -157,6 +157,42 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
 
   const noWallet = !d.rawCashByCcy || Object.keys(d.rawCashByCcy).length === 0;
 
+  const driftPctActual = d.currentCash > 0 ? Math.abs(scalarDelta) / d.currentCash : 0;
+  const breachAbs = drift.enabled && Math.abs(scalarDelta) > drift.absBase;
+  const breachPct = drift.enabled && drift.pct > 0 && driftPctActual > drift.pct;
+  const breached = !noWallet && (breachAbs || breachPct);
+  const breachSign = scalarDelta >= 0 ? "over" : "under";
+
+  // Fire a toast once per (portfolio, signed bucket) breach transition.
+  useEffect(() => {
+    if (!breached || !drift.notify || typeof window === "undefined") return;
+    const flagKey = `${driftKey(portfolioId)}:last-alert`;
+    const bucket = `${breachSign}:${breachAbs ? "abs" : ""}${breachPct ? "pct" : ""}`;
+    try {
+      const last = window.sessionStorage.getItem(flagKey);
+      if (last === bucket) return;
+      window.sessionStorage.setItem(flagKey, bucket);
+    } catch {
+      /* ignore */
+    }
+    toast.warning(
+      `Wallet drift: ${scalarDelta >= 0 ? "+" : "−"}${fmt(Math.abs(scalarDelta), d.baseCcy)}`,
+      {
+        description: `${(driftPctActual * 100).toFixed(2)}% vs current_cash — exceeds your alert threshold.`,
+      },
+    );
+  }, [
+    breached,
+    breachAbs,
+    breachPct,
+    breachSign,
+    drift.notify,
+    portfolioId,
+    scalarDelta,
+    driftPctActual,
+    d.baseCcy,
+  ]);
+
   return (
     <TooltipProvider delayDuration={150}>
       <Card>
@@ -172,10 +208,31 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
               ) : (
                 <Badge variant="outline" className="text-[10px]">FX off</Badge>
               )}
+              <DriftSettingsPopover value={drift} onChange={setDrift} baseCcy={d.baseCcy} />
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
+          {breached && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <BellRing className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="flex-1">
+                <div className="font-semibold">
+                  Wallet drift alert — cash_by_ccy is {breachSign} current_cash by{" "}
+                  {fmt(Math.abs(scalarDelta), d.baseCcy)} ({(driftPctActual * 100).toFixed(2)}%)
+                </div>
+                <div className="mt-0.5 text-xs opacity-90">
+                  Threshold: {fmt(drift.absBase, d.baseCcy)} abs · {(drift.pct * 100).toFixed(2)}% relative.
+                  Likely causes: stale FX, an unmirrored write, or a broker fill that hasn't been
+                  reflected in per-currency balances yet.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Scalar vs wallet mapping */}
           <div className="rounded-md border p-3 text-sm">
             <div className="flex items-center justify-between gap-3">
@@ -209,14 +266,15 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
                 No <code>cash_by_ccy</code> stored yet — showing synthesized {d.baseCcy}-only wallet from the scalar balance.
               </div>
             )}
-            {!noWallet && Math.abs(scalarDelta) > 0.5 && (
+            {!noWallet && !breached && Math.abs(scalarDelta) > 0.5 && (
               <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                 Wallet {scalarDelta >= 0 ? "exceeds" : "trails"} scalar by{" "}
-                {fmt(Math.abs(scalarDelta), d.baseCcy)} — likely stale FX or an unmirrored write.
+                {fmt(Math.abs(scalarDelta), d.baseCcy)} — within your configured alert threshold.
               </div>
             )}
           </div>
+
 
           {/* Per-currency balances */}
           <div>
