@@ -89,6 +89,7 @@ export async function reconcileLiveHoldingsFromBroker(
 
   const env = p.mode === "live_prod" ? "live" : "sim";
   let brokerCash: number;
+  let brokerTotalValue: number | null = null;
   let currency: string;
   let positions: Array<{
     symbol: string; quantity: number; avgPrice: number;
@@ -103,7 +104,11 @@ export async function reconcileLiveHoldingsFromBroker(
       adapter.getBalance(),
       adapter.getPositions(),
     ]);
-    brokerCash = Number(bal.cashAvailable ?? bal.cash);
+    // Use settled cash (bal.cash) rather than cashAvailable for the ledger:
+    // cashAvailable can be reduced by pending orders, which would understate
+    // free cash relative to what the Saxo app shows on the account summary.
+    brokerCash = Number(bal.cash);
+    brokerTotalValue = Number.isFinite(Number(bal.totalValue)) ? Number(bal.totalValue) : null;
     currency = bal.currency;
     positions = pos;
   } catch (e) {
@@ -118,6 +123,7 @@ export async function reconcileLiveHoldingsFromBroker(
     });
     return { skipped: true, reason: `broker read failed: ${msg}` };
   }
+
 
   const brokerSymbols = new Set(
     positions
@@ -162,12 +168,22 @@ export async function reconcileLiveHoldingsFromBroker(
     );
   }
 
-  // Recompute equity from broker prices + broker cash.
-  const holdingsValue = positions.reduce(
+  // Recompute equity from broker prices + broker cash, but PREFER Saxo's
+  // authoritative TotalValue when it's present so the headline number in Aegis
+  // matches the account summary shown in the Saxo app (which folds in bits our
+  // per-position math can miss — currency conversion at Saxo's rate, cash sub-
+  // accounts, un-booked corporate actions, etc.).
+  const holdingsValueLocal = positions.reduce(
     (sum, p) => sum + (p.marketPrice || p.avgPrice || 0) * p.quantity,
     0,
   );
-  const newTotal = brokerCash + holdingsValue;
+  const newTotal =
+    brokerTotalValue != null && brokerTotalValue > 0
+      ? brokerTotalValue
+      : brokerCash + holdingsValueLocal;
+  // Derive holdings_value from the authoritative total so cash + holdings_value
+  // always reconciles to total_value (avoids double-counting or off-by-one drift).
+  const holdingsValue = Math.max(0, newTotal - brokerCash);
 
   await db.from("portfolios")
     .update({ current_cash: brokerCash })
@@ -192,13 +208,15 @@ export async function reconcileLiveHoldingsFromBroker(
     status: 200,
     request: asJson({ localSymbols }),
     response: asJson({
-      brokerCash, currency, holdingsValue, newTotal,
+      brokerCash, currency, holdingsValue, holdingsValueLocal,
+      brokerTotalValue, newTotal,
       brokerPositions: positions.length,
       removedSymbols,
       keptSymbols: Array.from(brokerSymbols),
     }),
     error: null,
   });
+
 
   return {
     skipped: false,

@@ -210,28 +210,29 @@ export class SaxoAdapter implements BrokerAdapter {
     }>("GET", "/port/v1/balances/me");
     // Saxo reports several money fields. CashBalance is settled cash only, so a
     // brand-new account with a pending deposit shows 0 there even though the
-    // funds are visible in SpendingPower / TotalValue / TransactionsNotBooked.
-    // Treat the actual tradable amount as the max of the sources Saxo confirms
-    // are usable, so the portfolio's starting pot matches what the user
-    // actually deposited (e.g. £100 pending shows as £100, not £0).
+    // funds are visible in SpendingPower / CashAvailableForTrading /
+    // TransactionsNotBooked. Take the max of those *cash-only* fields so a
+    // pending deposit counts before it settles.
+    //
+    // IMPORTANT: do NOT fold `TotalValue` into the cash figure — TotalValue is
+    // cash + open positions valued at market, so including it double-counts
+    // holdings once the account owns anything and inflates the reported cash.
     const settled = Number(bal.CashBalance ?? 0);
     const notBooked = Number(bal.TransactionsNotBooked ?? 0);
     const spending = bal.SpendingPower != null ? Number(bal.SpendingPower) : null;
-    const total = bal.TotalValue != null ? Number(bal.TotalValue) : null;
+    const _totalDeclaredButNotUsedForCash = bal.TotalValue != null ? Number(bal.TotalValue) : null;
     const availTrading =
       bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : null;
-    // Effective cash = the largest of the fields Saxo tells us we can trade
-    // with, so a pending deposit counts even before it settles.
     const cash = Math.max(
       settled,
       settled + notBooked,
       spending ?? 0,
       availTrading ?? 0,
-      total ?? 0,
     );
     // Preserve availability semantics for guardrails: what's tradable *right now*.
     const cashAvailable = spending ?? availTrading ?? cash;
     const reservedCash = Math.max(0, cash - cashAvailable);
+
     return {
       cash,
       totalValue: Number(bal.TotalValue ?? cash),
