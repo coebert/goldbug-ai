@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import { ChevronDown, ShieldCheck, Gauge, SlidersHorizontal } from "lucide-react";
 import { Explain } from "@/components/explain";
 
+import { COMMODITY_GROUPS, type CommodityGroup } from "@/lib/commodity-groups";
+
 type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
 
 type RiskConfig = {
@@ -36,6 +38,9 @@ type RiskConfig = {
   vol_target_pct: number;
   max_daily_loss_pct: number;
   max_drawdown_halt_pct: number;
+  commodity_group_limits: Partial<Record<CommodityGroup, number>>;
+  commodity_min_adv_usd: number;
+  commodity_max_atr_pct: number;
   risk_level?: number;
 };
 
@@ -50,12 +55,23 @@ const DEFAULTS: RiskConfig = {
   vol_target_pct: 0.015,
   max_daily_loss_pct: 0.05,
   max_drawdown_halt_pct: 0.20,
+  commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
+  commodity_min_adv_usd: 250_000,
+  commodity_max_atr_pct: 0.06,
 };
 
 function parseCfg(raw: unknown): RiskConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULTS };
   const r = raw as Record<string, unknown>;
   const lvl = r.risk_level == null ? undefined : Number(r.risk_level);
+  const rawGroups = (r.commodity_group_limits ?? {}) as Record<string, unknown>;
+  const groups: Partial<Record<CommodityGroup, number>> = {};
+  for (const g of COMMODITY_GROUPS) {
+    const v = rawGroups[g];
+    if (v == null || v === "") continue;
+    const n = Number(v);
+    if (Number.isFinite(n)) groups[g] = Math.max(0, Math.min(1, n));
+  }
   return {
     asset_class_limits: {
       ...DEFAULTS.asset_class_limits,
@@ -74,6 +90,13 @@ function parseCfg(raw: unknown): RiskConfig {
     vol_target_pct: Number(r.vol_target_pct ?? DEFAULTS.vol_target_pct),
     max_daily_loss_pct: Number(r.max_daily_loss_pct ?? DEFAULTS.max_daily_loss_pct),
     max_drawdown_halt_pct: Number(r.max_drawdown_halt_pct ?? DEFAULTS.max_drawdown_halt_pct),
+    commodity_group_limits: Object.keys(groups).length ? groups : { ...DEFAULTS.commodity_group_limits },
+    commodity_min_adv_usd: Number.isFinite(Number(r.commodity_min_adv_usd))
+      ? Number(r.commodity_min_adv_usd)
+      : DEFAULTS.commodity_min_adv_usd,
+    commodity_max_atr_pct: Number.isFinite(Number(r.commodity_max_atr_pct))
+      ? Number(r.commodity_max_atr_pct)
+      : DEFAULTS.commodity_max_atr_pct,
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
   };
 }
