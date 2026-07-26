@@ -111,8 +111,10 @@ describe("runCryptoPreTradeChecks — buy path", () => {
   });
 
   it("respects config overrides so risk levels can widen/tighten thresholds", () => {
+    // Notional 500 EUR passes the tightened floor, and fee floor (5) is
+    // well inside the max_fee_pct cap.
     const r = runCryptoPreTradeChecks({
-      ...base, price: 40, quantity: 1,
+      ...base, price: 50, quantity: 10,
       config: { min_order_value_local: 20 },
     });
     expect(r.ok).toBe(true);
