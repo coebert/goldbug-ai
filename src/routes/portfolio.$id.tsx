@@ -123,6 +123,7 @@ import {
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
+import { TailHedgeCard } from "@/components/tail-hedge-card";
 import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-card";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
 import { FxAuditCard } from "@/components/fx-audit-card";
@@ -767,8 +768,11 @@ function PortfolioPage() {
                 totalValue={totalValue}
                 mode={p.mode}
                 series={holdingsSeries}
-              />
+               />
 
+            </div>
+            <div className="mb-6">
+              <TailHedgeCard portfolioId={id} currency={p.currency} />
             </div>
             <Card className="mb-6">
               <CardContent className="flex flex-wrap items-center gap-3 py-4">
