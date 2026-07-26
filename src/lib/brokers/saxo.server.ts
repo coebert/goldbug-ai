@@ -489,11 +489,77 @@ export class SaxoAdapter implements BrokerAdapter {
             response: report,
             error: report.summary,
           });
+
+          // Auto-heal drift by re-fetching the drifted approved ETPs from
+          // Saxo. Only runs on the *initial* lookup (skipDriftRetry gates
+          // recursion) and dedupes concurrent retries per (env, symbol) via
+          // the static in-flight map so parallel cache refreshes don't
+          // stampede /ref/v1/instruments.
+          if (!opts?.skipDriftRetry) {
+            const drifted = new Set<string>([
+              ...report.drift.missing,
+              ...report.drift.stale.map((s) => s.symbol),
+              ...report.drift.wrongAssetType.map((w) => w.symbol),
+            ]);
+            drifted.delete(symbol); // just refreshed
+            const retryTargets = [...drifted];
+            const retryResults: Array<{
+              symbol: string; ok: boolean; error?: string;
+            }> = [];
+            await Promise.all(
+              retryTargets.map(async (sym) => {
+                const key = `${this.env}::${sym}`;
+                const inflight = SaxoAdapter.driftRetryInFlight.get(key);
+                if (inflight) {
+                  try { await inflight; retryResults.push({ symbol: sym, ok: true }); }
+                  catch (e) { retryResults.push({ symbol: sym, ok: false, error: (e as Error).message }); }
+                  return;
+                }
+                const p = this.lookupUic(sym, { forceRefresh: true, skipDriftRetry: true });
+                SaxoAdapter.driftRetryInFlight.set(key, p);
+                try {
+                  await p;
+                  retryResults.push({ symbol: sym, ok: true });
+                } catch (e) {
+                  retryResults.push({ symbol: sym, ok: false, error: (e as Error).message });
+                } finally {
+                  SaxoAdapter.driftRetryInFlight.delete(key);
+                }
+              }),
+            );
+
+            // Re-validate and log the outcome so the audit trail shows
+            // whether the auto-heal actually cleared the drift.
+            const postSnap = await supabaseAdmin
+              .from("saxo_instrument_cache")
+              .select("symbol, env, asset_type, refreshed_at")
+              .eq("env", this.env);
+            const postReport = validateCryptoCacheSync({
+              env: this.env,
+              cacheRows: (postSnap.data ?? []) as Array<{
+                symbol: string; env: string; asset_type: string | null; refreshed_at: string | null;
+              }>,
+            });
+            await log({
+              portfolioId: this.portfolioId,
+              userId: this.userId,
+              env: this.env,
+              method: postReport.ok
+                ? "CRYPTO_CACHE_DRIFT_RETRY_OK"
+                : "CRYPTO_CACHE_DRIFT_RETRY_PARTIAL",
+              path: "/saxo_instrument_cache",
+              status: 200,
+              request: { triggeredBy: symbol, targets: retryTargets },
+              response: { retryResults, postReport },
+              error: postReport.ok ? undefined : postReport.summary,
+            });
+          }
         }
       }
     } catch {
-      // Sync check is best-effort — never let it prevent a valid order.
+      // Sync check + retry are best-effort — never let them prevent a valid order.
     }
+
     return {
       uic: hit.Identifier, assetType: hit.AssetType,
       currency: hit.CurrencyCode ?? "GBP", exchangeId: hit.ExchangeId,
