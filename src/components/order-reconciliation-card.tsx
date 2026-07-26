@@ -157,6 +157,18 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
             <PlayCircle className={`mr-1 h-3.5 w-3.5 ${backfill.isPending ? "animate-pulse" : ""}`} />
             {backfill.isPending ? "Backfilling…" : "Backfill"}
           </Button>
+          {portfolioId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fillsToTrades.mutate()}
+              disabled={fillsToTrades.isPending}
+              title="Rebuild this portfolio's trades ledger from real broker fills, then refresh holdings from Saxo"
+            >
+              <ClipboardCheck className={`mr-1 h-3.5 w-3.5 ${fillsToTrades.isPending ? "animate-pulse" : ""}`} />
+              {fillsToTrades.isPending ? "Reconciling…" : "Reconcile fills"}
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
             <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} />
           </Button>
