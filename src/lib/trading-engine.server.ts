@@ -1954,6 +1954,59 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const isLivePortfolio =
     portfolio.mode === "live_sim" || portfolio.mode === "live_prod";
 
+  // Phase 6 — Tail hedge executor. Compute the target hedge notional from the
+  // current in-memory NAV, then materialise the buy/sell into `executed` +
+  // `holdingsByS` so the paper writer below persists it alongside every other
+  // fill. Live portfolios are noted only; hedge routing there defers to the
+  // broker executor.
+  let tailHedgeDecision: import("./hedging/tail-hedge").TailHedgeDecision | null = null;
+  let tailHedgeExecution: {
+    applied: boolean; reason: string; symbol: string | null; qty: number; notional: number;
+  } | null = null;
+  try {
+    const { computeTailHedge } = await import("./hedging/tail-hedge");
+    const { applyTailHedgeToPaperPortfolio } = await import("./hedging/tail-hedge-executor.server");
+    const preHedgeHoldingsValue = Array.from(holdingsByS.values()).reduce((s, h) => {
+      const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+      return s + p * Number(h.quantity);
+    }, 0);
+    const preHedgeNav = workingCash + preHedgeHoldingsValue;
+    const prev = await admin
+      .from("decisions")
+      .select("raw")
+      .eq("portfolio_id", portfolioId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const prevNotional = Number(
+      (prev.data?.raw as { tail_hedge?: { targetNotional?: number } } | null)
+        ?.tail_hedge?.targetNotional ?? 0,
+    );
+    tailHedgeDecision = computeTailHedge({
+      nav: preHedgeNav,
+      cape: null,
+      regime: effectiveRegime.regime,
+      currentHedgeNotional: Number.isFinite(prevNotional) && prevNotional > 0 ? prevNotional : 0,
+    });
+    const exec = applyTailHedgeToPaperPortfolio({
+      decision: tailHedgeDecision,
+      holdingsByS,
+      workingCash,
+      priceMap,
+      portfolioId,
+      portfolioCurrency: portfolio.currency ?? "GBP",
+      isLivePortfolio,
+    });
+    workingCash = exec.workingCash;
+    if (exec.trade) executed.push(exec.trade);
+    tailHedgeExecution = {
+      applied: exec.applied, reason: exec.reason, symbol: exec.symbol,
+      qty: exec.qty, notional: exec.notional,
+    };
+  } catch (e) {
+    console.warn("tail hedge apply skipped:", e);
+  }
+
   if (!isLivePortfolio) {
     // Insert trades (only executed ones with quantity > 0)
     const tradesRows = executed
@@ -2002,33 +2055,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }, 0);
   const newTotal = workingCash + newHoldingsValue;
 
-  // Phase 6 — Tail hedge overlay (advisory). Compute the target hedge
-  // notional now that NAV is known so it can be persisted alongside the
-  // decision. Ratchets vs the previous tick's target notional so the
-  // rebalance threshold avoids churn across runs.
-  let tailHedgeDecision: import("./hedging/tail-hedge").TailHedgeDecision | null = null;
-  try {
-    const { computeTailHedge } = await import("./hedging/tail-hedge");
-    const prev = await admin
-      .from("decisions")
-      .select("raw")
-      .eq("portfolio_id", portfolioId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const prevNotional = Number(
-      (prev.data?.raw as { tail_hedge?: { targetNotional?: number } } | null)
-        ?.tail_hedge?.targetNotional ?? 0,
-    );
-    tailHedgeDecision = computeTailHedge({
-      nav: newTotal,
-      cape: null,
-      regime: effectiveRegime.regime,
-      currentHedgeNotional: Number.isFinite(prevNotional) && prevNotional > 0 ? prevNotional : 0,
-    });
-  } catch (e) {
-    console.warn("tail hedge compute skipped:", e);
-  }
+  // Phase 6 decision + execution telemetry now happens earlier (before the
+  // paper-portfolio trades/holdings writer) so hedge fills land in the same
+  // batch as every other trade. The decision + execution outcome are
+  // persisted in decisions.raw below.
+
+
 
   await admin
     .from("portfolios")
@@ -2165,6 +2197,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       },
       regime: regime ?? null,
       tail_hedge: tailHedgeDecision,
+      tail_hedge_execution: tailHedgeExecution,
       learning: {
         stats: learning.stats,
         lessons: learning.lessons,
