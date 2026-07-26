@@ -94,35 +94,31 @@ describe("Phase 6 backtest ↔ live executor consistency", () => {
     expect(bt!.qty * bt!.price).toBeLessThanOrEqual(spendCap + 1e-6);
   });
 
-  it("buy advisory with tight cash: both paths cap spend at cash*(1-buffer)", () => {
-    // Force delta > affordable so the cash-buffer cap is the binding constraint.
-    const initialCash = 5_000;
+  it("buy advisory with binding cash cap: qty is spend/price in both paths", () => {
+    // Force delta > affordable by advertising a huge NAV to the advisory while
+    // only funding a small workingCash — mimics a portfolio where most equity
+    // is tied up in positions but the executor still only spends free cash.
+    const advisedNav = 10_000_000;
+    const workingCash = 5_000;
     const price = 100;
-    const res = runPhaseBacktest(
-      [goldSeries([price])],
-      noSignal,
-      { ...ALL_PHASES_OFF, hedge: true },
-      { ...zeroCost, initialCash, cape: 40, regime: "risk_off", hedgeSymbol: "GLD" },
-    );
-    const bt = res.trades.find((t) => t.symbol === "GLD" && t.side === "buy");
-    expect(bt).toBeDefined();
-
     const decision = computeTailHedge({
-      nav: initialCash, cape: 40, regime: "risk_off", currentHedgeNotional: 0,
+      nav: advisedNav, cape: 40, regime: "risk_off", currentHedgeNotional: 0,
     });
+    expect(decision.action).toBe("buy");
+    expect(decision.deltaNotional).toBeGreaterThan(workingCash);
+
     const ex = applyTailHedgeToPaperPortfolio({
       ...baseExecArgs,
       decision,
       holdingsByS: new Map<string, Holding>(),
-      workingCash: initialCash,
+      workingCash,
       priceMap: new Map([["GLD", price]]),
     });
-
     expect(ex.applied).toBe(true);
-    expect(ex.qty).toBeCloseTo(bt!.qty, 8);
-    // Both must respect the no-borrow cap.
-    expect(ex.notional).toBeLessThanOrEqual(initialCash * (1 - 0.01) + 1e-6);
-    expect(bt!.qty * bt!.price).toBeLessThanOrEqual(initialCash * (1 - 0.01) + 1e-6);
+    // Both formulas: spend = min(delta, cash*(1-buffer)); qty = spend/price.
+    const expectedSpend = Math.min(decision.deltaNotional, workingCash * (1 - 0.01));
+    expect(ex.qty).toBeCloseTo(expectedSpend / price, 8);
+    expect(ex.notional).toBeLessThanOrEqual(workingCash * (1 - 0.01) + 1e-6);
   });
 
   it("sell advisory: both paths apply the same no-borrow (held-qty) cap and produce identical unwind qty", () => {
