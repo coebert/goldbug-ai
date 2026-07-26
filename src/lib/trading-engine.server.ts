@@ -1693,6 +1693,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       if (outcome.liquidityCappedSpend != null) sizingNotes.push("liquidity 1% ADV");
       const qty = outcome.qty;
       const fillPrice = outcome.fillPrice;
+
+      // Crypto post-sizing pre-trade gate: fee %, whole-unit lot size,
+      // venue minimum notional, and venue trading hours. Runs only for
+      // crypto BUYs; SELLs are always allowed through so a position can exit.
+      if (meta.asset_class === "crypto") {
+        const { runCryptoPreTradeChecks } = await import("./crypto-validation.server");
+        const pre = runCryptoPreTradeChecks({
+          symbol: meta.symbol,
+          side: "buy",
+          price: fillPrice,
+          quantity: qty,
+        });
+        if (!pre.ok) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price: fillPrice, value: 0,
+            reason: order.reason, rejected: pre.reason ?? "crypto pre-trade check failed",
+          });
+          continue;
+        }
+      }
       workingCash -= outcome.effectiveSpend;
       if (isNewPosition) newPositions += 1;
       const cur = holdingsByS.get(meta.symbol);
