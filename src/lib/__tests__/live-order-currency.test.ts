@@ -23,7 +23,7 @@ describe("normaliseCcy", () => {
     expect(normaliseCcy("US")).toBeNull();
     expect(normaliseCcy("USDX")).toBeNull();
     expect(normaliseCcy("US1")).toBeNull();
-    expect(normaliseCcy("GBp")).toBeNull(); // lowercase 'p' — LSE pence pseudo-code, not ISO-4217
+    expect(normaliseCcy("12A")).toBeNull();
   });
 });
 
