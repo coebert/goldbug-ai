@@ -63,6 +63,37 @@ export function LiveHoldingsCard({
   const denom = totalValue > 0 ? totalValue : holdingsValue + cash;
   const cashPct = denom > 0 ? (cash / denom) * 100 : 0;
 
+  // Per-currency native breakdown (no FX conversion). We show this whenever
+  // the account holds cash or positions in more than one currency, so users
+  // can see raw USD/EUR/GBP totals rather than only the converted base view.
+  const baseCcy = String(currency ?? "").toUpperCase();
+  const investedByCcy = new Map<string, number>();
+  for (const r of rows) {
+    const ccy = String(r.instrument_ccy || baseCcy).toUpperCase();
+    investedByCcy.set(ccy, (investedByCcy.get(ccy) ?? 0) + r.value);
+  }
+  const cashCcyMap = new Map<string, number>();
+  if (cashByCcy && typeof cashByCcy === "object") {
+    for (const [k, v] of Object.entries(cashByCcy)) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) continue;
+      cashCcyMap.set(String(k).toUpperCase(), n);
+    }
+  }
+  if (cashCcyMap.size === 0 && Number.isFinite(cash)) {
+    cashCcyMap.set(baseCcy, cash);
+  }
+  const allCcys = Array.from(
+    new Set<string>([...investedByCcy.keys(), ...cashCcyMap.keys()]),
+  ).sort((a, b) => (a === baseCcy ? -1 : b === baseCcy ? 1 : a.localeCompare(b)));
+  const showMultiCcy = allCcys.length > 1;
+  const fmtCcy = (ccy: string, n: number) =>
+    `${ccy} ${n.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+
   const fmt = (n: number) =>
     `${currency} ${n.toLocaleString(undefined, {
       minimumFractionDigits: 2,
