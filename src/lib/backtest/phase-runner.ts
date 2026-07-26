@@ -23,7 +23,7 @@ import {
   correlationMatrix,
   sizeAgainstClusterCap,
 } from "@/lib/sizing/correlation-cluster";
-import { computeTailHedge, DEFAULT_TAIL_HEDGE_CONFIG } from "@/lib/hedging/tail-hedge";
+import { computeTailHedge } from "@/lib/hedging/tail-hedge";
 
 export type DailyBar = { date: string } & Bar;
 
