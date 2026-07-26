@@ -105,14 +105,15 @@ describe("resolveOrderCurrency — priority chain", () => {
   });
 
   it("ignores a caller hint that is not ISO-4217 and falls through to cache", () => {
-    // Guards against upstream bugs that pass e.g. "GBp" (pence pseudo-code).
+    // Guards against upstream bugs that pass e.g. "US" (too short).
     expect(
       resolveOrderCurrency(
-        { symbol: "ULVR.L", instrument_ccy: "GBp" },
+        { symbol: "ULVR.L", instrument_ccy: "US" },
         { cache, portfolioCurrency: "EUR" },
       ),
     ).toBe("GBP");
   });
+
 });
 
 describe("resolveOrderCurrencies — batch stamping matches the executor's insert payload", () => {
