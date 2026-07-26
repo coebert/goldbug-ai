@@ -47,7 +47,7 @@ import {
 } from "../crypto-strategy.server";
 import { CRYPTO_SYMBOLS } from "../crypto-groups";
 import type { RegimeLabel } from "../regime-detector.server";
-import type { RiskLevel } from "../universe.server";
+type RiskLevel = "conservative" | "balanced" | "aggressive";
 
 const RISK_LEVELS: RiskLevel[] = ["conservative", "balanced", "aggressive"];
 const REGIMES: RegimeLabel[] = [
