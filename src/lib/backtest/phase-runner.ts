@@ -68,6 +68,10 @@ export type RunnerConfig = {
   slicingSlippageBps: number;      // e.g. 4 (each side under VWAP/TWAP)
   cape?: number | null;            // used by Phase 6
   regime?: string | null;          // used by Phase 6
+  /** Symbol used as the tail-hedge proxy (must be in `series`). Default "GLD". */
+  hedgeSymbol?: string;
+  /** Fraction of cash kept as safety on hedge buys (mirrors executor). */
+  hedgeCashBufferPct?: number;
 };
 
 export const DEFAULT_CONFIG: RunnerConfig = {
@@ -79,6 +83,8 @@ export const DEFAULT_CONFIG: RunnerConfig = {
   slicingSlippageBps: 4,
   cape: 25,
   regime: "bull_quiet",
+  hedgeSymbol: "GLD",
+  hedgeCashBufferPct: 0.01,
 };
 
 export type Trade = {
