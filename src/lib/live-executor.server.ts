@@ -313,6 +313,88 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
+  // ---------- Learned-cash lockout.
+  // If Saxo has rejected any buy on this portfolio with `InsufficientCash`
+  // in the recent past AND the broker cash figure we're about to size against
+  // hasn't materially grown since, block ALL new buys this tick. Saxo has
+  // empirically proven our `SpendingPower`/`CashAvailableForTrading` reads
+  // are optimistic (per-sub-account ring-fencing, unbooked in-flight fills,
+  // margin haircuts) and re-queuing the same buys just spams the rejection
+  // log. The lockout self-clears the moment a later CASH_SYNC shows
+  // meaningfully more cash than we had when the reject was recorded.
+  const LEARN_LOCKOUT_HOURS = 24;
+  try {
+    const cutoff = new Date(Date.now() - LEARN_LOCKOUT_HOURS * 3600_000).toISOString();
+    const { data: recentRejects } = await supabaseAdmin
+      .from("live_orders")
+      .select("id, symbol, side, quantity, updated_at, reject_reason, status")
+      .eq("portfolio_id", portfolio.id)
+      .eq("side", "buy")
+      .in("status", ["rejected", "error"])
+      .ilike("reject_reason", "%InsufficientCash%")
+      .gte("updated_at", cutoff)
+      .order("updated_at", { ascending: false })
+      .limit(10);
+    const rejects = recentRejects ?? [];
+    if (rejects.length > 0) {
+      const newestRejectAt = rejects[0].updated_at as string;
+      const { data: syncsAfter } = await supabaseAdmin
+        .from("live_broker_log")
+        .select("response, created_at")
+        .eq("portfolio_id", portfolio.id)
+        .eq("method", "CASH_SYNC")
+        .gt("created_at", newestRejectAt)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      const observed = (syncsAfter ?? [])
+        .map((r) => Number((r.response as { brokerCash?: number } | null)?.brokerCash ?? NaN))
+        .filter((n) => Number.isFinite(n));
+      const maxSince = observed.length > 0 ? Math.max(...observed) : NaN;
+      const minSince = observed.length > 0 ? Math.min(...observed) : NaN;
+      const materiallyGrew =
+        Number.isFinite(maxSince) &&
+        Number.isFinite(minSince) &&
+        maxSince > 0 &&
+        maxSince - minSince >= Math.max(5, minSince * 0.05);
+      if (!materiallyGrew) {
+        const reason = `broker rejected buys with InsufficientCash within last ${LEARN_LOCKOUT_HOURS}h; buys locked out until broker cash grows`;
+        for (const o of routable) {
+          if (o.side === "buy") preSkips.set(`${o.symbol}:${o.side}`, reason);
+        }
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_INSUFFICIENT_CASH_LOCKOUT",
+          path: "/reconcile/pre-place/lockout",
+          status: 200,
+          request: asJson({
+            asOf,
+            decisionId,
+            brokerCashAvailable,
+            recentRejectCount: rejects.length,
+            newestRejectAt,
+          }),
+          response: asJson({
+            blocked: routable.filter((o) => o.side === "buy").length,
+            rejects: rejects.map((r) => ({
+              symbol: r.symbol,
+              quantity: Number(r.quantity),
+              at: r.updated_at,
+            })),
+            cashSinceReject: { min: minSince, max: maxSince, samples: observed.length },
+          }),
+          error: reason,
+        });
+      }
+    }
+  } catch {
+    // Never let the lockout heuristic itself crash the tick.
+  }
+
+
+
   // Build per-currency cash view for the multi-ccy trim path, net of the
   // open-order reservations captured above.
   const cashByCcyRaw = pfRowData?.cash_by_ccy ?? null;
