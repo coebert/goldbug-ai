@@ -56,6 +56,7 @@ export function PortfolioRow({
   onRetryEquity,
   equityDecimals = 2,
   defaultRange = "1M",
+  brokerCurrency = null,
 }: {
   portfolio: {
     id: string;
@@ -77,6 +78,7 @@ export function PortfolioRow({
   onRetryEquity?: () => void;
   equityDecimals?: number;
   defaultRange?: SparkRange;
+  brokerCurrency?: string | null;
 }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>(defaultRange);
   const sliced = useMemo(() => {
@@ -113,6 +115,10 @@ export function PortfolioRow({
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const isSim = portfolio.mode !== "live_prod";
+  const isLive = portfolio.mode === "live_sim" || portfolio.mode === "live_prod";
+  const portfolioCcy = String(portfolio.currency || "").toUpperCase();
+  const brokerCcy = brokerCurrency ? brokerCurrency.toUpperCase() : null;
+  const currencyMismatch = isLive && !!brokerCcy && brokerCcy !== portfolioCcy;
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
@@ -208,6 +214,29 @@ export function PortfolioRow({
           </div>
         </div>
 
+        {currencyMismatch ? (
+          <div
+            role="alert"
+            data-testid="broker-currency-mismatch-warning"
+            data-portfolio-ccy={portfolioCcy}
+            data-broker-ccy={brokerCcy}
+            className="mt-3 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <div className="min-w-0">
+              <div className="font-semibold">
+                Broker currency mismatch ({brokerCcy} vs {portfolioCcy})
+              </div>
+              <div className="mt-0.5 text-destructive/80">
+                P&amp;L and % change are blocked — broker balance is in {brokerCcy} but this portfolio
+                accounts in {portfolioCcy}. Values aren't comparable until an FX conversion or account
+                re-denomination is in place.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+
         <div
           className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3 transition-opacity ${isRefreshingEquity ? "opacity-90" : ""}`}
           aria-busy={isRefreshingEquity || undefined}
@@ -244,6 +273,17 @@ export function PortfolioRow({
                   className="text-sm font-semibold tabular-nums text-muted-foreground"
                 >
                   —
+                </span>
+              ) : currencyMismatch ? (
+                <span
+                  data-testid="range-pct-currency-blocked"
+                  role="status"
+                  aria-label={`Equity change blocked: broker currency ${brokerCcy} does not match portfolio currency ${portfolioCcy}`}
+                  title={`Broker ${brokerCcy} vs portfolio ${portfolioCcy}`}
+                  className="inline-flex items-center gap-1 text-sm font-semibold tabular-nums text-destructive"
+                >
+                  <AlertCircle className="h-3.5 w-3.5" aria-hidden />
+                  blocked
                 </span>
               ) : (
                 <span
@@ -356,11 +396,22 @@ export function PortfolioRow({
                   {formatMoney(Number(portfolio.current_cash), portfolio.currency, equityDecimals)}
                   <span className="ml-1 text-[10px]">cash</span>
                 </div>
-                <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                  {pnl >= 0 ? "+" : ""}
-                  {pnlPct.toFixed(2)}%
-                  <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
-                </div>
+                {currencyMismatch ? (
+                  <div
+                    data-testid="pnl-currency-blocked"
+                    className="text-xs tabular-nums text-destructive"
+                    title={`Broker ${brokerCcy} vs portfolio ${portfolioCcy}`}
+                  >
+                    P&amp;L blocked
+                    <span className="ml-1 text-[10px] text-muted-foreground">currency mismatch</span>
+                  </div>
+                ) : (
+                  <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                    {pnl >= 0 ? "+" : ""}
+                    {pnlPct.toFixed(2)}%
+                    <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
+                  </div>
+                )}
               </>
             )}
           </div>

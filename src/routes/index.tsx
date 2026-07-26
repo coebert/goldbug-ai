@@ -240,6 +240,10 @@ function Home() {
                 equityError={equityErrored ? equityErrorMessage : null}
                 onRetryEquity={() => equityQ.refetch()}
                 equityDecimals={equityDecimals}
+                brokerCurrency={
+                  (equityQ.data as { brokerCurrencyByPortfolio?: Record<string, string> } | undefined)
+                    ?.brokerCurrencyByPortfolio?.[p.id] ?? null
+                }
               />
             ))}
           </div>
