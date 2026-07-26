@@ -1963,6 +1963,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   let tailHedgeExecution: {
     applied: boolean; reason: string; symbol: string | null; qty: number; notional: number;
   } | null = null;
+  let tailHedgeReconciliation:
+    | import("./hedging/tail-hedge-reconcile").TailHedgeReconciliation
+    | null = null;
   try {
     const { computeTailHedge } = await import("./hedging/tail-hedge");
     const { applyTailHedgeToPaperPortfolio } = await import("./hedging/tail-hedge-executor.server");
