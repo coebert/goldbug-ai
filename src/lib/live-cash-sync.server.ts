@@ -105,10 +105,27 @@ export async function syncLiveCashFromBroker(
   const hasLocalHoldings = (existingHoldings ?? []).length > 0;
 
   // Cash can legitimately move when live orders fill, settle, or fees are
-  // booked. Only treat a cash drift as an external deposit/withdrawal while
-  // the portfolio is still cash-only; once assets exist, keep the funding
-  // baseline stable and let holdings reconciliation own total equity.
-  const newStarting = hasLocalHoldings ? prevStarting : Math.max(0, prevStarting + delta);
+  // booked. Only treat a cash drift as an external deposit/withdrawal when
+  // ALL of these hold:
+  //   * we're on a real broker (live_prod). SIM broker balances (Saxo Demo)
+  //     don't reflect our simulated trades — treating drift there as a
+  //     deposit silently inflates starting_cash and turns real gains into
+  //     huge fake losses on the tile.
+  //   * the portfolio is still cash-only (no local holdings); once assets
+  //     exist, keep the baseline stable and let holdings reconciliation own
+  //     total equity.
+  //   * the broker cash currency matches the portfolio currency. A mismatch
+  //     (e.g. broker returning EUR against a GBP portfolio) is never a
+  //     deposit signal — the numbers aren't comparable.
+  const currencyMatches =
+    typeof currency === "string" &&
+    typeof (p as { currency?: string }).currency === "string" &&
+    currency.toUpperCase() === String((p as { currency?: string }).currency).toUpperCase();
+  const canTreatDriftAsDeposit =
+    p.mode === "live_prod" && !hasLocalHoldings && currencyMatches;
+  const newStarting = canTreatDriftAsDeposit
+    ? Math.max(0, prevStarting + delta)
+    : prevStarting;
   const upd = await db.from("portfolios")
     .update({ current_cash: brokerCash, starting_cash: newStarting })
     .eq("id", portfolioId);
