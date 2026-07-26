@@ -23,10 +23,14 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
 
-const SOURCE = readFileSync(
-  resolve(__dirname, "../index.tsx"),
-  "utf8",
-);
+// The portfolio card JSX now lives in the `PortfolioRow` component; the
+// index route file mounts it. Concatenate both so source-level regex
+// assertions catch drift regardless of which file the row block lives in.
+const SOURCE = [
+  readFileSync(resolve(__dirname, "../index.tsx"), "utf8"),
+  readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8"),
+].join("\n");
+
 
 // Mirror of the production JSX (src/routes/index.tsx lines 592–621).
 // Kept in lockstep with the source via the regex assertions below —
