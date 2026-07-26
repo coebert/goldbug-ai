@@ -292,7 +292,22 @@ describe("Phase 6 parity: stock splits, dividends, and corporate-action adjusted
     assertCaParity("GLD", withOpener, cfg("GLD", { initialCash: 100_000 }));
   });
 
-  it("deferral parity across a split: no trades and matching bucket set", () => {
+  it("symbol continuation after CA — contiguous grid, both paths treat as one instrument", () => {
+    // Two half-series stitched at the CA boundary. Feeding as one symbol
+    // to both engines produces the same fills — proving the parity
+    // contract holds under caller-side continuation onto a successor.
+    const stitched: DayInput[] = [
+      { date: "2024-10-01", price: 100 },
+      { date: "2024-10-02", price: 105 },
+      { date: "2024-10-03", price: 110 }, // pre-CA
+      // continuation from 2024-10-04 onward (successor listing)
+      { date: "2024-10-04", price: 108 },
+      { date: "2024-10-07", price: 500 }, // regime shift
+      { date: "2024-10-08", price: 200 },
+    ];
+    assertCaParity("GLD", stitched, cfg("GLD"));
+  });
+
     // Tiny NAV + tiny cash + hedge price such that delta<1 and/or
     // spend<price → both paths always defer with the same bucket. We
     // don't pin which bucket, only that the set is identical and no
