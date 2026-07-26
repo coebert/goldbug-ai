@@ -9,6 +9,10 @@ import {
   backfillOrderReconciliation,
   type BackfillResult,
 } from "@/lib/order-reconciliation-backfill.functions";
+import {
+  reconcileFillsToTrades,
+  type FillsTradesReconcileResult,
+} from "@/lib/fills-trades-reconcile.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,6 +87,30 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
     },
     onError: (e: unknown) =>
       toast.error(`Backfill failed: ${e instanceof Error ? e.message : String(e)}`),
+  });
+
+  const runFillsToTrades = useServerFn(reconcileFillsToTrades);
+  const fillsToTrades = useMutation({
+    mutationFn: () => {
+      if (!portfolioId) throw new Error("Open a specific portfolio to run this reconcile.");
+      return runFillsToTrades({ data: { portfolioId } });
+    },
+    onSuccess: (res: FillsTradesReconcileResult) => {
+      const h = res.holdings;
+      const brokerPart = h.skipped
+        ? `holdings sync skipped (${h.reason ?? "unknown"})`
+        : `${h.brokerPositions ?? 0} broker position${h.brokerPositions === 1 ? "" : "s"} · £${(h.newTotalValue ?? 0).toFixed(2)} ${h.currency ?? ""}`;
+      toast.success(
+        `Fills → trades: ${res.tradesFromFillsInserted} trade row${res.tradesFromFillsInserted === 1 ? "" : "s"} from ${res.fillsSeen} fill${res.fillsSeen === 1 ? "" : "s"} · dropped ${res.optimisticTradesDropped} optimistic · ${brokerPart}`,
+        { duration: 10000 },
+      );
+      queryClient.invalidateQueries({ queryKey: ["order-recon-view"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      queryClient.invalidateQueries({ queryKey: ["trades"] });
+      queryClient.invalidateQueries({ queryKey: ["holdings"] });
+    },
+    onError: (e: unknown) =>
+      toast.error(`Fills reconcile failed: ${e instanceof Error ? e.message : String(e)}`),
   });
 
   const rows: ReconOrderRow[] = q.data ?? [];
