@@ -1840,40 +1840,57 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const admin = supabaseAdmin;
   const executedAt = new Date().toISOString();
 
-  // Insert trades (only executed ones with quantity > 0)
-  const tradesRows = executed
-    .filter((t) => t.quantity > 0)
-    .map((t) => ({
-      portfolio_id: portfolioId,
-      symbol: t.symbol,
-      asset_class: findSymbol(t.symbol)!.asset_class,
-      side: t.side,
-      quantity: t.quantity,
-      price: t.price,
-      value: t.value,
-      executed_at: executedAt,
-      trade_date: asOf,
-      reason: t.reason + (t.rejected ? ` [REJECTED: ${t.rejected}]` : ""),
-    }));
-  if (tradesRows.length > 0) await admin.from("trades").insert(tradesRows);
+  // For live_sim / live_prod portfolios the engine's `executed` list is
+  // OPTIMISTIC — it reflects what the AI wants to do, not what the broker
+  // actually accepted. Writing those rows into `trades` / `holdings` here
+  // silently creates a ghost ledger that diverges from Saxo. For live modes
+  // we skip these writes and rely on:
+  //   - live-executor  → live_fills (real broker fills)
+  //   - live-holdings-sync (called right after this returns) → holdings
+  //   - reconcileFillsToTrades (operator button) → trades from live_fills
+  const isLivePortfolio =
+    portfolio.mode === "live_sim" || portfolio.mode === "live_prod";
 
-  // Replace holdings: delete then insert (simpler & atomic-enough for paper account)
-  await admin.from("holdings").delete().eq("portfolio_id", portfolioId);
-  const holdingsRows = Array.from(holdingsByS.values())
-    .filter((h) => Number(h.quantity) > 1e-8)
-    .map((h) => {
-      const hExt = h as unknown as { opened_at?: string | null; high_water_mark?: number | null };
-      return {
+  if (!isLivePortfolio) {
+    // Insert trades (only executed ones with quantity > 0)
+    const tradesRows = executed
+      .filter((t) => t.quantity > 0)
+      .map((t) => ({
         portfolio_id: portfolioId,
-        symbol: h.symbol,
-        asset_class: h.asset_class,
-        quantity: Number(h.quantity),
-        avg_cost: Number(h.avg_cost),
-        opened_at: hExt.opened_at ?? new Date().toISOString(),
-        high_water_mark: hExt.high_water_mark ?? Number(h.avg_cost),
-      };
-    });
-  if (holdingsRows.length > 0) await admin.from("holdings").insert(holdingsRows);
+        symbol: t.symbol,
+        asset_class: findSymbol(t.symbol)!.asset_class,
+        side: t.side,
+        quantity: t.quantity,
+        price: t.price,
+        value: t.value,
+        executed_at: executedAt,
+        trade_date: asOf,
+        reason: t.reason + (t.rejected ? ` [REJECTED: ${t.rejected}]` : ""),
+      }));
+    if (tradesRows.length > 0) await admin.from("trades").insert(tradesRows);
+
+    // Replace holdings: delete then insert (simpler & atomic-enough for paper account)
+    await admin.from("holdings").delete().eq("portfolio_id", portfolioId);
+    const holdingsRows = Array.from(holdingsByS.values())
+      .filter((h) => Number(h.quantity) > 1e-8)
+      .map((h) => {
+        const hExt = h as unknown as {
+          opened_at?: string | null;
+          high_water_mark?: number | null;
+        };
+        return {
+          portfolio_id: portfolioId,
+          symbol: h.symbol,
+          asset_class: h.asset_class,
+          quantity: Number(h.quantity),
+          avg_cost: Number(h.avg_cost),
+          opened_at: hExt.opened_at ?? new Date().toISOString(),
+          high_water_mark: hExt.high_water_mark ?? Number(h.avg_cost),
+        };
+      });
+    if (holdingsRows.length > 0) await admin.from("holdings").insert(holdingsRows);
+  }
+
 
   // Recompute portfolio value with latest holdings
   const newHoldingsValue = Array.from(holdingsByS.values()).reduce((sum, h) => {

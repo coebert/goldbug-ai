@@ -99,18 +99,18 @@ export async function reconcileFillsToTradesForPortfolio(
       const value = qty * px;
       const filledAtIso = (f.filled_at as string | null) ?? new Date().toISOString();
       const brokerFillId = f.broker_fill_id ? String(f.broker_fill_id) : String(f.id);
+      const rawSide = String(f.side ?? "buy").toLowerCase();
+      const side: "buy" | "sell" = rawSide === "sell" ? "sell" : "buy";
       return {
         portfolio_id: portfolioId,
         symbol: f.symbol as string,
         asset_class: classFor(f.symbol as string),
-        side: f.side as string,
+        side,
         quantity: qty,
         price: px,
         value,
         executed_at: filledAtIso,
         trade_date: filledAtIso.slice(0, 10),
-        // Deterministic tag lets subsequent reconciles distinguish rows we
-        // inserted from optimistic ones the engine may write in future.
         reason: `[broker-fill] fill_id=${brokerFillId}`,
         ...(f.currency ? { instrument_ccy: String(f.currency) } : {}),
       };
