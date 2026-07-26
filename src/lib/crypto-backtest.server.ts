@@ -36,9 +36,14 @@ export type CryptoBacktestOpts = {
   symbols: CryptoBacktestSymbol[];
   /** Optional annualised risk-free rate for Sharpe (defaults to 0). */
   riskFreeRateAnnual?: number;
-  /** Optional per-side trading cost in bps (defaults to 20 = 0.20%). */
+  /** Legacy: combined per-side trading cost in bps (defaults to 20 = 0.20%).
+   *  If set, overrides feeBps + slippageBps. */
   costBps?: number;
-};
+  /** Broker/exchange fee per side in bps (default 10 = 0.10%). */
+  feeBps?: number;
+  /** Slippage vs mid per side in bps (default 10 = 0.10%). */
+  slippageBps?: number;
+
 
 export type CryptoBacktestPoint = {
   date: string;
