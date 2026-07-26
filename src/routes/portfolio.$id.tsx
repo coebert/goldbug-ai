@@ -1286,6 +1286,10 @@ function PortfolioPage() {
             </div>
 
             <div className="mt-6">
+              <InvestableUniverseCard />
+            </div>
+
+            <div className="mt-6">
               <CommodityBacktestCard portfolioId={id} />
             </div>
 
