@@ -83,6 +83,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         currency: "GBP" as string,
         mismatches: [] as SnapshotMismatch[],
         deposits: [] as Array<{ portfolio_id: string; date: string; amount: number }>,
+        brokerCurrencyByPortfolio: {} as Record<string, string>,
       };
     }
 
