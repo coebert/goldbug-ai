@@ -277,7 +277,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
       const src = resp.source ?? "";
       const t = r.created_at as string;
       if (src.startsWith("fallback") && !lastFallbackAt) lastFallbackAt = t;
-      else if ((src === "yahoo" || src === "frankfurter") && !lastOkAt) lastOkAt = t;
+      else if ((src === "yahoo" || src === "frankfurter" || src === "er-api") && !lastOkAt) lastOkAt = t;
       if (lastFallbackAt && lastOkAt) break;
     }
     const circuitOpen =
