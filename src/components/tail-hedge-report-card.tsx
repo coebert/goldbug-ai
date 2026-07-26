@@ -6,9 +6,10 @@
 // engine persisted it) the leave-one-out phase attribution table so the
 // user can compare Phase 6's contribution against Phases 2–5.
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Area,
   ComposedChart,
@@ -59,6 +60,7 @@ export function TailHedgeReportCard({
   currency: string;
 }) {
   const fetchReport = useServerFn(getTailHedgeReport);
+  const queryClient = useQueryClient();
   const [win, setWin] = useState(1); // default 90d
   const sinceDays = WINDOWS[win].days;
 
@@ -68,6 +70,39 @@ export function TailHedgeReportCard({
       fetchReport({ data: sinceDays ? { portfolioId, sinceDays } : { portfolioId } }),
     staleTime: 60 * 1000,
   });
+
+  // Live hedging monitor — refresh the Phase 6 rollup whenever the engine
+  // persists a new decision (advisory + execution + reconciliation blocks all
+  // land in `decisions.raw`) or the broker records a fill for this portfolio.
+  // Both tables are in the `supabase_realtime` publication and RLS scopes rows
+  // to this user's portfolios, so subscribers only receive their own updates.
+  useEffect(() => {
+    if (!portfolioId) return;
+    const invalidate = () =>
+      queryClient.invalidateQueries({ queryKey: ["tail-hedge-report", portfolioId] });
+    const channel = supabase
+      .channel(`tail-hedge-live:${portfolioId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "decisions", filter: `portfolio_id=eq.${portfolioId}` },
+        invalidate,
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "decisions", filter: `portfolio_id=eq.${portfolioId}` },
+        invalidate,
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "live_fills", filter: `portfolio_id=eq.${portfolioId}` },
+        invalidate,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [portfolioId, queryClient]);
+
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -81,7 +116,16 @@ export function TailHedgeReportCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base">Tail hedge report (Phase 6)</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2">
+          Tail hedge report (Phase 6)
+          <span
+            className="inline-flex items-center gap-1 text-[10px] font-normal text-muted-foreground"
+            title="Auto-refreshes when the engine records a new hedge decision or the broker files a fill for this portfolio."
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            live
+          </span>
+        </CardTitle>
         <div className="flex gap-1">
           {WINDOWS.map((w, i) => (
             <Button
