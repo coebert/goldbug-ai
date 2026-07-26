@@ -191,8 +191,9 @@ export async function syncLiveCashFromBroker(
     status: upd.error ? 500 : 200,
     request: asJson({
       previousCash: prevCash, previousStarting: prevStarting,
-      hasLocalHoldings, currencyMatches, mode: p.mode,
+      hasLocalHoldings, mode: p.mode,
       portfolioCurrency: (p as { currency?: string }).currency ?? null,
+
     }),
     response: asJson({
       brokerCash,
