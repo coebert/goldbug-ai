@@ -111,10 +111,19 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     const t1 = Date.now();
 
     for (const p of pairs) {
-      expect(p.source).toBe("frankfurter");
+      // Only one direction of each unordered pair is actually fetched; the
+      // reverse row is derived as 1/rate from that same quote and carries
+      // the source suffixed with ":inverse".
+      expect(["frankfurter", "frankfurter:inverse"]).toContain(p.source);
       expect(p.stale).toBe(false);
-      const expected = FRANKFURTER_RATES[p.from][p.to];
-      expect(p.rate).toBeCloseTo(expected, 10);
+      if (p.source === "frankfurter") {
+        const expected = FRANKFURTER_RATES[p.from][p.to];
+        expect(p.rate).toBeCloseTo(expected, 10);
+      } else {
+        // Inverse row: rate must equal 1 / (provider quote for the reverse pair).
+        const providerReverse = FRANKFURTER_RATES[p.to][p.from];
+        expect(p.rate).toBeCloseTo(1 / providerReverse, 10);
+      }
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
       const obsMs = Date.parse(p.observedAt);
       expect(obsMs).toBeGreaterThanOrEqual(t0 - 5);
@@ -132,13 +141,19 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     const { buildFxAuditPairs } = await loadHelpers();
     const pairs = await buildFxAuditPairs();
     for (const p of pairs) {
-      expect(p.source).toBe("er-api");
+      expect(["er-api", "er-api:inverse"]).toContain(p.source);
       expect(p.stale).toBe(false);
-      const expected = ER_API_RATES[p.from][p.to];
-      expect(p.rate).toBeCloseTo(expected, 10);
+      if (p.source === "er-api") {
+        const expected = ER_API_RATES[p.from][p.to];
+        expect(p.rate).toBeCloseTo(expected, 10);
+      } else {
+        const providerReverse = ER_API_RATES[p.to][p.from];
+        expect(p.rate).toBeCloseTo(1 / providerReverse, 10);
+      }
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
     }
   });
+
 
   it("cache: second call inside the TTL reports source=cache and observedAt equal to the original fetch time", async () => {
     mockFetch((url) => {
