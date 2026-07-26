@@ -46,6 +46,12 @@ const ALIASES: Record<string, RegimeName> = {
   low_vol: "low_vol", calm: "low_vol", "low vol": "low_vol",
   trending: "trending", trend: "trending",
   range_bound: "range_bound", range: "range_bound", choppy: "range_bound",
+  // Persisted regime-detector labels → tail-hedge / weights matrix
+  bull_quiet: "low_vol",
+  bull_volatile: "risk_on",
+  correction: "high_vol",
+  crisis: "risk_off",
+  recovery: "risk_on",
 };
 
 export function resolveRegime(raw: string | null | undefined): RegimeName {
