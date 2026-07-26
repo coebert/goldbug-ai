@@ -115,6 +115,10 @@ export function PortfolioRow({
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const isSim = portfolio.mode !== "live_prod";
+  const isLive = portfolio.mode === "live_sim" || portfolio.mode === "live_prod";
+  const portfolioCcy = String(portfolio.currency || "").toUpperCase();
+  const brokerCcy = brokerCurrency ? brokerCurrency.toUpperCase() : null;
+  const currencyMismatch = isLive && !!brokerCcy && brokerCcy !== portfolioCcy;
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
