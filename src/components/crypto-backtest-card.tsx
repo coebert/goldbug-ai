@@ -46,12 +46,31 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
   });
 
   const report = mut.data?.report;
-  const chartData = (report?.equityCurve ?? []).map((p) => ({
-    date: p.date,
-    equity: Number(p.equity.toFixed(2)),
-    drawdown: -Number((p.drawdown * 100).toFixed(2)), // negative for area under 0
-    sleeve_pct: Number((p.sleeve_pct * 100).toFixed(2)),
-  }));
+  const benchmarks = report?.benchmarks ?? [];
+  // Merge benchmark curves by date for overlay chart.
+  const chartData = (() => {
+    if (!report) return [] as Array<Record<string, number | string>>;
+    const byDate = new Map<string, Record<string, number | string>>();
+    for (const p of report.equityCurve) {
+      byDate.set(p.date, {
+        date: p.date,
+        equity: Number(p.equity.toFixed(2)),
+        drawdown: -Number((p.drawdown * 100).toFixed(2)),
+        sleeve_pct: Number((p.sleeve_pct * 100).toFixed(2)),
+      });
+    }
+    for (const b of benchmarks) {
+      if (b.label.startsWith("Sleeve")) continue;
+      const key = benchKey(b.label);
+      for (const p of b.equityCurve) {
+        const row = byDate.get(p.date) ?? { date: p.date };
+        row[key] = Number(p.equity.toFixed(2));
+        byDate.set(p.date, row);
+      }
+    }
+    return Array.from(byDate.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  })();
+
 
   return (
     <Card>
@@ -116,12 +135,25 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmtGbp(Number(v))} width={72} />
                       <Tooltip
-                        formatter={(v: number | string, name) =>
-                          name === "equity" ? [fmtGbp(Number(v)), "Equity"] : [String(v), String(name)]
-                        }
+                        formatter={(v: number | string, name) => [fmtGbp(Number(v)), benchLabelFromKey(String(name))]}
                       />
-                      <Line type="monotone" dataKey="equity" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+                      <Line type="monotone" dataKey="equity" name="Sleeve" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+                      {benchmarks
+                        .filter((b) => !b.label.startsWith("Sleeve"))
+                        .map((b) => (
+                          <Line
+                            key={b.label}
+                            type="monotone"
+                            dataKey={benchKey(b.label)}
+                            name={b.label}
+                            stroke={benchColor(b.label)}
+                            strokeDasharray="4 3"
+                            dot={false}
+                            strokeWidth={1.5}
+                          />
+                        ))}
                     </ComposedChart>
+
                   </ResponsiveContainer>
                 </div>
                 <div className="h-40">
@@ -137,6 +169,60 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                 </div>
               </div>
             ) : null}
+
+            {benchmarks.length > 0 ? (
+              <div>
+                <div className="mb-2 text-sm font-medium">Benchmark comparison</div>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Same window, same starting cash. Passive holds pay one entry cost; cash compounds at the risk-free rate (0% if unset).
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Strategy</TableHead>
+                      <TableHead className="text-right">Final</TableHead>
+                      <TableHead className="text-right">Total return</TableHead>
+                      <TableHead className="text-right">CAGR</TableHead>
+                      <TableHead className="text-right">Max DD</TableHead>
+                      <TableHead className="text-right">Ann. vol</TableHead>
+                      <TableHead className="text-right">Sharpe</TableHead>
+                      <TableHead className="text-right">vs Sleeve</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const sleeve = benchmarks.find((b) => b.label.startsWith("Sleeve"));
+                      const sleeveRet = sleeve?.totalReturnPct ?? 0;
+                      return benchmarks.map((b) => {
+                        const isSleeve = b.label.startsWith("Sleeve");
+                        const delta = b.totalReturnPct - sleeveRet;
+                        return (
+                          <TableRow key={b.label} className={isSleeve ? "font-medium" : ""}>
+                            <TableCell>
+                              <span className="inline-flex items-center gap-2">
+                                <span className="inline-block h-2 w-2 rounded-full" style={{ background: benchColor(b.label) }} />
+                                {b.label}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">{fmtGbp(b.finalEquity)}</TableCell>
+                            <TableCell className={`text-right ${b.totalReturnPct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{fmtPct(b.totalReturnPct)}</TableCell>
+                            <TableCell className="text-right">{fmtPct(b.cagrPct)}</TableCell>
+                            <TableCell className="text-right text-rose-600">{fmtPct(b.maxDrawdownPct)}</TableCell>
+                            <TableCell className="text-right">{fmtPct(b.volatilityPctAnnual)}</TableCell>
+                            <TableCell className="text-right">{b.sharpe.toFixed(2)}</TableCell>
+                            <TableCell className={`text-right ${isSleeve ? "text-muted-foreground" : delta <= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                              {isSleeve ? "—" : `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(2)}pp`}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : null}
+
+
 
             <div>
               <div className="mb-2 text-sm font-medium">Per-ETP contribution</div>
@@ -197,4 +283,28 @@ function RegimeBadge({ label, value, total, tone }: { label: string; value: numb
       <div className="text-lg font-semibold">{value} <span className="text-xs opacity-80">({pct.toFixed(0)}%)</span></div>
     </div>
   );
+}
+
+// Stable string keys for benchmark series on the merged chart.
+function benchKey(label: string): string {
+  if (label.startsWith("BTC")) return "bench_btc";
+  if (label.startsWith("ETH")) return "bench_eth";
+  if (label.startsWith("Cash")) return "bench_cash";
+  return "bench_other";
+}
+function benchLabelFromKey(key: string): string {
+  switch (key) {
+    case "equity": return "Sleeve";
+    case "bench_btc": return "BTC buy & hold";
+    case "bench_eth": return "ETH buy & hold";
+    case "bench_cash": return "Cash";
+    default: return key;
+  }
+}
+function benchColor(label: string): string {
+  if (label.startsWith("Sleeve")) return "hsl(var(--primary))";
+  if (label.startsWith("BTC")) return "#f7931a";       // bitcoin orange
+  if (label.startsWith("ETH")) return "#627eea";       // ethereum blue
+  if (label.startsWith("Cash")) return "hsl(var(--muted-foreground))";
+  return "hsl(var(--muted-foreground))";
 }
