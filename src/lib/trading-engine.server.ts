@@ -1360,6 +1360,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             liquidity: commodityLiquidity,
           });
           continue;
+        }
+
+        const atrP = cfeat?.atr_pct ?? null;
+        if (cfg.commodity_max_atr_pct > 0 && atrP != null && atrP > cfg.commodity_max_atr_pct) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `commodity ${meta.symbol} blocked: 14d ATR ${(atrP * 100).toFixed(2)}% exceeds max ${(cfg.commodity_max_atr_pct * 100).toFixed(2)}%`,
+            liquidity: commodityLiquidity,
+          });
+          continue;
+        }
       }
 
       // Crypto-only pre-trade validation. Mirror of the commodity gate: confirms
@@ -1378,18 +1390,6 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           executed.push({
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
             reason: order.reason, rejected: kval.reason ?? "crypto validation failed",
-          });
-          continue;
-        }
-      }
-
-        const atrP = cfeat?.atr_pct ?? null;
-        if (cfg.commodity_max_atr_pct > 0 && atrP != null && atrP > cfg.commodity_max_atr_pct) {
-          executed.push({
-            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
-            reason: order.reason,
-            rejected: `commodity ${meta.symbol} blocked: 14d ATR ${(atrP * 100).toFixed(2)}% exceeds max ${(cfg.commodity_max_atr_pct * 100).toFixed(2)}%`,
-            liquidity: commodityLiquidity,
           });
           continue;
         }
