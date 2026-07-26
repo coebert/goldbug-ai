@@ -43,6 +43,15 @@ const DEFAULT_SLICE_TTL_MIN = 90; // 90 minutes total window
 const DEFAULT_SLICES = 4;
 const LARGE_ORDER_USD = 5_000;
 
+// Phase 4 — VWAP/TWAP smart slicing math (pure, tested separately).
+import {
+  buildSliceSchedule,
+  chooseSliceCount,
+  type ScheduleBucket,
+  type SliceStrategy,
+} from "./execution-vwap";
+
+
 
 
 class PendingSliceAccessError extends Error {
@@ -159,10 +168,32 @@ export async function maybeSliceOrder(input: SliceInput) {
 
   await assertPortfolioOwnership("maybeSliceOrder", clean.portfolioId, clean.ownerUserId);
 
-  const slices = clean.slices ?? DEFAULT_SLICES;
-  const sliceQty = Math.max(1, Math.floor((clean.totalQty / slices) * 10_000) / 10_000);
+  // Phase 4 — pick slice count from participation-rate heuristic when we
+  // know the venue's ADV. Small orders vs. deep tape stay as one shot.
+  const strategy: SliceStrategy = clean.strategy ?? "vwap";
+  const dynamicSlices = clean.slices ?? (
+    clean.advNotional
+      ? chooseSliceCount(notional, clean.advNotional)
+      : DEFAULT_SLICES
+  );
+  if (dynamicSlices <= 1) return null;
+  const slices = dynamicSlices;
+  const windowMinutes = clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN;
+
+  // Build the per-bucket qty/offset schedule. The first bucket's qty
+  // becomes slice_qty for the initial send; recordSliceFill advances
+  // through the schedule as fills come in.
+  const schedule = buildSliceSchedule({
+    strategy,
+    totalQty: clean.totalQty,
+    nSlices: slices,
+    windowMinutes,
+  });
+  const firstBucket: ScheduleBucket = schedule[0] ?? { qty: clean.totalQty / slices, offset_min: 0 };
+  const sliceQty = Math.max(1e-4, firstBucket.qty);
+
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + (clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
+  const expiresAt = new Date(now.getTime() + windowMinutes * 60_000);
 
   // Idempotency: if a slice with this (portfolio_id, idempotency_key) already
   // exists, return it instead of inserting a duplicate row.
@@ -196,6 +227,9 @@ export async function maybeSliceOrder(input: SliceInput) {
       expires_at: expiresAt.toISOString(),
       status: "active",
       idempotency_key: clean.idempotencyKey ?? null,
+      strategy,
+      schedule_json: schedule as unknown as Record<string, unknown>[],
+      adv_notional: clean.advNotional ?? null,
     })
     .select("id")
     .single();
@@ -217,8 +251,9 @@ export async function maybeSliceOrder(input: SliceInput) {
     console.warn("slicer insert failed", error);
     return null;
   }
-  return { sliceId: (data as { id: string }).id, sliceQty, slices };
+  return { sliceId: (data as { id: string }).id, sliceQty, slices, strategy, schedule };
 }
+
 
 
 /**
