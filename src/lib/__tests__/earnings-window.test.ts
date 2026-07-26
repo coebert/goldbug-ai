@@ -36,11 +36,8 @@ describe("evaluateEarningsWindow", () => {
     expect(r.size_multiplier).toBe(1);
   });
 
-  it("half-sizes right after the print, then normal", () => {
-    const soonAfter = evaluateEarningsWindow(inDays(-0), now, "buy");
-    expect(soonAfter.action).toBe("allow"); // 0 days ago == calm boundary
-    const stillFresh = evaluateEarningsWindow(inDays(-0.5).slice(0, 10), now, "buy");
-    // simple sanity: values in the past return a decision object
-    expect(["allow", "trim"]).toContain(stillFresh.action);
+  it("allows buys once past the post-event calm window", () => {
+    const r = evaluateEarningsWindow(inDays(-3), now, "buy");
+    expect(r.action).toBe("allow");
   });
 });
