@@ -17,10 +17,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { computeCardRangePct, type CardSparkPoint } from "@/lib/card-range-pct";
 
-const SOURCE = readFileSync(
-  resolve(__dirname, "../index.tsx"),
-  "utf8",
-);
+const SOURCE = readFileSync(resolve(__dirname, "../index.tsx"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
 
 // Mirror of the card's headline derivation. If the production line
 // changes shape, the source-level guard below fires — force the author
@@ -35,18 +32,18 @@ function headlineTotalEquity(
 }
 
 describe("portfolio card — total equity headline shares the % change source", () => {
-  it("source: totalEquity is read from sparkSeries[last].value (same array as computeCardRangePct)", () => {
-    // Must derive from the sparkline series, not from any independent
-    // valuation (e.g. portfolio.current_cash, holdings sum, etc.).
+  it("source: totalEquity is derived by deriveCardEquity(sparkSeries, sliced, ...) — same array feeds both", () => {
+    // The row must funnel BOTH numbers through the single-source-of-truth
+    // helper, passing the raw `sparkSeries` for the headline and the
+    // `sliced` suffix for the % — so they can never diverge.
     expect(SOURCE).toMatch(
-      /const\s+totalEquity\s*=\s*sparkSeries\.length\s*>\s*0\s*\?\s*sparkSeries\[sparkSeries\.length\s*-\s*1\]\.value/,
+      /const\s*\{\s*totalEquity\s*,\s*rangePct\s*\}\s*=\s*deriveCardEquity\(\s*sparkSeries\s*,\s*sliced\s*,/,
     );
-    // And that same `sparkSeries` prop is the one fed into the range %
-    // (via the `sliced` memo). Guard against a future refactor that
-    // routes the % through a different series.
-    expect(SOURCE).toMatch(/computeCardRangePct\(sliced,\s*deposits,\s*includeDeposits\)/);
+    // The sliced view fed into the helper is a suffix of sparkSeries
+    // (see the useMemo above the call site).
     expect(SOURCE).toMatch(/\[sparkSeries,\s*sparkRange\]/);
   });
+
 
   it("headline equals last sparkline point regardless of deposits toggle", () => {
     const series: CardSparkPoint[] = [

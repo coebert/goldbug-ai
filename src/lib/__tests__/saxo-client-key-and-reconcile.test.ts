@@ -386,7 +386,13 @@ describe("reconcileOrderStatusesForPortfolio", () => {
       portfolioId: "pf-1", userId: "u-1", adapter: adapter as never,
     });
     expect(summary.stillWorking).toBe(1);
-    expect(updates.some((u) => u.table === "live_orders" && u.id === "order-c")).toBe(false);
+    // The reconciler now syncs "submitted" → "working" onto the local row
+    // to reflect broker acknowledgement, but must not touch anything else
+    // (no reject_reason, no fills, no broker id churn).
+    const upd = updates.find((u) => u.table === "live_orders" && u.id === "order-c");
+    expect(upd?.patch).toEqual({ status: "working" });
+    expect(inserts.some((i) => i.table === "live_fills")).toBe(false);
+
   });
 
   it("flags orders that never received a broker id as no_broker_id (no writes)", async () => {

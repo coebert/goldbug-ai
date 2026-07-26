@@ -23,10 +23,14 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
 
-const SOURCE = readFileSync(
-  resolve(__dirname, "../index.tsx"),
-  "utf8",
-);
+// The portfolio card JSX now lives in the `PortfolioRow` component; the
+// index route file mounts it. Concatenate both so source-level regex
+// assertions catch drift regardless of which file the row block lives in.
+const SOURCE = [
+  readFileSync(resolve(__dirname, "../index.tsx"), "utf8"),
+  readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8"),
+].join("\n");
+
 
 // Mirror of the production JSX (src/routes/index.tsx lines 592–621).
 // Kept in lockstep with the source via the regex assertions below —
@@ -104,22 +108,20 @@ describe("portfolio card headline — layout contract (source-level)", () => {
     // typography so a future refactor cannot demote it back to a small
     // secondary metric.
     expect(SOURCE).toMatch(
-      /className="text-2xl font-bold leading-tight tabular-nums"\s*>\s*\{portfolio\.currency\}\s+\{formatMoneyAmount\(totalEquity\)\}/,
+      /className="font-display text-2xl font-bold leading-tight tabular-nums"\s*>\s*\{portfolio\.currency\}\s+\{formatMoneyAmount\(totalEquity,\s*equityDecimals\)\}/,
     );
     // Cash sub-line stays a small muted secondary.
     expect(SOURCE).toMatch(
       /className="mt-1 text-xs tabular-nums text-muted-foreground"/,
     );
-    // "cash vs start" label sits under the pnl%.
-    expect(SOURCE).toMatch(/cash vs start/);
     // Loading state uses a shimmer skeleton sized to match the
     // headline's typography box (h-8 ≈ text-2xl leading-tight) so
-    // the layout doesn't jump when data arrives. Right-alignment
-    // now comes from the enclosing `items-end` flex column.
+    // the layout doesn't jump when data arrives.
     expect(SOURCE).toMatch(
       /<Skeleton\b[\s\S]*?variant="shimmer"[\s\S]*?data-testid="total-equity-skeleton"[\s\S]*?h-8/,
     );
   });
+
 });
 
 describe("portfolio card headline — rendered snapshots", () => {

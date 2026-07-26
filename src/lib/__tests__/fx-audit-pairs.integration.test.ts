@@ -111,10 +111,19 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     const t1 = Date.now();
 
     for (const p of pairs) {
-      expect(p.source).toBe("frankfurter");
+      // Only one direction of each unordered pair is actually fetched; the
+      // reverse row is derived as 1/rate from that same quote and carries
+      // the source suffixed with ":inverse".
+      expect(["frankfurter", "frankfurter:inverse"]).toContain(p.source);
       expect(p.stale).toBe(false);
-      const expected = FRANKFURTER_RATES[p.from][p.to];
-      expect(p.rate).toBeCloseTo(expected, 10);
+      if (p.source === "frankfurter") {
+        const expected = FRANKFURTER_RATES[p.from][p.to];
+        expect(p.rate).toBeCloseTo(expected, 10);
+      } else {
+        // Inverse row: rate must equal 1 / (provider quote for the reverse pair).
+        const providerReverse = FRANKFURTER_RATES[p.to][p.from];
+        expect(p.rate).toBeCloseTo(1 / providerReverse, 10);
+      }
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
       const obsMs = Date.parse(p.observedAt);
       expect(obsMs).toBeGreaterThanOrEqual(t0 - 5);
@@ -132,13 +141,19 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     const { buildFxAuditPairs } = await loadHelpers();
     const pairs = await buildFxAuditPairs();
     for (const p of pairs) {
-      expect(p.source).toBe("er-api");
+      expect(["er-api", "er-api:inverse"]).toContain(p.source);
       expect(p.stale).toBe(false);
-      const expected = ER_API_RATES[p.from][p.to];
-      expect(p.rate).toBeCloseTo(expected, 10);
+      if (p.source === "er-api") {
+        const expected = ER_API_RATES[p.from][p.to];
+        expect(p.rate).toBeCloseTo(expected, 10);
+      } else {
+        const providerReverse = ER_API_RATES[p.to][p.from];
+        expect(p.rate).toBeCloseTo(1 / providerReverse, 10);
+      }
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
     }
   });
+
 
   it("cache: second call inside the TTL reports source=cache and observedAt equal to the original fetch time", async () => {
     mockFetch((url) => {
@@ -160,7 +175,7 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     });
     const second = await buildFxAuditPairs();
     for (const p of second) {
-      expect(p.source).toBe("cache");
+      expect(["cache", "cache:inverse"]).toContain(p.source);
       expect(p.stale).toBe(false);
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
       // Cache observedAt MUST equal the original fetch time — not "now".
@@ -178,6 +193,9 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     const firstObserved = new Map(
       first.map((p) => [`${p.from}${p.to}`, p.observedAt]),
     );
+    const firstRates = new Map(
+      first.map((p) => [`${p.from}${p.to}`, p.rate]),
+    );
 
     vi.useFakeTimers();
     vi.setSystemTime(Date.now() + 11 * 60_000); // past 10 min TTL
@@ -190,10 +208,12 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     });
     const second = await buildFxAuditPairs();
     for (const p of second) {
-      expect(p.source).toBe("cache-stale");
+      expect(["cache-stale", "cache-stale:inverse"]).toContain(p.source);
       expect(p.stale).toBe(true);
-      const expected = FRANKFURTER_RATES[p.from][p.to];
-      expect(p.rate).toBeCloseTo(expected, 10);
+      // Rate stays identical to the original — for direct rows that is the
+      // provider quote; for derived rows it is 1/(direct quote), which was
+      // already computed in the first pass.
+      expect(p.rate).toBeCloseTo(firstRates.get(`${p.from}${p.to}`)!, 10);
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
       expect(p.observedAt).toBe(firstObserved.get(`${p.from}${p.to}`));
     }
@@ -212,9 +232,8 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     expect(pairs).toHaveLength(6);
     for (const p of pairs) {
       // The critical loud-failure invariant: identity fallback MUST NEVER
-      // masquerade as a live provider. If any row ever reports rate=1 with
-      // source=frankfurter|er-api|cache, the sizing layer would silently
-      // trade on a bogus 1:1 cross-rate — this assertion catches that.
+      // masquerade as a live provider. Direct rows report "fallback:*",
+      // derived rows report "fallback:*:inverse" — both are unambiguous.
       expect(p.rate).toBe(1);
       expect(p.stale).toBe(true);
       expect(p.source.startsWith("fallback:")).toBe(true);
@@ -222,6 +241,7 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
       expect(p.impliedInverse).toBe(1);
     }
   });
+
 
   it("mixed provider health: if just one pair fails while others succeed, the failing row is flagged loudly and the healthy rows keep their live source/inverse", async () => {
     // Simulate GBP→EUR missing from BOTH providers while the other pairs
@@ -253,19 +273,28 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     });
     const { buildFxAuditPairs } = await loadHelpers();
     const pairs = await buildFxAuditPairs();
-    const bad = pairs.find((p) => p.from === "GBP" && p.to === "EUR");
-    expect(bad).toBeDefined();
-    expect(bad!.rate).toBe(1);
-    expect(bad!.stale).toBe(true);
-    expect(bad!.source.startsWith("fallback:")).toBe(true);
+    // GBP→EUR is the direct fetch that failed; its inverse EUR→GBP is
+    // derived from the same (fallback) quote, so both rows must flag.
+    const bad = pairs.filter(
+      (p) =>
+        (p.from === "GBP" && p.to === "EUR") ||
+        (p.from === "EUR" && p.to === "GBP"),
+    );
+    expect(bad).toHaveLength(2);
+    for (const b of bad) {
+      expect(b.rate).toBe(1);
+      expect(b.stale).toBe(true);
+      expect(b.source.startsWith("fallback:")).toBe(true);
+    }
 
     for (const p of pairs) {
-      if (p === bad) continue;
+      if (bad.includes(p)) continue;
       // Everything else must be a real live rate, not identity, not stale.
       expect(p.rate).not.toBe(1);
       expect(p.stale).toBe(false);
-      expect(["frankfurter", "er-api"]).toContain(p.source);
+      expect(["frankfurter", "er-api", "frankfurter:inverse", "er-api:inverse"]).toContain(p.source);
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
     }
   });
+
 });

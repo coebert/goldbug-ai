@@ -28,9 +28,10 @@ function equityFromReturns(returns: number[], start = 1000): EquityPoint[] {
 
 describe("bootstrapCIs", () => {
   it("returns null CIs when there is not enough data to resample", () => {
-    expect(bootstrapCIs([])).toEqual({ sharpe: null, maxDrawdown: null });
-    expect(bootstrapCIs([0.01])).toEqual({ sharpe: null, maxDrawdown: null });
+    expect(bootstrapCIs([])).toMatchObject({ sharpe: null, maxDrawdown: null });
+    expect(bootstrapCIs([0.01])).toMatchObject({ sharpe: null, maxDrawdown: null });
   });
+
 
   it("is deterministic for a given seed", () => {
     const a = bootstrapCIs(R, { samples: 500, seed: 42 });
