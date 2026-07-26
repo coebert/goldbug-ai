@@ -2164,6 +2164,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           : { skipped: true },
       },
       regime: regime ?? null,
+      tail_hedge: tailHedgeDecision,
       learning: {
         stats: learning.stats,
         lessons: learning.lessons,
