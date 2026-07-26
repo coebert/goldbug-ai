@@ -439,7 +439,7 @@ export function runPhaseBacktest(
       const bar = bySym.get(sym)?.get(date);
       endMv += pos.qty * (bar?.close ?? pos.prevClose);
     }
-    equity.push({ date, equity: cash + endMv + hedgeNotional });
+    equity.push({ date, equity: cash + endMv + hedgeMv(date) });
   }
 
   const metrics: RunMetrics = {
