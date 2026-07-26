@@ -62,6 +62,20 @@ export type CryptoSymbolContribution = {
   contributionPct: number; // fraction of total equity delta attributable to this symbol
 };
 
+export type CryptoBenchmarkPoint = { date: string; equity: number };
+
+export type CryptoBenchmarkReport = {
+  label: string;              // "Sleeve", "BTC buy & hold", "ETH buy & hold", "Cash"
+  symbol: string | null;      // null for cash
+  finalEquity: number;
+  totalReturnPct: number;
+  cagrPct: number;
+  maxDrawdownPct: number;
+  sharpe: number;
+  volatilityPctAnnual: number;
+  equityCurve: CryptoBenchmarkPoint[];
+};
+
 export type CryptoBacktestReport = {
   from: string;
   to: string;
@@ -78,7 +92,12 @@ export type CryptoBacktestReport = {
   bucketDayCount: Record<CryptoRegimeBucket, number>;
   bySymbol: CryptoSymbolContribution[];
   equityCurve: CryptoBacktestPoint[];
+  /** Same-window, same-starting-cash benchmarks so users can gauge whether
+   *  the playbook actually adds value over the two obvious passive
+   *  alternatives plus a do-nothing cash baseline. */
+  benchmarks: CryptoBenchmarkReport[];
 };
+
 
 // --- Regime derivation ------------------------------------------------------
 
