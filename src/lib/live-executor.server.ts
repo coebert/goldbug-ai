@@ -386,6 +386,7 @@ export async function routeOrdersToBroker(params: {
   // meaningfully more cash than we had when the reject was recorded.
   const LEARN_LOCKOUT_HOURS = 24;
   try {
+    const { decideInsufficientCashLockout } = await import("./insufficient-cash-lockout");
     const cutoff = new Date(Date.now() - LEARN_LOCKOUT_HOURS * 3600_000).toISOString();
     const { data: recentRejects } = await supabaseAdmin
       .from("live_orders")
@@ -408,20 +409,20 @@ export async function routeOrdersToBroker(params: {
         .gt("created_at", newestRejectAt)
         .order("created_at", { ascending: false })
         .limit(20);
-      const observed = (syncsAfter ?? [])
-        .map((r) => Number((r.response as { brokerCash?: number } | null)?.brokerCash ?? NaN))
-        .filter((n) => Number.isFinite(n));
-      const maxSince = observed.length > 0 ? Math.max(...observed) : NaN;
-      const minSince = observed.length > 0 ? Math.min(...observed) : NaN;
-      const materiallyGrew =
-        Number.isFinite(maxSince) &&
-        Number.isFinite(minSince) &&
-        maxSince > 0 &&
-        maxSince - minSince >= Math.max(5, minSince * 0.05);
-      if (!materiallyGrew) {
-        const reason = `broker rejected buys with InsufficientCash within last ${LEARN_LOCKOUT_HOURS}h; buys locked out until broker cash grows`;
+      const decision = decideInsufficientCashLockout({
+        rejects: rejects.map((r) => ({
+          at: r.updated_at as string,
+          symbol: r.symbol as string,
+          quantity: Number(r.quantity),
+        })),
+        cashSyncs: (syncsAfter ?? []).map((r) => ({
+          at: r.created_at as string,
+          brokerCash: Number((r.response as { brokerCash?: number } | null)?.brokerCash ?? NaN),
+        })),
+      });
+      if (decision.lockout) {
         for (const o of routable) {
-          if (o.side === "buy") preSkips.set(`${o.symbol}:${o.side}`, reason);
+          if (o.side === "buy") preSkips.set(`${o.symbol}:${o.side}`, decision.reason!);
         }
         await supabaseAdmin.from("live_broker_log").insert({
           portfolio_id: portfolio.id,
@@ -445,15 +446,20 @@ export async function routeOrdersToBroker(params: {
               quantity: Number(r.quantity),
               at: r.updated_at,
             })),
-            cashSinceReject: { min: minSince, max: maxSince, samples: observed.length },
+            cashSinceReject: {
+              min: decision.stats.minCashSinceReject,
+              max: decision.stats.maxCashSinceReject,
+              samples: decision.stats.samplesSinceReject,
+            },
           }),
-          error: reason,
+          error: decision.reason,
         });
       }
     }
   } catch {
     // Never let the lockout heuristic itself crash the tick.
   }
+
 
 
 
