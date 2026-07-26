@@ -20,6 +20,12 @@ export type AllPortfoliosEquity = {
   series: Array<Record<string, string | number>>;
   perPortfolioSeries: Record<string, PortfolioEquityPoint[]>;
   currency: string;
+  /** True when >1 distinct portfolio currency is present. Series totals
+   *  (`total_sim`, `total_real`) are only meaningful when every portfolio
+   *  reports the same currency; the UI must show a warning otherwise. */
+  mixedCurrency: boolean;
+  /** Distinct currencies observed across the portfolio list. */
+  currencies: string[];
 };
 
 function toNumber(value: number | string | null | undefined, fallback = 0) {
