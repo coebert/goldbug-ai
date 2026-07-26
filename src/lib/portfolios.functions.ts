@@ -213,7 +213,28 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       logSnapshotTimingMismatches(mismatches);
     }
 
-    return { ...built, mismatches, deposits, brokerCurrencyByPortfolio };
+    const { data: allHoldings } = await context.supabase
+      .from("holdings")
+      .select("portfolio_id,symbol,quantity,avg_cost,asset_class")
+      .in("portfolio_id", ids);
+    const holdingsByPortfolio: Record<
+      string,
+      Array<{ symbol: string; quantity: number; avg_cost: number; asset_class: string | null }>
+    > = {};
+    for (const h of allHoldings ?? []) {
+      if (!h.portfolio_id || !h.symbol) continue;
+      const qty = Number(h.quantity);
+      const avg = Number(h.avg_cost);
+      if (!Number.isFinite(qty) || qty === 0) continue;
+      (holdingsByPortfolio[h.portfolio_id] ??= []).push({
+        symbol: h.symbol,
+        quantity: qty,
+        avg_cost: Number.isFinite(avg) ? avg : 0,
+        asset_class: (h as { asset_class?: string | null }).asset_class ?? null,
+      });
+    }
+
+    return { ...built, mismatches, deposits, brokerCurrencyByPortfolio, holdingsByPortfolio };
   });
 
 export const getPortfolio = createServerFn({ method: "GET" })
