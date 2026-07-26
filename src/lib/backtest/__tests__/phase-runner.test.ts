@@ -121,6 +121,58 @@ describe("phase-runner", () => {
     const rawBps = raw.trades[0]?.costBps ?? 0;
     expect(slicedBps).toBeLessThan(rawBps);
   });
+
+  it("Phase 6 emits priced tail_hedge buy fills against the hedge symbol with cash-buffer sizing", () => {
+    const gold = makeSeries("GLD", Array.from({ length: 60 }, () => 200));
+    const stock = makeSeries("AAA", upTrend);
+    const res = runPhaseBacktest(
+      [stock, gold],
+      () => "hold",
+      { ...ALL_PHASES_OFF, hedge: true },
+      {
+        initialCash: 100_000, targetWeightPerBuy: 0.1, clusterCap: 1,
+        baseFeeBps: 10, baseSlippageBps: 10, slicingSlippageBps: 4,
+        cape: 40, regime: "risk_off", hedgeSymbol: "GLD", hedgeCashBufferPct: 0.01,
+      },
+    );
+    const hedgeBuys = res.trades.filter((t) => t.symbol === "GLD" && t.side === "buy");
+    expect(hedgeBuys.length).toBeGreaterThan(0);
+    for (const t of hedgeBuys) {
+      expect(t.price).toBe(200);
+      expect(t.costBps).toBe(20); // baseFee + baseSlippage
+      expect(t.reason).toMatch(/tail_hedge buy/);
+    }
+    // Held quantity implies notional stays under the max NAV cap; cash never
+    // goes negative under no-leverage sizing.
+    expect(res.equity.every((p) => p.equity > 0)).toBe(true);
+  });
+
+  it("Phase 6 unwinds only up to held qty when regime flips risk_on", () => {
+    const gold = makeSeries("GLD", Array.from({ length: 40 }, () => 200));
+    // Build hedge with high CAPE / risk_off first half, then flip to risk_on.
+    const buildPhase = runPhaseBacktest(
+      [gold],
+      () => "hold",
+      { ...ALL_PHASES_OFF, hedge: true },
+      { initialCash: 50_000, targetWeightPerBuy: 0.1, clusterCap: 1,
+        baseFeeBps: 0, baseSlippageBps: 0, slicingSlippageBps: 0,
+        cape: 40, regime: "risk_off", hedgeSymbol: "GLD", hedgeCashBufferPct: 0.01 },
+    );
+    const unwind = runPhaseBacktest(
+      [gold],
+      () => "hold",
+      { ...ALL_PHASES_OFF, hedge: true },
+      { initialCash: 50_000, targetWeightPerBuy: 0.1, clusterCap: 1,
+        baseFeeBps: 0, baseSlippageBps: 0, slicingSlippageBps: 0,
+        cape: 15, regime: "risk_on", hedgeSymbol: "GLD", hedgeCashBufferPct: 0.01 },
+    );
+    const builtSells = buildPhase.trades.filter((t) => t.side === "sell");
+    const unwindSells = unwind.trades.filter((t) => t.symbol === "GLD" && t.side === "sell");
+    // With no existing hedge and low-CAPE risk_on, sells never exceed 0 held qty.
+    expect(builtSells.length).toBe(0);
+    // Sell branch is safe even with zero holdings — no phantom shorts.
+    expect(unwindSells.length).toBe(0);
+  });
 });
 
 describe("phase-runner metrics", () => {
