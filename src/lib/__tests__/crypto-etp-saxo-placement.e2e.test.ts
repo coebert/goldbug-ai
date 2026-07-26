@@ -70,7 +70,7 @@ function makeFakeSaxo(env: "sim" | "live"): {
       // Adapter is only ever reached AFTER sleeve + execution + pre-trade
       // gates approve the order, so any call here means the pipeline
       // considered it economic and routable.
-      placed.push({ ...req, placedNotionalLocal: 0 });
+      placed.push({ ...req, placedNotionalLocal: req.quantity * (req.limitPrice ?? 0) });
       return {
         brokerOrderId: `sim-${req.clientOrderId}`,
         status: "submitted",
