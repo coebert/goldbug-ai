@@ -8,7 +8,7 @@ import { scoreCarry } from "./carry";
 import { scoreMeanReversion } from "./mean-reversion";
 import { scoreQuality } from "./quality";
 import { scoreTrend } from "./trend";
-import { weightsForRegime } from "./regime-matrix";
+import { effectiveWeightsForRegime } from "./regime-matrix";
 import { clamp1, type AlphaModelKind, type AlphaScore, type CompositeScore, type FeatureLike } from "./types";
 
 const MODELS: Array<(f: FeatureLike) => AlphaScore> = [
