@@ -2055,33 +2055,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }, 0);
   const newTotal = workingCash + newHoldingsValue;
 
-  // Phase 6 — Tail hedge overlay (advisory). Compute the target hedge
-  // notional now that NAV is known so it can be persisted alongside the
-  // decision. Ratchets vs the previous tick's target notional so the
-  // rebalance threshold avoids churn across runs.
-  let tailHedgeDecision: import("./hedging/tail-hedge").TailHedgeDecision | null = null;
-  try {
-    const { computeTailHedge } = await import("./hedging/tail-hedge");
-    const prev = await admin
-      .from("decisions")
-      .select("raw")
-      .eq("portfolio_id", portfolioId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const prevNotional = Number(
-      (prev.data?.raw as { tail_hedge?: { targetNotional?: number } } | null)
-        ?.tail_hedge?.targetNotional ?? 0,
-    );
-    tailHedgeDecision = computeTailHedge({
-      nav: newTotal,
-      cape: null,
-      regime: effectiveRegime.regime,
-      currentHedgeNotional: Number.isFinite(prevNotional) && prevNotional > 0 ? prevNotional : 0,
-    });
-  } catch (e) {
-    console.warn("tail hedge compute skipped:", e);
-  }
+  // Phase 6 decision + execution telemetry now happens earlier (before the
+  // paper-portfolio trades/holdings writer) so hedge fills land in the same
+  // batch as every other trade. The decision + execution outcome are
+  // persisted in decisions.raw below.
+
+
 
   await admin
     .from("portfolios")
