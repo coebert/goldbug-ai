@@ -1193,6 +1193,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     supabaseAdmin,
     env: (process.env.SAXO_ENV as string) || "sim",
   });
+  // Same shape for the crypto ETP sleeve — confirms Saxo-routability of
+  // physically-backed ETPs before a buy is sized. Spot pairs (BTC-USD) are
+  // fail-fast rejected by the classifier so they never leak to the broker.
+  const { makeCryptoValidator } = await import("./crypto-validation.server");
+  const validateCrypto = makeCryptoValidator({
+    supabaseAdmin,
+    env: (process.env.SAXO_ENV as string) || "sim",
+  });
 
   for (const order of sorted) {
     const sym = order.symbol.toUpperCase();
@@ -1353,6 +1361,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           });
           continue;
         }
+
         const atrP = cfeat?.atr_pct ?? null;
         if (cfg.commodity_max_atr_pct > 0 && atrP != null && atrP > cfg.commodity_max_atr_pct) {
           executed.push({
@@ -1360,6 +1369,27 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             reason: order.reason,
             rejected: `commodity ${meta.symbol} blocked: 14d ATR ${(atrP * 100).toFixed(2)}% exceeds max ${(cfg.commodity_max_atr_pct * 100).toFixed(2)}%`,
             liquidity: commodityLiquidity,
+          });
+          continue;
+        }
+      }
+
+      // Crypto-only pre-trade validation. Mirror of the commodity gate: confirms
+      // the proposed ETP is Saxo-routable, has a live price, and has the
+      // feature row the sizer needs. Spot pairs (BTC-USD etc.) are rejected
+      // here even though the live_prod broker filter also drops them, so
+      // sim/backtest proposals surface the same clear reason.
+      if (meta.asset_class === "crypto") {
+        const kval = await validateCrypto({
+          symbol: meta.symbol,
+          side: "buy",
+          price,
+          hasFeatureRow: featureBySymbol.has(meta.symbol),
+        });
+        if (!kval.ok) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason, rejected: kval.reason ?? "crypto validation failed",
           });
           continue;
         }
