@@ -71,9 +71,6 @@ export function applyTailHedgeToPaperPortfolio(
   if (decision.action === "hold" || Math.abs(decision.deltaNotional) < 1) {
     return { ...base, reason: `hold: ${decision.reason}` };
   }
-  if (isLivePortfolio) {
-    return { ...base, reason: "live portfolio — hedge routing deferred to broker executor" };
-  }
 
   const symbol = (input.hedgeSymbol && input.hedgeSymbol.trim())
     || defaultHedgeSymbolFor(portfolioCurrency);
@@ -84,6 +81,14 @@ export function applyTailHedgeToPaperPortfolio(
 
   const executedAt = new Date().toISOString();
 
+  // Shared no-leverage / no-borrow sizing. For BOTH paper and live modes:
+  //   buy  → capped at workingCash * (1 - buffer) (cash-only, never borrow)
+  //   sell → capped at current holdings quantity (never short)
+  // For live portfolios we additionally do NOT mutate holdingsByS/workingCash;
+  // the broker is authoritative and live-holdings-sync reconciles the mirror
+  // after routeOrdersToBroker submits the resulting ExecutedTrade to Saxo.
+  const mutateLocalState = !isLivePortfolio;
+
   if (decision.action === "buy") {
     const affordable = Math.max(0, workingCash * (1 - bufferPct));
     const spend = Math.min(decision.deltaNotional, affordable);
@@ -91,38 +96,41 @@ export function applyTailHedgeToPaperPortfolio(
       return { ...base, symbol, reason: `insufficient cash for 1 share of ${symbol}` };
     }
     const qty = spend / price;
-    workingCash -= qty * price;
 
-    const cur = holdingsByS.get(symbol);
-    if (cur) {
-      const newQty = Number(cur.quantity) + qty;
-      const newCost = (Number(cur.avg_cost) * Number(cur.quantity) + qty * price) / newQty;
-      const curHwm = Number(
-        (cur as unknown as { high_water_mark?: number | null }).high_water_mark ?? Number(cur.avg_cost),
-      );
-      holdingsByS.set(symbol, {
-        ...cur,
-        quantity: newQty,
-        avg_cost: newCost,
-        high_water_mark: Math.max(curHwm, price),
-      } as Holding);
-    } else {
-      holdingsByS.set(symbol, {
-        id: crypto.randomUUID(),
-        portfolio_id: portfolioId,
-        symbol,
-        asset_class: meta.asset_class,
-        quantity: qty,
-        avg_cost: price,
-        updated_at: executedAt,
-        opened_at: executedAt,
-        high_water_mark: price,
-      } as Holding);
+    if (mutateLocalState) {
+      workingCash -= qty * price;
+      const cur = holdingsByS.get(symbol);
+      if (cur) {
+        const newQty = Number(cur.quantity) + qty;
+        const newCost = (Number(cur.avg_cost) * Number(cur.quantity) + qty * price) / newQty;
+        const curHwm = Number(
+          (cur as unknown as { high_water_mark?: number | null }).high_water_mark ?? Number(cur.avg_cost),
+        );
+        holdingsByS.set(symbol, {
+          ...cur,
+          quantity: newQty,
+          avg_cost: newCost,
+          high_water_mark: Math.max(curHwm, price),
+        } as Holding);
+      } else {
+        holdingsByS.set(symbol, {
+          id: crypto.randomUUID(),
+          portfolio_id: portfolioId,
+          symbol,
+          asset_class: meta.asset_class,
+          quantity: qty,
+          avg_cost: price,
+          updated_at: executedAt,
+          opened_at: executedAt,
+          high_water_mark: price,
+        } as Holding);
+      }
     }
 
+    const routingNote = isLivePortfolio ? " [live: routed via broker executor]" : "";
     const trade: ExecutedTrade = {
       symbol, side: "buy", quantity: qty, price, value: qty * price,
-      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})`,
+      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${routingNote}`,
     };
     return {
       applied: true, workingCash, symbol, qty, notional: qty * price,
@@ -131,6 +139,8 @@ export function applyTailHedgeToPaperPortfolio(
   }
 
   // action === "sell": unwind up to |delta| notional of the existing hedge.
+  // No-borrow: never sell more than the current held quantity (mirrored from
+  // broker for live modes by live-holdings-sync).
   const cur = holdingsByS.get(symbol);
   if (!cur || Number(cur.quantity) <= 1e-8) {
     return { ...base, symbol, reason: `no ${symbol} to unwind` };
@@ -139,14 +149,17 @@ export function applyTailHedgeToPaperPortfolio(
   const qty = Math.min(Number(cur.quantity), wantQty);
   if (qty <= 0) return { ...base, symbol, reason: "computed sell qty is zero" };
 
-  const remaining = Number(cur.quantity) - qty;
-  workingCash += qty * price;
-  if (remaining <= 1e-8) holdingsByS.delete(symbol);
-  else holdingsByS.set(symbol, { ...cur, quantity: remaining } as Holding);
+  if (mutateLocalState) {
+    const remaining = Number(cur.quantity) - qty;
+    workingCash += qty * price;
+    if (remaining <= 1e-8) holdingsByS.delete(symbol);
+    else holdingsByS.set(symbol, { ...cur, quantity: remaining } as Holding);
+  }
 
+  const routingNote = isLivePortfolio ? " [live: routed via broker executor]" : "";
   const trade: ExecutedTrade = {
     symbol, side: "sell", quantity: qty, price, value: qty * price,
-    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})`,
+    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${routingNote}`,
   };
   return {
     applied: true, workingCash, symbol, qty, notional: qty * price,
