@@ -116,7 +116,16 @@ export function TailHedgeReportCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base">Tail hedge report (Phase 6)</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2">
+          Tail hedge report (Phase 6)
+          <span
+            className="inline-flex items-center gap-1 text-[10px] font-normal text-muted-foreground"
+            title="Auto-refreshes when the engine records a new hedge decision or the broker files a fill for this portfolio."
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            live
+          </span>
+        </CardTitle>
         <div className="flex gap-1">
           {WINDOWS.map((w, i) => (
             <Button
