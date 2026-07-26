@@ -47,6 +47,13 @@ export const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
+export type PortfolioHoldingSummary = {
+  symbol: string;
+  quantity: number;
+  avg_cost: number;
+  asset_class?: string | null;
+};
+
 export function PortfolioRow({
   portfolio,
   sparkSeries,
@@ -59,6 +66,7 @@ export function PortfolioRow({
   equityDecimals = 2,
   defaultRange = "1M",
   brokerCurrency = null,
+  holdings = [],
 }: {
   portfolio: {
     id: string;
@@ -81,6 +89,7 @@ export function PortfolioRow({
   equityDecimals?: number;
   defaultRange?: SparkRange;
   brokerCurrency?: string | null;
+  holdings?: PortfolioHoldingSummary[];
 }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>(defaultRange);
   const sliced = useMemo(() => {
