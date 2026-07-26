@@ -228,7 +228,7 @@ export async function maybeSliceOrder(input: SliceInput) {
       status: "active",
       idempotency_key: clean.idempotencyKey ?? null,
       strategy,
-      schedule_json: schedule as unknown as Record<string, unknown>[],
+      schedule_json: JSON.parse(JSON.stringify(schedule)),
       adv_notional: clean.advNotional ?? null,
     })
     .select("id")
