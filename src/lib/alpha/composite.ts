@@ -16,7 +16,7 @@ const MODELS: Array<(f: FeatureLike) => AlphaScore> = [
 ];
 
 export function scoreCandidate(f: FeatureLike, regime: string | null | undefined): CompositeScore {
-  const weights = weightsForRegime(regime);
+  const weights = effectiveWeightsForRegime(regime);
   const perModel: Partial<Record<AlphaModelKind, number>> = {};
   const rationales: Partial<Record<AlphaModelKind, string>> = {};
   let composite = 0;
@@ -62,7 +62,7 @@ export function formatAlphaPriorsForPrompt(
   regime: string | null | undefined,
   topN = 10,
 ): string {
-  const weights = weightsForRegime(regime);
+  const weights = effectiveWeightsForRegime(regime);
   const sorted = [...scores].sort((a, b) => b.composite - a.composite);
   const longs = sorted.slice(0, topN).filter((s) => s.composite > 0.05);
   const avoids = sorted.slice(-topN).reverse().filter((s) => s.composite < -0.05);
