@@ -1193,6 +1193,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     supabaseAdmin,
     env: (process.env.SAXO_ENV as string) || "sim",
   });
+  // Same shape for the crypto ETP sleeve — confirms Saxo-routability of
+  // physically-backed ETPs before a buy is sized. Spot pairs (BTC-USD) are
+  // fail-fast rejected by the classifier so they never leak to the broker.
+  const { makeCryptoValidator } = await import("./crypto-validation.server");
+  const validateCrypto = makeCryptoValidator({
+    supabaseAdmin,
+    env: (process.env.SAXO_ENV as string) || "sim",
+  });
 
   for (const order of sorted) {
     const sym = order.symbol.toUpperCase();
