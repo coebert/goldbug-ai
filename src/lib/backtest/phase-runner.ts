@@ -236,8 +236,27 @@ export function runPhaseBacktest(
   const trades: Trade[] = [];
   const equity: EquityPoint[] = [];
 
+  const positions: Record<string, Position> = {};
+  let cash = cfg.initialCash;
+  // Phase 6 hedge state — priced against a real symbol so fills mirror the
+  // executor: qty is tracked, buys pay cash (minus a buffer), sells return
+  // cash, both incur the same fee/slippage bps as any other trade.
+  const hedgeSymbol = cfg.hedgeSymbol ?? DEFAULT_CONFIG.hedgeSymbol!;
+  const hedgeBufferPct = cfg.hedgeCashBufferPct ?? DEFAULT_CONFIG.hedgeCashBufferPct!;
+  const hedgeHasSeries = bySym.has(hedgeSymbol);
+  let hedgeQty = 0;
+  let hedgePrevClose = 0;
+  const trades: Trade[] = [];
+  const equity: EquityPoint[] = [];
+
   const perSideCostBps = (sliced: boolean): number =>
     cfg.baseFeeBps + (sliced ? cfg.slicingSlippageBps : cfg.baseSlippageBps);
+
+  const hedgePriceOn = (date: string): number => {
+    const bar = bySym.get(hedgeSymbol)?.get(date);
+    return bar?.close ?? hedgePrevClose;
+  };
+  const hedgeMv = (date: string): number => hedgeQty * hedgePriceOn(date);
 
   for (const date of dates) {
     // Mark-to-market at today's close, then act.
@@ -247,7 +266,7 @@ export function runPhaseBacktest(
       if (bar) mv += pos.qty * bar.close;
       else mv += pos.qty * pos.prevClose;
     }
-    const nav = cash + mv + hedgeNotional;
+    const nav = cash + mv + hedgeMv(date);
 
     // Phase 3: advance trailing stops using today's bar; force-exit if hit.
     if (flags.trailing) {
