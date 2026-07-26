@@ -396,6 +396,34 @@ export function runCryptoPlaybookBacktest(opts: CryptoBacktestOpts): CryptoBackt
     };
   });
 
+  // ---- Benchmarks (same window, same starting cash) ----
+  const benchmarks: CryptoBenchmarkReport[] = [];
+  const sleeveCurve: CryptoBenchmarkPoint[] = equityCurve.map((p) => ({ date: p.date, equity: p.equity }));
+  benchmarks.push(summariseBenchmarkCurve(`Sleeve (${opts.riskLevel})`, null, sleeveCurve, opts.startingCash, rf));
+
+  const btcHold = opts.symbols.find((s) => s.group === "BTC");
+  if (btcHold) {
+    benchmarks.push(
+      summariseBenchmarkCurve("BTC buy & hold", btcHold.symbol, buildBuyHoldCurve(days, closesBySymbol.get(btcHold.symbol), opts.startingCash, cost), opts.startingCash, rf),
+    );
+  }
+  const ethHold = opts.symbols.find((s) => s.group === "ETH");
+  if (ethHold) {
+    benchmarks.push(
+      summariseBenchmarkCurve("ETH buy & hold", ethHold.symbol, buildBuyHoldCurve(days, closesBySymbol.get(ethHold.symbol), opts.startingCash, cost), opts.startingCash, rf),
+    );
+  }
+  // Cash baseline: risk-free compounded daily.
+  benchmarks.push(
+    summariseBenchmarkCurve(
+      rf > 0 ? `Cash @ ${(rf * 100).toFixed(1)}%` : "Cash (flat)",
+      null,
+      buildCashCurve(days, opts.startingCash, rf),
+      opts.startingCash,
+      rf,
+    ),
+  );
+
   return {
     from: opts.from,
     to: opts.to,
@@ -412,8 +440,91 @@ export function runCryptoPlaybookBacktest(opts: CryptoBacktestOpts): CryptoBackt
     bucketDayCount,
     bySymbol,
     equityCurve,
+    benchmarks,
   };
 }
+
+function buildBuyHoldCurve(
+  days: string[],
+  series: { dates: string[]; closes: number[]; index: Map<string, number> } | undefined,
+  startingCash: number,
+  costBps: number,
+): CryptoBenchmarkPoint[] {
+  const out: CryptoBenchmarkPoint[] = [];
+  if (!series || days.length === 0) return out;
+  // Find first day in the window with a price; buy all-in at that close net of one-way cost.
+  let entryPrice = 0;
+  for (const d of days) {
+    const idx = series.index.get(d);
+    if (idx != null) { entryPrice = series.closes[idx]; break; }
+  }
+  if (!(entryPrice > 0)) {
+    // No data — flat.
+    return days.map((d) => ({ date: d, equity: startingCash }));
+  }
+  const netCash = startingCash * (1 - costBps);
+  const units = netCash / entryPrice;
+  let lastPrice = entryPrice;
+  for (const d of days) {
+    const idx = series.index.get(d);
+    if (idx != null) lastPrice = series.closes[idx];
+    out.push({ date: d, equity: units * lastPrice });
+  }
+  return out;
+}
+
+function buildCashCurve(days: string[], startingCash: number, rfAnnual: number): CryptoBenchmarkPoint[] {
+  const daily = rfAnnual > 0 ? Math.pow(1 + rfAnnual, 1 / 252) - 1 : 0;
+  const out: CryptoBenchmarkPoint[] = [];
+  let equity = startingCash;
+  for (const d of days) {
+    equity = equity * (1 + daily);
+    out.push({ date: d, equity });
+  }
+  return out;
+}
+
+function summariseBenchmarkCurve(
+  label: string,
+  symbol: string | null,
+  curve: CryptoBenchmarkPoint[],
+  startingCash: number,
+  rfAnnual: number,
+): CryptoBenchmarkReport {
+  const final = curve.length ? curve[curve.length - 1].equity : startingCash;
+  const totalReturn = startingCash > 0 ? final / startingCash - 1 : 0;
+  const years = Math.max(1 / 365, curve.length / 252);
+  const cagr = startingCash > 0 ? Math.pow(final / startingCash, 1 / years) - 1 : 0;
+  let peak = startingCash;
+  let maxDd = 0;
+  const rets: number[] = [];
+  let prev = startingCash;
+  for (const p of curve) {
+    if (p.equity > peak) peak = p.equity;
+    const dd = peak > 0 ? (peak - p.equity) / peak : 0;
+    if (dd > maxDd) maxDd = dd;
+    if (prev > 0) rets.push((p.equity - prev) / prev);
+    prev = p.equity;
+  }
+  const mean = rets.reduce((a, b) => a + b, 0) / Math.max(1, rets.length);
+  const varr = rets.length > 1 ? rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length - 1) : 0;
+  const stdev = Math.sqrt(varr);
+  const annVol = stdev * Math.sqrt(252);
+  const dailyRf = rfAnnual / 252;
+  const sharpe = stdev > 0 ? ((mean - dailyRf) / stdev) * Math.sqrt(252) : 0;
+  return {
+    label,
+    symbol,
+    finalEquity: final,
+    totalReturnPct: totalReturn,
+    cagrPct: cagr,
+    maxDrawdownPct: maxDd,
+    sharpe,
+    volatilityPctAnnual: annVol,
+    equityCurve: curve,
+  };
+}
+
 
 // -- Convenience: the six approved crypto ETPs mapped to their groups.
 export const CRYPTO_BACKTEST_SYMBOLS: Array<{ symbol: string; group: CryptoGroup }> = [
