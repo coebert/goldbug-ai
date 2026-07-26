@@ -447,6 +447,43 @@ export class SaxoAdapter implements BrokerAdapter {
       currency: hit.CurrencyCode ?? null, exchange_id: hit.ExchangeId ?? null,
       raw: asJson(hit), refreshed_at: new Date().toISOString(),
     });
+    // Whenever a cache row for an approved crypto ETP changes, verify the
+    // crypto universe is still fully covered / correctly typed / fresh.
+    // Drift is logged (not thrown) so a single symbol refresh never
+    // blocks order placement — the tick loop already fails-closed on a
+    // missing / wrong / stale row via `crypto-validation.server.ts`.
+    try {
+      const { isApprovedCryptoEtp, validateCryptoCacheSync } = await import(
+        "@/lib/crypto-cache-sync"
+      );
+      if (isApprovedCryptoEtp(symbol)) {
+        const snap = await supabaseAdmin
+          .from("saxo_instrument_cache")
+          .select("symbol, env, asset_type, refreshed_at")
+          .eq("env", this.env);
+        const report = validateCryptoCacheSync({
+          env: this.env,
+          cacheRows: (snap.data ?? []) as Array<{
+            symbol: string; env: string; asset_type: string | null; refreshed_at: string | null;
+          }>,
+        });
+        if (!report.ok) {
+          await log({
+            portfolioId: this.portfolioId,
+            userId: this.userId,
+            env: this.env,
+            method: "CRYPTO_CACHE_SYNC_WARN",
+            path: "/saxo_instrument_cache",
+            status: 200,
+            request: { triggeredBy: symbol },
+            response: report,
+            error: report.summary,
+          });
+        }
+      }
+    } catch {
+      // Sync check is best-effort — never let it prevent a valid order.
+    }
     return {
       uic: hit.Identifier, assetType: hit.AssetType,
       currency: hit.CurrencyCode ?? "GBP", exchangeId: hit.ExchangeId,
