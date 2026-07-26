@@ -123,6 +123,7 @@ import {
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
+import { TailHedgeCard } from "@/components/tail-hedge-card";
 import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-card";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
 import { FxAuditCard } from "@/components/fx-audit-card";
