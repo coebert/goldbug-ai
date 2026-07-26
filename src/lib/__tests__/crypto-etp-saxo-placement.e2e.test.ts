@@ -142,9 +142,7 @@ async function routeCryptoBuy(
   if (res.status === "rejected" || res.status === "error") {
     return { symbol: p.symbol, status: "rejected", gate: "broker", reason: res.reason ?? res.status };
   }
-  const placedRow = placed[placed.length - 1];
-  placedRow.placedNotionalLocal = qty * exec.fillPrice;
-  return { symbol: p.symbol, status: "placed", qty, notional: placedRow.placedNotionalLocal };
+  return { symbol: p.symbol, status: "placed", qty, notional: qty * exec.fillPrice };
 }
 
 describe("E2E: Saxo order placement for the six crypto ETPs", () => {
