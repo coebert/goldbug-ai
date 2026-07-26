@@ -43,12 +43,17 @@ export function LiveHoldingsCard({
       const avg = Number(h.avg_cost);
       const s = series?.[h.symbol];
       // Prefer live price when we have one, otherwise fall back to cost.
-      const mark = s?.currentPrice ?? avg;
+      // `pricedAtCost` flags rows whose value is computed off `avg_cost`
+      // because the price cache is missing/stale — the UI shows a badge
+      // so users don't mistake a flat P/L row for genuine breakeven.
+      const hasLive = s?.currentPrice != null && Number.isFinite(Number(s.currentPrice));
+      const mark = hasLive ? Number(s!.currentPrice) : avg;
       const value = qty * mark;
       const costBasis = qty * avg;
-      return { ...h, qty, avg, mark, value, costBasis, series: s };
+      return { ...h, qty, avg, mark, value, costBasis, series: s, pricedAtCost: !hasLive };
     })
     .sort((a, b) => b.value - a.value);
+  const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
   const holdingsValue = rows.reduce((s, r) => s + r.value, 0);
   const denom = totalValue > 0 ? totalValue : holdingsValue + cash;
