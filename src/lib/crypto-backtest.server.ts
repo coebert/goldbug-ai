@@ -462,30 +462,35 @@ function buildBuyHoldCurve(
   days: string[],
   series: { dates: string[]; closes: number[]; index: Map<string, number> } | undefined,
   startingCash: number,
-  costBps: number,
+  costPerSide: number,
 ): CryptoBenchmarkPoint[] {
   const out: CryptoBenchmarkPoint[] = [];
   if (!series || days.length === 0) return out;
-  // Find first day in the window with a price; buy all-in at that close net of one-way cost.
+  // Entry: pay fee + slippage on the buy side (same combined per-side cost as
+  // the strategy). Model slippage by lifting the fill price above the close,
+  // matching how the strategy's `open` branch also pays `cost` on entry.
   let entryPrice = 0;
   for (const d of days) {
     const idx = series.index.get(d);
     if (idx != null) { entryPrice = series.closes[idx]; break; }
   }
   if (!(entryPrice > 0)) {
-    // No data — flat.
     return days.map((d) => ({ date: d, equity: startingCash }));
   }
-  const netCash = startingCash * (1 - costBps);
-  const units = netCash / entryPrice;
+  const effectiveEntry = entryPrice * (1 + costPerSide);
+  const units = startingCash / effectiveEntry;
   let lastPrice = entryPrice;
   for (const d of days) {
     const idx = series.index.get(d);
     if (idx != null) lastPrice = series.closes[idx];
+    // Report mark-to-market at the close (raw price), same convention the
+    // strategy uses for open positions in `equityCurve`. Exit-side cost is
+    // only realised on liquidation, which for buy & hold never happens.
     out.push({ date: d, equity: units * lastPrice });
   }
   return out;
 }
+
 
 function buildCashCurve(days: string[], startingCash: number, rfAnnual: number): CryptoBenchmarkPoint[] {
   const daily = rfAnnual > 0 ? Math.pow(1 + rfAnnual, 1 / 252) - 1 : 0;
