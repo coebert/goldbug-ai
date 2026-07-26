@@ -45,10 +45,20 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "VMID.L", name: "Vanguard FTSE 250 ETF", asset_class: "etf" },
   { symbol: "VWRL.L", name: "Vanguard FTSE All-World ETF", asset_class: "etf" },
   { symbol: "VUSA.L", name: "Vanguard S&P 500 ETF (LON)", asset_class: "etf" },
-  // Crypto
+  // Crypto — spot pairs (Yahoo price feed only; NOT Saxo-tradable, kept for
+  // reference/backtesting where the fetchers already understand them).
   { symbol: "BTC-USD", name: "Bitcoin", asset_class: "crypto" },
   { symbol: "ETH-USD", name: "Ethereum", asset_class: "crypto" },
   { symbol: "SOL-USD", name: "Solana", asset_class: "crypto" },
+  // Crypto — Saxo-tradable physically-backed ETPs/ETNs. Cash-account safe
+  // (no futures, leverage or inverse products). See `crypto-groups.ts` for
+  // the group map and `crypto-playbook.server.ts` for entry/exit rules.
+  { symbol: "BTCE.DE", name: "BTCetc Physical Bitcoin (XETRA)", asset_class: "crypto" },
+  { symbol: "ABTC.SW", name: "21Shares Bitcoin ETP (SIX)", asset_class: "crypto" },
+  { symbol: "VBTC.L",  name: "WisdomTree Physical Bitcoin (LON)", asset_class: "crypto" },
+  { symbol: "ZETH.SW", name: "21Shares Ethereum ETP (SIX)", asset_class: "crypto" },
+  { symbol: "ETHE.DE", name: "ETC Group Physical Ethereum (XETRA)", asset_class: "crypto" },
+  { symbol: "HODL.SW", name: "21Shares Crypto Basket Index ETP (SIX)", asset_class: "crypto" },
   // Commodities — LSE-listed physically-backed ETCs/ETFs (Saxo-tradable
   // AssetType=Etc/Etf). Futures pseudo-symbols like GC=F/SI=F/CL=F are
   // intentionally excluded because Saxo cash accounts cannot route them.

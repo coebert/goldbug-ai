@@ -8,6 +8,7 @@ import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { HISTORICAL_PLAYBOOK } from "./historical-playbook.server";
 import { HEDGE_FUND_PLAYBOOK } from "./hedge-fund-playbook.server";
 import { COMMODITY_PLAYBOOK } from "./commodity-playbook.server";
+import { CRYPTO_PLAYBOOK } from "./crypto-playbook.server";
 import {
   buildLearningContext,
   formatLearningBlock,
@@ -354,6 +355,8 @@ ${HISTORICAL_PLAYBOOK}
 ${HEDGE_FUND_PLAYBOOK}
 
 ${COMMODITY_PLAYBOOK}
+
+${CRYPTO_PLAYBOOK}
 
 ${args.fxSystemBlock ?? ""}
 
