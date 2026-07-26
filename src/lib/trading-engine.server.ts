@@ -273,6 +273,7 @@ export async function callAiForDecision(args: {
   fxSystemBlock?: string | null;
   fxUserBlock?: string | null;
   alphaPriors?: string | null;
+  cryptoSignalsBlock?: string | null;
 
 }): Promise<DecisionOutput> {
 
