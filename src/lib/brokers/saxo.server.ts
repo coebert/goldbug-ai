@@ -368,7 +368,14 @@ export class SaxoAdapter implements BrokerAdapter {
     return out;
   }
 
-  async lookupUic(symbol: string): Promise<{
+  // In-flight drift-retry lookups deduped per (env, symbol) so parallel
+  // callers hitting the same drift don't stampede the Saxo /ref/v1 search.
+  private static readonly driftRetryInFlight = new Map<string, Promise<unknown>>();
+
+  async lookupUic(
+    symbol: string,
+    opts?: { forceRefresh?: boolean; skipDriftRetry?: boolean },
+  ): Promise<{
     uic: number; assetType: string; currency: string; exchangeId?: string; tickSize?: number;
   }> {
     // Yahoo-style pseudo-tickers Saxo will never resolve: FX pairs
@@ -382,22 +389,25 @@ export class SaxoAdapter implements BrokerAdapter {
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const cached = await supabaseAdmin
-      .from("saxo_instrument_cache")
-      .select("uic, asset_type, currency, exchange_id, tick_size, refreshed_at")
-      .eq("symbol", symbol).eq("env", this.env).maybeSingle();
-    if (cached.data) {
-      const age = Date.now() - new Date(cached.data.refreshed_at as string).getTime();
-      if (age < 86_400_000) {
-        return {
-          uic: Number(cached.data.uic),
-          assetType: String(cached.data.asset_type),
-          currency: String(cached.data.currency ?? "GBP"),
-          exchangeId: cached.data.exchange_id ?? undefined,
-          tickSize: cached.data.tick_size ? Number(cached.data.tick_size) : undefined,
-        };
+    if (!opts?.forceRefresh) {
+      const cached = await supabaseAdmin
+        .from("saxo_instrument_cache")
+        .select("uic, asset_type, currency, exchange_id, tick_size, refreshed_at")
+        .eq("symbol", symbol).eq("env", this.env).maybeSingle();
+      if (cached.data) {
+        const age = Date.now() - new Date(cached.data.refreshed_at as string).getTime();
+        if (age < 86_400_000) {
+          return {
+            uic: Number(cached.data.uic),
+            assetType: String(cached.data.asset_type),
+            currency: String(cached.data.currency ?? "GBP"),
+            exchangeId: cached.data.exchange_id ?? undefined,
+            tickSize: cached.data.tick_size ? Number(cached.data.tick_size) : undefined,
+          };
+        }
       }
     }
+
 
     const { upper, base, suffix, preferredExchanges, searchKeywords } =
       normalizeSaxoSymbol(symbol);
@@ -479,11 +489,77 @@ export class SaxoAdapter implements BrokerAdapter {
             response: report,
             error: report.summary,
           });
+
+          // Auto-heal drift by re-fetching the drifted approved ETPs from
+          // Saxo. Only runs on the *initial* lookup (skipDriftRetry gates
+          // recursion) and dedupes concurrent retries per (env, symbol) via
+          // the static in-flight map so parallel cache refreshes don't
+          // stampede /ref/v1/instruments.
+          if (!opts?.skipDriftRetry) {
+            const drifted = new Set<string>([
+              ...report.drift.missing,
+              ...report.drift.stale.map((s) => s.symbol),
+              ...report.drift.wrongAssetType.map((w) => w.symbol),
+            ]);
+            drifted.delete(symbol); // just refreshed
+            const retryTargets = [...drifted];
+            const retryResults: Array<{
+              symbol: string; ok: boolean; error?: string;
+            }> = [];
+            await Promise.all(
+              retryTargets.map(async (sym) => {
+                const key = `${this.env}::${sym}`;
+                const inflight = SaxoAdapter.driftRetryInFlight.get(key);
+                if (inflight) {
+                  try { await inflight; retryResults.push({ symbol: sym, ok: true }); }
+                  catch (e) { retryResults.push({ symbol: sym, ok: false, error: (e as Error).message }); }
+                  return;
+                }
+                const p = this.lookupUic(sym, { forceRefresh: true, skipDriftRetry: true });
+                SaxoAdapter.driftRetryInFlight.set(key, p);
+                try {
+                  await p;
+                  retryResults.push({ symbol: sym, ok: true });
+                } catch (e) {
+                  retryResults.push({ symbol: sym, ok: false, error: (e as Error).message });
+                } finally {
+                  SaxoAdapter.driftRetryInFlight.delete(key);
+                }
+              }),
+            );
+
+            // Re-validate and log the outcome so the audit trail shows
+            // whether the auto-heal actually cleared the drift.
+            const postSnap = await supabaseAdmin
+              .from("saxo_instrument_cache")
+              .select("symbol, env, asset_type, refreshed_at")
+              .eq("env", this.env);
+            const postReport = validateCryptoCacheSync({
+              env: this.env,
+              cacheRows: (postSnap.data ?? []) as Array<{
+                symbol: string; env: string; asset_type: string | null; refreshed_at: string | null;
+              }>,
+            });
+            await log({
+              portfolioId: this.portfolioId,
+              userId: this.userId,
+              env: this.env,
+              method: postReport.ok
+                ? "CRYPTO_CACHE_DRIFT_RETRY_OK"
+                : "CRYPTO_CACHE_DRIFT_RETRY_PARTIAL",
+              path: "/saxo_instrument_cache",
+              status: 200,
+              request: { triggeredBy: symbol, targets: retryTargets },
+              response: { retryResults, postReport },
+              error: postReport.ok ? undefined : postReport.summary,
+            });
+          }
         }
       }
     } catch {
-      // Sync check is best-effort — never let it prevent a valid order.
+      // Sync check + retry are best-effort — never let them prevent a valid order.
     }
+
     return {
       uic: hit.Identifier, assetType: hit.AssetType,
       currency: hit.CurrencyCode ?? "GBP", exchangeId: hit.ExchangeId,
