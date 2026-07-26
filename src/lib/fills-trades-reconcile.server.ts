@@ -112,7 +112,7 @@ export async function reconcileFillsToTradesForPortfolio(
         // Deterministic tag lets subsequent reconciles distinguish rows we
         // inserted from optimistic ones the engine may write in future.
         reason: `[broker-fill] fill_id=${brokerFillId}`,
-        instrument_ccy: (f.currency as string | null) ?? null,
+        ...(f.currency ? { instrument_ccy: String(f.currency) } : {}),
       };
     });
 
