@@ -359,6 +359,8 @@ ${COMMODITY_PLAYBOOK}
 
 ${CRYPTO_PLAYBOOK}
 
+${args.cryptoSignalsBlock ?? ""}
+
 ${args.fxSystemBlock ?? ""}
 
 ${buildDiversificationTiltBlock({ tilt: cfg.diversification_tilt, cfg })}
