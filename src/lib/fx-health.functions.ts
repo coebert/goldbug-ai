@@ -21,6 +21,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export type FxHealthSource =
   | "yahoo"
   | "frankfurter"
+  | "er-api"
   | "cache"
   | "cache-stale"
   | "fallback"
@@ -44,12 +45,18 @@ function classify(source: string | null): FxHealthSource {
   if (!source) return "unknown";
   if (source === "yahoo") return "yahoo";
   if (source === "frankfurter") return "frankfurter";
+  if (source === "er-api") return "er-api";
   if (source === "identity") return "identity";
   if (source === "cache") return "cache";
   if (source === "cache-stale") return "cache-stale";
   if (source.startsWith("fallback")) return "fallback";
   return "unknown";
 }
+
+function isLiveProvider(s: FxHealthSource): boolean {
+  return s === "yahoo" || s === "frankfurter" || s === "er-api";
+}
+
 
 export const getFxHealth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -104,6 +111,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
           counts: {
             yahoo: 0,
             frankfurter: 0,
+            "er-api": 0,
             cache: 0,
             "cache-stale": 0,
             fallback: 0,
@@ -161,6 +169,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
     const providerCounts = {
       yahoo: 0,
       frankfurter: 0,
+      "er-api": 0,
       cache: 0,
       "cache-stale": 0,
       fallback: 0,
@@ -215,7 +224,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
       const bump = (bkt: Bucket | undefined) => {
         if (!bkt) return;
         bkt.total += 1;
-        if (source === "yahoo" || source === "frankfurter") bkt.ok += 1;
+        if (isLiveProvider(source)) bkt.ok += 1;
         else if (source === "fallback") bkt.fallback += 1;
         else if (source === "cache-stale" || resp.stale) bkt.stale += 1;
         else if (source === "cache") bkt.cache += 1;
@@ -268,7 +277,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
       const src = resp.source ?? "";
       const t = r.created_at as string;
       if (src.startsWith("fallback") && !lastFallbackAt) lastFallbackAt = t;
-      else if ((src === "yahoo" || src === "frankfurter") && !lastOkAt) lastOkAt = t;
+      else if ((src === "yahoo" || src === "frankfurter" || src === "er-api") && !lastOkAt) lastOkAt = t;
       if (lastFallbackAt && lastOkAt) break;
     }
     const circuitOpen =

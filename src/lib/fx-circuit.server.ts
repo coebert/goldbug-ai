@@ -50,7 +50,7 @@ export async function getFxCircuitState(
     const createdAt = r.created_at as string;
     if (src.startsWith("fallback")) {
       if (!lastFallbackAt) lastFallbackAt = createdAt;
-    } else if (src === "yahoo" || src === "frankfurter") {
+    } else if (src === "yahoo" || src === "frankfurter" || src === "er-api") {
       if (!lastOkAt) lastOkAt = createdAt;
     }
     if (lastFallbackAt && lastOkAt) break;

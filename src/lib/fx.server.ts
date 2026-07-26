@@ -1,12 +1,21 @@
-// Lightweight FX conversion via Yahoo Finance. Server-only.
+// Lightweight FX conversion. Server-only.
 // Used by the live executor to record the notional value of routed orders
 // in the broker account currency (e.g. Saxo SIM base = EUR) when the
 // portfolio's own accounting currency differs (e.g. GBP), and by the
 // multi-currency wallet/holdings valuation layer.
 //
-// Cached in-memory for 10 minutes per process. Failures fall back to rate = 1
-// with `stale: true` so the caller can note it in the log without blocking
-// order routing.
+// Provider order:
+//   1. Frankfurter (ECB reference rates, keyless, no rate limit) — primary.
+//      Yahoo's /v7/finance/quote endpoint started returning 401s to
+//      unauthenticated clients, causing the executor to fall back to the
+//      identity rate (1.0) and silently break cross-currency sizing.
+//   2. open.er-api.com (keyless mirror of ECB + commercial feeds) — fallback
+//      so a Frankfurter outage doesn't collapse to rate=1.
+//   3. Last-known cached rate marked stale, else identity fallback flagged
+//      so the FX-matrix guard blocks affected buys instead of silently
+//      trading on a bogus rate.
+//
+// Cached in-memory for 10 minutes per process.
 
 type Cached = { rate: number; ts: number };
 const cache = new Map<string, Cached>();
@@ -28,6 +37,39 @@ export interface FxResult {
   source: string;
 }
 
+async function fetchFrankfurter(f: string, t: string): Promise<number> {
+  const url = `https://api.frankfurter.dev/v1/latest?base=${f}&symbols=${t}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  if (!res.ok) {
+    await closeBody(res);
+    throw new Error(`frankfurter ${res.status}`);
+  }
+  const json = (await res.json()) as { rates?: Record<string, number> };
+  const rate = json?.rates?.[t];
+  if (typeof rate !== "number" || !(rate > 0) || !Number.isFinite(rate)) {
+    throw new Error("no rate in frankfurter response");
+  }
+  return rate;
+}
+
+async function fetchErApi(f: string, t: string): Promise<number> {
+  const url = `https://open.er-api.com/v6/latest/${f}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  if (!res.ok) {
+    await closeBody(res);
+    throw new Error(`er-api ${res.status}`);
+  }
+  const json = (await res.json()) as { result?: string; rates?: Record<string, number> };
+  if (json?.result && json.result !== "success") {
+    throw new Error(`er-api result=${json.result}`);
+  }
+  const rate = json?.rates?.[t];
+  if (typeof rate !== "number" || !(rate > 0) || !Number.isFinite(rate)) {
+    throw new Error("no rate in er-api response");
+  }
+  return rate;
+}
+
 /** Return the multiplier: amount_in_FROM * rate = amount_in_TO. */
 export async function getFxRate(from: string, to: string): Promise<FxResult> {
   const f = from.toUpperCase();
@@ -41,55 +83,36 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
     return { from: f, to: t, rate: cached.rate, stale: false, source: "cache" };
   }
 
-  const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${key}=X`;
+  let frankfurterErr: unknown;
   try {
-    const res = await fetch(yahooUrl, {
-      headers: { "user-agent": "Mozilla/5.0 (aegis-fx)" },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) {
-      await closeBody(res);
-      throw new Error(`yahoo ${res.status}`);
-    }
-    const json = (await res.json()) as {
-      quoteResponse?: { result?: Array<{ regularMarketPrice?: number }> };
-    };
-    const rate = json?.quoteResponse?.result?.[0]?.regularMarketPrice;
-    if (typeof rate === "number" && rate > 0 && Number.isFinite(rate)) {
-      cache.set(key, { rate, ts: now });
-      return { from: f, to: t, rate, stale: false, source: "yahoo" };
-    }
-    throw new Error("no rate in response");
-  } catch (yahooErr) {
-    try {
-      const fUrl = `https://api.frankfurter.dev/v1/latest?base=${f}&symbols=${t}`;
-      const res = await fetch(fUrl, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) {
-        await closeBody(res);
-        throw new Error(`frankfurter ${res.status}`);
-      }
-      const json = (await res.json()) as { rates?: Record<string, number> };
-      const rate = json?.rates?.[t];
-      if (typeof rate === "number" && rate > 0 && Number.isFinite(rate)) {
-        cache.set(key, { rate, ts: now });
-        return { from: f, to: t, rate, stale: false, source: "frankfurter" };
-      }
-      throw new Error("no rate in frankfurter response");
-    } catch (frankfurterErr) {
-      if (cached) {
-        return { from: f, to: t, rate: cached.rate, stale: true, source: "cache-stale" };
-      }
-      const yMsg = yahooErr instanceof Error ? yahooErr.message : "yahoo-error";
-      const fMsg = frankfurterErr instanceof Error ? frankfurterErr.message : "frankfurter-error";
-      return {
-        from: f,
-        to: t,
-        rate: 1,
-        stale: true,
-        source: `fallback:yahoo(${yMsg})+frankfurter(${fMsg})`,
-      };
-    }
+    const rate = await fetchFrankfurter(f, t);
+    cache.set(key, { rate, ts: now });
+    return { from: f, to: t, rate, stale: false, source: "frankfurter" };
+  } catch (e) {
+    frankfurterErr = e;
   }
+
+  let erApiErr: unknown;
+  try {
+    const rate = await fetchErApi(f, t);
+    cache.set(key, { rate, ts: now });
+    return { from: f, to: t, rate, stale: false, source: "er-api" };
+  } catch (e) {
+    erApiErr = e;
+  }
+
+  if (cached) {
+    return { from: f, to: t, rate: cached.rate, stale: true, source: "cache-stale" };
+  }
+  const fMsg = frankfurterErr instanceof Error ? frankfurterErr.message : "frankfurter-error";
+  const eMsg = erApiErr instanceof Error ? erApiErr.message : "er-api-error";
+  return {
+    from: f,
+    to: t,
+    rate: 1,
+    stale: true,
+    source: `fallback:frankfurter(${fMsg})+er-api(${eMsg})`,
+  };
 }
 
 /** Convenience: convert an amount using the live/cached rate. */

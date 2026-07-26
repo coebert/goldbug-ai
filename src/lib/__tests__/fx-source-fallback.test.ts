@@ -15,17 +15,15 @@ function mockFetch(handler: (url: string) => Response | Promise<Response>) {
   }) as unknown as typeof fetch;
 }
 
-const yahooBody = (rate: number) =>
+const frankfurterBody = (_from: string, to: string, rate: number) =>
   new Response(
-    JSON.stringify({
-      quoteResponse: { result: [{ regularMarketPrice: rate }] },
-    }),
+    JSON.stringify({ base: _from, rates: { [to]: rate } }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 
-const frankfurterBody = (from: string, to: string, rate: number) =>
+const erApiBody = (to: string, rate: number) =>
   new Response(
-    JSON.stringify({ base: from, rates: { [to]: rate } }),
+    JSON.stringify({ result: "success", rates: { [to]: rate } }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 
@@ -45,62 +43,62 @@ describe("getFxRate — source failures + identity fallback", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("uses Yahoo when it returns a valid rate", async () => {
+  it("uses Frankfurter as primary provider", async () => {
     mockFetch((url) => {
-      if (url.includes("query1.finance.yahoo.com")) return yahooBody(1.17);
-      throw new Error("frankfurter should not be called");
+      if (url.includes("frankfurter")) return frankfurterBody("GBP", "EUR", 1.17);
+      throw new Error("er-api should not be called");
     });
     const { getFxRate } = await loadFx();
     const r = await getFxRate("GBP", "EUR");
     expect(r.rate).toBe(1.17);
-    expect(r.source).toBe("yahoo");
+    expect(r.source).toBe("frankfurter");
     expect(r.stale).toBe(false);
   });
 
-  it("falls back to Frankfurter when Yahoo returns 401", async () => {
+  it("falls back to open.er-api.com when Frankfurter returns 5xx", async () => {
     mockFetch((url) => {
-      if (url.includes("yahoo")) return new Response("unauthorized", { status: 401 });
-      if (url.includes("frankfurter")) return frankfurterBody("GBP", "EUR", 1.155);
+      if (url.includes("frankfurter")) return new Response("boom", { status: 503 });
+      if (url.includes("er-api.com")) return erApiBody("EUR", 1.155);
       throw new Error("unexpected url " + url);
     });
     const { getFxRate } = await loadFx();
     const r = await getFxRate("GBP", "EUR");
     expect(r.rate).toBe(1.155);
-    expect(r.source).toBe("frankfurter");
+    expect(r.source).toBe("er-api");
     expect(r.stale).toBe(false);
   });
 
-  it("falls back to Frankfurter when Yahoo returns malformed json (no rate)", async () => {
+  it("falls back to er-api when Frankfurter returns malformed json (no rate)", async () => {
     mockFetch((url) => {
-      if (url.includes("yahoo"))
-        return new Response(JSON.stringify({ quoteResponse: { result: [] } }), {
+      if (url.includes("frankfurter"))
+        return new Response(JSON.stringify({ rates: {} }), {
           status: 200,
           headers: { "content-type": "application/json" },
         });
-      if (url.includes("frankfurter")) return frankfurterBody("GBP", "EUR", 1.16);
+      if (url.includes("er-api.com")) return erApiBody("EUR", 1.16);
       throw new Error("unexpected url " + url);
     });
     const { getFxRate } = await loadFx();
     const r = await getFxRate("GBP", "EUR");
-    expect(r.source).toBe("frankfurter");
+    expect(r.source).toBe("er-api");
     expect(r.rate).toBe(1.16);
   });
 
   it("returns a stale-cache result when both providers fail but a fresh rate is cached", async () => {
-    // Prime the cache with a successful Yahoo call.
-    mockFetch(() => yahooBody(1.2));
+    // Prime the cache with a successful Frankfurter call.
+    mockFetch((url) => {
+      if (url.includes("frankfurter")) return frankfurterBody("GBP", "EUR", 1.2);
+      throw new Error("unexpected url " + url);
+    });
     const { getFxRate } = await loadFx();
     const first = await getFxRate("GBP", "EUR");
-    expect(first.source).toBe("yahoo");
+    expect(first.source).toBe("frankfurter");
 
-    // Now both providers fail; TTL has NOT expired so first call is served
-    // from cache with source=cache, not stale — verify then invalidate cache
-    // by monkey-patching Date.now via vi.setSystemTime.
     vi.useFakeTimers();
     vi.setSystemTime(Date.now() + 11 * 60 * 1000); // past 10 min TTL
     mockFetch((url) => {
-      if (url.includes("yahoo")) return new Response("nope", { status: 500 });
       if (url.includes("frankfurter")) return new Response("nope", { status: 502 });
+      if (url.includes("er-api.com")) return new Response("nope", { status: 500 });
       throw new Error("unexpected url " + url);
     });
     const second = await getFxRate("GBP", "EUR");
@@ -111,18 +109,18 @@ describe("getFxRate — source failures + identity fallback", () => {
 
   it("returns rate=1 identity fallback with fallback source when both providers fail AND there is no cache", async () => {
     mockFetch((url) => {
-      if (url.includes("yahoo")) return new Response("boom", { status: 500 });
       if (url.includes("frankfurter")) return new Response("boom", { status: 502 });
+      if (url.includes("er-api.com")) return new Response("boom", { status: 500 });
       throw new Error("unexpected url " + url);
     });
     const { getFxRate } = await loadFx();
     const r = await getFxRate("GBP", "EUR");
     expect(r.rate).toBe(1);
     expect(r.stale).toBe(true);
-    expect(r.source).toMatch(/^fallback:yahoo\(.*\)\+frankfurter\(.*\)$/);
+    expect(r.source).toMatch(/^fallback:frankfurter\(.*\)\+er-api\(.*\)$/);
   });
 
-  it("also falls back to identity when Yahoo throws (network) and Frankfurter throws", async () => {
+  it("also falls back to identity when both providers throw (network)", async () => {
     mockFetch(() => {
       throw new Error("network down");
     });
@@ -135,14 +133,15 @@ describe("getFxRate — source failures + identity fallback", () => {
 
   it("cache hit on second call within TTL does not re-fetch", async () => {
     let calls = 0;
-    mockFetch(() => {
+    mockFetch((url) => {
       calls += 1;
-      return yahooBody(1.1);
+      if (url.includes("frankfurter")) return frankfurterBody("GBP", "EUR", 1.1);
+      throw new Error("unexpected url " + url);
     });
     const { getFxRate } = await loadFx();
     const a = await getFxRate("GBP", "EUR");
     const b = await getFxRate("GBP", "EUR");
-    expect(a.source).toBe("yahoo");
+    expect(a.source).toBe("frankfurter");
     expect(b.source).toBe("cache");
     expect(b.stale).toBe(false);
     expect(calls).toBe(1);
