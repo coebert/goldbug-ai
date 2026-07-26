@@ -1963,6 +1963,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   let tailHedgeExecution: {
     applied: boolean; reason: string; symbol: string | null; qty: number; notional: number;
   } | null = null;
+  let tailHedgeReconciliation:
+    | import("./hedging/tail-hedge-reconcile").TailHedgeReconciliation
+    | null = null;
   try {
     const { computeTailHedge } = await import("./hedging/tail-hedge");
     const { applyTailHedgeToPaperPortfolio } = await import("./hedging/tail-hedge-executor.server");
@@ -2003,9 +2006,34 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       applied: exec.applied, reason: exec.reason, symbol: exec.symbol,
       qty: exec.qty, notional: exec.notional,
     };
+    try {
+      const { reconcileTailHedge } = await import("./hedging/tail-hedge-reconcile");
+      const hedgeSym = exec.symbol;
+      // Observed holding of hedge symbol AFTER paper mutation (for live it's
+      // the pre-broker mirror; drift vs advised.targetNotional will resolve
+      // on the next broker sync).
+      const observedQty = hedgeSym
+        ? Number(holdingsByS.get(hedgeSym)?.quantity ?? 0)
+        : 0;
+      const observedPrice = hedgeSym ? (priceMap.get(hedgeSym) ?? null) : null;
+      tailHedgeReconciliation = reconcileTailHedge({
+        decision: tailHedgeDecision,
+        applied: {
+          applied: exec.applied, reason: exec.reason, symbol: exec.symbol,
+          qty: exec.qty, notional: exec.notional,
+        },
+        observedHedgeQty: observedQty,
+        observedHedgePrice: observedPrice,
+        isLivePortfolio,
+        priorTargetNotional: Number.isFinite(prevNotional) && prevNotional > 0 ? prevNotional : 0,
+      });
+    } catch (e) {
+      console.warn("tail hedge reconcile skipped:", e);
+    }
   } catch (e) {
     console.warn("tail hedge apply skipped:", e);
   }
+
 
   if (!isLivePortfolio) {
     // Insert trades (only executed ones with quantity > 0)
@@ -2198,6 +2226,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       regime: regime ?? null,
       tail_hedge: tailHedgeDecision,
       tail_hedge_execution: tailHedgeExecution,
+      tail_hedge_reconciliation: tailHedgeReconciliation,
       learning: {
         stats: learning.stats,
         lessons: learning.lessons,
