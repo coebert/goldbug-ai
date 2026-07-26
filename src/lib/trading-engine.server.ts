@@ -1360,7 +1360,29 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             liquidity: commodityLiquidity,
           });
           continue;
+      }
+
+      // Crypto-only pre-trade validation. Mirror of the commodity gate: confirms
+      // the proposed ETP is Saxo-routable, has a live price, and has the
+      // feature row the sizer needs. Spot pairs (BTC-USD etc.) are rejected
+      // here even though the live_prod broker filter also drops them, so
+      // sim/backtest proposals surface the same clear reason.
+      if (meta.asset_class === "crypto") {
+        const kval = await validateCrypto({
+          symbol: meta.symbol,
+          side: "buy",
+          price,
+          hasFeatureRow: featureBySymbol.has(meta.symbol),
+        });
+        if (!kval.ok) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason, rejected: kval.reason ?? "crypto validation failed",
+          });
+          continue;
         }
+      }
+
         const atrP = cfeat?.atr_pct ?? null;
         if (cfg.commodity_max_atr_pct > 0 && atrP != null && atrP > cfg.commodity_max_atr_pct) {
           executed.push({
