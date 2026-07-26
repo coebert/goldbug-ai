@@ -98,7 +98,7 @@ describe("crypto playbook — property-based invariants", () => {
         fc.double({ min: 1_000, max: 10_000_000, noNaN: true, noDefaultInfinity: true }),
         async (risk, regime, seed, drift, vol, nav) => {
           vi.mocked(getDailyCandles).mockImplementation(
-            async (sym: string) => synth(makePath(seed ^ sym.length, drift, vol)),
+            async (sym?: string) => synth(makePath(seed ^ ((sym ?? "X").length), drift, vol)),
           );
           const d = await computeCryptoSleeveDecision({
             asOf: "2026-01-15",
@@ -127,7 +127,7 @@ describe("crypto playbook — property-based invariants", () => {
         fc.double({ min: 0.005, max: 0.08, noNaN: true, noDefaultInfinity: true }),
         async (risk, regime, seed, drift, vol) => {
           vi.mocked(getDailyCandles).mockImplementation(
-            async (sym: string) => synth(makePath(seed ^ sym.length, drift, vol)),
+            async (sym?: string) => synth(makePath(seed ^ ((sym ?? "X").length), drift, vol)),
           );
           const d = await computeCryptoSleeveDecision({
             asOf: "2026-01-15",
@@ -159,7 +159,7 @@ describe("crypto playbook — property-based invariants", () => {
         fc.double({ min: 0.001, max: 0.15, noNaN: true, noDefaultInfinity: true }),
         async (risk, regime, seed, drift, vol) => {
           vi.mocked(getDailyCandles).mockImplementation(
-            async (sym: string) => synth(makePath(seed ^ sym.length, drift, vol)),
+            async (sym?: string) => synth(makePath(seed ^ ((sym ?? "X").length), drift, vol)),
           );
           const d = await computeCryptoSleeveDecision({
             asOf: "2026-01-15",
@@ -200,7 +200,7 @@ describe("crypto playbook — property-based invariants", () => {
           // Strong, noisy downtrend: negative drift dominates volatility so
           // the final close reliably sits well below the 200-day SMA.
           vi.mocked(getDailyCandles).mockImplementation(
-            async (sym: string) => synth(makePath(seed ^ sym.length, -0.01, 0.02, 220, 300)),
+            async (sym?: string) => synth(makePath(seed ^ ((sym ?? "X").length), -0.01, 0.02, 220, 300)),
           );
           const d = await computeCryptoSleeveDecision({
             asOf: "2026-01-15",
