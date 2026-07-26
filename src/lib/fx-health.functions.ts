@@ -169,6 +169,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
     const providerCounts = {
       yahoo: 0,
       frankfurter: 0,
+      "er-api": 0,
       cache: 0,
       "cache-stale": 0,
       fallback: 0,
