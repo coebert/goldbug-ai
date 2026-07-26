@@ -861,18 +861,15 @@ export async function routeOrdersToBroker(params: {
   let firstOrder = true;
 
   // Resolve the true instrument currency for every routable order so each
-  // live_orders row carries the correct currency stamp (was defaulting to
-  // 'GBP' at the DB level, which mis-classified every USD instrument and
-  // caused the affordability trim to bless orders the broker then rejected
-  // with InsufficientCash). Prefer the value the caller passed on the
-  // ExecutedOrder, then saxo_instrument_cache, then the portfolio base.
-  const routeSymToCcy = new Map<string, string>();
-  for (const o of routable) {
-    if (o.instrument_ccy) routeSymToCcy.set(o.symbol, o.instrument_ccy.toUpperCase());
-  }
+  // live_orders row carries the correct currency stamp. The DB now enforces
+  // NOT NULL + ISO-4217 CHECK on instrument_ccy, so a wrong/missing value
+  // fails the insert instead of masquerading as GBP. Priority:
+  //   caller hint > saxo_instrument_cache > portfolio base
+  const { resolveOrderCurrencies } = await import("@/lib/live-order-currency");
+  const cacheMap = new Map<string, string | null | undefined>();
   {
     const missing = Array.from(new Set(routable.map((o) => o.symbol))).filter(
-      (s) => !routeSymToCcy.has(s),
+      (s) => !routable.find((o) => o.symbol === s && o.instrument_ccy),
     );
     if (missing.length > 0) {
       const cache = await supabaseAdmin
@@ -880,13 +877,15 @@ export async function routeOrdersToBroker(params: {
         .select("symbol, currency")
         .in("symbol", missing);
       for (const row of cache.data ?? []) {
-        if (row.currency) routeSymToCcy.set(row.symbol, row.currency.toUpperCase());
+        cacheMap.set(row.symbol, row.currency);
       }
     }
-    for (const o of routable) {
-      if (!routeSymToCcy.has(o.symbol)) routeSymToCcy.set(o.symbol, portfolioCurrency);
-    }
   }
+  const routeSymToCcy = resolveOrderCurrencies(routable, {
+    cache: cacheMap,
+    portfolioCurrency,
+  });
+
 
 
   for (const order of routable) {
