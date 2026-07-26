@@ -1291,6 +1291,7 @@ function PortfolioPage() {
             {(p.mode === "live_sim" || p.mode === "live_prod") && (
               <div className="mt-6 space-y-4">
                 <FxAuditCard portfolioId={id} active={tab === "overview"} />
+                <FxTradeDrilldownCard portfolioId={id} active={tab === "overview"} />
                 <CashReconciliationLogCard portfolioId={id} />
               </div>
             )}
