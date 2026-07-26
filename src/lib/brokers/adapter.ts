@@ -8,6 +8,10 @@ export interface BrokerBalance {
   totalValue: number;
   /** Cash immediately available for trading (settled, unencumbered). */
   cashAvailable?: number;
+  /** Broker-authoritative spendable amount (Saxo SpendingPower or equivalent).
+   *  Typically ≤ cashAvailable once margin haircuts / sub-account ring-fencing
+   *  are applied. Prefer this over cashAvailable for pre-place gating. */
+  spendingPower?: number;
   /** Transactions booked but not yet settled (e.g. T+2 unsettled proceeds). */
   transactionsNotBooked?: number;
   /** Cash reserved by open orders / margin collateral, unavailable to trade now. */
