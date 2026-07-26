@@ -43,6 +43,15 @@ const DEFAULT_SLICE_TTL_MIN = 90; // 90 minutes total window
 const DEFAULT_SLICES = 4;
 const LARGE_ORDER_USD = 5_000;
 
+// Phase 4 — VWAP/TWAP smart slicing math (pure, tested separately).
+import {
+  buildSliceSchedule,
+  chooseSliceCount,
+  type ScheduleBucket,
+  type SliceStrategy,
+} from "./execution-vwap";
+
+
 
 
 class PendingSliceAccessError extends Error {
@@ -159,10 +168,32 @@ export async function maybeSliceOrder(input: SliceInput) {
 
   await assertPortfolioOwnership("maybeSliceOrder", clean.portfolioId, clean.ownerUserId);
 
-  const slices = clean.slices ?? DEFAULT_SLICES;
-  const sliceQty = Math.max(1, Math.floor((clean.totalQty / slices) * 10_000) / 10_000);
+  // Phase 4 — pick slice count from participation-rate heuristic when we
+  // know the venue's ADV. Small orders vs. deep tape stay as one shot.
+  const strategy: SliceStrategy = clean.strategy ?? "vwap";
+  const dynamicSlices = clean.slices ?? (
+    clean.advNotional
+      ? chooseSliceCount(notional, clean.advNotional)
+      : DEFAULT_SLICES
+  );
+  if (dynamicSlices <= 1) return null;
+  const slices = dynamicSlices;
+  const windowMinutes = clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN;
+
+  // Build the per-bucket qty/offset schedule. The first bucket's qty
+  // becomes slice_qty for the initial send; recordSliceFill advances
+  // through the schedule as fills come in.
+  const schedule = buildSliceSchedule({
+    strategy,
+    totalQty: clean.totalQty,
+    nSlices: slices,
+    windowMinutes,
+  });
+  const firstBucket: ScheduleBucket = schedule[0] ?? { qty: clean.totalQty / slices, offset_min: 0 };
+  const sliceQty = Math.max(1e-4, firstBucket.qty);
+
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + (clean.ttlMinutes ?? DEFAULT_SLICE_TTL_MIN) * 60_000);
+  const expiresAt = new Date(now.getTime() + windowMinutes * 60_000);
 
   // Idempotency: if a slice with this (portfolio_id, idempotency_key) already
   // exists, return it instead of inserting a duplicate row.
@@ -196,6 +227,9 @@ export async function maybeSliceOrder(input: SliceInput) {
       expires_at: expiresAt.toISOString(),
       status: "active",
       idempotency_key: clean.idempotencyKey ?? null,
+      strategy,
+      schedule_json: JSON.parse(JSON.stringify(schedule)),
+      adv_notional: clean.advNotional ?? null,
     })
     .select("id")
     .single();
@@ -217,8 +251,9 @@ export async function maybeSliceOrder(input: SliceInput) {
     console.warn("slicer insert failed", error);
     return null;
   }
-  return { sliceId: (data as { id: string }).id, sliceQty, slices };
+  return { sliceId: (data as { id: string }).id, sliceQty, slices, strategy, schedule };
 }
+
 
 
 /**
@@ -266,7 +301,7 @@ export async function recordSliceFill(
   // mutating. This blocks a caller from patching another user's slice by id.
   const { data: slice, error: sliceErr } = await supabaseAdmin
     .from("pending_slices")
-    .select("id, portfolio_id, remaining_qty, slices_done, slice_count")
+    .select("id, portfolio_id, remaining_qty, slices_done, slice_count, schedule_json, created_at, expires_at")
     .eq("id", clean.sliceId)
     .maybeSingle();
   if (sliceErr) {
@@ -281,6 +316,7 @@ export async function recordSliceFill(
   }
   const typed = slice as {
     portfolio_id: string; remaining_qty: number; slices_done: number; slice_count: number;
+    schedule_json: ScheduleBucket[] | null; created_at: string; expires_at: string;
   };
   await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, clean.ownerUserId);
 
@@ -308,9 +344,25 @@ export async function recordSliceFill(
   const remaining = Math.max(0, Number(typed.remaining_qty) - clean.filledQty);
   const done = Number(typed.slices_done) + 1;
   const status = remaining <= 1e-6 || done >= Number(typed.slice_count) ? "completed" : "active";
-  const nextAt = status === "active"
-    ? new Date(Date.now() + 20 * 60_000).toISOString() // next slice in ~20 min
-    : null;
+
+  // Phase 4 — walk the persisted VWAP/TWAP schedule when present so the
+  // next child order carries the correct bucket qty and fires at the
+  // planned wall-clock offset. Falls back to the legacy 20-min TWAP
+  // cadence for legacy rows written before schedule_json existed.
+  const schedule = Array.isArray(typed.schedule_json) ? typed.schedule_json : null;
+  const next = schedule?.[done] ?? null;
+  const createdMs = new Date(typed.created_at).getTime();
+  let nextAt: string | null = null;
+  let nextSliceQty: number | null = null;
+  if (status === "active") {
+    if (next) {
+      nextAt = new Date(createdMs + Math.max(0, Number(next.offset_min)) * 60_000).toISOString();
+      nextSliceQty = Math.max(1e-4, Math.min(remaining, Number(next.qty)));
+    } else {
+      nextAt = new Date(Date.now() + 20 * 60_000).toISOString();
+    }
+  }
+
   const patch: Update<"pending_slices"> = {
     remaining_qty: remaining,
     slices_done: done,
@@ -318,11 +370,13 @@ export async function recordSliceFill(
     notes: clean.note ?? null,
   };
   if (nextAt) patch.next_at = nextAt;
+  if (nextSliceQty !== null) patch.slice_qty = nextSliceQty;
   await supabaseAdmin
     .from("pending_slices")
     .update(patch)
     .eq("id", clean.sliceId)
     .eq("portfolio_id", typed.portfolio_id); // belt-and-braces scope
+
   return { applied: true };
 }
 

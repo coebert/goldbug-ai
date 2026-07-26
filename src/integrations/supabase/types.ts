@@ -920,6 +920,7 @@ export type Database = {
       }
       pending_slices: {
         Row: {
+          adv_notional: number | null
           created_at: string
           decision_id: string | null
           expires_at: string
@@ -931,16 +932,19 @@ export type Database = {
           notes: string | null
           portfolio_id: string
           remaining_qty: number
+          schedule_json: Json | null
           side: string
           slice_count: number
           slice_qty: number
           slices_done: number
           status: string
+          strategy: string
           symbol: string
           total_qty: number
           updated_at: string
         }
         Insert: {
+          adv_notional?: number | null
           created_at?: string
           decision_id?: string | null
           expires_at: string
@@ -952,16 +956,19 @@ export type Database = {
           notes?: string | null
           portfolio_id: string
           remaining_qty: number
+          schedule_json?: Json | null
           side: string
           slice_count?: number
           slice_qty: number
           slices_done?: number
           status?: string
+          strategy?: string
           symbol: string
           total_qty: number
           updated_at?: string
         }
         Update: {
+          adv_notional?: number | null
           created_at?: string
           decision_id?: string | null
           expires_at?: string
@@ -973,11 +980,13 @@ export type Database = {
           notes?: string | null
           portfolio_id?: string
           remaining_qty?: number
+          schedule_json?: Json | null
           side?: string
           slice_count?: number
           slice_qty?: number
           slices_done?: number
           status?: string
+          strategy?: string
           symbol?: string
           total_qty?: number
           updated_at?: string
