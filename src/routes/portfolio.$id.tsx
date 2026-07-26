@@ -125,6 +125,7 @@ import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-card";
 import { FxAuditCard } from "@/components/fx-audit-card";
+import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
 import { CommodityBacktestCard } from "@/components/commodity-backtest-card";
 
