@@ -540,8 +540,33 @@ function HoldingsStrip({
             {rows.length}
           </span>
         </div>
-        <div className="text-[11px] tabular-nums text-muted-foreground">
-          {investedPct.toFixed(0)}% invested · {cashPct.toFixed(0)}% cash
+        <div className="flex items-center gap-2">
+          <div
+            role="group"
+            aria-label="Sort holdings"
+            className="inline-flex overflow-hidden rounded-md border border-border/60 bg-background text-[10px]"
+            data-testid="holdings-sort"
+          >
+            {(["value", "weight", "symbol"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setSortKey(k)}
+                aria-pressed={sortKey === k}
+                data-testid={`holdings-sort-${k}`}
+                className={`px-1.5 py-0.5 uppercase tracking-wide transition-colors ${
+                  sortKey === k
+                    ? "bg-primary/15 font-semibold text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {k === "value" ? "Val" : k === "weight" ? "%" : "A–Z"}
+              </button>
+            ))}
+          </div>
+          <div className="text-[11px] tabular-nums text-muted-foreground">
+            {investedPct.toFixed(0)}% invested · {cashPct.toFixed(0)}% cash
+          </div>
         </div>
       </div>
 
