@@ -60,6 +60,7 @@ export function TailHedgeReportCard({
   currency: string;
 }) {
   const fetchReport = useServerFn(getTailHedgeReport);
+  const queryClient = useQueryClient();
   const [win, setWin] = useState(1); // default 90d
   const sinceDays = WINDOWS[win].days;
 
@@ -69,6 +70,39 @@ export function TailHedgeReportCard({
       fetchReport({ data: sinceDays ? { portfolioId, sinceDays } : { portfolioId } }),
     staleTime: 60 * 1000,
   });
+
+  // Live hedging monitor — refresh the Phase 6 rollup whenever the engine
+  // persists a new decision (advisory + execution + reconciliation blocks all
+  // land in `decisions.raw`) or the broker records a fill for this portfolio.
+  // Both tables are in the `supabase_realtime` publication and RLS scopes rows
+  // to this user's portfolios, so subscribers only receive their own updates.
+  useEffect(() => {
+    if (!portfolioId) return;
+    const invalidate = () =>
+      queryClient.invalidateQueries({ queryKey: ["tail-hedge-report", portfolioId] });
+    const channel = supabase
+      .channel(`tail-hedge-live:${portfolioId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "decisions", filter: `portfolio_id=eq.${portfolioId}` },
+        invalidate,
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "decisions", filter: `portfolio_id=eq.${portfolioId}` },
+        invalidate,
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "live_fills", filter: `portfolio_id=eq.${portfolioId}` },
+        invalidate,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [portfolioId, queryClient]);
+
 
   const chartData = useMemo(() => {
     if (!data) return [];
