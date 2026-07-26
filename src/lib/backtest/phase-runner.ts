@@ -230,11 +230,6 @@ export function runPhaseBacktest(
   const earningsBySym: Record<string, string[]> = {};
   for (const s of series) earningsBySym[s.symbol] = s.earnings ?? [];
 
-  const positions: Record<string, Position> = {};
-  let cash = cfg.initialCash;
-  let hedgeNotional = 0;
-  const trades: Trade[] = [];
-  const equity: EquityPoint[] = [];
 
   const positions: Record<string, Position> = {};
   let cash = cfg.initialCash;
