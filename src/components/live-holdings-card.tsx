@@ -215,6 +215,15 @@ export function LiveHoldingsCard({
                             {r.asset_class}
                           </Badge>
                         )}
+                        {r.pricedAtCost && (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/50 bg-amber-500/10 text-amber-500 text-[9px] px-1.5 py-0"
+                            title="Live price unavailable — value shown uses average cost as a proxy."
+                          >
+                            @ cost
+                          </Badge>
+                        )}
                         {changePct != null && (
                           <span
                             className={`sm:hidden inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold tabular-nums ${
