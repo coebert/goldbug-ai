@@ -37,6 +37,8 @@ export const IDEMPOTENCY_KEY = z
   .max(128)
   .regex(/^[A-Za-z0-9._:-]+$/, "invalid idempotency key");
 
+export const SLICE_STRATEGY = z.enum(["twap", "vwap", "immediate"]);
+
 export const SliceInputSchema = z.object({
   portfolioId: UUID,
   ownerUserId: UUID,
@@ -48,6 +50,9 @@ export const SliceInputSchema = z.object({
   slices: SLICE_COUNT.optional(),
   ttlMinutes: TTL_MINUTES.optional(),
   idempotencyKey: IDEMPOTENCY_KEY.optional(),
+  // Phase 4 — smart slicing hints. Optional so existing callers keep working.
+  strategy: SLICE_STRATEGY.optional(),
+  advNotional: NON_NEG.max(1e15).optional(),
 });
 
 export const FillInputSchema = z.object({
