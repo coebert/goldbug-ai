@@ -115,6 +115,36 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
   };
 }
 
+/**
+ * Same as `getFxRate` but also returns the observation timestamp of the
+ * underlying rate (cache entry timestamp when the answer came from cache /
+ * cache-stale, otherwise the moment of the successful live fetch). Used by
+ * the FX audit surface so operators can see exactly *when* the rate that
+ * sizing is about to use was captured, not just its provenance.
+ */
+export interface FxAuditedResult extends FxResult {
+  /** Epoch ms of the underlying observation. */
+  observedAtMs: number;
+}
+
+export async function getFxRateAudited(from: string, to: string): Promise<FxAuditedResult> {
+  const before = Date.now();
+  const res = await getFxRate(from, to);
+  const key = `${res.from}${res.to}`;
+  const cached = cache.get(key);
+  let observedAtMs = before;
+  if (res.source === "identity") observedAtMs = before;
+  else if (res.source === "cache" || res.source === "cache-stale") {
+    observedAtMs = cached?.ts ?? before;
+  } else if (res.source === "frankfurter" || res.source === "er-api") {
+    observedAtMs = cached?.ts ?? Date.now();
+  } else {
+    // fallback:* — no valid observation
+    observedAtMs = Date.now();
+  }
+  return { ...res, observedAtMs };
+}
+
 /** Convenience: convert an amount using the live/cached rate. */
 export async function convertAmount(amount: number, from: string, to: string): Promise<{
   amount: number;
