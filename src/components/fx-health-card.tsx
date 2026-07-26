@@ -172,8 +172,11 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                      <ProviderChip label="yahoo" n={p.counts.yahoo} good />
                       <ProviderChip label="frankfurter" n={p.counts.frankfurter} good />
+                      <ProviderChip label="er-api" n={p.counts["er-api"]} good />
+                      {p.counts.yahoo > 0 && (
+                        <ProviderChip label="yahoo" n={p.counts.yahoo} good />
+                      )}
                       <ProviderChip label="cache" n={p.counts.cache} />
                       {p.counts["cache-stale"] > 0 && (
                         <ProviderChip label="cache-stale" n={p.counts["cache-stale"]} warn />
