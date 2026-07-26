@@ -1265,14 +1265,6 @@ function PortfolioPage() {
                 </CardContent>
               </Card>
 
-              <LiveHoldingsCard
-                holdings={holdings}
-                currency={p.currency}
-                cash={Number(p.current_cash)}
-                totalValue={totalValue}
-                mode={p.mode}
-                series={holdingsSeries}
-              />
 
               <CommodityExposureCard
                 holdings={holdings}
