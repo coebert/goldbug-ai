@@ -37,6 +37,19 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       value: num(r.value),
       skipped: str(r.skipped),
       error: str(r.error),
+      tradeable_symbols: Array.isArray(r.tradeable_symbols)
+        ? (r.tradeable_symbols as unknown[]).filter((x): x is string => typeof x === "string")
+        : [],
+      excluded_symbols: Array.isArray(r.excluded_symbols)
+        ? (r.excluded_symbols as unknown[])
+            .map((x) => x as Record<string, unknown>)
+            .filter((x) => typeof x?.symbol === "string")
+            .map((x) => ({
+              symbol: String(x.symbol),
+              venue: typeof x.venue === "string" ? x.venue : "OTHER",
+              phase: typeof x.phase === "string" ? x.phase : "unknown",
+            }))
+        : [],
     }));
     return {
       ok: true,

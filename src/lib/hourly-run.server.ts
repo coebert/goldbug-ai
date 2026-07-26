@@ -16,7 +16,18 @@ export type HourlyRunResult = {
   skipped_paused: number;
   saxo_refresh: Record<string, { ok: boolean; error?: string; skipped?: string }>;
   triggered_by: "manual" | "cron";
-  results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number; skipped?: string }>;
+  results: Array<{
+    id: string;
+    mode: string;
+    ok: boolean;
+    error?: string;
+    value?: number;
+    skipped?: string;
+    /** Symbols whose venue was open at gate time (candidates AI could size). */
+    tradeable_symbols?: string[];
+    /** Symbols dropped by the market-hours gate, with venue + phase reason. */
+    excluded_symbols?: Array<{ symbol: string; venue: string; phase: string }>;
+  }>;
   metrics: RunMetricsSnapshot;
 };
 
@@ -197,23 +208,37 @@ async function runHourlyCycleInner(
         // `force:true` (manual override) bypasses this to allow ad-hoc runs
         // outside market hours (e.g. testing, backfills). This saves AI
         // credits during nights and weekends when no order could fill anyway.
-        if (!forceClear) {
-          try {
-            const universe = filterUniverse(classesFromUniverse(p.universe));
-            const symbols = universe.slice(0, 22).map((u) => u.symbol);
-            const anyOpen = symbols.some((s) => getMarketStatusForSymbol(s).isOpen);
-            if (symbols.length > 0 && !anyOpen) {
-              results.push({
-                id: p.id,
-                mode: p.mode,
-                ok: true,
-                skipped: "all venues closed — AI tick skipped to save credits (pass force:true to override)",
-              });
-              continue;
-            }
-          } catch (e) {
-            console.warn("hourly-run: market-hours gate failed, running anyway", p.id, e);
+        // Compute the tradeable/excluded split up front (independent of the
+        // gate) so every portfolio result carries an auditable record of
+        // which venues were open at decision time. `force:true` only bypasses
+        // the skip decision, not the audit.
+        let tradeableSymbols: string[] = [];
+        let excludedSymbols: Array<{ symbol: string; venue: string; phase: string }> = [];
+        try {
+          const universe = filterUniverse(classesFromUniverse(p.universe));
+          const symbols = universe.slice(0, 22).map((u) => u.symbol);
+          for (const s of symbols) {
+            const st = getMarketStatusForSymbol(s);
+            if (st.isOpen) tradeableSymbols.push(s);
+            else excludedSymbols.push({ symbol: s, venue: st.venue, phase: st.phase });
           }
+        } catch (e) {
+          console.warn("hourly-run: market-hours audit failed", p.id, e);
+        }
+
+        // Market-hours gate: skip AI decision cycles when every venue in this
+        // portfolio's universe is currently closed. Crypto/FX are always
+        // "open" so any portfolio that includes them will still tick.
+        if (!forceClear && tradeableSymbols.length === 0 && excludedSymbols.length > 0) {
+          results.push({
+            id: p.id,
+            mode: p.mode,
+            ok: true,
+            skipped: "all venues closed — AI tick skipped to save credits (pass force:true to override)",
+            tradeable_symbols: tradeableSymbols,
+            excluded_symbols: excludedSymbols,
+          });
+          continue;
         }
 
         const sinceIso = manualTrigger ? recentWindowIso : hourStartIso;
@@ -230,14 +255,28 @@ async function runHourlyCycleInner(
             const label = manualTrigger
               ? `already ticked at ${recent.data.created_at} — pass force:true to override`
               : "already ticked this hour";
-            results.push({ id: p.id, mode: p.mode, ok: true, skipped: label });
+            results.push({
+              id: p.id,
+              mode: p.mode,
+              ok: true,
+              skipped: label,
+              tradeable_symbols: tradeableSymbols,
+              excluded_symbols: excludedSymbols,
+            });
             continue;
           }
         }
 
         const r = await runDailyTick(p.id, today);
         bumpPortfolio("ok");
-        results.push({ id: p.id, mode: p.mode, ok: true, value: r.totalValue });
+        results.push({
+          id: p.id,
+          mode: p.mode,
+          ok: true,
+          value: r.totalValue,
+          tradeable_symbols: tradeableSymbols,
+          excluded_symbols: excludedSymbols,
+        });
 
         // Post-tick order-status reconciliation for live portfolios.
         // Without this, orders written as `submitted` at POST time never
