@@ -144,5 +144,7 @@ export function buildAllPortfoliosEquity({
     series,
     perPortfolioSeries,
     currency: perPortfolio[0]?.currency ?? "GBP",
+    mixedCurrency,
+    currencies: distinctCurrencies,
   };
 }
