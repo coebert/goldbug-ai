@@ -460,7 +460,182 @@ export async function routeOrdersToBroker(params: {
     // Never let the lockout heuristic itself crash the tick.
   }
 
+  // ---------- Adaptive buy-order cap.
+  // The lockout above is binary: it stops ALL buys once InsufficientCash has
+  // been seen and cash hasn't grown. But most of the time we're in a soft
+  // state — some buys succeed at Saxo, others reject — and the smart response
+  // is to keep trading at a size the broker actually accepts, not to fully
+  // stop. Learn the maximum notional the broker has recently ACCEPTED (or,
+  // failing that, a safe fraction below the smallest recent InsufficientCash
+  // reject) and haircut `brokerCashAvailable` by the observed reject rate.
+  //
+  // Runs only when the lockout hasn't already skipped every buy this tick.
+  const buysStillRoutable = routable.filter(
+    (o) => o.side === "buy" && !preSkips.has(`${o.symbol}:${o.side}`),
+  );
+  if (buysStillRoutable.length > 0) {
+    try {
+      const { computeAdaptiveBuyCap } = await import("./adaptive-buy-cap");
+      const LOOKBACK_HOURS = 24;
+      const cutoff = new Date(Date.now() - LOOKBACK_HOURS * 3600_000).toISOString();
+      const { data: recentBuys } = await supabaseAdmin
+        .from("live_orders")
+        .select(
+          "id, symbol, quantity, limit_price, status, reject_reason, instrument_ccy, updated_at",
+        )
+        .eq("portfolio_id", portfolio.id)
+        .eq("side", "buy")
+        .gte("updated_at", cutoff)
+        .order("updated_at", { ascending: false })
+        .limit(200);
 
+      const orderRows = recentBuys ?? [];
+      const successOrderIds = orderRows
+        .filter((r) => r.status === "filled" || r.status === "partial")
+        .map((r) => r.id as string);
+      const fillsByOrder = new Map<string, { qty: number; price: number; ccy: string }>();
+      if (successOrderIds.length > 0) {
+        const { data: fills } = await supabaseAdmin
+          .from("live_fills")
+          .select("order_id, quantity, fill_price, currency")
+          .in("order_id", successOrderIds);
+        for (const f of fills ?? []) {
+          const oid = f.order_id as string;
+          const prev = fillsByOrder.get(oid);
+          const qty = Number(f.quantity);
+          const px = Number(f.fill_price);
+          if (!Number.isFinite(qty) || !Number.isFinite(px) || qty <= 0 || px <= 0) continue;
+          if (prev) {
+            const totalQty = prev.qty + qty;
+            const vwap = (prev.qty * prev.price + qty * px) / totalQty;
+            fillsByOrder.set(oid, { qty: totalQty, price: vwap, ccy: prev.ccy });
+          } else {
+            fillsByOrder.set(oid, { qty, price: px, ccy: String(f.currency ?? "").toUpperCase() });
+          }
+        }
+      }
+
+      // Convert an instrument-ccy notional to account-ccy for the cap. When
+      // it's already the account ccy, no-op. Otherwise multiply by the
+      // current tick's fxRate (portfolio->account) as a best-effort proxy.
+      const acctCcy = (accountCurrency ?? portfolioCurrency).toUpperCase();
+      const toAcctCcy = (n: number, instCcy: string): number | null => {
+        if (!Number.isFinite(n) || n <= 0) return null;
+        const c = instCcy.toUpperCase();
+        if (c === acctCcy) return n;
+        if (c === portfolioCurrency && Number.isFinite(fxRate) && fxRate > 0) return n * fxRate;
+        // Unknown FX for this sample — drop it rather than distort the learner.
+        return null;
+      };
+
+      const samples: {
+        status: "filled" | "submitted" | "partial" | "rejected" | "error";
+        notionalAcctCcy: number;
+        rejectReason?: string | null;
+      }[] = [];
+      for (const r of orderRows) {
+        const instCcy = String(r.instrument_ccy ?? acctCcy).toUpperCase();
+        const status = r.status as string;
+        if (status === "filled" || status === "partial") {
+          const fill = fillsByOrder.get(r.id as string);
+          if (!fill) continue;
+          const n = toAcctCcy(fill.qty * fill.price, fill.ccy || instCcy);
+          if (n == null) continue;
+          samples.push({ status: status as "filled" | "partial", notionalAcctCcy: n });
+        } else if (status === "submitted") {
+          const qty = Number(r.quantity);
+          const px = Number(r.limit_price);
+          if (!Number.isFinite(qty) || !Number.isFinite(px) || qty <= 0 || px <= 0) continue;
+          const n = toAcctCcy(qty * px, instCcy);
+          if (n == null) continue;
+          samples.push({ status: "submitted", notionalAcctCcy: n });
+        } else if (status === "rejected" || status === "error") {
+          const qty = Number(r.quantity);
+          const px = Number(r.limit_price);
+          if (!Number.isFinite(qty) || !Number.isFinite(px) || qty <= 0 || px <= 0) continue;
+          const n = toAcctCcy(qty * px, instCcy);
+          if (n == null) continue;
+          samples.push({
+            status: status as "rejected" | "error",
+            notionalAcctCcy: n,
+            rejectReason: r.reject_reason as string | null,
+          });
+        }
+      }
+
+      const cap = computeAdaptiveBuyCap({
+        brokerCashAvailable,
+        recentBuys: samples,
+      });
+
+      // Nothing to do when there's no reject-rate signal AND no ceiling to
+      // enforce. Skip logging in the pure no-op case.
+      const willAdjustAggregate =
+        cap.aggregateCap != null &&
+        brokerCashAvailable != null &&
+        cap.aggregateCap < brokerCashAvailable - 1e-6;
+      const perOrderSkips: {
+        symbol: string;
+        notionalAcctCcy: number;
+        capAcctCcy: number;
+      }[] = [];
+      if (cap.perOrderCap != null && cap.perOrderCap > 0) {
+        for (const o of buysStillRoutable) {
+          const instCcy = (o.instrument_ccy ?? acctCcy).toUpperCase();
+          const notionalRaw = o.quantity * o.price;
+          const notional = toAcctCcy(notionalRaw, instCcy);
+          if (notional == null) continue;
+          if (notional > cap.perOrderCap) {
+            const reason = `adaptive-cap: order ${notional.toFixed(2)} ${acctCcy} exceeds learned per-order ceiling ${cap.perOrderCap.toFixed(2)} ${acctCcy} (source=${cap.learnedSource}, rejectRate=${cap.rejectRate.toFixed(2)})`;
+            preSkips.set(`${o.symbol}:${o.side}`, reason);
+            perOrderSkips.push({
+              symbol: o.symbol,
+              notionalAcctCcy: notional,
+              capAcctCcy: cap.perOrderCap,
+            });
+          }
+        }
+      }
+
+      if (willAdjustAggregate) {
+        brokerCashAvailable = cap.aggregateCap;
+      }
+
+      if (willAdjustAggregate || perOrderSkips.length > 0 || cap.samples.total > 0) {
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_ADAPTIVE_BUY_CAP",
+          path: "/reconcile/pre-place/adaptive-cap",
+          status: 200,
+          request: asJson({
+            asOf,
+            decisionId,
+            lookbackHours: LOOKBACK_HOURS,
+            samples: cap.samples,
+            rejectRate: cap.rejectRate,
+            aggregateMultiplier: cap.aggregateMultiplier,
+            perOrderCap: cap.perOrderCap,
+            aggregateCap: cap.aggregateCap,
+            learnedCeiling: cap.learnedCeiling,
+            learnedSource: cap.learnedSource,
+            acctCcy,
+          }),
+          response: asJson({
+            appliedAggregateHaircut: willAdjustAggregate,
+            brokerCashAvailableAfter: brokerCashAvailable,
+            perOrderSkips,
+            notes: cap.notes,
+          }),
+          error: null,
+        });
+      }
+    } catch {
+      // Never let the adaptive-cap heuristic itself crash the tick.
+    }
+  }
 
 
   // Build per-currency cash view for the multi-ccy trim path, net of the
