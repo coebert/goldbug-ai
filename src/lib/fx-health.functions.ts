@@ -21,6 +21,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export type FxHealthSource =
   | "yahoo"
   | "frankfurter"
+  | "er-api"
   | "cache"
   | "cache-stale"
   | "fallback"
@@ -44,12 +45,18 @@ function classify(source: string | null): FxHealthSource {
   if (!source) return "unknown";
   if (source === "yahoo") return "yahoo";
   if (source === "frankfurter") return "frankfurter";
+  if (source === "er-api") return "er-api";
   if (source === "identity") return "identity";
   if (source === "cache") return "cache";
   if (source === "cache-stale") return "cache-stale";
   if (source.startsWith("fallback")) return "fallback";
   return "unknown";
 }
+
+function isLiveProvider(s: FxHealthSource): boolean {
+  return s === "yahoo" || s === "frankfurter" || s === "er-api";
+}
+
 
 export const getFxHealth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
