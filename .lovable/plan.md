@@ -1,62 +1,52 @@
-# Crypto Sleeve Plan
+## Profit-Enhancement Rollout — 6 phases
 
-Add a new asset class — **crypto exposure via Saxo-tradable ETPs/ETNs only** (no spot BTC/ETH, no futures, no leverage) — that plugs into the existing universe, ranker, risk-controls, and playbook infrastructure exactly like the commodity sleeve.
+I'll ship these in the order of highest profit-per-effort, verifying each phase with tests before moving to the next. Each phase is independently valuable, so you'll see improvements incrementally rather than after one giant drop.
 
-## Scope
+### Phase 1 — Regime-based strategy on/off switching
+Turn off strategies that historically lose money in the current regime instead of always running them all.
+- Extend `src/lib/alpha/regime-matrix.ts` with an **enablement matrix**: which of {trend, mean-reversion, quality, carry, crypto sleeve} are active per regime (bull_quiet, bull_volatile, correction, bear, crisis, recovery).
+- Gate strategy scores in `src/lib/alpha/composite.ts` — a disabled strategy contributes 0 weight, not just downweighted.
+- Log the on/off state in `run_metrics` so we can attribute performance later.
+- Surface active strategies in the regime panel UI.
 
-**In:** BTCE.DE (BTCetc Physical Bitcoin), VBTC.L (WisdomTree Physical Bitcoin), ZETH.SW / ETHE.DE (Physical Ethereum), BCHN.SW (basket). Final list gated by what `saxo_instrument_cache` can actually resolve — anything not tradable in the user's Saxo account is auto-dropped.
+### Phase 2 — Earnings & event-window awareness
+Stop holding full size into binary events.
+- New `src/lib/earnings-calendar.server.ts` fetching upcoming earnings (Yahoo/Finnhub free tier or Saxo instrument details).
+- Extend `src/lib/risk-halts.server.ts` with an `EARNINGS_WINDOW` guard that trims positions to 50% of target size in the T-2 to T+1 window.
+- Cache in a new `earnings_cache` table (14-day TTL).
+- Show a "⚠ earnings in Nd" pill on `LiveHoldingsCard`.
 
-**Out:** spot crypto, perpetuals, futures, 2x/3x/-1x products, single-miner equities as a proxy, MSTR/COIN as a proxy.
+### Phase 3 — ATR-based trailing stops
+Replace fixed % stops with volatility-adaptive stops.
+- Add `atrTrailingStop()` to `src/lib/market-data.server.ts` (14-day ATR × multiplier by risk level: 2.5 / 3.0 / 3.5).
+- Wire into exit logic in `src/lib/trading-engine.server.ts` alongside existing exits (X1–X6).
+- Persist per-position `trail_high` and `stop_price` on `holdings` for hysteresis.
 
-## Files to add / change
+### Phase 4 — VWAP/TWAP order slicing
+Reduce execution slippage on orders > 25% of average daily volume.
+- Extend `pending_slices` scheduler to time-slice large orders across 4–8 buckets over 30–120 min.
+- Add spread-aware limit pricing for illiquid ETPs/ETCs (post at mid+edge instead of crossing).
+- Wire post-trade TCA feedback: symbols with consistent >20bps slippage get position-size downweight in `alpha/composite.ts`.
 
-### New
-- `src/lib/crypto-groups.ts` — group definitions (`btc`, `eth`, `basket`), per-group risk caps, symbol → group map. Mirrors `commodity-groups.ts`.
-- `src/lib/crypto-playbook.server.ts` — the AI system-prompt injection describing regime rules, entry/exit triggers, sizing, forbidden actions. Structure mirrors `commodity-playbook.server.ts`.
-- `src/components/crypto-exposure-card.tsx` — per-group exposure vs cap tile for portfolio overview.
+### Phase 5 — Correlation-aware position sizing
+Prevent correlated clusters from dominating risk.
+- Reuse existing correlation matrix from `correlation-heatmap-card`.
+- New `src/lib/risk/cluster-caps.server.ts`: build clusters at ρ > 0.7, cap combined cluster exposure by risk level (30/40/50%).
+- Apply in sizing pass, after alpha ranking but before order emission.
+- Add Kelly-fractional sizing (¼-Kelly) driven by existing `order-confidence` scores.
 
-### Modify
-- `src/lib/universe.server.ts` — add crypto symbols, tradability check (must exist in `saxo_instrument_cache` AND venue currently in `market-hours` "always-open" category), liquidity gate (min ADV$, max ATR%).
-- `src/lib/market-hours.ts` — add `CRYPTO_ETP` venue mapping to the underlying exchange hours (XETRA / LSE / SIX) — these are ETPs, not 24/7 spot.
-- `src/lib/trading-engine.server.ts` — inject `CRYPTO_PLAYBOOK` into the system prompt alongside historical / hedge-fund / commodity / FX playbooks.
-- `src/lib/risk-halts.server.ts` — add crypto-sleeve cap (default 5% low / 10% medium / 15% high risk) and per-group caps.
-- `src/components/risk-controls-card.tsx` — expose a `crypto_tilt` slider (0 = off, default; up to sleeve cap).
-- `src/routes/portfolio.$id.tsx` — mount `CryptoExposureCard` next to `CommodityExposureCard`.
+### Phase 6 — Tail hedge overlay (high-CAPE regimes only)
+Cheap convex downside protection when valuations are stretched.
+- New `src/lib/tail-hedge.server.ts`: when CAPE proxy > 30 AND regime ∈ {bull_volatile, correction}, allocate 0.5–1.5% of NAV to a defined put-spread proxy (via `PUTW`/`HDGE` ETFs Saxo supports) or long-vol ETP.
+- Sleeve is capped and separate from primary allocation.
+- Auto-unwind when regime turns risk-off (hedge has done its job) or CAPE reverts.
 
-### Migration
-- One migration adding `crypto_tilt numeric default 0` and `crypto_sleeve_cap_pct numeric` to `portfolios`, with GRANTs preserved.
+### Cross-cutting
+- Every phase ships with unit tests in `src/lib/__tests__/`.
+- Each phase adds one line to a new **Strategy Changelog** card on the admin route so you can see what changed and when.
+- No changes to broker plumbing — this is all pre-trade signal & sizing work.
 
-## Playbook (what triggers a crypto BUY)
+### Order & sequencing
+I'll implement Phase 1 first, ship it, verify tests pass, then move to Phase 2, etc. Each phase is 1 turn of work.
 
-The AI will only propose crypto when **at least two** of the following fire, mirroring the commodity gate style:
-
-- **C1 Trend:** price > SMA50 > SMA200 on the ETP; RSI-14 between 45 and 70.
-- **C2 Regime:** current `market_regimes` row is `risk_on` or `early_cycle` (never `recession`, `risk_off`, or `rising_rate_shock`).
-- **C3 Liquidity/macro:** DXY falling week-over-week OR 10y real yield falling OR Fed pivot flag in `market_events`.
-- **C4 Cross-asset confirmation:** QQQ trending up AND VIX < 20 AND credit spreads stable/tightening.
-- **C5 Behavioural guard:** reject if the instrument is >50% up in the last 60 trading days (parabolic filter).
-
-**Exits:** close below SMA50 for 2 sessions → trim 50%. Close below SMA200 → exit. VIX > 25 with widening spreads → cut sleeve to zero. Parabolic +40% in 30d → take partial profits.
-
-**Sizing:** start at 1/3 of per-symbol cap; sleeve capped by risk level as above; Kelly cap tightened to 15% (vs 25% for equities) because of higher realised vol.
-
-## Guardrails already inherited (no new code needed)
-- Correlation-cluster cap will naturally group BTC/ETH together (they run > 0.7).
-- Precheck via Saxo `precheck` API before submission.
-- FX matrix guard — most crypto ETPs quote EUR/USD/GBP; existing FX conversion logic applies.
-- Post-broker reconciliation confirms fills.
-
-## Technical notes
-
-- `crypto-playbook.server.ts` stays in `.server.ts` so the string never ships to the browser bundle (same rule as commodity playbook).
-- Symbol resolution guarded by `saxo_instrument_cache` — if the user's Saxo entitlements don't include crypto ETPs, the universe filter drops them silently and the ranker never sees them, so nothing breaks.
-- No changes to `client.ts`, `types.ts`, or auth files.
-
-## Out of scope (call out explicitly)
-- No spot crypto wallets, no on-chain, no self-custody, no Coinbase/Binance connectors.
-- No new backend for price feeds — the existing Yahoo/Frankfurter/price_cache path already handles ETP tickers.
-
-## Verification
-- Unit test: `src/lib/__tests__/crypto-universe.test.ts` — asserts crypto symbols only surface when in `saxo_instrument_cache` and when regime is risk-on/early-cycle.
-- Unit test: `src/lib/__tests__/crypto-sleeve-cap.test.ts` — asserts sleeve cap and per-group cap reject oversized proposals.
-- Manual: trigger an hourly run on a SIM portfolio with `crypto_tilt = 10%` and confirm a BTCE.DE proposal appears in `decisions` with the C1+C2 trigger cited in `reason`.
+Say **go** and I'll start with Phase 1.
