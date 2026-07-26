@@ -1,21 +1,23 @@
 // Tail-hedge executor (Phase 6).
 //
 // `computeTailHedge` returns an *advisory* target notional. This module turns
-// that advisory into concrete order-book effects for paper / backtest
-// portfolios: it appends an `ExecutedTrade` and mutates the in-memory
-// `holdingsByS` map + `workingCash` figure so the trades/holdings writer in
-// `runDailyTick` persists the hedge alongside every other fill.
+// that advisory into concrete order-book effects.
 //
-// Live portfolios (`live_sim` / `live_prod`) are intentionally NOT executed
-// here — the broker is authoritative for those and hedge routing needs to go
-// through `live-executor.server.ts`. We return `applied: false` with a note
-// so the caller can log/audit and skip.
+// Paper / backtest portfolios:  the returned ExecutedTrade is appended and
+// `holdingsByS` + `workingCash` are mutated in place so the trades/holdings
+// writer in `runDailyTick` persists the hedge alongside every other fill.
+//
+// Live (live_sim / live_prod) portfolios: we still emit the ExecutedTrade so
+// `routeOrdersToBroker` submits the hedge order to Saxo alongside every other
+// live order, but we DO NOT mutate holdingsByS/workingCash — the broker is
+// authoritative and `live-holdings-sync` reconciles the local mirror after
+// routing. Sizing preserves the same no-leverage/no-borrow constraints as
+// paper: buys are capped at available cash minus a safety buffer, sells are
+// capped at the current held quantity.
 //
 // Instrument choice: cash-only accounts can't buy SPY puts, so we proxy the
 // tail hedge with a physically-backed gold ETC/ETF that already sits in the
-// universe. This is a well-documented crisis-alpha substitute and every
-// existing sizing/precheck path already understands the symbols. Callers can
-// override per portfolio via `hedgeSymbol` (e.g. from portfolio settings).
+// universe. Callers can override per portfolio via `hedgeSymbol`.
 
 import type { Database } from "@/integrations/supabase/types";
 import type { TailHedgeDecision } from "./tail-hedge";
