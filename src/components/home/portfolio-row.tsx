@@ -528,42 +528,40 @@ function HoldingsStrip({
 
   return (
     <div
-      className="mt-4 rounded-lg border border-border/70 bg-muted/30 p-3"
+      className="mt-4 rounded-lg border border-border/70 bg-muted/30 p-2.5 sm:p-3"
       data-testid="portfolio-row-holdings-strip"
       data-portfolio-id={portfolioId}
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          <Briefcase className="h-3.5 w-3.5" aria-hidden />
-          Holdings
-          <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <Briefcase className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="truncate">Holdings</span>
+          <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
             {rows.length}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div
-            role="group"
-            aria-label="Sort holdings"
-            className="inline-flex overflow-hidden rounded-md border border-border/60 bg-background text-[10px]"
-            data-testid="holdings-sort"
-          >
-            {(["value", "weight", "symbol"] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setSortKey(k)}
-                aria-pressed={sortKey === k}
-                data-testid={`holdings-sort-${k}`}
-                className={`px-1.5 py-0.5 uppercase tracking-wide transition-colors ${
-                  sortKey === k
-                    ? "bg-primary/15 font-semibold text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {k === "value" ? "Val" : k === "weight" ? "%" : "A–Z"}
-              </button>
-            ))}
-          </div>
+        <div
+          role="group"
+          aria-label="Sort holdings"
+          className="inline-flex shrink-0 overflow-hidden rounded-md border border-border/60 bg-background text-[11px]"
+          data-testid="holdings-sort"
+        >
+          {(["value", "weight", "symbol"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setSortKey(k)}
+              aria-pressed={sortKey === k}
+              data-testid={`holdings-sort-${k}`}
+              className={`min-h-[32px] min-w-[36px] px-2 py-1 uppercase tracking-wide transition-colors ${
+                sortKey === k
+                  ? "bg-primary/15 font-semibold text-primary"
+                  : "text-muted-foreground hover:text-foreground active:bg-muted"
+              }`}
+            >
+              {k === "value" ? "Val" : k === "weight" ? "%" : "A–Z"}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -573,25 +571,25 @@ function HoldingsStrip({
       >
         <div className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5">
           <div className="flex items-center justify-between gap-2 text-primary">
-            <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide">
-              <span className="h-2 w-2 rounded-full bg-primary" aria-hidden />
-              Invested
+            <span className="inline-flex min-w-0 items-center gap-1 font-semibold uppercase tracking-wide">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+              <span className="truncate">Invested</span>
             </span>
-            <span className="font-semibold tabular-nums">{investedPct.toFixed(1)}%</span>
+            <span className="shrink-0 font-semibold tabular-nums">{investedPct.toFixed(1)}%</span>
           </div>
-          <div className="mt-0.5 font-display text-sm tabular-nums text-foreground">
+          <div className="mt-0.5 truncate font-display text-sm tabular-nums text-foreground">
             {formatMoney(investedValue, currency, 0)}
           </div>
         </div>
         <div className="rounded-md border border-border/70 bg-background px-2 py-1.5">
           <div className="flex items-center justify-between gap-2 text-muted-foreground">
-            <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide">
-              <span className="h-2 w-2 rounded-full bg-muted-foreground/60" aria-hidden />
-              Cash
+            <span className="inline-flex min-w-0 items-center gap-1 font-semibold uppercase tracking-wide">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground/60" aria-hidden />
+              <span className="truncate">Cash</span>
             </span>
-            <span className="font-semibold tabular-nums">{cashPct.toFixed(1)}%</span>
+            <span className="shrink-0 font-semibold tabular-nums">{cashPct.toFixed(1)}%</span>
           </div>
-          <div className="mt-0.5 font-display text-sm tabular-nums text-foreground">
+          <div className="mt-0.5 truncate font-display text-sm tabular-nums text-foreground">
             {formatMoney(cash, currency, 0)}
           </div>
         </div>
@@ -611,34 +609,34 @@ function HoldingsStrip({
           style={{ width: `${Math.min(100, Math.max(0, cashPct))}%` }}
         />
       </div>
-      <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-        <span>Total {formatMoney(investedValue + cash, currency, 0)}</span>
-        <span className="tabular-nums">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span className="truncate">Total {formatMoney(investedValue + cash, currency, 0)}</span>
+        <span className="shrink-0 tabular-nums">
           {rows.length} position{rows.length === 1 ? "" : "s"}
         </span>
       </div>
 
-      <ul className="flex flex-wrap gap-1.5">
+      <ul className="-mx-0.5 flex flex-wrap gap-1.5">
         {top.map((r) => {
           const w = denom > 0 ? (r.value / denom) * 100 : 0;
           return (
             <li
               key={r.symbol}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] tabular-nums"
+              className="inline-flex min-h-[32px] max-w-full items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] tabular-nums active:bg-muted"
               title={`${r.symbol} — ${r.qty.toLocaleString(undefined, {
                 maximumFractionDigits: 4,
               })} @ ${currency} ${r.avg.toFixed(2)} · ${w.toFixed(1)}% of portfolio`}
             >
-              <span className="font-semibold tracking-tight">{r.symbol}</span>
-              <span className="text-muted-foreground">{fmtVal(r.value)}</span>
-              <span className="rounded-sm bg-primary/10 px-1 text-[10px] font-medium text-primary">
+              <span className="truncate font-semibold tracking-tight">{r.symbol}</span>
+              <span className="truncate text-muted-foreground">{fmtVal(r.value)}</span>
+              <span className="shrink-0 rounded-sm bg-primary/10 px-1 text-[10px] font-medium text-primary">
                 {w.toFixed(1)}%
               </span>
             </li>
           );
         })}
         {rest > 0 && (
-          <li className="inline-flex items-center gap-1 rounded-md border border-dashed border-border/60 px-2 py-1 text-[11px] text-muted-foreground">
+          <li className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-dashed border-border/60 px-2 py-1 text-[11px] text-muted-foreground">
             +{rest} more
           </li>
         )}
@@ -646,3 +644,4 @@ function HoldingsStrip({
     </div>
   );
 }
+
