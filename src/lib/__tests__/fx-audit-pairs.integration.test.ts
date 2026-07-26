@@ -273,19 +273,28 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     });
     const { buildFxAuditPairs } = await loadHelpers();
     const pairs = await buildFxAuditPairs();
-    const bad = pairs.find((p) => p.from === "GBP" && p.to === "EUR");
-    expect(bad).toBeDefined();
-    expect(bad!.rate).toBe(1);
-    expect(bad!.stale).toBe(true);
-    expect(bad!.source.startsWith("fallback:")).toBe(true);
+    // GBP→EUR is the direct fetch that failed; its inverse EUR→GBP is
+    // derived from the same (fallback) quote, so both rows must flag.
+    const bad = pairs.filter(
+      (p) =>
+        (p.from === "GBP" && p.to === "EUR") ||
+        (p.from === "EUR" && p.to === "GBP"),
+    );
+    expect(bad).toHaveLength(2);
+    for (const b of bad) {
+      expect(b.rate).toBe(1);
+      expect(b.stale).toBe(true);
+      expect(b.source.startsWith("fallback:")).toBe(true);
+    }
 
     for (const p of pairs) {
-      if (p === bad) continue;
+      if (bad.includes(p)) continue;
       // Everything else must be a real live rate, not identity, not stale.
       expect(p.rate).not.toBe(1);
       expect(p.stale).toBe(false);
-      expect(["frankfurter", "er-api"]).toContain(p.source);
+      expect(["frankfurter", "er-api", "frankfurter:inverse", "er-api:inverse"]).toContain(p.source);
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
     }
   });
+
 });
