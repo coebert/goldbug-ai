@@ -224,7 +224,7 @@ export const getFxHealth = createServerFn({ method: "POST" })
       const bump = (bkt: Bucket | undefined) => {
         if (!bkt) return;
         bkt.total += 1;
-        if (source === "yahoo" || source === "frankfurter") bkt.ok += 1;
+        if (isLiveProvider(source)) bkt.ok += 1;
         else if (source === "fallback") bkt.fallback += 1;
         else if (source === "cache-stale" || resp.stale) bkt.stale += 1;
         else if (source === "cache") bkt.cache += 1;
