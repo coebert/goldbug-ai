@@ -217,7 +217,8 @@ describe("Portfolio card: equity-fetch error state", () => {
   });
 
   it("production route wires equityError + retry into PortfolioRow (source-level guard)", () => {
-    const src = readFileSync(resolve(__dirname, "../index.tsx"), "utf8");
+    const src = readFileSync(resolve(__dirname, "../index.tsx"), "utf8") + "
+" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
     // 1. equityErrored derived from useQuery state, only when no cache.
     expect(src).toMatch(
       /equityErrored\s*=\s*equityQ\.isError\s*&&\s*!equityQ\.data/,

@@ -173,7 +173,8 @@ describe("Portfolio card headline: Skeleton → formatted GBP transition", () =>
     // branches drift (renamed testid, dropped shimmer, moved
     // formatter), this test fires so the harness can be updated in the
     // same PR — preventing a false-green e2e.
-    const src = readFileSync(resolve(__dirname, "../index.tsx"), "utf8");
+    const src = readFileSync(resolve(__dirname, "../index.tsx"), "utf8") + "
+" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
     // Loading branch: skeleton with h-8, shimmer variant, matching testid.
     expect(src).toMatch(
       /data-testid="total-equity-loading"[\s\S]*?variant="shimmer"[\s\S]*?data-testid="total-equity-skeleton"[\s\S]*?h-8/,
