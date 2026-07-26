@@ -564,18 +564,58 @@ function HoldingsStrip({
               </button>
             ))}
           </div>
-          <div className="text-[11px] tabular-nums text-muted-foreground">
-            {investedPct.toFixed(0)}% invested · {cashPct.toFixed(0)}% cash
+        </div>
+      </div>
+
+      <div
+        className="mb-2 grid grid-cols-2 gap-2 text-[11px]"
+        data-testid="allocation-summary"
+      >
+        <div className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5">
+          <div className="flex items-center justify-between gap-2 text-primary">
+            <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide">
+              <span className="h-2 w-2 rounded-full bg-primary" aria-hidden />
+              Invested
+            </span>
+            <span className="font-semibold tabular-nums">{investedPct.toFixed(1)}%</span>
+          </div>
+          <div className="mt-0.5 font-display text-sm tabular-nums text-foreground">
+            {formatMoney(investedValue, currency, 0)}
+          </div>
+        </div>
+        <div className="rounded-md border border-border/70 bg-background px-2 py-1.5">
+          <div className="flex items-center justify-between gap-2 text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-wide">
+              <span className="h-2 w-2 rounded-full bg-muted-foreground/60" aria-hidden />
+              Cash
+            </span>
+            <span className="font-semibold tabular-nums">{cashPct.toFixed(1)}%</span>
+          </div>
+          <div className="mt-0.5 font-display text-sm tabular-nums text-foreground">
+            {formatMoney(cash, currency, 0)}
           </div>
         </div>
       </div>
 
       <div
-        className="mb-2 flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        className="mb-1 flex h-2 w-full overflow-hidden rounded-full bg-muted"
         role="img"
-        aria-label={`${investedPct.toFixed(0)} percent invested, ${cashPct.toFixed(0)} percent cash`}
+        aria-label={`${investedPct.toFixed(0)} percent invested (${formatMoney(investedValue, currency, 0)}), ${cashPct.toFixed(0)} percent cash (${formatMoney(cash, currency, 0)})`}
       >
-        <div className="h-full bg-primary/70" style={{ width: `${Math.min(100, investedPct)}%` }} />
+        <div
+          className="h-full bg-primary/80"
+          style={{ width: `${Math.min(100, Math.max(0, investedPct))}%` }}
+        />
+        <div
+          className="h-full bg-muted-foreground/40"
+          style={{ width: `${Math.min(100, Math.max(0, cashPct))}%` }}
+        />
+      </div>
+      <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span>Total {formatMoney(investedValue + cash, currency, 0)}</span>
+        <span className="tabular-nums">
+          {rows.length} position{rows.length === 1 ? "" : "s"}
+        </span>
       </div>
 
       <ul className="flex flex-wrap gap-1.5">
