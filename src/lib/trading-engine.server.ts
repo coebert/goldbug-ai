@@ -2226,6 +2226,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       regime: regime ?? null,
       tail_hedge: tailHedgeDecision,
       tail_hedge_execution: tailHedgeExecution,
+      tail_hedge_reconciliation: tailHedgeReconciliation,
       learning: {
         stats: learning.stats,
         lessons: learning.lessons,
