@@ -284,3 +284,27 @@ function RegimeBadge({ label, value, total, tone }: { label: string; value: numb
     </div>
   );
 }
+
+// Stable string keys for benchmark series on the merged chart.
+function benchKey(label: string): string {
+  if (label.startsWith("BTC")) return "bench_btc";
+  if (label.startsWith("ETH")) return "bench_eth";
+  if (label.startsWith("Cash")) return "bench_cash";
+  return "bench_other";
+}
+function benchLabelFromKey(key: string): string {
+  switch (key) {
+    case "equity": return "Sleeve";
+    case "bench_btc": return "BTC buy & hold";
+    case "bench_eth": return "ETH buy & hold";
+    case "bench_cash": return "Cash";
+    default: return key;
+  }
+}
+function benchColor(label: string): string {
+  if (label.startsWith("Sleeve")) return "hsl(var(--primary))";
+  if (label.startsWith("BTC")) return "#f7931a";       // bitcoin orange
+  if (label.startsWith("ETH")) return "#627eea";       // ethereum blue
+  if (label.startsWith("Cash")) return "hsl(var(--muted-foreground))";
+  return "hsl(var(--muted-foreground))";
+}
