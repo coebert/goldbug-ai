@@ -165,13 +165,15 @@ describe("E2E: Saxo order placement for the six crypto ETPs", () => {
 
     // One thin-liquidity ETP (VBTC.L) has an ADV small enough that the
     // 1% participation cap has to trim the order — this is the liquidity
-    // gate we want to prove fires end-to-end.
+    // gate we want to prove fires end-to-end. ADV chosen so the trimmed
+    // notional still clears the fee gate (fee_min / max_fee_pct ≈ £333).
     const THIN = "VBTC.L";
+    const THIN_ADV = 60_000; // 1% = 600 → below perSymbolCap, above fee floor
     const proposals: Proposal[] = APPROVED_ETPS.map((sym) => ({
       symbol: sym,
       price: 40,
       atrPct: 0.02,
-      adv20d: sym === THIN ? 20_000 : 5_000_000, // 1% of 20k = 200 (< perSymbolCap)
+      adv20d: sym === THIN ? THIN_ADV : 5_000_000,
       requestedSpend: perSymbolCap,
     }));
 
