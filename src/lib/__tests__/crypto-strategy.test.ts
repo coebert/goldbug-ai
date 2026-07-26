@@ -50,8 +50,9 @@ function synth(prices: number[]) {
 }
 
 function uptrend(len = 220, start = 100, step = 0.4) {
-  // Steady up-trend: price > SMA50 > SMA200, RSI in the 50s, ret60 ~24%.
-  return Array.from({ length: len }, (_, i) => start + i * step);
+  // Wobbly up-trend so RSI lands in the 50-65 range (a pure monotonic ramp
+  // would give RSI=100 and fail the 45-70 entry gate).
+  return Array.from({ length: len }, (_, i) => start + i * step + (i % 2 === 0 ? -0.15 : 0.15));
 }
 function downtrend(len = 220, start = 200, step = -0.4) {
   return Array.from({ length: len }, (_, i) => Math.max(1, start + i * step));
