@@ -10,21 +10,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  AUDIT_CCYS,
+  type AuditCcy,
+  type FxAuditPair,
+} from "@/lib/fx-audit.server";
 
-const AUDIT_CCYS = ["GBP", "USD", "EUR"] as const;
-type Ccy = (typeof AUDIT_CCYS)[number];
-
-export type FxAuditPair = {
-  from: Ccy;
-  to: Ccy;
-  rate: number;
-  source: string;
-  stale: boolean;
-  /** ISO of the underlying observation (fetch or cache-write time). */
-  observedAt: string;
-  /** Reciprocal implied by this rate; useful for sanity in the UI. */
-  impliedInverse: number;
-};
+type Ccy = AuditCcy;
+export type { FxAuditPair };
 
 export type FxAuditSnapshot = {
   requestedAt: string;
@@ -68,25 +61,8 @@ export const getFxAudit = createServerFn({ method: "POST" })
         ? (rawBase as Ccy)
         : null;
 
-    const { getFxRateAudited } = await import("@/lib/fx.server");
-    const jobs: Promise<FxAuditPair>[] = [];
-    for (const f of AUDIT_CCYS) {
-      for (const t of AUDIT_CCYS) {
-        if (f === t) continue;
-        jobs.push(
-          getFxRateAudited(f, t).then((r) => ({
-            from: f,
-            to: t,
-            rate: r.rate,
-            source: r.source,
-            stale: r.stale,
-            observedAt: new Date(r.observedAtMs).toISOString(),
-            impliedInverse: r.rate > 0 ? 1 / r.rate : 0,
-          })),
-        );
-      }
-    }
-    const pairs = await Promise.all(jobs);
+    const { buildFxAuditPairs } = await import("@/lib/fx-audit.server");
+    const pairs = await buildFxAuditPairs();
 
     // Also fetch the most recent FX_CAPTURE for this portfolio so the card
     // can cross-check the live rate against what was captured mid-tick.
