@@ -56,6 +56,7 @@ export function PortfolioRow({
   onRetryEquity,
   equityDecimals = 2,
   defaultRange = "1M",
+  brokerCurrency = null,
 }: {
   portfolio: {
     id: string;
@@ -77,6 +78,7 @@ export function PortfolioRow({
   onRetryEquity?: () => void;
   equityDecimals?: number;
   defaultRange?: SparkRange;
+  brokerCurrency?: string | null;
 }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>(defaultRange);
   const sliced = useMemo(() => {
