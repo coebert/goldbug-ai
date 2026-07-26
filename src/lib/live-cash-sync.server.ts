@@ -89,6 +89,43 @@ export async function syncLiveCashFromBroker(
     return { skipped: true, reason: `broker read failed: ${msg}` };
   }
 
+  // ---------------------------------------------------------------------------
+  // Preflight: portfolio accounting currency MUST match the broker account
+  // currency before we touch current_cash. Writing an EUR broker balance into
+  // a GBP portfolio silently produces bogus P&L / % change and — because the
+  // downstream mismatch guard then locks that portfolio's P&L card — leaves
+  // the user with no way to see performance. Detect the mismatch here, log a
+  // structured entry so it shows up in the trade-error dashboard, and skip
+  // the CASH_SYNC write entirely so nothing downstream is corrupted.
+  // ---------------------------------------------------------------------------
+  const portfolioCurrency =
+    typeof (p as { currency?: string }).currency === "string"
+      ? String((p as { currency?: string }).currency).toUpperCase()
+      : null;
+  const brokerCurrency =
+    typeof currency === "string" && currency ? currency.toUpperCase() : null;
+
+  if (!portfolioCurrency || !brokerCurrency || portfolioCurrency !== brokerCurrency) {
+    const reason = !portfolioCurrency
+      ? "portfolio has no accounting currency configured"
+      : !brokerCurrency
+        ? "broker did not return a currency"
+        : `currency mismatch: portfolio=${portfolioCurrency} broker=${brokerCurrency}`;
+    await db.from("live_broker_log").insert({
+      portfolio_id: portfolioId, user_id: p.user_id,
+      broker: "saxo", env,
+      method: "CASH_SYNC_PREFLIGHT", path: "/sync/cash/preflight",
+      status: 409,
+      request: asJson({
+        portfolioCurrency, mode: p.mode,
+        previousCash: Number(p.current_cash ?? 0),
+      }),
+      response: asJson({ brokerCurrency, brokerCash, blocked: true }),
+      error: reason,
+    });
+    return { skipped: true, reason };
+  }
+
   const prevCash = Number(p.current_cash ?? 0);
   const prevStarting = Number(p.starting_cash ?? 0);
   const delta = brokerCash - prevCash;
@@ -96,6 +133,7 @@ export async function syncLiveCashFromBroker(
   if (!Number.isFinite(brokerCash) || Math.abs(delta) < DRIFT_EPSILON) {
     return { skipped: true, reason: "no material drift" };
   }
+
 
   const { data: existingHoldings } = await db
     .from("holdings")
