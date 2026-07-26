@@ -752,6 +752,34 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
   const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
 
+  // Crypto sleeve — dedicated allocation & risk-management engine. Computes
+  // per-symbol trend/momentum/drawdown signals, maps regime → sleeve target,
+  // and formats a compact prompt block the AI must respect (plus a HARD
+  // veto in risk_off regimes that the sizing layer also honours).
+  const cryptoDecision = await (async () => {
+    try {
+      const { computeCryptoSleeveDecision, formatCryptoSignalsBlock } =
+        await import("./crypto-strategy.server");
+      const cryptoHoldings = (holdings ?? [])
+        .filter((h) => h.asset_class === "crypto")
+        .map((h) => {
+          const px = priceMap.get(h.symbol) ?? 0;
+          return { symbol: h.symbol, market_value_base: Number(h.quantity) * px };
+        });
+      const d = await computeCryptoSleeveDecision({
+        asOf,
+        riskLevel: portfolio.risk_level,
+        regime: effectiveRegime.regime,
+        nav: totalValue,
+        holdings: cryptoHoldings,
+      });
+      return { decision: d, block: formatCryptoSignalsBlock(d) };
+    } catch (e) {
+      console.warn("crypto sleeve decision failed", e);
+      return null;
+    }
+  })();
+
   // If circuit breaker is tripped, skip the AI call entirely.
   const decision: DecisionOutput = breakerTripped
     ? {
