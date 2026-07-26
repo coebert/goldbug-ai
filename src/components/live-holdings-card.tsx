@@ -284,6 +284,16 @@ export function LiveHoldingsCard({
             market prices are re-synced during each run and reconciliation.
           </p>
         )}
+        {stalePricedCount > 0 && (
+          <p
+            className="text-[11px] text-amber-500"
+            role="status"
+            title="These holdings are priced at their average cost because the price cache has no fresh quote — realised value may drift from live market once quotes return."
+          >
+            ⚠ {stalePricedCount} holding{stalePricedCount === 1 ? "" : "s"} priced at average
+            cost — price cache stale.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
