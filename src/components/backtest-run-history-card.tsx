@@ -319,7 +319,18 @@ export function BacktestRunHistoryCard({
     const pool = bucketMatches.length > 0 ? bucketMatches : runs;
     const scopedToBucket = bucketMatches.length > 0;
 
-    const rets = pool.map((r) => r.metrics.totalReturnPct ?? 0);
+    // Annualise totalReturnPct so runs of different horizons are comparable.
+    // Prior behaviour compared a 400-day 15% run against a 30-day 3% run on
+    // the same axis and systematically favoured the longer horizon.
+    const rets = pool.map((r) => {
+      const total = r.metrics.totalReturnPct ?? 0;
+      const days = Math.max(1, r.days ?? 0);
+      const years = days / 365.25;
+      if (years <= 0) return total;
+      const base = 1 + total / 100;
+      if (base <= 0) return total; // full loss – leave as-is
+      return (Math.pow(base, 1 / years) - 1) * 100;
+    });
     const mddMag = pool.map((r) => Math.abs(r.metrics.maxDrawdownPct ?? 0));
     const sharpes = pool.map((r) => r.metrics.sharpe ?? 0);
 

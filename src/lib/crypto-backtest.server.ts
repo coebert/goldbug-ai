@@ -369,8 +369,19 @@ export function runCryptoPlaybookBacktest(opts: CryptoBacktestOpts): CryptoBackt
 
   const finalEquity = equityCurve.length ? equityCurve[equityCurve.length - 1].equity : opts.startingCash;
   const totalReturn = opts.startingCash > 0 ? finalEquity / opts.startingCash - 1 : 0;
-  const years = Math.max(1 / 365, equityCurve.length / 252);
-  const cagr = opts.startingCash > 0 ? Math.pow(finalEquity / opts.startingCash, 1 / years) - 1 : 0;
+  // CAGR is only meaningful over a sufficient window. Annualising a handful
+  // of trading days compounds tiny per-day moves into absurd figures (e.g.
+  // +2% on day 1 → ~1270× annualised). Below ~30 trading days we report the
+  // total return unannualised; above that we use actual elapsed calendar
+  // days rather than a 252-day proxy so weekends don't inflate the exponent.
+  const MIN_TRADING_DAYS_FOR_CAGR = 30;
+  const firstTs = equityCurve.length ? equityCurve[0].t : 0;
+  const lastTs = equityCurve.length ? equityCurve[equityCurve.length - 1].t : 0;
+  const elapsedYears = lastTs > firstTs ? (lastTs - firstTs) / (365.25 * 24 * 60 * 60 * 1000) : 0;
+  const cagr =
+    opts.startingCash > 0 && equityCurve.length >= MIN_TRADING_DAYS_FOR_CAGR && elapsedYears > 0
+      ? Math.pow(finalEquity / opts.startingCash, 1 / elapsedYears) - 1
+      : totalReturn;
 
   const mean = dailyReturns.reduce((a, b) => a + b, 0) / Math.max(1, dailyReturns.length);
   const varr = dailyReturns.length > 1
@@ -512,8 +523,14 @@ function summariseBenchmarkCurve(
 ): CryptoBenchmarkReport {
   const final = curve.length ? curve[curve.length - 1].equity : startingCash;
   const totalReturn = startingCash > 0 ? final / startingCash - 1 : 0;
-  const years = Math.max(1 / 365, curve.length / 252);
-  const cagr = startingCash > 0 ? Math.pow(final / startingCash, 1 / years) - 1 : 0;
+  const MIN_TRADING_DAYS_FOR_CAGR = 30;
+  const firstTs = curve.length ? curve[0].t : 0;
+  const lastTs = curve.length ? curve[curve.length - 1].t : 0;
+  const elapsedYears = lastTs > firstTs ? (lastTs - firstTs) / (365.25 * 24 * 60 * 60 * 1000) : 0;
+  const cagr =
+    startingCash > 0 && curve.length >= MIN_TRADING_DAYS_FOR_CAGR && elapsedYears > 0
+      ? Math.pow(final / startingCash, 1 / elapsedYears) - 1
+      : totalReturn;
   let peak = startingCash;
   let maxDd = 0;
   const rets: number[] = [];

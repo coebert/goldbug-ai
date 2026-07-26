@@ -156,7 +156,11 @@ export function PerformanceDashboardCard({
               <Metric
                 label="Win rate"
                 value={winRate == null ? "—" : `${fmtNum(winRate, 1)}%`}
-                sub={`${metrics.wins}W / ${metrics.losses}L · ${metrics.trades} round-trips`}
+                sub={(() => {
+                  const be = Math.max(0, metrics.trades - metrics.wins - metrics.losses);
+                  const beSuffix = be > 0 ? ` · ${be} breakeven` : "";
+                  return `${metrics.wins}W / ${metrics.losses}L · ${metrics.trades} round-trips${beSuffix}`;
+                })()}
                 cls={winRateColor}
               />
             </div>
