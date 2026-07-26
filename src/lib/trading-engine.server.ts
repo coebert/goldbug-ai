@@ -816,6 +816,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxSystemBlock: fxContext?.block ?? null,
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
+        cryptoSignalsBlock: cryptoDecision?.block ?? null,
       });
 
 
