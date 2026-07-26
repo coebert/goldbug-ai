@@ -273,6 +273,7 @@ export async function callAiForDecision(args: {
   fxSystemBlock?: string | null;
   fxUserBlock?: string | null;
   alphaPriors?: string | null;
+  cryptoSignalsBlock?: string | null;
 
 }): Promise<DecisionOutput> {
 
@@ -357,6 +358,8 @@ ${HEDGE_FUND_PLAYBOOK}
 ${COMMODITY_PLAYBOOK}
 
 ${CRYPTO_PLAYBOOK}
+
+${args.cryptoSignalsBlock ?? ""}
 
 ${args.fxSystemBlock ?? ""}
 
@@ -749,6 +752,34 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
   const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
 
+  // Crypto sleeve — dedicated allocation & risk-management engine. Computes
+  // per-symbol trend/momentum/drawdown signals, maps regime → sleeve target,
+  // and formats a compact prompt block the AI must respect (plus a HARD
+  // veto in risk_off regimes that the sizing layer also honours).
+  const cryptoDecision = await (async () => {
+    try {
+      const { computeCryptoSleeveDecision, formatCryptoSignalsBlock } =
+        await import("./crypto-strategy.server");
+      const cryptoHoldings = (holdings ?? [])
+        .filter((h) => h.asset_class === "crypto")
+        .map((h) => {
+          const px = priceMap.get(h.symbol) ?? 0;
+          return { symbol: h.symbol, market_value_base: Number(h.quantity) * px };
+        });
+      const d = await computeCryptoSleeveDecision({
+        asOf,
+        riskLevel: portfolio.risk_level,
+        regime: effectiveRegime.regime,
+        nav: totalValue,
+        holdings: cryptoHoldings,
+      });
+      return { decision: d, block: formatCryptoSignalsBlock(d) };
+    } catch (e) {
+      console.warn("crypto sleeve decision failed", e);
+      return null;
+    }
+  })();
+
   // If circuit breaker is tripped, skip the AI call entirely.
   const decision: DecisionOutput = breakerTripped
     ? {
@@ -785,7 +816,26 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxSystemBlock: fxContext?.block ?? null,
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
+        cryptoSignalsBlock: cryptoDecision?.block ?? null,
       });
+
+  // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
+  // not just in the prompt. If the regime bucket is risk_off, strip any AI
+  // crypto BUY orders (X6) — sells / trims are always allowed to fire.
+  if (cryptoDecision?.decision?.hard_veto) {
+    const { classifyCryptoSymbol } = await import("./crypto-groups");
+    const before = decision.orders.length;
+    decision.orders = decision.orders.filter((o) => {
+      const isCrypto = classifyCryptoSymbol(o.symbol) != null;
+      return !(isCrypto && o.side === "buy");
+    });
+    const stripped = before - decision.orders.length;
+    if (stripped > 0) {
+      decision.briefing = `${decision.briefing}\n[Crypto sleeve veto] ${cryptoDecision.decision.veto_reason} — ${stripped} crypto BUY order(s) removed.`;
+    }
+  }
+
+
 
 
 
