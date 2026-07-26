@@ -49,7 +49,7 @@ export async function syncLiveCashFromBroker(
 
   const portfolioQuery = db
     .from("portfolios")
-    .select("id, user_id, mode, current_cash, starting_cash, live_paused")
+    .select("id, user_id, mode, current_cash, starting_cash, live_paused, currency")
     .eq("id", portfolioId);
   const { data: p, error } = await (isAdmin
     ? portfolioQuery.eq("user_id", userId)
