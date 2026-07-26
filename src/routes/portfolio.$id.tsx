@@ -775,6 +775,9 @@ function PortfolioPage() {
             <div className="mb-6">
               <TailHedgeCard portfolioId={id} currency={p.currency} />
             </div>
+            <div className="mb-6">
+              <TailHedgeReportCard portfolioId={id} currency={p.currency} />
+            </div>
             <Card className="mb-6">
               <CardContent className="flex flex-wrap items-center gap-3 py-4">
                 <UITooltipProvider delayDuration={100}>
