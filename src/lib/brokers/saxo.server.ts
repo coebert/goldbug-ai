@@ -368,7 +368,14 @@ export class SaxoAdapter implements BrokerAdapter {
     return out;
   }
 
-  async lookupUic(symbol: string): Promise<{
+  // In-flight drift-retry lookups deduped per (env, symbol) so parallel
+  // callers hitting the same drift don't stampede the Saxo /ref/v1 search.
+  private static readonly driftRetryInFlight = new Map<string, Promise<unknown>>();
+
+  async lookupUic(
+    symbol: string,
+    opts?: { forceRefresh?: boolean; skipDriftRetry?: boolean },
+  ): Promise<{
     uic: number; assetType: string; currency: string; exchangeId?: string; tickSize?: number;
   }> {
     // Yahoo-style pseudo-tickers Saxo will never resolve: FX pairs
@@ -382,17 +389,19 @@ export class SaxoAdapter implements BrokerAdapter {
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const cached = await supabaseAdmin
-      .from("saxo_instrument_cache")
-      .select("uic, asset_type, currency, exchange_id, tick_size, refreshed_at")
-      .eq("symbol", symbol).eq("env", this.env).maybeSingle();
-    if (cached.data) {
-      const age = Date.now() - new Date(cached.data.refreshed_at as string).getTime();
-      if (age < 86_400_000) {
-        return {
-          uic: Number(cached.data.uic),
-          assetType: String(cached.data.asset_type),
-          currency: String(cached.data.currency ?? "GBP"),
+    if (!opts?.forceRefresh) {
+      const cached = await supabaseAdmin
+        .from("saxo_instrument_cache")
+        .select("uic, asset_type, currency, exchange_id, tick_size, refreshed_at")
+        .eq("symbol", symbol).eq("env", this.env).maybeSingle();
+      if (cached.data) {
+        const age = Date.now() - new Date(cached.data.refreshed_at as string).getTime();
+        if (age < 86_400_000) {
+          return {
+            uic: Number(cached.data.uic),
+            assetType: String(cached.data.asset_type),
+            currency: String(cached.data.currency ?? "GBP"),
+
           exchangeId: cached.data.exchange_id ?? undefined,
           tickSize: cached.data.tick_size ? Number(cached.data.tick_size) : undefined,
         };
