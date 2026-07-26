@@ -196,7 +196,7 @@ describe("E2E: Saxo order placement for the six crypto ETPs", () => {
 
     // Liquidity gate: the thin ETP's placed notional was trimmed to ≤ 1% ADV.
     const thinPlaced = placed.find((o) => o.symbol === THIN)!;
-    expect(thinPlaced.placedNotionalLocal).toBeLessThanOrEqual(20_000 * 0.01 + 1e-6);
+    expect(thinPlaced.placedNotionalLocal).toBeLessThanOrEqual(THIN_ADV * 0.01 + 1e-6);
 
     // The unconstrained ETPs saturated their per-symbol cap (within one
     // whole-unit of the fill price, since we floor the quantity).
