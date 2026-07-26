@@ -208,8 +208,15 @@ type Book = { units: number; avgCost: number; realised: number; trades: number; 
 
 export function runCryptoPlaybookBacktest(opts: CryptoBacktestOpts): CryptoBacktestReport {
   const cap = cryptoSleeveCapPct(opts.riskLevel);
-  const cost = (opts.costBps ?? 20) / 10_000;
+  // Unified execution cost model applied identically to strategy trades AND
+  // benchmarks. Legacy `costBps` still wins if callers set it; otherwise the
+  // per-side cost is fee + slippage in bps.
+  const feeBps = opts.feeBps ?? 10;
+  const slipBps = opts.slippageBps ?? 10;
+  const totalBps = opts.costBps ?? (feeBps + slipBps);
+  const cost = totalBps / 10_000;
   const rf = opts.riskFreeRateAnnual ?? 0;
+
 
   // Symbol index by date for O(1) close lookups.
   const closesBySymbol = new Map<string, { dates: string[]; closes: number[]; index: Map<string, number> }>();
