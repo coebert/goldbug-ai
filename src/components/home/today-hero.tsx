@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, Clock, TrendingDown, TrendingUp } from "lucide-react";
 import type { ModeSummaryPair } from "@/lib/mode-summary";
 import { ukHour, ukZoneAbbr } from "@/lib/uk-time";
 import { ModeSummaryTile } from "./mode-summary-tile";
@@ -12,7 +12,15 @@ import { ModeSummaryTile } from "./mode-summary-tile";
  * (they carry contract-tested formatting; see
  * real-money-equity-formatting.contract.test.tsx).
  */
-export function TodayHero({ summary }: { summary: ModeSummaryPair }) {
+export function TodayHero({
+  summary,
+  mixedCurrency = false,
+  currencies = [],
+}: {
+  summary: ModeSummaryPair;
+  mixedCurrency?: boolean;
+  currencies?: string[];
+}) {
   const nextRun = useNextRunCountdown();
   if (!summary) {
     return (
