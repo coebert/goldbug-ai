@@ -170,6 +170,60 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
               </div>
             ) : null}
 
+            {benchmarks.length > 0 ? (
+              <div>
+                <div className="mb-2 text-sm font-medium">Benchmark comparison</div>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Same window, same starting cash. Passive holds pay one entry cost; cash compounds at the risk-free rate (0% if unset).
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Strategy</TableHead>
+                      <TableHead className="text-right">Final</TableHead>
+                      <TableHead className="text-right">Total return</TableHead>
+                      <TableHead className="text-right">CAGR</TableHead>
+                      <TableHead className="text-right">Max DD</TableHead>
+                      <TableHead className="text-right">Ann. vol</TableHead>
+                      <TableHead className="text-right">Sharpe</TableHead>
+                      <TableHead className="text-right">vs Sleeve</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const sleeve = benchmarks.find((b) => b.label.startsWith("Sleeve"));
+                      const sleeveRet = sleeve?.totalReturnPct ?? 0;
+                      return benchmarks.map((b) => {
+                        const isSleeve = b.label.startsWith("Sleeve");
+                        const delta = b.totalReturnPct - sleeveRet;
+                        return (
+                          <TableRow key={b.label} className={isSleeve ? "font-medium" : ""}>
+                            <TableCell>
+                              <span className="inline-flex items-center gap-2">
+                                <span className="inline-block h-2 w-2 rounded-full" style={{ background: benchColor(b.label) }} />
+                                {b.label}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">{fmtGbp(b.finalEquity)}</TableCell>
+                            <TableCell className={`text-right ${b.totalReturnPct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{fmtPct(b.totalReturnPct)}</TableCell>
+                            <TableCell className="text-right">{fmtPct(b.cagrPct)}</TableCell>
+                            <TableCell className="text-right text-rose-600">{fmtPct(b.maxDrawdownPct)}</TableCell>
+                            <TableCell className="text-right">{fmtPct(b.volatilityPctAnnual)}</TableCell>
+                            <TableCell className="text-right">{b.sharpe.toFixed(2)}</TableCell>
+                            <TableCell className={`text-right ${isSleeve ? "text-muted-foreground" : delta <= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                              {isSleeve ? "—" : `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(2)}pp`}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : null}
+
+
+
             <div>
               <div className="mb-2 text-sm font-medium">Per-ETP contribution</div>
               <Table>
