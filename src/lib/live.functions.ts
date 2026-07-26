@@ -558,9 +558,9 @@ export const getCashSyncHistory = createServerFn({ method: "POST" })
       .select("id, user_id").eq("id", data.portfolioId).maybeSingle();
     if (p.error || !p.data || p.data.user_id !== userId) throw new Error("Portfolio not found");
     const rows = await supabase.from("live_broker_log")
-      .select("id, created_at, status, request, response, error, env")
+      .select("id, created_at, status, request, response, error, env, method")
       .eq("portfolio_id", data.portfolioId)
-      .eq("method", "CASH_SYNC")
+      .in("method", ["CASH_SYNC", "CASH_SYNC_PREFLIGHT"])
       .order("created_at", { ascending: false })
       .limit(data.limit);
     return { rows: rows.data ?? [] };
