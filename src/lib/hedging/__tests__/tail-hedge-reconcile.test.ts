@@ -100,7 +100,7 @@ describe("reconcileTailHedge", () => {
       priorTargetNotional: 400,
     });
     expect(classifyDeferralReason(
-      { action: "sell", deltaNotional: -400, targetNotional: 0, targetPctNav: 0, reason: "" },
+      { action: "sell", deltaNotional: -400, targetNotional: 0, targetPctNav: 0, reason: "", regime: "risk_off" },
       { applied: false, reason: "no GLD to unwind", symbol: "GLD", qty: 0, notional: 0 },
     )).toBe("no_position_to_sell");
     expect(r.priorTargetNotional).toBe(400);
