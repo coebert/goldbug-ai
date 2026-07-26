@@ -946,9 +946,11 @@ export async function routeOrdersToBroker(params: {
         order_type: "market",
         status: "pending",
         submitted_at: new Date().toISOString(),
+        instrument_ccy: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
       })
       .select("id")
       .single();
+
 
     if (inserted.error || !inserted.data) {
       const isDuplicate = inserted.error?.code === "23505";
