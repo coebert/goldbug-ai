@@ -46,12 +46,31 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
   });
 
   const report = mut.data?.report;
-  const chartData = (report?.equityCurve ?? []).map((p) => ({
-    date: p.date,
-    equity: Number(p.equity.toFixed(2)),
-    drawdown: -Number((p.drawdown * 100).toFixed(2)), // negative for area under 0
-    sleeve_pct: Number((p.sleeve_pct * 100).toFixed(2)),
-  }));
+  const benchmarks = report?.benchmarks ?? [];
+  // Merge benchmark curves by date for overlay chart.
+  const chartData = (() => {
+    if (!report) return [] as Array<Record<string, number | string>>;
+    const byDate = new Map<string, Record<string, number | string>>();
+    for (const p of report.equityCurve) {
+      byDate.set(p.date, {
+        date: p.date,
+        equity: Number(p.equity.toFixed(2)),
+        drawdown: -Number((p.drawdown * 100).toFixed(2)),
+        sleeve_pct: Number((p.sleeve_pct * 100).toFixed(2)),
+      });
+    }
+    for (const b of benchmarks) {
+      if (b.label.startsWith("Sleeve")) continue;
+      const key = benchKey(b.label);
+      for (const p of b.equityCurve) {
+        const row = byDate.get(p.date) ?? { date: p.date };
+        row[key] = Number(p.equity.toFixed(2));
+        byDate.set(p.date, row);
+      }
+    }
+    return Array.from(byDate.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  })();
+
 
   return (
     <Card>
