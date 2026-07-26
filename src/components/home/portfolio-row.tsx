@@ -427,6 +427,14 @@ export function PortfolioRow({
             )}
           </div>
         </div>
+
+        <HoldingsStrip
+          holdings={holdings}
+          currency={portfolio.currency}
+          cash={Number(portfolio.current_cash)}
+          totalEquity={totalEquity}
+          portfolioId={portfolio.id}
+        />
       </CardContent>
       <ConfirmDialog
         open={confirmDelete}
