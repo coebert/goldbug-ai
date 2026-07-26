@@ -244,6 +244,7 @@ export const getPortfolio = createServerFn({ method: "GET" })
     if (!portfolio) throw new Error("Portfolio not found");
 
     const deposits: Array<{ date: string; amount: number }> = [];
+    let brokerCurrency: string | null = null;
     const mode = (portfolio as { mode?: string }).mode;
     if (mode !== "live_prod" && mode !== "live_sim") {
       const { data: simEvents } = await context.supabase
