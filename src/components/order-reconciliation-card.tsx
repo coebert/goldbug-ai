@@ -9,6 +9,10 @@ import {
   backfillOrderReconciliation,
   type BackfillResult,
 } from "@/lib/order-reconciliation-backfill.functions";
+import {
+  reconcileFillsToTrades,
+  type FillsTradesReconcileResult,
+} from "@/lib/fills-trades-reconcile.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,6 +89,30 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
       toast.error(`Backfill failed: ${e instanceof Error ? e.message : String(e)}`),
   });
 
+  const runFillsToTrades = useServerFn(reconcileFillsToTrades);
+  const fillsToTrades = useMutation({
+    mutationFn: () => {
+      if (!portfolioId) throw new Error("Open a specific portfolio to run this reconcile.");
+      return runFillsToTrades({ data: { portfolioId } });
+    },
+    onSuccess: (res: FillsTradesReconcileResult) => {
+      const h = res.holdings;
+      const brokerPart = h.skipped
+        ? `holdings sync skipped (${h.reason ?? "unknown"})`
+        : `${h.brokerPositions ?? 0} broker position${h.brokerPositions === 1 ? "" : "s"} · £${(h.newTotalValue ?? 0).toFixed(2)} ${h.currency ?? ""}`;
+      toast.success(
+        `Fills → trades: ${res.tradesFromFillsInserted} trade row${res.tradesFromFillsInserted === 1 ? "" : "s"} from ${res.fillsSeen} fill${res.fillsSeen === 1 ? "" : "s"} · dropped ${res.optimisticTradesDropped} optimistic · ${brokerPart}`,
+        { duration: 10000 },
+      );
+      queryClient.invalidateQueries({ queryKey: ["order-recon-view"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      queryClient.invalidateQueries({ queryKey: ["trades"] });
+      queryClient.invalidateQueries({ queryKey: ["holdings"] });
+    },
+    onError: (e: unknown) =>
+      toast.error(`Fills reconcile failed: ${e instanceof Error ? e.message : String(e)}`),
+  });
+
   const rows: ReconOrderRow[] = q.data ?? [];
   const filtered = useMemo(
     () => (status === "all" ? rows : rows.filter((r) => r.status.toLowerCase() === status)),
@@ -129,6 +157,18 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
             <PlayCircle className={`mr-1 h-3.5 w-3.5 ${backfill.isPending ? "animate-pulse" : ""}`} />
             {backfill.isPending ? "Backfilling…" : "Backfill"}
           </Button>
+          {portfolioId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fillsToTrades.mutate()}
+              disabled={fillsToTrades.isPending}
+              title="Rebuild this portfolio's trades ledger from real broker fills, then refresh holdings from Saxo"
+            >
+              <ClipboardCheck className={`mr-1 h-3.5 w-3.5 ${fillsToTrades.isPending ? "animate-pulse" : ""}`} />
+              {fillsToTrades.isPending ? "Reconciling…" : "Reconcile fills"}
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
             <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} />
           </Button>
