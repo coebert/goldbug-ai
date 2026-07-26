@@ -372,33 +372,59 @@ export function runPhaseBacktest(
       });
     }
 
-    // Phase 6: tail-hedge overlay rebalance (reserves cash, tracked as notional).
-    if (flags.hedge) {
+    // Phase 6: tail-hedge overlay rebalance — priced against `hedgeSymbol`
+    // and executed with the same no-leverage/no-borrow rules as the live
+    // executor: buys are capped at cash * (1 - buffer), sells are capped at
+    // the current held quantity, and both sides pay the standard fee/slippage
+    // bps so Phase 6 contribution matches real-world hedge fills.
+    if (flags.hedge && hedgeHasSeries) {
+      const hedgePrice = hedgePriceOn(date);
       const postNav = (() => {
         let m = 0;
         for (const [sym, pos] of Object.entries(positions)) {
           const bar = bySym.get(sym)?.get(date);
           m += pos.qty * (bar?.close ?? pos.prevClose);
         }
-        return cash + m + hedgeNotional;
+        return cash + m + hedgeQty * hedgePrice;
       })();
       const dec = computeTailHedge({
         nav: postNav,
         cape: cfg.cape ?? null,
         regime: cfg.regime ?? null,
-        currentHedgeNotional: hedgeNotional,
+        currentHedgeNotional: hedgeQty * hedgePrice,
       });
-      if (dec.action !== "hold") {
-        const delta = dec.deltaNotional;
-        if (delta > 0 && cash >= delta) {
-          cash -= delta;
-          hedgeNotional += delta;
-        } else if (delta < 0) {
-          const sell = Math.min(hedgeNotional, -delta);
-          hedgeNotional -= sell;
-          cash += sell;
+      if (dec.action !== "hold" && hedgePrice > 0 && Math.abs(dec.deltaNotional) >= 1) {
+        const bps = perSideCostBps(flags.slicing);
+        if (dec.action === "buy") {
+          const affordable = Math.max(0, cash * (1 - hedgeBufferPct));
+          const spend = Math.min(dec.deltaNotional, affordable);
+          if (spend >= hedgePrice) {
+            const priceWithCost = hedgePrice * (1 + bps / 10_000);
+            const qty = spend / priceWithCost;
+            cash -= qty * priceWithCost;
+            hedgeQty += qty;
+            trades.push({
+              date, symbol: hedgeSymbol, side: "buy", qty, price: hedgePrice, costBps: bps,
+              reason: `tail_hedge buy → target ${(dec.targetPctNav * 100).toFixed(2)}% NAV (${dec.reason})`,
+            });
+          }
+        } else {
+          // sell: unwind up to |delta|/price, capped at held qty (no shorting).
+          const wantQty = Math.abs(dec.deltaNotional) / hedgePrice;
+          const qty = Math.min(hedgeQty, wantQty);
+          if (qty > 1e-9) {
+            const proceeds = qty * hedgePrice * (1 - bps / 10_000);
+            cash += proceeds;
+            hedgeQty -= qty;
+            if (hedgeQty < 1e-9) hedgeQty = 0;
+            trades.push({
+              date, symbol: hedgeSymbol, side: "sell", qty, price: hedgePrice, costBps: bps,
+              reason: `tail_hedge sell → target ${(dec.targetPctNav * 100).toFixed(2)}% NAV (${dec.reason})`,
+            });
+          }
         }
       }
+      hedgePrevClose = hedgePrice;
     }
 
     // Roll prevClose for stop advance.
