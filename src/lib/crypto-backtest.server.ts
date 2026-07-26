@@ -375,8 +375,8 @@ export function runCryptoPlaybookBacktest(opts: CryptoBacktestOpts): CryptoBackt
   // total return unannualised; above that we use actual elapsed calendar
   // days rather than a 252-day proxy so weekends don't inflate the exponent.
   const MIN_TRADING_DAYS_FOR_CAGR = 30;
-  const firstTs = equityCurve.length ? equityCurve[0].t : 0;
-  const lastTs = equityCurve.length ? equityCurve[equityCurve.length - 1].t : 0;
+  const firstTs = equityCurve.length ? Date.parse(equityCurve[0].date) : 0;
+  const lastTs = equityCurve.length ? Date.parse(equityCurve[equityCurve.length - 1].date) : 0;
   const elapsedYears = lastTs > firstTs ? (lastTs - firstTs) / (365.25 * 24 * 60 * 60 * 1000) : 0;
   const cagr =
     opts.startingCash > 0 && equityCurve.length >= MIN_TRADING_DAYS_FOR_CAGR && elapsedYears > 0
@@ -524,8 +524,8 @@ function summariseBenchmarkCurve(
   const final = curve.length ? curve[curve.length - 1].equity : startingCash;
   const totalReturn = startingCash > 0 ? final / startingCash - 1 : 0;
   const MIN_TRADING_DAYS_FOR_CAGR = 30;
-  const firstTs = curve.length ? curve[0].t : 0;
-  const lastTs = curve.length ? curve[curve.length - 1].t : 0;
+  const firstTs = curve.length ? Date.parse(curve[0].date) : 0;
+  const lastTs = curve.length ? Date.parse(curve[curve.length - 1].date) : 0;
   const elapsedYears = lastTs > firstTs ? (lastTs - firstTs) / (365.25 * 24 * 60 * 60 * 1000) : 0;
   const cagr =
     startingCash > 0 && curve.length >= MIN_TRADING_DAYS_FOR_CAGR && elapsedYears > 0
