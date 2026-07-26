@@ -162,35 +162,52 @@ function maxDrawdownFromReturns(returns: number[]): number {
 export type BootstrapCIs = {
   sharpe: ConfidenceInterval | null;
   maxDrawdown: ConfidenceInterval | null;
+  method: "block" | "iid";
+  blockLength: number;
 };
 
 /**
- * 95% bootstrap CIs for Sharpe and max drawdown, using stationary IID
- * resampling of daily returns with replacement. Deterministic given `seed`.
+ * 95% bootstrap CIs for Sharpe and max drawdown.
  *
- * Assumptions & caveats:
- *  • IID bootstrap: intraday autocorrelation is ignored. For daily equity
- *    curves this is the standard first-order approximation.
- *  • Max drawdown is path-dependent — we rebuild an equity path from each
- *    resample and measure MDD on it. Order within a resample matters, but
- *    across resamples the marginal distribution of returns is preserved.
- *  • Returns null when fewer than 2 daily returns exist (nothing to resample).
+ * Default: MOVING-BLOCK bootstrap (contiguous blocks of length ~n^(1/3),
+ * Politis–Romano) which preserves short-range autocorrelation in daily
+ * returns. IID resampling systematically under-reports drawdown risk
+ * because it destroys the clustering of losing days that produces deep
+ * drawdowns in reality; block bootstrap keeps that clustering intact.
+ *
+ * Pass `{ method: "iid" }` to force the legacy IID behaviour.
+ * Deterministic given `seed`.
  */
 export function bootstrapCIs(
   returns: number[],
-  opts: { samples?: number; seed?: number } = {},
+  opts: { samples?: number; seed?: number; method?: "block" | "iid"; blockLength?: number } = {},
 ): BootstrapCIs {
   const samples = Math.max(100, Math.floor(opts.samples ?? 1000));
   const seed = opts.seed ?? 0xC0FFEE;
-  if (returns.length < 2) return { sharpe: null, maxDrawdown: null };
-  const rand = mulberry32(seed);
+  const method: "block" | "iid" = opts.method ?? "block";
   const n = returns.length;
+  const defaultBlock = Math.max(1, Math.round(Math.pow(Math.max(n, 1), 1 / 3)));
+  const blockLength = Math.max(1, Math.min(n || 1, Math.floor(opts.blockLength ?? defaultBlock)));
+  if (n < 2) return { sharpe: null, maxDrawdown: null, method, blockLength };
+  const rand = mulberry32(seed);
   const sharpes: number[] = new Array(samples);
   const mdds: number[] = new Array(samples);
   const resample: number[] = new Array(n);
   for (let i = 0; i < samples; i++) {
-    for (let j = 0; j < n; j++) {
-      resample[j] = returns[Math.floor(rand() * n)];
+    if (method === "iid") {
+      for (let j = 0; j < n; j++) resample[j] = returns[Math.floor(rand() * n)];
+    } else {
+      // Moving-block: pick a random start, copy `blockLength` contiguous
+      // values, repeat until the resample is full. Wraps around the end
+      // of the series (circular block variant) so every observation has
+      // equal probability of being sampled.
+      let j = 0;
+      while (j < n) {
+        const start = Math.floor(rand() * n);
+        for (let k = 0; k < blockLength && j < n; k++, j++) {
+          resample[j] = returns[(start + k) % n];
+        }
+      }
     }
     sharpes[i] = computeSharpe(resample);
     mdds[i] = maxDrawdownFromReturns(resample);
@@ -203,7 +220,7 @@ export function bootstrapCIs(
     high: percentileSorted(arr, 97.5),
     samples,
   });
-  return { sharpe: ci(sharpes), maxDrawdown: ci(mdds) };
+  return { sharpe: ci(sharpes), maxDrawdown: ci(mdds), method, blockLength };
 }
 
 
