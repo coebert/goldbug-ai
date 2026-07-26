@@ -860,6 +860,35 @@ export async function routeOrdersToBroker(params: {
   const ORDER_SPACING_MS = 1500;
   let firstOrder = true;
 
+  // Resolve the true instrument currency for every routable order so each
+  // live_orders row carries the correct currency stamp (was defaulting to
+  // 'GBP' at the DB level, which mis-classified every USD instrument and
+  // caused the affordability trim to bless orders the broker then rejected
+  // with InsufficientCash). Prefer the value the caller passed on the
+  // ExecutedOrder, then saxo_instrument_cache, then the portfolio base.
+  const routeSymToCcy = new Map<string, string>();
+  for (const o of routable) {
+    if (o.instrument_ccy) routeSymToCcy.set(o.symbol, o.instrument_ccy.toUpperCase());
+  }
+  {
+    const missing = Array.from(new Set(routable.map((o) => o.symbol))).filter(
+      (s) => !routeSymToCcy.has(s),
+    );
+    if (missing.length > 0) {
+      const cache = await supabaseAdmin
+        .from("saxo_instrument_cache")
+        .select("symbol, currency")
+        .in("symbol", missing);
+      for (const row of cache.data ?? []) {
+        if (row.currency) routeSymToCcy.set(row.symbol, row.currency.toUpperCase());
+      }
+    }
+    for (const o of routable) {
+      if (!routeSymToCcy.has(o.symbol)) routeSymToCcy.set(o.symbol, portfolioCurrency);
+    }
+  }
+
+
   for (const order of routable) {
     // Pre-placement affordability trim: buys that don't fit the freshly
     // reconciled broker cash are skipped before we ever call placeOrder.
