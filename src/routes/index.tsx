@@ -157,7 +157,11 @@ function Home() {
         <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
 
         {/* Hero "Today" band — combined equity, delta, next-run countdown, mode tiles */}
-        <TodayHero summary={todaySummary} />
+        <TodayHero
+          summary={todaySummary}
+          mixedCurrency={equityQ.data?.mixedCurrency ?? false}
+          currencies={equityQ.data?.currencies ?? []}
+        />
 
         <NewHereBanner />
 

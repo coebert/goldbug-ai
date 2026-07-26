@@ -20,6 +20,12 @@ export type AllPortfoliosEquity = {
   series: Array<Record<string, string | number>>;
   perPortfolioSeries: Record<string, PortfolioEquityPoint[]>;
   currency: string;
+  /** True when >1 distinct portfolio currency is present. Series totals
+   *  (`total_sim`, `total_real`) are only meaningful when every portfolio
+   *  reports the same currency; the UI must show a warning otherwise. */
+  mixedCurrency: boolean;
+  /** Distinct currencies observed across the portfolio list. */
+  currencies: string[];
 };
 
 function toNumber(value: number | string | null | undefined, fallback = 0) {
@@ -47,8 +53,19 @@ export function buildAllPortfoliosEquity({
   today: string;
 }): AllPortfoliosEquity {
   const list = portfolios;
+  const distinctCurrencies = Array.from(
+    new Set(list.map((p) => (p.currency || "GBP").toUpperCase())),
+  ).sort();
+  const mixedCurrency = distinctCurrencies.length > 1;
   if (list.length === 0) {
-    return { portfolios: [], series: [], perPortfolioSeries: {}, currency: "GBP" };
+    return {
+      portfolios: [],
+      series: [],
+      perPortfolioSeries: {},
+      currency: "GBP",
+      mixedCurrency: false,
+      currencies: [],
+    };
   }
 
   const byPortfolio = new Map<string, PortfolioEquityPoint[]>();
@@ -127,5 +144,7 @@ export function buildAllPortfoliosEquity({
     series,
     perPortfolioSeries,
     currency: perPortfolio[0]?.currency ?? "GBP",
+    mixedCurrency,
+    currencies: distinctCurrencies,
   };
 }

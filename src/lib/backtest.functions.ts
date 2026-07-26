@@ -71,7 +71,7 @@ export const runBacktest = createServerFn({ method: "POST" })
 
     // Compute key performance metrics for this backtest run.
     const { computeBacktestMetrics } = await import("./backtest-metrics");
-    const [{ data: eqRows }, { data: tradeRows }] = await Promise.all([
+    const [{ data: eqRows }, { data: tradeRows }, { data: fundRows }] = await Promise.all([
       context.supabase
         .from("equity_snapshots")
         .select("snapshot_date,total_value")
@@ -82,6 +82,11 @@ export const runBacktest = createServerFn({ method: "POST" })
         .select("trade_date,executed_at,side,symbol,quantity,price")
         .eq("portfolio_id", data.portfolio_id)
         .order("trade_date", { ascending: true }),
+      context.supabase
+        .from("sim_fund_events")
+        .select("created_at,amount")
+        .eq("portfolio_id", data.portfolio_id)
+        .order("created_at", { ascending: true }),
     ]);
     const startingCash = Number(p?.starting_cash ?? 0);
     const metrics = computeBacktestMetrics(
@@ -98,6 +103,10 @@ export const runBacktest = createServerFn({ method: "POST" })
         price: Number(t.price),
       })),
       startingCash,
+      (fundRows ?? []).map((f) => ({
+        date: String(f.created_at ?? "").slice(0, 10),
+        amount: Number(f.amount),
+      })),
     );
 
     return { ok: true, days: dates.length, finalValue: lastTotal, metrics };

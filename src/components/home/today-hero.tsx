@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, Clock, TrendingDown, TrendingUp } from "lucide-react";
 import type { ModeSummaryPair } from "@/lib/mode-summary";
 import { ukHour, ukZoneAbbr } from "@/lib/uk-time";
 import { ModeSummaryTile } from "./mode-summary-tile";
@@ -12,7 +12,15 @@ import { ModeSummaryTile } from "./mode-summary-tile";
  * (they carry contract-tested formatting; see
  * real-money-equity-formatting.contract.test.tsx).
  */
-export function TodayHero({ summary }: { summary: ModeSummaryPair }) {
+export function TodayHero({
+  summary,
+  mixedCurrency = false,
+  currencies = [],
+}: {
+  summary: ModeSummaryPair;
+  mixedCurrency?: boolean;
+  currencies?: string[];
+}) {
   const nextRun = useNextRunCountdown();
   if (!summary) {
     return (
@@ -67,6 +75,19 @@ export function TodayHero({ summary }: { summary: ModeSummaryPair }) {
               {formatGBP(combinedPnl)} vs yesterday
             </span>
           </div>
+          {mixedCurrency && (
+            <div
+              className="mt-2 inline-flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-500"
+              role="status"
+              aria-live="polite"
+              title="Portfolios use different currencies; combined equity is the raw sum without FX conversion."
+            >
+              <AlertTriangle className="mt-[1px] h-3 w-3 shrink-0" aria-hidden />
+              <span>
+                Combined figure is an un-converted sum — portfolios span {currencies.join(", ")}.
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border/60 bg-surface-sunken px-3 py-2">
           <Clock className="h-4 w-4 text-primary" aria-hidden />

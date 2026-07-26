@@ -43,12 +43,17 @@ export function LiveHoldingsCard({
       const avg = Number(h.avg_cost);
       const s = series?.[h.symbol];
       // Prefer live price when we have one, otherwise fall back to cost.
-      const mark = s?.currentPrice ?? avg;
+      // `pricedAtCost` flags rows whose value is computed off `avg_cost`
+      // because the price cache is missing/stale — the UI shows a badge
+      // so users don't mistake a flat P/L row for genuine breakeven.
+      const hasLive = s?.currentPrice != null && Number.isFinite(Number(s.currentPrice));
+      const mark = hasLive ? Number(s!.currentPrice) : avg;
       const value = qty * mark;
       const costBasis = qty * avg;
-      return { ...h, qty, avg, mark, value, costBasis, series: s };
+      return { ...h, qty, avg, mark, value, costBasis, series: s, pricedAtCost: !hasLive };
     })
     .sort((a, b) => b.value - a.value);
+  const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
   const holdingsValue = rows.reduce((s, r) => s + r.value, 0);
   const denom = totalValue > 0 ? totalValue : holdingsValue + cash;
@@ -210,6 +215,15 @@ export function LiveHoldingsCard({
                             {r.asset_class}
                           </Badge>
                         )}
+                        {r.pricedAtCost && (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/50 bg-amber-500/10 text-amber-500 text-[9px] px-1.5 py-0"
+                            title="Live price unavailable — value shown uses average cost as a proxy."
+                          >
+                            @ cost
+                          </Badge>
+                        )}
                         {changePct != null && (
                           <span
                             className={`sm:hidden inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold tabular-nums ${
@@ -268,6 +282,16 @@ export function LiveHoldingsCard({
           <p className="text-[11px] text-muted-foreground">
             Values shown at latest close where available, otherwise at broker average cost. Live
             market prices are re-synced during each run and reconciliation.
+          </p>
+        )}
+        {stalePricedCount > 0 && (
+          <p
+            className="text-[11px] text-amber-500"
+            role="status"
+            title="These holdings are priced at their average cost because the price cache has no fresh quote — realised value may drift from live market once quotes return."
+          >
+            ⚠ {stalePricedCount} holding{stalePricedCount === 1 ? "" : "s"} priced at average
+            cost — price cache stale.
           </p>
         )}
       </CardContent>
