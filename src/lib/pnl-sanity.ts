@@ -161,8 +161,13 @@ export function checkPnlSanity(input: PnlSanityInput): PnlSanityResult {
     });
   }
 
-  // 3. Large single-step jump vs prior equity.
-  if (stepPct > maxSingleStepPct && Math.abs(equityDelta) >= minAbsoluteResidual) {
+  // 3. Large single-step jump vs prior equity — only when the jump is NOT
+  //    already explained by an external cash movement (deposit/withdrawal).
+  if (
+    stepPct > maxSingleStepPct &&
+    Math.abs(equityDelta) >= minAbsoluteResidual &&
+    residualPct > maxSingleStepPct / 2
+  ) {
     flags.push({
       code: "unexplained_jump",
       severity: stepPct > maxSingleStepPct * 2 ? "critical" : "warn",
