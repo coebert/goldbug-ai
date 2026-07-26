@@ -113,7 +113,7 @@ describe("runCryptoPreTradeChecks — buy path", () => {
   it("respects config overrides so risk levels can widen/tighten thresholds", () => {
     const r = runCryptoPreTradeChecks({
       ...base, price: 40, quantity: 1,
-      config: { min_order_value_local: 20 }, // relax floor for this test
+      config: { min_order_value_local: 20 } as Partial<typeof CRYPTO_PRETRADE_CONFIG>,
     });
     expect(r.ok).toBe(true);
   });
