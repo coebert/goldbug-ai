@@ -200,6 +200,33 @@ export type Database = {
           },
         ]
       }
+      earnings_cache: {
+        Row: {
+          confidence: string
+          expires_at: string
+          fetched_at: string
+          next_earnings_date: string | null
+          source: string
+          symbol: string
+        }
+        Insert: {
+          confidence?: string
+          expires_at?: string
+          fetched_at?: string
+          next_earnings_date?: string | null
+          source?: string
+          symbol: string
+        }
+        Update: {
+          confidence?: string
+          expires_at?: string
+          fetched_at?: string
+          next_earnings_date?: string | null
+          source?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
       equity_snapshots: {
         Row: {
           cash: number
