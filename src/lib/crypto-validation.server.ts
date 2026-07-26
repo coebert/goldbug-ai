@@ -164,7 +164,16 @@ export function makeCryptoValidator(args: {
 // exported so tests + UI can show the same thresholds the engine enforces.
 // ---------------------------------------------------------------------------
 
-export const CRYPTO_PRETRADE_CONFIG = {
+export type CryptoPreTradeConfig = {
+  max_fee_pct: number;
+  estimated_fee_pct: number;
+  estimated_fee_min_local: number;
+  lot_size: number;
+  min_order_value_local: number;
+  allowed_phases: readonly string[];
+};
+
+export const CRYPTO_PRETRADE_CONFIG: CryptoPreTradeConfig = {
   // Max broker commission as a fraction of order notional. Saxo's tiered
   // schedule is ~0.08% on XETRA/SIX/LSE with a small per-order floor, so any
   // effective rate over 1.5% means the order is too small to be economic.
@@ -182,8 +191,8 @@ export const CRYPTO_PRETRADE_CONFIG = {
   min_order_value_local: 100,
   // Venue phases in which we're willing to route a fresh order. `regular`
   // is Saxo's continuous auction window; anything else queues the order.
-  allowed_phases: ["regular"] as const,
-} as const;
+  allowed_phases: ["regular"],
+};
 
 /** Approximate venue trading window (local wall-clock minutes, Mon–Fri). */
 type VenueSession = { tz: string; openMin: number; closeMin: number; label: string };
