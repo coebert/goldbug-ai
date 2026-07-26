@@ -17,8 +17,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { computeCardRangePct, type CardSparkPoint } from "@/lib/card-range-pct";
 
-const SOURCE = readFileSync(resolve(__dirname, "../index.tsx"), "utf8") + "
-" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
+const SOURCE = readFileSync(resolve(__dirname, "../index.tsx"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
 
 // Mirror of the card's headline derivation. If the production line
 // changes shape, the source-level guard below fires — force the author

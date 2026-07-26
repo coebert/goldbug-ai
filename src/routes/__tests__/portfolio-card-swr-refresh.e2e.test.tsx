@@ -188,8 +188,7 @@ describe("Portfolio card: stale-while-revalidate refresh", () => {
   });
 
   it("production route wires SWR + refresh indicator", () => {
-    const src = readFileSync(resolve(__dirname, "../index.tsx"), "utf8") + "
-" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
+    const src = readFileSync(resolve(__dirname, "../index.tsx"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../components/home/portfolio-row.tsx"), "utf8");
     // 1. equityQ uses keepPreviousData for SWR.
     expect(src).toMatch(/keepPreviousData/);
     expect(src).toMatch(
