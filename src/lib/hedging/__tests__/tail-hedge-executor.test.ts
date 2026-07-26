@@ -92,15 +92,40 @@ describe("tail-hedge-executor", () => {
     expect(r.workingCash).toBe(10_000);
   });
 
-  it("defers on live portfolios", () => {
+  it("emits a routable trade on live portfolios without mutating local state", () => {
+    const holdings = new Map<string, Holding>();
     const r = applyTailHedgeToPaperPortfolio({
       ...baseArgs, isLivePortfolio: true,
       decision: buyDecision(1_000),
-      holdingsByS: new Map(), workingCash: 10_000,
+      holdingsByS: holdings, workingCash: 10_000,
       priceMap: new Map([["GLD", 200]]),
     });
-    expect(r.applied).toBe(false);
-    expect(r.reason).toMatch(/live/i);
+    expect(r.applied).toBe(true);
+    expect(r.trade?.side).toBe("buy");
+    expect(r.trade?.reason).toMatch(/live: routed via broker executor/);
+    // Local mirror must be untouched — broker is authoritative for live.
+    expect(holdings.size).toBe(0);
+    expect(r.workingCash).toBe(10_000);
+  });
+
+  it("caps live sell qty to current held quantity (no shorting)", () => {
+    const holdings = new Map<string, Holding>([[
+      "GLD",
+      { id: "x", portfolio_id: baseArgs.portfolioId, symbol: "GLD",
+        asset_class: "commodity", quantity: 1, avg_cost: 200,
+        opened_at: null, updated_at: null, high_water_mark: 200 } as unknown as Holding,
+    ]]);
+    const r = applyTailHedgeToPaperPortfolio({
+      ...baseArgs, isLivePortfolio: true,
+      decision: sellDecision(10_000), // wants to sell way more than held
+      holdingsByS: holdings, workingCash: 500,
+      priceMap: new Map([["GLD", 200]]),
+    });
+    expect(r.applied).toBe(true);
+    expect(r.qty).toBeCloseTo(1, 6); // capped at held quantity
+    // Local mirror untouched.
+    expect(holdings.get("GLD")?.quantity).toBe(1);
+    expect(r.workingCash).toBe(500);
   });
 
   it("skips when no price is available", () => {
