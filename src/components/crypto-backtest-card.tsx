@@ -135,12 +135,25 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmtGbp(Number(v))} width={72} />
                       <Tooltip
-                        formatter={(v: number | string, name) =>
-                          name === "equity" ? [fmtGbp(Number(v)), "Equity"] : [String(v), String(name)]
-                        }
+                        formatter={(v: number | string, name) => [fmtGbp(Number(v)), benchLabelFromKey(String(name))]}
                       />
-                      <Line type="monotone" dataKey="equity" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+                      <Line type="monotone" dataKey="equity" name="Sleeve" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+                      {benchmarks
+                        .filter((b) => !b.label.startsWith("Sleeve"))
+                        .map((b) => (
+                          <Line
+                            key={b.label}
+                            type="monotone"
+                            dataKey={benchKey(b.label)}
+                            name={b.label}
+                            stroke={benchColor(b.label)}
+                            strokeDasharray="4 3"
+                            dot={false}
+                            strokeWidth={1.5}
+                          />
+                        ))}
                     </ComposedChart>
+
                   </ResponsiveContainer>
                 </div>
                 <div className="h-40">
