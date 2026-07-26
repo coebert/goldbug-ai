@@ -127,6 +127,7 @@ import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-
 import { FxAuditCard } from "@/components/fx-audit-card";
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
+import { InvestableUniverseCard } from "@/components/investable-universe-card";
 import { CommodityBacktestCard } from "@/components/commodity-backtest-card";
 
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
@@ -1283,6 +1284,10 @@ function PortfolioPage() {
 
             <div className="mt-6">
               <CommodityLiquiditySimulatorCard />
+            </div>
+
+            <div className="mt-6">
+              <InvestableUniverseCard />
             </div>
 
             <div className="mt-6">
