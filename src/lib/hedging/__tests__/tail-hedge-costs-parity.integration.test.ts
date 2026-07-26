@@ -89,9 +89,11 @@ function perSideBps(m: CostModel): number {
  * Implementation:
  *   • decision inputs (nav, currentHedgeNotional) use the raw mid price,
  *     identical to the backtest's `hedgePriceOn(date)` semantics;
- *   • the executor is fed a per-side adjusted price so its
- *     `qty = spend/price` and cash movements match the backtest's
- *     `price*(1+bps/1e4)` for buys and `price*(1-bps/1e4)` for sells.
+ *   • BUY: feed executor `mid*(1+bps/1e4)` so its `qty = spend/price`
+ *     and cash deduction match the backtest exactly;
+ *   • SELL: feed executor the raw mid so `wantQty = |delta|/mid` matches
+ *     the backtest, then post-adjust cash by `-qty*mid*bps/1e4` to
+ *     recover the backtest's `cash += qty*price*(1-bps/1e4)` formula.
  */
 function costAwareExecutorReplay(
   days: Array<{ date: string; price: number }>,
@@ -110,9 +112,7 @@ function costAwareExecutorReplay(
     const decision = computeTailHedge({
       nav, cape: c.cape, regime: c.regime, currentHedgeNotional: held * mid,
     });
-    let execPrice = mid;
-    if (decision.action === "buy") execPrice = mid * (1 + bps / 10_000);
-    else if (decision.action === "sell") execPrice = mid * (1 - bps / 10_000);
+    const execPrice = decision.action === "buy" ? mid * (1 + bps / 10_000) : mid;
     const priceMap = mid > 0 ? new Map([[c.hedgeSymbol!, execPrice]]) : new Map<string, number>();
     const r = applyTailHedgeToPaperPortfolio({
       portfolioId: "00000000-0000-0000-0000-000000000000",
@@ -124,6 +124,9 @@ function costAwareExecutorReplay(
     });
     cash = r.workingCash;
     if (r.applied && r.trade) {
+      // Sells: recover backtest's `cash += qty*price*(1-bps/1e4)` by
+      // charging the slippage/commission delta after the raw fill.
+      if (r.trade.side === "sell") cash -= r.qty * mid * (bps / 10_000);
       trades.push({
         date: day.date, symbol: c.hedgeSymbol!, side: r.trade.side,
         qty: r.trade.quantity, price: mid, costBps: bps, reason: r.trade.reason,
