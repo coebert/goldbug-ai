@@ -175,7 +175,7 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     });
     const second = await buildFxAuditPairs();
     for (const p of second) {
-      expect(p.source).toBe("cache");
+      expect(["cache", "cache:inverse"]).toContain(p.source);
       expect(p.stale).toBe(false);
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
       // Cache observedAt MUST equal the original fetch time — not "now".
@@ -193,6 +193,9 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     const firstObserved = new Map(
       first.map((p) => [`${p.from}${p.to}`, p.observedAt]),
     );
+    const firstRates = new Map(
+      first.map((p) => [`${p.from}${p.to}`, p.rate]),
+    );
 
     vi.useFakeTimers();
     vi.setSystemTime(Date.now() + 11 * 60_000); // past 10 min TTL
@@ -205,10 +208,12 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     });
     const second = await buildFxAuditPairs();
     for (const p of second) {
-      expect(p.source).toBe("cache-stale");
+      expect(["cache-stale", "cache-stale:inverse"]).toContain(p.source);
       expect(p.stale).toBe(true);
-      const expected = FRANKFURTER_RATES[p.from][p.to];
-      expect(p.rate).toBeCloseTo(expected, 10);
+      // Rate stays identical to the original — for direct rows that is the
+      // provider quote; for derived rows it is 1/(direct quote), which was
+      // already computed in the first pass.
+      expect(p.rate).toBeCloseTo(firstRates.get(`${p.from}${p.to}`)!, 10);
       expect(p.impliedInverse).toBeCloseTo(1 / p.rate, 12);
       expect(p.observedAt).toBe(firstObserved.get(`${p.from}${p.to}`));
     }
@@ -227,9 +232,8 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
     expect(pairs).toHaveLength(6);
     for (const p of pairs) {
       // The critical loud-failure invariant: identity fallback MUST NEVER
-      // masquerade as a live provider. If any row ever reports rate=1 with
-      // source=frankfurter|er-api|cache, the sizing layer would silently
-      // trade on a bogus 1:1 cross-rate — this assertion catches that.
+      // masquerade as a live provider. Direct rows report "fallback:*",
+      // derived rows report "fallback:*:inverse" — both are unambiguous.
       expect(p.rate).toBe(1);
       expect(p.stale).toBe(true);
       expect(p.source.startsWith("fallback:")).toBe(true);
@@ -237,6 +241,7 @@ describe("buildFxAuditPairs — matrix, inverses, observedAt per source", () => 
       expect(p.impliedInverse).toBe(1);
     }
   });
+
 
   it("mixed provider health: if just one pair fails while others succeed, the failing row is flagged loudly and the healthy rows keep their live source/inverse", async () => {
     // Simulate GBP→EUR missing from BOTH providers while the other pairs
