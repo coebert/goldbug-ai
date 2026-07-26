@@ -396,11 +396,22 @@ export function PortfolioRow({
                   {formatMoney(Number(portfolio.current_cash), portfolio.currency, equityDecimals)}
                   <span className="ml-1 text-[10px]">cash</span>
                 </div>
-                <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                  {pnl >= 0 ? "+" : ""}
-                  {pnlPct.toFixed(2)}%
-                  <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
-                </div>
+                {currencyMismatch ? (
+                  <div
+                    data-testid="pnl-currency-blocked"
+                    className="text-xs tabular-nums text-destructive"
+                    title={`Broker ${brokerCcy} vs portfolio ${portfolioCcy}`}
+                  >
+                    P&amp;L blocked
+                    <span className="ml-1 text-[10px] text-muted-foreground">currency mismatch</span>
+                  </div>
+                ) : (
+                  <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                    {pnl >= 0 ? "+" : ""}
+                    {pnlPct.toFixed(2)}%
+                    <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
+                  </div>
+                )}
               </>
             )}
           </div>
