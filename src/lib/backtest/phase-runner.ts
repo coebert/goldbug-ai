@@ -296,6 +296,9 @@ export function runPhaseBacktest(
 
     // Evaluate signals for every symbol with a bar today.
     for (const s of series) {
+      // When Phase 6 owns the hedge symbol, don't let external signals fight
+      // the overlay for the same instrument.
+      if (flags.hedge && s.symbol === hedgeSymbol) continue;
       const bar = bySym.get(s.symbol)?.get(date);
       if (!bar) continue;
       const sig = signalFn({ date, nav, weights, cash }, s.symbol);
