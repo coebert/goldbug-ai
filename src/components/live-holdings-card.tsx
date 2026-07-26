@@ -10,6 +10,7 @@ type Holding = {
   avg_cost: number | string;
   asset_class?: string | null;
   opened_at?: string | null;
+  instrument_ccy?: string | null;
 };
 
 export type HoldingSeriesInfo = {
@@ -24,6 +25,7 @@ export function LiveHoldingsCard({
   holdings,
   currency,
   cash,
+  cashByCcy,
   totalValue,
   mode,
   series,
@@ -31,10 +33,12 @@ export function LiveHoldingsCard({
   holdings: Holding[];
   currency: string;
   cash: number;
+  cashByCcy?: Record<string, number> | null;
   totalValue: number;
   mode: string;
   series?: Record<string, HoldingSeriesInfo>;
 }) {
+
   const isLive = mode === "live_prod";
 
   const rows = holdings
