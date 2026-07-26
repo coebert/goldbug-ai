@@ -301,7 +301,7 @@ export async function recordSliceFill(
   // mutating. This blocks a caller from patching another user's slice by id.
   const { data: slice, error: sliceErr } = await supabaseAdmin
     .from("pending_slices")
-    .select("id, portfolio_id, remaining_qty, slices_done, slice_count")
+    .select("id, portfolio_id, remaining_qty, slices_done, slice_count, schedule_json, created_at, expires_at")
     .eq("id", clean.sliceId)
     .maybeSingle();
   if (sliceErr) {
@@ -316,6 +316,7 @@ export async function recordSliceFill(
   }
   const typed = slice as {
     portfolio_id: string; remaining_qty: number; slices_done: number; slice_count: number;
+    schedule_json: ScheduleBucket[] | null; created_at: string; expires_at: string;
   };
   await assertPortfolioOwnership("recordSliceFill", typed.portfolio_id, clean.ownerUserId);
 
@@ -343,9 +344,25 @@ export async function recordSliceFill(
   const remaining = Math.max(0, Number(typed.remaining_qty) - clean.filledQty);
   const done = Number(typed.slices_done) + 1;
   const status = remaining <= 1e-6 || done >= Number(typed.slice_count) ? "completed" : "active";
-  const nextAt = status === "active"
-    ? new Date(Date.now() + 20 * 60_000).toISOString() // next slice in ~20 min
-    : null;
+
+  // Phase 4 — walk the persisted VWAP/TWAP schedule when present so the
+  // next child order carries the correct bucket qty and fires at the
+  // planned wall-clock offset. Falls back to the legacy 20-min TWAP
+  // cadence for legacy rows written before schedule_json existed.
+  const schedule = Array.isArray(typed.schedule_json) ? typed.schedule_json : null;
+  const next = schedule?.[done] ?? null;
+  const createdMs = new Date(typed.created_at).getTime();
+  let nextAt: string | null = null;
+  let nextSliceQty: number | null = null;
+  if (status === "active") {
+    if (next) {
+      nextAt = new Date(createdMs + Math.max(0, Number(next.offset_min)) * 60_000).toISOString();
+      nextSliceQty = Math.max(1e-4, Math.min(remaining, Number(next.qty)));
+    } else {
+      nextAt = new Date(Date.now() + 20 * 60_000).toISOString();
+    }
+  }
+
   const patch: Update<"pending_slices"> = {
     remaining_qty: remaining,
     slices_done: done,
@@ -353,11 +370,13 @@ export async function recordSliceFill(
     notes: clean.note ?? null,
   };
   if (nextAt) patch.next_at = nextAt;
+  if (nextSliceQty !== null) patch.slice_qty = nextSliceQty;
   await supabaseAdmin
     .from("pending_slices")
     .update(patch)
     .eq("id", clean.sliceId)
     .eq("portfolio_id", typed.portfolio_id); // belt-and-braces scope
+
   return { applied: true };
 }
 
