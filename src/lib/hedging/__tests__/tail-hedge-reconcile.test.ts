@@ -11,6 +11,7 @@ const dec = (over: Partial<TailHedgeDecision> = {}): TailHedgeDecision => ({
   targetNotional: 500,
   deltaNotional: 500,
   reason: "risk-off",
+  regime: "risk_off",
   ...over,
 });
 
