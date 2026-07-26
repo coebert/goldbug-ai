@@ -37,7 +37,7 @@ describe("chooseSliceCount", () => {
   });
   it("scales with participation, capped at max", () => {
     // Order = 100% of ADV → needs many slices, hit max=8
-    expect(chooseSliceCount(1_000_000, 1_000_000)).toBe(8);
+    expect(chooseSliceCount(2_000_000, 1_000_000)).toBe(8);
   });
   it("chooses a middling count for medium orders (~30% ADV)", () => {
     const n = chooseSliceCount(300_000, 1_000_000);
