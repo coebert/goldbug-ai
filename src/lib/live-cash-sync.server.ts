@@ -111,20 +111,60 @@ export async function syncLiveCashFromBroker(
       : !brokerCurrency
         ? "broker did not return a currency"
         : `currency mismatch: portfolio=${portfolioCurrency} broker=${brokerCurrency}`;
-    await db.from("live_broker_log").insert({
-      portfolio_id: portfolioId, user_id: p.user_id,
-      broker: "saxo", env,
-      method: "CASH_SYNC_PREFLIGHT", path: "/sync/cash/preflight",
-      status: 409,
-      request: asJson({
-        portfolioCurrency, mode: p.mode,
-        previousCash: Number(p.current_cash ?? 0),
-      }),
-      response: asJson({ brokerCurrency, brokerCash, blocked: true }),
-      error: reason,
-    });
+
+    // Idempotency: preflight failures are sticky — until the user changes
+    // the portfolio currency (or the broker account changes), every rerun
+    // produces exactly the same mismatch. We MUST NOT touch current_cash
+    // on any rerun (the early return below guarantees that), and we also
+    // suppress duplicate log rows so the trade-error dashboard doesn't
+    // fill up with identical 409s on every hourly tick. We only append a
+    // new PREFLIGHT log when the observed state actually changes
+    // (portfolio ccy, broker ccy, or the reason string).
+    const { data: lastPreflight } = await db
+      .from("live_broker_log")
+      .select("id, request, response, error")
+      .eq("portfolio_id", portfolioId)
+      .eq("method", "CASH_SYNC_PREFLIGHT")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const prev = lastPreflight ?? null;
+    const prevReq = (prev?.request ?? {}) as {
+      portfolioCurrency?: string | null;
+    };
+    const prevRes = (prev?.response ?? {}) as {
+      brokerCurrency?: string | null;
+      blocked?: boolean;
+    };
+    const alreadyLogged =
+      prev != null &&
+      prevRes.blocked === true &&
+      (prevReq.portfolioCurrency ?? null) === portfolioCurrency &&
+      (prevRes.brokerCurrency ?? null) === brokerCurrency &&
+      (prev.error ?? null) === reason;
+
+    if (!alreadyLogged) {
+      await db.from("live_broker_log").insert({
+        portfolio_id: portfolioId, user_id: p.user_id,
+        broker: "saxo", env,
+        method: "CASH_SYNC_PREFLIGHT", path: "/sync/cash/preflight",
+        status: 409,
+        request: asJson({
+          portfolioCurrency, mode: p.mode,
+          previousCash: Number(p.current_cash ?? 0),
+        }),
+        response: asJson({ brokerCurrency, brokerCash, blocked: true }),
+        error: reason,
+      });
+    }
+
+    // Deterministic skipped result — identical across reruns while the
+    // mismatch persists. current_cash / starting_cash are guaranteed
+    // untouched because we return before the update path below.
     return { skipped: true, reason };
   }
+
 
   const prevCash = Number(p.current_cash ?? 0);
   const prevStarting = Number(p.starting_cash ?? 0);
