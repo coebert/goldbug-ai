@@ -761,10 +761,14 @@ function PortfolioPage() {
                 holdings={holdings}
                 currency={p.currency}
                 cash={Number(p.current_cash)}
+                cashByCcy={
+                  (p as { cash_by_ccy?: Record<string, number> | null }).cash_by_ccy ?? null
+                }
                 totalValue={totalValue}
                 mode={p.mode}
                 series={holdingsSeries}
               />
+
             </div>
             <Card className="mb-6">
               <CardContent className="flex flex-wrap items-center gap-3 py-4">

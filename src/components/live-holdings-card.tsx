@@ -10,6 +10,7 @@ type Holding = {
   avg_cost: number | string;
   asset_class?: string | null;
   opened_at?: string | null;
+  instrument_ccy?: string | null;
 };
 
 export type HoldingSeriesInfo = {
@@ -24,6 +25,7 @@ export function LiveHoldingsCard({
   holdings,
   currency,
   cash,
+  cashByCcy,
   totalValue,
   mode,
   series,
@@ -31,10 +33,12 @@ export function LiveHoldingsCard({
   holdings: Holding[];
   currency: string;
   cash: number;
+  cashByCcy?: Record<string, number> | null;
   totalValue: number;
   mode: string;
   series?: Record<string, HoldingSeriesInfo>;
 }) {
+
   const isLive = mode === "live_prod";
 
   const rows = holdings
@@ -58,6 +62,37 @@ export function LiveHoldingsCard({
   const holdingsValue = rows.reduce((s, r) => s + r.value, 0);
   const denom = totalValue > 0 ? totalValue : holdingsValue + cash;
   const cashPct = denom > 0 ? (cash / denom) * 100 : 0;
+
+  // Per-currency native breakdown (no FX conversion). We show this whenever
+  // the account holds cash or positions in more than one currency, so users
+  // can see raw USD/EUR/GBP totals rather than only the converted base view.
+  const baseCcy = String(currency ?? "").toUpperCase();
+  const investedByCcy = new Map<string, number>();
+  for (const r of rows) {
+    const ccy = String(r.instrument_ccy || baseCcy).toUpperCase();
+    investedByCcy.set(ccy, (investedByCcy.get(ccy) ?? 0) + r.value);
+  }
+  const cashCcyMap = new Map<string, number>();
+  if (cashByCcy && typeof cashByCcy === "object") {
+    for (const [k, v] of Object.entries(cashByCcy)) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) continue;
+      cashCcyMap.set(String(k).toUpperCase(), n);
+    }
+  }
+  if (cashCcyMap.size === 0 && Number.isFinite(cash)) {
+    cashCcyMap.set(baseCcy, cash);
+  }
+  const allCcys = Array.from(
+    new Set<string>([...investedByCcy.keys(), ...cashCcyMap.keys()]),
+  ).sort((a, b) => (a === baseCcy ? -1 : b === baseCcy ? 1 : a.localeCompare(b)));
+  const showMultiCcy = allCcys.length > 1;
+  const fmtCcy = (ccy: string, n: number) =>
+    `${ccy} ${n.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
 
   const fmt = (n: number) =>
     `${currency} ${n.toLocaleString(undefined, {
@@ -131,6 +166,57 @@ export function LiveHoldingsCard({
             </div>
           </div>
         </div>
+
+        {showMultiCcy && (
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                By currency
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                native totals · no FX conversion
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs tabular-nums">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="py-1 pr-3 text-left font-medium">Ccy</th>
+                    <th className="py-1 pr-3 text-right font-medium">Invested</th>
+                    <th className="py-1 pr-3 text-right font-medium">Cash</th>
+                    <th className="py-1 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allCcys.map((ccy) => {
+                    const inv = investedByCcy.get(ccy) ?? 0;
+                    const csh = cashCcyMap.get(ccy) ?? 0;
+                    const total = inv + csh;
+                    return (
+                      <tr key={ccy} className="border-t border-border/40">
+                        <td className="py-1.5 pr-3 font-medium">
+                          {ccy}
+                          {ccy === baseCcy && (
+                            <span className="ml-1 text-[9px] uppercase text-muted-foreground">
+                              base
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right">{fmtCcy(ccy, inv)}</td>
+                        <td className="py-1.5 pr-3 text-right">{fmtCcy(ccy, csh)}</td>
+                        <td className="py-1.5 text-right font-semibold">
+                          {fmtCcy(ccy, total)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
 
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
