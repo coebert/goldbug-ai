@@ -97,9 +97,7 @@ export const getFxAudit = createServerFn({ method: "POST" })
     return {
       requestedAt: new Date().toISOString(),
       base,
-      pairs: pairs.sort((a, b) =>
-        (a.from + a.to).localeCompare(b.from + b.to),
-      ),
+      pairs,
       lastCapture,
     };
   });
