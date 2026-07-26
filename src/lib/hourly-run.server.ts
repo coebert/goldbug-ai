@@ -16,7 +16,18 @@ export type HourlyRunResult = {
   skipped_paused: number;
   saxo_refresh: Record<string, { ok: boolean; error?: string; skipped?: string }>;
   triggered_by: "manual" | "cron";
-  results: Array<{ id: string; mode: string; ok: boolean; error?: string; value?: number; skipped?: string }>;
+  results: Array<{
+    id: string;
+    mode: string;
+    ok: boolean;
+    error?: string;
+    value?: number;
+    skipped?: string;
+    /** Symbols whose venue was open at gate time (candidates AI could size). */
+    tradeable_symbols?: string[];
+    /** Symbols dropped by the market-hours gate, with venue + phase reason. */
+    excluded_symbols?: Array<{ symbol: string; venue: string; phase: string }>;
+  }>;
   metrics: RunMetricsSnapshot;
 };
 
