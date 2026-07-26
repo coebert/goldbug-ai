@@ -1,0 +1,2 @@
+ALTER TABLE public.live_orders DROP CONSTRAINT IF EXISTS live_orders_status_check;
+ALTER TABLE public.live_orders ADD CONSTRAINT live_orders_status_check CHECK (status = ANY (ARRAY['pending'::text, 'submitted'::text, 'working'::text, 'filled'::text, 'partial'::text, 'cancelled'::text, 'rejected'::text, 'error'::text]));
