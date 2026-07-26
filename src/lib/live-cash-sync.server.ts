@@ -152,15 +152,12 @@ export async function syncLiveCashFromBroker(
   //   * the portfolio is still cash-only (no local holdings); once assets
   //     exist, keep the baseline stable and let holdings reconciliation own
   //     total equity.
-  //   * the broker cash currency matches the portfolio currency. A mismatch
-  //     (e.g. broker returning EUR against a GBP portfolio) is never a
-  //     deposit signal — the numbers aren't comparable.
-  const currencyMatches =
-    typeof currency === "string" &&
-    typeof (p as { currency?: string }).currency === "string" &&
-    currency.toUpperCase() === String((p as { currency?: string }).currency).toUpperCase();
+  //   * broker currency vs portfolio currency is enforced upstream by the
+  //     preflight check (see top of this function), so we don't re-check it
+  //     here — a mismatch never reaches this point.
   const canTreatDriftAsDeposit =
-    p.mode === "live_prod" && !hasLocalHoldings && currencyMatches;
+    p.mode === "live_prod" && !hasLocalHoldings;
+
   const newStarting = canTreatDriftAsDeposit
     ? Math.max(0, prevStarting + delta)
     : prevStarting;
@@ -194,8 +191,9 @@ export async function syncLiveCashFromBroker(
     status: upd.error ? 500 : 200,
     request: asJson({
       previousCash: prevCash, previousStarting: prevStarting,
-      hasLocalHoldings, currencyMatches, mode: p.mode,
+      hasLocalHoldings, mode: p.mode,
       portfolioCurrency: (p as { currency?: string }).currency ?? null,
+
     }),
     response: asJson({
       brokerCash,
