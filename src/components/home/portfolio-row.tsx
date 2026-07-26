@@ -491,18 +491,23 @@ function HoldingsStrip({
   totalEquity: number;
   portfolioId: string;
 }) {
-  const rows = holdings
-    .map((h) => {
-      const qty = Number(h.quantity);
-      const avg = Number(h.avg_cost);
-      const value = qty * avg;
-      return { ...h, qty, avg, value };
-    })
-    .sort((a, b) => b.value - a.value);
-  const investedValue = rows.reduce((s, r) => s + r.value, 0);
+  type SortKey = "value" | "weight" | "symbol";
+  const [sortKey, setSortKey] = useState<SortKey>("value");
+  const built = holdings.map((h) => {
+    const qty = Number(h.quantity);
+    const avg = Number(h.avg_cost);
+    const value = qty * avg;
+    return { ...h, qty, avg, value };
+  });
+  const investedValue = built.reduce((s, r) => s + r.value, 0);
   const denom = totalEquity > 0 ? totalEquity : investedValue + cash;
   const investedPct = denom > 0 ? (investedValue / denom) * 100 : 0;
   const cashPct = denom > 0 ? (cash / denom) * 100 : 0;
+  const rows = [...built].sort((a, b) => {
+    if (sortKey === "symbol") return a.symbol.localeCompare(b.symbol);
+    // value and weight rank identically (weight = value / denom)
+    return b.value - a.value;
+  });
 
   if (rows.length === 0) {
     return (
