@@ -819,6 +819,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         cryptoSignalsBlock: cryptoDecision?.block ?? null,
       });
 
+  // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
+  // not just in the prompt. If the regime bucket is risk_off, strip any AI
+  // crypto BUY orders (X6) — sells / trims are always allowed to fire.
+  if (cryptoDecision?.decision?.hard_veto) {
+    const { classifyCryptoSymbol } = await import("./crypto-groups");
+    const before = decision.orders.length;
+    decision.orders = decision.orders.filter((o) => {
+      const isCrypto = classifyCryptoSymbol(o.symbol) != null;
+      return !(isCrypto && o.side === "buy");
+    });
+    const stripped = before - decision.orders.length;
+    if (stripped > 0) {
+      decision.briefing = `${decision.briefing}\n[Crypto sleeve veto] ${cryptoDecision.decision.veto_reason} — ${stripped} crypto BUY order(s) removed.`;
+    }
+  }
+
+
+
 
 
   // Feature lookup for later use (volatility sizing, asset class)
