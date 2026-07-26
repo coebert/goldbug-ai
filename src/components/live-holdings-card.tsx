@@ -167,6 +167,57 @@ export function LiveHoldingsCard({
           </div>
         </div>
 
+        {showMultiCcy && (
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                By currency
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                native totals · no FX conversion
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs tabular-nums">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="py-1 pr-3 text-left font-medium">Ccy</th>
+                    <th className="py-1 pr-3 text-right font-medium">Invested</th>
+                    <th className="py-1 pr-3 text-right font-medium">Cash</th>
+                    <th className="py-1 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allCcys.map((ccy) => {
+                    const inv = investedByCcy.get(ccy) ?? 0;
+                    const csh = cashCcyMap.get(ccy) ?? 0;
+                    const total = inv + csh;
+                    return (
+                      <tr key={ccy} className="border-t border-border/40">
+                        <td className="py-1.5 pr-3 font-medium">
+                          {ccy}
+                          {ccy === baseCcy && (
+                            <span className="ml-1 text-[9px] uppercase text-muted-foreground">
+                              base
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right">{fmtCcy(ccy, inv)}</td>
+                        <td className="py-1.5 pr-3 text-right">{fmtCcy(ccy, csh)}</td>
+                        <td className="py-1.5 text-right font-semibold">
+                          {fmtCcy(ccy, total)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
+
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {isLive
