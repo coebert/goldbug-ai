@@ -43,6 +43,8 @@ export type CryptoBacktestOpts = {
   feeBps?: number;
   /** Slippage vs mid per side in bps (default 10 = 0.10%). */
   slippageBps?: number;
+};
+
 
 
 export type CryptoBacktestPoint = {
