@@ -401,12 +401,13 @@ export class SaxoAdapter implements BrokerAdapter {
             uic: Number(cached.data.uic),
             assetType: String(cached.data.asset_type),
             currency: String(cached.data.currency ?? "GBP"),
-
-          exchangeId: cached.data.exchange_id ?? undefined,
-          tickSize: cached.data.tick_size ? Number(cached.data.tick_size) : undefined,
-        };
+            exchangeId: cached.data.exchange_id ?? undefined,
+            tickSize: cached.data.tick_size ? Number(cached.data.tick_size) : undefined,
+          };
+        }
       }
     }
+
 
     const { upper, base, suffix, preferredExchanges, searchKeywords } =
       normalizeSaxoSymbol(symbol);
