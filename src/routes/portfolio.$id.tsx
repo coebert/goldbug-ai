@@ -125,6 +125,7 @@ import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
 import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-card";
 import { FxAuditCard } from "@/components/fx-audit-card";
+import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
 import { CommodityBacktestCard } from "@/components/commodity-backtest-card";
 
@@ -1291,6 +1292,7 @@ function PortfolioPage() {
             {(p.mode === "live_sim" || p.mode === "live_prod") && (
               <div className="mt-6 space-y-4">
                 <FxAuditCard portfolioId={id} active={tab === "overview"} />
+                <FxTradeDrilldownCard portfolioId={id} active={tab === "overview"} />
                 <CashReconciliationLogCard portfolioId={id} />
               </div>
             )}
