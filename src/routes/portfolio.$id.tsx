@@ -129,6 +129,7 @@ import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
 import { InvestableUniverseCard } from "@/components/investable-universe-card";
 import { CommodityBacktestCard } from "@/components/commodity-backtest-card";
+import { CryptoBacktestCard } from "@/components/crypto-backtest-card";
 
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
@@ -1292,6 +1293,10 @@ function PortfolioPage() {
 
             <div className="mt-6">
               <CommodityBacktestCard portfolioId={id} />
+            </div>
+
+            <div className="mt-6">
+              <CryptoBacktestCard portfolioId={id} />
             </div>
 
             {(p.mode === "live_sim" || p.mode === "live_prod") && (
