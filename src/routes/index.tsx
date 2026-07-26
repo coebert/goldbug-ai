@@ -248,6 +248,14 @@ function Home() {
                   (equityQ.data as { brokerCurrencyByPortfolio?: Record<string, string> } | undefined)
                     ?.brokerCurrencyByPortfolio?.[p.id] ?? null
                 }
+                holdings={
+                  (equityQ.data as {
+                    holdingsByPortfolio?: Record<
+                      string,
+                      Array<{ symbol: string; quantity: number; avg_cost: number; asset_class: string | null }>
+                    >;
+                  } | undefined)?.holdingsByPortfolio?.[p.id] ?? []
+                }
               />
             ))}
           </div>

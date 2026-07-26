@@ -6,11 +6,13 @@ import { toast } from "sonner";
 import {
   AlertCircle,
   Banknote,
+  Briefcase,
   MoreVertical,
   Pencil,
   PlayCircle,
   RefreshCw,
   Trash2,
+  Wallet,
 } from "lucide-react";
 
 import { Sparkline } from "@/components/sparkline";
@@ -45,6 +47,13 @@ export const SPARK_RANGES: { key: SparkRange; days: number | null }[] = [
   { key: "All", days: null },
 ];
 
+export type PortfolioHoldingSummary = {
+  symbol: string;
+  quantity: number;
+  avg_cost: number;
+  asset_class?: string | null;
+};
+
 export function PortfolioRow({
   portfolio,
   sparkSeries,
@@ -57,6 +66,7 @@ export function PortfolioRow({
   equityDecimals = 2,
   defaultRange = "1M",
   brokerCurrency = null,
+  holdings = [],
 }: {
   portfolio: {
     id: string;
@@ -79,6 +89,7 @@ export function PortfolioRow({
   equityDecimals?: number;
   defaultRange?: SparkRange;
   brokerCurrency?: string | null;
+  holdings?: PortfolioHoldingSummary[];
 }) {
   const [sparkRange, setSparkRange] = useState<SparkRange>(defaultRange);
   const sliced = useMemo(() => {
@@ -416,6 +427,14 @@ export function PortfolioRow({
             )}
           </div>
         </div>
+
+        <HoldingsStrip
+          holdings={holdings}
+          currency={portfolio.currency}
+          cash={Number(portfolio.current_cash)}
+          totalEquity={totalEquity}
+          portfolioId={portfolio.id}
+        />
       </CardContent>
       <ConfirmDialog
         open={confirmDelete}
@@ -456,5 +475,104 @@ export function PortfolioRow({
         />
       )}
     </Card>
+  );
+}
+
+function HoldingsStrip({
+  holdings,
+  currency,
+  cash,
+  totalEquity,
+  portfolioId,
+}: {
+  holdings: PortfolioHoldingSummary[];
+  currency: string;
+  cash: number;
+  totalEquity: number;
+  portfolioId: string;
+}) {
+  const rows = holdings
+    .map((h) => {
+      const qty = Number(h.quantity);
+      const avg = Number(h.avg_cost);
+      const value = qty * avg;
+      return { ...h, qty, avg, value };
+    })
+    .sort((a, b) => b.value - a.value);
+  const investedValue = rows.reduce((s, r) => s + r.value, 0);
+  const denom = totalEquity > 0 ? totalEquity : investedValue + cash;
+  const investedPct = denom > 0 ? (investedValue / denom) * 100 : 0;
+  const cashPct = denom > 0 ? (cash / denom) * 100 : 0;
+
+  if (rows.length === 0) {
+    return (
+      <div className="mt-4 flex items-center gap-2 rounded-lg border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>Fully in cash — no open positions.</span>
+      </div>
+    );
+  }
+
+  const TOP = 6;
+  const top = rows.slice(0, TOP);
+  const rest = rows.length - top.length;
+  const fmtVal = (n: number) =>
+    n >= 1000
+      ? `${currency} ${(n / 1000).toFixed(1)}k`
+      : `${currency} ${n.toFixed(0)}`;
+
+  return (
+    <div
+      className="mt-4 rounded-lg border border-border/70 bg-muted/30 p-3"
+      data-testid="portfolio-row-holdings-strip"
+      data-portfolio-id={portfolioId}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <Briefcase className="h-3.5 w-3.5" aria-hidden />
+          Holdings
+          <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+            {rows.length}
+          </span>
+        </div>
+        <div className="text-[11px] tabular-nums text-muted-foreground">
+          {investedPct.toFixed(0)}% invested · {cashPct.toFixed(0)}% cash
+        </div>
+      </div>
+
+      <div
+        className="mb-2 flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        role="img"
+        aria-label={`${investedPct.toFixed(0)} percent invested, ${cashPct.toFixed(0)} percent cash`}
+      >
+        <div className="h-full bg-primary/70" style={{ width: `${Math.min(100, investedPct)}%` }} />
+      </div>
+
+      <ul className="flex flex-wrap gap-1.5">
+        {top.map((r) => {
+          const w = denom > 0 ? (r.value / denom) * 100 : 0;
+          return (
+            <li
+              key={r.symbol}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] tabular-nums"
+              title={`${r.symbol} — ${r.qty.toLocaleString(undefined, {
+                maximumFractionDigits: 4,
+              })} @ ${currency} ${r.avg.toFixed(2)} · ${w.toFixed(1)}% of portfolio`}
+            >
+              <span className="font-semibold tracking-tight">{r.symbol}</span>
+              <span className="text-muted-foreground">{fmtVal(r.value)}</span>
+              <span className="rounded-sm bg-primary/10 px-1 text-[10px] font-medium text-primary">
+                {w.toFixed(1)}%
+              </span>
+            </li>
+          );
+        })}
+        {rest > 0 && (
+          <li className="inline-flex items-center gap-1 rounded-md border border-dashed border-border/60 px-2 py-1 text-[11px] text-muted-foreground">
+            +{rest} more
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }
