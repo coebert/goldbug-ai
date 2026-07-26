@@ -146,11 +146,11 @@ export async function routeOrdersToBroker(params: {
   }
   const pfRow = await supabaseAdmin
     .from("portfolios")
-    .select("currency, fx_enabled, cash_by_ccy, fx_execution_mode")
+    .select("currency, fx_enabled, cash_by_ccy, fx_execution_mode, current_cash")
     .eq("id", portfolio.id)
     .maybeSingle();
   const pfRowData = pfRow.data as
-    | { currency?: string; fx_enabled?: boolean; cash_by_ccy?: Record<string, number> | null; fx_execution_mode?: string }
+    | { currency?: string; fx_enabled?: boolean; cash_by_ccy?: Record<string, number> | null; fx_execution_mode?: string; current_cash?: number }
     | null;
   const portfolioCurrency = pfRowData?.currency?.toUpperCase() ?? "GBP";
   const fxEnabled = pfRowData?.fx_enabled === true;
@@ -246,6 +246,68 @@ export async function routeOrdersToBroker(params: {
       error: msg,
     });
   }
+
+  // ---------- Broker SpendingPower reconciliation.
+  // The CASH_SYNC step above writes `portfolios.current_cash` from
+  // `cashAvailable ?? cash`, which in Saxo's `getBalance()` collapses to the
+  // MAX of {settled, settled+notBooked, SpendingPower, CashAvailableForTrading}.
+  // That's the right figure for equity/NAV tiles, but it's optimistic for
+  // pre-trade gating: SpendingPower can be strictly lower than cash once
+  // per-sub-account ring-fencing, margin haircuts, or unbooked in-flight
+  // fills are applied — and it's SpendingPower that Saxo enforces at precheck
+  // and POST /orders. Re-read the balance fresh here (separate from the
+  // NAV-oriented sync above), then constrain `brokerCashAvailable` to the
+  // MIN of {SpendingPower, CashAvailableForTrading, local current_cash} so
+  // every downstream affordability trim and precheck uses the authoritative
+  // spendable number. Non-blocking on failure.
+  try {
+    const bal2 = await adapter.getBalance();
+    const rawSp = Number((bal2 as { spendingPower?: number }).spendingPower ?? NaN);
+    const rawAvail = Number(bal2.cashAvailable ?? NaN);
+    const localCash = Number((pfRowData as { current_cash?: number } | null)?.current_cash ?? NaN);
+    const candidates: Array<{ label: string; value: number }> = [];
+    if (Number.isFinite(rawSp)) candidates.push({ label: "spendingPower", value: rawSp });
+    if (Number.isFinite(rawAvail)) candidates.push({ label: "cashAvailable", value: rawAvail });
+    if (Number.isFinite(localCash)) candidates.push({ label: "localCash", value: localCash });
+    if (candidates.length > 0) {
+      const reconciled = candidates.reduce((m, c) => (c.value < m.value ? c : m));
+      const before = brokerCashAvailable;
+      brokerCashAvailable = Math.max(0, reconciled.value);
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "PRE_PLACE_SPENDING_POWER_RECON",
+        path: "/reconcile/pre-place/spending-power",
+        status: 200,
+        request: asJson({ asOf, decisionId, brokerCashBefore: before }),
+        response: asJson({
+          spendingPower: Number.isFinite(rawSp) ? rawSp : null,
+          cashAvailable: Number.isFinite(rawAvail) ? rawAvail : null,
+          localCash: Number.isFinite(localCash) ? localCash : null,
+          reconciledSource: reconciled.label,
+          reconciledSpendable: brokerCashAvailable,
+          currency: bal2.currency,
+        }),
+        error: null,
+      });
+    }
+  } catch (e) {
+    await supabaseAdmin.from("live_broker_log").insert({
+      portfolio_id: portfolio.id,
+      user_id: userId,
+      broker: "saxo",
+      env: portfolio.mode === "live_prod" ? "live" : "sim",
+      method: "PRE_PLACE_SPENDING_POWER_RECON",
+      path: "/reconcile/pre-place/spending-power",
+      status: 502,
+      request: asJson({ asOf, decisionId }),
+      response: null,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
 
   // ---------- Subtract cash reserved by open working buy orders.
   // Saxo's `SpendingPower` / `CashAvailableForTrading` does NOT deduct the

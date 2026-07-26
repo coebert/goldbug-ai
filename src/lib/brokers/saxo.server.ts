@@ -244,6 +244,7 @@ export class SaxoAdapter implements BrokerAdapter {
       totalValue: Number(bal.TotalValue ?? cash),
       currency: bal.Currency ?? "GBP",
       cashAvailable,
+      spendingPower: spending ?? undefined,
       transactionsNotBooked: notBooked,
       reservedCash,
       unrealizedPnl:
