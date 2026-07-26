@@ -561,7 +561,7 @@ export type Database = {
           created_at: string
           decision_id: string | null
           id: string
-          instrument_ccy: string | null
+          instrument_ccy: string
           limit_price: number | null
           order_type: string
           portfolio_id: string
@@ -581,7 +581,7 @@ export type Database = {
           created_at?: string
           decision_id?: string | null
           id?: string
-          instrument_ccy?: string | null
+          instrument_ccy: string
           limit_price?: number | null
           order_type?: string
           portfolio_id: string
@@ -601,7 +601,7 @@ export type Database = {
           created_at?: string
           decision_id?: string | null
           id?: string
-          instrument_ccy?: string | null
+          instrument_ccy?: string
           limit_price?: number | null
           order_type?: string
           portfolio_id?: string
