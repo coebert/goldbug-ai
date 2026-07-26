@@ -123,19 +123,27 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         });
       }
     }
+    const brokerCurrencyByPortfolio: Record<string, string> = {};
     if (liveIdsAll.length > 0) {
       const { data: cashSyncs } = await context.supabase
         .from("live_broker_log")
         .select("portfolio_id, created_at, response, status, method")
         .in("portfolio_id", liveIdsAll)
         .eq("method", "CASH_SYNC")
-        .eq("status", 200);
+        .eq("status", 200)
+        .order("created_at", { ascending: false });
+      const seenCcy = new Set<string>();
       for (const row of cashSyncs ?? []) {
         if (!row.portfolio_id || !row.created_at) continue;
         const resp = (row.response ?? {}) as {
           delta?: number | string;
           startingCashAdjusted?: boolean;
+          currency?: string;
         };
+        if (!seenCcy.has(row.portfolio_id) && typeof resp.currency === "string" && resp.currency) {
+          brokerCurrencyByPortfolio[row.portfolio_id] = resp.currency.toUpperCase();
+          seenCcy.add(row.portfolio_id);
+        }
         if (!resp.startingCashAdjusted) continue;
         const amt = Number(resp.delta);
         if (!Number.isFinite(amt) || amt === 0) continue;
