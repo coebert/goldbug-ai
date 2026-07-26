@@ -19,9 +19,12 @@ describe("getFxMatrix", () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       calls += 1;
       const url = typeof input === "string" ? input : input.toString();
-      const rate = url.includes("USDGBP") ? 0.8 : 1.17;
+      const u = new URL(url);
+      const base = u.searchParams.get("base") ?? "";
+      const to = u.searchParams.get("symbols") ?? "";
+      const rate = base === "USD" && to === "GBP" ? 0.8 : 1.17;
       return new Response(
-        JSON.stringify({ quoteResponse: { result: [{ regularMarketPrice: rate }] } }),
+        JSON.stringify({ base, rates: { [to]: rate } }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     }) as unknown as typeof fetch;
@@ -49,4 +52,5 @@ describe("getFxMatrix", () => {
     expect(r.stale).toBe(true);
     expect(r.source.startsWith("fallback:")).toBe(true);
   });
+
 });
