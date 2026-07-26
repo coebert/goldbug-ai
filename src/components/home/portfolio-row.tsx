@@ -274,6 +274,17 @@ export function PortfolioRow({
                 >
                   —
                 </span>
+              ) : currencyMismatch ? (
+                <span
+                  data-testid="range-pct-currency-blocked"
+                  role="status"
+                  aria-label={`Equity change blocked: broker currency ${brokerCcy} does not match portfolio currency ${portfolioCcy}`}
+                  title={`Broker ${brokerCcy} vs portfolio ${portfolioCcy}`}
+                  className="inline-flex items-center gap-1 text-sm font-semibold tabular-nums text-destructive"
+                >
+                  <AlertCircle className="h-3.5 w-3.5" aria-hidden />
+                  blocked
+                </span>
               ) : (
                 <span
                   className={`text-sm font-semibold tabular-nums ${rangePct >= 0 ? "text-success" : "text-destructive"}`}
