@@ -748,7 +748,12 @@ function PortfolioPage() {
               </TabsList>
 
               <TabsContent value="overview" className="mt-4">
-            <RiskHaltBanner portfolioId={id} className="mb-4" />
+            <CurrencyDiagnosticsBanner
+              portfolioId={id}
+              portfolioCurrency={p.currency}
+              mode={p.mode}
+            />
+            <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
             <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
             <div className="mb-6">
               <LiveHoldingsCard
