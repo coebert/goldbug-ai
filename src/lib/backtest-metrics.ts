@@ -386,13 +386,41 @@ export function computeBacktestMetrics(
   equity: EquityPoint[],
   trades: TradeRow[],
   startingCash: number,
+  deposits: Array<{ date: string; amount: number }> = [],
 ): BacktestMetrics {
-  const values = equity
+  // Net external deposits/withdrawals out of the equity path so
+  // returns, DD, Sharpe and volatility reflect trading PnL only.
+  // Deposits dated on/before the first snapshot are baked into the
+  // baseline (starting_cash) and are NOT subtracted; deposits after
+  // that are subtracted cumulatively from every point on/after their
+  // date. Matches deposit-adjusted-series semantics used by the tiles.
+  const rawSorted = equity
     .filter((e) => Number.isFinite(Number(e.total_value)))
     .map((e) => ({
       snapshot_date: e.snapshot_date,
       total_value: Number(e.total_value),
-    }));
+    }))
+    .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+
+  const startDate = rawSorted[0]?.snapshot_date ?? "";
+  const relevantDeposits = deposits
+    .filter((d) => d && d.date > startDate && Number.isFinite(Number(d.amount)))
+    .map((d) => ({ date: d.date, amount: Number(d.amount) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  let cumulative = 0;
+  let depIdx = 0;
+  const values = rawSorted.map((p) => {
+    while (
+      depIdx < relevantDeposits.length &&
+      relevantDeposits[depIdx].date <= p.snapshot_date
+    ) {
+      cumulative += relevantDeposits[depIdx].amount;
+      depIdx += 1;
+    }
+    return { snapshot_date: p.snapshot_date, total_value: p.total_value - cumulative };
+  });
+
 
   if (values.length === 0) {
     return {
