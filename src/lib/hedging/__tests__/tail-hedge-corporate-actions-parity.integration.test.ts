@@ -308,7 +308,9 @@ describe("Phase 6 parity: stock splits, dividends, and corporate-action adjusted
     assertCaParity("GLD", stitched, cfg("GLD"));
   });
 
+  it("deferral parity across a split: no trades and matching bucket set", () => {
     // Tiny NAV + tiny cash + hedge price such that delta<1 and/or
+
     // spend<price → both paths always defer with the same bucket. We
     // don't pin which bucket, only that the set is identical and no
     // fills happen on either side.
