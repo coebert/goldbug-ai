@@ -53,8 +53,19 @@ export function buildAllPortfoliosEquity({
   today: string;
 }): AllPortfoliosEquity {
   const list = portfolios;
+  const distinctCurrencies = Array.from(
+    new Set(list.map((p) => (p.currency || "GBP").toUpperCase())),
+  ).sort();
+  const mixedCurrency = distinctCurrencies.length > 1;
   if (list.length === 0) {
-    return { portfolios: [], series: [], perPortfolioSeries: {}, currency: "GBP" };
+    return {
+      portfolios: [],
+      series: [],
+      perPortfolioSeries: {},
+      currency: "GBP",
+      mixedCurrency: false,
+      currencies: [],
+    };
   }
 
   const byPortfolio = new Map<string, PortfolioEquityPoint[]>();
