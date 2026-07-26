@@ -543,3 +543,25 @@ export const getLiveTradeAlert = createServerFn({ method: "POST" })
       reason: "no_fills" as const,
     };
   });
+
+/** History of CASH_SYNC broker log entries (audit trail of reconciliation decisions). */
+export const getCashSyncHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({
+      portfolioId: z.string().uuid(),
+      limit: z.number().int().min(1).max(200).default(50),
+    }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const p = await supabase.from("portfolios")
+      .select("id, user_id").eq("id", data.portfolioId).maybeSingle();
+    if (p.error || !p.data || p.data.user_id !== userId) throw new Error("Portfolio not found");
+    const rows = await supabase.from("live_broker_log")
+      .select("id, created_at, status, request, response, error, env")
+      .eq("portfolio_id", data.portfolioId)
+      .eq("method", "CASH_SYNC")
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    return { rows: rows.data ?? [] };
+  });

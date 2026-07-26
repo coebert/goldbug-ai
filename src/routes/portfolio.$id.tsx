@@ -123,6 +123,7 @@ import {
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
+import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-card";
 import { CommodityExposureCard } from "@/components/commodity-exposure-card";
 import { CommodityBacktestCard } from "@/components/commodity-backtest-card";
 
@@ -1285,6 +1286,13 @@ function PortfolioPage() {
             <div className="mt-6">
               <CommodityBacktestCard portfolioId={id} />
             </div>
+
+            {(p.mode === "live_sim" || p.mode === "live_prod") && (
+              <div className="mt-6">
+                <CashReconciliationLogCard portfolioId={id} />
+              </div>
+            )}
+
 
 
 
