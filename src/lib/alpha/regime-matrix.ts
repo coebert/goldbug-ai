@@ -57,3 +57,58 @@ export function resolveRegime(raw: string | null | undefined): RegimeName {
 export function weightsForRegime(raw: string | null | undefined): StrategyWeights {
   return MATRIX[resolveRegime(raw)];
 }
+
+// Phase 1 — regime-based strategy on/off switching.
+//
+// Rather than always running every model at some weight, some strategies
+// have well-documented failure modes in specific regimes. When disabled a
+// strategy contributes 0 to the composite (its weight is redistributed to
+// the still-enabled strategies), rather than merely being downweighted.
+//
+// Rules (from historical playbook + hedge-fund school priors):
+//   - Trend-following whipsaws in high_vol and range_bound.
+//   - Mean-reversion catches falling knives in risk_off / high_vol.
+//   - Carry underperforms in risk_on trend markets and blows up in risk_off
+//     when spreads widen — safest in low_vol.
+//   - Quality is the one factor we never fully disable; it is our
+//     defensive default across every regime.
+const ENABLEMENT: Record<RegimeName, Record<AlphaModelKind, boolean>> = {
+  risk_on:     { trend: true,  mean_reversion: true,  quality: true, carry: false },
+  risk_off:    { trend: false, mean_reversion: false, quality: true, carry: false },
+  high_vol:    { trend: false, mean_reversion: false, quality: true, carry: true  },
+  low_vol:     { trend: true,  mean_reversion: true,  quality: true, carry: true  },
+  trending:    { trend: true,  mean_reversion: false, quality: true, carry: false },
+  range_bound: { trend: false, mean_reversion: true,  quality: true, carry: true  },
+  unknown:     { trend: true,  mean_reversion: true,  quality: true, carry: true  },
+};
+
+export function enabledStrategiesForRegime(
+  raw: string | null | undefined,
+): Record<AlphaModelKind, boolean> {
+  return ENABLEMENT[resolveRegime(raw)];
+}
+
+// Return regime weights with disabled strategies zeroed out and the
+// remaining weight renormalised across the enabled set. If every
+// strategy is disabled (should not happen — quality is always on) we
+// return the raw weights untouched to avoid a division by zero.
+export function effectiveWeightsForRegime(
+  raw: string | null | undefined,
+): StrategyWeights {
+  const base = weightsForRegime(raw);
+  const enabled = enabledStrategiesForRegime(raw);
+  const gated: StrategyWeights = { trend: 0, mean_reversion: 0, quality: 0, carry: 0 };
+  let live = 0;
+  (Object.keys(base) as AlphaModelKind[]).forEach((k) => {
+    if (enabled[k]) {
+      gated[k] = base[k];
+      live += base[k];
+    }
+  });
+  if (live <= 0) return base;
+  (Object.keys(gated) as AlphaModelKind[]).forEach((k) => {
+    gated[k] = gated[k] / live;
+  });
+  return gated;
+}
+
