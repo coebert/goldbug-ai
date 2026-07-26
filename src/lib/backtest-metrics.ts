@@ -208,15 +208,21 @@ export function bootstrapCIs(
 
 
 
-/** Annualised Sharpe ratio, rf = 0. Null when stdev is 0 or < 2 samples. */
-export function computeSharpe(returns: number[]): number {
+/**
+ * Annualised Sharpe ratio. Pass `rf` (annualised risk-free rate as a decimal,
+ * e.g. 0.04 for 4%) to subtract the daily-equivalent rf before annualising.
+ * Defaults to 0 for backwards compatibility with the portfolio dashboard.
+ * The crypto backtest engine uses the same convention with an explicit rf.
+ */
+export function computeSharpe(returns: number[], rf = 0): number {
   if (returns.length < 2) return 0;
   const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
   const variance =
     returns.reduce((a, b) => a + (b - mean) ** 2, 0) / (returns.length - 1);
   const sd = Math.sqrt(variance);
   if (!(sd > 0)) return 0;
-  return (mean / sd) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+  const dailyRf = rf / TRADING_DAYS_PER_YEAR;
+  return ((mean - dailyRf) / sd) * Math.sqrt(TRADING_DAYS_PER_YEAR);
 }
 
 /** Annualised volatility (stdev × √252) as a percentage. */
