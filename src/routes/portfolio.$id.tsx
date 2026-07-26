@@ -1287,6 +1287,13 @@ function PortfolioPage() {
               <CommodityBacktestCard portfolioId={id} />
             </div>
 
+            {(p.mode === "live_sim" || p.mode === "live_prod") && (
+              <div className="mt-6">
+                <CashReconciliationLogCard portfolioId={id} />
+              </div>
+            )}
+
+
 
 
 
