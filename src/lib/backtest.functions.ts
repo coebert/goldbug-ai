@@ -84,9 +84,9 @@ export const runBacktest = createServerFn({ method: "POST" })
         .order("trade_date", { ascending: true }),
       context.supabase
         .from("sim_fund_events")
-        .select("event_date,amount")
+        .select("created_at,amount")
         .eq("portfolio_id", data.portfolio_id)
-        .order("event_date", { ascending: true }),
+        .order("created_at", { ascending: true }),
     ]);
     const startingCash = Number(p?.starting_cash ?? 0);
     const metrics = computeBacktestMetrics(
@@ -104,7 +104,7 @@ export const runBacktest = createServerFn({ method: "POST" })
       })),
       startingCash,
       (fundRows ?? []).map((f) => ({
-        date: f.event_date as string,
+        date: String(f.created_at ?? "").slice(0, 10),
         amount: Number(f.amount),
       })),
     );
