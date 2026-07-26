@@ -214,6 +214,29 @@ export function PortfolioRow({
           </div>
         </div>
 
+        {currencyMismatch ? (
+          <div
+            role="alert"
+            data-testid="broker-currency-mismatch-warning"
+            data-portfolio-ccy={portfolioCcy}
+            data-broker-ccy={brokerCcy}
+            className="mt-3 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <div className="min-w-0">
+              <div className="font-semibold">
+                Broker currency mismatch ({brokerCcy} vs {portfolioCcy})
+              </div>
+              <div className="mt-0.5 text-destructive/80">
+                P&amp;L and % change are blocked — broker balance is in {brokerCcy} but this portfolio
+                accounts in {portfolioCcy}. Values aren't comparable until an FX conversion or account
+                re-denomination is in place.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+
         <div
           className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3 transition-opacity ${isRefreshingEquity ? "opacity-90" : ""}`}
           aria-busy={isRefreshingEquity || undefined}
