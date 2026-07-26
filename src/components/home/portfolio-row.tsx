@@ -6,11 +6,13 @@ import { toast } from "sonner";
 import {
   AlertCircle,
   Banknote,
+  Briefcase,
   MoreVertical,
   Pencil,
   PlayCircle,
   RefreshCw,
   Trash2,
+  Wallet,
 } from "lucide-react";
 
 import { Sparkline } from "@/components/sparkline";
