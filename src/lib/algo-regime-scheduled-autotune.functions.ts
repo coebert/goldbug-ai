@@ -30,7 +30,7 @@ import {
   type EquityPoint,
   type RegimeObservation,
 } from "@/lib/microstructure/algo-regime-calibration";
-import { suggestConfigAdjustments } from "@/lib/microstructure/algo-regime-autotune";
+import { suggestConfigAdjustments, type RiskLevel } from "@/lib/microstructure/algo-regime-autotune";
 import {
   evaluateShadow,
   DEFAULT_SHADOW_EVAL_OPTIONS,
@@ -99,6 +99,19 @@ async function loadOverride(
   };
 }
 
+async function loadRiskLevel(
+  supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
+  portfolioId: string,
+): Promise<RiskLevel> {
+  const { data } = await supabase
+    .from("portfolios")
+    .select("risk_level")
+    .eq("id", portfolioId)
+    .maybeSingle();
+  const r = (data?.risk_level as string | undefined) ?? "balanced";
+  return r === "conservative" || r === "aggressive" ? r : "balanced";
+}
+
 async function persistOverride(
   supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
   portfolioId: string,
@@ -156,7 +169,8 @@ export const applyAlgoRegimeTuneWithShadow = createServerFn({ method: "POST" })
     );
     const baselineReport = calibrateRegime(observations, equity);
     const previous = await loadOverride(context.supabase, data.portfolioId);
-    const tuned = suggestConfigAdjustments(baselineReport, previous);
+    const riskLevel = await loadRiskLevel(context.supabase, data.portfolioId);
+    const tuned = suggestConfigAdjustments(baselineReport, previous, riskLevel);
 
     const baseline = {
       matched: baselineReport.matched,

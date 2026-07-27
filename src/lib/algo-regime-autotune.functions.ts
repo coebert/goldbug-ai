@@ -14,6 +14,7 @@ import {
 import {
   suggestConfigAdjustments,
   type AutoTuneResult,
+  type RiskLevel,
 } from "@/lib/microstructure/algo-regime-autotune";
 import {
   DEFAULT_ALGO_REGIME_CONFIG,
@@ -80,7 +81,16 @@ export const autoTuneAlgoRegime = createServerFn({ method: "POST" })
       ...((existing?.config as Partial<AlgoRegimeConfig> | undefined) ?? {}),
     };
 
-    const tuned = suggestConfigAdjustments(report, previous);
+    const { data: pf } = await context.supabase
+      .from("portfolios")
+      .select("risk_level")
+      .eq("id", data.portfolioId)
+      .maybeSingle();
+    const rawRisk = (pf?.risk_level as string | undefined) ?? "balanced";
+    const riskLevel: RiskLevel =
+      rawRisk === "conservative" || rawRisk === "aggressive" ? rawRisk : "balanced";
+
+    const tuned = suggestConfigAdjustments(report, previous, riskLevel);
 
     // 3. Persist unless dry-run or nothing changed.
     let persisted = false;

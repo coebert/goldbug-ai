@@ -15,7 +15,7 @@ import {
   type AlgoRegimeConfig,
 } from "@/lib/microstructure/algo-regime";
 import { calibrateRegime } from "@/lib/microstructure/algo-regime-calibration";
-import { suggestConfigAdjustments } from "@/lib/microstructure/algo-regime-autotune";
+import { suggestConfigAdjustments, type RiskLevel } from "@/lib/microstructure/algo-regime-autotune";
 import {
   compareAlgoRegimeConfigs,
   type BacktestComparison,
@@ -94,6 +94,15 @@ export const backtestAlgoRegimeCandidate = createServerFn({ method: "POST" })
       .order("run_date", { ascending: false })
       .limit(data.maxObservations);
     if (decErr) throw new Error(decErr.message);
+
+    const { data: pfRow } = await context.supabase
+      .from("portfolios")
+      .select("risk_level")
+      .eq("id", data.portfolioId)
+      .maybeSingle();
+    const rawRisk = (pfRow?.risk_level as string | undefined) ?? "balanced";
+    const riskLevel: RiskLevel =
+      rawRisk === "conservative" || rawRisk === "aggressive" ? rawRisk : "balanced";
 
     const runDates = Array.from(
       new Set((decisions ?? []).map((d) => d.run_date as string)),
@@ -203,7 +212,7 @@ export const backtestAlgoRegimeCandidate = createServerFn({ method: "POST" })
       perDay.map((d) => ({ date: d.date, tier: "normal" })), // placeholder — unused, real tiers come from simulate
       equity,
     );
-    const tuned = suggestConfigAdjustments(baselineReport, activeConfig);
+    const tuned = suggestConfigAdjustments(baselineReport, activeConfig, riskLevel);
     const candidateConfig: AlgoRegimeConfig = data.candidate
       ? {
           ...activeConfig,
