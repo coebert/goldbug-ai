@@ -611,19 +611,27 @@ export const syncBrokerBalanceForEnv = createServerFn({ method: "POST" })
 
     const synced: Array<{
       portfolioId: string; name: string;
-      ok: boolean; message?: string;
-      currentCash?: number | null; totalEquity?: number | null;
-      depositDetected?: number | null;
+      ok: boolean; skipped?: boolean; reason?: string;
+      previousCash?: number | null; newCash?: number | null; delta?: number | null;
+      message?: string;
     }> = [];
     for (const p of list.data ?? []) {
       try {
-        const r = await syncLiveCashFromBroker(p.id, owned);
-        synced.push({
-          portfolioId: p.id, name: p.name, ok: true,
-          currentCash: r?.currentCash ?? null,
-          totalEquity: r?.totalEquity ?? null,
-          depositDetected: r?.depositDetected ?? null,
-        });
+        const r = (await syncLiveCashFromBroker(p.id, owned)) as
+          | { skipped: true; reason?: string }
+          | { skipped: false; delta: number; brokerCash: number; previousCash: number; newCash: number };
+        if (r && "skipped" in r && r.skipped) {
+          synced.push({ portfolioId: p.id, name: p.name, ok: true, skipped: true, reason: r.reason });
+        } else if (r && "skipped" in r) {
+          synced.push({
+            portfolioId: p.id, name: p.name, ok: true, skipped: false,
+            previousCash: r.previousCash ?? null,
+            newCash: r.newCash ?? null,
+            delta: r.delta ?? null,
+          });
+        } else {
+          synced.push({ portfolioId: p.id, name: p.name, ok: true });
+        }
       } catch (e) {
         synced.push({
           portfolioId: p.id, name: p.name, ok: false,
