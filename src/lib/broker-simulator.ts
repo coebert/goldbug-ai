@@ -610,6 +610,21 @@ export function simulateBrokerExecution(
   const snapshots: SimSnapshot[] = [];
   const rejections: SimRejection[] = [];
 
+  // Phase B — fold the algo-regime snapshot into effective options.
+  // We tighten `liquidity.maxParticipationRate` (never loosen it) and
+  // pre-reject BUYs when the guard recommends blocking new market buys.
+  const regime = options.algoRegime ?? null;
+  if (regime) {
+    const { effectiveMaxParticipation } = require("./microstructure/algo-regime-guard") as typeof import("./microstructure/algo-regime-guard");
+    const eff = effectiveMaxParticipation(options.liquidity?.maxParticipationRate, regime);
+    if (eff !== null) {
+      options = {
+        ...options,
+        liquidity: { ...(options.liquidity ?? {}), maxParticipationRate: eff },
+      };
+    }
+  }
+
   // Queue-based dispatch so a liquidity-truncated fill can enqueue its
   // residual as a follow-up decision when `timeSliceUnfilled` is on.
   // Each entry carries the parent decision id and the slice number so
@@ -623,10 +638,28 @@ export function simulateBrokerExecution(
     attemptsRemaining: number;
   };
   const sliceMax = Math.max(0, options.timeSliceMaxAttempts ?? 5);
-  const queue: QueueItem[] = decisions.map((d) => ({
-    decision: d, sliceOf: d.id, sliceIndex: 0,
-    attemptsRemaining: options.timeSliceUnfilled ? sliceMax : 0,
-  }));
+  const blockBuys = !!regime?.multipliers.blockNewBuys;
+  if (blockBuys) {
+    // Emit typed rejections up-front (before validation) so the report
+    // reflects the guard cleanly and no cash/position math ever runs.
+    let step = 0;
+    for (const d of decisions) {
+      step += 1;
+      if (d.side === "BUY") {
+        rejections.push({
+          step, decisionId: d.id, symbol: d.symbol, side: d.side,
+          reason: "algo_regime_block",
+          requested: { quantity: d.quantity, price: d.price, fee: d.fee ?? 0 },
+        });
+      }
+    }
+  }
+  const queue: QueueItem[] = decisions
+    .filter((d) => !(blockBuys && d.side === "BUY"))
+    .map((d) => ({
+      decision: d, sliceOf: d.id, sliceIndex: 0,
+      attemptsRemaining: options.timeSliceUnfilled ? sliceMax : 0,
+    }));
 
   // Threaded through each iteration so the per-branch snapshot pushes
   // can tag their emissions with the correct slice metadata.
