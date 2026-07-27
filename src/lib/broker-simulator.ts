@@ -964,6 +964,7 @@ export function buildExecutionQualityReport(
     would_borrow: 0,
     would_short: 0,
     no_liquidity: 0,
+    algo_regime_block: 0,
   };
   for (const r of rejections) rejectionsByReason[r.reason] += 1;
 
