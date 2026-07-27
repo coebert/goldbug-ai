@@ -15,6 +15,8 @@
 // When the deposit list is empty the helper is a pure pass-through:
 // `adjusted === equity` and `pct === raw%`.
 
+import { capitalAdjustedPct } from "./capital-adjusted-return";
+
 export type EquityPoint = { date: string; equity: number };
 export type DepositPoint = { date: string; amount: number };
 
