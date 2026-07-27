@@ -84,6 +84,15 @@ export type ExecutionSeriesPoint = {
   /** Notional-weighted liquidity-adjusted slippage, bps. `null` when the
    *  fill was unconstrained (no volume) or unfilled. */
   liquidityAdjustedSlippageBps: number | null;
+  /** Filled notional in trade currency across all slices (0 if unfilled). */
+  filledNotional: number;
+  /**
+   * Per-side execution cost decomposition (bps of mid) from the
+   * microstructure model — lets the UI attribute costs to spread,
+   * latency, market impact, and urgency for this parent decision.
+   * `null` for unfilled orders or when the model cannot be evaluated.
+   */
+  costBreakdownBps: SpreadSlippageBreakdown | null;
 };
 
 export type ScenarioReport = {
