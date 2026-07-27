@@ -25,6 +25,10 @@ import {
   type TradeRow,
   type BacktestMetrics,
 } from "./backtest-metrics";
+import {
+  estimateSpreadSlippage,
+  type SpreadSlippageBreakdown,
+} from "./spread-slippage";
 
 /** Broker decision annotated with the trading date it is applied on. */
 export type DatedDecision = SimDecision & {
