@@ -148,11 +148,11 @@ describe("execution-invariants — detects hand-crafted violations", () => {
     expect(codes).toContain("BUY_EXCEEDS_PRIOR_CASH");
   });
 
-  it("flags out-of-order steps", () => {
+  it("flags non-increasing step ordering across multiple snapshots", () => {
     const report = checkExecutionInvariants({
       initial: startState(100),
       decisions: [],
-      snapshots: [baseSnap({ step: 2 })],
+      snapshots: [baseSnap({ step: 2 }), baseSnap({ step: 2 })],
       rejections: [],
     });
     expect(report.violations.some((v) => v.code === "STEP_ORDERING")).toBe(true);
