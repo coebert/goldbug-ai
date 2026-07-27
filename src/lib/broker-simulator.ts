@@ -447,9 +447,12 @@ export function simulateBrokerExecution(
       }
       qty = held;
     }
-    const proceeds = qty * d.price;
+    const f = options.frictions;
+    const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f);
+    const proceeds = qty * effSellPrice;
+    const totalFeePaid = totalFee(proceeds, "SELL", fee, f);
     // Fee still owed on SELL; may not push cash below 0.
-    if (fee > cash + proceeds) {
+    if (totalFeePaid > cash + proceeds) {
       rejections.push({
         step, decisionId: d.id, symbol: d.symbol, side: d.side,
         reason: "insufficient_cash",
@@ -457,8 +460,9 @@ export function simulateBrokerExecution(
       });
       continue;
     }
-    cash = Math.max(0, cash + proceeds - fee);
-    const realizedPnl = (d.price - (existing?.avgCost ?? 0)) * qty - fee;
+    cash = Math.max(0, cash + proceeds - totalFeePaid);
+    const realizedPnl =
+      (effSellPrice - (existing?.avgCost ?? 0)) * qty - totalFeePaid;
     if (existing) {
       existing.quantity -= qty;
       if (existing.quantity <= 0) {
@@ -473,7 +477,7 @@ export function simulateBrokerExecution(
       cash, holdings: cloneHoldings(holdings),
       holdingsValue, totalValue: cash + holdingsValue,
       realizedPnl,
-      fillQuantity: qty, fillPrice: d.price, fee,
+      fillQuantity: qty, fillPrice: effSellPrice, fee: totalFeePaid,
     });
   }
 
