@@ -89,6 +89,7 @@ function runStrategy(args: {
   let peakSinceEntry = 0;
   let stopBar: number | null = null;
   let stopFillPrice: number | null = null;
+  let stopFillQty: number | null = null;
   let peakEquity = startingCash;
   let maxDD = 0;
   let peakPosition = 0;
