@@ -140,6 +140,7 @@ import { CryptoBacktestCard } from "@/components/crypto-backtest-card";
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
+import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 const BacktestResultsCard = lazy(() =>
   import("@/components/backtest-results-card").then((m) => ({ default: m.BacktestResultsCard })),
 );
@@ -575,14 +576,21 @@ function PortfolioPage() {
 
 
 
-  const holdingsValue = useMemo(() => {
-    // Approx: use avg_cost as fallback (real value shown in dashboard when snapshots exist)
-    return holdings.reduce((s, h) => s + Number(h.quantity) * Number(h.avg_cost), 0);
-  }, [holdings]);
-
-  const totalValue = equityData.length
-    ? equityData[equityData.length - 1].value
-    : Number(p?.current_cash ?? 0) + holdingsValue;
+  // Single authoritative source of the three headline numbers. When an
+  // equity snapshot exists it wins (both `total_value` and `cash` come from
+  // the FX/GBX-normalised snapshot, so `invested = total_value − cash` cannot
+  // disagree with the equity tile). The fallback path is only used when the
+  // portfolio has no snapshots yet (first tick, brand-new account).
+  const latestSnapshot = equity.length ? equity[equity.length - 1] : null;
+  const { totalValue, cash: cashAuthoritative, invested: holdingsValue } = useMemo(
+    () =>
+      derivePortfolioMetrics({
+        latestSnapshot,
+        currentCash: p?.current_cash ?? 0,
+        holdings,
+      }),
+    [latestSnapshot, p?.current_cash, holdings],
+  );
   const startingCash = Number(p?.starting_cash ?? 0);
   const pnl = totalValue - startingCash;
   const pnlPct = startingCash > 0 ? (pnl / startingCash) * 100 : 0;
@@ -765,11 +773,12 @@ function PortfolioPage() {
               <LiveHoldingsCard
                 holdings={holdings}
                 currency={p.currency}
-                cash={Number(p.current_cash)}
+                cash={cashAuthoritative}
                 cashByCcy={
                   (p as { cash_by_ccy?: Record<string, number> | null }).cash_by_ccy ?? null
                 }
                 totalValue={totalValue}
+                invested={holdingsValue}
                 mode={p.mode}
                 series={holdingsSeries}
                />
