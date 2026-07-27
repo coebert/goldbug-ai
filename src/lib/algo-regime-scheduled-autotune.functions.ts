@@ -284,7 +284,16 @@ export const evaluateAlgoRegimeShadow = createServerFn({ method: "POST" })
 
       const decision = evaluateShadow(baseline, postReport, DEFAULT_SHADOW_EVAL_OPTIONS);
 
-      const update: Record<string, unknown> = {
+      type HistoryUpdate = {
+        evaluated_at?: string;
+        post_matched: number;
+        post_monotone: boolean;
+        post_normal_mean: number | null;
+        post_extreme_mean: number | null;
+        decision_reason: string;
+        status?: "accepted" | "rolled_back";
+      };
+      const update: HistoryUpdate = {
         evaluated_at: new Date().toISOString(),
         post_matched: postReport.matched,
         post_monotone: postReport.monotone,
@@ -314,6 +323,7 @@ export const evaluateAlgoRegimeShadow = createServerFn({ method: "POST" })
         .update(update)
         .eq("id", row.id as string);
       if (upErr) throw new Error(upErr.message);
+
 
       results.push({
         historyId: row.id as string,
