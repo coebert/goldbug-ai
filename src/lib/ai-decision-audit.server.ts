@@ -99,8 +99,8 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
   const features = ctx.features ?? {};
   const regimeSlim = ctx.regime ?? null;
 
-  type Row = Record<string, unknown>;
-  const rows: Row[] = [];
+  const rows: AuditInsert[] = [];
+
   const sellSymbols = new Set<string>();
 
   for (const e of ctx.executed) {
