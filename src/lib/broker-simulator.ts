@@ -83,6 +83,16 @@ export type SimSnapshot = {
   fillQuantity: number;
   fillPrice: number;
   fee: number;
+  /** Originally requested quantity (before liquidity/cash truncation). */
+  requestedQuantity: number;
+  /** True when fillQuantity < requestedQuantity for any reason. */
+  partial: boolean;
+  /**
+   * Highest-priority reason the fill was truncated below `requestedQuantity`,
+   * or `null` for a full fill. Priority (highest first):
+   *   "liquidity" > "cash" > "position".
+   */
+  truncationReason: "liquidity" | "cash" | "position" | null;
 };
 
 export type SimRejection = {
@@ -97,7 +107,8 @@ export type SimRejection = {
     | "no_position_to_sell"
     | "insufficient_cash"
     | "would_borrow"
-    | "would_short";
+    | "would_short"
+    | "no_liquidity";
   requested: { quantity: number; price: number; fee: number };
 };
 
