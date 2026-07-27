@@ -21,6 +21,7 @@ import { BatchLessonsCard } from "@/components/batch-lessons-card";
 import { RetrainScheduleCard } from "@/components/retrain-schedule-card";
 import { RunMetricsCard } from "@/components/run-metrics-card";
 import { OrderReconciliationCard } from "@/components/order-reconciliation-card";
+import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-card";
 
 
 export const Route = createFileRoute("/admin")({
@@ -386,6 +387,8 @@ function AdminPage() {
       <NotificationsPanel />
 
       <SecurityAuditCard />
+
+      <StartingCashIntegrityCard />
 
       <TranslationQualityCard />
 
