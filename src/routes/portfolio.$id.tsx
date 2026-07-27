@@ -122,6 +122,8 @@ import {
   compareGridHeader,
   tooltipModeChip,
 } from "@/lib/portfolio-performance-format";
+import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
+
 
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
