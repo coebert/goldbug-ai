@@ -131,7 +131,11 @@ const traceArb = (opts: { minDays?: number; maxDays?: number } = {}) =>
 // ---------- 1. computeDailyEquityChanges ----------
 
 describe("property: computeDailyEquityChanges excludes cash flows", () => {
-  it("per-day pnl/pct matches the trading-only series regardless of flows", () => {
+  it("per-day trading pnl matches the flow-free series regardless of flows", () => {
+    // The exclusion contract is on `pnl` (the numerator) — the % is
+    // then pnl/prev, and prev legitimately shifts when flows move
+    // the equity level. So we lock pnl parity and separately assert
+    // pct is derived from the observed pnl / prev.
     fc.assert(
       fc.property(traceArb(), ({ trace }) => {
         const withFlows = trace.visibleEquity.map((v, i) => ({
@@ -151,8 +155,15 @@ describe("property: computeDailyEquityChanges excludes cash flows", () => {
         const oracle = computeDailyEquityChanges(withoutFlows, []);
         expect(observed).toHaveLength(oracle.length);
         for (let i = 0; i < observed.length; i++) {
+          // pnl must be the trading-only delta — flows fully excluded.
           expect(observed[i].pnl).toBeCloseTo(oracle[i].pnl, 6);
-          expect(observed[i].pct).toBeCloseTo(oracle[i].pct, 9);
+          // pct must derive from that pnl over the observed prev
+          // equity (never from rawDelta).
+          const expectedPct =
+            observed[i].prevEquity > 0
+              ? (observed[i].pnl / observed[i].prevEquity) * 100
+              : 0;
+          expect(observed[i].pct).toBeCloseTo(expectedPct, 9);
         }
       }),
       { numRuns: 200 },
