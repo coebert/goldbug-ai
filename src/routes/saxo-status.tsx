@@ -317,12 +317,27 @@ function SaxoStatusPage() {
 
   const fetchStatus = useServerFn(getSaxoOAuthStatus);
   const startOAuth = useServerFn(startSaxoOAuth);
+  const syncBalance = useServerFn(syncBrokerBalanceForEnv);
 
   const q = useQuery({
     queryKey: ["saxo-status"],
     queryFn: () => fetchStatus(),
     refetchInterval: 30_000,
     enabled: !!session,
+  });
+
+  const [lastSync, setLastSync] = useState<Record<EnvKey, SyncResult | null>>({ sim: null, live: null });
+  const [syncErr, setSyncErr] = useState<Record<EnvKey, string | null>>({ sim: null, live: null });
+  const syncMut = useMutation({
+    mutationFn: (env: EnvKey) => syncBalance({ data: { env } }),
+    onMutate: (env) => { setSyncErr((s) => ({ ...s, [env]: null })); },
+    onSuccess: (res, env) => {
+      setLastSync((s) => ({ ...s, [env]: res }));
+      q.refetch();
+    },
+    onError: (e, env) => {
+      setSyncErr((s) => ({ ...s, [env]: e instanceof Error ? e.message : String(e) }));
+    },
   });
 
   const onConnect = async (env: EnvKey) => {
@@ -333,6 +348,8 @@ function SaxoStatusPage() {
       alert(e instanceof Error ? e.message : String(e));
     }
   };
+  const isSyncing = (env: EnvKey) => syncMut.isPending && syncMut.variables === env;
+
 
   if (!ready || !session) {
     return (
