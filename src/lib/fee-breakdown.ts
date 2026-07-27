@@ -10,11 +10,8 @@
 //      (FIFO lot matching identical to backtest-metrics; buy fees are
 //      allocated pro-rata by the quantity taken out of each lot.)
 
-import {
-  estimateSaxoCommission,
-  inferSaxoCurrency,
-  type AssetClass,
-} from "./saxo-fees";
+import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
+import type { AssetClass } from "./universe.server";
 
 export type FeeTradeInput = {
   trade_date: string;
