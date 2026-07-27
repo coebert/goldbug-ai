@@ -360,8 +360,8 @@ export type CashSyncSnapshotInput = {
 };
 
 export type CashSyncSnapshotWriteResult =
-  | { action: "inserted"; totalValue: number }
-  | { action: "updated"; totalValue: number; previousTotalValue: number }
+  | { action: "inserted"; totalValue: number; invariantViolations?: string[] }
+  | { action: "updated"; totalValue: number; previousTotalValue: number; invariantViolations?: string[] }
   | { action: "error"; message: string };
 
 // Minimal structural type of the Supabase client surface we use, so tests can
@@ -402,6 +402,62 @@ export async function writeCashSyncSnapshot(
   }
   const totalValue = cash + holdingsValue;
 
+  // Server-side invariant guard: catch "impossible totals" (invested
+  // > 100%, cash > 100%, identity broken, negatives, NaN) BEFORE they
+  // land in equity_snapshots and propagate into every tile/chart. The
+  // check itself never blocks the write — broker-authoritative values
+  // must always be persisted so trading can continue — but every
+  // violation is logged with structured context for later triage.
+  const { checkEquityInvariants } = await import("@/lib/equity-invariants");
+  const invariant = checkEquityInvariants({
+    portfolioId: input.portfolioId,
+    snapshotDate: input.snapshotDate,
+    cash,
+    holdingsValue,
+    totalValue,
+  });
+  if (!invariant.ok) {
+    // Fire-and-forget: never let a logging failure fail the write, and
+    // never block the trading tick waiting on ClickHouse/Postgres.
+    void (async () => {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin.from("security_audit_log").insert({
+          event: "equity_invariant_violation",
+          op: "writeCashSyncSnapshot",
+          reason: invariant.violations.map((v) => v.code).join(","),
+          portfolio_id: input.portfolioId,
+          details: JSON.parse(
+            JSON.stringify({
+              worstSeverity: invariant.worstSeverity,
+              violations: invariant.violations,
+              snapshot: { cash, holdingsValue, totalValue, snapshotDate: input.snapshotDate },
+            }),
+          ),
+        });
+      } catch (err) {
+        // Best-effort structured stderr so the sandbox/worker logs still
+        // show the diagnostic even when the audit insert failed.
+        // eslint-disable-next-line no-console
+        console.error("[equity-invariant] audit persist failed", {
+          portfolio_id: input.portfolioId,
+          snapshot_date: input.snapshotDate,
+          violations: invariant.violations.map((v) => v.code),
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+    // eslint-disable-next-line no-console
+    console.warn("[equity-invariant] snapshot violates invariants", {
+      portfolio_id: input.portfolioId,
+      snapshot_date: input.snapshotDate,
+      cash,
+      holdings_value: holdingsValue,
+      total_value: totalValue,
+      codes: invariant.violations.map((v) => v.code),
+    });
+  }
+
   const existing = await client
     .from("equity_snapshots")
     .select("id, total_value")
@@ -423,6 +479,7 @@ export async function writeCashSyncSnapshot(
       action: "updated",
       totalValue,
       previousTotalValue: Number(existing.data.total_value ?? 0),
+      invariantViolations: invariant.ok ? undefined : invariant.violations.map((v) => v.code),
     };
   }
 
@@ -434,6 +491,10 @@ export async function writeCashSyncSnapshot(
     total_value: totalValue,
   });
   if (ins.error) return { action: "error", message: ins.error.message };
-  return { action: "inserted", totalValue };
+  return {
+    action: "inserted",
+    totalValue,
+    invariantViolations: invariant.ok ? undefined : invariant.violations.map((v) => v.code),
+  };
 }
 
