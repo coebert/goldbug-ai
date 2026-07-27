@@ -227,14 +227,14 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
             >
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
                 interval={0}
                 tickMargin={6}
                 axisLine={{ stroke: "hsl(var(--border))" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
                 tickFormatter={(v: number) => formatMoney(v, currency).replace("+", "")}
                 width={70}
                 axisLine={false}
