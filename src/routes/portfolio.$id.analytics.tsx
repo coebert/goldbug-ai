@@ -45,6 +45,7 @@ function AnalyticsPage() {
         <ExecutionQualityCard portfolioId={id} />
         <AlgoRegimeHistoryCard portfolioId={id} />
         <AlgoRegimeCalibrationCard portfolioId={id} />
+        <AlgoRegimeBacktestCard portfolioId={id} />
       </main>
     </div>
   );
