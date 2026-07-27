@@ -159,6 +159,70 @@ function isFiniteNonNeg(n: number): boolean {
   return Number.isFinite(n) && n >= 0;
 }
 
+/**
+ * Effective (post-slippage) execution price for a given quoted price,
+ * side, and fill quantity. BUYs pay up, SELLs receive down. Impact is
+ * linear in qty. Returned price is clamped >= 0.
+ */
+function effectiveFillPrice(
+  quote: number,
+  qty: number,
+  side: Side,
+  f: Frictions | undefined,
+): number {
+  if (!f) return quote;
+  const slipFrac = (f.slippageBps ?? 0) / 10_000;
+  const impact = (f.impactPerUnit ?? 0) * qty;
+  if (side === "BUY") return quote * (1 + slipFrac) + impact;
+  return Math.max(0, quote * (1 - slipFrac) - impact);
+}
+
+/**
+ * Total fee for a fill: baseFee (per-decision override) + commission
+ * (max of bps-of-notional and minCommission) + buy-side tax.
+ */
+function totalFee(
+  notional: number,
+  side: Side,
+  baseFee: number,
+  f: Frictions | undefined,
+): number {
+  if (!f) return baseFee;
+  const bpsComm = notional * ((f.commissionBps ?? 0) / 10_000);
+  const commission = Math.max(f.minCommission ?? 0, bpsComm);
+  const tax = side === "BUY" ? notional * ((f.buyTaxBps ?? 0) / 10_000) : 0;
+  return baseFee + commission + tax;
+}
+
+/**
+ * Largest BUY quantity in [0, requested] such that
+ *   qty*effPrice(qty) + totalFee(qty*effPrice(qty)) <= cash.
+ * Solved by bisection to keep the closed-form independent of the
+ * chosen friction model. 40 iterations gives ~1e-12 relative precision.
+ */
+function maxAffordableBuyQty(
+  requested: number,
+  quote: number,
+  cash: number,
+  baseFee: number,
+  f: Frictions,
+): number {
+  const spendAt = (q: number): number => {
+    const p = effectiveFillPrice(quote, q, "BUY", f);
+    const notional = q * p;
+    return notional + totalFee(notional, "BUY", baseFee, f);
+  };
+  if (spendAt(requested) <= cash) return requested;
+  if (spendAt(0) > cash) return 0; // fixed fees alone unaffordable
+  let lo = 0;
+  let hi = requested;
+  for (let i = 0; i < 40; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (spendAt(mid) <= cash) lo = mid; else hi = mid;
+  }
+  return lo;
+}
+
 function cloneHoldings(hs: SimHolding[]): SimHolding[] {
   return hs.map((h) => ({ symbol: h.symbol, quantity: h.quantity, avgCost: h.avgCost }));
 }
