@@ -10,6 +10,13 @@ export type ExecutionParams = {
   spread_atr_frac: number; // half-spread = spread_atr_frac * ATR%
   adv_participation: number; // max fraction of 20d ADV$ per trade
   min_trade_value: number;
+  /**
+   * Minimum per-side commission in trade currency (e.g. Saxo's £3 UK / $1 US
+   * / €3 EU floor). When set, effective per-side commission is
+   * `max(commission_bps * notional, min_commission)`. Defaults to 0 for
+   * back-compat with existing backtests.
+   */
+  min_commission?: number;
 };
 
 export const DEFAULT_EXECUTION: ExecutionParams = {
@@ -18,6 +25,7 @@ export const DEFAULT_EXECUTION: ExecutionParams = {
   spread_atr_frac: 0.25,
   adv_participation: 0.01, // 1% of ADV
   min_trade_value: 25,
+  min_commission: 0,
 };
 
 export type ExecutionOutcome = {
