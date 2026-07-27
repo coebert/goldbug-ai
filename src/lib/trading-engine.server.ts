@@ -1784,6 +1784,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         atrPct: featExec?.atr_pct ?? null,
         adv20d: featExec?.adv_20d ?? null,
         params: feeAdjustedParams,
+        assetClass: meta.asset_class,
+        currency: tradeCcy,
+        urgency: "normal",
       });
       const commodityLiq = meta.asset_class === "commodity"
         ? computeCommodityTradeLiquidity({
