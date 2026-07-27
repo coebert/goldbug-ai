@@ -354,6 +354,7 @@ ${args.hyperparams ? formatHyperparamBlock(args.hyperparams) : ""}
 ${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 ${args.alphaPriors ?? ""}
+${args.algoRegimeBlock ?? ""}
 
 ${HISTORICAL_PLAYBOOK}
 
