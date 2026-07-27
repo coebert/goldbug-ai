@@ -66,6 +66,7 @@ type RunResult = {
   peakPosition: number;
   stopBar: number | null;
   stopFillPrice: number | null;
+  stopFillQty: number | null;
   maxDrawdownPct: number;
 };
 
