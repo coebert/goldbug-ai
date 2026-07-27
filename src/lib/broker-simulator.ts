@@ -164,7 +164,8 @@ export type SimRejection = {
     | "insufficient_cash"
     | "would_borrow"
     | "would_short"
-    | "no_liquidity";
+    | "no_liquidity"
+    | "algo_regime_block";
   requested: { quantity: number; price: number; fee: number };
 };
 
@@ -287,6 +288,16 @@ export type SimulateOptions = {
    */
   timeSliceUnfilled?: boolean;
   timeSliceMaxAttempts?: number;
+
+  /**
+   * Phase B — adaptive execution guardrail. When set, the snapshot's
+   * `multipliers.maxParticipation` is folded into `liquidity` as the
+   * stricter of {caller cap, regime cap}, and if `blockNewBuys` is true
+   * every BUY decision is rejected up-front with reason
+   * `algo_regime_block` (SELLs / protective exits are never blocked).
+   * Omit for byte-identical legacy behaviour.
+   */
+  algoRegime?: import("./microstructure/algo-regime").AlgoRegimeSnapshot | null;
 };
 
 /**
