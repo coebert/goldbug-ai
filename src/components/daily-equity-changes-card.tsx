@@ -188,7 +188,17 @@ export function DailyEquityChangesCard({
                 tone="neg"
               />
             </div>
-            <div className="h-56 w-full">
+            <div
+              className="h-56 w-full"
+              role="img"
+              aria-label={`Daily equity change bar chart, ${range} range, ${stats!.up} up days and ${stats!.down} down days`}
+            >
+              <span className="sr-only" aria-live="polite">
+                {`Daily trading-only percentage change over ${stats!.total} days: ${stats!.up} up, ${stats!.down} down, ${stats!.flat} flat. `}
+                {`Best day ${stats!.best.pct >= 0 ? "up" : "down"} ${Math.abs(stats!.best.pct).toFixed(2)} percent on ${fmtDateShort(stats!.best.date)}. `}
+                {`Worst day ${stats!.worst.pct >= 0 ? "up" : "down"} ${Math.abs(stats!.worst.pct).toFixed(2)} percent on ${fmtDateShort(stats!.worst.date)}. `}
+                Deposits and withdrawals are excluded.
+              </span>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
@@ -196,16 +206,16 @@ export function DailyEquityChangesCard({
                 >
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 10 }}
+                    tick={AXIS_TICK}
                     interval="preserveStartEnd"
                     minTickGap={16}
                   />
                   <YAxis
-                    tick={{ fontSize: 10 }}
+                    tick={AXIS_TICK}
                     tickFormatter={(v: number) => `${v.toFixed(1)}%`}
                     width={44}
                   />
-                  <ReferenceLine y={0} stroke="hsl(var(--border))" />
+                  <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.4} />
                   <Tooltip
                     cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
                     content={({ active, payload }) => {
@@ -218,7 +228,7 @@ export function DailyEquityChangesCard({
                           <div
                             className={`mt-1 font-semibold tabular-nums ${pos ? "text-success" : "text-destructive"}`}
                           >
-                            {pos ? "+" : ""}
+                            {pos ? "▲ +" : "▼ "}
                             {d.pct.toFixed(2)}%
                           </div>
                           <div className="mt-1 text-muted-foreground tabular-nums">
