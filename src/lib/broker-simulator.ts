@@ -51,6 +51,16 @@ export type SimDecision = {
    * ADV-like volumes, not to a size someone else has already sized down).
    */
   availableVolume?: number;
+  /**
+   * Optional per-decision rolling window of recent bar volumes. Used
+   * only when `availableVolume` is not set. The engine reduces this
+   * series to a single volume figure via the liquidity model's
+   * aggregator (default `mean`) and treats the result exactly as if it
+   * had been passed as `availableVolume`. Empty / all-invalid arrays
+   * fall back to `options.liquidity` sources.
+   */
+  volumeHistory?: number[];
+
 };
 
 export type SimHolding = {
@@ -198,7 +208,32 @@ export type SimulateOptions = {
     availableVolume?: Record<string, number>;
     maxParticipationRate?: number;
     minFillQuantity?: number;
+    /**
+     * Per-symbol rolling window of recent bar volumes (oldest → newest,
+     * or any order — only the trailing `rollingWindow` entries and their
+     * aggregate matter). When a decision has neither its own
+     * `availableVolume` nor `volumeHistory`, and no
+     * `availableVolume[symbol]` entry exists, the engine derives the
+     * per-step cap from these bars using `volumeAggregator`
+     * (default `mean`). Empty / all-invalid arrays are treated as
+     * unconstrained.
+     */
+    volumeHistory?: Record<string, number[]>;
+    /**
+     * Number of trailing bars to include when reducing `volumeHistory`
+     * (either per-symbol or per-decision) to a single figure. `0`,
+     * negative, or omitted means "use the entire supplied history".
+     */
+    rollingWindow?: number;
+    /**
+     * How to reduce the trailing window to a single volume estimate.
+     *  - "mean"   arithmetic mean (default; classic N-bar ADV proxy).
+     *  - "median" order-statistic median (robust to outlier bars).
+     *  - "min"    conservative worst-case bar in the window.
+     */
+    volumeAggregator?: "mean" | "median" | "min";
   };
+
   /**
    * When true, any decision that only partially fills because of a
    * `liquidity` truncation has its residual quantity automatically
@@ -313,30 +348,87 @@ function markToMarket(
 }
 
 /**
+ * Reduce a rolling window of recent bar volumes to a single ADV-like
+ * figure. Filters out non-finite / negative entries first. Returns
+ * `null` when nothing usable remains so callers can fall through to
+ * the next precedence tier instead of capping at zero.
+ */
+function aggregateVolumeHistory(
+  history: readonly number[] | undefined,
+  window: number | undefined,
+  how: "mean" | "median" | "min" | undefined,
+): number | null {
+  if (!history || history.length === 0) return null;
+  const clean = history.filter(
+    (v) => Number.isFinite(v) && (v as number) >= 0,
+  );
+  if (clean.length === 0) return null;
+  const n = Number.isFinite(window) && (window as number) > 0
+    ? Math.min(clean.length, Math.floor(window as number))
+    : clean.length;
+  const tail = clean.slice(clean.length - n);
+  const agg = how ?? "mean";
+  if (agg === "min") return Math.min(...tail);
+  if (agg === "median") {
+    const sorted = [...tail].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  }
+  let sum = 0;
+  for (const v of tail) sum += v;
+  return sum / tail.length;
+}
+
+/**
  * Compute the maximum fill quantity permitted by the liquidity model
  * for a given decision. Returns `Infinity` when no cap applies, `0`
  * when the market is dry, or a finite positive cap otherwise.
+ *
+ * Precedence for the raw volume estimate (highest first):
+ *   1. per-decision `availableVolume`
+ *   2. per-decision `volumeHistory` (reduced via rolling window)
+ *   3. per-symbol   `availableVolume[symbol]`
+ *   4. per-symbol   `volumeHistory[symbol]` (reduced via rolling window)
+ *   5. unconstrained (`Infinity`)
+ * `maxParticipationRate` scales whichever tier resolves.
  */
 function liquidityCap(
   d: SimDecision,
   liquidity: SimulateOptions["liquidity"],
 ): number {
+  const window = liquidity?.rollingWindow;
+  const agg = liquidity?.volumeAggregator;
+
+  let vol: number | null = null;
   const perDecision = d.availableVolume;
-  const perSymbol = liquidity?.availableVolume?.[d.symbol];
-  const volSources: number[] = [];
   if (Number.isFinite(perDecision) && (perDecision as number) >= 0) {
-    volSources.push(perDecision as number);
-  } else if (Number.isFinite(perSymbol) && (perSymbol as number) >= 0) {
-    volSources.push(perSymbol as number);
+    vol = perDecision as number;
   }
-  if (volSources.length === 0) return Number.POSITIVE_INFINITY;
-  const vol = Math.min(...volSources);
+  if (vol === null) {
+    vol = aggregateVolumeHistory(d.volumeHistory, window, agg);
+  }
+  if (vol === null) {
+    const perSymbol = liquidity?.availableVolume?.[d.symbol];
+    if (Number.isFinite(perSymbol) && (perSymbol as number) >= 0) {
+      vol = perSymbol as number;
+    }
+  }
+  if (vol === null) {
+    vol = aggregateVolumeHistory(
+      liquidity?.volumeHistory?.[d.symbol], window, agg,
+    );
+  }
+  if (vol === null) return Number.POSITIVE_INFINITY;
+
   const rate = liquidity?.maxParticipationRate;
   const rateClamped = Number.isFinite(rate) && (rate as number) > 0
     ? Math.min(1, rate as number)
     : 1;
   return vol * rateClamped;
 }
+
 
 export function simulateBrokerExecution(
   initial: SimState,
