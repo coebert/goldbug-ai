@@ -25,6 +25,10 @@ import {
   type TradeRow,
   type BacktestMetrics,
 } from "./backtest-metrics";
+import {
+  estimateSpreadSlippage,
+  type SpreadSlippageBreakdown,
+} from "./spread-slippage";
 
 /** Broker decision annotated with the trading date it is applied on. */
 export type DatedDecision = SimDecision & {
@@ -80,6 +84,15 @@ export type ExecutionSeriesPoint = {
   /** Notional-weighted liquidity-adjusted slippage, bps. `null` when the
    *  fill was unconstrained (no volume) or unfilled. */
   liquidityAdjustedSlippageBps: number | null;
+  /** Filled notional in trade currency across all slices (0 if unfilled). */
+  filledNotional: number;
+  /**
+   * Per-side execution cost decomposition (bps of mid) from the
+   * microstructure model — lets the UI attribute costs to spread,
+   * latency, market impact, and urgency for this parent decision.
+   * `null` for unfilled orders or when the model cannot be evaluated.
+   */
+  costBreakdownBps: SpreadSlippageBreakdown | null;
 };
 
 export type ScenarioReport = {
@@ -267,6 +280,28 @@ export function computeExecutionSeries(
         liqDen += w;
       }
     }
+    const filledNotional = slipDen;
+    // Attribute per-side cost (bps of mid) to spread / latency / impact /
+    // urgency using the microstructure model. We supply the decision's
+    // requested notional and, when available, an ADV$ proxy from
+    // `availableVolume × price`. AssetClass/ATR/currency are unknown at
+    // this layer so we rely on the model's asset-class-agnostic defaults.
+    let costBreakdownBps: SpreadSlippageBreakdown | null = null;
+    if (fillRatio > 0 && d.price > 0 && d.quantity > 0) {
+      const notional = d.quantity * d.price;
+      const adv20d = d.availableVolume && d.availableVolume > 0
+        ? d.availableVolume * d.price
+        : null;
+      try {
+        costBreakdownBps = estimateSpreadSlippage({
+          notional,
+          adv20d,
+          urgency: "normal",
+        });
+      } catch {
+        costBreakdownBps = null;
+      }
+    }
     return {
       date: d.date,
       decisionId: d.id,
@@ -275,6 +310,8 @@ export function computeExecutionSeries(
       fillRatio,
       slippageBps: slipDen > 0 ? slipNum / slipDen : null,
       liquidityAdjustedSlippageBps: liqDen > 0 ? liqNum / liqDen : null,
+      filledNotional,
+      costBreakdownBps,
     };
   });
 }
