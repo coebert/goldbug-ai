@@ -71,9 +71,10 @@ describe("assertNoFlowLeakage: withdrawal-only day fixtures", () => {
       pnl: 0,
       override: { pnl: -1_000, pct: -20 }, // withdrawal wrongly booked as loss
     });
-    expect(() => assertNoFlowLeakage([bad], "regr")).toThrow(
-      /leaked into pnl\/pct|pct drift/,
-    );
+    // pnl=-1000, netFlow=-1000, rawDelta=-1000 → arithmetic identity
+    // breaks (pnl+netFlow=-2000 ≠ rawDelta), so the guard fires on the
+    // arithmetic branch rather than the pct-drift branch.
+    expect(() => assertNoFlowLeakage([bad], "regr")).toThrow(/flow leak/);
   });
 
   it("throws when a withdrawal-only day reports non-zero pct but zero pnl", () => {
