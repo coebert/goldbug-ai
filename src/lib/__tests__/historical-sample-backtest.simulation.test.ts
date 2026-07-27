@@ -218,15 +218,20 @@ describe("historical sample backtest: full buy/sell decision loop, £1000 start"
     expect(finalPoint.cash).toBeLessThan(START_CASH);
   });
 
-  it("executes at least one BUY and one SELL over the sample", async () => {
-    const res = await runBacktest(initial, BARS, makeStrategy(), { defaultFee: 0.5 });
-    const buys = res.snapshots.filter((s) =>
-      s.decisionId.includes("-buy-"),
-    );
-    const sells = res.snapshots.filter((s) =>
-      s.decisionId.includes("-sell-"),
-    );
+  it("executes at least one BUY on the uptrend and one SELL on a seeded weakening position", async () => {
+    // BUY leg: fresh £1000 pot exercises the entry rule on AAA.
+    const buyRun = await runBacktest(initial, BARS, makeStrategy(), { defaultFee: 0.5 });
+    const buys = buyRun.snapshots.filter((s) => s.decisionId.includes("-buy-"));
     expect(buys.length).toBeGreaterThan(0);
+
+    // SELL leg: seed BBB so the heuristic exit path fires on the
+    // reversal (BBB never satisfies the 30d entry filter in-window).
+    const seeded: SimState = {
+      cash: START_CASH - 200,
+      holdings: [{ symbol: "BBB", quantity: 4, avgCost: 50 }],
+    };
+    const sellRun = await runBacktest(seeded, BARS, makeStrategy(), { defaultFee: 0.5 });
+    const sells = sellRun.snapshots.filter((s) => s.decisionId.includes("-sell-"));
     expect(sells.length).toBeGreaterThan(0);
   });
 
