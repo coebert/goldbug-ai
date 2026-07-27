@@ -89,7 +89,6 @@ describe("execution-invariants — detects hand-crafted violations", () => {
   });
 
 
-  });
 
   it("flags negative cash (borrowing)", () => {
     const report = checkExecutionInvariants({
