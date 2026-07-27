@@ -1,7 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
+import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Holding = {
   id: string;
@@ -160,26 +166,71 @@ export function LiveHoldingsCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border bg-muted/30 p-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground sm:text-xs">
-              <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Invested
+        <TooltipProvider delayDuration={150}>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground sm:text-xs">
+                <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Invested
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What Invested includes"
+                      className="inline-flex text-muted-foreground/70 hover:text-foreground"
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[260px] text-xs leading-snug">
+                    <div className="font-medium">Market value of open positions</div>
+                    <div className="mt-1 text-muted-foreground">
+                      Includes: quantity × current price for every holding, normalised to the
+                      portfolio's base currency (FX / GBX-adjusted).
+                    </div>
+                    <div className="mt-1 text-muted-foreground">
+                      Excludes: cash, pending orders, and any deposits still sitting as cash.
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(holdingsValue)}</div>
+              <div className="text-[10px] text-muted-foreground sm:text-[11px]">
+                {denom > 0 ? `${(100 - cashPct).toFixed(0)}% of portfolio` : "—"}
+              </div>
             </div>
-            <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(holdingsValue)}</div>
-            <div className="text-[10px] text-muted-foreground sm:text-[11px]">
-              {denom > 0 ? `${(100 - cashPct).toFixed(0)}% of portfolio` : "—"}
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground sm:text-xs">
+                <Wallet className="h-3.5 w-3.5 shrink-0" /> Cash
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What Cash includes"
+                      className="inline-flex text-muted-foreground/70 hover:text-foreground"
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[260px] text-xs leading-snug">
+                    <div className="font-medium">Uninvested balance</div>
+                    <div className="mt-1 text-muted-foreground">
+                      Includes: settled cash from deposits, sale proceeds, dividends, and
+                      interest, converted to base currency.
+                    </div>
+                    <div className="mt-1 text-muted-foreground">
+                      Excludes: cash reserved by working orders and the market value of open
+                      positions.
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(cash)}</div>
+              <div className="text-[10px] text-muted-foreground sm:text-[11px]">
+                {denom > 0 ? `${cashPct.toFixed(0)}% of portfolio` : "—"}
+              </div>
             </div>
           </div>
-          <div className="rounded-lg border bg-muted/30 p-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground sm:text-xs">
-              <Wallet className="h-3.5 w-3.5 shrink-0" /> Cash
-            </div>
-            <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(cash)}</div>
-            <div className="text-[10px] text-muted-foreground sm:text-[11px]">
-              {denom > 0 ? `${cashPct.toFixed(0)}% of portfolio` : "—"}
-            </div>
-          </div>
-        </div>
+        </TooltipProvider>
 
         {showMultiCcy && (
           <div className="rounded-lg border bg-muted/20 p-3">
