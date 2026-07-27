@@ -42,6 +42,15 @@ export type SimDecision = {
   price: number;
   /** Optional fixed fee (currency units, >= 0). */
   fee?: number;
+  /**
+   * Optional per-decision override of the available market volume
+   * (shares/units) that can fill this order. Takes precedence over
+   * `options.liquidity.availableVolume[symbol]`. When present alongside
+   * `options.liquidity.maxParticipationRate`, the fill is capped at
+   * `availableVolume * maxParticipationRate` (participation applies to
+   * ADV-like volumes, not to a size someone else has already sized down).
+   */
+  availableVolume?: number;
 };
 
 export type SimHolding = {
