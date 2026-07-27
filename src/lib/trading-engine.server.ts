@@ -274,6 +274,9 @@ export async function callAiForDecision(args: {
   fxUserBlock?: string | null;
   alphaPriors?: string | null;
   cryptoSignalsBlock?: string | null;
+  algoRegimeBlock?: string | null;
+
+
 
 }): Promise<DecisionOutput> {
 
