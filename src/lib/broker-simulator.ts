@@ -982,12 +982,7 @@ export function buildExecutionQualityReport(
     partSum: 0, partCount: 0,
   });
   const bySymbolRaw = new Map<string, Bucket>();
-  const symbolOf = (s: SimSnapshot): string =>
-    // decisionId includes the symbol only indirectly; fall back to holdings
-    // change is ambiguous, so read symbol off any matching holding entry.
-    // In practice callers rely on the snapshot ordering, so we recover the
-    // symbol via a scan of the holdings list at that step.
-    s.holdings.find((h) => h.quantity > 0)?.symbol ?? "__unknown__";
+
 
   for (const s of snapshots) {
     const isParent = (s.sliceIndex ?? 0) === 0;
