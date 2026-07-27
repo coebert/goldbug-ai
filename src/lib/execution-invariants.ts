@@ -162,12 +162,11 @@ export function checkExecutionInvariants(args: {
     let derived = 0;
     for (const h of s.holdings) {
       const mark = markPrices?.[h.symbol];
-      const price =
-        isFiniteNum(mark) && mark > 0
-          ? mark
-          : isFiniteNum(h.avgCost) && h.avgCost > 0
-            ? h.avgCost
-            : 0;
+      // Mirror simulator's markToMarket exactly: mark wins when
+      // provided (even if <=0 → clamped to 0); otherwise avgCost;
+      // then clamp non-positive/non-finite to 0.
+      const raw = isFiniteNum(mark) ? mark : h.avgCost;
+      const price = isFiniteNum(raw) && raw > 0 ? raw : 0;
       derived += h.quantity * price;
     }
     // Tolerate a wider band here since marks may include the fill
