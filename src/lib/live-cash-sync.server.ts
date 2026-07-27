@@ -292,7 +292,7 @@ export async function syncLiveCashFromBroker(
   // to (cash + latest snapshot's holdings_value) means a CASH_SYNC that
   // happens between a fill and the next HOLDINGS_SYNC leaves holdings stale
   // and understates total equity (see 2026-07-27 08:00 CASH_SYNC incident).
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso;
   let holdingsValueForSnapshot: number;
   if (brokerTotalValue != null && brokerTotalValue > 0) {
     holdingsValueForSnapshot = Math.max(0, brokerTotalValue - brokerCash);
