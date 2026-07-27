@@ -63,11 +63,20 @@ function formatPct(v: number) {
   return `${sign}${Math.abs(v).toFixed(2)}%`;
 }
 
+// Vivid, semantically meaningful palette (independent of theme chart vars
+// which may render near-black in some themes).
 const COLORS: Record<string, string> = {
-  deposits: "hsl(var(--chart-1, 214 90% 52%))",
-  withdrawals: "hsl(var(--chart-2, 20 90% 55%))",
-  tradingPnl: "hsl(var(--chart-3, 142 70% 45%))",
-  feesDivInterest: "hsl(var(--chart-4, 260 60% 60%))",
+  deposits: "#3b82f6", // blue — money in
+  withdrawals: "#f97316", // orange — money out
+  tradingPnl: "#10b981", // emerald — trading performance
+  feesDivInterest: "#a855f7", // violet — inferred fees/divs/interest
+};
+
+const SHORT_LABELS: Record<string, string> = {
+  deposits: "Deposits",
+  withdrawals: "Withdrawals",
+  tradingPnl: "Trading",
+  feesDivInterest: "Fees / Div",
 };
 
 export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props) {
