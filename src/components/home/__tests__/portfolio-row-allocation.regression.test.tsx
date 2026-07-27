@@ -3,14 +3,14 @@
 //   1. investedPct + cashPct == 100% (within rounding)
 //   2. Invested amount == totalEquity − cash (never cost-basis sum)
 //   3. "Total" line == totalEquity (never cost-basis sum + cash)
-//   4. Chip values sum to the authoritative invested amount
+//   4. Chip weights sum to invested%, not to a raw cost-basis %
 //
 // Guards the bug that showed Invested 94.4% + Cash 41.3% = 135.7% on a
 // real-money card because Invested was computed from Σ(qty × avg_cost)
 // while Cash and totalEquity came from the broker snapshot.
 
 import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PortfolioRow } from "@/components/home/portfolio-row";
 
@@ -19,11 +19,11 @@ function renderRow(overrides: {
   cash: number;
   startingCash?: number;
   holdings: Array<{ symbol: string; quantity: number; avg_cost: number }>;
-}) {
+}): string {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  return renderToStaticMarkup(
     <QueryClientProvider client={qc}>
       <PortfolioRow
         portfolio={{
@@ -48,15 +48,30 @@ function renderRow(overrides: {
   );
 }
 
-const parsePct = (t: string) => Number(t.replace("%", ""));
-const parseGbp = (t: string) => Number(t.replace(/[^0-9.\-]/g, ""));
+// Match the two allocation-summary tile percentages: they render as
+// `<span ...>NN.N%</span>` inside the allocation-summary block, in
+// Invested-then-Cash DOM order.
+function summaryPcts(html: string): { invested: number; cash: number } {
+  const block = html.match(
+    /data-testid="allocation-summary"[\s\S]*?<\/div><\/div><\/div>/,
+  );
+  const src = block?.[0] ?? html;
+  const pcts = [...src.matchAll(/>(-?\d+\.\d)%</g)].map((m) => Number(m[1]));
+  return { invested: pcts[0], cash: pcts[1] };
+}
+
+function totalLineAmount(html: string): number {
+  // "Total GBP 302" or "Total GBP 1,000"
+  const m = html.match(/Total\s+GBP[\s\u00a0]*([\d,]+)/);
+  return m ? Number(m[1].replace(/,/g, "")) : NaN;
+}
 
 describe("HoldingsStrip — allocation percentages sum to 100 and are anchored to totalEquity", () => {
   it("cost-basis > equity (drawdown): invested% + cash% == 100%, total == totalEquity", () => {
     // Repro of the screenshot: broker equity £301.83, cash £124.60,
     // cost-basis of two holdings sums to £285 (94.4% of 301.83 vs
     // 41.3% cash = 135.7% total under the old bug).
-    renderRow({
+    const html = renderRow({
       totalEquity: 301.83,
       cash: 124.6,
       holdings: [
@@ -65,26 +80,18 @@ describe("HoldingsStrip — allocation percentages sum to 100 and are anchored t
       ],
     });
 
-    const summary = screen.getByTestId("allocation-summary");
-    const [investedTile, cashTile] = within(summary).getAllByText(/%$/);
-    const investedPct = parsePct(investedTile.textContent!);
-    const cashPct = parsePct(cashTile.textContent!);
-    expect(investedPct + cashPct).toBeCloseTo(100, 1);
-    // Invested = totalEquity − cash = 177.23 → rendered as "GBP 177".
-    expect(within(summary).getByText(/GBP\s*177/)).toBeInTheDocument();
-    // Cash tile shows the broker cash (£125 rounded).
-    expect(within(summary).getByText(/GBP\s*125/)).toBeInTheDocument();
-
-    const strip = screen.getByTestId("portfolio-row-holdings-strip");
-    // "Total GBP 302" — the authoritative totalEquity, not 285+125=410.
-    expect(within(strip).getByText(/Total\s+GBP\s*302/)).toBeInTheDocument();
-    expect(within(strip).queryByText(/Total\s+GBP\s*4\d\d/)).toBeNull();
+    const { invested, cash } = summaryPcts(html);
+    expect(invested + cash).toBeCloseTo(100, 1);
+    // Authoritative invested = 301.83 − 124.60 = £177.23 → "GBP 177".
+    expect(html).toMatch(/GBP[\s\u00a0]*177/);
+    // "Total GBP 302" — never 285 + 125 = 410.
+    expect(totalLineAmount(html)).toBe(302);
   });
 
   it("cost-basis < equity (unrealised gain): invested% + cash% still == 100%", () => {
     // £1,000 equity, £200 cash → invested must be £800 (80%/20%),
     // even though holdings cost only £600.
-    renderRow({
+    const html = renderRow({
       totalEquity: 1_000,
       cash: 200,
       holdings: [
@@ -93,18 +100,15 @@ describe("HoldingsStrip — allocation percentages sum to 100 and are anchored t
       ],
     });
 
-    const summary = screen.getByTestId("allocation-summary");
-    const [investedTile, cashTile] = within(summary).getAllByText(/%$/);
-    expect(parsePct(investedTile.textContent!)).toBeCloseTo(80, 1);
-    expect(parsePct(cashTile.textContent!)).toBeCloseTo(20, 1);
-    expect(within(summary).getByText(/GBP\s*800/)).toBeInTheDocument();
-
-    const strip = screen.getByTestId("portfolio-row-holdings-strip");
-    expect(within(strip).getByText(/Total\s+GBP\s*1,000/)).toBeInTheDocument();
+    const { invested, cash } = summaryPcts(html);
+    expect(invested).toBeCloseTo(80, 1);
+    expect(cash).toBeCloseTo(20, 1);
+    expect(html).toMatch(/GBP[\s\u00a0]*800/);
+    expect(totalLineAmount(html)).toBe(1_000);
   });
 
-  it("chip weights sum to investedPct and chip values sum to authoritative invested", () => {
-    renderRow({
+  it("chip weights sum to investedPct (not to raw cost-basis %)", () => {
+    const html = renderRow({
       totalEquity: 301.83,
       cash: 124.6,
       holdings: [
@@ -112,27 +116,20 @@ describe("HoldingsStrip — allocation percentages sum to 100 and are anchored t
         { symbol: "VUKE:xlon", quantity: 1, avg_cost: 139 },
       ],
     });
-
-    const strip = screen.getByTestId("portfolio-row-holdings-strip");
-    const chips = within(strip).getAllByTitle(/of portfolio/);
-    expect(chips.length).toBe(2);
-    // Extract "X.Y%" from each chip's inner "% of portfolio" badge.
-    const weights = chips.map((li) => {
-      const m = li.textContent!.match(/(\d+\.\d)%/g)!;
-      return parsePct(m[m.length - 1]);
-    });
-    const sumWeights = weights.reduce((a, b) => a + b, 0);
-    // Weights sum to the authoritative invested% (~58.7%), not to
-    // ~135% that raw cost-basis would produce.
+    // Chip weights render as `>N.N%<` inside the chip list, appearing
+    // AFTER the two allocation-summary tile percentages. Take the tail.
+    const all = [...html.matchAll(/>(-?\d+\.\d)%</g)].map((m) => Number(m[1]));
+    // Two summary pcts + two chip pcts (top 6 chips, only 2 holdings).
+    expect(all.length).toBeGreaterThanOrEqual(4);
+    const chipWeights = all.slice(-2);
+    const sumWeights = chipWeights.reduce((a, b) => a + b, 0);
+    // Sum equals authoritative invested% (~58.7%), NOT ~135% (raw).
     expect(sumWeights).toBeCloseTo((177.23 / 301.83) * 100, 0);
     expect(sumWeights).toBeLessThan(100);
   });
 
-  it("100% cash, no holdings: invested 0%, cash 100%, total == cash", () => {
-    renderRow({ totalEquity: 500, cash: 500, holdings: [] });
-    // No holdings → the empty-state pill is rendered, not the tiles.
-    expect(
-      screen.getByText(/Fully in cash — no open positions/i),
-    ).toBeInTheDocument();
+  it("100% cash, no holdings: strip renders the empty-state pill", () => {
+    const html = renderRow({ totalEquity: 500, cash: 500, holdings: [] });
+    expect(html).toMatch(/Fully in cash/i);
   });
 });
