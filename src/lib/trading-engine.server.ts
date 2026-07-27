@@ -67,6 +67,7 @@ import {
   tightenForRegime,
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
+import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
