@@ -116,10 +116,18 @@ describe("deriveStripAllocation — allocation is anchored to totalEquity", () =
         expect(a.cashPct).toBeLessThanOrEqual(100 + 1e-9);
       }
       // Chip values sum to investedValue; chip weights sum to investedPct.
+      // When there are no holdings (rawInvested == 0), chips carry 0 —
+      // any residual invested amount is only representable as "unknown
+      // holdings" and isn't split across chips.
       const chipSum = a.chips.reduce((s, c) => s + c.value, 0);
       const weightSum = a.chips.reduce((s, c) => s + c.weight, 0);
-      expect(chipSum).toBeCloseTo(a.investedValue, 6);
-      expect(weightSum).toBeCloseTo(a.investedPct, 6);
+      if (a.rawInvested > 0) {
+        expect(chipSum).toBeCloseTo(a.investedValue, 6);
+        expect(weightSum).toBeCloseTo(a.investedPct, 6);
+      } else {
+        expect(chipSum).toBe(0);
+        expect(weightSum).toBe(0);
+      }
     }
   });
 });
