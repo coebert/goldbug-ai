@@ -396,8 +396,26 @@ function SaxoStatusPage() {
 
         {q.data && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <EnvCard env="sim" status={q.data.sim} onConnect={() => onConnect("sim")} connecting={false} />
-            <EnvCard env="live" status={q.data.live} onConnect={() => onConnect("live")} connecting={false} />
+            <EnvCard
+              env="sim"
+              status={q.data.sim}
+              onConnect={() => onConnect("sim")}
+              connecting={false}
+              onSyncBalance={() => syncMut.mutate("sim")}
+              syncing={isSyncing("sim")}
+              lastSync={lastSync.sim}
+              syncError={syncErr.sim}
+            />
+            <EnvCard
+              env="live"
+              status={q.data.live}
+              onConnect={() => onConnect("live")}
+              connecting={false}
+              onSyncBalance={() => syncMut.mutate("live")}
+              syncing={isSyncing("live")}
+              lastSync={lastSync.live}
+              syncError={syncErr.live}
+            />
           </div>
         )}
 
