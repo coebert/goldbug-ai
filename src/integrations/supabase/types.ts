@@ -114,6 +114,41 @@ export type Database = {
           },
         ]
       }
+      algo_regime_config_overrides: {
+        Row: {
+          config: Json
+          created_at: string
+          notes: string | null
+          portfolio_id: string
+          tuned_at: string
+          updated_at: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          notes?: string | null
+          portfolio_id: string
+          tuned_at?: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          notes?: string | null
+          portfolio_id?: string
+          tuned_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "algo_regime_config_overrides_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: true
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backtest_runs: {
         Row: {
           created_at: string
