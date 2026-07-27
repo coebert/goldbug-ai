@@ -165,6 +165,32 @@ export type SimulateOptions = {
    * existing callers/tests are unaffected.
    */
   frictions?: Frictions;
+  /**
+   * Optional liquidity / market-volume constraint. Applied BEFORE the
+   * cash and position truncation checks — fills are first capped at
+   * whatever the market can actually absorb, then further truncated if
+   * cash (BUY) or held position (SELL) is insufficient.
+   *
+   *  - availableVolume[symbol]    hard cap on units filled for that symbol
+   *                               this step. Per-decision `availableVolume`
+   *                               overrides this on a given decision.
+   *  - maxParticipationRate       fraction in (0,1] limiting the fill to
+   *                               that share of the available volume
+   *                               (proxies "don't be more than X% of ADV").
+   *                               Defaults to 1 (whole book fillable).
+   *  - minFillQuantity            if the post-cap fill is below this floor
+   *                               the step is rejected as "no_liquidity"
+   *                               instead of producing a dust partial.
+   *                               Defaults to 0 (any positive fill accepted).
+   *
+   * When neither map nor per-decision `availableVolume` is set, the
+   * symbol is treated as unconstrained (byte-identical to prior behaviour).
+   */
+  liquidity?: {
+    availableVolume?: Record<string, number>;
+    maxParticipationRate?: number;
+    minFillQuantity?: number;
+  };
 };
 
 export type SimulateResult = {
