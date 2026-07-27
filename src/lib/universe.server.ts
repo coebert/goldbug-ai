@@ -313,10 +313,12 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   if (r.execution_params && typeof r.execution_params === "object") {
     const e = r.execution_params as Record<string, unknown>;
     const ep: Partial<ExecutionParamsConfig> = {};
-    const num = (k: keyof ExecutionParamsConfig, min: number, max: number) => {
+    type NumericParamKey = Exclude<keyof ExecutionParamsConfig, "microstructure">;
+    const num = (k: NumericParamKey, min: number, max: number) => {
       const n = Number(e[k]);
       if (Number.isFinite(n)) ep[k] = Math.max(min, Math.min(max, n));
     };
+
     num("slippage_bps", 0, 500);
     num("commission_bps", 0, 500);
     num("spread_atr_frac", 0, 2);
