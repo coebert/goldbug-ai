@@ -3,15 +3,32 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Gauge, Wand2 } from "lucide-react";
+import { Gauge, Wand2, Undo2, ShieldCheck } from "lucide-react";
 import { getAlgoRegimeCalibration } from "@/lib/algo-regime-calibration.functions";
 import { autoTuneAlgoRegime, type AutoTuneResponse } from "@/lib/algo-regime-autotune.functions";
+import {
+  applyAlgoRegimeTuneWithShadow,
+  listAlgoRegimeTuneHistory,
+  rollbackAlgoRegimeTune,
+  evaluateAlgoRegimeShadow,
+} from "@/lib/algo-regime-scheduled-autotune.functions";
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "text-amber-500",
+  accepted: "text-emerald-500",
+  rolled_back: "text-red-500",
+  superseded: "text-muted-foreground",
+};
 
 export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string }) {
   const fetchCal = useServerFn(getAlgoRegimeCalibration);
   const tuneFn = useServerFn(autoTuneAlgoRegime);
+  const applyShadowFn = useServerFn(applyAlgoRegimeTuneWithShadow);
+  const evalShadowFn = useServerFn(evaluateAlgoRegimeShadow);
+  const rollbackFn = useServerFn(rollbackAlgoRegimeTune);
+  const listHistoryFn = useServerFn(listAlgoRegimeTuneHistory);
   const qc = useQueryClient();
   const [lastTune, setLastTune] = useState<AutoTuneResponse | null>(null);
   const { data, isLoading, error } = useQuery({
@@ -20,13 +37,40 @@ export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string
     refetchInterval: 5 * 60_000,
   });
 
+  const history = useQuery({
+    queryKey: ["algo-regime-tune-history", portfolioId],
+    queryFn: () => listHistoryFn({ data: { portfolioId, limit: 20 } }),
+    refetchInterval: 5 * 60_000,
+  });
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["algo-regime-calibration", portfolioId] });
+    qc.invalidateQueries({ queryKey: ["algo-regime-tune-history", portfolioId] });
+  };
+
   const tune = useMutation({
     mutationFn: (dryRun: boolean) => tuneFn({ data: { portfolioId, dryRun } }),
     onSuccess: (r) => {
       setLastTune(r);
-      if (r.persisted) qc.invalidateQueries({ queryKey: ["algo-regime-calibration", portfolioId] });
+      if (r.persisted) invalidateAll();
     },
   });
+
+  const applyShadow = useMutation({
+    mutationFn: () => applyShadowFn({ data: { portfolioId, dryRun: false } }),
+    onSuccess: () => invalidateAll(),
+  });
+
+  const evalShadow = useMutation({
+    mutationFn: () => evalShadowFn({ data: { portfolioId, windowDays: 7 } }),
+    onSuccess: () => invalidateAll(),
+  });
+
+  const rollback = useMutation({
+    mutationFn: (historyId: string) => rollbackFn({ data: { portfolioId, historyId } }),
+    onSuccess: () => invalidateAll(),
+  });
+
 
   return (
     <Card>
