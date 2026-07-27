@@ -358,7 +358,7 @@ export async function syncLiveCashFromBroker(
       delta,
       newCash: brokerCash,
       newStarting,
-      startingCashAdjusted: canTreatDriftAsDeposit,
+      startingCashAdjusted: startingCashActuallyChanged,
       currency,
     }),
     error: upd.error?.message ?? null,
