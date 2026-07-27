@@ -12,6 +12,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   detectAlgoRegime,
+  type AlgoRegimeConfig,
   type AlgoRegimeSnapshot,
   type BarSeries,
 } from "./algo-regime";
@@ -53,7 +54,26 @@ export type BuildAlgoRegimeInputs = {
   benchSymbol?: string;
   /** Days of history to pull. Detectors need ≥ 30 for whipsaw / vol baseline. */
   lookbackDays?: number;
+  /**
+   * Portfolio id — used to look up an auto-tuned config override in
+   * `algo_regime_config_overrides`. Omit for a global/default snapshot.
+   */
+  portfolioId?: string;
 };
+
+async function loadConfigOverride(
+  portfolioId: string | undefined,
+): Promise<Partial<AlgoRegimeConfig> | undefined> {
+  if (!portfolioId) return undefined;
+  const { data, error } = await supabaseAdmin
+    .from("algo_regime_config_overrides")
+    .select("config")
+    .eq("portfolio_id", portfolioId)
+    .maybeSingle();
+  if (error || !data) return undefined;
+  const cfg = data.config as Partial<AlgoRegimeConfig> | null;
+  return cfg && typeof cfg === "object" ? cfg : undefined;
+}
 
 /**
  * Build an `AlgoRegimeSnapshot` from `price_cache` for the given portfolio
