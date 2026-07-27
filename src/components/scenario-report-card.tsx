@@ -219,6 +219,182 @@ export function ScenarioReportCard(props: {
   );
 }
 
+/**
+ * Execution-quality dashboard: two overlaid charts plotted against the
+ * per-decision execution timeline (decision index on the x-axis so
+ * multiple orders on the same date remain distinguishable).
+ *   1. Fill ratio per decision, per scenario (0..1).
+ *   2. Liquidity-adjusted slippage in bps per decision, per scenario.
+ * Points where the metric is unavailable (unfilled / unconstrained
+ * book) are skipped by supplying `null`, which Recharts renders as a
+ * gap in that scenario's line rather than a zero.
+ */
+function ExecutionQualitySection(props: {
+  reports: ScenarioReport[];
+  visible: Record<string, boolean>;
+}) {
+  const { reports, visible } = props;
+  const fillData = useMemo(
+    () => buildExecutionChartData(reports, (p) => p.fillRatio),
+    [reports],
+  );
+  const liqSlipData = useMemo(
+    () => buildExecutionChartData(
+      reports, (p) => p.liquidityAdjustedSlippageBps,
+    ),
+    [reports],
+  );
+  const anyDecisions = fillData.length > 0;
+  if (!anyDecisions) return null;
+
+  return (
+    <>
+      <section>
+        <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+          Fill ratio per decision
+        </h3>
+        <div className="h-56 w-full">
+          <ResponsiveContainer>
+            <LineChart data={fillData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10 }}
+                minTickGap={16}
+              />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                domain={[0, 1]}
+                tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
+              />
+              <Tooltip
+                formatter={(v: number) => `${(v * 100).toFixed(1)}%`}
+                labelFormatter={(l) => `Decision: ${l}`}
+              />
+              <Legend />
+              {reports.map((r, i) => visible[r.id] && (
+                <Line
+                  key={r.id}
+                  type="monotone"
+                  dataKey={r.id}
+                  name={r.label}
+                  stroke={PALETTE[i % PALETTE.length]}
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+          Liquidity-adjusted slippage per decision (bps)
+        </h3>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Adverse slippage in basis points, normalised by the fraction of
+          available liquidity consumed. Positive = costlier fills. Gaps
+          indicate an unconstrained book or unfilled order.
+        </p>
+        <div className="h-56 w-full">
+          <ResponsiveContainer>
+            <LineChart data={liqSlipData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10 }}
+                minTickGap={16}
+              />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v) => `${Number(v).toFixed(0)}`}
+              />
+              <Tooltip
+                formatter={(v: number) => `${v.toFixed(2)} bps`}
+                labelFormatter={(l) => `Decision: ${l}`}
+              />
+              <Legend />
+              {reports.map((r, i) => visible[r.id] && (
+                <Line
+                  key={r.id}
+                  type="monotone"
+                  dataKey={r.id}
+                  name={r.label}
+                  stroke={PALETTE[i % PALETTE.length]}
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/**
+ * Build a row-per-decision dataset for the execution charts. The x-axis
+ * key `label` uniquely identifies each decision (`date · SYMBOL SIDE`)
+ * so multiple orders on the same date don't collapse into one x-value.
+ * The decision universe is the UNION across scenarios, ordered by the
+ * first scenario's `executionSeries` (decisions are input-order stable
+ * across scenarios in practice, but we defensively support gaps).
+ */
+function buildExecutionChartData(
+  reports: ScenarioReport[],
+  pick: (p: ScenarioReport["executionSeries"][number]) => number | null,
+): Array<Record<string, string | number | null>> {
+  if (reports.length === 0) return [];
+  // Preserve decision order by walking the longest series; then union
+  // in any decisionIds unique to shorter/differently-ordered series.
+  const orderRef = reports.reduce(
+    (best, r) => r.executionSeries.length > best.length ? r.executionSeries : best,
+    reports[0].executionSeries,
+  );
+  const seen = new Set<string>();
+  const orderedIds: string[] = [];
+  const labelFor = new Map<string, string>();
+  for (const p of orderRef) {
+    if (!seen.has(p.decisionId)) {
+      seen.add(p.decisionId);
+      orderedIds.push(p.decisionId);
+      labelFor.set(p.decisionId, `${p.date} · ${p.symbol} ${p.side}`);
+    }
+  }
+  for (const r of reports) {
+    for (const p of r.executionSeries) {
+      if (!seen.has(p.decisionId)) {
+        seen.add(p.decisionId);
+        orderedIds.push(p.decisionId);
+        labelFor.set(p.decisionId, `${p.date} · ${p.symbol} ${p.side}`);
+      }
+    }
+  }
+  const perScenarioById = reports.map((r) => {
+    const m = new Map<string, ScenarioReport["executionSeries"][number]>();
+    for (const p of r.executionSeries) m.set(p.decisionId, p);
+    return { id: r.id, m };
+  });
+  return orderedIds.map((decisionId) => {
+    const row: Record<string, string | number | null> = {
+      label: labelFor.get(decisionId) ?? decisionId,
+    };
+    for (const s of perScenarioById) {
+      const p = s.m.get(decisionId);
+      row[s.id] = p ? pick(p) : null;
+    }
+    return row;
+  });
+}
+
+
+
 function ScenarioLegend(props: {
   reports: ScenarioReport[];
   visible: Record<string, boolean>;
