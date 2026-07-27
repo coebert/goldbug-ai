@@ -284,11 +284,67 @@ export type SimulateOptions = {
   timeSliceMaxAttempts?: number;
 };
 
+/**
+ * Aggregate execution-quality diagnostics. Cheap to derive from the
+ * per-snapshot data but pre-computed here so downstream evaluators
+ * (backtests, live executor, tests) don't have to re-implement the
+ * weighting every time. All slippage figures are notional-weighted
+ * (fillQuantity * expectedPrice) so a tiny partial fill can't skew
+ * the summary against a large well-executed one.
+ */
+export type ExecutionQualityReport = {
+  /** Number of decisions submitted (before slicing / rejection). */
+  decisionCount: number;
+  /** Sum of every snapshot's `requestedQuantity` (excludes slices). */
+  totalRequested: number;
+  /** Sum of every snapshot's `fillQuantity` (includes slice fills). */
+  totalFilled: number;
+  /** `totalFilled / totalRequested`, clamped to `[0, 1]`. `1` when no requests. */
+  fillRatio: number;
+  fullyFilledCount: number;
+  partialFillCount: number;
+  rejectionCount: number;
+  /** Count of rejections keyed by `SimRejection.reason`. */
+  rejectionsByReason: Record<SimRejection["reason"], number>;
+  /**
+   * Notional-weighted average signed slippage in bps across every
+   * snapshot with a positive fill. Positive = adverse to the trader.
+   */
+  weightedAvgSlippageBps: number;
+  /**
+   * Notional-weighted average of `liquidityAdjustedSlippageBps`
+   * across snapshots where it was defined. `null` when nothing in
+   * the run had a measurable liquidity constraint.
+   */
+  weightedAvgLiquidityAdjustedSlippageBps: number | null;
+  /**
+   * Simple mean of `participationRate` across snapshots where it
+   * was defined. `null` when no fill touched a constrained book.
+   */
+  avgParticipationRate: number | null;
+  /**
+   * Per-symbol drill-down using the same weighting rules as the top
+   * level. Keys are the raw `symbol` strings from the decisions.
+   */
+  bySymbol: Record<string, {
+    requested: number;
+    filled: number;
+    fillRatio: number;
+    weightedAvgSlippageBps: number;
+    weightedAvgLiquidityAdjustedSlippageBps: number | null;
+    avgParticipationRate: number | null;
+    fillCount: number;
+  }>;
+};
+
 export type SimulateResult = {
   finalState: SimState;
   snapshots: SimSnapshot[];
   rejections: SimRejection[];
+  /** Aggregate diagnostics — see `ExecutionQualityReport`. */
+  executionQuality: ExecutionQualityReport;
 };
+
 
 // ---------------------------------------------------------------------------
 
