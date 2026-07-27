@@ -51,14 +51,22 @@ function pricePath(bars: number, fn: (i: number) => number): number[] {
   return Array.from({ length: bars }, (_, i) => Number(fn(i).toFixed(4)));
 }
 
-const AAA = pricePath(40, (i) => 100 * (1 + 0.01 * i)); // linear +1%/bar
+// Micro-oscillation makes RSI a real signal instead of pinning it at
+// 100 on strictly monotonic paths — closer to how live prices look
+// and, crucially, keeps the heuristic sell's `RSI>=75` rule from
+// spuriously exiting an otherwise-healthy uptrend.
+const wiggle = (i: number, amp: number) => 1 + amp * Math.sin(i * 1.7);
+
+const AAA = pricePath(40, (i) => 100 * (1 + 0.01 * i) * wiggle(i, 0.01)); // ~+1%/bar drift, ±1% noise
 const BBB = pricePath(40, (i) => {
   const peak = 20;
-  if (i <= peak) return 50 * (1 + 0.02 * i);        // up to 70
-  const j = i - peak;
-  return 70 * (1 - 0.025 * j);                       // fades ~-2.5%/bar
+  const base =
+    i <= peak
+      ? 50 * (1 + 0.02 * i)             // up to ~70
+      : 70 * (1 - 0.025 * (i - peak));  // fades ~-2.5%/bar
+  return base * wiggle(i, 0.01);
 });
-const CCC = pricePath(40, (i) => 80 * Math.pow(0.985, i)); // steady bleed
+const CCC = pricePath(40, (i) => 80 * Math.pow(0.985, i) * wiggle(i, 0.005)); // steady bleed
 
 const BARS: BacktestBar[] = DATES.map((date, i) => ({
   date,
