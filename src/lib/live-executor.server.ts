@@ -50,8 +50,16 @@ export async function routeOrdersToBroker(params: {
   asOf: string;
   decisionId: string | null;
   executed: ExecutedOrderLike[];
+  /**
+   * Phase B — optional algo-regime snapshot. When
+   * `multipliers.blockNewBuys` is true every BUY in `executed` is
+   * pre-skipped (SELLs still route) and the block is logged to
+   * live_broker_log with method `PRE_PLACE_ALGO_REGIME_BLOCK`. Omit for
+   * the legacy path.
+   */
+  algoRegime?: import("./microstructure/algo-regime").AlgoRegimeSnapshot | null;
 }): Promise<RouteResult[]> {
-  const { portfolio, userId, asOf, decisionId, executed } = params;
+  const { portfolio, userId, asOf, decisionId, executed, algoRegime } = params;
   const results: RouteResult[] = [];
 
   // Post-broker reconciliation state. Populated by the buys branch so the
