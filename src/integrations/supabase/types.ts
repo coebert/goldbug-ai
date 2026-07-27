@@ -253,6 +253,56 @@ export type Database = {
           },
         ]
       }
+      daily_equity_changes: {
+        Row: {
+          change_date: string
+          computed_at: string
+          equity: number
+          id: string
+          net_flow: number
+          pct: number
+          pnl: number
+          portfolio_id: string
+          prev_date: string
+          prev_equity: number
+          raw_delta: number
+        }
+        Insert: {
+          change_date: string
+          computed_at?: string
+          equity: number
+          id?: string
+          net_flow?: number
+          pct: number
+          pnl: number
+          portfolio_id: string
+          prev_date: string
+          prev_equity: number
+          raw_delta: number
+        }
+        Update: {
+          change_date?: string
+          computed_at?: string
+          equity?: number
+          id?: string
+          net_flow?: number
+          pct?: number
+          pnl?: number
+          portfolio_id?: string
+          prev_date?: string
+          prev_equity?: number
+          raw_delta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_equity_changes_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decisions: {
         Row: {
           briefing: string
