@@ -360,8 +360,8 @@ export type CashSyncSnapshotInput = {
 };
 
 export type CashSyncSnapshotWriteResult =
-  | { action: "inserted"; totalValue: number }
-  | { action: "updated"; totalValue: number; previousTotalValue: number }
+  | { action: "inserted"; totalValue: number; invariantViolations?: string[] }
+  | { action: "updated"; totalValue: number; previousTotalValue: number; invariantViolations?: string[] }
   | { action: "error"; message: string };
 
 // Minimal structural type of the Supabase client surface we use, so tests can
