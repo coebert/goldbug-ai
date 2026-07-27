@@ -169,10 +169,10 @@ function makeStrategy(): BacktestStrategy {
         (f) =>
           typeof f.change5d === "number" && f.change5d > 0.02 &&
           typeof f.change30d === "number" && f.change30d > 0.05 &&
-          // RSI upper-bound only: reject overbought (>=80). Smooth
-          // monotonic uptrends pin RSI at 100, so a lower bound would
-          // spuriously reject perfectly buyable trends.
-          typeof f.rsi14 === "number" && f.rsi14 < 80,
+          // "Not overbought" gate. Kept strictly below the heuristic
+          // sell's RSI>=75 threshold so we never buy something the
+          // exit rule would immediately sell back.
+          typeof f.rsi14 === "number" && f.rsi14 < 70,
       )
       .sort((a, b) => (b.change30d ?? 0) - (a.change30d ?? 0));
 
