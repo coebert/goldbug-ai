@@ -164,18 +164,54 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
               <ReferenceLine y={0} stroke="hsl(var(--border))" />
               <Tooltip
                 cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
-                formatter={(value: number, _name, entry) => {
-                  const pct = (entry?.payload as { pct: number } | undefined)?.pct ?? 0;
-                  return [`${formatMoney(value, currency)}  (${formatPct(pct)})`, "Contribution"];
-                }}
-                labelClassName="text-xs"
-                contentStyle={{
-                  background: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 8,
-                  fontSize: 12,
+                content={({ active, payload }) => {
+                  if (!active || !payload || payload.length === 0) return null;
+                  const p = payload[0].payload as {
+                    key: string;
+                    name: string;
+                    amount: number;
+                    pct: number;
+                  };
+                  const totalPct = breakdown.totalPct;
+                  const shareOfMove =
+                    totalPct !== 0 ? (p.pct / totalPct) * 100 : 0;
+                  const tone =
+                    p.amount > 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : p.amount < 0
+                        ? "text-destructive"
+                        : "text-muted-foreground";
+                  return (
+                    <div
+                      className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md"
+                      style={{ borderColor: "hsl(var(--border))" }}
+                    >
+                      <div className="mb-1 flex items-center gap-2 font-medium">
+                        <span
+                          className="inline-block h-2 w-2 rounded-sm"
+                          style={{ background: COLORS[p.key] }}
+                        />
+                        {p.name}
+                      </div>
+                      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 tabular-nums">
+                        <span className="text-muted-foreground">Amount</span>
+                        <span className={`text-right ${tone}`}>
+                          {formatMoney(p.amount, currency)}
+                        </span>
+                        <span className="text-muted-foreground">Contribution</span>
+                        <span className={`text-right ${tone}`}>
+                          {formatPct(p.pct)} pts
+                        </span>
+                        <span className="text-muted-foreground">Share of move</span>
+                        <span className="text-right">
+                          {totalPct === 0 ? "—" : `${shareOfMove.toFixed(1)}%`}
+                        </span>
+                      </div>
+                    </div>
+                  );
                 }}
               />
+
               <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
                 {chartData.map((d) => (
                   <Cell key={d.key} fill={COLORS[d.key]} />
