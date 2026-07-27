@@ -98,7 +98,10 @@ describe("portfolio page + LiveHoldingsCard use derivePortfolioMetrics as single
     // Extract per-position rendered values that precede "% of portfolio"
     // in the per-row markup (the tile's own "% of portfolio" strings are
     // preceded by tile fmt() output, not by row fmt(r.value)).
-    const rowValueRe = /GBP\s([0-9,]+\.\d{2})<\/div><div[^>]*>([0-9.]+)% of portfolio/g;
+    // Row "% of portfolio" is rendered with one decimal (e.g. 45.3%), whereas
+    // the tile version uses integer % — so we require `\d+\.\d+%` to isolate
+    // per-position rows only.
+    const rowValueRe = /GBP\s([0-9,]+\.\d{2})<\/div><div[^>]*>\d+\.\d+% of portfolio/g;
     const rowValues = [...cardHtml.matchAll(rowValueRe)].map((m) => Number(m[1].replace(/,/g, "")));
     expect(rowValues.length).toBe(holdings.length);
 
