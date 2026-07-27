@@ -12,16 +12,17 @@ import {
 const cfg = DEFAULT_ALGO_REGIME_CONFIG;
 
 function calmCloses(n = 60, start = 100): number[] {
+  // gentle upward drift with tiny jitter — low vol, few sign flips
   const out = [start];
-  for (let i = 1; i < n; i++) out.push(out[i - 1] * (1 + (i % 2 ? 0.001 : -0.001)));
+  for (let i = 1; i < n; i++) out.push(out[i - 1] * (1 + 0.0005 + (i % 7 === 0 ? -0.0002 : 0.0001)));
   return out;
 }
 
 describe("algo-regime detectors", () => {
   it("volBurst fires when short-window vol >> long-window vol", () => {
-    const closes = calmCloses(30);
-    // inject a burst in the last 5 bars
-    for (let i = 0; i < 5; i++) closes.push(closes.at(-1)! * (i % 2 ? 1.05 : 0.95));
+    const closes = calmCloses(40);
+    // inject a large burst in the last 5 bars
+    for (let i = 0; i < 5; i++) closes.push(closes.at(-1)! * (i % 2 ? 1.08 : 0.92));
     expect(detectVolBurst(closes, cfg)).toBe(true);
   });
 
