@@ -180,20 +180,35 @@ function ReportPage() {
                 <CardTitle className="text-base">Strategy vs {data.benchmark} (normalised to portfolio start)</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80 w-full">
+                <div
+                  className="h-80 w-full"
+                  role="img"
+                  aria-label={`Line chart comparing Strategy against ${data.benchmark} benchmark, ${data.strategy_series.length} points`}
+                >
+                  <span className="sr-only">
+                    {(() => {
+                      const s = data.strategy_series;
+                      if (!s.length) return "No series data.";
+                      const first = s[0];
+                      const last = s[s.length - 1];
+                      const stratPct = first.strategy > 0 ? ((last.strategy - first.strategy) / first.strategy) * 100 : 0;
+                      const benchPct = first.benchmark > 0 ? ((last.benchmark - first.benchmark) / first.benchmark) * 100 : 0;
+                      return `Strategy ${stratPct >= 0 ? "up" : "down"} ${Math.abs(stratPct).toFixed(2)} percent. ${data.benchmark} ${benchPct >= 0 ? "up" : "down"} ${Math.abs(benchPct).toFixed(2)} percent. Both normalised to portfolio start.`;
+                    })()}
+                  </span>
                   <ResponsiveContainer>
                     <LineChart data={data.strategy_series} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                       <XAxis
                         dataKey="date"
-                        tick={{ fontSize: 11 }}
-                        label={{ value: "Date", position: "insideBottom", offset: -4, style: { fontSize: 11 } }}
+                        tick={AXIS_TICK}
+                        label={{ value: "Date", position: "insideBottom", offset: -4, style: { fontSize: 12, fill: "hsl(var(--foreground))" } }}
                         minTickGap={40}
                       />
                       <YAxis
-                        tick={{ fontSize: 11 }}
+                        tick={AXIS_TICK}
                         tickFormatter={(v) => `${(v as number).toLocaleString()}`}
-                        label={{ value: `Value (${currency})`, angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
+                        label={{ value: `Value (${currency})`, angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "hsl(var(--foreground))" } }}
                       />
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }}
@@ -202,10 +217,10 @@ function ReportPage() {
                           name,
                         ]}
                       />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <ReferenceLine y={data.portfolio.starting_cash} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: "Start", fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-                      <Line type="monotone" dataKey="strategy" name="Strategy" stroke="#22c55e" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="benchmark" name={data.benchmark} stroke="#3b82f6" strokeWidth={2} dot={false} />
+                      <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--foreground))" }} />
+                      <ReferenceLine y={data.portfolio.starting_cash} stroke="hsl(var(--foreground))" strokeOpacity={0.5} strokeDasharray="4 4" label={{ value: "Start", fill: "hsl(var(--foreground))", fontSize: 11 }} />
+                      <Line type="monotone" dataKey="strategy" name="Strategy" stroke={CHART_ROLE.positive} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="benchmark" name={data.benchmark} stroke={CHART_ROLE.benchmark} strokeWidth={2} strokeDasharray="6 3" dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
