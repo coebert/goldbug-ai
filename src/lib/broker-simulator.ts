@@ -630,7 +630,8 @@ export function simulateBrokerExecution(
     // Runs BEFORE cash/position sizing so participation is measured against
     // the market's ability to fill, not against our remaining budget.
     const originalRequested = d.quantity;
-    const liqCap = liquidityCap(d, options.liquidity);
+    const { cap: liqCap, rawVolume: liqRawVolume } =
+      liquidityCap(d, options.liquidity);
     if (liqCap <= 0) {
       rejections.push({
         step, decisionId: d.id, symbol: d.symbol, side: d.side,
@@ -640,6 +641,7 @@ export function simulateBrokerExecution(
       continue;
     }
     const requestedAfterLiquidity = Math.min(originalRequested, liqCap);
+
     const liquidityTruncated =
       requestedAfterLiquidity < originalRequested - 1e-12;
     const minFill = options.liquidity?.minFillQuantity ?? 0;
