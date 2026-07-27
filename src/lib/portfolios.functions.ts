@@ -149,12 +149,26 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
           delta?: number | string;
           startingCashAdjusted?: boolean;
           currency?: string;
+          newStarting?: number | string;
+          previousStarting?: number | string;
         };
         if (!seenCcy.has(row.portfolio_id) && typeof resp.currency === "string" && resp.currency) {
           brokerCurrencyByPortfolio[row.portfolio_id] = resp.currency.toUpperCase();
           seenCcy.add(row.portfolio_id);
         }
         if (!resp.startingCashAdjusted) continue;
+        // Defensive: older log rows set startingCashAdjusted=true even when
+        // the monotonic clamp left starting_cash unchanged (negative drift).
+        // Trust the row only if the baseline actually moved.
+        const prevStart = Number(resp.previousStarting);
+        const newStart = Number(resp.newStarting);
+        if (
+          Number.isFinite(prevStart) &&
+          Number.isFinite(newStart) &&
+          prevStart === newStart
+        ) {
+          continue;
+        }
         const amt = Number(resp.delta);
         if (!Number.isFinite(amt) || amt === 0) continue;
         deposits.push({
