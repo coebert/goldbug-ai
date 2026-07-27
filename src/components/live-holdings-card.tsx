@@ -83,27 +83,42 @@ export function LiveHoldingsCard({
   // `derivePortfolioMetrics`, which reads the server-side equity snapshot),
   // otherwise derive from `totalValue - cash`. Raw qty × price is in native
   // units (USD, GBX, EUR) and cannot be summed as base currency — doing so
-  // would produce a > 100% "invested" tile. We scale each row proportionally
-  // so the per-position bars, multi-ccy breakdown and tile all agree.
+  // would produce a > 100% "invested" tile.
   const parentInvested =
     typeof invested === "number" && Number.isFinite(invested) && invested >= 0
       ? invested
       : null;
-  const authoritativeInvested =
+  const authoritativeInvestedRaw =
     parentInvested != null
       ? parentInvested
       : Number.isFinite(totalValue) && totalValue > 0
         ? Math.max(0, Number(totalValue) - Number(cash))
         : rawSum;
-  const scale = rawSum > 0 ? authoritativeInvested / rawSum : 0;
-  const rows = rawRows
-    .map((r) => ({ ...r, value: rawSum > 0 ? r.rawValue * scale : 0 }))
-    .sort((a, b) => b.value - a.value);
+  // Round every displayed money value on the same 2dp/halfExpand grid so
+  // per-position rows sum bit-exactly to the Invested tile and the Cash +
+  // Invested tiles sum bit-exactly to the Total headline.
+  const authoritativeInvested = roundMoney(authoritativeInvestedRaw);
+  const cashDisplay = roundMoney(cash);
+  const totalDisplay = roundMoney(
+    Number.isFinite(totalValue) && totalValue > 0
+      ? totalValue
+      : authoritativeInvested + cashDisplay,
+  );
+  // Largest-remainder split of Invested across positions — guarantees
+  // Σ(row.value) === authoritativeInvested at 2dp.
+  const sortedByValueDesc = rawRows
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => b.r.rawValue - a.r.rawValue);
+  const allocated = allocateRoundedShares(
+    sortedByValueDesc.map(({ r }) => Math.max(0, r.rawValue)),
+    authoritativeInvested,
+  );
+  const rows = sortedByValueDesc.map(({ r }, idx) => ({ ...r, value: allocated[idx] }));
   const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
   const holdingsValue = authoritativeInvested;
-  const denom = totalValue > 0 ? totalValue : holdingsValue + cash;
-  const cashPct = denom > 0 ? (cash / denom) * 100 : 0;
+  const denom = totalDisplay > 0 ? totalDisplay : holdingsValue + cashDisplay;
+  const cashPct = denom > 0 ? (cashDisplay / denom) * 100 : 0;
 
   // Per-currency native breakdown (no FX conversion). We show this whenever
   // the account holds cash or positions in more than one currency, so users
@@ -112,43 +127,30 @@ export function LiveHoldingsCard({
   const investedByCcy = new Map<string, number>();
   for (const r of rows) {
     const ccy = String(r.instrument_ccy || baseCcy).toUpperCase();
-    investedByCcy.set(ccy, (investedByCcy.get(ccy) ?? 0) + r.value);
+    investedByCcy.set(ccy, roundMoney((investedByCcy.get(ccy) ?? 0) + r.value));
   }
   const cashCcyMap = new Map<string, number>();
   if (cashByCcy && typeof cashByCcy === "object") {
     for (const [k, v] of Object.entries(cashByCcy)) {
       const n = Number(v);
       if (!Number.isFinite(n)) continue;
-      cashCcyMap.set(String(k).toUpperCase(), n);
+      cashCcyMap.set(String(k).toUpperCase(), roundMoney(n));
     }
   }
   if (cashCcyMap.size === 0 && Number.isFinite(cash)) {
-    cashCcyMap.set(baseCcy, cash);
+    cashCcyMap.set(baseCcy, cashDisplay);
   }
   const allCcys = Array.from(
     new Set<string>([...investedByCcy.keys(), ...cashCcyMap.keys()]),
   ).sort((a, b) => (a === baseCcy ? -1 : b === baseCcy ? 1 : a.localeCompare(b)));
   const showMultiCcy = allCcys.length > 1;
-  const fmtCcy = (ccy: string, n: number) =>
-    `${ccy} ${n.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+  // All money formatting flows through the shared helpers so the tiles,
+  // per-position rows, and multi-ccy breakdown share one rounding /
+  // grouping / -0 policy (see src/lib/format-money.ts).
+  const fmtCcy = (ccy: string, n: number) => formatMoney(n, ccy);
+  const fmt = (n: number) => formatMoney(n, currency);
+  const fmtSigned = (n: number) => formatMoneySigned(n, currency);
 
-
-  const fmt = (n: number) =>
-    `${currency} ${n.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-
-  const fmtSigned = (n: number) => {
-    const sign = n > 0 ? "+" : n < 0 ? "−" : "";
-    return `${sign}${currency} ${Math.abs(n).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
 
   const fmtPct = (p: number) => {
     const sign = p > 0 ? "+" : p < 0 ? "−" : "";
