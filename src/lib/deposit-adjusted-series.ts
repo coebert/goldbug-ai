@@ -72,9 +72,10 @@ export function buildDepositAdjustedSeries(
     // TWRR: (equity − cumFlows − baseline) / (baseline + cumFlows).
     const denom = baseline + cumulative;
     const pct =
-      Number.isFinite(baseline) && denom > 0
+      Number.isFinite(baseline) && baseline > 0 && denom > 0
         ? ((adjusted - baseline) / denom) * 100
         : 0;
+
     out.push({
       date: p.date,
       equity: Number.isFinite(equity) ? equity : 0,
