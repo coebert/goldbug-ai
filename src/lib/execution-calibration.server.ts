@@ -259,7 +259,6 @@ export async function calibrateExecution(
 // Per-symbol microstructure calibration (ADV$, realized vol, tuning)
 // =====================================================================
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /** Currency inferred from Yahoo suffix — good enough for banding ADV notional
  *  and picking the venue spread multiplier. */
