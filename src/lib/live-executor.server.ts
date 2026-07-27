@@ -375,6 +375,66 @@ export async function routeOrdersToBroker(params: {
     });
   }
 
+  // ---------- Cross-currency guard when FX routing is disabled.
+  // When `fx_enabled=false`, the executor has no way to route a USD/GBP buy
+  // against an EUR wallet (or any other base-vs-instrument mismatch): the
+  // multi-ccy trimmer only runs in the `fxEnabled` branch, and the single-
+  // currency fallback debits the base wallet in the base currency. Sending
+  // such orders to Saxo just triggers InsufficientCash rejects — which then
+  // trip the 24h learned-cash lockout below and block ALL subsequent buys,
+  // including valid same-currency ones. Skip cross-currency buys here so
+  // Saxo is never asked and the lockout stays quiet. Sells are unaffected;
+  // they only free cash.
+  if (!fxEnabled) {
+    const mismatched: Array<{ symbol: string; instCcy: string }> = [];
+    const needCcyLookup = Array.from(
+      new Set(
+        routable
+          .filter((o) => o.side === "buy" && !o.instrument_ccy)
+          .map((o) => o.symbol),
+      ),
+    );
+    const ccyBySymbol = new Map<string, string>();
+    for (const o of routable) {
+      if (o.instrument_ccy) ccyBySymbol.set(o.symbol, o.instrument_ccy.toUpperCase());
+    }
+    if (needCcyLookup.length > 0) {
+      const cache = await supabaseAdmin
+        .from("saxo_instrument_cache")
+        .select("symbol, currency")
+        .in("symbol", needCcyLookup);
+      for (const row of cache.data ?? []) {
+        if (row.currency) ccyBySymbol.set(row.symbol as string, String(row.currency).toUpperCase());
+      }
+    }
+    for (const o of routable) {
+      if (o.side !== "buy") continue;
+      const instCcy = ccyBySymbol.get(o.symbol);
+      if (instCcy && instCcy !== portfolioCurrency) {
+        preSkips.set(
+          `${o.symbol}:${o.side}`,
+          `cross-currency buy skipped: instrument is ${instCcy} but portfolio base is ${portfolioCurrency} and fx_enabled=false; enable FX to trade this instrument`,
+        );
+        mismatched.push({ symbol: o.symbol, instCcy });
+      }
+    }
+    if (mismatched.length > 0) {
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "PRE_PLACE_FX_DISABLED_SKIP",
+        path: "/reconcile/pre-place/fx-disabled",
+        status: 200,
+        request: asJson({ asOf, decisionId, portfolioCurrency }),
+        response: asJson({ skipped: mismatched }),
+        error: `skipped ${mismatched.length} cross-currency buy(s) because fx_enabled=false`,
+      });
+    }
+  }
+
+
   // ---------- Learned-cash lockout.
   // If Saxo has rejected any buy on this portfolio with `InsufficientCash`
   // in the recent past AND the broker cash figure we're about to size against
