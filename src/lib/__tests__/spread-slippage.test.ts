@@ -98,16 +98,15 @@ describe("execution-realism — integration with spread-slippage model", () => {
   });
 
   it("SELLs receive symmetric adverse pricing under the same conditions", () => {
+    // Stay well under the 1% ADV liquidity cap so buy/sell compare apples-to-apples.
     const buy = applyBuyExecution({
-      requestedSpend: 50_000, price: 100, atrPct: 0.02, adv20d: 1_000_000,
+      requestedSpend: 5_000, price: 100, atrPct: 0.02, adv20d: 1_000_000,
       assetClass: "stock", currency: "USD",
     });
     const sell = applySellExecution({
-      qty: 500, price: 100, atrPct: 0.02, adv20d: 1_000_000,
+      qty: 50, price: 100, atrPct: 0.02, adv20d: 1_000_000,
       assetClass: "stock", currency: "USD",
     });
-    // Buys pay above mid, sells receive below mid — the round-trip cost is
-    // approximately twice the per-side cost bps.
     const buyBps = (buy.fillPrice / 100 - 1) * 10_000;
     const sellBps = (1 - sell.fillPrice / 100) * 10_000;
     expect(buyBps).toBeGreaterThan(0);
