@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getFeeBreakdown } from "@/lib/fee-breakdown.functions";
+import { FeeDragCharts } from "@/components/fee-drag-charts";
 
 function fmtMoney(v: number, ccy: string, digits = 2) {
   if (!Number.isFinite(v)) return "—";
