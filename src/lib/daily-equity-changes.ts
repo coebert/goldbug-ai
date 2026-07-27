@@ -124,9 +124,9 @@ export function assertNoFlowLeakage(
     // Pure cash-flow day: rawDelta is entirely explained by netFlow.
     if (
       r.netFlow !== 0 &&
-      Math.abs(r.rawDelta - r.netFlow) <= FLOW_LEAK_EPS_ABS
+      Math.abs(r.rawDelta - r.netFlow) <= absEps
     ) {
-      if (Math.abs(r.pnl) > FLOW_LEAK_EPS_ABS || Math.abs(r.pct) > pctEps) {
+      if (Math.abs(r.pnl) > absEps || Math.abs(r.pct) > pctEps) {
         throw new Error(
           `[${source}] deposit/withdrawal-only day ${r.date} leaked into pnl/pct: pnl=${r.pnl}, pct=${r.pct}%, netFlow=${r.netFlow}`,
         );
