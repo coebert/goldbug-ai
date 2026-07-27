@@ -21,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
+import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 import { AXIS_TICK, CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
@@ -322,6 +323,13 @@ export function BacktestResultsCard({
               </ResponsiveContainer>
             </div>
           )}
+        </section>
+
+        <section>
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Fees &amp; net returns
+          </div>
+          <FeeBreakdownCard portfolioId={portfolioId} runToken={runToken} days={days} />
         </section>
       </CardContent>
     </Card>
