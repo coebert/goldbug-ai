@@ -93,6 +93,14 @@ export type SimSnapshot = {
    *   "liquidity" > "cash" > "position".
    */
   truncationReason: "liquidity" | "cash" | "position" | null;
+  /**
+   * When set, this snapshot is a time-sliced continuation of the parent
+   * `sliceOf` decision. `sliceIndex` is 0 for the parent snapshot and
+   * 1..N for each residual re-attempt. Present only when the caller
+   * enables `timeSliceUnfilled`; omitted for one-shot fills.
+   */
+  sliceOf?: string;
+  sliceIndex?: number;
 };
 
 export type SimRejection = {
@@ -191,6 +199,21 @@ export type SimulateOptions = {
     maxParticipationRate?: number;
     minFillQuantity?: number;
   };
+  /**
+   * When true, any decision that only partially fills because of a
+   * `liquidity` truncation has its residual quantity automatically
+   * re-queued as a follow-up decision, up to
+   * `timeSliceMaxAttempts` extra attempts (default 5). Each attempt
+   * gets a FRESH per-decision liquidity cap — mirroring "the next bar
+   * of ADV becomes available" — and produces its own snapshot linked
+   * to the original decision via `sliceOf` + `sliceIndex`. Slices
+   * respect the same cash / position / min-fill rules as any other
+   * decision, and stop early once the residual is fully filled or a
+   * follow-up gets rejected. Off by default: existing callers keep
+   * one-shot semantics.
+   */
+  timeSliceUnfilled?: boolean;
+  timeSliceMaxAttempts?: number;
 };
 
 export type SimulateResult = {
@@ -338,10 +361,67 @@ export function simulateBrokerExecution(
   const snapshots: SimSnapshot[] = [];
   const rejections: SimRejection[] = [];
 
+  // Queue-based dispatch so a liquidity-truncated fill can enqueue its
+  // residual as a follow-up decision when `timeSliceUnfilled` is on.
+  // Each entry carries the parent decision id and the slice number so
+  // downstream observers can stitch the sliced fills back together.
+  type QueueItem = {
+    decision: SimDecision;
+    sliceOf: string;   // original decision id (== decision.id for parents)
+    sliceIndex: number; // 0 for parent, 1..N for time-slice residuals
+    /** Extra attempts still allowed AFTER this one. 0 means this is the
+     * last chance — any residual is dropped rather than re-queued. */
+    attemptsRemaining: number;
+  };
+  const sliceMax = Math.max(0, options.timeSliceMaxAttempts ?? 5);
+  const queue: QueueItem[] = decisions.map((d) => ({
+    decision: d, sliceOf: d.id, sliceIndex: 0,
+    attemptsRemaining: options.timeSliceUnfilled ? sliceMax : 0,
+  }));
+
+  // Threaded through each iteration so the per-branch snapshot pushes
+  // can tag their emissions with the correct slice metadata.
+  let curSliceOf = "";
+  let curSliceIndex = 0;
+  let curAttemptsRemaining = 0;
+
+  /**
+   * After a snapshot has been pushed, decide whether to enqueue a
+   * residual continuation. Only liquidity-driven partials get sliced —
+   * cash/position truncations mean the ledger itself couldn't take
+   * more, not that the market couldn't supply it.
+   */
+  const maybeEnqueueResidual = (
+    d: SimDecision,
+    filledQty: number,
+  ): void => {
+    if (!options.timeSliceUnfilled || curAttemptsRemaining <= 0) return;
+    const s = snapshots[snapshots.length - 1];
+    if (!s || s.truncationReason !== "liquidity") return;
+    const residual = d.quantity - filledQty;
+    if (residual <= 1e-12) return;
+    queue.push({
+      decision: {
+        ...d,
+        id: `${curSliceOf}#slice-${curSliceIndex + 1}`,
+        quantity: residual,
+      },
+      sliceOf: curSliceOf,
+      sliceIndex: curSliceIndex + 1,
+      attemptsRemaining: curAttemptsRemaining - 1,
+    });
+  };
+
   let step = 0;
-  for (const d of decisions) {
+  while (queue.length > 0) {
+    const item = queue.shift()!;
+    const d = item.decision;
+    curSliceOf = item.sliceOf;
+    curSliceIndex = item.sliceIndex;
+    curAttemptsRemaining = item.attemptsRemaining;
     step += 1;
     const fee = d.fee ?? 0;
+
 
     // ---- input validation ------------------------------------------------
     if (!Number.isFinite(d.quantity) || d.quantity <= 0) {
@@ -458,7 +538,11 @@ export function simulateBrokerExecution(
           requestedQuantity: originalRequested,
           partial: qty < originalRequested - 1e-12,
           truncationReason,
+          ...(options.timeSliceUnfilled
+            ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
+            : {}),
         });
+        maybeEnqueueResidual(d, qty);
         continue;
       }
 
@@ -519,7 +603,11 @@ export function simulateBrokerExecution(
         requestedQuantity: originalRequested,
         partial: qty < originalRequested - 1e-12,
         truncationReason,
+        ...(options.timeSliceUnfilled
+          ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
+          : {}),
       });
+      maybeEnqueueResidual(d, qty);
       continue;
     }
 
@@ -582,7 +670,11 @@ export function simulateBrokerExecution(
       requestedQuantity: originalRequested,
       partial: qty < originalRequested - 1e-12,
       truncationReason,
+      ...(options.timeSliceUnfilled
+        ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
+        : {}),
     });
+    maybeEnqueueResidual(d, qty);
   }
 
   return {
