@@ -106,8 +106,11 @@ export async function buildAlgoRegimeSnapshot(
     }),
   );
 
+  const configOverride = await loadConfigOverride(input.portfolioId);
+
   return detectAlgoRegime({
     primary,
     crossSection: Object.keys(crossSection).length >= 2 ? crossSection : undefined,
+    config: configOverride,
   });
 }
