@@ -177,20 +177,32 @@ describe("broker-simulator — automatic time-slicing", () => {
     expect("sliceIndex" in s).toBe(false);
   });
 
-  it("respects minFillQuantity: the FINAL residual slice can still fall below it and be rejected", () => {
-    // Cap = 30/bar, min-fill = 15, request = 100 → parent 30, slice-1 30,
-    // slice-2 30, slice-3 wants 10 but 10 < minFillQuantity=15 ⇒ rejected
-    // as "no_liquidity" for that slice; earlier slices stand.
+  it("minFillQuantity only rejects slices that are themselves liquidity-truncated below the floor", () => {
+    // Cap = 30/bar, min-fill = 15, request = 100 →
+    //   parent 30, slice-1 30, slice-2 30, slice-3 residual = 10.
+    // The residual (10) is smaller than the bar's cap (30) so slice-3 is
+    // NOT a liquidity truncation — it's a full fill of its own request
+    // and the min-fill floor doesn't apply to it. All 4 fills stand.
     const res = simulateBrokerExecution(
       start(100_000),
       [buy("d1", "ACME", 100, 10, 30)],
       { timeSliceUnfilled: true, liquidity: { minFillQuantity: 15 } },
     );
-    expect(res.snapshots.length).toBe(3);
-    expect(res.snapshots.every((s) => s.fillQuantity === 30)).toBe(true);
-    expect(res.rejections).toHaveLength(1);
-    expect(res.rejections[0].decisionId).toBe("d1#slice-3");
-    expect(res.rejections[0].reason).toBe("no_liquidity");
+    expect(res.snapshots.length).toBe(4);
+    expect(res.snapshots.slice(0, 3).every((s) => s.fillQuantity === 30)).toBe(true);
+    expect(res.snapshots[3].fillQuantity).toBe(10);
+    expect(res.snapshots[3].truncationReason).toBeNull();
+    expect(res.rejections).toHaveLength(0);
+    // A request that DOES leave a truncated tail (residual > cap) is
+    // rejected: cap=10, min-fill=15, first slice requests 20 → capped
+    // to 10, which is below the floor → no_liquidity.
+    const rejectRun = simulateBrokerExecution(
+      start(100_000),
+      [buy("d1", "ACME", 20, 10, 10)],
+      { timeSliceUnfilled: true, liquidity: { minFillQuantity: 15 } },
+    );
+    expect(rejectRun.snapshots).toHaveLength(0);
+    expect(rejectRun.rejections[0].reason).toBe("no_liquidity");
   });
 
   it("fuzz: sliced execution keeps every invariant intact", () => {
