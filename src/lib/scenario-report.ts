@@ -66,11 +66,29 @@ export type ScenarioSummary = {
   days: number;
 };
 
+export type ExecutionSeriesPoint = {
+  /** Date the parent decision was placed. */
+  date: string;
+  /** Parent decision id (slices collapse back to their parent). */
+  decisionId: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  /** fillQuantity / requestedQuantity, in [0, 1]. */
+  fillRatio: number;
+  /** Notional-weighted slippage across all slices, bps. `null` if unfilled. */
+  slippageBps: number | null;
+  /** Notional-weighted liquidity-adjusted slippage, bps. `null` when the
+   *  fill was unconstrained (no volume) or unfilled. */
+  liquidityAdjustedSlippageBps: number | null;
+};
+
 export type ScenarioReport = {
   id: string;
   label: string;
   equityCurve: EquityCurvePoint[];
   drawdownCurve: DrawdownPoint[];
+  /** One point per parent decision, in decision-execution order. */
+  executionSeries: ExecutionSeriesPoint[];
   summary: ScenarioSummary;
   metrics: BacktestMetrics;
   raw: SimulateResult;
