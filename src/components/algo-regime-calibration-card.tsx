@@ -111,6 +111,26 @@ export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string
             </div>
           </>
         )}
+        {tune.error && (
+          <p className="text-sm text-destructive">{(tune.error as Error).message}</p>
+        )}
+        {lastTune && (
+          <div className="rounded-lg border p-3 text-xs space-y-1 bg-muted/20">
+            <div className="font-medium">
+              Auto-tune {lastTune.persisted ? "applied" : lastTune.changed ? "preview" : "no-op"}
+              <span className="ml-2 text-muted-foreground">({lastTune.matched} samples)</span>
+            </div>
+            {lastTune.notes.map((n, i) => (
+              <div key={i} className="text-muted-foreground">• {n}</div>
+            ))}
+            {lastTune.changed && (
+              <div className="mt-1 font-mono text-[11px]">
+                volBurstRatio {lastTune.previous.volBurstRatio.toFixed(2)} → {lastTune.suggested.volBurstRatio.toFixed(2)},{" "}
+                liquidityVacuumRatio {lastTune.previous.liquidityVacuumRatio.toFixed(2)} → {lastTune.suggested.liquidityVacuumRatio.toFixed(2)}
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
