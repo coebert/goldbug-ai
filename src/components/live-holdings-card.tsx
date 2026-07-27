@@ -248,7 +248,7 @@ export function LiveHoldingsCard({
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(cash)}</div>
+              <div className="mt-1 text-base font-semibold leading-tight tabular-nums sm:text-lg">{fmt(cashDisplay)}</div>
               <div className="text-[10px] text-muted-foreground sm:text-[11px]">
                 {denom > 0 ? `${cashPct.toFixed(0)}% of portfolio` : "—"}
               </div>
