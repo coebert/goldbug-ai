@@ -165,16 +165,23 @@ export function BacktestResultsCard({
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Equity curve
             </div>
-            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-3 text-[10px] text-foreground">
               <span className="inline-flex items-center gap-1">
-                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" /> buy
+                <span aria-hidden className="inline-block h-0 w-0 border-b-[8px] border-l-[5px] border-r-[5px] border-l-transparent border-r-transparent" style={{ borderBottomColor: BUY_COLOR }} /> buy
               </span>
               <span className="inline-flex items-center gap-1">
-                <span className="inline-block h-2 w-2 rounded-full bg-red-500" /> sell
+                <span aria-hidden className="inline-block h-0 w-0 border-t-[8px] border-l-[5px] border-r-[5px] border-l-transparent border-r-transparent" style={{ borderTopColor: SELL_COLOR }} /> sell
               </span>
             </div>
           </div>
-          <div className="h-48 w-full sm:h-56">
+          <div
+            className="h-48 w-full sm:h-56"
+            role="img"
+            aria-label={`Backtest equity curve with ${buyMarkers.length} buys and ${sellMarkers.length} sells`}
+          >
+            <span className="sr-only">
+              {`Equity curve over ${equityData.length} days from ${equityData[0]?.date ?? ""} to ${equityData[equityData.length - 1]?.date ?? ""}. Buys marked with up triangles, sells with down triangles.`}
+            </span>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={equityData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
@@ -182,10 +189,10 @@ export function BacktestResultsCard({
                   dataKey="date"
                   type="category"
                   allowDuplicatedCategory={false}
-                  tick={{ fontSize: 11 }}
+                  tick={AXIS_TICK}
                   minTickGap={24}
                 />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtCompact} width={56} />
+                <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={56} />
                 <Tooltip
                   formatter={(v: number) => fmtCurrency(v)}
                   labelFormatter={(l) => `${l}`}
@@ -195,7 +202,7 @@ export function BacktestResultsCard({
                   type="monotone"
                   dataKey="value"
                   name="Equity"
-                  stroke="hsl(var(--primary, 217 91% 60%))"
+                  stroke={EQUITY_COLOR}
                   strokeWidth={2}
                   dot={false}
                 />
@@ -203,14 +210,14 @@ export function BacktestResultsCard({
                   name="Buys"
                   data={buyMarkers}
                   dataKey="value"
-                  fill="rgb(16 185 129)"
+                  fill={BUY_COLOR}
                   shape="triangle"
                 />
                 <Scatter
                   name="Sells"
                   data={sellMarkers}
                   dataKey="value"
-                  fill="rgb(239 68 68)"
+                  fill={SELL_COLOR}
                   shape="triangle"
                 />
               </ComposedChart>
