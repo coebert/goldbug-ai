@@ -324,6 +324,13 @@ export function BacktestResultsCard({
             </div>
           )}
         </section>
+
+        <section>
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Fees &amp; net returns
+          </div>
+          <FeeBreakdownCard portfolioId={portfolioId} runToken={runToken} days={days} />
+        </section>
       </CardContent>
     </Card>
   );
