@@ -127,11 +127,18 @@ export function FeeBreakdownCard({
           />
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "round" | "trade")}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "charts" | "round" | "trade")}>
           <TabsList>
+            <TabsTrigger value="charts">Charts</TabsTrigger>
             <TabsTrigger value="round">Round-trips ({rt.length})</TabsTrigger>
             <TabsTrigger value="trade">Per trade ({pt.length})</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="charts">
+            <FeeDragCharts perTrade={pt} currency={ccy} />
+          </TabsContent>
+
+
 
           <TabsContent value="round">
             {rt.length === 0 ? (
