@@ -235,6 +235,7 @@ describe("regression: UI % change equals server % change and excludes deposits",
       const expectedPct = tradingReturn * 100;
       expect(Math.abs(ui - expectedPct)).toBeLessThan(1e-6);
       expect(Math.abs(server - expectedPct)).toBeLessThan(1e-6);
+      if(Math.abs(bd-expectedPct)>1e-6){console.log("DIAG",{start,end,tradingReturn,externalNet,deposits,ui,server,bd,expectedPct,bdRes})}
       expect(Math.abs(bd - expectedPct)).toBeLessThan(1e-6);
       expect(Math.abs(ui - server)).toBeLessThan(1e-6);
       expect(Math.abs(bd - server)).toBeLessThan(1e-6);
