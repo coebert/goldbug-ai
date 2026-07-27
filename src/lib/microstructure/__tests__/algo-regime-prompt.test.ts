@@ -18,7 +18,7 @@ describe("algo-regime prompt block", () => {
   it("includes tier, active signals and blocking guidance for extreme regimes", () => {
     const block = formatAlgoRegimePromptBlock(extreme);
     expect(block).toMatch(/tier=extreme/);
-    expect(block).toMatch(/vol_burst/);
+    expect(block).toMatch(/volatility_burst/);
     expect(block).toMatch(/liquidity_vacuum/);
     expect(block).toMatch(/blockNewBuys=true/);
     expect(block).toMatch(/BLOCK new market buys/);
