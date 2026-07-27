@@ -21,26 +21,21 @@ import {
   YAxis,
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
+import { AXIS_TICK, CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 
-// Deterministic palette so the same symbol keeps its colour across renders.
-const PALETTE = [
-  "hsl(var(--chart-1, 217 91% 60%))",
-  "hsl(var(--chart-2, 142 71% 45%))",
-  "hsl(var(--chart-3, 38 92% 50%))",
-  "hsl(var(--chart-4, 291 64% 55%))",
-  "hsl(var(--chart-5, 0 84% 60%))",
-  "hsl(199 89% 48%)",
-  "hsl(24 95% 53%)",
-  "hsl(160 84% 39%)",
-  "hsl(280 65% 60%)",
-  "hsl(48 96% 53%)",
-];
+// Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
+const PALETTE = CHART_SEQUENCE;
 
-function colorFor(symbol: string, index: number): string {
+function colorFor(_symbol: string, index: number): string {
   return PALETTE[index % PALETTE.length];
 }
 
+// Neutral cash band — kept low-chroma so per-symbol hues stand out.
 const CASH_COLOR = "hsl(220 9% 46%)";
+const EQUITY_COLOR = CHART_ROLE.deposits; // blue reads as the primary series
+const BUY_COLOR = CHART_ROLE.positive;
+const SELL_COLOR = CHART_ROLE.negative;
+const DRAWDOWN_COLOR = OKABE_ITO.vermillion;
 
 export function BacktestResultsCard({
   portfolioId,
