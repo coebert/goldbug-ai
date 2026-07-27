@@ -895,7 +895,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
         cryptoSignalsBlock: cryptoDecision?.block ?? null,
+        algoRegimeBlock,
       });
+
 
   // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
   // not just in the prompt. If the regime bucket is risk_off, strip any AI
