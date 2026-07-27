@@ -338,21 +338,21 @@ function OutcomeRow({
         <div>
           <div className="text-[10px] uppercase tracking-wide">Created</div>
           <div className="text-foreground">
-            {formatUkTime(row.createdAt, { seconds: true })}
+            {formatUkTime(row.createdAt)}
           </div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wide">Submitted</div>
           <div className="text-foreground">
             {row.submittedAt
-              ? formatUkTime(row.submittedAt, { seconds: true })
+              ? formatUkTime(row.submittedAt)
               : "—"}
           </div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wide">Last event</div>
           <div className="text-foreground">
-            {formatUkTime(lastEventAt, { seconds: true })}
+            {formatUkTime(lastEventAt)}
           </div>
         </div>
         <div>
@@ -399,7 +399,7 @@ function OutcomeRow({
                   {formatQty(f.quantity)} @ {formatPrice(f.price, f.currency)}
                 </span>
                 <span className="text-muted-foreground">
-                  {formatUkTime(f.filledAt, { seconds: true })}
+                  {formatUkTime(f.filledAt)}
                 </span>
               </li>
             ))}
