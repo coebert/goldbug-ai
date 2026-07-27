@@ -468,9 +468,13 @@ If no action is warranted, return an empty orders array.`;
         orders: heuristic.orders.map((o) => ({
           symbol: o.symbol,
           side: o.side,
-          quantity: o.quantity,
+          percent: 100, // full-exit sell of the current holding
+          conviction: 0.5,
           reason: o.reason,
-        })) as DecisionOutput["orders"],
+          signal_weights: {
+            sma_trend: 0, rsi: 0, price_change: 1, news_sentiment: 0, volatility: 0,
+          },
+        })),
       };
     } catch (heuristicErr) {
       // Heuristic itself must never break the tick. Fall through to an
