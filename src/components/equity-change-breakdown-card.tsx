@@ -79,8 +79,12 @@ const SHORT_LABELS: Record<string, string> = {
   feesDivInterest: "Fees / Div",
 };
 
+const SERIES_ORDER = ["deposits", "withdrawals", "tradingPnl", "feesDivInterest"] as const;
+type SeriesKey = (typeof SERIES_ORDER)[number];
+
 export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props) {
   const [range, setRange] = useState<Range>("30d");
+  const [hidden, setHidden] = useState<Set<SeriesKey>>(() => new Set());
 
   const breakdown = useMemo(
     () => computeEquityChangeBreakdown(sliceEquityByRange(equity, range), deposits),
@@ -105,13 +109,24 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
   }
 
   const rows = breakdown.buckets;
-  const chartData = rows.map((b) => ({
+  const visibleRows = rows.filter((b) => !hidden.has(b.key as SeriesKey));
+  const chartData = visibleRows.map((b) => ({
     key: b.key,
     name: SHORT_LABELS[b.key] ?? b.label,
     fullName: b.label,
     amount: b.amount,
     pct: b.pctPoints,
   }));
+
+  const toggle = (k: SeriesKey) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      // Prevent hiding the last visible series (chart would be empty).
+      if (next.has(k)) next.delete(k);
+      else if (rows.length - next.size > 1) next.add(k);
+      return next;
+    });
+  };
 
   const totalIsNegative = breakdown.totalChange < 0;
   const totalTone = totalIsNegative ? "text-destructive" : breakdown.totalChange > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground";
