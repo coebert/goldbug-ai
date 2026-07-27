@@ -82,6 +82,10 @@ export type SimSnapshot = {
   /** Sequence number, starting at 1 for the first applied step. */
   step: number;
   decisionId: string;
+  /** Traded symbol — mirrored from the source decision for easy grouping. */
+  symbol: string;
+  /** Side of the executed decision. */
+  side: Side;
   cash: number;
   holdings: SimHolding[];
   /** Σ (quantity * mark_price) at the moment this snapshot was taken. */
@@ -90,6 +94,7 @@ export type SimSnapshot = {
   totalValue: number;
   /** Realized PnL for a SELL step, 0 otherwise. */
   realizedPnl: number;
+
   fillQuantity: number;
   fillPrice: number;
   fee: number;
@@ -111,7 +116,40 @@ export type SimSnapshot = {
    */
   sliceOf?: string;
   sliceIndex?: number;
+  // -------- execution-quality diagnostics -----------------------------------
+  /**
+   * The quoted decision price fed into the engine (`decision.price`) —
+   * pinned on the snapshot so downstream consumers don't have to join
+   * back against the input array to compute slippage or debug fills.
+   */
+  expectedPrice: number;
+  /**
+   * Signed slippage of the realized fill vs the quoted expected price,
+   * expressed in basis points and always oriented so positive = adverse:
+   *   BUY:  (fillPrice - expectedPrice) / expectedPrice * 1e4
+   *   SELL: (expectedPrice - fillPrice) / expectedPrice * 1e4
+   * `0` when the expected price is 0 or the step didn't fill.
+   */
+  slippageBps: number;
+  /**
+   * Fraction of the raw (pre-participation-rate) liquidity cap that
+   * this fill consumed, in `[0, 1]`. `null` when the symbol was
+   * unconstrained (no volume estimate available), so callers can
+   * distinguish "we consumed 100% of a small book" from "there was no
+   * book to measure against".
+   */
+  participationRate: number | null;
+  /**
+   * `slippageBps` normalized by `participationRate` — a rough
+   * "cost per unit of liquidity consumed" that lets you compare fills
+   * across very different order sizes and books. `null` whenever
+   * `participationRate` is `null` or `0`.
+   */
+  liquidityAdjustedSlippageBps: number | null;
 };
+
+
+
 
 export type SimRejection = {
   step: number;
@@ -251,11 +289,67 @@ export type SimulateOptions = {
   timeSliceMaxAttempts?: number;
 };
 
+/**
+ * Aggregate execution-quality diagnostics. Cheap to derive from the
+ * per-snapshot data but pre-computed here so downstream evaluators
+ * (backtests, live executor, tests) don't have to re-implement the
+ * weighting every time. All slippage figures are notional-weighted
+ * (fillQuantity * expectedPrice) so a tiny partial fill can't skew
+ * the summary against a large well-executed one.
+ */
+export type ExecutionQualityReport = {
+  /** Number of decisions submitted (before slicing / rejection). */
+  decisionCount: number;
+  /** Sum of every snapshot's `requestedQuantity` (excludes slices). */
+  totalRequested: number;
+  /** Sum of every snapshot's `fillQuantity` (includes slice fills). */
+  totalFilled: number;
+  /** `totalFilled / totalRequested`, clamped to `[0, 1]`. `1` when no requests. */
+  fillRatio: number;
+  fullyFilledCount: number;
+  partialFillCount: number;
+  rejectionCount: number;
+  /** Count of rejections keyed by `SimRejection.reason`. */
+  rejectionsByReason: Record<SimRejection["reason"], number>;
+  /**
+   * Notional-weighted average signed slippage in bps across every
+   * snapshot with a positive fill. Positive = adverse to the trader.
+   */
+  weightedAvgSlippageBps: number;
+  /**
+   * Notional-weighted average of `liquidityAdjustedSlippageBps`
+   * across snapshots where it was defined. `null` when nothing in
+   * the run had a measurable liquidity constraint.
+   */
+  weightedAvgLiquidityAdjustedSlippageBps: number | null;
+  /**
+   * Simple mean of `participationRate` across snapshots where it
+   * was defined. `null` when no fill touched a constrained book.
+   */
+  avgParticipationRate: number | null;
+  /**
+   * Per-symbol drill-down using the same weighting rules as the top
+   * level. Keys are the raw `symbol` strings from the decisions.
+   */
+  bySymbol: Record<string, {
+    requested: number;
+    filled: number;
+    fillRatio: number;
+    weightedAvgSlippageBps: number;
+    weightedAvgLiquidityAdjustedSlippageBps: number | null;
+    avgParticipationRate: number | null;
+    fillCount: number;
+  }>;
+};
+
 export type SimulateResult = {
   finalState: SimState;
   snapshots: SimSnapshot[];
   rejections: SimRejection[];
+  /** Aggregate diagnostics — see `ExecutionQualityReport`. */
+  executionQuality: ExecutionQualityReport;
 };
+
 
 // ---------------------------------------------------------------------------
 
@@ -397,7 +491,7 @@ function aggregateVolumeHistory(
 function liquidityCap(
   d: SimDecision,
   liquidity: SimulateOptions["liquidity"],
-): number {
+): { cap: number; rawVolume: number | null } {
   const window = liquidity?.rollingWindow;
   const agg = liquidity?.volumeAggregator;
 
@@ -420,14 +514,66 @@ function liquidityCap(
       liquidity?.volumeHistory?.[d.symbol], window, agg,
     );
   }
-  if (vol === null) return Number.POSITIVE_INFINITY;
+  if (vol === null) return { cap: Number.POSITIVE_INFINITY, rawVolume: null };
 
   const rate = liquidity?.maxParticipationRate;
   const rateClamped = Number.isFinite(rate) && (rate as number) > 0
     ? Math.min(1, rate as number)
     : 1;
-  return vol * rateClamped;
+  return { cap: vol * rateClamped, rawVolume: vol };
 }
+
+/**
+ * Signed slippage in basis points, oriented so positive = adverse for
+ * the trader (BUY paid up, SELL received less). Returns 0 when the
+ * expected price is <= 0 or the fill quantity is 0.
+ */
+function slippageBpsOf(
+  side: Side,
+  expectedPrice: number,
+  fillPrice: number,
+  fillQty: number,
+): number {
+  if (!(expectedPrice > 0) || fillQty <= 0) return 0;
+  const diff = side === "BUY"
+    ? fillPrice - expectedPrice
+    : expectedPrice - fillPrice;
+  return (diff / expectedPrice) * 10_000;
+}
+
+/**
+ * Build the execution-quality fields tacked onto every emitted snapshot.
+ * `rawVolume` is the pre-participation-rate liquidity estimate
+ * (`null` when the symbol was unconstrained).
+ */
+function qualityFields(
+  side: Side,
+  expectedPrice: number,
+  fillPrice: number,
+  fillQty: number,
+  rawVolume: number | null,
+): Pick<
+  SimSnapshot,
+  "expectedPrice" | "slippageBps" | "participationRate"
+    | "liquidityAdjustedSlippageBps"
+> {
+  const slippageBps = slippageBpsOf(side, expectedPrice, fillPrice, fillQty);
+  const participationRate =
+    rawVolume !== null && rawVolume > 0
+      ? Math.min(1, fillQty / rawVolume)
+      : null;
+  const liquidityAdjustedSlippageBps =
+    participationRate !== null && participationRate > 0
+      ? slippageBps / participationRate
+      : null;
+  return {
+    expectedPrice,
+    slippageBps,
+    participationRate,
+    liquidityAdjustedSlippageBps,
+  };
+}
+
 
 
 export function simulateBrokerExecution(
@@ -545,7 +691,8 @@ export function simulateBrokerExecution(
     // Runs BEFORE cash/position sizing so participation is measured against
     // the market's ability to fill, not against our remaining budget.
     const originalRequested = d.quantity;
-    const liqCap = liquidityCap(d, options.liquidity);
+    const { cap: liqCap, rawVolume: liqRawVolume } =
+      liquidityCap(d, options.liquidity);
     if (liqCap <= 0) {
       rejections.push({
         step, decisionId: d.id, symbol: d.symbol, side: d.side,
@@ -555,6 +702,7 @@ export function simulateBrokerExecution(
       continue;
     }
     const requestedAfterLiquidity = Math.min(originalRequested, liqCap);
+
     const liquidityTruncated =
       requestedAfterLiquidity < originalRequested - 1e-12;
     const minFill = options.liquidity?.minFillQuantity ?? 0;
@@ -622,7 +770,7 @@ export function simulateBrokerExecution(
         const truncationReason: SimSnapshot["truncationReason"] =
           liquidityTruncated ? "liquidity" : cashTruncated ? "cash" : null;
         snapshots.push({
-          step, decisionId: d.id,
+          step, decisionId: d.id, symbol: d.symbol, side: d.side,
           cash, holdings: cloneHoldings(holdings),
           holdingsValue, totalValue: cash + holdingsValue,
           realizedPnl: 0,
@@ -630,6 +778,8 @@ export function simulateBrokerExecution(
           requestedQuantity: originalRequested,
           partial: qty < originalRequested - 1e-12,
           truncationReason,
+          ...qualityFields("BUY", d.price, d.price, qty, liqRawVolume),
+
           ...(options.timeSliceUnfilled
             ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
             : {}),
@@ -687,7 +837,7 @@ export function simulateBrokerExecution(
       const truncationReason: SimSnapshot["truncationReason"] =
         liquidityTruncated ? "liquidity" : cashTruncated ? "cash" : null;
       snapshots.push({
-        step, decisionId: d.id,
+        step, decisionId: d.id, symbol: d.symbol, side: d.side,
         cash, holdings: cloneHoldings(holdings),
         holdingsValue, totalValue: cash + holdingsValue,
         realizedPnl: 0,
@@ -695,6 +845,8 @@ export function simulateBrokerExecution(
         requestedQuantity: originalRequested,
         partial: qty < originalRequested - 1e-12,
         truncationReason,
+        ...qualityFields("BUY", d.price, effPrice, qty, liqRawVolume),
+
         ...(options.timeSliceUnfilled
           ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
           : {}),
@@ -754,7 +906,7 @@ export function simulateBrokerExecution(
     const truncationReason: SimSnapshot["truncationReason"] =
       liquidityTruncated ? "liquidity" : positionTruncated ? "position" : null;
     snapshots.push({
-      step, decisionId: d.id,
+      step, decisionId: d.id, symbol: d.symbol, side: d.side,
       cash, holdings: cloneHoldings(holdings),
       holdingsValue, totalValue: cash + holdingsValue,
       realizedPnl,
@@ -762,6 +914,8 @@ export function simulateBrokerExecution(
       requestedQuantity: originalRequested,
       partial: qty < originalRequested - 1e-12,
       truncationReason,
+      ...qualityFields("SELL", d.price, effSellPrice, qty, liqRawVolume),
+
       ...(options.timeSliceUnfilled
         ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
         : {}),
@@ -773,5 +927,139 @@ export function simulateBrokerExecution(
     finalState: { cash, holdings },
     snapshots,
     rejections,
+    executionQuality: buildExecutionQualityReport(
+      decisions.length, snapshots, rejections,
+    ),
   };
 }
+
+/**
+ * Aggregate the per-snapshot quality fields into the top-level
+ * `ExecutionQualityReport`. Kept as a standalone function so tests
+ * (and external callers) can re-run it against edited snapshot arrays
+ * without re-executing the whole simulator.
+ */
+export function buildExecutionQualityReport(
+  decisionCount: number,
+  snapshots: readonly SimSnapshot[],
+  rejections: readonly SimRejection[],
+): ExecutionQualityReport {
+  const rejectionsByReason: Record<SimRejection["reason"], number> = {
+    invalid_quantity: 0,
+    invalid_price: 0,
+    invalid_fee: 0,
+    no_position_to_sell: 0,
+    insufficient_cash: 0,
+    would_borrow: 0,
+    would_short: 0,
+    no_liquidity: 0,
+  };
+  for (const r of rejections) rejectionsByReason[r.reason] += 1;
+
+  // Only parent snapshots (sliceIndex 0 or absent) contribute to
+  // "requested" totals — sliced residuals inherit that requested qty.
+  let totalRequested = 0;
+  let totalFilled = 0;
+  let fullyFilledCount = 0;
+  let partialFillCount = 0;
+
+  let slipWeightSum = 0;
+  let slipNumerator = 0;
+  let liqAdjWeightSum = 0;
+  let liqAdjNumerator = 0;
+  let partRateSum = 0;
+  let partRateCount = 0;
+
+  type Bucket = {
+    requested: number; filled: number; fillCount: number;
+    slipW: number; slipN: number;
+    liqAdjW: number; liqAdjN: number;
+    partSum: number; partCount: number;
+  };
+  const bucket = (): Bucket => ({
+    requested: 0, filled: 0, fillCount: 0,
+    slipW: 0, slipN: 0, liqAdjW: 0, liqAdjN: 0,
+    partSum: 0, partCount: 0,
+  });
+  const bySymbolRaw = new Map<string, Bucket>();
+
+
+  for (const s of snapshots) {
+    const isParent = (s.sliceIndex ?? 0) === 0;
+    if (isParent) totalRequested += s.requestedQuantity;
+    totalFilled += s.fillQuantity;
+    if (s.fillQuantity > 0 && !s.partial) fullyFilledCount += 1;
+    if (s.partial) partialFillCount += 1;
+
+    const w = s.fillQuantity * (s.expectedPrice > 0 ? s.expectedPrice : 1);
+    if (s.fillQuantity > 0) {
+      slipWeightSum += w;
+      slipNumerator += w * s.slippageBps;
+      if (s.liquidityAdjustedSlippageBps !== null) {
+        liqAdjWeightSum += w;
+        liqAdjNumerator += w * s.liquidityAdjustedSlippageBps;
+      }
+      if (s.participationRate !== null) {
+        partRateSum += s.participationRate;
+        partRateCount += 1;
+      }
+    }
+
+    const sym = s.symbol;
+    const b = bySymbolRaw.get(sym) ?? bucket();
+    if (isParent) b.requested += s.requestedQuantity;
+    b.filled += s.fillQuantity;
+    if (s.fillQuantity > 0) {
+      b.fillCount += 1;
+      b.slipW += w;
+      b.slipN += w * s.slippageBps;
+      if (s.liquidityAdjustedSlippageBps !== null) {
+        b.liqAdjW += w;
+        b.liqAdjN += w * s.liquidityAdjustedSlippageBps;
+      }
+      if (s.participationRate !== null) {
+        b.partSum += s.participationRate;
+        b.partCount += 1;
+      }
+    }
+    bySymbolRaw.set(sym, b);
+  }
+
+  const bySymbol: ExecutionQualityReport["bySymbol"] = {};
+  for (const [sym, b] of bySymbolRaw) {
+    bySymbol[sym] = {
+      requested: b.requested,
+      filled: b.filled,
+      fillRatio: b.requested > 0
+        ? Math.min(1, Math.max(0, b.filled / b.requested))
+        : 1,
+      weightedAvgSlippageBps: b.slipW > 0 ? b.slipN / b.slipW : 0,
+      weightedAvgLiquidityAdjustedSlippageBps:
+        b.liqAdjW > 0 ? b.liqAdjN / b.liqAdjW : null,
+      avgParticipationRate:
+        b.partCount > 0 ? b.partSum / b.partCount : null,
+      fillCount: b.fillCount,
+    };
+  }
+
+  return {
+    decisionCount,
+    totalRequested,
+    totalFilled,
+    fillRatio: totalRequested > 0
+      ? Math.min(1, Math.max(0, totalFilled / totalRequested))
+      : 1,
+    fullyFilledCount,
+    partialFillCount,
+    rejectionCount: rejections.length,
+    rejectionsByReason,
+    weightedAvgSlippageBps:
+      slipWeightSum > 0 ? slipNumerator / slipWeightSum : 0,
+    weightedAvgLiquidityAdjustedSlippageBps:
+      liqAdjWeightSum > 0 ? liqAdjNumerator / liqAdjWeightSum : null,
+    avgParticipationRate:
+      partRateCount > 0 ? partRateSum / partRateCount : null,
+    bySymbol,
+  };
+}
+
