@@ -126,16 +126,27 @@ function AttributionPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.overall.rows.map((r) => ({ signal: r.signal, contribution: r.contribution_pct, win: r.win_rate == null ? null : r.win_rate * 100 }))}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="signal" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" label={{ value: "Contribution to P&L (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                      <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" domain={[0, 100]} label={{ value: "Win rate (%)", angle: 90, position: "insideRight", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
+                      <XAxis dataKey="signal" tick={AXIS_TICK} stroke="hsl(var(--foreground))" />
+                      <YAxis yAxisId="left" tick={AXIS_TICK} stroke="hsl(var(--foreground))" label={{ value: "Contribution to P&L (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--foreground))", style: { fontSize: 12 } }} />
+                      <YAxis yAxisId="right" tick={AXIS_TICK} orientation="right" stroke="hsl(var(--foreground))" domain={[0, 100]} label={{ value: "Win rate (%)", angle: 90, position: "insideRight", fill: "hsl(var(--foreground))", style: { fontSize: 12 } }} />
                       <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                      <Legend />
-                      <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--muted-foreground))" />
+                      <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
+                      <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.5} />
                       <Bar yAxisId="left" dataKey="contribution" name="Signed contribution (%)">
                         {data.overall.rows.map((r) => (
-                          <Bar key={r.signal} dataKey="contribution" fill={r.contribution_pct >= 0 ? "#22c55e" : "#ef4444"} />
+                          <Cell
+                            key={r.signal}
+                            fill={r.contribution_pct >= 0 ? CHART_ROLE.positive : CHART_ROLE.negative}
+                          />
                         ))}
+                        <LabelList
+                          dataKey="contribution"
+                          position="top"
+                          style={{ fontSize: 11, fill: "hsl(var(--foreground))", fontVariantNumeric: "tabular-nums" }}
+                          formatter={(v: number) =>
+                            v == null ? "" : `${v >= 0 ? "▲ +" : "▼ "}${v.toFixed(2)}%`
+                          }
+                        />
                       </Bar>
                       <Bar yAxisId="right" dataKey="win" name="Win rate (%)" fill="#64748b" opacity={0.6} />
                     </BarChart>
