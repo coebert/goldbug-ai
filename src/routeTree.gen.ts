@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TradesRouteImport } from './routes/trades'
+import { Route as SimulationReportRouteImport } from './routes/simulation-report'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
 import { Route as LearnRouteImport } from './routes/learn'
@@ -38,6 +39,11 @@ import { Route as ApiPublicHooksBackfillDailyEquityChangesRouteImport } from './
 const TradesRoute = TradesRouteImport.update({
   id: '/trades',
   path: '/trades',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SimulationReportRoute = SimulationReportRouteImport.update({
+  id: '/simulation-report',
+  path: '/simulation-report',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SaxoStatusRoute = SaxoStatusRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
+  '/simulation-report': typeof SimulationReportRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
+  '/simulation-report': typeof SimulationReportRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
+  '/simulation-report': typeof SimulationReportRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
+    | '/simulation-report'
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
+    | '/simulation-report'
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -314,6 +325,7 @@ export interface FileRouteTypes {
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
+    | '/simulation-report'
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -342,6 +354,7 @@ export interface RootRouteChildren {
   LearnRoute: typeof LearnRoute
   SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
+  SimulationReportRoute: typeof SimulationReportRoute
   TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
@@ -364,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/trades'
       fullPath: '/trades'
       preLoaderRoute: typeof TradesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/simulation-report': {
+      id: '/simulation-report'
+      path: '/simulation-report'
+      fullPath: '/simulation-report'
+      preLoaderRoute: typeof SimulationReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/saxo-status': {
@@ -564,6 +584,7 @@ const rootRouteChildren: RootRouteChildren = {
   LearnRoute: LearnRoute,
   SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
+  SimulationReportRoute: SimulationReportRoute,
   TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
