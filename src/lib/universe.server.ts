@@ -317,6 +317,7 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
     num("spread_atr_frac", 0, 2);
     num("adv_participation", 0, 0.5);
     num("min_trade_value", 0, 10_000);
+    num("min_commission", 0, 10_000);
     out.execution_params = ep;
   }
   if (r.execution_calibration && typeof r.execution_calibration === "object") {
