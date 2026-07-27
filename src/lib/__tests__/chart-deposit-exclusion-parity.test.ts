@@ -150,10 +150,12 @@ describe("chart deposit exclusion — parity with computeModeSummary", () => {
     );
 
     // Trading gains total 200+200+100 = 500; deposits 500 netted out.
+    // Capital-adjusted pct: 500 / (1000 + 500) = 33.333...%
     expect(round(chartPnl)).toBe(500);
-    expect(round(adj[adj.length - 1].pct)).toBe(50);
+    expect(round(adj[adj.length - 1].pct)).toBe(round((500 / 1500) * 100));
     expect(round(summary!.sim.pnl)).toBe(500);
-    expect(round(summary!.sim.pct)).toBe(50);
+    expect(round(summary!.sim.pct)).toBe(round((500 / 1500) * 100));
+
   });
 
   it("includeDeposits=true on summary matches RAW chart delta (no adjustment)", () => {
