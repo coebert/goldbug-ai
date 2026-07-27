@@ -843,6 +843,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       return await buildAlgoRegimeSnapshot({
         asOf,
         holdingSymbols: (holdings ?? []).map((h) => h.symbol),
+        portfolioId,
       });
     } catch (e) {
       console.warn("algo-regime snapshot failed", e);
