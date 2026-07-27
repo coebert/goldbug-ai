@@ -30,7 +30,7 @@ import {
   type EquityPoint,
   type RegimeObservation,
 } from "@/lib/microstructure/algo-regime-calibration";
-import { suggestConfigAdjustments } from "@/lib/microstructure/algo-regime-autotune";
+import { suggestConfigAdjustments, type RiskLevel } from "@/lib/microstructure/algo-regime-autotune";
 import {
   evaluateShadow,
   DEFAULT_SHADOW_EVAL_OPTIONS,
