@@ -149,6 +149,77 @@ export type Database = {
           },
         ]
       }
+      algo_regime_tune_history: {
+        Row: {
+          applied_at: string
+          baseline_extreme_mean: number | null
+          baseline_matched: number
+          baseline_monotone: boolean
+          baseline_normal_mean: number | null
+          created_at: string
+          decision_reason: string | null
+          evaluated_at: string | null
+          id: string
+          new_config: Json
+          notes: string | null
+          portfolio_id: string
+          post_extreme_mean: number | null
+          post_matched: number | null
+          post_monotone: boolean | null
+          post_normal_mean: number | null
+          prev_config: Json
+          status: Database["public"]["Enums"]["algo_regime_tune_status"]
+        }
+        Insert: {
+          applied_at?: string
+          baseline_extreme_mean?: number | null
+          baseline_matched: number
+          baseline_monotone: boolean
+          baseline_normal_mean?: number | null
+          created_at?: string
+          decision_reason?: string | null
+          evaluated_at?: string | null
+          id?: string
+          new_config: Json
+          notes?: string | null
+          portfolio_id: string
+          post_extreme_mean?: number | null
+          post_matched?: number | null
+          post_monotone?: boolean | null
+          post_normal_mean?: number | null
+          prev_config: Json
+          status?: Database["public"]["Enums"]["algo_regime_tune_status"]
+        }
+        Update: {
+          applied_at?: string
+          baseline_extreme_mean?: number | null
+          baseline_matched?: number
+          baseline_monotone?: boolean
+          baseline_normal_mean?: number | null
+          created_at?: string
+          decision_reason?: string | null
+          evaluated_at?: string | null
+          id?: string
+          new_config?: Json
+          notes?: string | null
+          portfolio_id?: string
+          post_extreme_mean?: number | null
+          post_matched?: number | null
+          post_monotone?: boolean | null
+          post_normal_mean?: number | null
+          prev_config?: Json
+          status?: Database["public"]["Enums"]["algo_regime_tune_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "algo_regime_tune_history_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backtest_runs: {
         Row: {
           created_at: string
@@ -2041,6 +2112,11 @@ export type Database = {
       }
     }
     Enums: {
+      algo_regime_tune_status:
+        | "pending"
+        | "accepted"
+        | "rolled_back"
+        | "superseded"
       asset_class: "stock" | "etf" | "crypto" | "commodity" | "fx"
       portfolio_mode: "backtest" | "paper" | "live_sim" | "live_prod"
       portfolio_status: "active" | "paused" | "complete"
@@ -2173,6 +2249,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      algo_regime_tune_status: [
+        "pending",
+        "accepted",
+        "rolled_back",
+        "superseded",
+      ],
       asset_class: ["stock", "etf", "crypto", "commodity", "fx"],
       portfolio_mode: ["backtest", "paper", "live_sim", "live_prod"],
       portfolio_status: ["active", "paused", "complete"],
