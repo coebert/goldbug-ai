@@ -703,7 +703,7 @@ function PortfolioPage() {
               </div>
               <div className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
                 <span className="text-xl font-semibold leading-tight tabular-nums sm:text-3xl">
-                  {p.currency} {totalValue.toFixed(2)}
+                  {formatMoney(totalValue, p.currency)}
                 </span>
                 <span
                   className={`text-[11px] font-medium tabular-nums sm:text-sm ${
@@ -711,8 +711,9 @@ function PortfolioPage() {
                   }`}
                 >
                   {pnl >= 0 ? "+" : ""}
-                  {pnl.toFixed(2)} ({pnlPct.toFixed(2)}%)
+                  {formatMoneyAmount(pnl)} ({pnlPct.toFixed(2)}%)
                 </span>
+
               </div>
             </div>
 
