@@ -1,0 +1,47 @@
+// Okabe–Ito color-blind-safe palette shared across charts.
+// Each hue is distinguishable under protanopia, deuteranopia and
+// tritanopia. Pair with non-color encodings (dashes, markers, text)
+// whenever a chart carries semantic meaning.
+//
+// Reference: Okabe & Ito, "Color Universal Design (CUD)", 2008.
+export const OKABE_ITO = {
+  black: "#000000",
+  orange: "#E69F00",
+  skyBlue: "#56B4E9",
+  bluishGreen: "#009E73",
+  yellow: "#F0E442",
+  blue: "#0072B2",
+  vermillion: "#D55E00",
+  reddishPurple: "#CC79A7",
+} as const;
+
+// Semantic role tokens. Prefer these over raw hex so meaning stays
+// consistent across cards.
+export const CHART_ROLE = {
+  positive: OKABE_ITO.bluishGreen, // gains, buys, strategy P&L
+  negative: OKABE_ITO.vermillion, // losses, sells, drawdown
+  benchmark: OKABE_ITO.orange, // reference series (index, S&P)
+  deposits: OKABE_ITO.blue, // capital in
+  withdrawals: OKABE_ITO.orange,
+  neutral: OKABE_ITO.skyBlue, // cash / carry
+  highlight: OKABE_ITO.reddishPurple, // fees, div/interest, misc
+  warning: OKABE_ITO.yellow,
+} as const;
+
+// Ordered sequence for series without semantic meaning (e.g. per-symbol
+// stacks). Ordered to maximise adjacent-hue distance.
+export const CHART_SEQUENCE: readonly string[] = [
+  OKABE_ITO.blue,
+  OKABE_ITO.orange,
+  OKABE_ITO.bluishGreen,
+  OKABE_ITO.reddishPurple,
+  OKABE_ITO.skyBlue,
+  OKABE_ITO.vermillion,
+  OKABE_ITO.yellow,
+] as const;
+
+// Axis/tick styling. `--foreground` clears WCAG AA against both light
+// and dark card surfaces; 12px is the smallest size that keeps AA
+// legibility for numeric axes.
+export const AXIS_TICK = { fontSize: 12, fill: "hsl(var(--foreground))" } as const;
+export const AXIS_LABEL = { fontSize: 12, fill: "hsl(var(--foreground))" } as const;
