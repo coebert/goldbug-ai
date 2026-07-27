@@ -241,12 +241,16 @@ describe("multi-deposit portfolios: daily % excludes cash flows on every surface
     expect(daily[1].pnl).toBeCloseTo(6, 6);
 
     // Trailing card badge and tile: £11 trading on £1,000,000 capital.
+    // Trailing card badge covers the full window: £11 trading on
+    // £1,000,000 capital. Mode-summary tile anchors on the last two
+    // snapshots (no flow between) so it reports the last-day £6.
     const cardPct = computeCardRangePct(spark(rows), depsCard(deposits), false)!;
     const summary = computeModeSummary(series(rows), PORTS, depsSummary(deposits))!;
     expect(cardPct).toBeCloseTo((11 / 1_000_000) * 100, 6);
-    expect(summary.real.pnl).toBeCloseTo(11, 6);
-    expect(summary.real.pct).toBeCloseTo((11 / 1_000_000) * 100, 6);
+    expect(summary.real.pnl).toBeCloseTo(6, 6);
+    expect(summary.real.pct).toBeCloseTo((6 / 1_000_005) * 100, 6);
     // And definitively NOT the raw +100000%-ish figure.
+
     expect(cardPct).toBeLessThan(1);
     expect(summary.real.pct).toBeLessThan(1);
   });
