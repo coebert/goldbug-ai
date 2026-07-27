@@ -169,7 +169,8 @@ export const applyAlgoRegimeTuneWithShadow = createServerFn({ method: "POST" })
     );
     const baselineReport = calibrateRegime(observations, equity);
     const previous = await loadOverride(context.supabase, data.portfolioId);
-    const tuned = suggestConfigAdjustments(baselineReport, previous);
+    const riskLevel = await loadRiskLevel(context.supabase, data.portfolioId);
+    const tuned = suggestConfigAdjustments(baselineReport, previous, riskLevel);
 
     const baseline = {
       matched: baselineReport.matched,
