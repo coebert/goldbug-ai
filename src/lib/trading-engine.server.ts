@@ -924,6 +924,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Feature lookup for later use (volatility sizing, asset class)
   const featureBySymbol = new Map(features.map((f) => [f.symbol, f] as const));
 
+  // Per-symbol microstructure calibration overrides (ADV$, realized vol, ATR
+  // → tightened impact_coeff / vol_widening_coeff_bps / caps). Falls back to
+  // DEFAULT_TUNING when a symbol has no persisted calibration row.
+  const { loadTuningForSymbols } = await import("./execution-calibration.server");
+  const symbolTuning = await loadTuningForSymbols(features.map((f) => f.symbol))
+    .catch(() => new Map<string, import("./spread-slippage").SpreadSlippageTuning>());
+
+
   // Phase 6 — execution-alpha helper for sells. Mirrors the buy-path wiring
   // (TOD haircut/hard-block + slice plan) so protective and discretionary
   // sells surface the same telemetry and respect the same auction windows.
@@ -1771,13 +1779,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
+      const symTuning = symbolTuning.get(meta.symbol.toUpperCase());
       const feeAdjustedParams = {
         ...(cfg.execution_params ?? {}),
         min_commission: Math.max(
           Number(cfg.execution_params?.min_commission ?? 0),
           saxoFee.tier.min,
         ),
+        // Per-symbol microstructure overrides win over user config to reflect
+        // the actual liquidity/volatility we measured for this name.
+        microstructure: {
+          ...(cfg.execution_params?.microstructure ?? {}),
+          ...(symTuning ?? {}),
+        },
       };
+
       const outcome = applyBuyExecution({
         requestedSpend: spend,
         price,

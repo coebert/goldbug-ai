@@ -122,7 +122,12 @@ export type ExecutionParamsConfig = {
   adv_participation: number;
   min_trade_value: number;
   min_commission: number;
+  /** Optional microstructure tuning overrides merged into DEFAULT_TUNING at
+   *  call time (see spread-slippage.ts). Left loosely typed so per-symbol
+   *  calibration can plug in without importing engine types here. */
+  microstructure?: Record<string, number>;
 };
+
 
 export type ExecutionCalibrationMeta = {
   as_of: string;
@@ -308,10 +313,12 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   if (r.execution_params && typeof r.execution_params === "object") {
     const e = r.execution_params as Record<string, unknown>;
     const ep: Partial<ExecutionParamsConfig> = {};
-    const num = (k: keyof ExecutionParamsConfig, min: number, max: number) => {
+    type NumericParamKey = Exclude<keyof ExecutionParamsConfig, "microstructure">;
+    const num = (k: NumericParamKey, min: number, max: number) => {
       const n = Number(e[k]);
       if (Number.isFinite(n)) ep[k] = Math.max(min, Math.min(max, n));
     };
+
     num("slippage_bps", 0, 500);
     num("commission_bps", 0, 500);
     num("spread_atr_frac", 0, 2);
