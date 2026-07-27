@@ -192,7 +192,9 @@ function ReportPage() {
                       const first = s[0];
                       const last = s[s.length - 1];
                       const stratPct = first.strategy > 0 ? ((last.strategy - first.strategy) / first.strategy) * 100 : 0;
-                      const benchPct = first.benchmark > 0 ? ((last.benchmark - first.benchmark) / first.benchmark) * 100 : 0;
+                      const fb = first.benchmark ?? 0;
+                      const lb = last.benchmark ?? 0;
+                      const benchPct = fb > 0 ? ((lb - fb) / fb) * 100 : 0;
                       return `Strategy ${stratPct >= 0 ? "up" : "down"} ${Math.abs(stratPct).toFixed(2)} percent. ${data.benchmark} ${benchPct >= 0 ? "up" : "down"} ${Math.abs(benchPct).toFixed(2)} percent. Both normalised to portfolio start.`;
                     })()}
                   </span>
