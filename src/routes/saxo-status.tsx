@@ -202,7 +202,7 @@ function EnvCard({
             </div>
           ))}
         </dl>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             onClick={onConnect}
@@ -211,12 +211,87 @@ function EnvCard({
             <ExternalLink className="mr-1.5 h-4 w-4" />
             {status.connected ? `Reconnect ${label}` : `Connect ${label}`}
           </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onSyncBalance}
+            disabled={!status.connected || syncing}
+            title="Fetch fresh balance from Saxo and reconcile every live portfolio in this environment. Use this right after a deposit."
+          >
+            <DownloadCloud className={`mr-1.5 h-4 w-4 ${syncing ? "animate-pulse" : ""}`} />
+            {syncing ? "Syncing…" : "Sync Saxo balance"}
+          </Button>
           {!status.appConfigured && (
             <span className="inline-flex items-center gap-1 text-xs text-amber-500">
               <AlertTriangle className="h-3.5 w-3.5" /> Save app credentials first.
             </span>
           )}
         </div>
+        {syncError && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-500">
+            Sync failed: {syncError}
+          </div>
+        )}
+        {lastSync && (
+          <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium text-foreground">Latest broker snapshot</span>
+              <span className="text-muted-foreground">{fmtDateTime(lastSync.fetchedAt)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+              <div>
+                <div className="text-[10px] uppercase text-muted-foreground">Total value</div>
+                <div className="font-mono">{fmtMoney(lastSync.totalValue, lastSync.currency)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase text-muted-foreground">Cash</div>
+                <div className="font-mono">{fmtMoney(lastSync.cash, lastSync.currency)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase text-muted-foreground">Positions</div>
+                <div className="font-mono">
+                  {fmtMoney(lastSync.positionsValue, lastSync.currency)}{" "}
+                  <span className="text-muted-foreground">({lastSync.positionsCount})</span>
+                </div>
+              </div>
+            </div>
+            {lastSync.synced.length > 0 && (
+              <div className="border-t border-border pt-2">
+                <div className="mb-1 text-[10px] uppercase text-muted-foreground">
+                  Reconciled portfolios ({lastSync.synced.length})
+                </div>
+                <ul className="space-y-1">
+                  {lastSync.synced.map((s) => (
+                    <li key={s.portfolioId} className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="truncate">{s.name}</span>
+                      {!s.ok ? (
+                        <span className="text-red-500">{s.message ?? "failed"}</span>
+                      ) : s.skipped ? (
+                        <span className="text-muted-foreground">skipped — {s.reason ?? "no change"}</span>
+                      ) : (
+                        <span className="font-mono">
+                          {fmtMoney(s.previousCash ?? null, lastSync.currency)} →{" "}
+                          {fmtMoney(s.newCash ?? null, lastSync.currency)}
+                          {typeof s.delta === "number" && Number.isFinite(s.delta) && s.delta !== 0 && (
+                            <span className={s.delta > 0 ? "ml-1 text-emerald-500" : "ml-1 text-red-500"}>
+                              ({s.delta > 0 ? "+" : ""}
+                              {fmtMoney(s.delta, lastSync.currency)})
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {lastSync.synced.length === 0 && (
+              <div className="text-muted-foreground">
+                No live portfolios in this environment yet — snapshot fetched for verification only.
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
