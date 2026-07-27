@@ -199,6 +199,21 @@ export type SimulateOptions = {
     maxParticipationRate?: number;
     minFillQuantity?: number;
   };
+  /**
+   * When true, any decision that only partially fills because of a
+   * `liquidity` truncation has its residual quantity automatically
+   * re-queued as a follow-up decision, up to
+   * `timeSliceMaxAttempts` extra attempts (default 5). Each attempt
+   * gets a FRESH per-decision liquidity cap — mirroring "the next bar
+   * of ADV becomes available" — and produces its own snapshot linked
+   * to the original decision via `sliceOf` + `sliceIndex`. Slices
+   * respect the same cash / position / min-fill rules as any other
+   * decision, and stop early once the residual is fully filled or a
+   * follow-up gets rejected. Off by default: existing callers keep
+   * one-shot semantics.
+   */
+  timeSliceUnfilled?: boolean;
+  timeSliceMaxAttempts?: number;
 };
 
 export type SimulateResult = {
