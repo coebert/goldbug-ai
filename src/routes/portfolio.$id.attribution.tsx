@@ -11,6 +11,8 @@ import { ArrowLeft } from "lucide-react";
 import {
   BarChart,
   Bar,
+  Cell,
+  LabelList,
   LineChart,
   Line,
   XAxis,
@@ -23,6 +25,7 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
+import { AXIS_TICK, CHART_ROLE } from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/portfolio/$id/attribution")({
   head: () => ({
@@ -51,7 +54,10 @@ const SIGNAL_COLORS: Record<string, string> = {
 const SIGNALS = ["sma_trend", "rsi", "price_change", "news_sentiment", "volatility"] as const;
 
 function fmtPct(v: number | null | undefined, digits = 2) {
-  return v == null ? "—" : `${v.toFixed(digits)}%`;
+  if (v == null) return "—";
+  // Always show a sign glyph so meaning is not colour-only.
+  const sign = v > 0 ? "▲ +" : v < 0 ? "▼ " : "";
+  return `${sign}${v.toFixed(digits)}%`;
 }
 function fmtRate(v: number | null | undefined) {
   return v == null ? "—" : `${(v * 100).toFixed(0)}%`;
@@ -123,16 +129,27 @@ function AttributionPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.overall.rows.map((r) => ({ signal: r.signal, contribution: r.contribution_pct, win: r.win_rate == null ? null : r.win_rate * 100 }))}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="signal" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" label={{ value: "Contribution to P&L (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                      <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" domain={[0, 100]} label={{ value: "Win rate (%)", angle: 90, position: "insideRight", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
+                      <XAxis dataKey="signal" tick={AXIS_TICK} stroke="hsl(var(--foreground))" />
+                      <YAxis yAxisId="left" tick={AXIS_TICK} stroke="hsl(var(--foreground))" label={{ value: "Contribution to P&L (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--foreground))", style: { fontSize: 12 } }} />
+                      <YAxis yAxisId="right" tick={AXIS_TICK} orientation="right" stroke="hsl(var(--foreground))" domain={[0, 100]} label={{ value: "Win rate (%)", angle: 90, position: "insideRight", fill: "hsl(var(--foreground))", style: { fontSize: 12 } }} />
                       <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                      <Legend />
-                      <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--muted-foreground))" />
+                      <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
+                      <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.5} />
                       <Bar yAxisId="left" dataKey="contribution" name="Signed contribution (%)">
                         {data.overall.rows.map((r) => (
-                          <Bar key={r.signal} dataKey="contribution" fill={r.contribution_pct >= 0 ? "#22c55e" : "#ef4444"} />
+                          <Cell
+                            key={r.signal}
+                            fill={r.contribution_pct >= 0 ? CHART_ROLE.positive : CHART_ROLE.negative}
+                          />
                         ))}
+                        <LabelList
+                          dataKey="contribution"
+                          position="top"
+                          style={{ fontSize: 11, fill: "hsl(var(--foreground))", fontVariantNumeric: "tabular-nums" }}
+                          formatter={(v: number) =>
+                            v == null ? "" : `${v >= 0 ? "▲ +" : "▼ "}${v.toFixed(2)}%`
+                          }
+                        />
                       </Bar>
                       <Bar yAxisId="right" dataKey="win" name="Win rate (%)" fill="#64748b" opacity={0.6} />
                     </BarChart>
@@ -170,9 +187,9 @@ function AttributionPage() {
                         <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
                         <Legend />
                         <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
-                        <Line type="monotone" dataKey="strategy" name="Strategy (sum of trade returns %)" stroke="#22d3ee" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="benchmark" name="SPY (same windows)" stroke="#94a3b8" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="alpha" name="Alpha (strategy − SPY)" stroke="#22c55e" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="strategy" name="Strategy (solid)" stroke={CHART_ROLE.positive} strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="benchmark" name="SPY (dashed)" stroke={CHART_ROLE.benchmark} strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                        <Line type="monotone" dataKey="alpha" name="Alpha = Strategy − SPY (dotted)" stroke={CHART_ROLE.highlight} strokeWidth={2} strokeDasharray="2 3" dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
