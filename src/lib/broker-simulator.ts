@@ -29,6 +29,8 @@
 // execution-realism / execution-slicer. This module owns the ledger
 // arithmetic and its guarantees.
 
+import { effectiveMaxParticipation } from "./microstructure/algo-regime-guard";
+
 export type Side = "BUY" | "SELL";
 
 export type SimDecision = {
@@ -164,7 +166,8 @@ export type SimRejection = {
     | "insufficient_cash"
     | "would_borrow"
     | "would_short"
-    | "no_liquidity";
+    | "no_liquidity"
+    | "algo_regime_block";
   requested: { quantity: number; price: number; fee: number };
 };
 
@@ -287,6 +290,16 @@ export type SimulateOptions = {
    */
   timeSliceUnfilled?: boolean;
   timeSliceMaxAttempts?: number;
+
+  /**
+   * Phase B — adaptive execution guardrail. When set, the snapshot's
+   * `multipliers.maxParticipation` is folded into `liquidity` as the
+   * stricter of {caller cap, regime cap}, and if `blockNewBuys` is true
+   * every BUY decision is rejected up-front with reason
+   * `algo_regime_block` (SELLs / protective exits are never blocked).
+   * Omit for byte-identical legacy behaviour.
+   */
+  algoRegime?: import("./microstructure/algo-regime").AlgoRegimeSnapshot | null;
 };
 
 /**
@@ -599,6 +612,20 @@ export function simulateBrokerExecution(
   const snapshots: SimSnapshot[] = [];
   const rejections: SimRejection[] = [];
 
+  // Phase B — fold the algo-regime snapshot into effective options.
+  // We tighten `liquidity.maxParticipationRate` (never loosen it) and
+  // pre-reject BUYs when the guard recommends blocking new market buys.
+  const regime = options.algoRegime ?? null;
+  if (regime) {
+    const eff = effectiveMaxParticipation(options.liquidity?.maxParticipationRate, regime);
+    if (eff !== null) {
+      options = {
+        ...options,
+        liquidity: { ...(options.liquidity ?? {}), maxParticipationRate: eff },
+      };
+    }
+  }
+
   // Queue-based dispatch so a liquidity-truncated fill can enqueue its
   // residual as a follow-up decision when `timeSliceUnfilled` is on.
   // Each entry carries the parent decision id and the slice number so
@@ -612,10 +639,28 @@ export function simulateBrokerExecution(
     attemptsRemaining: number;
   };
   const sliceMax = Math.max(0, options.timeSliceMaxAttempts ?? 5);
-  const queue: QueueItem[] = decisions.map((d) => ({
-    decision: d, sliceOf: d.id, sliceIndex: 0,
-    attemptsRemaining: options.timeSliceUnfilled ? sliceMax : 0,
-  }));
+  const blockBuys = !!regime?.multipliers.blockNewBuys;
+  if (blockBuys) {
+    // Emit typed rejections up-front (before validation) so the report
+    // reflects the guard cleanly and no cash/position math ever runs.
+    let step = 0;
+    for (const d of decisions) {
+      step += 1;
+      if (d.side === "BUY") {
+        rejections.push({
+          step, decisionId: d.id, symbol: d.symbol, side: d.side,
+          reason: "algo_regime_block",
+          requested: { quantity: d.quantity, price: d.price, fee: d.fee ?? 0 },
+        });
+      }
+    }
+  }
+  const queue: QueueItem[] = decisions
+    .filter((d) => !(blockBuys && d.side === "BUY"))
+    .map((d) => ({
+      decision: d, sliceOf: d.id, sliceIndex: 0,
+      attemptsRemaining: options.timeSliceUnfilled ? sliceMax : 0,
+    }));
 
   // Threaded through each iteration so the per-branch snapshot pushes
   // can tag their emissions with the correct slice metadata.
@@ -953,6 +998,7 @@ export function buildExecutionQualityReport(
     would_borrow: 0,
     would_short: 0,
     no_liquidity: 0,
+    algo_regime_block: 0,
   };
   for (const r of rejections) rejectionsByReason[r.reason] += 1;
 
