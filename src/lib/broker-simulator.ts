@@ -29,6 +29,8 @@
 // execution-realism / execution-slicer. This module owns the ledger
 // arithmetic and its guarantees.
 
+import { effectiveMaxParticipation } from "./microstructure/algo-regime-guard";
+
 export type Side = "BUY" | "SELL";
 
 export type SimDecision = {
@@ -615,7 +617,6 @@ export function simulateBrokerExecution(
   // pre-reject BUYs when the guard recommends blocking new market buys.
   const regime = options.algoRegime ?? null;
   if (regime) {
-    const { effectiveMaxParticipation } = require("./microstructure/algo-regime-guard") as typeof import("./microstructure/algo-regime-guard");
     const eff = effectiveMaxParticipation(options.liquidity?.maxParticipationRate, regime);
     if (eff !== null) {
       options = {
