@@ -51,6 +51,16 @@ export type SimDecision = {
    * ADV-like volumes, not to a size someone else has already sized down).
    */
   availableVolume?: number;
+  /**
+   * Optional per-decision rolling window of recent bar volumes. Used
+   * only when `availableVolume` is not set. The engine reduces this
+   * series to a single volume figure via the liquidity model's
+   * aggregator (default `mean`) and treats the result exactly as if it
+   * had been passed as `availableVolume`. Empty / all-invalid arrays
+   * fall back to `options.liquidity` sources.
+   */
+  volumeHistory?: number[];
+
 };
 
 export type SimHolding = {
