@@ -142,6 +142,7 @@ import { CryptoBacktestCard } from "@/components/crypto-backtest-card";
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
+import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 const BacktestResultsCard = lazy(() =>
