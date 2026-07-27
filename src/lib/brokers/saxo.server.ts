@@ -285,7 +285,7 @@ export class SaxoAdapter implements BrokerAdapter {
         totalValue: bal.TotalValue ?? null,
         currency: bal.Currency ?? null,
       }),
-      error: null,
+      error: undefined,
     });
 
     return {
