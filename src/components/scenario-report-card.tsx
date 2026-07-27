@@ -13,6 +13,7 @@ import {
   buildScenarioReport, defaultScenarioSpecs,
   type BuildScenarioReportInput, type ScenarioReport,
 } from "@/lib/scenario-report";
+import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
 
 const PALETTE = [
   "hsl(217 91% 60%)",
@@ -155,6 +156,8 @@ export function ScenarioReportCard(props: {
         <ExecutionQualitySection reports={reports} visible={visible} />
 
         <CostBreakdownSection reports={reports} visible={visible} />
+
+        <ExecutionCostHeatmaps reports={reports} visible={visible} />
 
 
 
