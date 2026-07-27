@@ -107,7 +107,8 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
   const rows = breakdown.buckets;
   const chartData = rows.map((b) => ({
     key: b.key,
-    name: b.label,
+    name: SHORT_LABELS[b.key] ?? b.label,
+    fullName: b.label,
     amount: b.amount,
     pct: b.pctPoints,
   }));
