@@ -15,7 +15,7 @@ import {
   type AlgoRegimeConfig,
 } from "@/lib/microstructure/algo-regime";
 import { calibrateRegime } from "@/lib/microstructure/algo-regime-calibration";
-import { suggestConfigAdjustments } from "@/lib/microstructure/algo-regime-autotune";
+import { suggestConfigAdjustments, type RiskLevel } from "@/lib/microstructure/algo-regime-autotune";
 import {
   compareAlgoRegimeConfigs,
   type BacktestComparison,
