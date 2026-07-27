@@ -831,7 +831,34 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   })();
 
+  // Phase E — algo-regime guard. Best-effort snapshot; failure never blocks
+  // the tick. Threaded into the AI prompt (Phase D), into live routing
+  // (Phase B pre-place block for new BUYs) and persisted in decisions.raw
+  // for observability.
+  const algoRegime = await (async () => {
+    try {
+      const { buildAlgoRegimeSnapshot } = await import(
+        "./microstructure/algo-regime.server"
+      );
+      return await buildAlgoRegimeSnapshot({
+        asOf,
+        holdingSymbols: (holdings ?? []).map((h) => h.symbol),
+      });
+    } catch (e) {
+      console.warn("algo-regime snapshot failed", e);
+      return null;
+    }
+  })();
+  const algoRegimeBlock = await (async () => {
+    if (!algoRegime) return null;
+    const { formatAlgoRegimePromptBlock } = await import(
+      "./microstructure/algo-regime-prompt"
+    );
+    return formatAlgoRegimePromptBlock(algoRegime);
+  })();
+
   // If circuit breaker is tripped, skip the AI call entirely.
+
   const decision: DecisionOutput = breakerTripped
     ? {
         briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
