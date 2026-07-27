@@ -14,6 +14,7 @@ import {
 import {
   suggestConfigAdjustments,
   type AutoTuneResult,
+  type RiskLevel,
 } from "@/lib/microstructure/algo-regime-autotune";
 import {
   DEFAULT_ALGO_REGIME_CONFIG,
