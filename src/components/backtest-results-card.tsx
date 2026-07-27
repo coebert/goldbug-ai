@@ -21,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
+import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 import { AXIS_TICK, CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
