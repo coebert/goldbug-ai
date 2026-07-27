@@ -108,10 +108,13 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
   const qc = useQueryClient();
   const queryKey = ["trade-outcomes", portfolioId] as const;
 
+  const [windowHours, setWindowHours] = useState<number>(24);
+  const queryKey = ["trade-outcomes", portfolioId, windowHours] as const;
+
   const query = useQuery({
     queryKey,
     queryFn: () =>
-      fetchOutcomes({ data: { portfolioId, sinceHours: 24, limit: 80 } }),
+      fetchOutcomes({ data: { portfolioId, sinceHours: windowHours, limit: 200 } }),
     enabled: active,
     staleTime: 15_000,
     refetchInterval: active ? 30_000 : false,
