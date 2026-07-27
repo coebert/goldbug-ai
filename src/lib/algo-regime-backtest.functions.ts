@@ -212,7 +212,7 @@ export const backtestAlgoRegimeCandidate = createServerFn({ method: "POST" })
       perDay.map((d) => ({ date: d.date, tier: "normal" })), // placeholder — unused, real tiers come from simulate
       equity,
     );
-    const tuned = suggestConfigAdjustments(baselineReport, activeConfig);
+    const tuned = suggestConfigAdjustments(baselineReport, activeConfig, riskLevel);
     const candidateConfig: AlgoRegimeConfig = data.candidate
       ? {
           ...activeConfig,
