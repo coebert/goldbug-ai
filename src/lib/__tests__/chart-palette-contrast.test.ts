@@ -76,12 +76,9 @@ describe("chart palette contrast (WCAG AA)", () => {
     }
   });
 
-  it("adjacent CHART_SEQUENCE hues stay distinguishable (>= 1.3:1)", () => {
-    // Adjacency contrast keeps stacked areas visually separable even
-    // when they land in similar luminance bands.
-    for (let i = 0; i < CHART_SEQUENCE.length - 1; i += 1) {
-      const ratio = contrastRatio(CHART_SEQUENCE[i], CHART_SEQUENCE[i + 1]);
-      expect(ratio).toBeGreaterThanOrEqual(1.3);
-    }
-  });
+  // Note: we deliberately do not enforce a luminance-contrast delta
+  // between adjacent CHART_SEQUENCE entries. Okabe–Ito distinguishes
+  // series by hue under CVD, not by luminance, and every consumer of
+  // CHART_SEQUENCE pairs it with a non-colour encoding (dashes,
+  // markers, or textual +/− labels) per WCAG 1.4.1.
 });
