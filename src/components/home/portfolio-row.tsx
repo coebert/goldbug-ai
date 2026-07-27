@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Banknote,
   Briefcase,
+  Info,
   MoreVertical,
   Pencil,
   PlayCircle,
@@ -14,6 +15,12 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import { Sparkline } from "@/components/sparkline";
 import { Skeleton } from "@/components/ui/skeleton";
