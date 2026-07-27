@@ -195,7 +195,57 @@ export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string
             )}
           </div>
         )}
+        {history.data && history.data.length > 0 && (
+          <div className="rounded-lg border p-3 text-xs space-y-2 bg-muted/10">
+            <div className="font-medium">Tune history</div>
+            <div className="space-y-1">
+              {history.data.map((row) => {
+                const color = STATUS_COLORS[row.status] ?? "";
+                return (
+                  <div
+                    key={row.id}
+                    className="flex items-start justify-between gap-2 border-t pt-1 first:border-t-0 first:pt-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono">
+                          {new Date(row.appliedAt).toLocaleString()}
+                        </span>
+                        <span className={`uppercase font-semibold ${color}`}>
+                          {row.status.replace("_", " ")}
+                        </span>
+                      </div>
+                      {row.decisionReason && (
+                        <div className="text-muted-foreground">{row.decisionReason}</div>
+                      )}
+                      {row.notes && (
+                        <div className="text-muted-foreground truncate" title={row.notes}>
+                          {row.notes}
+                        </div>
+                      )}
+                      <div className="text-[11px] text-muted-foreground">
+                        baseline n={row.baseline.matched} · post n={row.post.matched ?? "—"}
+                      </div>
+                    </div>
+                    {row.status !== "rolled_back" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={rollback.isPending}
+                        onClick={() => rollback.mutate(row.id)}
+                        className="shrink-0"
+                      >
+                        <Undo2 className="mr-1 h-3 w-3" /> Roll back
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
+
 }
