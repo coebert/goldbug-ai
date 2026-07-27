@@ -11,6 +11,8 @@ import { ArrowLeft } from "lucide-react";
 import {
   BarChart,
   Bar,
+  Cell,
+  LabelList,
   LineChart,
   Line,
   XAxis,
@@ -23,6 +25,7 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
+import { AXIS_TICK, CHART_ROLE } from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/portfolio/$id/attribution")({
   head: () => ({
