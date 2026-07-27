@@ -121,6 +121,7 @@ export type ExecutionParamsConfig = {
   spread_atr_frac: number;
   adv_participation: number;
   min_trade_value: number;
+  min_commission: number;
 };
 
 export type ExecutionCalibrationMeta = {
