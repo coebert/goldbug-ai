@@ -109,15 +109,27 @@ export function DailyEquityChangesCard({
     };
   }, [rows]);
 
-  const chartData = rows.map((r) => ({
-    date: r.date,
-    label: fmtDateShort(r.date),
-    pct: Number(r.pct.toFixed(4)),
-    pnl: r.pnl,
-    equity: r.equity,
-    prevEquity: r.prevEquity,
-    netFlow: r.netFlow,
-  }));
+  const chartData = useMemo(() => {
+    const data = rows.map((r) => ({
+      date: r.date,
+      label: fmtDateShort(r.date),
+      pct: Number(r.pct.toFixed(4)),
+      pnl: r.pnl,
+      equity: r.equity,
+      prevEquity: r.prevEquity,
+      netFlow: r.netFlow,
+      // rawDelta is reconstructed so the assertion can verify pnl fully
+      // accounts for netFlow (identity by construction is fine — the
+      // real check is the pure-flow-day and pct-derivation branches).
+      rawDelta: r.pnl + r.netFlow,
+    }));
+    // 4-dp rounding on pct means ~5e-5 pp of slack vs the exact
+    // pnl/prev ratio; give the assertion matching tolerance.
+    assertNoFlowLeakage(data, "DailyEquityChangesCard.chartData", {
+      pctTolerance: 1e-4,
+    });
+    return data;
+  }, [rows]);
 
   return (
     <Card data-testid="daily-equity-changes-card">
