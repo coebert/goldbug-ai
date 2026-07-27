@@ -528,38 +528,22 @@ function HoldingsStrip({
 }) {
   type SortKey = "value" | "weight" | "symbol";
   const [sortKey, setSortKey] = useState<SortKey>("value");
-  // Raw cost-basis per holding (qty * avg_cost). Used ONLY for
-  // per-chip weight ordering — never as the authoritative Invested
-  // total, which comes from the broker snapshot (totalEquity − cash).
-  const built = holdings.map((h) => {
-    const qty = Number(h.quantity);
-    const avg = Number(h.avg_cost);
-    const raw = qty * avg;
-    return { ...h, qty, avg, raw };
-  });
-  const rawInvested = built.reduce((s, r) => s + r.raw, 0);
-
   // Authoritative allocation, anchored to the broker's totalEquity so
-  // Invested% + Cash% == 100% and Total == totalEquity. Cost-basis
-  // sums can exceed equity (drawdown) or fall short of it (unrealised
-  // gains); either would produce percentages that don't add to 100.
-  const denom = totalEquity > 0 ? totalEquity : Math.max(0, rawInvested + cash);
-  const safeCash = Math.max(0, Math.min(cash, denom));
-  const investedValue = Math.max(0, denom - safeCash);
-  const investedPct = denom > 0 ? (investedValue / denom) * 100 : 0;
-  const cashPct = denom > 0 ? (safeCash / denom) * 100 : 0;
-
-  // Scale each chip's displayed value so the sum of chip values
-  // equals the authoritative investedValue (not rawInvested), and
-  // per-chip weights sum to investedPct.
-  const scale = rawInvested > 0 ? investedValue / rawInvested : 0;
-  const rows = [...built]
-    .map((r) => ({ ...r, value: r.raw * scale }))
-    .sort((a, b) => {
-      if (sortKey === "symbol") return a.symbol.localeCompare(b.symbol);
-      // value and weight rank identically (weight = value / denom)
-      return b.value - a.value;
-    });
+  // Invested% + Cash% == 100% and Total == totalEquity. See
+  // deriveStripAllocation for the invariants.
+  const {
+    chips,
+    investedValue,
+    safeCash,
+    denom,
+    investedPct,
+    cashPct,
+  } = deriveStripAllocation(holdings, cash, totalEquity);
+  const rows = [...chips].sort((a, b) => {
+    if (sortKey === "symbol") return a.symbol.localeCompare(b.symbol);
+    // value and weight rank identically (weight = value / denom)
+    return b.value - a.value;
+  });
 
   if (rows.length === 0) {
     return (
