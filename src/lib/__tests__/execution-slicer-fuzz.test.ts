@@ -205,7 +205,12 @@ describe("execution-slicer schemas: mutated inputs are rejected", () => {
     fc.assert(
       fc.property(
         validFillInputArb,
-        fc.string({ minLength: 501, maxLength: 2_000 }),
+        fc
+          .string({ minLength: 501, maxLength: 2_000 })
+          // The schema trims before enforcing max(500), so ensure the trimmed
+          // length still exceeds 500 (otherwise a whitespace-only payload
+          // shrinks to an empty — and valid — note).
+          .filter((s) => s.trim().length > 500),
         (base, longNote) => {
           const mutated = { ...base, note: longNote };
           expect(FillInputSchema.safeParse(mutated).success).toBe(false);
