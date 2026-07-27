@@ -43,8 +43,9 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
   });
 
   it("WITHDRAWAL layered on a real trading loss reports only the trading loss", () => {
-    // Equity: 1000 → 750. Cash-flow: −200 withdrawal.
-    // Trading PnL = (750 − 1000) − (−200) = −50 → −5.00%.
+    // Equity: 1000 → 750. Cash-flow: −200.
+    // Trading PnL = (750 − 1000) − (−200) = −50.
+    // Capital-adjusted denom = 1000 − 200 = 800.
     const series: SummarySeriesRow[] = [
       { date: "2026-07-20", "live-1": 1000 },
       { date: "2026-07-21", "live-1": 750 },
@@ -54,11 +55,12 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(-50);
-    expect(s?.real.pct).toBeCloseTo(-5, 10);
+    expect(s?.real.pct).toBeCloseTo((-50 / 800) * 100, 10);
   });
 
   it("WITHDRAWAL layered on a real trading gain reports only the trading gain", () => {
-    // Equity: 1000 → 900. Cash-flow: −200. Trading PnL = +100 → +10%.
+    // Equity: 1000 → 900. Cash-flow: −200. Trading PnL = +100.
+    // Capital-adjusted denom = 1000 − 200 = 800.
     const series: SummarySeriesRow[] = [
       { date: "2026-07-20", "live-1": 1000 },
       { date: "2026-07-21", "live-1": 900 },
@@ -68,8 +70,9 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(100);
-    expect(s?.real.pct).toBeCloseTo(10, 10);
+    expect(s?.real.pct).toBeCloseTo((100 / 800) * 100, 10);
   });
+
 
   it("SAME-MODE internal transfer (net 0 within mode) is a no-op on that mode", () => {
     // £150 moves from sim-1 → sim-2, both simulated. Sim-mode net
@@ -110,8 +113,8 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
   it("cross-mode transfer + real trading gain: each mode reports its own trading pnl", () => {
     // Live withdraws £200 to sim (transfer). Live also gained £50 from
     // trading, sim lost £30 from trading.
-    // Live: 1000 → (1000 + 50 − 200) = 850. Trading pnl = 50 → +5%.
-    // Sim : 500  → (500 − 30 + 200)   = 670. Trading pnl = −30 → −6%.
+    // Live: 1000 → 850, netFlow=-200, trading=50, denom=1000-200=800.
+    // Sim : 500  → 670, netFlow=+200, trading=-30, denom=500+200=700.
     const series: SummarySeriesRow[] = [
       { date: "2026-07-20", "sim-1": 500, "live-1": 1000 },
       { date: "2026-07-21", "sim-1": 670, "live-1": 850 },
@@ -122,10 +125,11 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
     ];
     const s = computeModeSummary(series, [SIM, LIVE], events);
     expect(s?.real.pnl).toBe(50);
-    expect(s?.real.pct).toBeCloseTo(5, 10);
+    expect(s?.real.pct).toBeCloseTo((50 / 800) * 100, 10);
     expect(s?.sim.pnl).toBe(-30);
-    expect(s?.sim.pct).toBeCloseTo(-6, 10);
+    expect(s?.sim.pct).toBeCloseTo((-30 / 700) * 100, 10);
   });
+
 
   it("withdrawal dated on/before the previous snapshot is already baked in — no double-net", () => {
     // Withdrawal on 2026-07-19 is BEFORE the previous-window anchor
@@ -160,6 +164,7 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
   it("withdrawal targeting a DIFFERENT portfolio in the same mode is still netted for that mode's total", () => {
     // Two sim portfolios. sim-2 sees a £100 withdrawal on 07-21.
     // Sim-mode total: 1000 → 940. Cash-flow: −100. Trading pnl = +40.
+    // Capital-adjusted denom = 1000 − 100 = 900.
     const series: SummarySeriesRow[] = [
       { date: "2026-07-20", "sim-1": 400, "sim-2": 600 },
       { date: "2026-07-21", "sim-1": 420, "sim-2": 520 },
@@ -170,7 +175,7 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
     const s = computeModeSummary(series, [SIM, SIM_B], events);
     expect(s?.sim.now).toBe(940);
     expect(s?.sim.pnl).toBe(40);
-    expect(s?.sim.pct).toBeCloseTo(4, 10);
+    expect(s?.sim.pct).toBeCloseTo((40 / 900) * 100, 10);
   });
 
   it("withdrawal on a DIFFERENT mode does not leak into this mode's pnl", () => {
@@ -193,7 +198,8 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
 
   it("mixed deposit + withdrawal on the same day are summed as net cash-flow", () => {
     // Same day: +£300 deposit and −£100 withdrawal → net +£200.
-    // Equity moves 1000 → 1250. Trading pnl = 250 − 200 = 50 → +5%.
+    // Equity moves 1000 → 1250. Trading pnl = 250 − 200 = 50.
+    // Capital-adjusted denom = 1000 + 200 = 1200.
     const series: SummarySeriesRow[] = [
       { date: "2026-07-20", "live-1": 1000 },
       { date: "2026-07-21", "live-1": 1250 },
@@ -204,8 +210,9 @@ describe("computeModeSummary — withdrawals and transfers excluded from pct", (
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(50);
-    expect(s?.real.pct).toBeCloseTo(5, 10);
+    expect(s?.real.pct).toBeCloseTo((50 / 1200) * 100, 10);
   });
+
 
   it("includeDeposits: true reverses the netting for withdrawals too (symmetry)", () => {
     // With the toggle ON, raw equity delta is reported — a withdrawal

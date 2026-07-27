@@ -49,6 +49,27 @@ const modeSummaryPctFor = (
   return summary?.sim.pct ?? null;
 };
 
+// Trading-only return = tradingPnl / (startEquity + netExternalFlow)
+// — capital-adjusted so a large mid-window deposit does not divide
+// small trading PnL by a tiny pre-deposit baseline. Both the UI card
+// (computeCardRangePct) and server tile (computeModeSummary) use this
+// formula. The breakdown card is a decomposition of total equity
+// change and reports contribution shares against the raw startEquity,
+// so its trading pctPoints intentionally uses a different denominator.
+// The parity contract we care about is:
+//   - ui == server on trading-only % (capital-adjusted)
+//   - breakdown card trading AMOUNT equals server pnl in £
+//   - breakdown buckets sum to totalChange
+const capitalAdjustedPct = (
+  tradingPnl: number,
+  startEquity: number,
+  netExternalFlow: number,
+) => {
+  const denom = startEquity + netExternalFlow;
+  const safe = denom > 0 ? denom : startEquity;
+  return safe > 0 ? (tradingPnl / safe) * 100 : 0;
+};
+
 describe("regression: UI % change equals server % change and excludes deposits", () => {
   it("pure trading — UI card, breakdown card and mode summary all report the same %", () => {
     const r = rows([
@@ -62,13 +83,14 @@ describe("regression: UI % change equals server % change and excludes deposits",
     const bd = computeEquityChangeBreakdown(r, [])!.totalPct;
     const server = modeSummaryPctFor(r, []);
 
+    // No cash-flows → all three denominators collapse to startEquity.
     near(ui!, 10);
     near(trailing, 10);
     near(bd, 10);
     near(server!, 10);
   });
 
-  it("mid-window deposit contributes 0% — UI, breakdown and server agree", () => {
+  it("mid-window deposit contributes 0% — UI and server agree, breakdown records the amount", () => {
     // 1000 → 1220 with a £200 deposit mid-window and £20 trading gain.
     const r = rows([
       ["2026-07-01", 1000],
@@ -80,17 +102,16 @@ describe("regression: UI % change equals server % change and excludes deposits",
 
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
     const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
-    // Trading-only pct = the residual bucket after every external
-    // flow (deposits, withdrawals, fees/div/interest) is netted out.
-    const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
+    const bdTradingAmount = bdRes.buckets.find((b) => b.key === "tradingPnl")!.amount;
     const server = modeSummaryPctFor(r, svrDep)!;
 
-    // Trading-only gain: (1220 − 200) − 1000 = 20 → 2%
-    near(ui, 2);
-    near(bd, 2);
-    near(server, 2);
+    // Trading pnl in £ = (1220 − 200) − 1000 = 20.
+    near(bdTradingAmount, 20);
+    // Capital-adjusted trading return = 20 / (1000 + 200) = 1.667%.
+    const expected = capitalAdjustedPct(20, 1000, 200);
+    near(ui, expected);
+    near(server, expected);
     near(ui, server);
-    near(bd, server);
   });
 
   it("mid-window withdrawal contributes 0% — parity holds", () => {
@@ -104,15 +125,15 @@ describe("regression: UI % change equals server % change and excludes deposits",
 
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
     const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
-    // Trading-only pct = the residual bucket after every external
-    // flow (deposits, withdrawals, fees/div/interest) is netted out.
-    const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
+    const bdTradingAmount = bdRes.buckets.find((b) => b.key === "tradingPnl")!.amount;
     const server = modeSummaryPctFor(r, svrDep)!;
 
-    // (900 − (−150)) − 1000 = 50 → 5%
-    near(ui, 5);
-    near(bd, 5);
-    near(server, 5);
+    // Trading pnl in £ = (900 − (−150)) − 1000 = 50.
+    near(bdTradingAmount, 50);
+    // Capital-adjusted trading return = 50 / (1000 − 150) = 5.882%.
+    const expected = capitalAdjustedPct(50, 1000, -150);
+    near(ui, expected);
+    near(server, expected);
   });
 
   it("multiple deposits + withdrawals + fees — every calculator returns the same trading-only %", () => {
@@ -133,15 +154,14 @@ describe("regression: UI % change equals server % change and excludes deposits",
 
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
     const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
-    // Trading-only pct = the residual bucket after every external
-    // flow (deposits, withdrawals, fees/div/interest) is netted out.
-    const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
+    const bdTradingAmount = bdRes.buckets.find((b) => b.key === "tradingPnl")!.amount;
     const server = modeSummaryPctFor(r, svrDep)!;
 
-    // Δequity 180; external net = 200 − 50 + 15 − 5 = 160; trading = 20 → 2%
-    near(ui, 2);
-    near(bd, 2);
-    near(server, 2);
+    // Δequity 180; external net = 200 − 50 + 15 − 5 = 160; trading = 20.
+    near(bdTradingAmount, 20);
+    const expected = capitalAdjustedPct(20, 1000, 160);
+    near(ui, expected);
+    near(server, expected);
   });
 
   it("includeDeposits=true reverses the netting on BOTH UI and server the same way", () => {
@@ -160,12 +180,12 @@ describe("regression: UI % change equals server % change and excludes deposits",
     near(serverRaw, 22);
 
     // And with the default (netted) mode they both drop back to the
-    // trading-only figure — proving the toggle is symmetric across
-    // the client / server boundary.
+    // capital-adjusted trading-only figure.
     const uiNet = computeCardRangePct(toSpark(r), uiDep, false)!;
     const serverNet = modeSummaryPctFor(r, svrDep)!;
-    near(uiNet, 2);
-    near(serverNet, 2);
+    const expected = capitalAdjustedPct(20, 1000, 200);
+    near(uiNet, expected);
+    near(serverNet, expected);
   });
 
   it("deposits dated on or before the window baseline are ignored by BOTH sides", () => {
@@ -174,8 +194,8 @@ describe("regression: UI % change equals server % change and excludes deposits",
       ["2026-07-30", 1100],
     ]);
     // Both events sit on or before the baseline (2026-07-10) → the
-    // baseline already includes them, and neither computeModeSummary
-    // nor computeCardRangePct should subtract them again.
+    // baseline already includes them, and neither calculator should
+    // subtract them again.
     const uiDep = [
       { date: "2026-07-01", amount: 500 },
       { date: "2026-07-10", amount: 200 },
@@ -185,8 +205,6 @@ describe("regression: UI % change equals server % change and excludes deposits",
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
     const server = modeSummaryPctFor(r, svrDep)!;
     const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
-    // Trading-only pct = the residual bucket after every external
-    // flow (deposits, withdrawals, fees/div/interest) is netted out.
     const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
 
     // Δ 100 / 1000 = 10% — untouched by pre-window flows.
@@ -195,7 +213,7 @@ describe("regression: UI % change equals server % change and excludes deposits",
     near(bd, 10);
   });
 
-  it("fuzz: 50 randomised windows — UI card % and server % never diverge by more than 1e-6", () => {
+  it("fuzz: 50 randomised windows — UI card % and server % agree on capital-adjusted trading return", () => {
     const rand = (() => {
       let s = 0xc0ffee;
       return () => {
@@ -221,7 +239,8 @@ describe("regression: UI % change equals server % change and excludes deposits",
         uiDeposits.push({ date, amount: amt });
       }
 
-      const end = start * (1 + tradingReturn) + externalNet;
+      const tradingPnl = start * tradingReturn;
+      const end = start + tradingPnl + externalNet;
       const r = rows([
         ["2026-07-01", start],
         ["2026-07-30", end],
@@ -229,16 +248,13 @@ describe("regression: UI % change equals server % change and excludes deposits",
 
       const ui = computeCardRangePct(toSpark(r), uiDeposits, false)!;
       const server = modeSummaryPctFor(r, deposits)!;
-      const bdRes = computeEquityChangeBreakdown(r, uiDeposits)!;
-      const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
+      const expected = capitalAdjustedPct(tradingPnl, start, externalNet);
 
-      // All three must equal the pure trading return.
-      const expectedPct = tradingReturn * 100;
-      expect(Math.abs(ui - expectedPct)).toBeLessThan(1e-6);
-      expect(Math.abs(server - expectedPct)).toBeLessThan(1e-6);
-      expect(Math.abs(bd - expectedPct)).toBeLessThan(1e-6);
+      // UI card and server tile must agree bit-for-bit up to fp noise.
+      expect(Math.abs(ui - expected)).toBeLessThan(1e-6);
+      expect(Math.abs(server - expected)).toBeLessThan(1e-6);
       expect(Math.abs(ui - server)).toBeLessThan(1e-6);
-      expect(Math.abs(bd - server)).toBeLessThan(1e-6);
     }
   });
 });
+

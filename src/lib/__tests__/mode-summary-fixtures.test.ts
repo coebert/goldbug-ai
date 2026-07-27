@@ -55,19 +55,22 @@ describe("computeModeSummary — mixed deposit fixtures & event ordering", () =>
     const s = computeModeSummary(series, portfolios, shuffledDeposits)!;
     // Real now = 520 + 445 = 965; previous = 305 + 495 = 800.
     // Net real deposits in window = 200 + 0.004 + 0 − 50 = 150.004.
-    // Trading pnl = (965 − 800) − 150.004 = 14.996.
+    // Trading pnl = (965 − 800) − 150.004 = 14.996. Denominator is
+    // capital-adjusted (prev + net flows = 950.004).
     expect(s.real.now).toBe(965);
     expect(s.real.pnl).toBeCloseTo(14.996, 6);
-    expect(s.real.pct).toBeCloseTo((14.996 / 800) * 100, 6);
+    expect(s.real.pct).toBeCloseTo((14.996 / 950.004) * 100, 6);
   });
 
   it("sim mode nets its own deposit and ignores real-side events", () => {
     const s = computeModeSummary(series, portfolios, shuffledDeposits)!;
     // Sim now = 1250; previous = 1010; deposit = 200 → pnl = 40.
+    // Capital-adjusted denominator = 1010 + 200 = 1210.
     expect(s.sim.now).toBe(1250);
     expect(s.sim.pnl).toBeCloseTo(40, 6);
-    expect(s.sim.pct).toBeCloseTo((40 / 1010) * 100, 6);
+    expect(s.sim.pct).toBeCloseTo((40 / 1210) * 100, 6);
   });
+
 
   it("result is invariant to deposit event ordering", () => {
     const forward = computeModeSummary(series, portfolios, shuffledDeposits)!;
@@ -99,10 +102,12 @@ describe("computeModeSummary — mixed deposit fixtures & event ordering", () =>
         { portfolio_id: REAL_A, date: "2026-07-20", amount: -500 },
       ],
     )!;
-    // rawDelta = −50; netDeposits = −100 → pnl = −50 − (−100) = 50.
+    // rawDelta = −50; netDeposits = −100 → pnl = 50.
+    // Capital-adjusted denom = 1000 − 100 = 900.
     expect(s.real.pnl).toBeCloseTo(50, 6);
-    expect(s.real.pct).toBeCloseTo(5, 6);
+    expect(s.real.pct).toBeCloseTo((50 / 900) * 100, 6);
   });
+
 
   it("includeDeposits:true short-circuits netting even with mixed events", () => {
     const s = computeModeSummary(series, portfolios, shuffledDeposits, {
@@ -127,6 +132,8 @@ describe("computeModeSummary — mixed deposit fixtures & event ordering", () =>
     // (out of window) or 07-19 (before prev). pnl = 0 − 123 = −123.
     expect(s.real.now).toBe(800);
     expect(s.real.pnl).toBeCloseTo(-123, 6);
-    expect(s.real.pct).toBeCloseTo((-123 / 800) * 100, 6);
+    // Capital-adjusted denominator = 800 + 123 = 923.
+    expect(s.real.pct).toBeCloseTo((-123 / 923) * 100, 6);
   });
+
 });
