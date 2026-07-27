@@ -172,7 +172,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         .from("live_broker_log")
         .select("portfolio_id,created_at,response,status")
         .in("portfolio_id", liveIds)
-        .eq("method", "CASH_SYNC")
+        .in("method", ["CASH_SYNC", "HOLDINGS_SYNC"])
         .eq("status", 200)
         .order("created_at", { ascending: false })
         .limit(50);

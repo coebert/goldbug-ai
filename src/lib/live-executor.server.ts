@@ -214,10 +214,12 @@ export async function routeOrdersToBroker(params: {
     const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
     const { withOwnedClient } = await import("./_server/owned-client");
     const preSync = await syncLiveCashFromBroker(portfolio.id, withOwnedClient(userId));
-    // If the drift-update ran, capture the fresh broker cash so the
-    // affordability check below uses the same number the local DB just wrote.
+    // If the drift-update ran, capture the fresh broker spendable cash so the
+    // affordability check below does not use ledger cash reserved by Saxo.
     if (!preSync.skipped && Number.isFinite(preSync.brokerCash)) {
-      brokerCashAvailable = Number(preSync.brokerCash);
+      brokerCashAvailable = preSync.brokerSpendableCash != null
+        ? Number(preSync.brokerSpendableCash)
+        : Number(preSync.brokerCash);
     }
     await supabaseAdmin.from("live_broker_log").insert({
       portfolio_id: portfolio.id,

@@ -331,4 +331,47 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
     expect(snap!.holdings_value).toBe(150);
     expect(snap!.total_value).toBe(250);
   });
+
+  it("uses broker ledger cash for equity, not lower spendable cash reserved by Saxo", async () => {
+    // Reproduces the stale-warning screenshot: Saxo ledger cash is £124.60
+    // but spendable cash / SpendingPower is only £14.98 because the broker
+    // has reserved/ring-fenced funds. Equity accounting must keep using the
+    // ledger cash that reconciles to TotalValue; otherwise CASH_SYNC records
+    // a fake -£109.62 withdrawal, lowers starting_cash, and leaves today's
+    // snapshot appearing stale.
+    const today = new Date().toISOString().slice(0, 10);
+    const store = makeStore(
+      [{
+        id: PID, user_id: UID, mode: "live_prod",
+        current_cash: 124.6, starting_cash: 300,
+        live_paused: false, currency: "GBP",
+      }],
+      [{ id: "h1", portfolio_id: PID }],
+      [],
+    );
+    store.equity_snapshots.push({
+      id: "today", portfolio_id: PID, snapshot_date: today,
+      cash: 124.6, holdings_value: 177.23, total_value: 301.83,
+    });
+    balanceStub.mockResolvedValue({
+      cash: 124.6,
+      cashAvailable: 14.98,
+      spendingPower: 14.98,
+      totalValue: 301.83,
+      currency: "GBP",
+    });
+
+    const res = await syncLiveCashFromBroker(PID, makeOwned(store, UID));
+
+    expect(res).toMatchObject({ skipped: true, reason: "no material drift" });
+    expect(store.portfolios[0].current_cash).toBe(124.6);
+    expect(store.portfolios[0].starting_cash).toBe(300);
+    const snap = store.equity_snapshots.find((s) => s.snapshot_date === today);
+    expect(snap).toMatchObject({
+      cash: 124.6,
+      holdings_value: 177.23,
+      total_value: 301.83,
+    });
+    expect(store.live_broker_log).toHaveLength(0);
+  });
 });
