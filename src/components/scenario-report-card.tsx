@@ -13,6 +13,7 @@ import {
   buildScenarioReport, defaultScenarioSpecs,
   type BuildScenarioReportInput, type ScenarioReport,
 } from "@/lib/scenario-report";
+import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
 
 const PALETTE = [
   "hsl(217 91% 60%)",
