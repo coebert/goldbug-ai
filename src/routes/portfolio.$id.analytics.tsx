@@ -6,6 +6,7 @@ import { PerformanceAnalyticsCard } from "@/components/performance-analytics-car
 import { ExecutionQualityCard } from "@/components/execution-quality-card";
 import { AlgoRegimeHistoryCard } from "@/components/algo-regime-history-card";
 import { AlgoRegimeCalibrationCard } from "@/components/algo-regime-calibration-card";
+import { AlgoRegimeBacktestCard } from "@/components/algo-regime-backtest-card";
 
 export const Route = createFileRoute("/portfolio/$id/analytics")({
   head: () => ({
