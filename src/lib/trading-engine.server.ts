@@ -432,25 +432,57 @@ If no action is warranted, return an empty orders array.`;
     });
     return output;
   } catch (error) {
-    if (NoObjectGeneratedError.isInstance(error)) {
-
+    // AI gateway failures (403 Forbidden, 429 rate-limit, 402 credits,
+    // network) and unparseable outputs must NEVER abort the tick — the
+    // engine's downstream guardrail exits (stop-loss, take-profit, ATR
+    // trailing, chandelier, time-based, hedging reconciliation) still need
+    // to run. We also emit a NON-AI HEURISTIC set of protective sells so
+    // risk keeps coming down even when the model is unreachable. No BUYs
+    // are proposed without the model's risk view.
+    const parseFail = NoObjectGeneratedError.isInstance(error);
+    const msg = parseFail
+      ? (error.text?.slice(0, 300) ?? "structured output parse error")
+      : (error instanceof Error ? error.message : String(error));
+    console.warn(
+      `AI decision unavailable — falling back to heuristic (${parseFail ? "parse" : "gateway"}: ${msg.slice(0, 160)})`,
+    );
+    try {
+      const { buildHeuristicDecision } = await import("./heuristic-decision");
+      const heuristic = buildHeuristicDecision({
+        holdings: args.holdings.map((h) => ({
+          symbol: h.symbol,
+          quantity: Number(h.quantity),
+        })),
+        features: args.features.map((f) => ({
+          symbol: f.symbol,
+          rsi14: f.rsi14,
+          change5d: f.change5d,
+          change30d: f.change30d,
+          macd_hist: f.macd_hist,
+        })),
+        reason: msg,
+      });
       return {
-        briefing: "AI response could not be parsed; taking no action today.",
-        rationale: error.text?.slice(0, 500) ?? "Parse error",
+        briefing: heuristic.briefing,
+        rationale: heuristic.rationale,
+        orders: heuristic.orders.map((o) => ({
+          symbol: o.symbol,
+          side: o.side,
+          quantity: o.quantity,
+          reason: o.reason,
+        })) as DecisionOutput["orders"],
+      };
+    } catch (heuristicErr) {
+      // Heuristic itself must never break the tick. Fall through to an
+      // empty decision so guardrails still run downstream.
+      const hMsg = heuristicErr instanceof Error ? heuristicErr.message : String(heuristicErr);
+      console.warn(`Heuristic fallback failed — ${hMsg}`);
+      return {
+        briefing: `AI provider unavailable (${msg.slice(0, 120)}); heuristic fallback errored. Guardrail exits still applied.`,
+        rationale: `AI gateway error: ${msg.slice(0, 200)}. Heuristic error: ${hMsg.slice(0, 200)}.`,
         orders: [],
       };
     }
-    // AI gateway failures (403/429/network) must NOT abort the whole portfolio
-    // tick — downstream guardrail exits (stop-loss, take-profit, ATR trailing,
-    // time-based, hedging reconciliation) still need to run. Degrade gracefully
-    // by returning an empty orders decision and logging the reason.
-    const msg = error instanceof Error ? error.message : String(error);
-    console.warn(`AI decision skipped for tick — ${msg}`);
-    return {
-      briefing: `AI provider unavailable this tick (${msg.slice(0, 120)}); no new orders proposed. Guardrail-driven exits still applied.`,
-      rationale: "Automated decisioning was skipped due to an AI gateway error; only rule-based exits ran.",
-      orders: [],
-    };
   }
 }
 
