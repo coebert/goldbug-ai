@@ -92,6 +92,32 @@ export type SimRejection = {
   requested: { quantity: number; price: number; fee: number };
 };
 
+/**
+ * Realistic trading frictions applied to every fill when provided.
+ * All fields optional; omitted values default to 0 (frictionless).
+ *
+ *  - commissionBps      per-fill commission as basis points of notional
+ *                       (5 = 0.05%). Combined with `minCommission` via max().
+ *  - minCommission      minimum commission floor per fill (currency units).
+ *  - buyTaxBps          buy-side transaction tax (e.g. UK stamp duty 50 bps).
+ *                       Not applied on SELLs.
+ *  - slippageBps        fixed adverse move applied to the quoted price:
+ *                       BUY fills at quote*(1+bps/1e4), SELL at quote*(1-bps/1e4).
+ *  - impactPerUnit      additional adverse slip that scales linearly with
+ *                       filled quantity — proxies book-depth impact for
+ *                       larger orders. Same sign convention as slippageBps.
+ *
+ * The invariants (no borrow, no leverage, snapshot consistency, no
+ * negative cash) hold regardless of the friction values chosen.
+ */
+export type Frictions = {
+  commissionBps?: number;
+  minCommission?: number;
+  buyTaxBps?: number;
+  slippageBps?: number;
+  impactPerUnit?: number;
+};
+
 export type SimulateOptions = {
   /**
    * If a BUY exceeds available cash, truncate the quantity to what
@@ -113,6 +139,12 @@ export type SimulateOptions = {
    * present. Symbols in this map DO NOT trigger any trades.
    */
   markPrices?: Record<string, number>;
+  /**
+   * Optional transaction-cost & slippage model. When omitted, the
+   * engine runs frictionless (byte-identical to prior behaviour) so
+   * existing callers/tests are unaffected.
+   */
+  frictions?: Frictions;
 };
 
 export type SimulateResult = {
@@ -125,6 +157,70 @@ export type SimulateResult = {
 
 function isFiniteNonNeg(n: number): boolean {
   return Number.isFinite(n) && n >= 0;
+}
+
+/**
+ * Effective (post-slippage) execution price for a given quoted price,
+ * side, and fill quantity. BUYs pay up, SELLs receive down. Impact is
+ * linear in qty. Returned price is clamped >= 0.
+ */
+function effectiveFillPrice(
+  quote: number,
+  qty: number,
+  side: Side,
+  f: Frictions | undefined,
+): number {
+  if (!f) return quote;
+  const slipFrac = (f.slippageBps ?? 0) / 10_000;
+  const impact = (f.impactPerUnit ?? 0) * qty;
+  if (side === "BUY") return quote * (1 + slipFrac) + impact;
+  return Math.max(0, quote * (1 - slipFrac) - impact);
+}
+
+/**
+ * Total fee for a fill: baseFee (per-decision override) + commission
+ * (max of bps-of-notional and minCommission) + buy-side tax.
+ */
+function totalFee(
+  notional: number,
+  side: Side,
+  baseFee: number,
+  f: Frictions | undefined,
+): number {
+  if (!f) return baseFee;
+  const bpsComm = notional * ((f.commissionBps ?? 0) / 10_000);
+  const commission = Math.max(f.minCommission ?? 0, bpsComm);
+  const tax = side === "BUY" ? notional * ((f.buyTaxBps ?? 0) / 10_000) : 0;
+  return baseFee + commission + tax;
+}
+
+/**
+ * Largest BUY quantity in [0, requested] such that
+ *   qty*effPrice(qty) + totalFee(qty*effPrice(qty)) <= cash.
+ * Solved by bisection to keep the closed-form independent of the
+ * chosen friction model. 40 iterations gives ~1e-12 relative precision.
+ */
+function maxAffordableBuyQty(
+  requested: number,
+  quote: number,
+  cash: number,
+  baseFee: number,
+  f: Frictions,
+): number {
+  const spendAt = (q: number): number => {
+    const p = effectiveFillPrice(quote, q, "BUY", f);
+    const notional = q * p;
+    return notional + totalFee(notional, "BUY", baseFee, f);
+  };
+  if (spendAt(requested) <= cash) return requested;
+  if (spendAt(0) > cash) return 0; // fixed fees alone unaffordable
+  let lo = 0;
+  let hi = requested;
+  for (let i = 0; i < 40; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (spendAt(mid) <= cash) lo = mid; else hi = mid;
+  }
+  return lo;
 }
 
 function cloneHoldings(hs: SimHolding[]): SimHolding[] {
@@ -202,21 +298,78 @@ export function simulateBrokerExecution(
     }
 
     if (d.side === "BUY") {
-      // Fee is paid regardless of fill quantity. If we can't even pay
-      // the fee, the whole step is rejected — never allow cash to dip
-      // below 0 via a fee.
-      if (fee > cash) {
-        rejections.push({
-          step, decisionId: d.id, symbol: d.symbol, side: d.side,
-          reason: "insufficient_cash",
-          requested: { quantity: d.quantity, price: d.price, fee },
+      const f = options.frictions;
+
+      // Frictionless path (unchanged) — preserves byte-for-byte legacy
+      // behaviour when no cost model is configured.
+      if (!f) {
+        if (fee > cash) {
+          rejections.push({
+            step, decisionId: d.id, symbol: d.symbol, side: d.side,
+            reason: "insufficient_cash",
+            requested: { quantity: d.quantity, price: d.price, fee },
+          });
+          continue;
+        }
+        const cashAfterFee = cash - fee;
+        let qty = d.quantity;
+        const cost = qty * d.price;
+        if (cost > cashAfterFee) {
+          if (!truncateBuys) {
+            rejections.push({
+              step, decisionId: d.id, symbol: d.symbol, side: d.side,
+              reason: "would_borrow",
+              requested: { quantity: d.quantity, price: d.price, fee },
+            });
+            continue;
+          }
+          qty = d.price > 0 ? Math.max(0, cashAfterFee / d.price) : 0;
+          if (qty <= 0) {
+            rejections.push({
+              step, decisionId: d.id, symbol: d.symbol, side: d.side,
+              reason: "insufficient_cash",
+              requested: { quantity: d.quantity, price: d.price, fee },
+            });
+            continue;
+          }
+        }
+        const spend = qty * d.price + fee;
+        cash = Math.max(0, cash - spend);
+
+        const existing = holdings.find((h) => h.symbol === d.symbol);
+        if (existing) {
+          const totalCost = existing.quantity * existing.avgCost + qty * d.price;
+          const totalQty = existing.quantity + qty;
+          existing.quantity = totalQty;
+          existing.avgCost = totalQty > 0 ? totalCost / totalQty : 0;
+        } else {
+          holdings.push({ symbol: d.symbol, quantity: qty, avgCost: d.price });
+        }
+
+        const holdingsValue = markToMarket(holdings, options.markPrices);
+        snapshots.push({
+          step, decisionId: d.id,
+          cash, holdings: cloneHoldings(holdings),
+          holdingsValue, totalValue: cash + holdingsValue,
+          realizedPnl: 0,
+          fillQuantity: qty, fillPrice: d.price, fee,
         });
         continue;
       }
-      const cashAfterFee = cash - fee;
-      let qty = d.quantity;
-      const cost = qty * d.price;
-      if (cost > cashAfterFee) {
+
+      // ---- Friction-aware BUY --------------------------------------------
+      // Effective price and total fee are functions of the filled qty
+      // (linear book impact, bps commissions, buy-side tax). Truncate
+      // via bisection so no borrow is ever possible regardless of the
+      // chosen cost model.
+      const requested = d.quantity;
+      const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f);
+      const requestedNotional = requested * requestedEffPrice;
+      const requestedSpend =
+        requestedNotional + totalFee(requestedNotional, "BUY", fee, f);
+
+      let qty = requested;
+      if (requestedSpend > cash) {
         if (!truncateBuys) {
           rejections.push({
             step, decisionId: d.id, symbol: d.symbol, side: d.side,
@@ -225,13 +378,10 @@ export function simulateBrokerExecution(
           });
           continue;
         }
-        // Truncate to the largest quantity that fits. Use floor with a
-        // tiny epsilon guard so 1e-15 float noise never lets a cent
-        // slip through.
-        qty = d.price > 0 ? Math.max(0, cashAfterFee / d.price) : 0;
-        // If the resulting qty is 0 (e.g. price too high for any
-        // fraction), reject cleanly rather than emit a no-op snapshot.
+        qty = maxAffordableBuyQty(requested, d.price, cash, fee, f);
         if (qty <= 0) {
+          // Even the fixed portion (baseFee + minCommission) exceeds
+          // available cash — no fill possible without borrowing.
           rejections.push({
             step, decisionId: d.id, symbol: d.symbol, side: d.side,
             reason: "insufficient_cash",
@@ -240,20 +390,27 @@ export function simulateBrokerExecution(
           continue;
         }
       }
-      const spend = qty * d.price + fee;
-      // Post-condition guard: cash MUST NOT go negative. If float math
-      // produced a sliver below zero, snap to 0 rather than reject —
-      // but log by clamping and emitting the snapshot at 0.
+
+      const effPrice = effectiveFillPrice(d.price, qty, "BUY", f);
+      const notional = qty * effPrice;
+      const totalFeePaid = totalFee(notional, "BUY", fee, f);
+      const spend = notional + totalFeePaid;
+      // Clamp against float noise from the bisection; the invariant
+      // check asserts spend<=priorCash within MONEY_EPS.
       cash = Math.max(0, cash - spend);
 
       const existing = holdings.find((h) => h.symbol === d.symbol);
       if (existing) {
-        const totalCost = existing.quantity * existing.avgCost + qty * d.price;
+        // Weighted-average cost is based on the *execution* price
+        // (what we actually paid per share, excluding commission/tax
+        // to keep avgCost a pure price series — fees are realized on
+        // exit via realizedPnl).
+        const totalCost = existing.quantity * existing.avgCost + qty * effPrice;
         const totalQty = existing.quantity + qty;
         existing.quantity = totalQty;
         existing.avgCost = totalQty > 0 ? totalCost / totalQty : 0;
       } else {
-        holdings.push({ symbol: d.symbol, quantity: qty, avgCost: d.price });
+        holdings.push({ symbol: d.symbol, quantity: qty, avgCost: effPrice });
       }
 
       const holdingsValue = markToMarket(holdings, options.markPrices);
@@ -262,7 +419,7 @@ export function simulateBrokerExecution(
         cash, holdings: cloneHoldings(holdings),
         holdingsValue, totalValue: cash + holdingsValue,
         realizedPnl: 0,
-        fillQuantity: qty, fillPrice: d.price, fee,
+        fillQuantity: qty, fillPrice: effPrice, fee: totalFeePaid,
       });
       continue;
     }
@@ -290,9 +447,12 @@ export function simulateBrokerExecution(
       }
       qty = held;
     }
-    const proceeds = qty * d.price;
+    const f = options.frictions;
+    const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f);
+    const proceeds = qty * effSellPrice;
+    const totalFeePaid = totalFee(proceeds, "SELL", fee, f);
     // Fee still owed on SELL; may not push cash below 0.
-    if (fee > cash + proceeds) {
+    if (totalFeePaid > cash + proceeds) {
       rejections.push({
         step, decisionId: d.id, symbol: d.symbol, side: d.side,
         reason: "insufficient_cash",
@@ -300,8 +460,9 @@ export function simulateBrokerExecution(
       });
       continue;
     }
-    cash = Math.max(0, cash + proceeds - fee);
-    const realizedPnl = (d.price - (existing?.avgCost ?? 0)) * qty - fee;
+    cash = Math.max(0, cash + proceeds - totalFeePaid);
+    const realizedPnl =
+      (effSellPrice - (existing?.avgCost ?? 0)) * qty - totalFeePaid;
     if (existing) {
       existing.quantity -= qty;
       if (existing.quantity <= 0) {
@@ -316,7 +477,7 @@ export function simulateBrokerExecution(
       cash, holdings: cloneHoldings(holdings),
       holdingsValue, totalValue: cash + holdingsValue,
       realizedPnl,
-      fillQuantity: qty, fillPrice: d.price, fee,
+      fillQuantity: qty, fillPrice: effSellPrice, fee: totalFeePaid,
     });
   }
 
