@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PerformanceAnalyticsCard } from "@/components/performance-analytics-card";
 import { ExecutionQualityCard } from "@/components/execution-quality-card";
 import { AlgoRegimeHistoryCard } from "@/components/algo-regime-history-card";
+import { AlgoRegimeCalibrationCard } from "@/components/algo-regime-calibration-card";
 
 export const Route = createFileRoute("/portfolio/$id/analytics")({
   head: () => ({
@@ -42,6 +43,7 @@ function AnalyticsPage() {
         <PerformanceAnalyticsCard portfolioId={id} />
         <ExecutionQualityCard portfolioId={id} />
         <AlgoRegimeHistoryCard portfolioId={id} />
+        <AlgoRegimeCalibrationCard portfolioId={id} />
       </main>
     </div>
   );
