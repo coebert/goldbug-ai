@@ -922,5 +922,144 @@ export function simulateBrokerExecution(
     finalState: { cash, holdings },
     snapshots,
     rejections,
+    executionQuality: buildExecutionQualityReport(
+      decisions.length, snapshots, rejections,
+    ),
   };
 }
+
+/**
+ * Aggregate the per-snapshot quality fields into the top-level
+ * `ExecutionQualityReport`. Kept as a standalone function so tests
+ * (and external callers) can re-run it against edited snapshot arrays
+ * without re-executing the whole simulator.
+ */
+export function buildExecutionQualityReport(
+  decisionCount: number,
+  snapshots: readonly SimSnapshot[],
+  rejections: readonly SimRejection[],
+): ExecutionQualityReport {
+  const rejectionsByReason: Record<SimRejection["reason"], number> = {
+    invalid_quantity: 0,
+    invalid_price: 0,
+    invalid_fee: 0,
+    no_position_to_sell: 0,
+    insufficient_cash: 0,
+    would_borrow: 0,
+    would_short: 0,
+    no_liquidity: 0,
+  };
+  for (const r of rejections) rejectionsByReason[r.reason] += 1;
+
+  // Only parent snapshots (sliceIndex 0 or absent) contribute to
+  // "requested" totals — sliced residuals inherit that requested qty.
+  let totalRequested = 0;
+  let totalFilled = 0;
+  let fullyFilledCount = 0;
+  let partialFillCount = 0;
+
+  let slipWeightSum = 0;
+  let slipNumerator = 0;
+  let liqAdjWeightSum = 0;
+  let liqAdjNumerator = 0;
+  let partRateSum = 0;
+  let partRateCount = 0;
+
+  type Bucket = {
+    requested: number; filled: number; fillCount: number;
+    slipW: number; slipN: number;
+    liqAdjW: number; liqAdjN: number;
+    partSum: number; partCount: number;
+  };
+  const bucket = (): Bucket => ({
+    requested: 0, filled: 0, fillCount: 0,
+    slipW: 0, slipN: 0, liqAdjW: 0, liqAdjN: 0,
+    partSum: 0, partCount: 0,
+  });
+  const bySymbolRaw = new Map<string, Bucket>();
+  const symbolOf = (s: SimSnapshot): string =>
+    // decisionId includes the symbol only indirectly; fall back to holdings
+    // change is ambiguous, so read symbol off any matching holding entry.
+    // In practice callers rely on the snapshot ordering, so we recover the
+    // symbol via a scan of the holdings list at that step.
+    s.holdings.find((h) => h.quantity > 0)?.symbol ?? "__unknown__";
+
+  for (const s of snapshots) {
+    const isParent = (s.sliceIndex ?? 0) === 0;
+    if (isParent) totalRequested += s.requestedQuantity;
+    totalFilled += s.fillQuantity;
+    if (s.fillQuantity > 0 && !s.partial) fullyFilledCount += 1;
+    if (s.partial) partialFillCount += 1;
+
+    const w = s.fillQuantity * (s.expectedPrice > 0 ? s.expectedPrice : 1);
+    if (s.fillQuantity > 0) {
+      slipWeightSum += w;
+      slipNumerator += w * s.slippageBps;
+      if (s.liquidityAdjustedSlippageBps !== null) {
+        liqAdjWeightSum += w;
+        liqAdjNumerator += w * s.liquidityAdjustedSlippageBps;
+      }
+      if (s.participationRate !== null) {
+        partRateSum += s.participationRate;
+        partRateCount += 1;
+      }
+    }
+
+    const sym = symbolOf(s);
+    const b = bySymbolRaw.get(sym) ?? bucket();
+    if (isParent) b.requested += s.requestedQuantity;
+    b.filled += s.fillQuantity;
+    if (s.fillQuantity > 0) {
+      b.fillCount += 1;
+      b.slipW += w;
+      b.slipN += w * s.slippageBps;
+      if (s.liquidityAdjustedSlippageBps !== null) {
+        b.liqAdjW += w;
+        b.liqAdjN += w * s.liquidityAdjustedSlippageBps;
+      }
+      if (s.participationRate !== null) {
+        b.partSum += s.participationRate;
+        b.partCount += 1;
+      }
+    }
+    bySymbolRaw.set(sym, b);
+  }
+
+  const bySymbol: ExecutionQualityReport["bySymbol"] = {};
+  for (const [sym, b] of bySymbolRaw) {
+    bySymbol[sym] = {
+      requested: b.requested,
+      filled: b.filled,
+      fillRatio: b.requested > 0
+        ? Math.min(1, Math.max(0, b.filled / b.requested))
+        : 1,
+      weightedAvgSlippageBps: b.slipW > 0 ? b.slipN / b.slipW : 0,
+      weightedAvgLiquidityAdjustedSlippageBps:
+        b.liqAdjW > 0 ? b.liqAdjN / b.liqAdjW : null,
+      avgParticipationRate:
+        b.partCount > 0 ? b.partSum / b.partCount : null,
+      fillCount: b.fillCount,
+    };
+  }
+
+  return {
+    decisionCount,
+    totalRequested,
+    totalFilled,
+    fillRatio: totalRequested > 0
+      ? Math.min(1, Math.max(0, totalFilled / totalRequested))
+      : 1,
+    fullyFilledCount,
+    partialFillCount,
+    rejectionCount: rejections.length,
+    rejectionsByReason,
+    weightedAvgSlippageBps:
+      slipWeightSum > 0 ? slipNumerator / slipWeightSum : 0,
+    weightedAvgLiquidityAdjustedSlippageBps:
+      liqAdjWeightSum > 0 ? liqAdjNumerator / liqAdjWeightSum : null,
+    avgParticipationRate:
+      partRateCount > 0 ? partRateSum / partRateCount : null,
+    bySymbol,
+  };
+}
+
