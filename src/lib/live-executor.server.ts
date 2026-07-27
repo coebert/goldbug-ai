@@ -218,6 +218,42 @@ export async function routeOrdersToBroker(params: {
   // exceeds what the broker actually has available, so we never hand Saxo an
   // order that will come straight back as InsufficientCash.
   const preSkips = new Map<string, string>(); // clientOrderId key by symbol+side
+
+  // ---------- Phase B: algo-regime block-new-buys guardrail.
+  // When the caller supplied a snapshot whose multipliers recommend
+  // blocking new market buys, pre-skip every BUY in `routable` before we
+  // touch the broker. SELLs (protective exits) still route. Idempotent
+  // and logged for audit.
+  if (algoRegime?.multipliers.blockNewBuys) {
+    const reason = `algo_regime_${algoRegime.tier}:${algoRegime.reason}`;
+    let blocked = 0;
+    for (const o of routable) {
+      if (o.side === "buy") {
+        preSkips.set(`${o.symbol}:${o.side}`, reason);
+        blocked += 1;
+      }
+    }
+    if (blocked > 0) {
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "PRE_PLACE_ALGO_REGIME_BLOCK",
+        path: "/reconcile/pre-place/algo-regime",
+        status: 200,
+        request: asJson({
+          asOf, decisionId,
+          tier: algoRegime.tier,
+          score: algoRegime.score,
+          maxParticipation: algoRegime.multipliers.maxParticipation,
+        }),
+        response: asJson({ blocked, totalRoutable: routable.length }),
+        error: reason,
+      });
+    }
+  }
+
   try {
     const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
     const { withOwnedClient } = await import("./_server/owned-client");
