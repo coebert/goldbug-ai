@@ -171,6 +171,7 @@ function runStrategy(args: {
         if (decision.side === "SELL" && stopBar === null) {
           stopBar = i;
           stopFillPrice = s.fillPrice;
+          stopFillQty = s.fillQuantity;
           peakSinceEntry = 0; // reset for any future re-entry (not used here)
         }
         peakPosition = Math.max(peakPosition, newHeld);
@@ -183,7 +184,7 @@ function runStrategy(args: {
     bars.push(barRec);
   }
 
-  return { bars, peakPosition, stopBar, stopFillPrice, maxDrawdownPct: maxDD };
+  return { bars, peakPosition, stopBar, stopFillPrice, stopFillQty, maxDrawdownPct: maxDD };
 }
 
 describe("integration: tighter liquidity caps → risk-outcome differences at the same risk level", () => {
