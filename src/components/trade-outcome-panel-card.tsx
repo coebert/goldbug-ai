@@ -5,6 +5,7 @@ import {
   getTradeOutcomes,
   type TradeOutcomeRow,
 } from "@/lib/trade-outcomes.functions";
+import { summarizeOutcomes } from "@/lib/trade-outcome-summary";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
@@ -21,6 +22,9 @@ import {
   XCircle,
   Clock,
   CircleDashed,
+  TrendingDown,
+  Target,
+  AlertTriangle,
 } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
 import { cn } from "@/lib/utils";
