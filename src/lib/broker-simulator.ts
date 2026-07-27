@@ -82,6 +82,10 @@ export type SimSnapshot = {
   /** Sequence number, starting at 1 for the first applied step. */
   step: number;
   decisionId: string;
+  /** Traded symbol — mirrored from the source decision for easy grouping. */
+  symbol: string;
+  /** Side of the executed decision. */
+  side: Side;
   cash: number;
   holdings: SimHolding[];
   /** Σ (quantity * mark_price) at the moment this snapshot was taken. */
@@ -90,6 +94,7 @@ export type SimSnapshot = {
   totalValue: number;
   /** Realized PnL for a SELL step, 0 otherwise. */
   realizedPnl: number;
+
   fillQuantity: number;
   fillPrice: number;
   fee: number;
