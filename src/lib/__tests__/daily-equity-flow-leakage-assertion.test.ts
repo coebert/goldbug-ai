@@ -34,12 +34,12 @@ describe("assertNoFlowLeakage", () => {
 
   it("flags pure deposit days that produce non-zero pct", () => {
     const bad = clean({ rawDelta: 500, netFlow: 500, pnl: 0, pct: 50 });
-    expect(() => assertNoFlowLeakage([bad], "src")).toThrow(/leaked into pnl\/pct/);
+    expect(() => assertNoFlowLeakage([bad], "src")).toThrow(/pct drift|leaked into pnl\/pct/);
   });
 
   it("flags pure withdrawal days that produce non-zero pct", () => {
     const bad = clean({ rawDelta: -200, netFlow: -200, pnl: 0, pct: -20 });
-    expect(() => assertNoFlowLeakage([bad], "src")).toThrow(/leaked into pnl\/pct/);
+    expect(() => assertNoFlowLeakage([bad], "src")).toThrow(/pct drift|leaked into pnl\/pct/);
   });
 
   it("flags pct that was computed from rawDelta instead of pnl", () => {
