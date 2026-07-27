@@ -13,6 +13,10 @@
 // to authenticated users.
 
 import { asJson } from "@/lib/_server/db-json";
+import type { Database } from "@/integrations/supabase/types";
+
+type AuditInsert = Database["public"]["Tables"]["ai_decision_audit"]["Insert"];
+
 
 export interface ExecutedAuditEntry {
   symbol: string;
