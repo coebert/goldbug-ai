@@ -95,14 +95,23 @@ function uiRenderedRows(fixture: {
       currency="GBP"
     />,
   );
-  const container = document.createElement("div");
-  container.innerHTML = html;
-  const chartEl = container.querySelector<HTMLElement>("[data-testid=chart-data]");
-  const payload = chartEl?.getAttribute("data-payload");
-  const chart: ChartRow[] = payload ? JSON.parse(payload) : [];
-  const stats = Array.from(container.querySelectorAll("[class*='font-display']")).map(
-    (el) => (el as HTMLElement).textContent?.trim() ?? "",
-  );
+  // Parse without a DOM: the test runs under the node env. The mocked
+  // BarChart wraps its data in a JSON-encoded `data-payload` attribute
+  // that survives static markup verbatim (Recharts is stubbed above).
+  const payloadMatch = html.match(/data-payload="([^"]*)"/);
+  const decoded = payloadMatch
+    ? payloadMatch[1]
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+    : "[]";
+  const chart: ChartRow[] = JSON.parse(decoded);
+
+  // Best/Worst stat values sit inside <div class="font-display …">.
+  const stats = Array.from(
+    html.matchAll(/<div class="[^"]*font-display[^"]*"[^>]*>([^<]*)<\/div>/g),
+  ).map((m) => (m[1] ?? "").trim());
   return { chart, best: stats[2], worst: stats[3] };
 }
 
