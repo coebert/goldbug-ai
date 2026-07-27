@@ -10,6 +10,13 @@ export type ExecutionParams = {
   spread_atr_frac: number; // half-spread = spread_atr_frac * ATR%
   adv_participation: number; // max fraction of 20d ADV$ per trade
   min_trade_value: number;
+  /**
+   * Minimum per-side commission in trade currency (e.g. Saxo's £3 UK / $1 US
+   * / €3 EU floor). When set, effective per-side commission is
+   * `max(commission_bps * notional, min_commission)`. Defaults to 0 for
+   * back-compat with existing backtests.
+   */
+  min_commission?: number;
 };
 
 export const DEFAULT_EXECUTION: ExecutionParams = {
@@ -18,6 +25,7 @@ export const DEFAULT_EXECUTION: ExecutionParams = {
   spread_atr_frac: 0.25,
   adv_participation: 0.01, // 1% of ADV
   min_trade_value: 25,
+  min_commission: 0,
 };
 
 export type ExecutionOutcome = {
@@ -69,11 +77,31 @@ export function applyBuyExecution(args: {
   const slip = p.slippage_bps / 10_000;
   const fillPrice = args.price * (1 + halfSpread + slip);
   const commissionRate = p.commission_bps / 10_000;
-  const perShareCost = fillPrice * (1 + commissionRate);
-  const qty = spend / perShareCost;
+  const minComm = Math.max(0, p.min_commission ?? 0);
+  // Try bps-only sizing first: spend = qty*fillPrice*(1 + commRate).
+  let qty = spend / (fillPrice * (1 + commissionRate));
+  let commission = qty * fillPrice * commissionRate;
+  if (commission < minComm) {
+    // Min-commission floor dominates: spend = qty*fillPrice + minComm.
+    commission = minComm;
+    qty = Math.max(0, (spend - minComm) / fillPrice);
+  }
+  if (qty <= 0 || qty * fillPrice + commission < p.min_trade_value) {
+    return {
+      fillPrice: args.price,
+      effectiveSpend: 0,
+      qty: 0,
+      costPaid: 0,
+      liquidityCappedSpend,
+      belowMinTrade: true,
+      notes: [...notes, minComm > 0 && spend <= minComm
+        ? `blocked: notional ${spend.toFixed(0)} <= min commission ${minComm.toFixed(0)}`
+        : `below min trade value ${p.min_trade_value}`],
+    };
+  }
   const costPaid = spend - qty * args.price;
   if (halfSpread > 0) notes.push(`spread ${(halfSpread * 10_000).toFixed(1)}bps`);
-  notes.push(`slippage ${p.slippage_bps}bps, commission ${p.commission_bps}bps`);
+  notes.push(`slippage ${p.slippage_bps}bps, commission ${p.commission_bps}bps${minComm > 0 ? ` (min ${minComm})` : ""}`);
 
   return {
     fillPrice,
@@ -101,8 +129,9 @@ export function applySellExecution(args: {
   const slip = p.slippage_bps / 10_000;
   const fillPrice = args.price * (1 - halfSpread - slip);
   const gross = args.qty * fillPrice;
-  const commission = gross * (p.commission_bps / 10_000);
-  const proceedsNet = gross - commission;
+  const minComm = Math.max(0, p.min_commission ?? 0);
+  const commission = Math.max(gross * (p.commission_bps / 10_000), minComm);
+  const proceedsNet = Math.max(0, gross - commission);
   const costPaid = args.qty * args.price - proceedsNet;
   return { fillPrice, proceedsNet, costPaid };
 }

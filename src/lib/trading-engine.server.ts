@@ -67,6 +67,7 @@ import {
   tightenForRegime,
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
+import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
@@ -1740,14 +1741,49 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
-      // Phase 5 — realistic execution (spread, slippage, commission, liquidity cap)
+      // Phase 5 — realistic execution (spread, slippage, commission, liquidity cap).
+      // We now factor in Saxo's real published fee schedule: per-venue rate
+      // (~8bps for UK/US/EU stocks, ~10bps CHF) with a per-side MINIMUM
+      // (£3 UK, $1 US, €3 EU, etc.). Small orders that would be dominated
+      // by the fixed floor are rejected outright so profit margins are not
+      // silently eaten by fees.
       const featExec = featureBySymbol.get(meta.symbol);
+      const tradeCcy = inferSaxoCurrency(meta.symbol);
+      const saxoFee = estimateSaxoCommission({
+        notional: spend,
+        currency: tradeCcy,
+        symbol: meta.symbol,
+        assetClass: meta.asset_class,
+      });
+      const MAX_ROUND_TRIP_FEE_BPS = 100; // ≥1% round-trip cost blocks the trade.
+      if (saxoFee.roundTripBps > MAX_ROUND_TRIP_FEE_BPS) {
+        executed.push({
+          symbol: meta.symbol,
+          side: "buy",
+          quantity: 0,
+          price,
+          value: 0,
+          reason: order.reason,
+          rejected:
+            `fee guard: Saxo ${saxoFee.tier.venue} min ${saxoFee.tier.currency} ${saxoFee.tier.min}`
+            + ` on notional ${spend.toFixed(0)} = ${saxoFee.roundTripBps.toFixed(0)}bps round-trip`
+            + ` (limit ${MAX_ROUND_TRIP_FEE_BPS}bps). Order too small to cover Saxo commission.`,
+        });
+        continue;
+      }
+      const feeAdjustedParams = {
+        ...(cfg.execution_params ?? {}),
+        min_commission: Math.max(
+          Number(cfg.execution_params?.min_commission ?? 0),
+          saxoFee.tier.min,
+        ),
+      };
       const outcome = applyBuyExecution({
         requestedSpend: spend,
         price,
         atrPct: featExec?.atr_pct ?? null,
         adv20d: featExec?.adv_20d ?? null,
-        params: cfg.execution_params ?? undefined,
+        params: feeAdjustedParams,
       });
       const commodityLiq = meta.asset_class === "commodity"
         ? computeCommodityTradeLiquidity({
@@ -1772,6 +1808,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         continue;
       }
       if (outcome.liquidityCappedSpend != null) sizingNotes.push("liquidity 1% ADV");
+      sizingNotes.push(
+        `saxo fee ${saxoFee.tier.currency}${saxoFee.commission.toFixed(2)}`
+        + ` (${saxoFee.perSideBps.toFixed(0)}bps${saxoFee.minFloorApplied ? " floor" : ""})`,
+      );
       const qty = outcome.qty;
       const fillPrice = outcome.fillPrice;
 
