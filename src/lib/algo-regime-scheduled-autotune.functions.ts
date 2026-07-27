@@ -99,6 +99,19 @@ async function loadOverride(
   };
 }
 
+async function loadRiskLevel(
+  supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
+  portfolioId: string,
+): Promise<RiskLevel> {
+  const { data } = await supabase
+    .from("portfolios")
+    .select("risk_level")
+    .eq("id", portfolioId)
+    .maybeSingle();
+  const r = (data?.risk_level as string | undefined) ?? "balanced";
+  return r === "conservative" || r === "aggressive" ? r : "balanced";
+}
+
 async function persistOverride(
   supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
   portfolioId: string,
