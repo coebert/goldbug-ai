@@ -280,7 +280,8 @@ export async function callAiForDecision(args: {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY missing");
   const gateway = createLovableAiGatewayProvider(key);
-  const model = gateway("google/gemini-3.6-flash");
+  const MODEL_ID = "google/gemini-2.5-flash";
+  const model = gateway(MODEL_ID);
 
   const risk = riskProfile(args.portfolio.risk_level);
   const cfg = parseRiskConfig(args.portfolio.risk_config);
@@ -439,7 +440,17 @@ If no action is warranted, return an empty orders array.`;
         orders: [],
       };
     }
-    throw error;
+    // AI gateway failures (403/429/network) must NOT abort the whole portfolio
+    // tick — downstream guardrail exits (stop-loss, take-profit, ATR trailing,
+    // time-based, hedging reconciliation) still need to run. Degrade gracefully
+    // by returning an empty orders decision and logging the reason.
+    const msg = error instanceof Error ? error.message : String(error);
+    console.warn(`AI decision skipped for tick — ${msg}`);
+    return {
+      briefing: `AI provider unavailable this tick (${msg.slice(0, 120)}); no new orders proposed. Guardrail-driven exits still applied.`,
+      rationale: "Automated decisioning was skipped due to an AI gateway error; only rule-based exits ran.",
+      orders: [],
+    };
   }
 }
 
@@ -2156,7 +2167,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     run_date: asOf,
     briefing: decision.briefing,
     rationale: decision.rationale,
-    model: "google/gemini-3.6-flash",
+    model: "google/gemini-2.5-flash",
     portfolio_value: newTotal,
     raw: asJson({
       orders: decision.orders,
