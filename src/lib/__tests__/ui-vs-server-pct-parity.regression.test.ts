@@ -79,7 +79,10 @@ describe("regression: UI % change equals server % change and excludes deposits",
     const svrDep = uiDep.map((d) => ({ ...d, portfolio_id: "p1" }));
 
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
-    const bd = computeEquityChangeBreakdown(r, uiDep)!.totalPct;
+    const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
+    // Trading-only pct = the residual bucket after every external
+    // flow (deposits, withdrawals, fees/div/interest) is netted out.
+    const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
     const server = modeSummaryPctFor(r, svrDep)!;
 
     // Trading-only gain: (1220 − 200) − 1000 = 20 → 2%
@@ -100,7 +103,10 @@ describe("regression: UI % change equals server % change and excludes deposits",
     const svrDep = uiDep.map((d) => ({ ...d, portfolio_id: "p1" }));
 
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
-    const bd = computeEquityChangeBreakdown(r, uiDep)!.totalPct;
+    const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
+    // Trading-only pct = the residual bucket after every external
+    // flow (deposits, withdrawals, fees/div/interest) is netted out.
+    const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
     const server = modeSummaryPctFor(r, svrDep)!;
 
     // (900 − (−150)) − 1000 = 50 → 5%
@@ -126,7 +132,10 @@ describe("regression: UI % change equals server % change and excludes deposits",
     const svrDep = uiDep.map((d) => ({ ...d, portfolio_id: "p1" }));
 
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
-    const bd = computeEquityChangeBreakdown(r, uiDep)!.totalPct;
+    const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
+    // Trading-only pct = the residual bucket after every external
+    // flow (deposits, withdrawals, fees/div/interest) is netted out.
+    const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
     const server = modeSummaryPctFor(r, svrDep)!;
 
     // Δequity 180; external net = 200 − 50 + 15 − 5 = 160; trading = 20 → 2%
@@ -175,7 +184,10 @@ describe("regression: UI % change equals server % change and excludes deposits",
 
     const ui = computeCardRangePct(toSpark(r), uiDep, false)!;
     const server = modeSummaryPctFor(r, svrDep)!;
-    const bd = computeEquityChangeBreakdown(r, uiDep)!.totalPct;
+    const bdRes = computeEquityChangeBreakdown(r, uiDep)!;
+    // Trading-only pct = the residual bucket after every external
+    // flow (deposits, withdrawals, fees/div/interest) is netted out.
+    const bd = bdRes.buckets.find((b) => b.key === "tradingPnl")!.pctPoints;
 
     // Δ 100 / 1000 = 10% — untouched by pre-window flows.
     near(ui, 10);
