@@ -480,3 +480,98 @@ function truncateReason(reason: string, max = 260): string {
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max)}…`;
 }
+
+function SummaryTiles({
+  summary,
+}: {
+  summary: ReturnType<typeof summarizeOutcomes>;
+}) {
+  const fmtPct = (n: number) =>
+    `${n.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+  const fmtBps = (n: number | null) => {
+    if (n == null) return "—";
+    const rounded = Math.round(n * 10) / 10;
+    const sign = rounded > 0 ? "+" : "";
+    return `${sign}${rounded.toLocaleString(undefined, { maximumFractionDigits: 1 })} bps`;
+  };
+  const slippageTone =
+    summary.avgSlippageBps == null
+      ? "text-foreground"
+      : summary.avgSlippageBps > 5
+        ? "text-rose-500"
+        : summary.avgSlippageBps < -1
+          ? "text-emerald-500"
+          : "text-foreground";
+  const errorTone =
+    summary.errorCount > 0 ? "text-destructive" : "text-foreground";
+
+  return (
+    <div
+      className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
+      aria-label="Trade outcome summary"
+    >
+      <Tile
+        icon={<Target className="h-3.5 w-3.5" />}
+        label="Fill rate"
+        value={summary.total > 0 ? fmtPct(summary.fillRatePct) : "—"}
+        sub={`${summary.filled + summary.partial}/${summary.total} orders`}
+      />
+      <Tile
+        icon={<Activity className="h-3.5 w-3.5" />}
+        label="Volume filled"
+        value={summary.total > 0 ? fmtPct(summary.volumeFillRatePct) : "—"}
+        sub="Σ filled qty ÷ requested"
+      />
+      <Tile
+        icon={<TrendingDown className="h-3.5 w-3.5" />}
+        label="Avg slippage"
+        value={fmtBps(summary.avgSlippageBps)}
+        sub={
+          summary.slippageSampleCount > 0
+            ? `${summary.slippageSampleCount} limit ${summary.slippageSampleCount === 1 ? "order" : "orders"}`
+            : "No limit fills"
+        }
+        valueClassName={slippageTone}
+      />
+      <Tile
+        icon={<AlertTriangle className="h-3.5 w-3.5" />}
+        label="Errors"
+        value={String(summary.errorCount)}
+        sub={
+          summary.cancelledCount > 0
+            ? `${summary.cancelledCount} cancelled`
+            : "rejected + error"
+        }
+        valueClassName={errorTone}
+      />
+    </div>
+  );
+}
+
+function Tile({
+  icon,
+  label,
+  value,
+  sub,
+  valueClassName,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card/60 p-2.5">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div className={cn("mt-1 text-lg font-semibold tabular-nums", valueClassName)}>
+        {value}
+      </div>
+      <div className="text-[10px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
