@@ -63,11 +63,20 @@ function formatPct(v: number) {
   return `${sign}${Math.abs(v).toFixed(2)}%`;
 }
 
+// Vivid, semantically meaningful palette (independent of theme chart vars
+// which may render near-black in some themes).
 const COLORS: Record<string, string> = {
-  deposits: "hsl(var(--chart-1, 214 90% 52%))",
-  withdrawals: "hsl(var(--chart-2, 20 90% 55%))",
-  tradingPnl: "hsl(var(--chart-3, 142 70% 45%))",
-  feesDivInterest: "hsl(var(--chart-4, 260 60% 60%))",
+  deposits: "#3b82f6", // blue — money in
+  withdrawals: "#f97316", // orange — money out
+  tradingPnl: "#10b981", // emerald — trading performance
+  feesDivInterest: "#a855f7", // violet — inferred fees/divs/interest
+};
+
+const SHORT_LABELS: Record<string, string> = {
+  deposits: "Deposits",
+  withdrawals: "Withdrawals",
+  tradingPnl: "Trading",
+  feesDivInterest: "Fees / Div",
 };
 
 export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props) {
@@ -98,7 +107,8 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
   const rows = breakdown.buckets;
   const chartData = rows.map((b) => ({
     key: b.key,
-    name: b.label,
+    name: SHORT_LABELS[b.key] ?? b.label,
+    fullName: b.label,
     amount: b.amount,
     pct: b.pctPoints,
   }));
@@ -148,18 +158,31 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
           </div>
         </div>
 
-        <div className="h-56 w-full">
+        <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
-              barCategoryGap="20%"
+              margin={{ top: 24, right: 12, left: 8, bottom: 8 }}
+              barCategoryGap="25%"
             >
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                interval={0}
+                tickMargin={6}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+                tickLine={false}
+              />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 tickFormatter={(v: number) => formatMoney(v, currency).replace("+", "")}
                 width={70}
+                axisLine={false}
+                tickLine={false}
+                domain={([min, max]: [number, number]) => [
+                  Math.min(0, min) * 1.15,
+                  Math.max(0, max) * 1.25 || 1,
+                ]}
               />
               <ReferenceLine y={0} stroke="hsl(var(--border))" />
               <Tooltip
@@ -169,6 +192,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   const p = payload[0].payload as {
                     key: string;
                     name: string;
+                    fullName: string;
                     amount: number;
                     pct: number;
                   };
@@ -191,7 +215,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                           className="inline-block h-2 w-2 rounded-sm"
                           style={{ background: COLORS[p.key] }}
                         />
-                        {p.name}
+                        {p.fullName}
                       </div>
                       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 tabular-nums">
                         <span className="text-muted-foreground">Amount</span>
@@ -212,7 +236,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                 }}
               />
 
-              <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+              <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={56}>
                 {chartData.map((d) => (
                   <Cell key={d.key} fill={COLORS[d.key]} />
                 ))}
@@ -220,7 +244,11 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   dataKey="pct"
                   position="top"
                   formatter={(v: unknown) => formatPct(Number(v))}
-                  style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fill: "hsl(var(--foreground))",
+                  }}
                 />
               </Bar>
             </BarChart>
