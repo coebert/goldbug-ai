@@ -878,6 +878,16 @@ function PortfolioPage() {
 
             {p && (
               <div className="mb-4">
+                <DailyEquityChangesCard
+                  equity={equity as { snapshot_date: string; total_value: number }[]}
+                  deposits={depositEvents}
+                  currency={String(p.currency ?? "GBP")}
+                />
+              </div>
+            )}
+
+            {p && (
+              <div className="mb-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
                 </Suspense>
