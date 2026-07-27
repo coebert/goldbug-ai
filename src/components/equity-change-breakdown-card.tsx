@@ -207,10 +207,18 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
             );
           })}
         </div>
+        <p className="sr-only" aria-live="polite">
+          Equity change over the selected {range.toUpperCase()} window: total{" "}
+          {formatMoney(breakdown.totalChange, currency)} ({formatPct(breakdown.totalPct)}).{" "}
+          {rows.map((b) => `${b.label} ${formatMoney(b.amount, currency)} (${formatPct(b.pctPoints)})`).join("; ")}.
+        </p>
 
+        <div
+          className="h-64 w-full"
+          role="img"
+          aria-label={`Bar chart of equity change components for the ${range.toUpperCase()} window`}
+        >
 
-
-        <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
