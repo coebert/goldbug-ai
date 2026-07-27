@@ -106,7 +106,6 @@ function formatPrice(p: number | null, ccy: string) {
 export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
   const fetchOutcomes = useServerFn(getTradeOutcomes);
   const qc = useQueryClient();
-  const queryKey = ["trade-outcomes", portfolioId] as const;
 
   const [windowHours, setWindowHours] = useState<number>(24);
   const queryKey = ["trade-outcomes", portfolioId, windowHours] as const;
