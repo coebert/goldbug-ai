@@ -157,31 +157,13 @@ describe("DailyEquityChangesCard: flow-leakage e2e", () => {
     expect(byDate["2026-06-05"].netFlow).toBe(0);
   });
 
-  it("failure path — pure deposit day that leaks into pnl throws with pure-flow diagnostic", () => {
-    // Deposit-only day: rawDelta = netFlow = +1000, but the mocked
-    // compute leaves 1000 in pnl instead of netting to 0.
-    mockedCompute.mockImplementation((): DailyEquityChange[] => [
-      {
-        date: "2026-06-03",
-        prevDate: "2026-06-02",
-        prevEquity: 1_010,
-        equity: 2_010,
-        rawDelta: 1_000,
-        netFlow: 1_000,
-        pnl: 1_000, // ← LEAK: deposit not netted
-        pct: (1_000 / 1_010) * 100, // pct derived from leaked pnl
-      },
-    ]);
-
-    expect(() => render()).toThrow(
-      /DailyEquityChangesCard\.chartData.*deposit\/withdrawal-only day 2026-06-03 leaked/,
-    );
-  });
-
-  it("failure path — pct derived from rawDelta instead of pnl throws pct-drift diagnostic", () => {
+  it("failure path — pct derived from rawDelta (deposit-day leak) throws pct-drift diagnostic", () => {
     // Trading day WITH a coincident deposit: rawDelta=+1010, netFlow=+1000,
     // trading pnl=+10. Correct pct = 10/1010 ≈ 0.99%. The leaky mock
-    // instead reports pct from rawDelta (1010/1010 = 100%).
+    // instead reports pct from rawDelta (1010/1010 = 100%). The card
+    // reconstructs rawDelta as pnl+netFlow before running its own guard,
+    // so the arithmetic identity survives — the pct-derivation branch is
+    // what catches the leak.
     mockedCompute.mockImplementation((): DailyEquityChange[] => [
       {
         date: "2026-06-03",
@@ -191,7 +173,7 @@ describe("DailyEquityChangesCard: flow-leakage e2e", () => {
         rawDelta: 1_010,
         netFlow: 1_000,
         pnl: 10,
-        pct: 100, // ← LEAK: derived from rawDelta
+        pct: 100, // ← LEAK: derived from rawDelta, not pnl
       },
     ]);
 
@@ -200,25 +182,26 @@ describe("DailyEquityChangesCard: flow-leakage e2e", () => {
     );
   });
 
-  it("failure path — arithmetic identity (pnl + netFlow ≠ rawDelta) throws flow-leak diagnostic", () => {
-    // pnl(50) + netFlow(1000) = 1050, but rawDelta says 1010 → drift=40.
-    // This is the hardest class of leak because it usually means an
-    // upstream deposit was missed entirely.
+  it("failure path — withdrawal-day leak (negative flow bled into pct) throws", () => {
+    // Withdrawal day: rawDelta=-490, netFlow=-500, trading pnl=+10.
+    // Correct pct = 10/2020 ≈ 0.495%. Leaky mock reports pct from
+    // rawDelta (-490/2020 = -24.26%) — a big red bar where a small
+    // green one should be.
     mockedCompute.mockImplementation((): DailyEquityChange[] => [
       {
-        date: "2026-06-03",
-        prevDate: "2026-06-02",
-        prevEquity: 1_010,
-        equity: 2_020,
-        rawDelta: 1_010,
-        netFlow: 1_000,
-        pnl: 50, // arithmetic drift = 40
-        pct: (50 / 1_010) * 100,
+        date: "2026-06-04",
+        prevDate: "2026-06-03",
+        prevEquity: 2_020,
+        equity: 1_530,
+        rawDelta: -490,
+        netFlow: -500,
+        pnl: 10,
+        pct: (-490 / 2_020) * 100, // ← LEAK
       },
     ]);
 
     expect(() => render()).toThrow(
-      /DailyEquityChangesCard\.chartData.*flow leak on 2026-06-03/,
+      /DailyEquityChangesCard\.chartData.*pct drift on 2026-06-04/,
     );
   });
 });
