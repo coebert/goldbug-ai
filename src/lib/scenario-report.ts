@@ -222,10 +222,61 @@ export function runScenario(
     days: equityCurve.length,
   };
 
+  const executionSeries = computeExecutionSeries(raw.snapshots, decisions);
+
   return {
     id: spec.id, label: spec.label,
-    equityCurve, drawdownCurve, summary, metrics, raw,
+    equityCurve, drawdownCurve, executionSeries,
+    summary, metrics, raw,
   };
+}
+
+/**
+ * Collapse per-slice snapshots down to one point per parent decision:
+ * `fillRatio = Σ fillQuantity / requestedQuantity` (of the parent decision),
+ * with slippage figures notional-weighted across every filled slice.
+ * A decision that never filled emits a point with `fillRatio = 0` and
+ * `null` slippage so it's still visible on the timeline.
+ */
+export function computeExecutionSeries(
+  snapshots: SimSnapshot[],
+  decisions: DatedDecision[],
+): ExecutionSeriesPoint[] {
+  const byParent = new Map<string, SimSnapshot[]>();
+  for (const s of snapshots) {
+    const parent = s.sliceOf ?? s.decisionId;
+    const arr = byParent.get(parent) ?? [];
+    arr.push(s);
+    byParent.set(parent, arr);
+  }
+  return decisions.map((d) => {
+    const slices = byParent.get(d.id) ?? [];
+    const filled = slices.filter((s) => s.fillQuantity > 0);
+    const totalFillQty = filled.reduce((a, s) => a + s.fillQuantity, 0);
+    const req = d.quantity > 0 ? d.quantity : 0;
+    const fillRatio = req > 0 ? Math.min(1, totalFillQty / req) : 0;
+
+    let slipNum = 0, slipDen = 0;
+    let liqNum = 0, liqDen = 0;
+    for (const s of filled) {
+      const w = s.fillQuantity * s.fillPrice;
+      slipNum += s.slippageBps * w;
+      slipDen += w;
+      if (s.liquidityAdjustedSlippageBps != null) {
+        liqNum += s.liquidityAdjustedSlippageBps * w;
+        liqDen += w;
+      }
+    }
+    return {
+      date: d.date,
+      decisionId: d.id,
+      symbol: d.symbol,
+      side: d.side,
+      fillRatio,
+      slippageBps: slipDen > 0 ? slipNum / slipDen : null,
+      liquidityAdjustedSlippageBps: liqDen > 0 ? liqNum / liqDen : null,
+    };
+  });
 }
 
 /** Build a full report across every scenario. */
