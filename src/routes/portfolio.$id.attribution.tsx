@@ -184,9 +184,9 @@ function AttributionPage() {
                         <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
                         <Legend />
                         <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
-                        <Line type="monotone" dataKey="strategy" name="Strategy (sum of trade returns %)" stroke="#22d3ee" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="benchmark" name="SPY (same windows)" stroke="#94a3b8" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="alpha" name="Alpha (strategy − SPY)" stroke="#22c55e" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="strategy" name="Strategy (solid)" stroke={CHART_ROLE.positive} strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="benchmark" name="SPY (dashed)" stroke={CHART_ROLE.benchmark} strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                        <Line type="monotone" dataKey="alpha" name="Alpha = Strategy − SPY (dotted)" stroke={CHART_ROLE.highlight} strokeWidth={2} strokeDasharray="2 3" dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
