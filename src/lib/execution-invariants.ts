@@ -76,12 +76,15 @@ export function checkExecutionInvariants(args: {
   }
 
   // ---- monotonic step ordering --------------------------------------------
-  for (let i = 0; i < snapshots.length; i += 1) {
-    if (snapshots[i].step !== i + 1) {
+  // Simulator increments `step` per decision (including rejected ones),
+  // so snapshot steps must be strictly increasing but not necessarily
+  // contiguous.
+  for (let i = 1; i < snapshots.length; i += 1) {
+    if (snapshots[i].step <= snapshots[i - 1].step) {
       violations.push({
         code: "STEP_ORDERING",
         step: snapshots[i].step,
-        message: `snapshot at index ${i} has step ${snapshots[i].step}, expected ${i + 1}`,
+        message: `snapshot step ${snapshots[i].step} not > previous ${snapshots[i - 1].step}`,
       });
     }
   }
