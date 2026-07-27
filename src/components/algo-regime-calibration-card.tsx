@@ -31,13 +31,34 @@ export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Gauge className="h-4 w-4" /> Algo-regime calibration
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Realised next-snapshot returns bucketed by the tier active at each decision.
-          Monotone means <span className="font-mono">normal ≥ elevated ≥ extreme</span> — the guard is predictive.
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Gauge className="h-4 w-4" /> Algo-regime calibration
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Realised next-snapshot returns bucketed by the tier active at each decision.
+              Monotone means <span className="font-mono">normal ≥ elevated ≥ extreme</span> — the guard is predictive.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={tune.isPending}
+              onClick={() => tune.mutate(true)}
+            >
+              <Wand2 className="mr-1 h-3 w-3" /> Preview tune
+            </Button>
+            <Button
+              size="sm"
+              disabled={tune.isPending}
+              onClick={() => tune.mutate(false)}
+            >
+              Apply auto-tune
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
