@@ -513,6 +513,55 @@ function truncateReason(reason: string, max = 260): string {
   return `${trimmed.slice(0, max)}…`;
 }
 
+const NON_TERMINAL_STATUSES = new Set([
+  "pending",
+  "submitted",
+  "working",
+]);
+const SUCCESS_STATUSES = new Set(["filled", "partially_filled"]);
+const FAILURE_STATUSES = new Set(["rejected", "error", "cancelled"]);
+
+function maybeToastTransition(args: {
+  orderId: string;
+  prev: string;
+  next: string;
+  symbol: string;
+  side: string;
+  brokerOrderId: string | null;
+  rejectReason: string | null;
+  toastedRef: React.MutableRefObject<Set<string>>;
+}) {
+  const { orderId, prev, next, symbol, side, brokerOrderId, rejectReason, toastedRef } = args;
+
+  const wasNonTerminal = NON_TERMINAL_STATUSES.has(prev);
+  const nowSuccess = SUCCESS_STATUSES.has(next);
+  const nowFailure = FAILURE_STATUSES.has(next);
+  if (!wasNonTerminal || (!nowSuccess && !nowFailure)) return;
+
+  const key = `${orderId}:${next}`;
+  if (toastedRef.current.has(key)) return;
+  toastedRef.current.add(key);
+
+  const sideLabel = side ? side.toUpperCase() : "";
+  const title = nowSuccess
+    ? `${sideLabel} ${symbol} ${next === "partially_filled" ? "partially filled" : "filled"}`
+    : `${sideLabel} ${symbol} ${next === "cancelled" ? "cancelled" : "failed"}`;
+
+  const brokerLine = brokerOrderId
+    ? `Broker order: ${brokerOrderId}`
+    : "Broker order: (none assigned)";
+  const description = rejectReason
+    ? `${brokerLine} · ${truncateReason(rejectReason, 140)}`
+    : brokerLine;
+
+  if (nowSuccess) {
+    toast.success(title, { description, duration: 6000 });
+  } else {
+    toast.error(title, { description, duration: 8000 });
+  }
+}
+
+
 function SummaryTiles({
   summary,
 }: {
