@@ -430,7 +430,7 @@ function aggregateVolumeHistory(
 function liquidityCap(
   d: SimDecision,
   liquidity: SimulateOptions["liquidity"],
-): number {
+): { cap: number; rawVolume: number | null } {
   const window = liquidity?.rollingWindow;
   const agg = liquidity?.volumeAggregator;
 
@@ -453,14 +453,66 @@ function liquidityCap(
       liquidity?.volumeHistory?.[d.symbol], window, agg,
     );
   }
-  if (vol === null) return Number.POSITIVE_INFINITY;
+  if (vol === null) return { cap: Number.POSITIVE_INFINITY, rawVolume: null };
 
   const rate = liquidity?.maxParticipationRate;
   const rateClamped = Number.isFinite(rate) && (rate as number) > 0
     ? Math.min(1, rate as number)
     : 1;
-  return vol * rateClamped;
+  return { cap: vol * rateClamped, rawVolume: vol };
 }
+
+/**
+ * Signed slippage in basis points, oriented so positive = adverse for
+ * the trader (BUY paid up, SELL received less). Returns 0 when the
+ * expected price is <= 0 or the fill quantity is 0.
+ */
+function slippageBpsOf(
+  side: Side,
+  expectedPrice: number,
+  fillPrice: number,
+  fillQty: number,
+): number {
+  if (!(expectedPrice > 0) || fillQty <= 0) return 0;
+  const diff = side === "BUY"
+    ? fillPrice - expectedPrice
+    : expectedPrice - fillPrice;
+  return (diff / expectedPrice) * 10_000;
+}
+
+/**
+ * Build the execution-quality fields tacked onto every emitted snapshot.
+ * `rawVolume` is the pre-participation-rate liquidity estimate
+ * (`null` when the symbol was unconstrained).
+ */
+function qualityFields(
+  side: Side,
+  expectedPrice: number,
+  fillPrice: number,
+  fillQty: number,
+  rawVolume: number | null,
+): Pick<
+  SimSnapshot,
+  "expectedPrice" | "slippageBps" | "participationRate"
+    | "liquidityAdjustedSlippageBps"
+> {
+  const slippageBps = slippageBpsOf(side, expectedPrice, fillPrice, fillQty);
+  const participationRate =
+    rawVolume !== null && rawVolume > 0
+      ? Math.min(1, fillQty / rawVolume)
+      : null;
+  const liquidityAdjustedSlippageBps =
+    participationRate !== null && participationRate > 0
+      ? slippageBps / participationRate
+      : null;
+  return {
+    expectedPrice,
+    slippageBps,
+    participationRate,
+    liquidityAdjustedSlippageBps,
+  };
+}
+
 
 
 export function simulateBrokerExecution(
