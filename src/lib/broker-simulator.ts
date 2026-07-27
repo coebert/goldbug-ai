@@ -93,6 +93,14 @@ export type SimSnapshot = {
    *   "liquidity" > "cash" > "position".
    */
   truncationReason: "liquidity" | "cash" | "position" | null;
+  /**
+   * When set, this snapshot is a time-sliced continuation of the parent
+   * `sliceOf` decision. `sliceIndex` is 0 for the parent snapshot and
+   * 1..N for each residual re-attempt. Present only when the caller
+   * enables `timeSliceUnfilled`; omitted for one-shot fills.
+   */
+  sliceOf?: string;
+  sliceIndex?: number;
 };
 
 export type SimRejection = {
