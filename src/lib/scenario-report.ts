@@ -250,7 +250,7 @@ export const SCENARIO_MATRIX: Record<MatrixPresetKey, {
     label: "Realistic frictions · Deep book",
     options: {
       frictions: {
-        commissionPerShare: 0.005,
+        commissionBps: 5,
         minCommission: 1,
         slippageBps: 5,
       },
@@ -260,7 +260,7 @@ export const SCENARIO_MATRIX: Record<MatrixPresetKey, {
     label: "Realistic frictions · Thin book (5% ADV)",
     options: {
       frictions: {
-        commissionPerShare: 0.005,
+        commissionBps: 5,
         minCommission: 1,
         slippageBps: 5,
       },
@@ -273,7 +273,7 @@ export const SCENARIO_MATRIX: Record<MatrixPresetKey, {
     label: "Harsh frictions · Thin book (2% ADV)",
     options: {
       frictions: {
-        commissionPerShare: 0.01,
+        commissionBps: 10,
         minCommission: 2,
         slippageBps: 15,
       },
