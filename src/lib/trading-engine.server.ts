@@ -2370,7 +2370,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         asOf,
         decisionId,
         executed,
+        algoRegime,
       });
+
     } catch (e) {
       console.error("live routing failed", portfolioId, e);
       routedOrders = { error: e instanceof Error ? e.message : String(e) };
