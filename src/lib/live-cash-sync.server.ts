@@ -187,21 +187,43 @@ export async function syncLiveCashFromBroker(
   const hasLocalHoldings = (existingHoldings ?? []).length > 0;
 
   // Cash can legitimately move when live orders fill, settle, or fees are
-  // booked. Only treat a cash drift as an external deposit/withdrawal when
-  // ALL of these hold:
-  //   * we're on a real broker (live_prod). SIM broker balances (Saxo Demo)
-  //     don't reflect our simulated trades — treating drift there as a
-  //     deposit silently inflates starting_cash and turns real gains into
-  //     huge fake losses on the tile.
-  //   * the portfolio is still cash-only (no local holdings); once assets
-  //     exist, keep the baseline stable and let holdings reconciliation own
-  //     total equity.
-  //   * broker currency vs portfolio currency is enforced upstream by the
-  //     preflight check (see top of this function), so we don't re-check it
-  //     here — a mismatch never reaches this point.
-  const canTreatDriftAsDeposit =
-    p.mode === "live_prod" && !hasLocalHoldings;
+  // booked. To decide whether a drift is an external deposit/withdrawal vs
+  // a trading fill we look at what actually happened at the broker in the
+  // recent past: if no fills explain the cash change, it must be external
+  // money movement and starting_cash must move with it so PnL/% aren't
+  // corrupted. Only applies on real brokers (live_prod) — SIM broker
+  // balances (Saxo Demo) don't reflect our simulated trades.
+  //   * Broker currency vs portfolio currency is enforced upstream by the
+  //     preflight check above.
+  let canTreatDriftAsDeposit = false;
+  if (p.mode === "live_prod") {
+    if (!hasLocalHoldings) {
+      canTreatDriftAsDeposit = true;
+    } else {
+      const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const recentFills = await db
+        .from("live_fills")
+        .select("side, quantity, fill_price, fee")
+        .eq("portfolio_id", portfolioId)
+        .gte("filled_at", sinceIso);
+      const explainedCashDelta = (recentFills.data ?? []).reduce((sum, f) => {
+        const notional = Number(f.quantity) * Number(f.fill_price);
+        const fee = Number(f.fee ?? 0);
+        // buys reduce cash, sells increase cash; both incur fees
+        return sum + (f.side === "sell" ? notional - fee : -notional - fee);
+      }, 0);
+      const unexplained = delta - explainedCashDelta;
+      // Any material unexplained cash move (in either direction) is treated
+      // as an external deposit/withdrawal against the starting pot.
+      if (Math.abs(unexplained) >= DRIFT_EPSILON) {
+        canTreatDriftAsDeposit = true;
+      }
+    }
+  }
 
+  // starting_cash is monotonic in the deposit direction — once the user has
+  // put money in, we never let a subsequent fill or fee silently reduce the
+  // recorded baseline. Withdrawals still subtract from it.
   const newStarting = canTreatDriftAsDeposit
     ? Math.max(0, prevStarting + delta)
     : prevStarting;
@@ -209,24 +231,31 @@ export async function syncLiveCashFromBroker(
     .update({ current_cash: brokerCash, starting_cash: newStarting })
     .eq("id", portfolioId);
 
-  const latestSnapshotQuery = db
-    .from("equity_snapshots")
-    .select("holdings_value")
-    .eq("portfolio_id", portfolioId)
-    .order("snapshot_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const latestSnapshot = await latestSnapshotQuery;
-  const holdingsValue = Number(latestSnapshot.data?.holdings_value ?? 0);
+  // Prefer the broker's authoritative TotalValue for today's equity snapshot
+  // so the headline matches what the user sees in the Saxo app. Falling back
+  // to (cash + latest snapshot's holdings_value) means a CASH_SYNC that
+  // happens between a fill and the next HOLDINGS_SYNC leaves holdings stale
+  // and understates total equity (see 2026-07-27 08:00 CASH_SYNC incident).
   const today = new Date().toISOString().slice(0, 10);
+  let holdingsValueForSnapshot: number;
+  if (brokerTotalValue != null && brokerTotalValue > 0) {
+    holdingsValueForSnapshot = Math.max(0, brokerTotalValue - brokerCash);
+  } else {
+    const latestSnapshot = await db
+      .from("equity_snapshots")
+      .select("holdings_value")
+      .eq("portfolio_id", portfolioId)
+      .order("snapshot_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    holdingsValueForSnapshot = Number(latestSnapshot.data?.holdings_value ?? 0);
+  }
   await writeCashSyncSnapshot(db as unknown as CashSyncSnapshotClient, {
     portfolioId,
     snapshotDate: today,
     cash: brokerCash,
-    holdingsValue,
+    holdingsValue: holdingsValueForSnapshot,
   });
-
-
 
   await db.from("live_broker_log").insert({
     portfolio_id: portfolioId, user_id: p.user_id,
@@ -237,10 +266,10 @@ export async function syncLiveCashFromBroker(
       previousCash: prevCash, previousStarting: prevStarting,
       hasLocalHoldings, mode: p.mode,
       portfolioCurrency: (p as { currency?: string }).currency ?? null,
-
     }),
     response: asJson({
       brokerCash,
+      brokerTotalValue,
       delta,
       newCash: brokerCash,
       newStarting,
