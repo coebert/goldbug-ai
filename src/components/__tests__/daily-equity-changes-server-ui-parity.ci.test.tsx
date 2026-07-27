@@ -88,18 +88,20 @@ function uiRenderedRows(fixture: {
   equity: EquitySnapshotLite[];
   deposits: DepositLite[];
 }): { chart: ChartRow[]; best?: string; worst?: string } {
-  const { container } = render(
+  const html = renderToStaticMarkup(
     <DailyEquityChangesCard
       equity={fixture.equity}
       deposits={fixture.deposits}
       currency="GBP"
     />,
   );
+  const container = document.createElement("div");
+  container.innerHTML = html;
   const chartEl = container.querySelector<HTMLElement>("[data-testid=chart-data]");
-  const payload = chartEl?.dataset.payload;
+  const payload = chartEl?.getAttribute("data-payload");
   const chart: ChartRow[] = payload ? JSON.parse(payload) : [];
   const stats = Array.from(container.querySelectorAll("[class*='font-display']")).map(
-    (el) => el.textContent?.trim() ?? "",
+    (el) => (el as HTMLElement).textContent?.trim() ?? "",
   );
   return { chart, best: stats[2], worst: stats[3] };
 }
