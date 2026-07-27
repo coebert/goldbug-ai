@@ -383,6 +383,9 @@ function AdminPage() {
 
       <GlobalSignalDecayCard />
 
+      <MicrostructureCalibrationCard />
+
+
       <SecurityAlertSettingsCard />
 
       <NotificationsPanel />
