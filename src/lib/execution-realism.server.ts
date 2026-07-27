@@ -129,8 +129,9 @@ export function applySellExecution(args: {
   const slip = p.slippage_bps / 10_000;
   const fillPrice = args.price * (1 - halfSpread - slip);
   const gross = args.qty * fillPrice;
-  const commission = gross * (p.commission_bps / 10_000);
-  const proceedsNet = gross - commission;
+  const minComm = Math.max(0, p.min_commission ?? 0);
+  const commission = Math.max(gross * (p.commission_bps / 10_000), minComm);
+  const proceedsNet = Math.max(0, gross - commission);
   const costPaid = args.qty * args.price - proceedsNet;
   return { fillPrice, proceedsNet, costPaid };
 }
