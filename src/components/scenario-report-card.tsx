@@ -157,6 +157,8 @@ export function ScenarioReportCard(props: {
 
         <CostBreakdownSection reports={reports} visible={visible} />
 
+        <ExecutionCostHeatmaps reports={reports} visible={visible} />
+
 
 
 
