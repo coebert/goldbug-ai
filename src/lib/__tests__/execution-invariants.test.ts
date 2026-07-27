@@ -79,7 +79,12 @@ describe("execution-invariants — detects hand-crafted violations", () => {
     requestedQuantity: 0,
     partial: false,
     truncationReason: null,
+    expectedPrice: 0,
+    slippageBps: 0,
+    participationRate: null,
+    liquidityAdjustedSlippageBps: null,
     ...over,
+
   });
 
   it("flags negative cash (borrowing)", () => {
