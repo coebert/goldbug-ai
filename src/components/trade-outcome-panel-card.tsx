@@ -194,10 +194,18 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
 
   const rows = query.data?.rows ?? [];
   const counts = query.data?.counts ?? {};
+  const summary = useMemo(() => summarizeOutcomes(rows), [rows]);
   const filtered = useMemo(() => {
     if (bucket === "all") return rows;
     return rows.filter((r) => bucketOf(r.status) === bucket);
   }, [rows, bucket]);
+
+  const WINDOWS: { hours: number; label: string }[] = [
+    { hours: 1, label: "1h" },
+    { hours: 6, label: "6h" },
+    { hours: 24, label: "24h" },
+    { hours: 24 * 7, label: "7d" },
+  ];
 
   return (
     <Card>
@@ -209,25 +217,76 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
               Trade outcomes (live)
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Last 24 h of attempted orders. Streams updates as Saxo fills or
-              rejects each order.
+              Attempted orders in the selected window. Streams updates as Saxo
+              fills or rejects each order.
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => query.refetch()}
-            disabled={query.isFetching}
-            aria-label="Refresh trade outcomes"
-          >
-            <RefreshCw
-              className={cn(
-                "h-4 w-4",
-                query.isFetching && "animate-spin",
-              )}
-            />
-          </Button>
+          <div className="flex items-center gap-1">
+            <div
+              role="tablist"
+              aria-label="Time window"
+              className="hidden sm:flex rounded-md border border-border bg-background p-0.5"
+            >
+              {WINDOWS.map((w) => (
+                <button
+                  key={w.hours}
+                  role="tab"
+                  aria-selected={windowHours === w.hours}
+                  onClick={() => setWindowHours(w.hours)}
+                  className={cn(
+                    "rounded px-2 py-1 text-xs transition-colors",
+                    windowHours === w.hours
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              aria-label="Refresh trade outcomes"
+            >
+              <RefreshCw
+                className={cn(
+                  "h-4 w-4",
+                  query.isFetching && "animate-spin",
+                )}
+              />
+            </Button>
+          </div>
         </div>
+
+        {/* Mobile window selector */}
+        <div
+          role="tablist"
+          aria-label="Time window"
+          className="mt-2 flex sm:hidden rounded-md border border-border bg-background p-0.5 w-fit"
+        >
+          {WINDOWS.map((w) => (
+            <button
+              key={w.hours}
+              role="tab"
+              aria-selected={windowHours === w.hours}
+              onClick={() => setWindowHours(w.hours)}
+              className={cn(
+                "rounded px-2 py-1 text-xs transition-colors",
+                windowHours === w.hours
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
+
+        <SummaryTiles summary={summary} />
+
 
         <div
           role="tablist"
