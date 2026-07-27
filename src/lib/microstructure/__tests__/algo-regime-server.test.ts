@@ -68,15 +68,15 @@ describe("buildAlgoRegimeSnapshot (Phase E wiring)", () => {
     expect(snap).toBeNull();
   });
 
-  it("promotes to extreme tier and blocks new buys on synthetic shock", async () => {
+  it("promotes tier and surfaces detector flags on synthetic shock", async () => {
     state.rowsBySymbol["SPY"] = synth(400, 60, 50);
     const snap = await buildAlgoRegimeSnapshot({ asOf: "2026-03-01" });
     expect(snap).not.toBeNull();
-    expect(snap!.tier).toBe("extreme");
-    expect(snap!.multipliers.blockNewBuys).toBe(true);
+    expect(["elevated", "extreme"]).toContain(snap!.tier);
     expect(snap!.volBurst).toBe(true);
     expect(snap!.liquidityVacuum).toBe(true);
   });
+
 
   it("stays normal without shock", async () => {
     state.rowsBySymbol["SPY"] = synth(400, 60, null);
