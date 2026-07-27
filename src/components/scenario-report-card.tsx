@@ -398,6 +398,164 @@ function buildExecutionChartData(
 }
 
 
+/**
+ * Per-trade execution cost decomposition (spread, latency, market impact,
+ * urgency) from the microstructure model. One expandable sub-section per
+ * visible scenario with a table of every filled parent decision, plus a
+ * scenario-level notional-weighted average summary row.
+ */
+function CostBreakdownSection(props: {
+  reports: ScenarioReport[];
+  visible: Record<string, boolean>;
+}) {
+  const shown = props.reports.filter((r) => props.visible[r.id]);
+  const anyBreakdown = shown.some((r) =>
+    r.executionSeries.some((p) => p.costBreakdownBps != null),
+  );
+  if (!anyBreakdown) return null;
+
+  return (
+    <section>
+      <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+        Per-trade cost breakdown (bps of mid, per side)
+      </h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Attributes each filled decision's execution cost to half-spread,
+        fixed latency toll, size-driven market impact, and urgency. Bars
+        stack to the modelled total per-side cost. Weighted averages use
+        filled notional.
+      </p>
+      <div className="space-y-6">
+        {shown.map((r, i) => (
+          <CostBreakdownScenario
+            key={r.id}
+            report={r}
+            color={PALETTE[i % PALETTE.length]}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CostBreakdownScenario(props: {
+  report: ScenarioReport;
+  color: string;
+}) {
+  const rows = props.report.executionSeries.filter(
+    (p) => p.costBreakdownBps != null && p.filledNotional > 0,
+  );
+  if (rows.length === 0) return null;
+
+  // Notional-weighted average per component.
+  const totalNotional = rows.reduce((a, p) => a + p.filledNotional, 0);
+  const wavg = (pick: (b: NonNullable<typeof rows[number]["costBreakdownBps"]>) => number) =>
+    totalNotional > 0
+      ? rows.reduce((a, p) => a + pick(p.costBreakdownBps!) * p.filledNotional, 0) / totalNotional
+      : 0;
+  const avg = {
+    halfSpreadBps: wavg((b) => b.halfSpreadBps),
+    latencyBps: wavg((b) => b.latencyBps),
+    impactBps: wavg((b) => b.impactBps),
+    urgencyBps: wavg((b) => b.urgencyBps),
+    totalBps: wavg((b) => b.totalBps),
+  };
+
+  const SEG = {
+    spread: "hsl(217 91% 60%)",
+    latency: "hsl(38 92% 50%)",
+    impact: "hsl(291 64% 55%)",
+    urgency: "hsl(142 71% 45%)",
+  };
+
+  return (
+    <div className="rounded-md border border-foreground/10">
+      <div className="flex items-center justify-between gap-2 border-b border-foreground/10 px-3 py-2">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ backgroundColor: props.color }}
+          />
+          {props.report.label}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {rows.length} filled trade{rows.length === 1 ? "" : "s"} ·
+          weighted total {avg.totalBps.toFixed(1)} bps
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-3 border-b border-foreground/10 px-3 py-2 text-xs">
+        <LegendSwatch color={SEG.spread} label={`Spread ${avg.halfSpreadBps.toFixed(1)}bps`} />
+        <LegendSwatch color={SEG.latency} label={`Latency ${avg.latencyBps.toFixed(1)}bps`} />
+        <LegendSwatch color={SEG.impact} label={`Impact ${avg.impactBps.toFixed(1)}bps`} />
+        <LegendSwatch color={SEG.urgency} label={`Urgency ${avg.urgencyBps >= 0 ? "+" : ""}${avg.urgencyBps.toFixed(1)}bps`} />
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Decision</TableHead>
+              <TableHead className="text-right">Spread</TableHead>
+              <TableHead className="text-right">Latency</TableHead>
+              <TableHead className="text-right">Impact</TableHead>
+              <TableHead className="text-right">Urgency</TableHead>
+              <TableHead className="text-right">Total (bps)</TableHead>
+              <TableHead className="min-w-[160px]">Composition</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((p) => {
+              const b = p.costBreakdownBps!;
+              const total = Math.max(0, b.totalBps);
+              const pctOf = (v: number) => (total > 0 ? (Math.max(0, v) / total) * 100 : 0);
+              return (
+                <TableRow key={p.decisionId}>
+                  <TableCell className="font-medium">
+                    <div className="text-sm">{p.symbol} <span className="text-muted-foreground">{p.side}</span></div>
+                    <div className="text-xs text-muted-foreground">{p.date}</div>
+                  </TableCell>
+                  <TableCell className="text-right">{b.halfSpreadBps.toFixed(1)}</TableCell>
+                  <TableCell className="text-right">{b.latencyBps.toFixed(1)}</TableCell>
+                  <TableCell className="text-right">{b.impactBps.toFixed(1)}</TableCell>
+                  <TableCell className="text-right">
+                    {b.urgencyBps >= 0 ? "+" : ""}{b.urgencyBps.toFixed(1)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {b.totalBps.toFixed(1)}
+                  </TableCell>
+                  <TableCell>
+                    <div
+                      className="flex h-2 w-full overflow-hidden rounded-full bg-muted"
+                      role="img"
+                      aria-label={`Spread ${b.halfSpreadBps.toFixed(1)} bps, latency ${b.latencyBps.toFixed(1)} bps, impact ${b.impactBps.toFixed(1)} bps, urgency ${b.urgencyBps.toFixed(1)} bps, total ${b.totalBps.toFixed(1)} bps`}
+                    >
+                      <span style={{ width: `${pctOf(b.halfSpreadBps)}%`, backgroundColor: SEG.spread }} />
+                      <span style={{ width: `${pctOf(b.latencyBps)}%`, backgroundColor: SEG.latency }} />
+                      <span style={{ width: `${pctOf(b.impactBps)}%`, backgroundColor: SEG.impact }} />
+                      <span style={{ width: `${pctOf(Math.max(0, b.urgencyBps))}%`, backgroundColor: SEG.urgency }} />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function LegendSwatch(props: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+      <span
+        className="inline-block h-2 w-2 rounded-sm"
+        style={{ backgroundColor: props.color }}
+      />
+      {props.label}
+    </span>
+  );
+}
+
 
 function ScenarioLegend(props: {
   reports: ScenarioReport[];
