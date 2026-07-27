@@ -152,6 +152,10 @@ export function ScenarioReportCard(props: {
           </div>
         </section>
 
+        <ExecutionQualitySection reports={reports} visible={visible} />
+
+
+
         <section>
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">
             Summary
