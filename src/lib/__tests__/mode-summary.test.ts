@@ -61,9 +61,12 @@ describe("computeModeSummary — excludes deposits from pnl & pct", () => {
       [{ portfolio_id: REAL, date: "2026-07-23", amount: 200 }],
     )!;
     expect(s.real.pnl).toBe(20);
-    // pct is anchored on the pre-deposit equity (300), not 500.
-    expect(s.real.pct).toBeCloseTo((20 / 300) * 100, 5);
+    // Denominator is capital-adjusted (prev + net deposits = 500) so
+    // large deposits cannot inflate the % against a tiny pre-deposit
+    // baseline. £20 trading on £500 employed capital = 4%.
+    expect(s.real.pct).toBeCloseTo((20 / 500) * 100, 5);
   });
+
 
   it("deposit dated ON prev snapshot is already baked in — not double-subtracted", () => {
     const s = computeModeSummary(
@@ -101,8 +104,10 @@ describe("computeModeSummary — excludes deposits from pnl & pct", () => {
       [{ portfolio_id: REAL, date: "2026-07-23", amount: -30 }],
     )!;
     expect(s.real.pnl).toBe(10);
-    expect(s.real.pct).toBeCloseTo(2, 5);
+    // Denominator adjusted for the withdrawn capital: 500 − 30 = 470.
+    expect(s.real.pct).toBeCloseTo((10 / 470) * 100, 5);
   });
+
 
   it("sim deposits are netted from sim, not from real", () => {
     const s = computeModeSummary(

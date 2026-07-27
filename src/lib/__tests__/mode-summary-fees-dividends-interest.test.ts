@@ -87,37 +87,36 @@ describe("computeModeSummary — fees, dividends, interest excluded from pct", (
 
   it("FEE + trading gain: reports only the trading gain", () => {
     // £50 trading gain, £5 fee → equity 1000 → 1045.
-    // Trading pnl = (1045 − 1000) − (−5) = 50 → +5.00%.
+    // Trading pnl = (1045 − 1000) − (−5) = 50. Denominator is
+    // capital-adjusted (prev + net flows = 1000 + (−5) = 995).
     const series = twoPointSeries(1000, 1045);
     const events: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-07-21", amount: -5 },
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(50);
-    expect(s?.real.pct).toBeCloseTo(5, 10);
+    expect(s?.real.pct).toBeCloseTo((50 / 995) * 100, 10);
   });
 
   it("DIVIDEND + trading loss: reports only the trading loss", () => {
     // £30 dividend received, £30 trading loss → equity 1000 → 1000.
-    // Trading pnl = (1000 − 1000) − 30 = −30 → −3.00%.
+    // Trading pnl = (1000 − 1000) − 30 = −30. Capital-adjusted
+    // denominator = 1000 + 30 = 1030.
     const series = twoPointSeries(1000, 1000);
     const events: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-07-21", amount: 30 },
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(-30);
-    expect(s?.real.pct).toBeCloseTo(-3, 10);
+    expect(s?.real.pct).toBeCloseTo((-30 / 1030) * 100, 10);
   });
 
   it("FEE + DIVIDEND + INTEREST + DEPOSIT + trading gain: only the trading gain shows", () => {
     // Mixed non-trading flows all land on 2026-07-21:
-    //   fee      −8
-    //   dividend +25
-    //   interest +2
-    //   deposit  +100
+    //   fee      −8, dividend +25, interest +2, deposit +100
     //   net cash-flow = +119
     // Equity moves 1000 → 1159, so trading pnl = (1159−1000) − 119 = 40.
-    // pct = 40 / 1000 = +4.00%.
+    // Denominator is capital-adjusted: 1000 + 119 = 1119.
     const series = twoPointSeries(1000, 1159);
     const events: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-07-21", amount: -8 },
@@ -127,8 +126,9 @@ describe("computeModeSummary — fees, dividends, interest excluded from pct", (
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(40);
-    expect(s?.real.pct).toBeCloseTo(4, 10);
+    expect(s?.real.pct).toBeCloseTo((40 / 1119) * 100, 10);
   });
+
 
   it("FEES / DIVIDENDS / INTEREST dated ON OR BEFORE the previous snapshot are not double-netted", () => {
     // Fees & dividends dated 2026-07-19 are already baked into the
@@ -216,8 +216,9 @@ describe("computeModeSummary — fees, dividends, interest excluded from pct", (
     ];
     const s = computeModeSummary(series, [LIVE], events);
     // Trailing net non-trading flow = 15 (20 − 5).
-    // Trading pnl = 35 − 15 = 20 → 20 / 1000 = +2%.
+    // Trading pnl = 35 − 15 = 20. Capital-adjusted denom = 1000 + 15.
     expect(s?.real.pnl).toBe(20);
-    expect(s?.real.pct).toBeCloseTo(2, 10);
+    expect(s?.real.pct).toBeCloseTo((20 / 1015) * 100, 10);
   });
+
 });

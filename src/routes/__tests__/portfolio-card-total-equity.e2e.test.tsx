@@ -156,7 +156,9 @@ describe("home dashboard e2e — total equity headline vs equity % share one sou
     expect(results[0].headline).toBe("GBP 1,234.56");
     // Deposit toggle actually moves the %: with deposits netted, the
     // £100 mid-window cash-in does not count as trading gain.
-    expect(results[0].pctExcl).toBeCloseTo(((1234.56 - 100 - 1000) / 1000) * 100, 5);
+    // Capital-adjusted: trading pnl / (baseline + net flow) = (134.56)/(1000+100).
+    expect(results[0].pctExcl).toBeCloseTo(((1234.56 - 100 - 1000) / (1000 + 100)) * 100, 5);
+
     expect(results[0].pctIncl).toBeCloseTo(((1234.56 - 1000) / 1000) * 100, 5);
     expect(results[0].pctExcl).not.toBe(results[0].pctIncl);
 

@@ -42,7 +42,8 @@ describe("computeModeSummary — initial deposit excluded from % change", () => 
   });
 
   it("initial seed + top-up + small trading gain → pct reflects ONLY the trading gain", () => {
-    // 100 → 305: +£200 deposit, +£5 trading profit. pct on £100 = 5%.
+    // 100 → 305: +£200 deposit, +£5 trading profit.
+    // Capital-adjusted denom = 100 + 200 = 300.
     const series: SummarySeriesRow[] = [
       { date: "2026-07-20", "live-1": 100 },
       { date: "2026-07-21", "live-1": 305 },
@@ -53,8 +54,9 @@ describe("computeModeSummary — initial deposit excluded from % change", () => 
     ];
     const s = computeModeSummary(series, [LIVE], deposits);
     expect(s?.real.pnl).toBe(5);
-    expect(s?.real.pct).toBeCloseTo(5, 10);
+    expect(s?.real.pct).toBeCloseTo((5 / 300) * 100, 10);
   });
+
 
   it("sim portfolio seeded with £1,000,000, no trading → sim pct = 0%", () => {
     const series: SummarySeriesRow[] = [

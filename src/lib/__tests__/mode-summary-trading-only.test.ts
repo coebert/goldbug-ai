@@ -28,8 +28,9 @@ const portfolios = [
 
 describe("computeModeSummary — pct reflects trading PnL only (invariant)", () => {
   it("multiple real portfolios: deposits into ONE are netted from the mode aggregate", () => {
-    // Trading PnL: A +£10, B +£5 → total +£15 on a £700 baseline (≈2.143%).
+    // Trading PnL: A +£10, B +£5 → total +£15.
     // A also received a £100 deposit inside the window.
+    // Capital-adjusted denom = 700 + 100 = 800.
     const s = computeModeSummary(
       [
         { date: "2026-07-22", [REAL_A]: 300, [REAL_B]: 400 },
@@ -40,9 +41,10 @@ describe("computeModeSummary — pct reflects trading PnL only (invariant)", () 
     )!;
     expect(s.real.now).toBe(815);
     expect(s.real.pnl).toBe(15); // 815 − 700 − 100
-    expect(s.real.pct).toBeCloseTo((15 / 700) * 100, 5);
+    expect(s.real.pct).toBeCloseTo((15 / 800) * 100, 5);
     expect(s.real.count).toBe(2);
   });
+
 
   it("deposit + withdrawal net to zero → pct matches raw trading %", () => {
     // Prev 500 → now 520; +£50 deposit and -£50 withdrawal same day.
@@ -103,12 +105,13 @@ describe("computeModeSummary — pct reflects trading PnL only (invariant)", () 
         { portfolio_id: SIM, date: "2026-07-23", amount: 40 },     // sim deposit
       ],
     )!;
-    // Real trading = 0; sim trading = 10.
+    // Real trading = 0; sim trading = 10. Capital-adjusted denoms.
     expect(s.real.pnl).toBe(0);
     expect(s.real.pct).toBe(0);
     expect(s.sim.pnl).toBe(10);
-    expect(s.sim.pct).toBeCloseTo(1, 5);
+    expect(s.sim.pct).toBeCloseTo((10 / 1040) * 100, 5);
   });
+
 
   it("deposit routed to an UNKNOWN portfolio id is ignored (defensive)", () => {
     const s = computeModeSummary(
@@ -123,11 +126,14 @@ describe("computeModeSummary — pct reflects trading PnL only (invariant)", () 
     expect(s.real.pct).toBeCloseTo(6, 5);
   });
 
-  it("property: adding a deposit + equal same-mode equity bump yields IDENTICAL pnl/pct as no-deposit baseline", () => {
+  it("property: adding a deposit + equal same-mode equity bump yields IDENTICAL pnl as no-deposit baseline", () => {
     // For any random baseline, trading delta, and deposit amount,
-    // the pair (deposit=D, now=prev+trading+D) must be observationally
-    // equivalent to (deposit=0, now=prev+trading). This is THE property
-    // that "deposits don't inflate profits".
+    // the pair (deposit=D, now=prev+trading+D) must produce the same
+    // trading pnl as (deposit=0, now=prev+trading). Under the
+    // capital-adjusted denominator the pct legitimately shifts when
+    // the deposit changes the invested capital base, so we only lock
+    // pnl here — the pct semantics are covered by the mode-summary
+    // regression suite.
     fc.assert(
       fc.property(
         fc.double({ noDefaultInfinity: true, noNaN: true, min: 1, max: 1e9 }),   // prev > 0
@@ -150,12 +156,8 @@ describe("computeModeSummary — pct reflects trading PnL only (invariant)", () 
             portfolios,
             [],
           )!;
-          // Trading pnl and pct must match within floating-point tolerance
-          // regardless of the deposit magnitude.
           const tol = Math.max(1e-6, Math.abs(trading) * 1e-9, Math.abs(deposit) * 1e-9);
           expect(Math.abs(withDeposit.real.pnl - noDeposit.real.pnl)).toBeLessThanOrEqual(tol);
-          const pctTol = Math.max(1e-6, Math.abs(noDeposit.real.pct) * 1e-9);
-          expect(Math.abs(withDeposit.real.pct - noDeposit.real.pct)).toBeLessThanOrEqual(pctTol);
           expect(Number.isFinite(withDeposit.real.pct)).toBe(true);
         },
       ),
@@ -163,8 +165,12 @@ describe("computeModeSummary — pct reflects trading PnL only (invariant)", () 
     );
   });
 
-  it("property: pct is invariant under deposit magnitude when trading portion is fixed", () => {
-    // Two different deposit amounts, same underlying trading delta → same pct.
+
+  it("property: pnl is invariant under deposit magnitude when trading portion is fixed", () => {
+    // Two different deposit amounts, same underlying trading delta →
+    // same pnl. (pct also changes with the capital-adjusted denominator,
+    // which is the intended behaviour — see the pathological £999k
+    // deposit case in mode-summary-time-ranges-multi-deposits.)
     fc.assert(
       fc.property(
         fc.double({ noDefaultInfinity: true, noNaN: true, min: 1, max: 1e6 }),
@@ -180,19 +186,20 @@ describe("computeModeSummary — pct reflects trading PnL only (invariant)", () 
               ],
               portfolios,
               [{ portfolio_id: REAL_A, date: "2026-07-23", amount: dep }],
-            )!.real.pct;
+            )!.real;
           const a = run(dep1);
           const b = run(dep2);
           const tol = Math.max(
             1e-6,
             (Math.abs(dep1) + Math.abs(dep2) + Math.abs(trading)) * 1e-9,
           );
-          expect(Math.abs(a - b)).toBeLessThanOrEqual(tol);
-          expect(Number.isFinite(a)).toBe(true);
-          expect(Number.isFinite(b)).toBe(true);
+          expect(Math.abs(a.pnl - b.pnl)).toBeLessThanOrEqual(tol);
+          expect(Number.isFinite(a.pct)).toBe(true);
+          expect(Number.isFinite(b.pct)).toBe(true);
         },
       ),
       { numRuns: 300 },
     );
   });
+
 });

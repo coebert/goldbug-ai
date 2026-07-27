@@ -64,9 +64,16 @@ export function buildDepositAdjustedSeries(
     }
     cumulative += dep;
     const adjusted = equity - cumulative;
+    // Denominator scales with cumulative net flows so a large mid-
+    // window deposit does not divide subsequent trading PnL by the
+    // tiny pre-deposit baseline (which would produce a ridiculous %
+    // like +1101% for a £999k top-up that only earned +£11k trading).
+    // This is equivalent to a capital-adjusted return / single-flow
+    // TWRR: (equity − cumFlows − baseline) / (baseline + cumFlows).
+    const denom = baseline + cumulative;
     const pct =
-      Number.isFinite(baseline) && baseline > 0
-        ? ((adjusted - baseline) / baseline) * 100
+      Number.isFinite(baseline) && denom > 0
+        ? ((adjusted - baseline) / denom) * 100
         : 0;
     out.push({
       date: p.date,
@@ -77,6 +84,7 @@ export function buildDepositAdjustedSeries(
     });
   }
   return out;
+
 }
 
 

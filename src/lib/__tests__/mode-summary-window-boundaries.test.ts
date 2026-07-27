@@ -70,15 +70,14 @@ describe("computeModeSummary — window boundary contract", () => {
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(50);
-    expect(s?.real.pct).toBeCloseTo(5, 10);
+    // Capital-adjusted denominator = 1000 + 100 = 1100.
+    expect(s?.real.pct).toBeCloseTo((50 / 1100) * 100, 10);
   });
 
   it("deposit dated STRICTLY between prev and last is INCLUDED", () => {
-    // The generic in-window case, guarded here as the interior
-    // sibling of the two boundary tests above.
     const series: SummarySeriesRow[] = [
       { date: "2026-07-18", "live-1": 1000 },
-      { date: "2026-07-22", "live-1": 1075 }, // £75 trading + £-... wait
+      { date: "2026-07-22", "live-1": 1075 },
     ];
     // Trading gain = 50, deposit = 25 → equity delta 75.
     const events: DepositEvent[] = [
@@ -86,8 +85,10 @@ describe("computeModeSummary — window boundary contract", () => {
     ];
     const s = computeModeSummary(series, [LIVE], events);
     expect(s?.real.pnl).toBe(50);
-    expect(s?.real.pct).toBeCloseTo(5, 10);
+    // Capital-adjusted denominator = 1000 + 25 = 1025.
+    expect(s?.real.pct).toBeCloseTo((50 / 1025) * 100, 10);
   });
+
 
   it("first-snapshot-only trade: single row means no trading pnl is inferred", () => {
     // The very first day the mode ever appears in the series has no
@@ -165,12 +166,14 @@ describe("computeModeSummary — window boundary contract", () => {
     ];
     const s = computeModeSummary(series, [SIM, LIVE], events);
     // Real: 1080 − 1000 = 80 gross; net deposit 50 → trading pnl 30.
+    // Capital-adjusted denominator = 1000 + 50 = 1050.
     expect(s?.real.pnl).toBe(30);
-    expect(s?.real.pct).toBeCloseTo(3, 10);
+    expect(s?.real.pct).toBeCloseTo((30 / 1050) * 100, 10);
     // Sim: no cash-flow → pure £20 trading gain.
     expect(s?.sim.pnl).toBe(20);
     expect(s?.sim.pct).toBeCloseTo(4, 10);
   });
+
 
   it("previous == 0: pct is guarded to 0 even when pnl > 0 (starting-from-empty boundary)", () => {
     // The mode starts at 0 on day one and grows to 100 via a deposit.

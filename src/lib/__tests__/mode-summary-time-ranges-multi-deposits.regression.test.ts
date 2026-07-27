@@ -44,20 +44,23 @@ const windowRows = (
 ];
 
 describe("computeModeSummary — % change across time ranges & multi-deposit events", () => {
+  // Denominator is capital-adjusted (startEquity + net in-window flows)
+  // so a large mid-window deposit cannot divide small trading PnL by a
+  // tiny pre-deposit baseline. See computeModeSummary docstring.
+  const expectedPct = (tradingPnl: number, startEquity: number, inWindowFlows: number) =>
+    (tradingPnl / (startEquity + inWindowFlows)) * 100;
+
   it("7-day window with a single mid-window deposit → deposit netted, pnl == trading only", () => {
-    // start £1,000 → end £1,105: +£100 deposit on day 3, +£5 trading.
     const rows = windowRows("2026-06-01", 1_000, "2026-06-07", 5, 100);
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-06-03", amount: 100 },
     ];
     const s = computeModeSummary(rows, [LIVE], deposits);
     expect(s?.real.pnl).toBeCloseTo(5, 10);
-    expect(s?.real.pct).toBeCloseTo((5 / 1_000) * 100, 10);
+    expect(s?.real.pct).toBeCloseTo(expectedPct(5, 1_000, 100), 10);
   });
 
   it("30-day window with three deposits + one withdrawal → all netted, pnl == £30", () => {
-    // Flows: +200, +500, +50, -100 = +£650 net cash-flow.
-    // Trading PnL = £30 → end equity = 1000 + 650 + 30 = 1680.
     const rows = windowRows("2026-06-01", 1_000, "2026-06-30", 30, 650);
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-06-05", amount: 200 },
@@ -67,11 +70,10 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
     ];
     const s = computeModeSummary(rows, [LIVE], deposits);
     expect(s?.real.pnl).toBeCloseTo(30, 10);
-    expect(s?.real.pct).toBeCloseTo((30 / 1_000) * 100, 10);
+    expect(s?.real.pct).toBeCloseTo(expectedPct(30, 1_000, 650), 10);
   });
 
   it("90-day (quarter) window with 5 deposits → pnl == pure trading PnL, £89", () => {
-    // Five deposits totalling £1,650 over 90 days, plus £89 trading PnL.
     const rows = windowRows("2026-05-01", 1_000, "2026-07-29", 89, 1_650);
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-05-06", amount: 200 },
@@ -82,12 +84,10 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
     ];
     const s = computeModeSummary(rows, [LIVE], deposits);
     expect(s?.real.pnl).toBeCloseTo(89, 10);
-    expect(s?.real.pct).toBeCloseTo((89 / 1_000) * 100, 10);
+    expect(s?.real.pct).toBeCloseTo(expectedPct(89, 1_000, 1_650), 10);
   });
 
   it("pnl is invariant to the NUMBER of deposit events (same net cash-flow)", () => {
-    // Same £500 net inflow, same £20 trading PnL → same pnl and pct
-    // whether it arrives as 1, 5, or 20 discrete events.
     const oneEvent: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-06-10", amount: 500 },
     ];
@@ -105,12 +105,11 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
     for (const deposits of [oneEvent, fiveEvents, twentyEvents]) {
       const s = computeModeSummary(rows, [LIVE], deposits);
       expect(s?.real.pnl).toBeCloseTo(20, 10);
-      expect(s?.real.pct).toBeCloseTo((20 / 1_000) * 100, 10);
+      expect(s?.real.pct).toBeCloseTo(expectedPct(20, 1_000, 500), 10);
     }
   });
 
   it("pct scales linearly with trading PnL when the anchor equity is fixed", () => {
-    // Same £1,000 anchor + same deposit set. Vary trading PnL only.
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-06-05", amount: 200 },
       { portfolio_id: "live-1", date: "2026-06-15", amount: 300 },
@@ -119,13 +118,11 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
       const rows = windowRows("2026-06-01", 1_000, "2026-06-30", trading, 500);
       const s = computeModeSummary(rows, [LIVE], deposits);
       expect(s?.real.pnl).toBeCloseTo(trading, 10);
-      expect(s?.real.pct).toBeCloseTo((trading / 1_000) * 100, 10);
+      expect(s?.real.pct).toBeCloseTo(expectedPct(trading, 1_000, 500), 10);
     }
   });
 
   it("deposit dated on/before windowStart is NOT re-netted (no double-count)", () => {
-    // windowStart == 2026-06-01, deposit on 2026-05-20 is already in
-    // the £1,000 starting equity and must be ignored by the summary.
     const rows = windowRows("2026-06-01", 1_000, "2026-06-15", 15, 0);
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-05-20", amount: 500 },
@@ -133,7 +130,7 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
     ];
     const s = computeModeSummary(rows, [LIVE], deposits);
     expect(s?.real.pnl).toBeCloseTo(15, 10);
-    expect(s?.real.pct).toBeCloseTo((15 / 1_000) * 100, 10);
+    expect(s?.real.pct).toBeCloseTo(expectedPct(15, 1_000, 0), 10);
   });
 
   it("deposit dated exactly on windowEnd IS netted (inclusive right edge)", () => {
@@ -146,18 +143,16 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
   });
 
   it("withdrawal-only window: negative cash-flow is netted symmetrically", () => {
-    // −£300 withdrawal + £12 trading. Raw delta = −288, pnl = +12.
     const rows = windowRows("2026-06-01", 2_000, "2026-06-14", 12, -300);
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-06-05", amount: -300 },
     ];
     const s = computeModeSummary(rows, [LIVE], deposits);
     expect(s?.real.pnl).toBeCloseTo(12, 10);
-    expect(s?.real.pct).toBeCloseTo((12 / 2_000) * 100, 10);
+    expect(s?.real.pct).toBeCloseTo(expectedPct(12, 2_000, -300), 10);
   });
 
   it("includeDeposits:true across a multi-deposit window returns RAW equity change", () => {
-    // Opt-in raw view: pnl == now − previous, deposits included.
     const rows = windowRows("2026-06-01", 1_000, "2026-06-30", 30, 650);
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-06-05", amount: 200 },
@@ -171,7 +166,6 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
   });
 
   it("YTD-style long window: negative trading PnL nets deposits correctly", () => {
-    // Drawdown scenario: +£400 net deposits, −£150 trading. Pnl = −£150.
     const rows = windowRows("2026-01-01", 5_000, "2026-07-27", -150, 400);
     const deposits: DepositEvent[] = [
       { portfolio_id: "live-1", date: "2026-02-14", amount: 250 },
@@ -180,6 +174,26 @@ describe("computeModeSummary — % change across time ranges & multi-deposit eve
     ];
     const s = computeModeSummary(rows, [LIVE], deposits);
     expect(s?.real.pnl).toBeCloseTo(-150, 10);
-    expect(s?.real.pct).toBeCloseTo((-150 / 5_000) * 100, 10);
+    expect(s?.real.pct).toBeCloseTo(expectedPct(-150, 5_000, 400), 10);
+  });
+
+  it("large deposit relative to baseline no longer explodes the percentage", () => {
+    // The Balanced-sim bug: £1,000 baseline, £999,000 mid-window
+    // deposit, +£11,116 trading PnL. Old formula divided by £1,000
+    // and reported +1,111.6% — a nonsense figure. Capital-adjusted
+    // denominator (baseline + net flows) yields the realistic figure.
+    const rows = windowRows("2026-07-01", 1_000, "2026-07-27", 11_116, 999_000);
+    const deposits: DepositEvent[] = [
+      { portfolio_id: "live-1", date: "2026-07-24", amount: 999_000 },
+    ];
+    const s = computeModeSummary(rows, [LIVE], deposits);
+    expect(s?.real.pnl).toBeCloseTo(11_116, 10);
+    expect(s?.real.pct).toBeCloseTo(
+      (11_116 / (1_000 + 999_000)) * 100,
+      10,
+    );
+    // Sanity: nowhere near the 1000%+ that the old formula produced.
+    expect(Math.abs(s!.real.pct)).toBeLessThan(10);
   });
 });
+

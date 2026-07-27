@@ -119,8 +119,17 @@ export function computeModeSummary(
 
     const rawDelta = now - previous;
     const pnl = includeDeposits ? rawDelta : rawDelta - netDeposits;
-    const pct = previous > 0 ? (pnl / previous) * 100 : 0;
+    // Denominator scales with net cash flows so a large mid-window
+    // deposit does not divide trading PnL by pre-deposit equity and
+    // produce absurd percentages (e.g. +1101% for £11k trading gain
+    // on a £999k top-up). Capital-adjusted return: pnl / (prev + net
+    // flows). Falls back to `previous` for pure-withdrawal edge cases
+    // where the adjusted denominator would collapse to <= 0.
+    const denom = includeDeposits ? previous : previous + netDeposits;
+    const denomSafe = denom > 0 ? denom : previous;
+    const pct = denomSafe > 0 ? (pnl / denomSafe) * 100 : 0;
     return { now, pnl, pct, count };
+
   };
 
   return {

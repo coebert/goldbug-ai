@@ -35,7 +35,10 @@ describe("buildDepositAdjustedSeries", () => {
 
   it("mid-series deposit is subtracted from every subsequent point", () => {
     // £200 deposit on day 2 that exactly funds the equity bump →
-    // adjusted stays flat and pct stays at 0.
+    // adjusted stays flat and pct stays at 0. Subsequent trading
+    // gain is scaled against the capital-adjusted baseline
+    // (baseline + cumulative flows) so a large deposit cannot
+    // divide small trading PnL by a tiny pre-deposit baseline.
     const s = buildDepositAdjustedSeries(
       pts([
         ["2026-07-22", 1000],
@@ -47,7 +50,8 @@ describe("buildDepositAdjustedSeries", () => {
     expect(s[1].adjusted).toBe(1000);
     expect(s[1].pct).toBeCloseTo(0, 5);
     expect(s[2].adjusted).toBe(1010);
-    expect(s[2].pct).toBeCloseTo(1, 5);
+    // 10 trading PnL on capital of 1000 + 200 = 1200.
+    expect(s[2].pct).toBeCloseTo((10 / 1200) * 100, 5);
   });
 
   it("withdrawal (negative) is added back — trading PnL survives it", () => {
@@ -59,7 +63,8 @@ describe("buildDepositAdjustedSeries", () => {
       [{ date: "2026-07-23", amount: -60 }],
     );
     expect(s[1].adjusted).toBe(1030);
-    expect(s[1].pct).toBeCloseTo(3, 5);
+    // 30 trading PnL on capital of 1000 − 60 = 940.
+    expect(s[1].pct).toBeCloseTo((30 / 940) * 100, 5);
   });
 
   it("multiple deposits accumulate", () => {
@@ -76,8 +81,10 @@ describe("buildDepositAdjustedSeries", () => {
     );
     expect(s[1].pct).toBeCloseTo(0, 5);
     expect(s[2].adjusted).toBe(1050);
-    expect(s[2].pct).toBeCloseTo(5, 5);
+    // 50 trading PnL on capital of 1000 + 500 + 500 = 2000.
+    expect(s[2].pct).toBeCloseTo((50 / 2000) * 100, 5);
   });
+
 
   it("deposits before startDate are ignored (already in baseline)", () => {
     const s = buildDepositAdjustedSeries(
@@ -125,9 +132,10 @@ describe("buildDepositAdjustedSeries", () => {
       ]),
       [{ date: "2026-07-23", amount: 200 }],
     );
-    // Trading = +£20 on £300 baseline → ~6.667%.
-    expect(pct).toBeCloseTo((20 / 300) * 100, 5);
+    // Trading = +£20 on capital 300 + 200 = 500 → 4%.
+    expect(pct).toBeCloseTo((20 / 500) * 100, 5);
   });
+
 
   it("empty input → empty output", () => {
     expect(buildDepositAdjustedSeries([], [])).toEqual([]);
