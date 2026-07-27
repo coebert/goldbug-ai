@@ -2304,6 +2304,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           : { skipped: true },
       },
       regime: regime ?? null,
+      algo_regime: algoRegime ?? null,
       tail_hedge: tailHedgeDecision,
       tail_hedge_execution: tailHedgeExecution,
       tail_hedge_reconciliation: tailHedgeReconciliation,
@@ -2312,6 +2313,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         lessons: learning.lessons,
         lessons_as_of: learning.lessons_as_of,
       },
+
     }),
   }).select("id").single();
   const decisionId = decisionInsert.data?.id ?? null;
