@@ -68,6 +68,8 @@ describe("execution-invariants — detects hand-crafted violations", () => {
   const baseSnap = (over: Partial<SimSnapshot>): SimSnapshot => ({
     step: 1,
     decisionId: "d1",
+    symbol: "AAA",
+    side: "BUY",
     cash: 100,
     holdings: [],
     holdingsValue: 0,
@@ -84,6 +86,8 @@ describe("execution-invariants — detects hand-crafted violations", () => {
     participationRate: null,
     liquidityAdjustedSlippageBps: null,
     ...over,
+  });
+
 
   });
 
