@@ -1,52 +1,63 @@
-## Profit-Enhancement Rollout — 6 phases
+# Strategy: Defending Against AI-Driven Market Patterns
 
-I'll ship these in the order of highest profit-per-effort, verifying each phase with tests before moving to the next. Each phase is independently valuable, so you'll see improvements incrementally rather than after one giant drop.
+Modern markets show new footprints from algorithmic/AI participants: flash crashes, liquidity mirages, momentum ignition, quote stuffing, correlated de-risking (all algos exit together), and sudden volatility bursts around events. This plan hardens the app end-to-end.
 
-### Phase 1 — Regime-based strategy on/off switching
-Turn off strategies that historically lose money in the current regime instead of always running them all.
-- Extend `src/lib/alpha/regime-matrix.ts` with an **enablement matrix**: which of {trend, mean-reversion, quality, carry, crypto sleeve} are active per regime (bull_quiet, bull_volatile, correction, bear, crisis, recovery).
-- Gate strategy scores in `src/lib/alpha/composite.ts` — a disabled strategy contributes 0 weight, not just downweighted.
-- Log the on/off state in `run_metrics` so we can attribute performance later.
-- Surface active strategies in the regime panel UI.
+## Goals
 
-### Phase 2 — Earnings & event-window awareness
-Stop holding full size into binary events.
-- New `src/lib/earnings-calendar.server.ts` fetching upcoming earnings (Yahoo/Finnhub free tier or Saxo instrument details).
-- Extend `src/lib/risk-halts.server.ts` with an `EARNINGS_WINDOW` guard that trims positions to 50% of target size in the T-2 to T+1 window.
-- Cache in a new `earnings_cache` table (14-day TTL).
-- Show a "⚠ earnings in Nd" pill on `LiveHoldingsCard`.
+1. Detect abnormal microstructure conditions (liquidity vacuums, vol bursts, correlated de-risking) in real time.
+2. Adapt execution to avoid getting picked off by faster algos.
+3. Size and hedge for fatter tails and faster regime shifts.
+4. Give the AI decision layer explicit priors about algo-driven behavior.
 
-### Phase 3 — ATR-based trailing stops
-Replace fixed % stops with volatility-adaptive stops.
-- Add `atrTrailingStop()` to `src/lib/market-data.server.ts` (14-day ATR × multiplier by risk level: 2.5 / 3.0 / 3.5).
-- Wire into exit logic in `src/lib/trading-engine.server.ts` alongside existing exits (X1–X6).
-- Persist per-position `trail_high` and `stop_price` on `holdings` for hysteresis.
+## Phases
 
-### Phase 4 — VWAP/TWAP order slicing
-Reduce execution slippage on orders > 25% of average daily volume.
-- Extend `pending_slices` scheduler to time-slice large orders across 4–8 buckets over 30–120 min.
-- Add spread-aware limit pricing for illiquid ETPs/ETCs (post at mid+edge instead of crossing).
-- Wire post-trade TCA feedback: symbols with consistent >20bps slippage get position-size downweight in `alpha/composite.ts`.
+### Phase A — Detect: Algo-driven regime & microstructure signals
+New module `src/lib/microstructure/algo-regime.ts`:
+- **Volatility burst detector**: short-window realized vol vs 20d baseline; flag when ratio > 2.5.
+- **Liquidity vacuum detector**: recent volume / rolling median < 0.4 with widening spread proxy.
+- **Momentum-ignition / mean-reversion whiplash**: count sign flips of 5-bar returns in last 30 bars vs historical.
+- **Correlated de-risking**: cross-sectional correlation of top holdings' 5-day returns spiking above baseline (all-algos-exit signature).
+- **Gap-and-fade**: overnight gap > 1.5×ATR that reverses ≥50% within first 30 min.
 
-### Phase 5 — Correlation-aware position sizing
-Prevent correlated clusters from dominating risk.
-- Reuse existing correlation matrix from `correlation-heatmap-card`.
-- New `src/lib/risk/cluster-caps.server.ts`: build clusters at ρ > 0.7, cap combined cluster exposure by risk level (30/40/50%).
-- Apply in sizing pass, after alpha ranking but before order emission.
-- Add Kelly-fractional sizing (¼-Kelly) driven by existing `order-confidence` scores.
+Outputs an `AlgoRegimeSnapshot { volBurst, liquidityVacuum, whipsaw, correlationSpike, gapFade, score, tier: normal|elevated|extreme }`.
 
-### Phase 6 — Tail hedge overlay (high-CAPE regimes only)
-Cheap convex downside protection when valuations are stretched.
-- New `src/lib/tail-hedge.server.ts`: when CAPE proxy > 30 AND regime ∈ {bull_volatile, correction}, allocate 0.5–1.5% of NAV to a defined put-spread proxy (via `PUTW`/`HDGE` ETFs Saxo supports) or long-vol ETP.
-- Sleeve is capped and separate from primary allocation.
-- Auto-unwind when regime turns risk-off (hedge has done its job) or CAPE reverts.
+### Phase B — Adapt execution
+Extend `src/lib/broker-simulator.ts` and live executor:
+- **Adaptive participation cap**: shrink `maxParticipationRate` (e.g. 15% → 5%) when tier=elevated, 2% when extreme.
+- **Wider TWAP slicing** in elevated regimes; skip new entries entirely in `extreme`.
+- **Anti-momentum-ignition guard**: reject market orders when short-window vol > 2× baseline; require marketable-limit with max slippage cap.
+- **Post-only / passive bias** when spread proxy is wide.
+- **Cool-down after whipsaw**: block re-entry into a symbol for N minutes after a stop-out during whipsaw regime.
 
-### Cross-cutting
-- Every phase ships with unit tests in `src/lib/__tests__/`.
-- Each phase adds one line to a new **Strategy Changelog** card on the admin route so you can see what changed and when.
-- No changes to broker plumbing — this is all pre-trade signal & sizing work.
+### Phase C — Size & hedge for fatter tails
+- **Vol-targeted sizing**: scale position by `targetVol / max(realizedVol, 1e-6)`; new helper `src/lib/sizing/vol-target.ts`.
+- **Correlation-spike downscale**: when Phase A correlation signal fires, apply extra 0.5× multiplier via existing `sizeAgainstClusterCap`.
+- **Tail-hedge boost**: when `tier=extreme`, bump `TailHedgeConfig.baselinePctNav` (still capped) — integrate into `computeTailHedge` via a new `algoRegimeTier` input.
+- **Circuit breaker**: pause new buys when portfolio's realized 1-day move > 3σ vs 60d baseline; require next-tick confirmation.
 
-### Order & sequencing
-I'll implement Phase 1 first, ship it, verify tests pass, then move to Phase 2, etc. Each phase is 1 turn of work.
+### Phase D — Inform the AI decision layer
+- Append an `ALGO-DRIVEN MARKET REGIME` block to `HISTORICAL_PLAYBOOK` in `src/lib/historical-playbook.server.ts` (flash-crash 2010, vol-mageddon Feb-2018, Mar-2020 gamma, meme-squeeze 2021, Aug-2024 yen-carry unwind) plus base rates and behavioral rules ("do not chase 1-min breakouts", "widen stops in whipsaw", "prefer VWAP over market").
+- Pipe the current `AlgoRegimeSnapshot` into the decision prompt and heuristic fallback (`src/lib/heuristic-decision.ts`) so both branches see the tier.
 
-Say **go** and I'll start with Phase 1.
+### Phase E — Observability
+- New card `src/components/algo-regime-card.tsx` on the portfolio page showing current tier, active signals, and the sizing/execution multipliers currently applied.
+- Log every tier transition to `ai_decision_audit` context so post-hoc review can confirm the guardrails fired.
+
+### Phase F — Tests
+- Unit tests for each detector (`microstructure/__tests__/*.test.ts`) with synthetic bar fixtures.
+- Integration test: extreme-tier tick should produce zero new market buys and reduced participation.
+- Property test: vol-target sizer never exceeds risk-level cap and monotonically shrinks as realized vol rises.
+- Regression: existing scenario-report matrix still passes; add a new "algo-driven volatile" preset to `SCENARIO_MATRIX`.
+
+## Non-goals
+
+- No new venue/broker integration; execution changes stay within existing Saxo pathway and the simulator.
+- No change to the equity/cash accounting layer.
+- No new user-visible risk-level presets (existing conservative/balanced/high still apply).
+
+## Rollout
+
+1. Land Phases A, C, F behind pure functions (no live wiring) — verifiable via tests.
+2. Wire Phase D (playbook + heuristic) — decision-only impact.
+3. Wire Phase B into simulator, then live executor behind a per-portfolio flag `algo_regime_guard_enabled` defaulting on.
+4. Ship Phase E card once signals stabilize.

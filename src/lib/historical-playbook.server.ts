@@ -45,4 +45,25 @@ BEHAVIORAL GUARDRAILS (avoid the classic mistakes):
   - Diversify across 2-3 uncorrelated asset classes when regime is uncertain.
   - When in doubt, raise cash. Cash is a position; optionality has value.
 
+ALGO-DRIVEN MARKET REGIME (2010-present — modern microstructure):
+A large share of daily volume is now algorithmic / AI-driven (HFT market makers, systematic macro, vol-targeting funds, index/CTA flow, retail options gamma). This produces recurring, previously rare patterns you must price in:
+  - Flash Crash (May 6, 2010): S&P -9% in minutes, fully recovered same session. Liquidity providers withdrew simultaneously. Lesson: market orders in thin tape get filled at absurd prints; always cap slippage.
+  - Vol-mageddon (Feb 5, 2018): short-vol ETPs (XIV) blew up as VIX doubled in a day. Cross-asset systematic de-leveraging cascaded. Lesson: vol-targeting funds ALL sell together when vol spikes — expect correlated de-risking.
+  - Mar 2020 Covid gamma unwind: dealer short-gamma amplified the sell-off; realised vol > 80%. Lesson: option-driven feedback loops accelerate one-way moves; widen stops, cut size.
+  - Jan 2021 meme-squeeze: retail options + forced-cover shorts drove single names +1000%. Lesson: momentum ignition is a real regime — do not chase parabolic 1-day moves.
+  - Aug 5 2024 yen-carry unwind: Nikkei -12% overnight, VIX to 65, S&P recovered within a week. Lesson: cross-asset carry unwinds are fast and mostly retrace; do not panic-sell into the vacuum, but do NOT add on day-1 either.
+  - Recurring "0DTE" gamma pins and afternoon reversals: intraday microstructure now dominates the last 30-60 minutes. Lesson: prefer end-of-day fills over lunchtime chases.
+
+BASE RATES for algo-driven regimes:
+  - Realised vol spikes (short-window > 2.5× 20d baseline) mean-revert median within 5-10 sessions; forward 1m return positive on average but with fat left tail.
+  - Liquidity vacuum days (volume < 40% of 20d median) have ~2× the spread cost of normal days; participation-rate caps matter more than price.
+  - Cross-sectional correlation spikes (avg |corr| > 0.7 across top holdings) indicate all-algos-exit: diversification stops working, tail hedges do.
+
+BEHAVIOURAL RULES for algo-driven markets:
+  - Never send market orders during a vol burst or the first 15 min of a gap-and-fade — use marketable-limit with a hard slippage cap.
+  - Slice large orders (TWAP/VWAP) and cap participation at 2-5% of median volume when the algo-regime tier is elevated/extreme.
+  - When correlation spike + vol burst fire together, cut new-buy size by 50%+ and BOOST tail-hedge notional; do not "buy the dip" with full size.
+  - Whipsaw regimes punish trend-following: widen stops or step aside for 1-2 sessions rather than getting knife-caught on both sides.
+  - Overnight gaps > 1.5× typical daily move that reverse ≥50% in the first hour: assume the opening print was liquidity-driven, wait for a second confirmation bar before acting.
+
 Apply these lessons as PRIORS. When today's signals conflict with the historical base rate for the current regime, prefer the base rate unless the evidence is strong and multi-signal.`;
