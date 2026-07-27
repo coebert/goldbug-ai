@@ -289,6 +289,32 @@ function markToMarket(
   return sum;
 }
 
+/**
+ * Compute the maximum fill quantity permitted by the liquidity model
+ * for a given decision. Returns `Infinity` when no cap applies, `0`
+ * when the market is dry, or a finite positive cap otherwise.
+ */
+function liquidityCap(
+  d: SimDecision,
+  liquidity: SimulateOptions["liquidity"],
+): number {
+  const perDecision = d.availableVolume;
+  const perSymbol = liquidity?.availableVolume?.[d.symbol];
+  const volSources: number[] = [];
+  if (Number.isFinite(perDecision) && (perDecision as number) >= 0) {
+    volSources.push(perDecision as number);
+  } else if (Number.isFinite(perSymbol) && (perSymbol as number) >= 0) {
+    volSources.push(perSymbol as number);
+  }
+  if (volSources.length === 0) return Number.POSITIVE_INFINITY;
+  const vol = Math.min(...volSources);
+  const rate = liquidity?.maxParticipationRate;
+  const rateClamped = Number.isFinite(rate) && (rate as number) > 0
+    ? Math.min(1, rate as number)
+    : 1;
+  return vol * rateClamped;
+}
+
 export function simulateBrokerExecution(
   initial: SimState,
   decisions: SimDecision[],
