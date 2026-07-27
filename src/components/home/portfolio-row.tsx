@@ -42,6 +42,7 @@ import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { deletePortfolio } from "@/lib/trading.functions";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
 import { deriveCardEquity } from "@/lib/derive-card-equity";
+import { deriveStripAllocation } from "@/lib/derive-strip-allocation";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
 
 export type SparkPoint = { date: string; value: number };
