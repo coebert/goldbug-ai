@@ -303,6 +303,13 @@ export async function syncLiveCashFromBroker(
   const newStarting = canTreatDriftAsDeposit
     ? Math.max(0, prevStarting + delta)
     : prevStarting;
+  // Only report a starting-cash adjustment when the value actually moved.
+  // The monotonic clamp (Math.max) can leave newStarting === prevStarting
+  // for negative drift; historically we still logged those as adjustments,
+  // which the dashboard then treated as phantom withdrawals and inflated
+  // % change (see the 2026-07-27 real-money tile incident: 3 spurious
+  // -£109.62/-£175.40 rows produced +270.84%).
+  const startingCashActuallyChanged = newStarting !== prevStarting;
   const upd = await db.from("portfolios")
     .update({ current_cash: brokerCash, starting_cash: newStarting })
     .eq("id", portfolioId);
