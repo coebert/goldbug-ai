@@ -14,6 +14,106 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_decision_audit: {
+        Row: {
+          action: string
+          asset_class: string | null
+          created_at: string
+          decided_at: string
+          decision_id: string | null
+          id: string
+          instrument_ccy: string | null
+          market_inputs: Json
+          model: string | null
+          notional: number | null
+          order_id: string | null
+          outcome: string
+          outcome_at: string | null
+          outcome_detail: string | null
+          portfolio_id: string
+          price: number | null
+          rationale: string | null
+          requested_quantity: number | null
+          run_date: string
+          source: string
+          symbol: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          asset_class?: string | null
+          created_at?: string
+          decided_at?: string
+          decision_id?: string | null
+          id?: string
+          instrument_ccy?: string | null
+          market_inputs?: Json
+          model?: string | null
+          notional?: number | null
+          order_id?: string | null
+          outcome?: string
+          outcome_at?: string | null
+          outcome_detail?: string | null
+          portfolio_id: string
+          price?: number | null
+          rationale?: string | null
+          requested_quantity?: number | null
+          run_date: string
+          source?: string
+          symbol: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          asset_class?: string | null
+          created_at?: string
+          decided_at?: string
+          decision_id?: string | null
+          id?: string
+          instrument_ccy?: string | null
+          market_inputs?: Json
+          model?: string | null
+          notional?: number | null
+          order_id?: string | null
+          outcome?: string
+          outcome_at?: string | null
+          outcome_detail?: string | null
+          portfolio_id?: string
+          price?: number | null
+          rationale?: string | null
+          requested_quantity?: number | null
+          run_date?: string
+          source?: string
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_decision_audit_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_decision_audit_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "live_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_decision_audit_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backtest_runs: {
         Row: {
           created_at: string
