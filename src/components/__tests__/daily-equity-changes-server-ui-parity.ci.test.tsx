@@ -22,7 +22,7 @@
 // days are already covered by daily-equity-changes.test.ts.
 
 import { describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   computeDailyEquityChanges,
