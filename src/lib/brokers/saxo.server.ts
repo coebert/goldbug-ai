@@ -202,7 +202,7 @@ export class SaxoAdapter implements BrokerAdapter {
   }
 
   async getBalance(): Promise<BrokerBalance> {
-    const bal = await this.req<{
+    type SaxoBalance = {
       CashBalance?: number;
       TotalValue?: number;
       Currency?: string;
@@ -213,7 +213,37 @@ export class SaxoAdapter implements BrokerAdapter {
       UnrealizedPositionsValue?: number;
       OpenPositionsCount?: number;
       InitialMargin?: { CollateralAvailable?: number };
-    }>("GET", "/port/v1/balances/me");
+    };
+
+    // Deposit-detection fix: `/port/v1/balances/me` returns the balance for
+    // the caller's default account context only. When a Saxo user has multiple
+    // sub-accounts (or the deposit lands in a cash-only wallet distinct from
+    // the trading account), a fresh top-up shows in the Saxo web UI (which
+    // aggregates the whole client) but never appears in `/balances/me`, so
+    // AI-driven CASH_SYNC keeps writing the same stale figure. Query the
+    // ClientKey-scoped aggregate first so any deposit against any sub-account
+    // is picked up automatically; fall back to `/balances/me` when we can't
+    // resolve a ClientKey (or the aggregated call fails), preserving the
+    // previous behaviour rather than breaking sync.
+    let bal: SaxoBalance | null = null;
+    let source: "client" | "me" = "me";
+    let clientLookupError: string | null = null;
+    try {
+      const ck = await this.getClientKey();
+      if (ck) {
+        bal = await this.req<SaxoBalance>("GET", "/port/v1/balances", {
+          query: { ClientKey: ck },
+        });
+        source = "client";
+      }
+    } catch (e) {
+      clientLookupError = e instanceof Error ? e.message : String(e);
+    }
+    if (bal == null) {
+      bal = await this.req<SaxoBalance>("GET", "/port/v1/balances/me");
+      source = "me";
+    }
+
     // Saxo reports several money fields. CashBalance is settled cash only, so a
     // brand-new account with a pending deposit shows 0 there even though the
     // funds are visible in SpendingPower / CashAvailableForTrading /
@@ -226,7 +256,6 @@ export class SaxoAdapter implements BrokerAdapter {
     const settled = Number(bal.CashBalance ?? 0);
     const notBooked = Number(bal.TransactionsNotBooked ?? 0);
     const spending = bal.SpendingPower != null ? Number(bal.SpendingPower) : null;
-    const _totalDeclaredButNotUsedForCash = bal.TotalValue != null ? Number(bal.TotalValue) : null;
     const availTrading =
       bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : null;
     const cash = Math.max(
@@ -238,6 +267,26 @@ export class SaxoAdapter implements BrokerAdapter {
     // Preserve availability semantics for guardrails: what's tradable *right now*.
     const cashAvailable = spending ?? availTrading ?? cash;
     const reservedCash = Math.max(0, cash - cashAvailable);
+
+    // Structured log so the trade-error dashboard shows which balance endpoint
+    // we used and what raw figures Saxo returned — makes deposit-not-detected
+    // reports diagnosable without server access.
+    await log({
+      portfolioId: this.portfolioId,
+      userId: this.userId,
+      env: this.env,
+      method: "BALANCE_FETCH",
+      path: source === "client" ? "/port/v1/balances?ClientKey" : "/port/v1/balances/me",
+      status: 200,
+      request: asJson({ source, clientLookupError }),
+      response: asJson({
+        cash, cashAvailable, notBooked,
+        settled, spending, availTrading,
+        totalValue: bal.TotalValue ?? null,
+        currency: bal.Currency ?? null,
+      }),
+      error: null,
+    });
 
     return {
       cash,
@@ -254,6 +303,7 @@ export class SaxoAdapter implements BrokerAdapter {
     };
 
   }
+
 
   async getPositions(): Promise<BrokerPosition[]> {
     // Saxo returns a very thin payload unless we opt in to field groups.
