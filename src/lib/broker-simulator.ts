@@ -770,7 +770,7 @@ export function simulateBrokerExecution(
         const truncationReason: SimSnapshot["truncationReason"] =
           liquidityTruncated ? "liquidity" : cashTruncated ? "cash" : null;
         snapshots.push({
-          step, decisionId: d.id,
+          step, decisionId: d.id, symbol: d.symbol, side: d.side,
           cash, holdings: cloneHoldings(holdings),
           holdingsValue, totalValue: cash + holdingsValue,
           realizedPnl: 0,
@@ -837,7 +837,7 @@ export function simulateBrokerExecution(
       const truncationReason: SimSnapshot["truncationReason"] =
         liquidityTruncated ? "liquidity" : cashTruncated ? "cash" : null;
       snapshots.push({
-        step, decisionId: d.id,
+        step, decisionId: d.id, symbol: d.symbol, side: d.side,
         cash, holdings: cloneHoldings(holdings),
         holdingsValue, totalValue: cash + holdingsValue,
         realizedPnl: 0,
@@ -906,7 +906,7 @@ export function simulateBrokerExecution(
     const truncationReason: SimSnapshot["truncationReason"] =
       liquidityTruncated ? "liquidity" : positionTruncated ? "position" : null;
     snapshots.push({
-      step, decisionId: d.id,
+      step, decisionId: d.id, symbol: d.symbol, side: d.side,
       cash, holdings: cloneHoldings(holdings),
       holdingsValue, totalValue: cash + holdingsValue,
       realizedPnl,
