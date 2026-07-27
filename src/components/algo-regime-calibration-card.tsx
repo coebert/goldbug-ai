@@ -1,17 +1,31 @@
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Gauge } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Gauge, Wand2 } from "lucide-react";
 import { getAlgoRegimeCalibration } from "@/lib/algo-regime-calibration.functions";
+import { autoTuneAlgoRegime, type AutoTuneResponse } from "@/lib/algo-regime-autotune.functions";
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
 export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string }) {
   const fetchCal = useServerFn(getAlgoRegimeCalibration);
+  const tuneFn = useServerFn(autoTuneAlgoRegime);
+  const qc = useQueryClient();
+  const [lastTune, setLastTune] = useState<AutoTuneResponse | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ["algo-regime-calibration", portfolioId],
     queryFn: () => fetchCal({ data: { portfolioId, limit: 200 } }),
     refetchInterval: 5 * 60_000,
+  });
+
+  const tune = useMutation({
+    mutationFn: (dryRun: boolean) => tuneFn({ data: { portfolioId, dryRun } }),
+    onSuccess: (r) => {
+      setLastTune(r);
+      if (r.persisted) qc.invalidateQueries({ queryKey: ["algo-regime-calibration", portfolioId] });
+    },
   });
 
   return (
