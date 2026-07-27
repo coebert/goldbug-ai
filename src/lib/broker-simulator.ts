@@ -603,7 +603,11 @@ export function simulateBrokerExecution(
         requestedQuantity: originalRequested,
         partial: qty < originalRequested - 1e-12,
         truncationReason,
+        ...(options.timeSliceUnfilled
+          ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
+          : {}),
       });
+      maybeEnqueueResidual(d, qty);
       continue;
     }
 
