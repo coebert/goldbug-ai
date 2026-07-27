@@ -1,0 +1,187 @@
+// Records every AI trading decision (buy / sell / hold) into the
+// ai_decision_audit table so the whole "why did the model do this?" chain is
+// reconstructible after the fact: the symbol, requested quantity + price, the
+// market inputs the model considered, the linked broker order id, and the
+// outcome (placed / filled / rejected / skipped / hold).
+//
+// Called from src/lib/trading-engine.server.ts after the decision is
+// persisted and (for live modes) after orders have been routed to the broker,
+// so we can attach live_orders.id in the same insert. A DB trigger on
+// live_orders then keeps `outcome` in sync as the broker updates status.
+//
+// All writes go through service_role: the table exposes only owner-read RLS
+// to authenticated users.
+
+import { asJson } from "@/lib/_server/db-json";
+
+export interface ExecutedAuditEntry {
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  value?: number;
+  reason?: string;
+  rejected?: string;
+  instrument_ccy?: string;
+}
+
+export interface HoldingAuditEntry {
+  symbol: string;
+  quantity: number;
+  asset_class?: string | null;
+  instrument_ccy?: string | null;
+}
+
+export interface AuditContext {
+  portfolioId: string;
+  userId: string;
+  decisionId: string | null;
+  runDate: string;               // YYYY-MM-DD
+  model: string;                 // e.g. "google/gemini-2.5-flash"
+  executed: ExecutedAuditEntry[]; // buy/sell attempts (may be rejected)
+  heldAfter: HoldingAuditEntry[]; // holdings remaining after sells → 'hold' rows
+  features: Record<string, unknown> | null | undefined; // per-symbol signal snapshot
+  regime?: unknown;
+  rationale?: string;            // AI rationale for the whole run
+}
+
+// Classify the source of a buy/sell into a coarse bucket so consumers can
+// filter (AI-directed vs risk-driven exits vs hedging).
+function classifySource(entry: ExecutedAuditEntry): string {
+  const r = (entry.reason ?? "").toLowerCase();
+  if (!r) return "ai_decision";
+  if (r.includes("tail") || r.includes("hedge")) return "tail_hedge";
+  if (r.includes("stop") || r.includes("trail") || r.includes("take-profit")
+      || r.includes("take_profit") || r.includes("max-hold") || r.includes("max_hold")
+      || r.includes("time-exit") || r.includes("blackout")) return "risk_exit";
+  if (r.includes("crypto")) return "crypto_sleeve";
+  if (r.includes("fx")) return "fx_intent";
+  return "ai_decision";
+}
+
+function outcomeFor(entry: ExecutedAuditEntry, orderId: string | null): {
+  outcome: "skipped" | "placed" | "hold";
+  detail: string | null;
+} {
+  if (entry.rejected) return { outcome: "skipped", detail: entry.rejected };
+  // If we placed an order we mark 'placed' as the initial state; the
+  // live_orders trigger will advance it to filled / rejected / etc.
+  if (orderId) return { outcome: "placed", detail: null };
+  // Paper / backtest runs never create a live_orders row but the trade did
+  // execute against the simulator — still "placed" (immediately filled at
+  // the same price).
+  return { outcome: "placed", detail: null };
+}
+
+export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // Fetch live_orders created for this decision so we can attach their ids.
+  // Match on (symbol, side); Saxo's client_order_id is deterministic per
+  // (portfolio, date, symbol, side) so there's exactly one row per pair.
+  let orderIdMap = new Map<string, string>();
+  if (ctx.decisionId) {
+    const { data: orders } = await supabaseAdmin
+      .from("live_orders")
+      .select("id, symbol, side")
+      .eq("portfolio_id", ctx.portfolioId)
+      .eq("decision_id", ctx.decisionId);
+    for (const o of orders ?? []) {
+      orderIdMap.set(`${String(o.symbol).toUpperCase()}|${o.side}`, o.id as string);
+    }
+  }
+
+  const now = new Date().toISOString();
+  const features = ctx.features ?? {};
+  const regimeSlim = ctx.regime ?? null;
+
+  type Row = Record<string, unknown>;
+  const rows: Row[] = [];
+  const sellSymbols = new Set<string>();
+
+  for (const e of ctx.executed) {
+    const sym = String(e.symbol ?? "").toUpperCase();
+    if (!sym) continue;
+    const key = `${sym}|${e.side}`;
+    const orderId = orderIdMap.get(key) ?? null;
+    const { outcome, detail } = outcomeFor(e, orderId);
+    const source = classifySource(e);
+    if (e.side === "sell") sellSymbols.add(sym);
+    const featureBlock = (features as Record<string, unknown>)[sym] ?? null;
+    rows.push({
+      decision_id: ctx.decisionId,
+      portfolio_id: ctx.portfolioId,
+      user_id: ctx.userId,
+      run_date: ctx.runDate,
+      decided_at: now,
+      symbol: sym,
+      asset_class: null,
+      action: e.side,
+      source,
+      model: ctx.model,
+      requested_quantity: Number.isFinite(e.quantity) ? e.quantity : 0,
+      price: Number.isFinite(e.price) ? e.price : null,
+      notional: Number.isFinite(e.value)
+        ? e.value
+        : Number.isFinite(e.quantity * e.price)
+          ? Number((e.quantity * e.price).toFixed(2))
+          : null,
+      instrument_ccy: e.instrument_ccy ?? null,
+      rationale: e.reason ?? ctx.rationale ?? null,
+      market_inputs: asJson({
+        features: featureBlock,
+        regime: regimeSlim,
+        run_rationale: ctx.rationale ?? null,
+      }),
+      order_id: orderId,
+      outcome,
+      outcome_detail: detail,
+      outcome_at: outcome === "placed" ? now : null,
+    });
+  }
+
+  // Emit a 'hold' row for every still-held position we did NOT sell this
+  // tick — that's the "did nothing / kept holding" audit trail.
+  for (const h of ctx.heldAfter) {
+    const sym = String(h.symbol ?? "").toUpperCase();
+    if (!sym || sellSymbols.has(sym)) continue;
+    if (!(Number(h.quantity) > 0)) continue;
+    const featureBlock = (features as Record<string, unknown>)[sym] ?? null;
+    rows.push({
+      decision_id: ctx.decisionId,
+      portfolio_id: ctx.portfolioId,
+      user_id: ctx.userId,
+      run_date: ctx.runDate,
+      decided_at: now,
+      symbol: sym,
+      asset_class: h.asset_class ?? null,
+      action: "hold",
+      source: "ai_decision",
+      model: ctx.model,
+      requested_quantity: Number(h.quantity),
+      price: null,
+      notional: null,
+      instrument_ccy: h.instrument_ccy ?? null,
+      rationale: ctx.rationale ?? null,
+      market_inputs: asJson({
+        features: featureBlock,
+        regime: regimeSlim,
+        run_rationale: ctx.rationale ?? null,
+      }),
+      order_id: null,
+      outcome: "hold",
+      outcome_detail: null,
+      outcome_at: now,
+    });
+  }
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabaseAdmin.from("ai_decision_audit").insert(rows);
+  if (error) {
+    // Never fail the trading tick because of an audit-log write failure —
+    // just surface it. The DB trigger will still keep outcomes in sync
+    // once the initial insert eventually lands (retried next tick).
+    console.warn("ai_decision_audit insert failed:", error.message);
+  }
+}
