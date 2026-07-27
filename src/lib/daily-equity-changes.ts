@@ -70,5 +70,67 @@ export function computeDailyEquityChanges(
       pct,
     });
   }
+  assertNoFlowLeakage(out, "computeDailyEquityChanges");
   return out;
+}
+
+// Absolute tolerance for arithmetic invariants (£/€/$). 1e-6 is well
+// below the smallest currency unit; anything larger indicates a real
+// leak, not float noise.
+const FLOW_LEAK_EPS_ABS = 1e-6;
+// Percentage-point tolerance for the derived `pct` reproduction.
+const FLOW_LEAK_EPS_PCT = 1e-9;
+
+export type FlowLeakRow = {
+  date: string;
+  prevEquity: number;
+  equity: number;
+  rawDelta: number;
+  netFlow: number;
+  pnl: number;
+  pct: number;
+};
+
+/**
+ * Runtime guard: every daily-equity row MUST satisfy
+ *   pnl   = rawDelta - netFlow                  (flow fully netted)
+ *   pct   = prev > 0 ? pnl / prev * 100 : 0     (pct derived from pnl only)
+ *   pure-flow day (rawDelta ≈ netFlow, netFlow ≠ 0) ⇒ pnl == 0 and pct == 0
+ *
+ * Throws with an actionable diagnostic on the first offending row so any
+ * regression that leaks deposits/withdrawals into daily % change fails
+ * loudly in tests and in production logs, not silently on a chart.
+ */
+export function assertNoFlowLeakage(
+  rows: readonly FlowLeakRow[],
+  source: string,
+  opts: { pctTolerance?: number; absTolerance?: number } = {},
+): void {
+  const absEps = opts.absTolerance ?? FLOW_LEAK_EPS_ABS;
+  const pctEps = opts.pctTolerance ?? FLOW_LEAK_EPS_PCT;
+  for (const r of rows) {
+    const arithmeticDrift = Math.abs(r.pnl + r.netFlow - r.rawDelta);
+    if (arithmeticDrift > absEps) {
+      throw new Error(
+        `[${source}] flow leak on ${r.date}: pnl(${r.pnl}) + netFlow(${r.netFlow}) ≠ rawDelta(${r.rawDelta}); drift=${arithmeticDrift}`,
+      );
+    }
+    const expectedPct = r.prevEquity > 0 ? (r.pnl / r.prevEquity) * 100 : 0;
+    if (Math.abs(r.pct - expectedPct) > pctEps) {
+      throw new Error(
+        `[${source}] pct drift on ${r.date}: got ${r.pct}%, expected ${expectedPct}% (pnl/prev). pct must derive from pnl only, never rawDelta.`,
+      );
+    }
+    // Pure cash-flow day: rawDelta is entirely explained by netFlow.
+    if (
+      r.netFlow !== 0 &&
+      Math.abs(r.rawDelta - r.netFlow) <= absEps
+    ) {
+      if (Math.abs(r.pnl) > absEps || Math.abs(r.pct) > pctEps) {
+        throw new Error(
+          `[${source}] deposit/withdrawal-only day ${r.date} leaked into pnl/pct: pnl=${r.pnl}, pct=${r.pct}%, netFlow=${r.netFlow}`,
+        );
+      }
+    }
+  }
 }
