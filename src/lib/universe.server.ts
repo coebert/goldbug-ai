@@ -122,7 +122,12 @@ export type ExecutionParamsConfig = {
   adv_participation: number;
   min_trade_value: number;
   min_commission: number;
+  /** Optional microstructure tuning overrides merged into DEFAULT_TUNING at
+   *  call time (see spread-slippage.ts). Left loosely typed so per-symbol
+   *  calibration can plug in without importing engine types here. */
+  microstructure?: Record<string, number>;
 };
+
 
 export type ExecutionCalibrationMeta = {
   as_of: string;
