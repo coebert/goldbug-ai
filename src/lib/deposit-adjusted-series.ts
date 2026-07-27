@@ -70,11 +70,16 @@ export function buildDepositAdjustedSeries(
     // like +1101% for a £999k top-up that only earned +£11k trading).
     // This is equivalent to a capital-adjusted return / single-flow
     // TWRR: (equity − cumFlows − baseline) / (baseline + cumFlows).
-    const denom = baseline + cumulative;
+    // Capital-adjusted denom = baseline + cumulative flows. If a large
+    // withdrawal collapses the denom to <= 0, fall back to `baseline`
+    // so pct stays finite — matches computeModeSummary's guard.
+    const denomRaw = baseline + cumulative;
+    const denomSafe = denomRaw > 0 ? denomRaw : baseline;
     const pct =
-      Number.isFinite(baseline) && baseline > 0 && denom > 0
-        ? ((adjusted - baseline) / denom) * 100
+      Number.isFinite(baseline) && baseline > 0 && denomSafe > 0
+        ? ((adjusted - baseline) / denomSafe) * 100
         : 0;
+
 
     out.push({
       date: p.date,
