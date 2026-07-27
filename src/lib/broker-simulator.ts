@@ -141,6 +141,9 @@ export type SimSnapshot = {
    * `participationRate` is `null` or `0`.
    */
   liquidityAdjustedSlippageBps: number | null;
+};
+
+
 
 
 export type SimRejection = {
