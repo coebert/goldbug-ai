@@ -122,6 +122,9 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
 
   const [bucket, setBucket] = useState<Bucket>("all");
   const [flash, setFlash] = useState<Set<string>>(new Set());
+  // Prevents duplicate toasts when Realtime re-delivers the same UPDATE
+  // (e.g. reconnects) or when we cross a terminal boundary more than once.
+  const toastedRef = useRef<Set<string>>(new Set());
 
   // Realtime: any change to this portfolio's orders or fills → refetch and
   // flash the affected order card briefly.
@@ -138,9 +141,37 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
           filter: `portfolio_id=eq.${portfolioId}`,
         },
         (payload) => {
-          const id =
-            (payload.new as { id?: string } | null)?.id ??
-            (payload.old as { id?: string } | null)?.id;
+          const newRow = payload.new as {
+            id?: string;
+            status?: string;
+            symbol?: string;
+            side?: string;
+            broker_order_id?: string | null;
+            reject_reason?: string | null;
+          } | null;
+          const oldRow = payload.old as { id?: string; status?: string } | null;
+          const id = newRow?.id ?? oldRow?.id;
+
+          // Toast on state transition into a terminal status.
+          if (
+            payload.eventType === "UPDATE" &&
+            id &&
+            newRow?.status &&
+            oldRow?.status &&
+            newRow.status !== oldRow.status
+          ) {
+            maybeToastTransition({
+              orderId: id,
+              prev: oldRow.status,
+              next: newRow.status,
+              symbol: newRow.symbol ?? "—",
+              side: newRow.side ?? "",
+              brokerOrderId: newRow.broker_order_id ?? null,
+              rejectReason: newRow.reject_reason ?? null,
+              toastedRef,
+            });
+          }
+
           if (id) {
             setFlash((prev) => {
               const next = new Set(prev);
