@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getFeeBreakdown } from "@/lib/fee-breakdown.functions";
+import { FeeDragCharts } from "@/components/fee-drag-charts";
 
 function fmtMoney(v: number, ccy: string, digits = 2) {
   if (!Number.isFinite(v)) return "—";
@@ -47,7 +48,7 @@ export function FeeBreakdownCard({
     staleTime: 60 * 1000,
   });
 
-  const [tab, setTab] = useState<"round" | "trade">("round");
+  const [tab, setTab] = useState<"charts" | "round" | "trade">("charts");
   const rt = q.data?.roundTrips ?? [];
   const pt = q.data?.perTrade ?? [];
   const s = q.data?.summary;
@@ -126,11 +127,18 @@ export function FeeBreakdownCard({
           />
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "round" | "trade")}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "charts" | "round" | "trade")}>
           <TabsList>
+            <TabsTrigger value="charts">Charts</TabsTrigger>
             <TabsTrigger value="round">Round-trips ({rt.length})</TabsTrigger>
             <TabsTrigger value="trade">Per trade ({pt.length})</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="charts">
+            <FeeDragCharts perTrade={pt} currency={ccy} />
+          </TabsContent>
+
+
 
           <TabsContent value="round">
             {rt.length === 0 ? (
