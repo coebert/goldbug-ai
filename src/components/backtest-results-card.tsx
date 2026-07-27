@@ -229,13 +229,20 @@ export function BacktestResultsCard({
           <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Drawdown curve
           </div>
-          <div className="h-32 w-full sm:h-40">
+          <div
+            className="h-32 w-full sm:h-40"
+            role="img"
+            aria-label={`Backtest drawdown curve, ${drawdownData.length} observations`}
+          >
+            <span className="sr-only">
+              {`Peak-to-trough drawdown series. Minimum ${Math.min(0, ...drawdownData.map((d) => d.drawdown)).toFixed(2)} percent.`}
+            </span>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={drawdownData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
+                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
                 <YAxis
-                  tick={{ fontSize: 11 }}
+                  tick={AXIS_TICK}
                   width={56}
                   tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                   domain={[(min: number) => Math.min(0, Math.floor(min)), 0]}
@@ -249,9 +256,10 @@ export function BacktestResultsCard({
                   type="monotone"
                   dataKey="drawdown"
                   name="Drawdown"
-                  stroke="rgb(239 68 68)"
-                  fill="rgb(239 68 68)"
+                  stroke={DRAWDOWN_COLOR}
+                  fill={DRAWDOWN_COLOR}
                   fillOpacity={0.25}
+                  strokeDasharray="4 2"
                 />
               </AreaChart>
             </ResponsiveContainer>
