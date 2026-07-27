@@ -518,6 +518,69 @@ export type Database = {
           },
         ]
       }
+      execution_calibrations: {
+        Row: {
+          adv_notional_20d: number | null
+          adv_notional_60d: number | null
+          adv_shares_20d: number | null
+          as_of: string
+          asset_class: string
+          atr_pct_14d: number | null
+          currency: string | null
+          half_spread_bps_est: number | null
+          impact_coeff_est: number | null
+          max_half_spread_bps_est: number | null
+          max_impact_bps_est: number | null
+          notes: string | null
+          realized_vol_daily: number | null
+          sample_days: number
+          spread_pct_est: number | null
+          symbol: string
+          updated_at: string
+          vol_widening_coeff_bps_est: number | null
+        }
+        Insert: {
+          adv_notional_20d?: number | null
+          adv_notional_60d?: number | null
+          adv_shares_20d?: number | null
+          as_of: string
+          asset_class: string
+          atr_pct_14d?: number | null
+          currency?: string | null
+          half_spread_bps_est?: number | null
+          impact_coeff_est?: number | null
+          max_half_spread_bps_est?: number | null
+          max_impact_bps_est?: number | null
+          notes?: string | null
+          realized_vol_daily?: number | null
+          sample_days: number
+          spread_pct_est?: number | null
+          symbol: string
+          updated_at?: string
+          vol_widening_coeff_bps_est?: number | null
+        }
+        Update: {
+          adv_notional_20d?: number | null
+          adv_notional_60d?: number | null
+          adv_shares_20d?: number | null
+          as_of?: string
+          asset_class?: string
+          atr_pct_14d?: number | null
+          currency?: string | null
+          half_spread_bps_est?: number | null
+          impact_coeff_est?: number | null
+          max_half_spread_bps_est?: number | null
+          max_impact_bps_est?: number | null
+          notes?: string | null
+          realized_vol_daily?: number | null
+          sample_days?: number
+          spread_pct_est?: number | null
+          symbol?: string
+          updated_at?: string
+          vol_widening_coeff_bps_est?: number | null
+        }
+        Relationships: []
+      }
       headline_translation_cache: {
         Row: {
           confidence: number | null
