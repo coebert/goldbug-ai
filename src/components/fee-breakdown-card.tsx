@@ -48,7 +48,7 @@ export function FeeBreakdownCard({
     staleTime: 60 * 1000,
   });
 
-  const [tab, setTab] = useState<"round" | "trade">("round");
+  const [tab, setTab] = useState<"charts" | "round" | "trade">("charts");
   const rt = q.data?.roundTrips ?? [];
   const pt = q.data?.perTrade ?? [];
   const s = q.data?.summary;
