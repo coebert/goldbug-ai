@@ -88,11 +88,20 @@ export function normalizeGbxToBase(
   if (!Number.isFinite(value)) return 0;
   const inst = String(instrumentCcy ?? "").toUpperCase();
   const base = String(baseCcy ?? "").toUpperCase();
-  if ((inst === "GBX" || inst === "GBP.PENCE" || inst === "GBP.PENCE".toUpperCase() || inst === "GBp".toUpperCase()) && base === "GBP") {
-    return value / 100;
-  }
+  // GBX / GBp are the LSE pence conventions. `.toUpperCase()` folds
+  // "GBp" → "GBP" so we must NOT compare the upper-cased form against
+  // "GBP" (that would treat real GBP quotes as pence). Match against
+  // an explicit allow-list of pence tags on the raw string instead.
+  const rawInst = String(instrumentCcy ?? "");
+  const isPence =
+    inst === "GBX" ||
+    rawInst === "GBp" ||
+    rawInst === "gbx" ||
+    inst === "GBP.PENCE";
+  if (isPence && base === "GBP") return value / 100;
   return value;
 }
+
 
 /**
  * Largest-remainder allocation. Given raw non-negative shares and an
