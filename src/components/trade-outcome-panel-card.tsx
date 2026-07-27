@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -121,6 +122,9 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
 
   const [bucket, setBucket] = useState<Bucket>("all");
   const [flash, setFlash] = useState<Set<string>>(new Set());
+  // Prevents duplicate toasts when Realtime re-delivers the same UPDATE
+  // (e.g. reconnects) or when we cross a terminal boundary more than once.
+  const toastedRef = useRef<Set<string>>(new Set());
 
   // Realtime: any change to this portfolio's orders or fills → refetch and
   // flash the affected order card briefly.
@@ -137,9 +141,37 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
           filter: `portfolio_id=eq.${portfolioId}`,
         },
         (payload) => {
-          const id =
-            (payload.new as { id?: string } | null)?.id ??
-            (payload.old as { id?: string } | null)?.id;
+          const newRow = payload.new as {
+            id?: string;
+            status?: string;
+            symbol?: string;
+            side?: string;
+            broker_order_id?: string | null;
+            reject_reason?: string | null;
+          } | null;
+          const oldRow = payload.old as { id?: string; status?: string } | null;
+          const id = newRow?.id ?? oldRow?.id;
+
+          // Toast on state transition into a terminal status.
+          if (
+            payload.eventType === "UPDATE" &&
+            id &&
+            newRow?.status &&
+            oldRow?.status &&
+            newRow.status !== oldRow.status
+          ) {
+            maybeToastTransition({
+              orderId: id,
+              prev: oldRow.status,
+              next: newRow.status,
+              symbol: newRow.symbol ?? "—",
+              side: newRow.side ?? "",
+              brokerOrderId: newRow.broker_order_id ?? null,
+              rejectReason: newRow.reject_reason ?? null,
+              toastedRef,
+            });
+          }
+
           if (id) {
             setFlash((prev) => {
               const next = new Set(prev);
@@ -480,6 +512,55 @@ function truncateReason(reason: string, max = 260): string {
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max)}…`;
 }
+
+const NON_TERMINAL_STATUSES = new Set([
+  "pending",
+  "submitted",
+  "working",
+]);
+const SUCCESS_STATUSES = new Set(["filled", "partially_filled"]);
+const FAILURE_STATUSES = new Set(["rejected", "error", "cancelled"]);
+
+function maybeToastTransition(args: {
+  orderId: string;
+  prev: string;
+  next: string;
+  symbol: string;
+  side: string;
+  brokerOrderId: string | null;
+  rejectReason: string | null;
+  toastedRef: React.MutableRefObject<Set<string>>;
+}) {
+  const { orderId, prev, next, symbol, side, brokerOrderId, rejectReason, toastedRef } = args;
+
+  const wasNonTerminal = NON_TERMINAL_STATUSES.has(prev);
+  const nowSuccess = SUCCESS_STATUSES.has(next);
+  const nowFailure = FAILURE_STATUSES.has(next);
+  if (!wasNonTerminal || (!nowSuccess && !nowFailure)) return;
+
+  const key = `${orderId}:${next}`;
+  if (toastedRef.current.has(key)) return;
+  toastedRef.current.add(key);
+
+  const sideLabel = side ? side.toUpperCase() : "";
+  const title = nowSuccess
+    ? `${sideLabel} ${symbol} ${next === "partially_filled" ? "partially filled" : "filled"}`
+    : `${sideLabel} ${symbol} ${next === "cancelled" ? "cancelled" : "failed"}`;
+
+  const brokerLine = brokerOrderId
+    ? `Broker order: ${brokerOrderId}`
+    : "Broker order: (none assigned)";
+  const description = rejectReason
+    ? `${brokerLine} · ${truncateReason(rejectReason, 140)}`
+    : brokerLine;
+
+  if (nowSuccess) {
+    toast.success(title, { description, duration: 6000 });
+  } else {
+    toast.error(title, { description, duration: 8000 });
+  }
+}
+
 
 function SummaryTiles({
   summary,
