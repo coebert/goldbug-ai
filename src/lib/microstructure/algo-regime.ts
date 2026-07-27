@@ -131,12 +131,14 @@ function pearson(a: number[], b: number[]): number {
 
 export function detectVolBurst(closes: number[], cfg: AlgoRegimeConfig): boolean {
   const r = pctReturns(closes);
-  if (r.length < cfg.longVolWindow) return false;
+  if (r.length < cfg.longVolWindow + cfg.shortVolWindow) return false;
   const short = r.slice(-cfg.shortVolWindow);
-  const long = r.slice(-cfg.longVolWindow);
+  // baseline is the longVolWindow returns *preceding* the short window,
+  // so a fresh burst is not diluted by including itself in the baseline.
+  const long = r.slice(-(cfg.longVolWindow + cfg.shortVolWindow), -cfg.shortVolWindow);
   const sv = stdev(short);
   const lv = stdev(long);
-  if (lv <= 0) return false;
+  if (lv <= 0) return sv > 0;
   return sv / lv >= cfg.volBurstRatio;
 }
 
