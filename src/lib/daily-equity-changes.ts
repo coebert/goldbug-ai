@@ -110,13 +110,13 @@ export function assertNoFlowLeakage(
   const pctEps = opts.pctTolerance ?? FLOW_LEAK_EPS_PCT;
   for (const r of rows) {
     const arithmeticDrift = Math.abs(r.pnl + r.netFlow - r.rawDelta);
-    if (arithmeticDrift > FLOW_LEAK_EPS_ABS) {
+    if (arithmeticDrift > absEps) {
       throw new Error(
         `[${source}] flow leak on ${r.date}: pnl(${r.pnl}) + netFlow(${r.netFlow}) ≠ rawDelta(${r.rawDelta}); drift=${arithmeticDrift}`,
       );
     }
     const expectedPct = r.prevEquity > 0 ? (r.pnl / r.prevEquity) * 100 : 0;
-    if (Math.abs(r.pct - expectedPct) > FLOW_LEAK_EPS_PCT) {
+    if (Math.abs(r.pct - expectedPct) > pctEps) {
       throw new Error(
         `[${source}] pct drift on ${r.date}: got ${r.pct}%, expected ${expectedPct}% (pnl/prev). pct must derive from pnl only, never rawDelta.`,
       );
@@ -126,7 +126,7 @@ export function assertNoFlowLeakage(
       r.netFlow !== 0 &&
       Math.abs(r.rawDelta - r.netFlow) <= FLOW_LEAK_EPS_ABS
     ) {
-      if (Math.abs(r.pnl) > FLOW_LEAK_EPS_ABS || Math.abs(r.pct) > FLOW_LEAK_EPS_PCT) {
+      if (Math.abs(r.pnl) > FLOW_LEAK_EPS_ABS || Math.abs(r.pct) > pctEps) {
         throw new Error(
           `[${source}] deposit/withdrawal-only day ${r.date} leaked into pnl/pct: pnl=${r.pnl}, pct=${r.pct}%, netFlow=${r.netFlow}`,
         );
