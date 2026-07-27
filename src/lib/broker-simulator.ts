@@ -784,6 +784,8 @@ export function simulateBrokerExecution(
         requestedQuantity: originalRequested,
         partial: qty < originalRequested - 1e-12,
         truncationReason,
+        ...qualityFields("BUY", d.price, effPrice, qty, liqRawVolume),
+
         ...(options.timeSliceUnfilled
           ? { sliceOf: curSliceOf, sliceIndex: curSliceIndex }
           : {}),
