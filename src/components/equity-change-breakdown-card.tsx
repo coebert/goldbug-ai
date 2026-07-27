@@ -165,11 +165,31 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
               margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
               barCategoryGap="20%"
             >
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{ top: 24, right: 12, left: 8, bottom: 8 }}
+              barCategoryGap="25%"
+            >
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                interval={0}
+                tickMargin={6}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+                tickLine={false}
+              />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 tickFormatter={(v: number) => formatMoney(v, currency).replace("+", "")}
                 width={70}
+                axisLine={false}
+                tickLine={false}
+                domain={([min, max]: [number, number]) => [
+                  Math.min(0, min) * 1.15,
+                  Math.max(0, max) * 1.25 || 1,
+                ]}
               />
               <ReferenceLine y={0} stroke="hsl(var(--border))" />
               <Tooltip
@@ -179,6 +199,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   const p = payload[0].payload as {
                     key: string;
                     name: string;
+                    fullName: string;
                     amount: number;
                     pct: number;
                   };
@@ -201,7 +222,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                           className="inline-block h-2 w-2 rounded-sm"
                           style={{ background: COLORS[p.key] }}
                         />
-                        {p.name}
+                        {p.fullName}
                       </div>
                       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 tabular-nums">
                         <span className="text-muted-foreground">Amount</span>
@@ -222,7 +243,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                 }}
               />
 
-              <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+              <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={56}>
                 {chartData.map((d) => (
                   <Cell key={d.key} fill={COLORS[d.key]} />
                 ))}
@@ -230,7 +251,11 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   dataKey="pct"
                   position="top"
                   formatter={(v: unknown) => formatPct(Number(v))}
-                  style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fill: "hsl(var(--foreground))",
+                  }}
                 />
               </Bar>
             </BarChart>
