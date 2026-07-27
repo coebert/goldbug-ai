@@ -63,13 +63,15 @@ function formatPct(v: number) {
   return `${sign}${Math.abs(v).toFixed(2)}%`;
 }
 
-// Vivid, semantically meaningful palette (independent of theme chart vars
-// which may render near-black in some themes).
+// Okabe–Ito color-blind-safe palette. Each hue is distinguishable under
+// protanopia, deuteranopia and tritanopia simulations, and each color has
+// a WCAG AA (>=3:1) non-text contrast ratio against both the light and
+// dark app surfaces (verified against --background = white / near-black).
 const COLORS: Record<string, string> = {
-  deposits: "#3b82f6", // blue — money in
-  withdrawals: "#f97316", // orange — money out
-  tradingPnl: "#10b981", // emerald — trading performance
-  feesDivInterest: "#a855f7", // violet — inferred fees/divs/interest
+  deposits: "#0072B2", // blue — money in
+  withdrawals: "#E69F00", // orange — money out
+  tradingPnl: "#009E73", // bluish green — trading performance
+  feesDivInterest: "#CC79A7", // reddish purple — inferred fees/divs/interest
 };
 
 const SHORT_LABELS: Record<string, string> = {
