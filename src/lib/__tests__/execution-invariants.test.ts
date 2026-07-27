@@ -76,6 +76,9 @@ describe("execution-invariants — detects hand-crafted violations", () => {
     fillQuantity: 0,
     fillPrice: 0,
     fee: 0,
+    requestedQuantity: 0,
+    partial: false,
+    truncationReason: null,
     ...over,
   });
 

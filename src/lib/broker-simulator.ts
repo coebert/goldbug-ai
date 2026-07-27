@@ -42,6 +42,15 @@ export type SimDecision = {
   price: number;
   /** Optional fixed fee (currency units, >= 0). */
   fee?: number;
+  /**
+   * Optional per-decision override of the available market volume
+   * (shares/units) that can fill this order. Takes precedence over
+   * `options.liquidity.availableVolume[symbol]`. When present alongside
+   * `options.liquidity.maxParticipationRate`, the fill is capped at
+   * `availableVolume * maxParticipationRate` (participation applies to
+   * ADV-like volumes, not to a size someone else has already sized down).
+   */
+  availableVolume?: number;
 };
 
 export type SimHolding = {
@@ -74,6 +83,16 @@ export type SimSnapshot = {
   fillQuantity: number;
   fillPrice: number;
   fee: number;
+  /** Originally requested quantity (before liquidity/cash truncation). */
+  requestedQuantity: number;
+  /** True when fillQuantity < requestedQuantity for any reason. */
+  partial: boolean;
+  /**
+   * Highest-priority reason the fill was truncated below `requestedQuantity`,
+   * or `null` for a full fill. Priority (highest first):
+   *   "liquidity" > "cash" > "position".
+   */
+  truncationReason: "liquidity" | "cash" | "position" | null;
 };
 
 export type SimRejection = {
@@ -88,7 +107,8 @@ export type SimRejection = {
     | "no_position_to_sell"
     | "insufficient_cash"
     | "would_borrow"
-    | "would_short";
+    | "would_short"
+    | "no_liquidity";
   requested: { quantity: number; price: number; fee: number };
 };
 
@@ -145,6 +165,32 @@ export type SimulateOptions = {
    * existing callers/tests are unaffected.
    */
   frictions?: Frictions;
+  /**
+   * Optional liquidity / market-volume constraint. Applied BEFORE the
+   * cash and position truncation checks — fills are first capped at
+   * whatever the market can actually absorb, then further truncated if
+   * cash (BUY) or held position (SELL) is insufficient.
+   *
+   *  - availableVolume[symbol]    hard cap on units filled for that symbol
+   *                               this step. Per-decision `availableVolume`
+   *                               overrides this on a given decision.
+   *  - maxParticipationRate       fraction in (0,1] limiting the fill to
+   *                               that share of the available volume
+   *                               (proxies "don't be more than X% of ADV").
+   *                               Defaults to 1 (whole book fillable).
+   *  - minFillQuantity            if the post-cap fill is below this floor
+   *                               the step is rejected as "no_liquidity"
+   *                               instead of producing a dust partial.
+   *                               Defaults to 0 (any positive fill accepted).
+   *
+   * When neither map nor per-decision `availableVolume` is set, the
+   * symbol is treated as unconstrained (byte-identical to prior behaviour).
+   */
+  liquidity?: {
+    availableVolume?: Record<string, number>;
+    maxParticipationRate?: number;
+    minFillQuantity?: number;
+  };
 };
 
 export type SimulateResult = {
@@ -243,6 +289,32 @@ function markToMarket(
   return sum;
 }
 
+/**
+ * Compute the maximum fill quantity permitted by the liquidity model
+ * for a given decision. Returns `Infinity` when no cap applies, `0`
+ * when the market is dry, or a finite positive cap otherwise.
+ */
+function liquidityCap(
+  d: SimDecision,
+  liquidity: SimulateOptions["liquidity"],
+): number {
+  const perDecision = d.availableVolume;
+  const perSymbol = liquidity?.availableVolume?.[d.symbol];
+  const volSources: number[] = [];
+  if (Number.isFinite(perDecision) && (perDecision as number) >= 0) {
+    volSources.push(perDecision as number);
+  } else if (Number.isFinite(perSymbol) && (perSymbol as number) >= 0) {
+    volSources.push(perSymbol as number);
+  }
+  if (volSources.length === 0) return Number.POSITIVE_INFINITY;
+  const vol = Math.min(...volSources);
+  const rate = liquidity?.maxParticipationRate;
+  const rateClamped = Number.isFinite(rate) && (rate as number) > 0
+    ? Math.min(1, rate as number)
+    : 1;
+  return vol * rateClamped;
+}
+
 export function simulateBrokerExecution(
   initial: SimState,
   decisions: SimDecision[],
@@ -297,8 +369,35 @@ export function simulateBrokerExecution(
       continue;
     }
 
+    // ---- liquidity gate --------------------------------------------------
+    // Runs BEFORE cash/position sizing so participation is measured against
+    // the market's ability to fill, not against our remaining budget.
+    const originalRequested = d.quantity;
+    const liqCap = liquidityCap(d, options.liquidity);
+    if (liqCap <= 0) {
+      rejections.push({
+        step, decisionId: d.id, symbol: d.symbol, side: d.side,
+        reason: "no_liquidity",
+        requested: { quantity: d.quantity, price: d.price, fee },
+      });
+      continue;
+    }
+    const requestedAfterLiquidity = Math.min(originalRequested, liqCap);
+    const liquidityTruncated =
+      requestedAfterLiquidity < originalRequested - 1e-12;
+    const minFill = options.liquidity?.minFillQuantity ?? 0;
+    if (liquidityTruncated && requestedAfterLiquidity < minFill) {
+      rejections.push({
+        step, decisionId: d.id, symbol: d.symbol, side: d.side,
+        reason: "no_liquidity",
+        requested: { quantity: d.quantity, price: d.price, fee },
+      });
+      continue;
+    }
+
     if (d.side === "BUY") {
       const f = options.frictions;
+      let cashTruncated = false;
 
       // Frictionless path (unchanged) — preserves byte-for-byte legacy
       // behaviour when no cost model is configured.
@@ -312,7 +411,7 @@ export function simulateBrokerExecution(
           continue;
         }
         const cashAfterFee = cash - fee;
-        let qty = d.quantity;
+        let qty = requestedAfterLiquidity;
         const cost = qty * d.price;
         if (cost > cashAfterFee) {
           if (!truncateBuys) {
@@ -323,6 +422,7 @@ export function simulateBrokerExecution(
             });
             continue;
           }
+          cashTruncated = true;
           qty = d.price > 0 ? Math.max(0, cashAfterFee / d.price) : 0;
           if (qty <= 0) {
             rejections.push({
@@ -347,22 +447,23 @@ export function simulateBrokerExecution(
         }
 
         const holdingsValue = markToMarket(holdings, options.markPrices);
+        const truncationReason: SimSnapshot["truncationReason"] =
+          liquidityTruncated ? "liquidity" : cashTruncated ? "cash" : null;
         snapshots.push({
           step, decisionId: d.id,
           cash, holdings: cloneHoldings(holdings),
           holdingsValue, totalValue: cash + holdingsValue,
           realizedPnl: 0,
           fillQuantity: qty, fillPrice: d.price, fee,
+          requestedQuantity: originalRequested,
+          partial: qty < originalRequested - 1e-12,
+          truncationReason,
         });
         continue;
       }
 
       // ---- Friction-aware BUY --------------------------------------------
-      // Effective price and total fee are functions of the filled qty
-      // (linear book impact, bps commissions, buy-side tax). Truncate
-      // via bisection so no borrow is ever possible regardless of the
-      // chosen cost model.
-      const requested = d.quantity;
+      const requested = requestedAfterLiquidity;
       const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f);
       const requestedNotional = requested * requestedEffPrice;
       const requestedSpend =
@@ -378,10 +479,9 @@ export function simulateBrokerExecution(
           });
           continue;
         }
+        cashTruncated = true;
         qty = maxAffordableBuyQty(requested, d.price, cash, fee, f);
         if (qty <= 0) {
-          // Even the fixed portion (baseFee + minCommission) exceeds
-          // available cash — no fill possible without borrowing.
           rejections.push({
             step, decisionId: d.id, symbol: d.symbol, side: d.side,
             reason: "insufficient_cash",
@@ -395,16 +495,10 @@ export function simulateBrokerExecution(
       const notional = qty * effPrice;
       const totalFeePaid = totalFee(notional, "BUY", fee, f);
       const spend = notional + totalFeePaid;
-      // Clamp against float noise from the bisection; the invariant
-      // check asserts spend<=priorCash within MONEY_EPS.
       cash = Math.max(0, cash - spend);
 
       const existing = holdings.find((h) => h.symbol === d.symbol);
       if (existing) {
-        // Weighted-average cost is based on the *execution* price
-        // (what we actually paid per share, excluding commission/tax
-        // to keep avgCost a pure price series — fees are realized on
-        // exit via realizedPnl).
         const totalCost = existing.quantity * existing.avgCost + qty * effPrice;
         const totalQty = existing.quantity + qty;
         existing.quantity = totalQty;
@@ -414,12 +508,17 @@ export function simulateBrokerExecution(
       }
 
       const holdingsValue = markToMarket(holdings, options.markPrices);
+      const truncationReason: SimSnapshot["truncationReason"] =
+        liquidityTruncated ? "liquidity" : cashTruncated ? "cash" : null;
       snapshots.push({
         step, decisionId: d.id,
         cash, holdings: cloneHoldings(holdings),
         holdingsValue, totalValue: cash + holdingsValue,
         realizedPnl: 0,
         fillQuantity: qty, fillPrice: effPrice, fee: totalFeePaid,
+        requestedQuantity: originalRequested,
+        partial: qty < originalRequested - 1e-12,
+        truncationReason,
       });
       continue;
     }
@@ -435,7 +534,8 @@ export function simulateBrokerExecution(
       });
       continue;
     }
-    let qty = d.quantity;
+    let qty = requestedAfterLiquidity;
+    let positionTruncated = false;
     if (qty > held) {
       if (!truncateSells) {
         rejections.push({
@@ -445,13 +545,13 @@ export function simulateBrokerExecution(
         });
         continue;
       }
+      positionTruncated = true;
       qty = held;
     }
     const f = options.frictions;
     const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f);
     const proceeds = qty * effSellPrice;
     const totalFeePaid = totalFee(proceeds, "SELL", fee, f);
-    // Fee still owed on SELL; may not push cash below 0.
     if (totalFeePaid > cash + proceeds) {
       rejections.push({
         step, decisionId: d.id, symbol: d.symbol, side: d.side,
@@ -466,18 +566,22 @@ export function simulateBrokerExecution(
     if (existing) {
       existing.quantity -= qty;
       if (existing.quantity <= 0) {
-        // Fully closed → drop the row so holdings never carries 0/negative.
         holdings = holdings.filter((h) => h.symbol !== d.symbol);
       }
     }
 
     const holdingsValue = markToMarket(holdings, options.markPrices);
+    const truncationReason: SimSnapshot["truncationReason"] =
+      liquidityTruncated ? "liquidity" : positionTruncated ? "position" : null;
     snapshots.push({
       step, decisionId: d.id,
       cash, holdings: cloneHoldings(holdings),
       holdingsValue, totalValue: cash + holdingsValue,
       realizedPnl,
       fillQuantity: qty, fillPrice: effSellPrice, fee: totalFeePaid,
+      requestedQuantity: originalRequested,
+      partial: qty < originalRequested - 1e-12,
+      truncationReason,
     });
   }
 
