@@ -79,8 +79,12 @@ const SHORT_LABELS: Record<string, string> = {
   feesDivInterest: "Fees / Div",
 };
 
+const SERIES_ORDER = ["deposits", "withdrawals", "tradingPnl", "feesDivInterest"] as const;
+type SeriesKey = (typeof SERIES_ORDER)[number];
+
 export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props) {
   const [range, setRange] = useState<Range>("30d");
+  const [hidden, setHidden] = useState<Set<SeriesKey>>(() => new Set());
 
   const breakdown = useMemo(
     () => computeEquityChangeBreakdown(sliceEquityByRange(equity, range), deposits),
@@ -105,13 +109,24 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
   }
 
   const rows = breakdown.buckets;
-  const chartData = rows.map((b) => ({
+  const visibleRows = rows.filter((b) => !hidden.has(b.key as SeriesKey));
+  const chartData = visibleRows.map((b) => ({
     key: b.key,
     name: SHORT_LABELS[b.key] ?? b.label,
     fullName: b.label,
     amount: b.amount,
     pct: b.pctPoints,
   }));
+
+  const toggle = (k: SeriesKey) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      // Prevent hiding the last visible series (chart would be empty).
+      if (next.has(k)) next.delete(k);
+      else if (rows.length - next.size > 1) next.add(k);
+      return next;
+    });
+  };
 
   const totalIsNegative = breakdown.totalChange < 0;
   const totalTone = totalIsNegative ? "text-destructive" : breakdown.totalChange > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground";
@@ -157,6 +172,41 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
             {formatMoney(breakdown.endEquity, currency).replace("+", "")}
           </div>
         </div>
+
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Toggle series">
+          {rows.map((b) => {
+            const key = b.key as SeriesKey;
+            const isHidden = hidden.has(key);
+            const onlyOneLeft = rows.length - hidden.size <= 1 && !isHidden;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggle(key)}
+                disabled={onlyOneLeft}
+                aria-pressed={!isHidden}
+                title={onlyOneLeft ? "At least one series must remain visible" : isHidden ? `Show ${b.label}` : `Hide ${b.label}`}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition ${
+                  isHidden
+                    ? "border-dashed border-border bg-transparent text-muted-foreground opacity-60 hover:opacity-100"
+                    : "border-border bg-muted/40 text-foreground hover:bg-muted/70"
+                } ${onlyOneLeft ? "cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                <span
+                  aria-hidden
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ background: isHidden ? "transparent" : COLORS[key], borderWidth: isHidden ? 1 : 0, borderStyle: "solid", borderColor: COLORS[key] }}
+                />
+                <span className="font-medium">{b.label}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {formatPct(b.pctPoints)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+
 
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
