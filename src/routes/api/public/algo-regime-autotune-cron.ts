@@ -122,7 +122,16 @@ export const Route = createFileRoute("/api/public/algo-regime-autotune-cron")({
 
           const decision = evaluateShadow(baseline, post, DEFAULT_SHADOW_EVAL_OPTIONS);
 
-          const update: Record<string, unknown> = {
+          type HistoryUpdate = {
+            post_matched: number;
+            post_monotone: boolean;
+            post_normal_mean: number | null;
+            post_extreme_mean: number | null;
+            decision_reason: string;
+            status?: "accepted" | "rolled_back";
+            evaluated_at?: string;
+          };
+          const update: HistoryUpdate = {
             post_matched: post.matched,
             post_monotone: post.monotone,
             post_normal_mean:
@@ -131,6 +140,7 @@ export const Route = createFileRoute("/api/public/algo-regime-autotune-cron")({
               post.perTier.find((t) => t.tier === "extreme")?.meanReturn ?? null,
             decision_reason: decision.reason,
           };
+
 
           if (decision.action === "wait") {
             // stay pending; do not touch evaluated_at.
