@@ -101,6 +101,26 @@ export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string
             >
               Apply auto-tune
             </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={applyShadow.isPending}
+              onClick={() => applyShadow.mutate()}
+              title="Apply and start a 7-day shadow window that may auto-rollback"
+            >
+              <ShieldCheck className="mr-1 h-3 w-3" />
+              {applyShadow.isPending ? "Applying…" : "Apply (shadow)"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={evalShadow.isPending}
+              onClick={() => evalShadow.mutate()}
+              title="Evaluate pending tunes past the shadow window"
+            >
+              {evalShadow.isPending ? "Evaluating…" : "Evaluate now"}
+            </Button>
+
           </div>
         </div>
       </CardHeader>
