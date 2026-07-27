@@ -23,6 +23,7 @@ import {
   type EquitySnapshotLite,
 } from "@/lib/daily-equity-changes";
 import { formatMoney } from "@/lib/format-money";
+import { AXIS_TICK, CHART_ROLE } from "@/lib/chart-palette";
 
 type Range = "7d" | "30d" | "90d" | "ytd" | "all";
 
@@ -40,8 +41,10 @@ const RANGES: { key: Range; label: string }[] = [
   { key: "all", label: "All" },
 ];
 
-const POS = "hsl(var(--success, 142 70% 45%))";
-const NEG = "hsl(var(--destructive, 0 72% 51%))";
+// Okabe–Ito colour-blind-safe roles; positive/negative also carry a
+// glyph in the sr-only summary so meaning is not colour-dependent.
+const POS = CHART_ROLE.positive;
+const NEG = CHART_ROLE.negative;
 
 function sliceByRange(rows: EquitySnapshotLite[], range: Range): EquitySnapshotLite[] {
   if (range === "all" || rows.length === 0) return rows;
