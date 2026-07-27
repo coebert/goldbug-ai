@@ -92,6 +92,32 @@ export type SimRejection = {
   requested: { quantity: number; price: number; fee: number };
 };
 
+/**
+ * Realistic trading frictions applied to every fill when provided.
+ * All fields optional; omitted values default to 0 (frictionless).
+ *
+ *  - commissionBps      per-fill commission as basis points of notional
+ *                       (5 = 0.05%). Combined with `minCommission` via max().
+ *  - minCommission      minimum commission floor per fill (currency units).
+ *  - buyTaxBps          buy-side transaction tax (e.g. UK stamp duty 50 bps).
+ *                       Not applied on SELLs.
+ *  - slippageBps        fixed adverse move applied to the quoted price:
+ *                       BUY fills at quote*(1+bps/1e4), SELL at quote*(1-bps/1e4).
+ *  - impactPerUnit      additional adverse slip that scales linearly with
+ *                       filled quantity — proxies book-depth impact for
+ *                       larger orders. Same sign convention as slippageBps.
+ *
+ * The invariants (no borrow, no leverage, snapshot consistency, no
+ * negative cash) hold regardless of the friction values chosen.
+ */
+export type Frictions = {
+  commissionBps?: number;
+  minCommission?: number;
+  buyTaxBps?: number;
+  slippageBps?: number;
+  impactPerUnit?: number;
+};
+
 export type SimulateOptions = {
   /**
    * If a BUY exceeds available cash, truncate the quantity to what
@@ -113,6 +139,12 @@ export type SimulateOptions = {
    * present. Symbols in this map DO NOT trigger any trades.
    */
   markPrices?: Record<string, number>;
+  /**
+   * Optional transaction-cost & slippage model. When omitted, the
+   * engine runs frictionless (byte-identical to prior behaviour) so
+   * existing callers/tests are unaffected.
+   */
+  frictions?: Frictions;
 };
 
 export type SimulateResult = {
