@@ -111,7 +111,37 @@ export type SimSnapshot = {
    */
   sliceOf?: string;
   sliceIndex?: number;
-};
+  // -------- execution-quality diagnostics -----------------------------------
+  /**
+   * The quoted decision price fed into the engine (`decision.price`) —
+   * pinned on the snapshot so downstream consumers don't have to join
+   * back against the input array to compute slippage or debug fills.
+   */
+  expectedPrice: number;
+  /**
+   * Signed slippage of the realized fill vs the quoted expected price,
+   * expressed in basis points and always oriented so positive = adverse:
+   *   BUY:  (fillPrice - expectedPrice) / expectedPrice * 1e4
+   *   SELL: (expectedPrice - fillPrice) / expectedPrice * 1e4
+   * `0` when the expected price is 0 or the step didn't fill.
+   */
+  slippageBps: number;
+  /**
+   * Fraction of the raw (pre-participation-rate) liquidity cap that
+   * this fill consumed, in `[0, 1]`. `null` when the symbol was
+   * unconstrained (no volume estimate available), so callers can
+   * distinguish "we consumed 100% of a small book" from "there was no
+   * book to measure against".
+   */
+  participationRate: number | null;
+  /**
+   * `slippageBps` normalized by `participationRate` — a rough
+   * "cost per unit of liquidity consumed" that lets you compare fills
+   * across very different order sizes and books. `null` whenever
+   * `participationRate` is `null` or `0`.
+   */
+  liquidityAdjustedSlippageBps: number | null;
+
 
 export type SimRejection = {
   step: number;
