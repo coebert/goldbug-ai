@@ -33,6 +33,7 @@ import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public
 import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/public/hooks/daily-summary'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
+import { Route as ApiPublicHooksBackfillDailyEquityChangesRouteImport } from './routes/api/public/hooks/backfill-daily-equity-changes'
 
 const TradesRoute = TradesRouteImport.update({
   id: '/trades',
@@ -159,6 +160,12 @@ const ApiPublicHooksBatchRetrainRoute =
     path: '/api/public/hooks/batch-retrain',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBackfillDailyEquityChangesRoute =
+  ApiPublicHooksBackfillDailyEquityChangesRouteImport.update({
+    id: '/api/public/hooks/backfill-daily-equity-changes',
+    path: '/api/public/hooks/backfill-daily-equity-changes',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
@@ -203,6 +211,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
@@ -230,6 +239,7 @@ export interface FileRoutesById {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
@@ -310,6 +322,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
@@ -333,6 +346,7 @@ export interface RootRouteChildren {
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
+  ApiPublicHooksBackfillDailyEquityChangesRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   ApiPublicHooksBatchRetrainRoute: typeof ApiPublicHooksBatchRetrainRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
   ApiPublicHooksDailySummaryRoute: typeof ApiPublicHooksDailySummaryRoute
@@ -513,6 +527,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBatchRetrainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/backfill-daily-equity-changes': {
+      id: '/api/public/hooks/backfill-daily-equity-changes'
+      path: '/api/public/hooks/backfill-daily-equity-changes'
+      fullPath: '/api/public/hooks/backfill-daily-equity-changes'
+      preLoaderRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -547,6 +568,8 @@ const rootRouteChildren: RootRouteChildren = {
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
+  ApiPublicHooksBackfillDailyEquityChangesRoute:
+    ApiPublicHooksBackfillDailyEquityChangesRoute,
   ApiPublicHooksBatchRetrainRoute: ApiPublicHooksBatchRetrainRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
   ApiPublicHooksDailySummaryRoute: ApiPublicHooksDailySummaryRoute,
