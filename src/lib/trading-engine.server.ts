@@ -472,7 +472,7 @@ If no action is warranted, return an empty orders array.`;
           conviction: 0.5,
           reason: o.reason,
           signal_weights: {
-            sma_trend: 0, rsi: 0, price_change: 1, news_sentiment: 0, volatility: 0,
+            sma_trend: 0, rsi: 0, price_change: 100, news_sentiment: 0, volatility: 0,
           },
         })),
       };
