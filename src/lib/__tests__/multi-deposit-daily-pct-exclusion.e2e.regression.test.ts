@@ -136,13 +136,17 @@ describe("multi-deposit portfolios: daily % excludes cash flows on every surface
     const daily = computeDailyEquityChanges(eq(rows), depsChart(deposits));
     for (const d of daily) expect(d.pnl).toBeCloseTo(5, 10);
 
-    // Card badge parity with summary tile — both capital-adjusted.
+    // Card badge is a trailing metric across the whole window; the
+    // mode-summary tile anchors on the last two snapshots only. Both
+    // strip flows from their respective windows.
     const cardPct = computeCardRangePct(spark(rows), depsCard(deposits), false)!;
     const summary = computeModeSummary(series(rows), PORTS, depsSummary(deposits))!;
-    expect(cardPct).toBeCloseTo(summary.real.pct, 10);
-    // Trading pnl over the window = £20 on capital 2000 + 220 = 2220.
-    expect(summary.real.pnl).toBeCloseTo(20, 10);
-    expect(summary.real.pct).toBeCloseTo((20 / 2220) * 100, 10);
+    // Window trading pnl = £20 on capital 2000 + 220 = 2220.
+    expect(cardPct).toBeCloseTo((20 / 2220) * 100, 10);
+    // Last-day trading pnl = £5 on capital 2265 + (−30) = 2235.
+    expect(summary.real.pnl).toBeCloseTo(5, 10);
+    expect(summary.real.pct).toBeCloseTo((5 / 2235) * 100, 10);
+
   });
 
   it("splitting one large deposit into many small events leaves every pnl unchanged", () => {
