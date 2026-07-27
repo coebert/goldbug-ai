@@ -22,6 +22,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { AXIS_TICK, CHART_ROLE } from "@/lib/chart-palette";
+import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 
 export const Route = createFileRoute("/portfolio/$id/report")({
   head: () => ({
