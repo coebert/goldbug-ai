@@ -17,6 +17,7 @@ import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  assertNoFlowLeakage,
   computeDailyEquityChanges,
   type DepositLite,
   type EquitySnapshotLite,
