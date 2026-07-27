@@ -208,7 +208,32 @@ export type SimulateOptions = {
     availableVolume?: Record<string, number>;
     maxParticipationRate?: number;
     minFillQuantity?: number;
+    /**
+     * Per-symbol rolling window of recent bar volumes (oldest → newest,
+     * or any order — only the trailing `rollingWindow` entries and their
+     * aggregate matter). When a decision has neither its own
+     * `availableVolume` nor `volumeHistory`, and no
+     * `availableVolume[symbol]` entry exists, the engine derives the
+     * per-step cap from these bars using `volumeAggregator`
+     * (default `mean`). Empty / all-invalid arrays are treated as
+     * unconstrained.
+     */
+    volumeHistory?: Record<string, number[]>;
+    /**
+     * Number of trailing bars to include when reducing `volumeHistory`
+     * (either per-symbol or per-decision) to a single figure. `0`,
+     * negative, or omitted means "use the entire supplied history".
+     */
+    rollingWindow?: number;
+    /**
+     * How to reduce the trailing window to a single volume estimate.
+     *  - "mean"   arithmetic mean (default; classic N-bar ADV proxy).
+     *  - "median" order-statistic median (robust to outlier bars).
+     *  - "min"    conservative worst-case bar in the window.
+     */
+    volumeAggregator?: "mean" | "median" | "min";
   };
+
   /**
    * When true, any decision that only partially fills because of a
    * `liquidity` truncation has its residual quantity automatically
