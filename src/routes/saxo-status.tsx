@@ -83,16 +83,35 @@ function overallTone(s: {
   return { tone: "ok", label: "Connected" };
 }
 
+function fmtMoney(n: number | null | undefined, ccy: string | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  try {
+    return new Intl.NumberFormat("en-GB", { style: "currency", currency: ccy || "GBP" }).format(n);
+  } catch {
+    return `${n.toFixed(2)} ${ccy ?? ""}`.trim();
+  }
+}
+
+type SyncResult = Awaited<ReturnType<typeof syncBrokerBalanceForEnv>>;
+
 function EnvCard({
   env,
   status,
   onConnect,
   connecting,
+  onSyncBalance,
+  syncing,
+  lastSync,
+  syncError,
 }: {
   env: EnvKey;
   status: Awaited<ReturnType<typeof getSaxoOAuthStatus>>["sim"];
   onConnect: () => void;
   connecting: boolean;
+  onSyncBalance: () => void;
+  syncing: boolean;
+  lastSync: SyncResult | null;
+  syncError: string | null;
 }) {
   const t = overallTone(status);
   const label = env.toUpperCase();
