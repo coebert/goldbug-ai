@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.tg_sync_ai_audit_from_order() FROM PUBLIC, anon, authenticated;
