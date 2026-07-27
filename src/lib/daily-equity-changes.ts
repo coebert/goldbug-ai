@@ -104,7 +104,10 @@ export type FlowLeakRow = {
 export function assertNoFlowLeakage(
   rows: readonly FlowLeakRow[],
   source: string,
+  opts: { pctTolerance?: number; absTolerance?: number } = {},
 ): void {
+  const absEps = opts.absTolerance ?? FLOW_LEAK_EPS_ABS;
+  const pctEps = opts.pctTolerance ?? FLOW_LEAK_EPS_PCT;
   for (const r of rows) {
     const arithmeticDrift = Math.abs(r.pnl + r.netFlow - r.rawDelta);
     if (arithmeticDrift > FLOW_LEAK_EPS_ABS) {
