@@ -5,6 +5,7 @@ import {
   getTradeOutcomes,
   type TradeOutcomeRow,
 } from "@/lib/trade-outcomes.functions";
+import { summarizeOutcomes } from "@/lib/trade-outcome-summary";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
@@ -21,6 +22,9 @@ import {
   XCircle,
   Clock,
   CircleDashed,
+  TrendingDown,
+  Target,
+  AlertTriangle,
 } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
 import { cn } from "@/lib/utils";
@@ -102,12 +106,14 @@ function formatPrice(p: number | null, ccy: string) {
 export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
   const fetchOutcomes = useServerFn(getTradeOutcomes);
   const qc = useQueryClient();
-  const queryKey = ["trade-outcomes", portfolioId] as const;
+
+  const [windowHours, setWindowHours] = useState<number>(24);
+  const queryKey = ["trade-outcomes", portfolioId, windowHours] as const;
 
   const query = useQuery({
     queryKey,
     queryFn: () =>
-      fetchOutcomes({ data: { portfolioId, sinceHours: 24, limit: 80 } }),
+      fetchOutcomes({ data: { portfolioId, sinceHours: windowHours, limit: 200 } }),
     enabled: active,
     staleTime: 15_000,
     refetchInterval: active ? 30_000 : false,
@@ -188,10 +194,18 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
 
   const rows = query.data?.rows ?? [];
   const counts = query.data?.counts ?? {};
+  const summary = useMemo(() => summarizeOutcomes(rows), [rows]);
   const filtered = useMemo(() => {
     if (bucket === "all") return rows;
     return rows.filter((r) => bucketOf(r.status) === bucket);
   }, [rows, bucket]);
+
+  const WINDOWS: { hours: number; label: string }[] = [
+    { hours: 1, label: "1h" },
+    { hours: 6, label: "6h" },
+    { hours: 24, label: "24h" },
+    { hours: 24 * 7, label: "7d" },
+  ];
 
   return (
     <Card>
@@ -203,25 +217,76 @@ export function TradeOutcomePanelCard({ portfolioId, active = true }: Props) {
               Trade outcomes (live)
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Last 24 h of attempted orders. Streams updates as Saxo fills or
-              rejects each order.
+              Attempted orders in the selected window. Streams updates as Saxo
+              fills or rejects each order.
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => query.refetch()}
-            disabled={query.isFetching}
-            aria-label="Refresh trade outcomes"
-          >
-            <RefreshCw
-              className={cn(
-                "h-4 w-4",
-                query.isFetching && "animate-spin",
-              )}
-            />
-          </Button>
+          <div className="flex items-center gap-1">
+            <div
+              role="tablist"
+              aria-label="Time window"
+              className="hidden sm:flex rounded-md border border-border bg-background p-0.5"
+            >
+              {WINDOWS.map((w) => (
+                <button
+                  key={w.hours}
+                  role="tab"
+                  aria-selected={windowHours === w.hours}
+                  onClick={() => setWindowHours(w.hours)}
+                  className={cn(
+                    "rounded px-2 py-1 text-xs transition-colors",
+                    windowHours === w.hours
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              aria-label="Refresh trade outcomes"
+            >
+              <RefreshCw
+                className={cn(
+                  "h-4 w-4",
+                  query.isFetching && "animate-spin",
+                )}
+              />
+            </Button>
+          </div>
         </div>
+
+        {/* Mobile window selector */}
+        <div
+          role="tablist"
+          aria-label="Time window"
+          className="mt-2 flex sm:hidden rounded-md border border-border bg-background p-0.5 w-fit"
+        >
+          {WINDOWS.map((w) => (
+            <button
+              key={w.hours}
+              role="tab"
+              aria-selected={windowHours === w.hours}
+              onClick={() => setWindowHours(w.hours)}
+              className={cn(
+                "rounded px-2 py-1 text-xs transition-colors",
+                windowHours === w.hours
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
+
+        <SummaryTiles summary={summary} />
+
 
         <div
           role="tablist"
@@ -415,3 +480,98 @@ function truncateReason(reason: string, max = 260): string {
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max)}…`;
 }
+
+function SummaryTiles({
+  summary,
+}: {
+  summary: ReturnType<typeof summarizeOutcomes>;
+}) {
+  const fmtPct = (n: number) =>
+    `${n.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+  const fmtBps = (n: number | null) => {
+    if (n == null) return "—";
+    const rounded = Math.round(n * 10) / 10;
+    const sign = rounded > 0 ? "+" : "";
+    return `${sign}${rounded.toLocaleString(undefined, { maximumFractionDigits: 1 })} bps`;
+  };
+  const slippageTone =
+    summary.avgSlippageBps == null
+      ? "text-foreground"
+      : summary.avgSlippageBps > 5
+        ? "text-rose-500"
+        : summary.avgSlippageBps < -1
+          ? "text-emerald-500"
+          : "text-foreground";
+  const errorTone =
+    summary.errorCount > 0 ? "text-destructive" : "text-foreground";
+
+  return (
+    <div
+      className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
+      aria-label="Trade outcome summary"
+    >
+      <Tile
+        icon={<Target className="h-3.5 w-3.5" />}
+        label="Fill rate"
+        value={summary.total > 0 ? fmtPct(summary.fillRatePct) : "—"}
+        sub={`${summary.filled + summary.partial}/${summary.total} orders`}
+      />
+      <Tile
+        icon={<Activity className="h-3.5 w-3.5" />}
+        label="Volume filled"
+        value={summary.total > 0 ? fmtPct(summary.volumeFillRatePct) : "—"}
+        sub="Σ filled qty ÷ requested"
+      />
+      <Tile
+        icon={<TrendingDown className="h-3.5 w-3.5" />}
+        label="Avg slippage"
+        value={fmtBps(summary.avgSlippageBps)}
+        sub={
+          summary.slippageSampleCount > 0
+            ? `${summary.slippageSampleCount} limit ${summary.slippageSampleCount === 1 ? "order" : "orders"}`
+            : "No limit fills"
+        }
+        valueClassName={slippageTone}
+      />
+      <Tile
+        icon={<AlertTriangle className="h-3.5 w-3.5" />}
+        label="Errors"
+        value={String(summary.errorCount)}
+        sub={
+          summary.cancelledCount > 0
+            ? `${summary.cancelledCount} cancelled`
+            : "rejected + error"
+        }
+        valueClassName={errorTone}
+      />
+    </div>
+  );
+}
+
+function Tile({
+  icon,
+  label,
+  value,
+  sub,
+  valueClassName,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card/60 p-2.5">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div className={cn("mt-1 text-lg font-semibold tabular-nums", valueClassName)}>
+        {value}
+      </div>
+      <div className="text-[10px] text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
