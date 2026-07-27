@@ -2357,8 +2357,37 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   }
 
+  // Per-symbol audit log: capture every buy/sell/hold, the market inputs, the
+  // resulting broker order id (when live-routed) and the initial outcome. A
+  // DB trigger on live_orders keeps `outcome` in sync as the broker updates
+  // status. Fire-and-forget so a logging failure never blocks the tick.
+  try {
+    const { recordAiDecisionAudit } = await import("./ai-decision-audit.server");
+    const heldAfter = Array.from(holdingsByS.values()).map((h) => ({
+      symbol: h.symbol,
+      quantity: Number(h.quantity),
+      asset_class: h.asset_class as string | null,
+      instrument_ccy: (h as { instrument_ccy?: string | null }).instrument_ccy ?? null,
+    }));
+    await recordAiDecisionAudit({
+      portfolioId,
+      userId: portfolio.user_id,
+      decisionId,
+      runDate: asOf,
+      model: "google/gemini-2.5-flash",
+      executed: executed as unknown as Parameters<typeof recordAiDecisionAudit>[0]["executed"],
+      heldAfter,
+      features: features as unknown as Record<string, unknown>,
+      regime: effectiveRegime,
+      rationale: decision.rationale,
+    });
+  } catch (e) {
+    console.warn("ai_decision_audit skipped", portfolioId, e);
+  }
+
   // Self-reflection: refresh distilled lessons periodically. Fire-and-forget so
   // reflection cost never blocks the tick; failures just skip this cycle.
+
   reflectAndUpdateLessons(portfolioId, asOf, learning).catch((e) =>
     console.warn("Reflection skipped:", e),
   );
