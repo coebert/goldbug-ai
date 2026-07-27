@@ -1779,13 +1779,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
+      const symTuning = symbolTuning.get(meta.symbol.toUpperCase());
       const feeAdjustedParams = {
         ...(cfg.execution_params ?? {}),
         min_commission: Math.max(
           Number(cfg.execution_params?.min_commission ?? 0),
           saxoFee.tier.min,
         ),
+        // Per-symbol microstructure overrides win over user config to reflect
+        // the actual liquidity/volatility we measured for this name.
+        microstructure: {
+          ...(cfg.execution_params?.microstructure ?? {}),
+          ...(symTuning ?? {}),
+        },
       };
+
       const outcome = applyBuyExecution({
         requestedSpend: spend,
         price,
