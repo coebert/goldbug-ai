@@ -88,3 +88,41 @@ describe("buildScenarioReport", () => {
     expect(reports.map((r) => r.id)).toEqual(specs.map((s) => s.id));
   });
 });
+
+describe("executionSeries", () => {
+  it("emits one point per input decision, in order", () => {
+    const decisions = tradingCycle();
+    const r = runScenario(defaultScenarioSpecs()[0], decisions, initial);
+    expect(r.executionSeries.map((p) => p.decisionId))
+      .toEqual(decisions.map((d) => d.id));
+  });
+
+  it("fillRatio is 1 for a fully-filled decision in a deep book", () => {
+    const r = runScenario(defaultScenarioSpecs()[0], tradingCycle(), initial);
+    for (const p of r.executionSeries) {
+      expect(p.fillRatio).toBeCloseTo(1, 6);
+    }
+  });
+
+  it("thin book with participation cap produces fillRatio < 1", () => {
+    // Buy 100 of AAA but market only offers 100 shares total; 5% cap ⇒ 5.
+    const decisions: DatedDecision[] = [
+      { id: "b1", date: "2024-01-02", symbol: "AAA", side: "BUY",
+        quantity: 100, price: 50, availableVolume: 100 },
+    ];
+    const thin = defaultScenarioSpecs().find((s) => s.id === "frictionless_thin")!;
+    const r = runScenario(thin, decisions, initial);
+    expect(r.executionSeries[0].fillRatio).toBeLessThan(1);
+    expect(r.executionSeries[0].fillRatio).toBeGreaterThan(0);
+  });
+
+  it("liquidityAdjustedSlippageBps is null for unconstrained fills", () => {
+    // No volume info at all -> unconstrained -> liq-adjusted slip is null.
+    const decisions: DatedDecision[] = [
+      { id: "b1", date: "2024-01-02", symbol: "AAA", side: "BUY",
+        quantity: 10, price: 100 },
+    ];
+    const r = runScenario(defaultScenarioSpecs()[0], decisions, initial);
+    expect(r.executionSeries[0].liquidityAdjustedSlippageBps).toBeNull();
+  });
+});
