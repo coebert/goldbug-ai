@@ -66,21 +66,16 @@ export function buildDepositAdjustedSeries(
     }
     cumulative += dep;
     const adjusted = equity - cumulative;
-    // Denominator scales with cumulative net flows so a large mid-
-    // window deposit does not divide subsequent trading PnL by the
-    // tiny pre-deposit baseline (which would produce a ridiculous %
-    // like +1101% for a £999k top-up that only earned +£11k trading).
-    // This is equivalent to a capital-adjusted return / single-flow
-    // TWRR: (equity − cumFlows − baseline) / (baseline + cumFlows).
-    // Capital-adjusted denom = baseline + cumulative flows. If a large
-    // withdrawal collapses the denom to <= 0, fall back to `baseline`
-    // so pct stays finite — matches computeModeSummary's guard.
-    const denomRaw = baseline + cumulative;
-    const denomSafe = denomRaw > 0 ? denomRaw : baseline;
-    const pct =
-      Number.isFinite(baseline) && baseline > 0 && denomSafe > 0
-        ? ((adjusted - baseline) / denomSafe) * 100
-        : 0;
+    // Delegate the capital-adjusted denominator + guards to the shared
+    // helper so this surface never drifts from mode-summary / card /
+    // breakdown maths. Equivalent to a single-flow TWRR:
+    //   (equity − cumFlows − baseline) / (baseline + cumFlows).
+    const pct = capitalAdjustedPct({
+      pnl: adjusted - baseline,
+      baseline,
+      netFlow: cumulative,
+    });
+
 
 
     out.push({
