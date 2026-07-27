@@ -1,15 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getSaxoOAuthStatus, startSaxoOAuth } from "@/lib/live.functions";
+import { getSaxoOAuthStatus, startSaxoOAuth, syncBrokerBalanceForEnv } from "@/lib/live.functions";
 import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, RefreshCw, DownloadCloud } from "lucide-react";
 
 export const Route = createFileRoute("/saxo-status")({
   head: () => ({
