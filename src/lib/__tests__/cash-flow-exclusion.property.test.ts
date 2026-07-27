@@ -81,12 +81,17 @@ function buildTrace(
 
 // ---------- arbitraries ----------
 
-const tradePnlArb = fc.double({
-  min: -75,
-  max: 75,
-  noNaN: true,
-  noDefaultInfinity: true,
-});
+const tradePnlArb = fc
+  .double({
+    min: -75,
+    max: 75,
+    noNaN: true,
+    noDefaultInfinity: true,
+  })
+  // Real trades don't move equity by sub-cent amounts; filter out
+  // synthetic noise that would fall inside the runtime guard's float
+  // tolerance and make "pure flow day" ambiguous.
+  .map((x) => (Math.abs(x) < 0.01 ? 0 : x));
 
 // Baseline strictly > 0 and comfortably above the worst-case cumulative
 // trading loss so `prev` in the daily computation never drops to 0
