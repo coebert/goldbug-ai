@@ -326,6 +326,33 @@ export function PortfolioRow({
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 {sparkRange}
               </span>
+              {equityLoading || equityEmpty || currencyMismatch || equityError ? null : dailyPct == null ? (
+                <span
+                  data-testid="daily-pct-empty"
+                  aria-label="No daily change data"
+                  className="ml-1 inline-flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground"
+                >
+                  Today —
+                </span>
+              ) : (
+                <span
+                  data-testid="daily-pct"
+                  title={
+                    dailyFromDate && dailyToDate
+                      ? `Trading-only % change from ${dailyFromDate} to ${dailyToDate} (deposits/withdrawals excluded)`
+                      : "Trading-only daily % change (deposits/withdrawals excluded)"
+                  }
+                  aria-label={`Today ${dailyPct >= 0 ? "up" : "down"} ${Math.abs(dailyPct).toFixed(2)} percent`}
+                  className={`ml-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                    dailyPct >= 0
+                      ? "border-success/40 bg-success/10 text-success"
+                      : "border-destructive/40 bg-destructive/10 text-destructive"
+                  }`}
+                >
+                  Today {dailyPct >= 0 ? "+" : ""}
+                  {dailyPct.toFixed(2)}%
+                </span>
+              )}
             </div>
             <div className="mt-2 flex gap-0.5 rounded-md border border-border/60 p-0.5">
               {SPARK_RANGES.map((r) => (
