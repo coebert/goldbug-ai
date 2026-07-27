@@ -85,22 +85,36 @@ export type HeuristicDecision = {
   orders: Array<{ symbol: string; side: "sell"; quantity: number; reason: string }>;
 };
 
+import type { AlgoRegimeSnapshot } from "./microstructure/algo-regime";
+import { summarizeAlgoRegime } from "./microstructure/algo-regime-prompt";
+
 export function buildHeuristicDecision(args: {
   holdings: HeuristicHolding[];
   features: HeuristicFeature[];
   reason: string; // why AI was unavailable
+  algoRegime?: AlgoRegimeSnapshot | null;
 }): HeuristicDecision {
-  const sells = buildHeuristicSells(args.holdings, args.features);
+  // In an elevated/extreme algo regime, be MORE aggressive on protective
+  // sells (raise the cap) — the whole point of the guard is to cut exposure
+  // when microstructure turns against us and the model is offline.
+  const maxSells = args.algoRegime?.tier === "extreme" ? 6
+    : args.algoRegime?.tier === "elevated" ? 4
+    : 3;
+  const sells = buildHeuristicSells(args.holdings, args.features, { maxSells });
+  const regimeTag = args.algoRegime ? ` · ${summarizeAlgoRegime(args.algoRegime)}` : "";
   const briefing = sells.length > 0
-    ? `AI unavailable — heuristic proposed ${sells.length} protective sell(s); no new buys.`
-    : "AI unavailable — heuristic found no exit signals; guardrail exits still enforced.";
+    ? `AI unavailable — heuristic proposed ${sells.length} protective sell(s); no new buys.${regimeTag}`
+    : `AI unavailable — heuristic found no exit signals; guardrail exits still enforced.${regimeTag}`;
   return {
     briefing,
     rationale:
       `AI gateway error: ${args.reason.slice(0, 200)}. ` +
       `Fallback rule-set: sell holdings with 30d ≤ -10%, 5d ≤ -5%, RSI ≥ 75, or MACD- + 5d-. ` +
       `No BUY orders are placed without the model's risk view. Stop-loss / take-profit / ATR ` +
-      `trailing / hedging reconciliation run independently of this decision.`,
+      `trailing / hedging reconciliation run independently of this decision.` +
+      (args.algoRegime && args.algoRegime.tier !== "normal"
+        ? ` Algo-regime tier=${args.algoRegime.tier} → protective-sell cap raised to ${maxSells}.`
+        : ""),
     orders: sells,
   };
 }
