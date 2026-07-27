@@ -642,7 +642,7 @@ function HoldingsStrip({
             <span className="shrink-0 font-semibold tabular-nums">{cashPct.toFixed(1)}%</span>
           </div>
           <div className="mt-0.5 truncate font-display text-sm tabular-nums text-foreground">
-            {formatMoney(cash, currency, 0)}
+            {formatMoney(safeCash, currency, 0)}
           </div>
         </div>
       </div>
@@ -650,7 +650,7 @@ function HoldingsStrip({
       <div
         className="mb-1 flex h-2 w-full overflow-hidden rounded-full bg-muted"
         role="img"
-        aria-label={`${investedPct.toFixed(0)} percent invested (${formatMoney(investedValue, currency, 0)}), ${cashPct.toFixed(0)} percent cash (${formatMoney(cash, currency, 0)})`}
+        aria-label={`${investedPct.toFixed(0)} percent invested (${formatMoney(investedValue, currency, 0)}), ${cashPct.toFixed(0)} percent cash (${formatMoney(safeCash, currency, 0)})`}
       >
         <div
           className="h-full bg-primary/80"
@@ -662,7 +662,7 @@ function HoldingsStrip({
         />
       </div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-        <span className="truncate">Total {formatMoney(investedValue + cash, currency, 0)}</span>
+        <span className="truncate">Total {formatMoney(denom, currency, 0)}</span>
         <span className="shrink-0 tabular-nums">
           {rows.length} position{rows.length === 1 ? "" : "s"}
         </span>
