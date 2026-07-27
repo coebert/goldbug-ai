@@ -279,17 +279,24 @@ export function BacktestResultsCard({
           {holdingsPoints.length === 0 ? (
             <p className="text-sm text-muted-foreground">No holdings in this window.</p>
           ) : (
-            <div className="h-52 w-full sm:h-64">
+            <div
+              className="h-52 w-full sm:h-64"
+              role="img"
+              aria-label={`Holdings over time, ${holdingsSymbols.length} symbols plus cash`}
+            >
+              <span className="sr-only">
+                {`Stacked market value including cash across ${holdingsPoints.length} days. Symbols: ${["Cash", ...holdingsSymbols].join(", ")}.`}
+              </span>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={holdingsPoints} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                   <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtCompact} width={56} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
+                  <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={56} />
                   <Tooltip
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--foreground))" }} />
                   <Area
                     type="monotone"
                     dataKey="cash"
