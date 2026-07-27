@@ -20,6 +20,7 @@ import { TranslationQualityCard } from "@/components/translation-quality-card";
 import { BatchLessonsCard } from "@/components/batch-lessons-card";
 import { RetrainScheduleCard } from "@/components/retrain-schedule-card";
 import { RunMetricsCard } from "@/components/run-metrics-card";
+import { MicrostructureCalibrationCard } from "@/components/microstructure-calibration-card";
 import { OrderReconciliationCard } from "@/components/order-reconciliation-card";
 import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-card";
 
