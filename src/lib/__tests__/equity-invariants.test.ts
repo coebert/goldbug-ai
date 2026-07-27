@@ -18,9 +18,10 @@ describe("checkEquityInvariants — pure invariants", () => {
   });
 
   it("flags invested > 100% (the user-reported bug)", () => {
-    // 143.6% invested + 98.9% cash — Invested is quoted in native-currency
-    // sums while total_value came from the (FX-normalised) broker.
-    const r = checkEquityInvariants({ cash: 989, holdingsValue: 1436, totalValue: 1000 });
+    // 143.6% invested + 110% cash — Invested is quoted in native-currency
+    // sums while total_value came from the (FX-normalised) broker. Both
+    // percentages exceed 100% and the identity is broken.
+    const r = checkEquityInvariants({ cash: 1100, holdingsValue: 1436, totalValue: 1000 });
     expect(r.ok).toBe(false);
     const codes = r.violations.map((v) => v.code).sort();
     expect(codes).toContain("invested_exceeds_equity");
