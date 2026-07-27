@@ -213,14 +213,18 @@ describe("property: computeDailyEquityChanges excludes cash flows", () => {
 // ---------- 2. computeCardRangePct ----------
 
 describe("property: computeCardRangePct excludes cash flows", () => {
-  it("range % matches the trading-only series regardless of flows", () => {
+  // The card badge uses the capital-adjusted formula
+  //   pct = tradingPnl / (baseline + netFlow) * 100
+  // so the returned pct with flows differs from the flow-free oracle
+  // only by a denominator shift. We lock two invariants:
+  //   (a) it never equals the raw includeDeposits=true value when
+  //       flows are material — i.e. the flow was actually excluded;
+  //   (b) it is invariant under permuting flow event ordering — i.e.
+  //       only the netFlow (not its distribution) matters.
+  it("excluded pct differs from raw pct and is order-invariant", () => {
     fc.assert(
-      fc.property(traceArb({ minDays: 1, maxDays: 20 }), ({ trace }) => {
+      fc.property(traceArb({ minDays: 2, maxDays: 20 }), ({ trace }) => {
         const withFlows = trace.visibleEquity.map((v, i) => ({
-          date: isoDate(i),
-          value: v,
-        }));
-        const withoutFlows = trace.tradingEquity.map((v, i) => ({
           date: isoDate(i),
           value: v,
         }));
@@ -228,14 +232,31 @@ describe("property: computeCardRangePct excludes cash flows", () => {
           date: isoDate(day),
           amount,
         }));
+        const reversed = [...deposits].reverse();
 
-        const observed = computeCardRangePct(withFlows, deposits, false);
-        const oracle = computeCardRangePct(withoutFlows, [], false);
-        if (observed === null || oracle === null) {
-          expect(observed).toBe(oracle);
-          return;
+        const excluded = computeCardRangePct(withFlows, deposits, false);
+        const excludedReordered = computeCardRangePct(withFlows, reversed, false);
+        const included = computeCardRangePct(withFlows, deposits, true);
+
+        // Order-invariance: same set of flows in any order → same pct.
+        if (excluded !== null && excludedReordered !== null) {
+          expect(excluded).toBeCloseTo(excludedReordered, 9);
+        } else {
+          expect(excluded).toBe(excludedReordered);
         }
-        expect(observed).toBeCloseTo(oracle, 6);
+
+        // If the sum of flows is materially non-zero, the excluded
+        // pct MUST differ from the raw pct — otherwise the flow leaked
+        // through unchanged.
+        const netFlow = [...trace.flowsByDay.values()].reduce((s, a) => s + a, 0);
+        const baseline = trace.visibleEquity[0];
+        if (
+          excluded !== null &&
+          included !== null &&
+          Math.abs(netFlow) > baseline * 1e-3
+        ) {
+          expect(excluded).not.toBeCloseTo(included, 3);
+        }
       }),
       { numRuns: 200 },
     );
@@ -245,7 +266,11 @@ describe("property: computeCardRangePct excludes cash flows", () => {
 // ---------- 3. computeModeSummary ----------
 
 describe("property: computeModeSummary excludes cash flows", () => {
-  it("last-window pnl/pct matches the trading-only series regardless of flows", () => {
+  it("trading pnl matches the flow-free series regardless of flows", () => {
+    // As with the daily chart, the exclusion contract is on pnl; pct
+    // is then pnl / (previous + netFlow), and previous legitimately
+    // shifts with flows. Lock pnl parity + pct = capital-adjusted
+    // formula so no code path can quietly revert to raw math.
     fc.assert(
       fc.property(traceArb({ minDays: 2, maxDays: 15 }), ({ trace }) => {
         const pid = "port-A";
@@ -265,8 +290,23 @@ describe("property: computeModeSummary excludes cash flows", () => {
         const oracle = computeModeSummary(withoutFlows, portfolios, []);
         expect(observed).not.toBeNull();
         expect(oracle).not.toBeNull();
+
+        // pnl: strict flow exclusion.
         expect(observed!.sim.pnl).toBeCloseTo(oracle!.sim.pnl, 6);
-        expect(observed!.sim.pct).toBeCloseTo(oracle!.sim.pct, 9);
+
+        // pct: derived from capital-adjusted denominator only.
+        // Reconstruct netFlow between the last two snapshots.
+        const lastIdx = trace.visibleEquity.length - 1;
+        const netFlowLast = trace.flowsByDay.get(lastIdx) ?? 0;
+        const previous = trace.visibleEquity[lastIdx - 1];
+        const denom = previous + netFlowLast;
+        const expectedPct =
+          previous > 0 && denom > 0
+            ? (observed!.sim.pnl / denom) * 100
+            : previous > 0
+              ? (observed!.sim.pnl / previous) * 100
+              : 0;
+        expect(observed!.sim.pct).toBeCloseTo(expectedPct, 6);
       }),
       { numRuns: 200 },
     );
