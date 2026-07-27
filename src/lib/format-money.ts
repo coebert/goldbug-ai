@@ -200,7 +200,10 @@ export function formatMoneySigned(
   fractionDigits?: number,
 ): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  const sign = value > 0 ? "+" : value < 0 ? "\u2212" : "";
-  const body = formatMoneyAmount(Math.abs(value), fractionDigits);
+  const digits = fractionDigits ?? 2;
+  const rounded = roundMoney(value, digits);
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "\u2212" : "";
+  const body = formatMoneyAmount(Math.abs(rounded), fractionDigits);
   return body === "—" ? "—" : `${sign}${currency} ${body}`;
+
 }
