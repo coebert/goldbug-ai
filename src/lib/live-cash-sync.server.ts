@@ -5,9 +5,13 @@
 //
 // Rules:
 //  * Only touches live_sim / live_prod portfolios.
-//  * The delta (broker cash − local cash) is applied to BOTH current_cash and
+//  * The delta (broker ledger cash − local cash) is applied to BOTH current_cash and
 //    starting_cash so PnL/return calculations don't spike as a fake gain/loss
 //    when the user deposits or withdraws money at the broker.
+//  * Never use broker spendable cash / SpendingPower for equity snapshots:
+//    it can be lower than settled cash when cash is reserved or ring-fenced,
+//    and comparing that spendable figure with ledger snapshots creates false
+//    "stale real-money equity" warnings.
 //  * Small drifts (<0.5 in account currency) are ignored — they usually come
 //    from FX rounding, fees, or in-flight fills already accounted for locally.
 //  * Never throws upward: a broker read failure is logged and the tick
@@ -28,7 +32,10 @@ export type LiveCashSyncResult =
   | {
       skipped: false;
       delta: number;
+      /** Settled/pending ledger cash used for portfolio equity accounting. */
       brokerCash: number;
+      /** Spendable cash/SpendingPower used only by pre-trade affordability gates. */
+      brokerSpendableCash: number | null;
       previousCash: number;
       newCash: number;
       newStartingCash: number;
@@ -65,6 +72,7 @@ export async function syncLiveCashFromBroker(
   const env = p.mode === "live_prod" ? "live" : "sim";
 
   let brokerCash: number;
+  let brokerSpendableCash: number | null = null;
   let brokerTotalValue: number | null = null;
   let currency: string;
   try {
@@ -73,9 +81,17 @@ export async function syncLiveCashFromBroker(
       userId: p.user_id, portfolioId, envOverride: env,
     });
     const bal = await adapter.getBalance();
-    // cashAvailable already accounts for pending deposits (TransactionsNotBooked)
-    // and SpendingPower — that's what the AI should be allowed to trade with.
-    brokerCash = Number(bal.cashAvailable ?? bal.cash);
+    // IMPORTANT: equity snapshots and portfolio.current_cash must use Saxo's
+    // ledger/accounting cash, not spendable cash. Spendable cash / SpendingPower
+    // can be lower when cash is reserved by working orders or broker haircuts;
+    // treating it as actual cash creates false withdrawals, corrupts the
+    // starting pot, and leaves the dashboard warning that broker cash and
+    // stored snapshots disagree. Pre-trade sizing reads spendable cash again
+    // separately in live-executor.server.ts.
+    brokerCash = Number(bal.cash);
+    brokerSpendableCash = Number.isFinite(Number(bal.cashAvailable))
+      ? Number(bal.cashAvailable)
+      : null;
     brokerTotalValue = Number.isFinite(Number(bal.totalValue)) && Number(bal.totalValue) > 0
       ? Number(bal.totalValue)
       : null;
@@ -225,7 +241,11 @@ export async function syncLiveCashFromBroker(
           reason: "snapshot-refresh-only",
         }),
         response: asJson({
-          brokerCash, brokerTotalValue, delta,
+          brokerCash,
+          brokerSpendableCash,
+          brokerCashBasis: "ledger",
+          brokerTotalValue,
+          delta,
           snapshotRewritten: true, holdingsValueForSnapshot, currency,
         }),
         error: null,
@@ -325,6 +345,8 @@ export async function syncLiveCashFromBroker(
     }),
     response: asJson({
       brokerCash,
+      brokerSpendableCash,
+      brokerCashBasis: "ledger",
       brokerTotalValue,
       delta,
       newCash: brokerCash,
@@ -338,7 +360,7 @@ export async function syncLiveCashFromBroker(
   if (upd.error) return { skipped: true, reason: upd.error.message };
 
   return {
-    skipped: false, delta, brokerCash, currency,
+    skipped: false, delta, brokerCash, brokerSpendableCash, currency,
     previousCash: prevCash, newCash: brokerCash, newStartingCash: newStarting,
   };
 }
