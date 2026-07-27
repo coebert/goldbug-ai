@@ -28,6 +28,9 @@ export type SummaryPortfolio = {
 
 export type SummarySeriesRow = Record<string, unknown> & { date: string };
 
+import { capitalAdjustedPct } from "./capital-adjusted-return";
+
+
 export type DepositEvent = {
   portfolio_id: string;
   /** YYYY-MM-DD */
