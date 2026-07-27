@@ -54,7 +54,10 @@ const SIGNAL_COLORS: Record<string, string> = {
 const SIGNALS = ["sma_trend", "rsi", "price_change", "news_sentiment", "volatility"] as const;
 
 function fmtPct(v: number | null | undefined, digits = 2) {
-  return v == null ? "—" : `${v.toFixed(digits)}%`;
+  if (v == null) return "—";
+  // Always show a sign glyph so meaning is not colour-only.
+  const sign = v > 0 ? "▲ +" : v < 0 ? "▼ " : "";
+  return `${sign}${v.toFixed(digits)}%`;
 }
 function fmtRate(v: number | null | undefined) {
   return v == null ? "—" : `${(v * 100).toFixed(0)}%`;
