@@ -41,7 +41,7 @@ export function LiveHoldingsCard({
 
   const isLive = mode === "live_prod";
 
-  const rows = holdings
+  const rawRows = holdings
     .map((h) => {
       const qty = Number(h.quantity);
       const avg = Number(h.avg_cost);
@@ -52,14 +52,28 @@ export function LiveHoldingsCard({
       // so users don't mistake a flat P/L row for genuine breakeven.
       const hasLive = s?.currentPrice != null && Number.isFinite(Number(s.currentPrice));
       const mark = hasLive ? Number(s!.currentPrice) : avg;
-      const value = qty * mark;
+      const rawValue = qty * mark;
       const costBasis = qty * avg;
-      return { ...h, qty, avg, mark, value, costBasis, series: s, pricedAtCost: !hasLive };
-    })
+      return { ...h, qty, avg, mark, rawValue, costBasis, series: s, pricedAtCost: !hasLive };
+    });
+  const rawSum = rawRows.reduce((s, r) => s + r.rawValue, 0);
+  // Authoritative invested value comes from the server-side snapshot
+  // (`totalValue - cash`), which is FX/GBX-normalised to the portfolio
+  // base currency. Raw qty × price is in native units (USD, GBX, EUR)
+  // and would otherwise be summed as if it were the base currency —
+  // producing a > 100% "invested" tile. We scale each row proportionally
+  // so the per-position bars, multi-ccy breakdown and tile all agree.
+  const authoritativeInvested =
+    Number.isFinite(totalValue) && totalValue > 0
+      ? Math.max(0, Number(totalValue) - Number(cash))
+      : rawSum;
+  const scale = rawSum > 0 ? authoritativeInvested / rawSum : 0;
+  const rows = rawRows
+    .map((r) => ({ ...r, value: rawSum > 0 ? r.rawValue * scale : 0 }))
     .sort((a, b) => b.value - a.value);
   const stalePricedCount = rows.filter((r) => r.pricedAtCost).length;
 
-  const holdingsValue = rows.reduce((s, r) => s + r.value, 0);
+  const holdingsValue = authoritativeInvested;
   const denom = totalValue > 0 ? totalValue : holdingsValue + cash;
   const cashPct = denom > 0 ? (cash / denom) * 100 : 0;
 

@@ -107,8 +107,11 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       today,
     });
 
+    // Include live_sim portfolios: they are funded via sim_fund_events
+    // (Saxo demo top-ups), not real broker deposits, so their deposits
+    // must be netted out of range % change just like pure sim modes.
     const simIds = list
-      .filter((p) => p.mode !== "live_prod" && p.mode !== "live_sim")
+      .filter((p) => p.mode !== "live_prod")
       .map((p) => p.id);
     const liveIdsAll = list
       .filter((p) => p.mode === "live_prod" || p.mode === "live_sim")
