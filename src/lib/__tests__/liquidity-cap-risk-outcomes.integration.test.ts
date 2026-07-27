@@ -111,13 +111,20 @@ function runStrategy(args: {
         quantity: held, price,
       };
     } else if (!stopHit) {
-      const targetUnits = (maxPositionPct * equity) / price;
-      const gap = targetUnits - held;
-      if (gap > 1e-9) {
-        decision = {
-          id: `buy-${i}`, symbol: SYMBOL, side: "BUY",
-          quantity: gap, price,
-        };
+      // Momentum-only entry: only accumulate while price is at/above its
+      // running peak since entry. This isolates the liquidity effect —
+      // otherwise the tight run would keep buying on the way down (target
+      // grows as price falls) and the drawdown comparison becomes noisy.
+      const canAccumulate = held === 0 || price >= peakSinceEntry - 1e-9;
+      if (canAccumulate) {
+        const targetUnits = (maxPositionPct * equity) / price;
+        const gap = targetUnits - held;
+        if (gap > 1e-9) {
+          decision = {
+            id: `buy-${i}`, symbol: SYMBOL, side: "BUY",
+            quantity: gap, price,
+          };
+        }
       }
     }
 
