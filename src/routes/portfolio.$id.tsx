@@ -773,11 +773,12 @@ function PortfolioPage() {
               <LiveHoldingsCard
                 holdings={holdings}
                 currency={p.currency}
-                cash={Number(p.current_cash)}
+                cash={cashAuthoritative}
                 cashByCcy={
                   (p as { cash_by_ccy?: Record<string, number> | null }).cash_by_ccy ?? null
                 }
                 totalValue={totalValue}
+                invested={holdingsValue}
                 mode={p.mode}
                 series={holdingsSeries}
                />
