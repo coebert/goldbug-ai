@@ -67,9 +67,11 @@ describe("detectAlgoRegime tiering", () => {
   });
 
   it("escalates to extreme when 3+ signals fire and blocks new buys", () => {
-    const closes = calmCloses(30);
-    for (let i = 0; i < 5; i++) closes.push(closes.at(-1)! * (i % 2 ? 1.05 : 0.95));
-    const vols = Array.from({ length: 25 }, () => 1_000_000);
+    const closes = calmCloses(40);
+    // burst
+    for (let i = 0; i < 5; i++) closes.push(closes.at(-1)! * (i % 2 ? 1.08 : 0.92));
+    // volumes with a vacuum on the last bar
+    const vols = Array.from({ length: 44 }, () => 1_000_000);
     vols.push(50_000);
     const xs = {
       A: Array.from({ length: 30 }, (_, i) => (i % 2 ? 0.02 : -0.02)),
@@ -78,6 +80,8 @@ describe("detectAlgoRegime tiering", () => {
     const snap = detectAlgoRegime({
       primary: { closes, volumes: vols },
       crossSection: xs,
+      overnightGapPct: 2.0,
+      openingFadePct: -1.5,
     });
     expect(snap.score).toBeGreaterThanOrEqual(3);
     expect(snap.tier).toBe("extreme");
