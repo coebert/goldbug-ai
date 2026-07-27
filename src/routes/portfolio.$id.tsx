@@ -1387,6 +1387,7 @@ function PortfolioPage() {
                     {p.fx_enabled === true && (
                       <ManualFxConvertCard portfolio={p} />
                     )}
+                    <TradeOutcomePanelCard portfolioId={p.id} active={tab === "errors"} />
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
                   </div>
                 </Suspense>
