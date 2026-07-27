@@ -2383,8 +2383,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     });
   } catch (e) {
     console.warn("ai_decision_audit skipped", portfolioId, e);
+  }
 
+  // Self-reflection: refresh distilled lessons periodically. Fire-and-forget so
   // reflection cost never blocks the tick; failures just skip this cycle.
+
   reflectAndUpdateLessons(portfolioId, asOf, learning).catch((e) =>
     console.warn("Reflection skipped:", e),
   );
