@@ -174,7 +174,63 @@ export async function syncLiveCashFromBroker(
   const prevStarting = Number(p.starting_cash ?? 0);
   const delta = brokerCash - prevCash;
 
-  if (!Number.isFinite(brokerCash) || Math.abs(delta) < DRIFT_EPSILON) {
+  if (!Number.isFinite(brokerCash)) {
+    return { skipped: true, reason: "broker cash not finite" };
+  }
+
+  // Even when the portfolio's current_cash already matches the broker (no
+  // material drift), today's equity_snapshot can still be stale — e.g. an
+  // earlier HOLDINGS_SYNC / CASH_SYNC wrote a snapshot before a fill and
+  // the newer authoritative TotalValue has since changed. The "stale data"
+  // banner is driven by comparing broker cash vs today's snapshot.cash, so
+  // if we early-return here without refreshing the snapshot the mismatch
+  // sticks forever. Always reconcile today's snapshot against the freshly
+  // fetched broker values before deciding whether to skip.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (Math.abs(delta) < DRIFT_EPSILON) {
+    const { data: todaySnap } = await db
+      .from("equity_snapshots")
+      .select("cash, holdings_value, total_value")
+      .eq("portfolio_id", portfolioId)
+      .eq("snapshot_date", todayIso)
+      .maybeSingle();
+    let holdingsValueForSnapshot: number;
+    if (brokerTotalValue != null && brokerTotalValue > 0) {
+      holdingsValueForSnapshot = Math.max(0, brokerTotalValue - brokerCash);
+    } else {
+      holdingsValueForSnapshot = Number(todaySnap?.holdings_value ?? 0);
+    }
+    const snapCash = Number(todaySnap?.cash ?? Number.NaN);
+    const snapHoldings = Number(todaySnap?.holdings_value ?? Number.NaN);
+    const snapNeedsRewrite =
+      !todaySnap ||
+      !Number.isFinite(snapCash) ||
+      Math.abs(snapCash - brokerCash) >= DRIFT_EPSILON ||
+      (Number.isFinite(snapHoldings) &&
+        Math.abs(snapHoldings - holdingsValueForSnapshot) >= DRIFT_EPSILON);
+    if (snapNeedsRewrite) {
+      await writeCashSyncSnapshot(db as unknown as CashSyncSnapshotClient, {
+        portfolioId,
+        snapshotDate: todayIso,
+        cash: brokerCash,
+        holdingsValue: holdingsValueForSnapshot,
+      });
+      await db.from("live_broker_log").insert({
+        portfolio_id: portfolioId, user_id: p.user_id,
+        broker: "saxo", env,
+        method: "CASH_SYNC", path: "/sync/cash",
+        status: 200,
+        request: asJson({
+          previousCash: prevCash, hasLocalHoldings: null, mode: p.mode,
+          reason: "snapshot-refresh-only",
+        }),
+        response: asJson({
+          brokerCash, brokerTotalValue, delta,
+          snapshotRewritten: true, holdingsValueForSnapshot, currency,
+        }),
+        error: null,
+      });
+    }
     return { skipped: true, reason: "no material drift" };
   }
 
@@ -236,7 +292,7 @@ export async function syncLiveCashFromBroker(
   // to (cash + latest snapshot's holdings_value) means a CASH_SYNC that
   // happens between a fill and the next HOLDINGS_SYNC leaves holdings stale
   // and understates total equity (see 2026-07-27 08:00 CASH_SYNC incident).
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso;
   let holdingsValueForSnapshot: number;
   if (brokerTotalValue != null && brokerTotalValue > 0) {
     holdingsValueForSnapshot = Math.max(0, brokerTotalValue - brokerCash);
