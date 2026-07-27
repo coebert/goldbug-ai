@@ -335,17 +335,45 @@ export function PortfolioRow({
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              Total equity
-              {isRefreshingEquity && !equityLoading ? (
-                <span
-                  data-testid="equity-refreshing-dot"
-                  aria-label="Refreshing equity"
-                  title="Refreshing"
-                  className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70"
-                />
-              ) : null}
-            </div>
+            <TooltipProvider delayDuration={150}>
+              <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Total equity
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What total equity and % change include"
+                      className="inline-flex text-muted-foreground/70 hover:text-foreground"
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[280px] text-left text-xs normal-case leading-snug tracking-normal">
+                    <div className="font-medium">Total equity</div>
+                    <div className="mt-1 text-muted-foreground">
+                      Cash + market value of open positions, in the portfolio's base currency
+                      (from the latest broker snapshot).
+                    </div>
+                    <div className="mt-2 font-medium">% change over range</div>
+                    <div className="mt-1 text-muted-foreground">
+                      Includes: realised and unrealised trading P&amp;L, fees, dividends and interest.
+                    </div>
+                    <div className="mt-1 text-muted-foreground">
+                      Excludes: deposits and withdrawals — cash you add or remove doesn't count as
+                      a gain or loss.
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+                {isRefreshingEquity && !equityLoading ? (
+                  <span
+                    data-testid="equity-refreshing-dot"
+                    aria-label="Refreshing equity"
+                    title="Refreshing"
+                    className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary/70"
+                  />
+                ) : null}
+              </div>
+            </TooltipProvider>
             {equityError ? (
               <div
                 role="alert"
