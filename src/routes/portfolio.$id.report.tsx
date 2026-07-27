@@ -230,6 +230,8 @@ function ReportPage() {
               </CardContent>
             </Card>
 
+            <FeeBreakdownCard portfolioId={id} days={windowDays} />
+
             <Tabs defaultValue="weekly">
               <TabsList>
                 <TabsTrigger value="daily">Daily ({data.daily.length})</TabsTrigger>
