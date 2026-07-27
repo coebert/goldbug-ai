@@ -1005,7 +1005,7 @@ export function buildExecutionQualityReport(
       }
     }
 
-    const sym = symbolOf(s);
+    const sym = s.symbol;
     const b = bySymbolRaw.get(sym) ?? bucket();
     if (isParent) b.requested += s.requestedQuantity;
     b.filled += s.fillQuantity;
