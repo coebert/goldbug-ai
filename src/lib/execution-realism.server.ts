@@ -77,11 +77,31 @@ export function applyBuyExecution(args: {
   const slip = p.slippage_bps / 10_000;
   const fillPrice = args.price * (1 + halfSpread + slip);
   const commissionRate = p.commission_bps / 10_000;
-  const perShareCost = fillPrice * (1 + commissionRate);
-  const qty = spend / perShareCost;
+  const minComm = Math.max(0, p.min_commission ?? 0);
+  // Try bps-only sizing first: spend = qty*fillPrice*(1 + commRate).
+  let qty = spend / (fillPrice * (1 + commissionRate));
+  let commission = qty * fillPrice * commissionRate;
+  if (commission < minComm) {
+    // Min-commission floor dominates: spend = qty*fillPrice + minComm.
+    commission = minComm;
+    qty = Math.max(0, (spend - minComm) / fillPrice);
+  }
+  if (qty <= 0 || qty * fillPrice + commission < p.min_trade_value) {
+    return {
+      fillPrice: args.price,
+      effectiveSpend: 0,
+      qty: 0,
+      costPaid: 0,
+      liquidityCappedSpend,
+      belowMinTrade: true,
+      notes: [...notes, minComm > 0 && spend <= minComm
+        ? `blocked: notional ${spend.toFixed(0)} <= min commission ${minComm.toFixed(0)}`
+        : `below min trade value ${p.min_trade_value}`],
+    };
+  }
   const costPaid = spend - qty * args.price;
   if (halfSpread > 0) notes.push(`spread ${(halfSpread * 10_000).toFixed(1)}bps`);
-  notes.push(`slippage ${p.slippage_bps}bps, commission ${p.commission_bps}bps`);
+  notes.push(`slippage ${p.slippage_bps}bps, commission ${p.commission_bps}bps${minComm > 0 ? ` (min ${minComm})` : ""}`);
 
   return {
     fillPrice,
