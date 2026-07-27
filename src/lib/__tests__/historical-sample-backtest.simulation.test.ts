@@ -237,14 +237,22 @@ describe("historical sample backtest: full buy/sell decision loop, £1000 start"
     expect(res.finalState.holdings.find((h) => h.symbol === "CCC")).toBeUndefined();
   });
 
-  it("exits the reversing symbol (BBB) via the heuristic protective sell", async () => {
-    const res = await runBacktest(initial, BARS, makeStrategy(), { defaultFee: 0.5 });
+  it("exits a pre-existing weakening position (BBB) via the heuristic protective sell", async () => {
+    // BBB peaks around bar 20 then bleeds off. To exercise the exit
+    // path against real declining data, we seed the initial state with
+    // a BBB position (as if inherited from a prior period) rather than
+    // waiting for the 30d buy filter to warm up — by which point BBB
+    // is already falling and would never satisfy the entry rule.
+    const seeded: SimState = {
+      cash: START_CASH - 200,
+      holdings: [{ symbol: "BBB", quantity: 4, avgCost: 50 }],
+    };
+    const res = await runBacktest(seeded, BARS, makeStrategy(), { defaultFee: 0.5 });
     const bbbSells = res.snapshots.filter(
       (s) => s.decisionId.includes("-sell-BBB"),
     );
     expect(bbbSells.length).toBeGreaterThan(0);
     const finalBBB = res.finalState.holdings.find((h) => h.symbol === "BBB");
-    // Either fully exited, or heavily reduced from any peak position.
     expect(finalBBB?.quantity ?? 0).toBe(0);
   });
 
