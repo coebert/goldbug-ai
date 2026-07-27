@@ -280,6 +280,28 @@ export function computeExecutionSeries(
         liqDen += w;
       }
     }
+    const filledNotional = slipDen;
+    // Attribute per-side cost (bps of mid) to spread / latency / impact /
+    // urgency using the microstructure model. We supply the decision's
+    // requested notional and, when available, an ADV$ proxy from
+    // `availableVolume × price`. AssetClass/ATR/currency are unknown at
+    // this layer so we rely on the model's asset-class-agnostic defaults.
+    let costBreakdownBps: SpreadSlippageBreakdown | null = null;
+    if (fillRatio > 0 && d.price > 0 && d.quantity > 0) {
+      const notional = d.quantity * d.price;
+      const adv20d = d.availableVolume && d.availableVolume > 0
+        ? d.availableVolume * d.price
+        : null;
+      try {
+        costBreakdownBps = estimateSpreadSlippage({
+          notional,
+          adv20d,
+          urgency: "normal",
+        });
+      } catch {
+        costBreakdownBps = null;
+      }
+    }
     return {
       date: d.date,
       decisionId: d.id,
@@ -288,6 +310,8 @@ export function computeExecutionSeries(
       fillRatio,
       slippageBps: slipDen > 0 ? slipNum / slipDen : null,
       liquidityAdjustedSlippageBps: liqDen > 0 ? liqNum / liqDen : null,
+      filledNotional,
+      costBreakdownBps,
     };
   });
 }
