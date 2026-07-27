@@ -26,6 +26,7 @@ import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
 import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id.analytics'
 import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
+import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/api/public/algo-regime-autotune-cron'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
@@ -121,6 +122,12 @@ const ApiPublicNewsPreviewRoute = ApiPublicNewsPreviewRouteImport.update({
   path: '/api/public/news-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAlgoRegimeAutotuneCronRoute =
+  ApiPublicAlgoRegimeAutotuneCronRouteImport.update({
+    id: '/api/public/algo-regime-autotune-cron',
+    path: '/api/public/algo-regime-autotune-cron',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
   id: '/api/public/saxo/callback',
   path: '/api/public/saxo/callback',
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
@@ -214,6 +222,7 @@ export interface FileRoutesByTo {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
@@ -243,6 +252,7 @@ export interface FileRoutesById {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
@@ -301,6 +312,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
@@ -329,6 +341,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
@@ -358,6 +371,7 @@ export interface RootRouteChildren {
   TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
+  ApiPublicAlgoRegimeAutotuneCronRoute: typeof ApiPublicAlgoRegimeAutotuneCronRoute
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
   ApiPublicHooksBackfillDailyEquityChangesRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   ApiPublicHooksBatchRetrainRoute: typeof ApiPublicHooksBatchRetrainRoute
@@ -491,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicNewsPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/algo-regime-autotune-cron': {
+      id: '/api/public/algo-regime-autotune-cron'
+      path: '/api/public/algo-regime-autotune-cron'
+      fullPath: '/api/public/algo-regime-autotune-cron'
+      preLoaderRoute: typeof ApiPublicAlgoRegimeAutotuneCronRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/saxo/callback': {
       id: '/api/public/saxo/callback'
       path: '/api/public/saxo/callback'
@@ -588,6 +609,7 @@ const rootRouteChildren: RootRouteChildren = {
   TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
+  ApiPublicAlgoRegimeAutotuneCronRoute: ApiPublicAlgoRegimeAutotuneCronRoute,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
   ApiPublicHooksBackfillDailyEquityChangesRoute:
     ApiPublicHooksBackfillDailyEquityChangesRoute,
