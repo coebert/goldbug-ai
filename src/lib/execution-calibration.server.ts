@@ -20,6 +20,8 @@ import {
   VENUE_SPREAD_MULT,
   type SpreadSlippageTuning,
 } from "./spread-slippage";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
 
 
 // Broker-level commission floors (round-trip per side, bps).
