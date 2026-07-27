@@ -173,6 +173,41 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Toggle series">
+          {rows.map((b) => {
+            const key = b.key as SeriesKey;
+            const isHidden = hidden.has(key);
+            const onlyOneLeft = rows.length - hidden.size <= 1 && !isHidden;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggle(key)}
+                disabled={onlyOneLeft}
+                aria-pressed={!isHidden}
+                title={onlyOneLeft ? "At least one series must remain visible" : isHidden ? `Show ${b.label}` : `Hide ${b.label}`}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition ${
+                  isHidden
+                    ? "border-dashed border-border bg-transparent text-muted-foreground opacity-60 hover:opacity-100"
+                    : "border-border bg-muted/40 text-foreground hover:bg-muted/70"
+                } ${onlyOneLeft ? "cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                <span
+                  aria-hidden
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ background: isHidden ? "transparent" : COLORS[key], borderWidth: isHidden ? 1 : 0, borderStyle: "solid", borderColor: COLORS[key] }}
+                />
+                <span className="font-medium">{b.label}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {formatPct(b.pctPoints)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+
+
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
