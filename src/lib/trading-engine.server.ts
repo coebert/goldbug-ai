@@ -831,7 +831,34 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }
   })();
 
+  // Phase E — algo-regime guard. Best-effort snapshot; failure never blocks
+  // the tick. Threaded into the AI prompt (Phase D), into live routing
+  // (Phase B pre-place block for new BUYs) and persisted in decisions.raw
+  // for observability.
+  const algoRegime = await (async () => {
+    try {
+      const { buildAlgoRegimeSnapshot } = await import(
+        "./microstructure/algo-regime.server"
+      );
+      return await buildAlgoRegimeSnapshot({
+        asOf,
+        holdingSymbols: (holdings ?? []).map((h) => h.symbol),
+      });
+    } catch (e) {
+      console.warn("algo-regime snapshot failed", e);
+      return null;
+    }
+  })();
+  const algoRegimeBlock = await (async () => {
+    if (!algoRegime) return null;
+    const { formatAlgoRegimePromptBlock } = await import(
+      "./microstructure/algo-regime-prompt"
+    );
+    return formatAlgoRegimePromptBlock(algoRegime);
+  })();
+
   // If circuit breaker is tripped, skip the AI call entirely.
+
   const decision: DecisionOutput = breakerTripped
     ? {
         briefing: `Circuit breaker active (${circuit.reason ?? "auto-paused"}). No new AI decisions today; stop-loss / take-profit still enforced.`,
@@ -868,7 +895,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
         cryptoSignalsBlock: cryptoDecision?.block ?? null,
+        algoRegimeBlock,
       });
+
 
   // Enforce the crypto sleeve's hard risk-off veto in the sizing layer too,
   // not just in the prompt. If the regime bucket is risk_off, strip any AI
@@ -2275,6 +2304,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           : { skipped: true },
       },
       regime: regime ?? null,
+      algo_regime: algoRegime ?? null,
       tail_hedge: tailHedgeDecision,
       tail_hedge_execution: tailHedgeExecution,
       tail_hedge_reconciliation: tailHedgeReconciliation,
@@ -2283,6 +2313,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         lessons: learning.lessons,
         lessons_as_of: learning.lessons_as_of,
       },
+
     }),
   }).select("id").single();
   const decisionId = decisionInsert.data?.id ?? null;
@@ -2339,7 +2370,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         asOf,
         decisionId,
         executed,
+        algoRegime,
       });
+
     } catch (e) {
       console.error("live routing failed", portfolioId, e);
       routedOrders = { error: e instanceof Error ? e.message : String(e) };
