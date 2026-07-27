@@ -65,6 +65,7 @@ export async function syncLiveCashFromBroker(
   const env = p.mode === "live_prod" ? "live" : "sim";
 
   let brokerCash: number;
+  let brokerTotalValue: number | null = null;
   let currency: string;
   try {
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
@@ -75,6 +76,9 @@ export async function syncLiveCashFromBroker(
     // cashAvailable already accounts for pending deposits (TransactionsNotBooked)
     // and SpendingPower — that's what the AI should be allowed to trade with.
     brokerCash = Number(bal.cashAvailable ?? bal.cash);
+    brokerTotalValue = Number.isFinite(Number(bal.totalValue)) && Number(bal.totalValue) > 0
+      ? Number(bal.totalValue)
+      : null;
     currency = bal.currency;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
