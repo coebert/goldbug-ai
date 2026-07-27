@@ -1,6 +1,12 @@
 // Execution calibration — estimates realistic spread / slippage / commission
-// from recent daily OHLCV using Corwin-Schultz (2012) and asset-class priors.
-// Output is a Partial<ExecutionParams> that plugs into the paper engine.
+// AND per-symbol microstructure tuning (ADV notional, realized vol, impact
+// coefficient, vol-widening coefficient) from recent daily OHLCV.
+//
+// Output is:
+//   1) a Partial<ExecutionParams>  → legacy paper engine
+//   2) per-symbol SpreadSlippageTuning overrides → tightens market-impact and
+//      ATR-based spread assumptions in the live trading engine
+//   3) rows persisted to `public.execution_calibrations` for reuse and UI
 
 import type { Candle } from "./market-data.server";
 import { getDailyCandlesRange } from "./market-data.server";
@@ -8,6 +14,13 @@ import type { AssetClass } from "./universe.server";
 import { UNIVERSE } from "./universe.server";
 import type { ExecutionParams } from "./execution-realism.server";
 import { DEFAULT_EXECUTION } from "./execution-realism.server";
+import {
+  BASE_SPREAD_BPS_BY_CLASS,
+  DEFAULT_TUNING,
+  VENUE_SPREAD_MULT,
+  type SpreadSlippageTuning,
+} from "./spread-slippage";
+
 
 // Broker-level commission floors (round-trip per side, bps).
 const COMMISSION_FLOOR_BPS: Record<AssetClass, number> = {
