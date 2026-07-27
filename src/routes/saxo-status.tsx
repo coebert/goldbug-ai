@@ -1,15 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getSaxoOAuthStatus, startSaxoOAuth } from "@/lib/live.functions";
+import { getSaxoOAuthStatus, startSaxoOAuth, syncBrokerBalanceForEnv } from "@/lib/live.functions";
 import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, RefreshCw, DownloadCloud } from "lucide-react";
 
 export const Route = createFileRoute("/saxo-status")({
   head: () => ({
@@ -83,16 +83,35 @@ function overallTone(s: {
   return { tone: "ok", label: "Connected" };
 }
 
+function fmtMoney(n: number | null | undefined, ccy: string | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  try {
+    return new Intl.NumberFormat("en-GB", { style: "currency", currency: ccy || "GBP" }).format(n);
+  } catch {
+    return `${n.toFixed(2)} ${ccy ?? ""}`.trim();
+  }
+}
+
+type SyncResult = Awaited<ReturnType<typeof syncBrokerBalanceForEnv>>;
+
 function EnvCard({
   env,
   status,
   onConnect,
   connecting,
+  onSyncBalance,
+  syncing,
+  lastSync,
+  syncError,
 }: {
   env: EnvKey;
   status: Awaited<ReturnType<typeof getSaxoOAuthStatus>>["sim"];
   onConnect: () => void;
   connecting: boolean;
+  onSyncBalance: () => void;
+  syncing: boolean;
+  lastSync: SyncResult | null;
+  syncError: string | null;
 }) {
   const t = overallTone(status);
   const label = env.toUpperCase();
@@ -183,7 +202,7 @@ function EnvCard({
             </div>
           ))}
         </dl>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             onClick={onConnect}
@@ -192,12 +211,87 @@ function EnvCard({
             <ExternalLink className="mr-1.5 h-4 w-4" />
             {status.connected ? `Reconnect ${label}` : `Connect ${label}`}
           </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onSyncBalance}
+            disabled={!status.connected || syncing}
+            title="Fetch fresh balance from Saxo and reconcile every live portfolio in this environment. Use this right after a deposit."
+          >
+            <DownloadCloud className={`mr-1.5 h-4 w-4 ${syncing ? "animate-pulse" : ""}`} />
+            {syncing ? "Syncing…" : "Sync Saxo balance"}
+          </Button>
           {!status.appConfigured && (
             <span className="inline-flex items-center gap-1 text-xs text-amber-500">
               <AlertTriangle className="h-3.5 w-3.5" /> Save app credentials first.
             </span>
           )}
         </div>
+        {syncError && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-500">
+            Sync failed: {syncError}
+          </div>
+        )}
+        {lastSync && (
+          <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium text-foreground">Latest broker snapshot</span>
+              <span className="text-muted-foreground">{fmtDateTime(lastSync.fetchedAt)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+              <div>
+                <div className="text-[10px] uppercase text-muted-foreground">Total value</div>
+                <div className="font-mono">{fmtMoney(lastSync.totalValue, lastSync.currency)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase text-muted-foreground">Cash</div>
+                <div className="font-mono">{fmtMoney(lastSync.cash, lastSync.currency)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase text-muted-foreground">Positions</div>
+                <div className="font-mono">
+                  {fmtMoney(lastSync.positionsValue, lastSync.currency)}{" "}
+                  <span className="text-muted-foreground">({lastSync.positionsCount})</span>
+                </div>
+              </div>
+            </div>
+            {lastSync.synced.length > 0 && (
+              <div className="border-t border-border pt-2">
+                <div className="mb-1 text-[10px] uppercase text-muted-foreground">
+                  Reconciled portfolios ({lastSync.synced.length})
+                </div>
+                <ul className="space-y-1">
+                  {lastSync.synced.map((s) => (
+                    <li key={s.portfolioId} className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="truncate">{s.name}</span>
+                      {!s.ok ? (
+                        <span className="text-red-500">{s.message ?? "failed"}</span>
+                      ) : s.skipped ? (
+                        <span className="text-muted-foreground">skipped — {s.reason ?? "no change"}</span>
+                      ) : (
+                        <span className="font-mono">
+                          {fmtMoney(s.previousCash ?? null, lastSync.currency)} →{" "}
+                          {fmtMoney(s.newCash ?? null, lastSync.currency)}
+                          {typeof s.delta === "number" && Number.isFinite(s.delta) && s.delta !== 0 && (
+                            <span className={s.delta > 0 ? "ml-1 text-emerald-500" : "ml-1 text-red-500"}>
+                              ({s.delta > 0 ? "+" : ""}
+                              {fmtMoney(s.delta, lastSync.currency)})
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {lastSync.synced.length === 0 && (
+              <div className="text-muted-foreground">
+                No live portfolios in this environment yet — snapshot fetched for verification only.
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -223,12 +317,27 @@ function SaxoStatusPage() {
 
   const fetchStatus = useServerFn(getSaxoOAuthStatus);
   const startOAuth = useServerFn(startSaxoOAuth);
+  const syncBalance = useServerFn(syncBrokerBalanceForEnv);
 
   const q = useQuery({
     queryKey: ["saxo-status"],
     queryFn: () => fetchStatus(),
     refetchInterval: 30_000,
     enabled: !!session,
+  });
+
+  const [lastSync, setLastSync] = useState<Record<EnvKey, SyncResult | null>>({ sim: null, live: null });
+  const [syncErr, setSyncErr] = useState<Record<EnvKey, string | null>>({ sim: null, live: null });
+  const syncMut = useMutation({
+    mutationFn: (env: EnvKey) => syncBalance({ data: { env } }),
+    onMutate: (env) => { setSyncErr((s) => ({ ...s, [env]: null })); },
+    onSuccess: (res, env) => {
+      setLastSync((s) => ({ ...s, [env]: res }));
+      q.refetch();
+    },
+    onError: (e, env) => {
+      setSyncErr((s) => ({ ...s, [env]: e instanceof Error ? e.message : String(e) }));
+    },
   });
 
   const onConnect = async (env: EnvKey) => {
@@ -239,6 +348,8 @@ function SaxoStatusPage() {
       alert(e instanceof Error ? e.message : String(e));
     }
   };
+  const isSyncing = (env: EnvKey) => syncMut.isPending && syncMut.variables === env;
+
 
   if (!ready || !session) {
     return (
@@ -285,8 +396,26 @@ function SaxoStatusPage() {
 
         {q.data && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <EnvCard env="sim" status={q.data.sim} onConnect={() => onConnect("sim")} connecting={false} />
-            <EnvCard env="live" status={q.data.live} onConnect={() => onConnect("live")} connecting={false} />
+            <EnvCard
+              env="sim"
+              status={q.data.sim}
+              onConnect={() => onConnect("sim")}
+              connecting={false}
+              onSyncBalance={() => syncMut.mutate("sim")}
+              syncing={isSyncing("sim")}
+              lastSync={lastSync.sim}
+              syncError={syncErr.sim}
+            />
+            <EnvCard
+              env="live"
+              status={q.data.live}
+              onConnect={() => onConnect("live")}
+              connecting={false}
+              onSyncBalance={() => syncMut.mutate("live")}
+              syncing={isSyncing("live")}
+              lastSync={lastSync.live}
+              syncError={syncErr.live}
+            />
           </div>
         )}
 

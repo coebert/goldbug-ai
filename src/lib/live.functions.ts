@@ -565,3 +565,94 @@ export const getCashSyncHistory = createServerFn({ method: "POST" })
       .limit(data.limit);
     return { rows: rows.data ?? [] };
   });
+
+/**
+ * Force a broker balance refresh at the environment level (SIM or LIVE).
+ * Called from the broker settings UI ("Sync Saxo balance") right after the
+ * user deposits new funds into Saxo, so the AI sees the extra cash before
+ * the next hourly tick.
+ *
+ * Fetches an authoritative broker snapshot (cash + positions + totalValue)
+ * and runs `syncLiveCashFromBroker` for every one of the caller's live
+ * portfolios in that env so their `current_cash` / equity snapshots pick up
+ * any external deposit or withdrawal immediately.
+ */
+export const syncBrokerBalanceForEnv = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z.object({ env: z.enum(["sim", "live"]) }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const targetMode = data.env === "live" ? "live_prod" : "live_sim";
+
+    // Pull an authoritative broker snapshot first — useful even if the user
+    // has no live portfolio yet (they can still verify the deposit landed).
+    const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
+    const adapter = await buildSaxoAdapter({
+      userId, portfolioId: null, envOverride: data.env,
+    });
+    const ping = await adapter.ping();
+    if (!ping.ok) throw new Error(`Broker ping failed: ${ping.reason ?? "unknown"}`);
+    const [bal, pos] = await Promise.all([adapter.getBalance(), adapter.getPositions()]);
+    const positionsValue = pos.reduce(
+      (s, p) => s + Number(p.marketPrice ?? 0) * Number(p.quantity ?? 0),
+      0,
+    );
+
+    // Then reconcile every matching live portfolio owned by the caller so
+    // the just-deposited cash is immediately available to the trading engine.
+    const list = await supabase.from("portfolios")
+      .select("id, name").eq("user_id", userId).eq("mode", targetMode);
+    if (list.error) throw new Error(list.error.message);
+
+    const { syncLiveCashFromBroker } = await import("@/lib/live-cash-sync.server");
+    const { withOwnedClient } = await import("@/lib/_server/owned-client");
+    const owned = withOwnedClient(userId, supabase);
+
+    const synced: Array<{
+      portfolioId: string; name: string;
+      ok: boolean; skipped?: boolean; reason?: string;
+      previousCash?: number | null; newCash?: number | null; delta?: number | null;
+      message?: string;
+    }> = [];
+    for (const p of list.data ?? []) {
+      try {
+        const r = (await syncLiveCashFromBroker(p.id, owned)) as
+          | { skipped: true; reason?: string }
+          | { skipped: false; delta: number; brokerCash: number; previousCash: number; newCash: number };
+        if (r && "skipped" in r && r.skipped) {
+          synced.push({ portfolioId: p.id, name: p.name, ok: true, skipped: true, reason: r.reason });
+        } else if (r && "skipped" in r) {
+          synced.push({
+            portfolioId: p.id, name: p.name, ok: true, skipped: false,
+            previousCash: r.previousCash ?? null,
+            newCash: r.newCash ?? null,
+            delta: r.delta ?? null,
+          });
+        } else {
+          synced.push({ portfolioId: p.id, name: p.name, ok: true });
+        }
+      } catch (e) {
+        synced.push({
+          portfolioId: p.id, name: p.name, ok: false,
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    return {
+      env: data.env,
+      accountId: ping.accountId ?? null,
+      currency: bal.currency,
+      cash: bal.cash,
+      cashAvailable: bal.cashAvailable ?? null,
+      transactionsNotBooked: bal.transactionsNotBooked ?? null,
+      reservedCash: bal.reservedCash ?? null,
+      unrealizedPnl: bal.unrealizedPnl ?? null,
+      positionsValue,
+      totalValue: bal.totalValue,
+      positionsCount: pos.length,
+      fetchedAt: new Date().toISOString(),
+      synced,
+    };
+  });
