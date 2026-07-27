@@ -127,6 +127,16 @@ export function PortfolioRow({
     includeDeposits,
     Number(portfolio.current_cash),
   );
+  // Daily % change: last two points of the FULL series (not the
+  // range-sliced view), with deposits netted so cash flows never
+  // masquerade as trading P&L. Same rule as computeModeSummary.
+  const dailyPct = useMemo(() => {
+    if (sparkSeries.length < 2) return null;
+    const tail = sparkSeries.slice(-2);
+    return computeCardRangePct(tail, includeDeposits ? [] : deposits, includeDeposits);
+  }, [sparkSeries, deposits, includeDeposits]);
+  const dailyFromDate = sparkSeries.length >= 2 ? sparkSeries[sparkSeries.length - 2].date : null;
+  const dailyToDate = sparkSeries.length >= 1 ? sparkSeries[sparkSeries.length - 1].date : null;
   const equityLoading = isLoadingEquity && sparkSeries.length === 0;
   const equityEmpty = !isLoadingEquity && sparkSeries.length === 0;
   const del = useServerFn(deletePortfolio);
