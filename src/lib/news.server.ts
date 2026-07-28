@@ -538,17 +538,22 @@ async function fetchGdeltForDate(
   max = 20,
 ): Promise<Array<NewsItem & { source_weight: number }> | null> {
   const perSliceMax = Math.max(3, Math.ceil(max / Math.max(1, GDELT_SOURCES.length)));
-  const jobs = GDELT_SOURCES.map(async (src) => {
+  // GDELT enforces "≤1 request every 5 seconds" per client. Fan-out in
+  // parallel caused every slice to 429 and abort. Serialize with pacing so
+  // each slice actually returns data — total worst case ~ N * 5.5s well
+  // inside the hourly-run budget.
+  const flat: Array<NewsItem & { source_weight: number }> = [];
+  let anyReturnedNonNull = false;
+  for (let i = 0; i < GDELT_SOURCES.length; i++) {
+    const src = GDELT_SOURCES[i];
+    if (i > 0) await new Promise((r) => setTimeout(r, 5_500));
     const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
-    if (!items) return [] as Array<NewsItem & { source_weight: number }>;
-    return items.map((it) => ({ ...it, source_weight: src.weight }));
-  });
-  const settled = await Promise.all(jobs);
-  const flat = settled.flat();
-  if (flat.length === 0) {
-    const allNull = settled.every((s) => s.length === 0);
-    return allNull ? null : flat;
+    if (items) {
+      anyReturnedNonNull = true;
+      for (const it of items) flat.push({ ...it, source_weight: src.weight });
+    }
   }
+  if (flat.length === 0 && !anyReturnedNonNull) return null;
   return flat;
 }
 
