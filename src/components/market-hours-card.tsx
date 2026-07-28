@@ -52,7 +52,6 @@ function formatVenueMinInUk(now: Date, tz: string, minute: number): string {
   const mm = String(minute % 60).padStart(2, "0");
   // Build ISO-ish string then parse using tz offset via Intl detour.
   const anchor = new Date(`${today}T${hh}:${mm}:00`);
-  // Find how tz interprets that wall time by offset diff at `now`.
   const asTz = new Date(anchor.toLocaleString("en-US", { timeZone: tz }));
   const asUtc = new Date(anchor.toLocaleString("en-US", { timeZone: "UTC" }));
   const offsetMs = asUtc.getTime() - asTz.getTime();
@@ -69,6 +68,63 @@ function venueLocalNow(now: Date, tz: string): { minute: number; isoDay: number 
   const wk = parts.find((p) => p.type === "weekday")?.value ?? "Mon";
   const map: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
   return { minute: hh * 60 + mm, isoDay: map[wk] ?? 1 };
+}
+
+/** Convert a wall-clock time in `tz` to a UTC Date instant. */
+function zonedInstant(y: number, m: number, d: number, hh: number, mm: number, tz: string): Date {
+  const guess = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(guess);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? "0");
+  let hour = get("hour");
+  if (hour === 24) hour = 0;
+  const asLocal = Date.UTC(get("year"), get("month") - 1, get("day"), hour, get("minute"));
+  const offset = asLocal - guess.getTime();
+  return new Date(guess.getTime() - offset);
+}
+
+/** Date parts (y/m/d + ISO weekday) for `now` projected into `tz`. */
+function venueDateParts(now: Date, tz: string): { y: number; m: number; d: number; isoDay: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz, weekday: "short", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const map: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  return {
+    y: Number(get("year")),
+    m: Number(get("month")),
+    d: Number(get("day")),
+    isoDay: map[get("weekday")] ?? 1,
+  };
+}
+
+/** Next occurrence of `minuteOfDay` in `tz` on any of `days` that is strictly after `now`. */
+function nextOccurrence(now: Date, tz: string, minuteOfDay: number, days: readonly number[]): Date | null {
+  const hh = Math.floor(minuteOfDay / 60);
+  const mm = minuteOfDay % 60;
+  for (let add = 0; add < 10; add++) {
+    const anchor = new Date(now.getTime() + add * 86_400_000);
+    const p = venueDateParts(anchor, tz);
+    if (!days.includes(p.isoDay)) continue;
+    const inst = zonedInstant(p.y, p.m, p.d, hh, mm, tz);
+    if (inst.getTime() > now.getTime()) return inst;
+  }
+  return null;
+}
+
+/** Compact "1d 2h", "3h 14m", "42m", "31s" duration formatter. */
+function fmtCountdown(ms: number): string {
+  if (ms <= 0) return "now";
+  const totalSec = Math.floor(ms / 1000);
+  const d = Math.floor(totalSec / 86_400);
+  const h = Math.floor((totalSec % 86_400) / 3_600);
+  const m = Math.floor((totalSec % 3_600) / 60);
+  const s = totalSec % 60;
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  if (m > 0) return `${m}m`;
+  return `${s}s`;
 }
 
 function marketStatus(now: Date, m: Market): { open: boolean; label: string } {
@@ -89,10 +145,33 @@ function marketStatus(now: Date, m: Market): { open: boolean; label: string } {
   return { open: false, label: minute < m.openMin ? "Pre-market" : "Closed" };
 }
 
+/** Returns the timing hint shown under each market row. Null = no countdown. */
+function marketCountdown(now: Date, m: Market, open: boolean): { label: string; value: string } | null {
+  if (m.id === "crypto") return null;
+  if (m.id === "fx") {
+    // FX: closes Fri 22:00 UK, opens Sun 22:00 UK.
+    const target = open
+      ? nextOccurrence(now, "Europe/London", 22 * 60, [5])
+      : nextOccurrence(now, "Europe/London", 22 * 60, [7]);
+    if (!target) return null;
+    return { label: open ? "Closes in" : "Opens in", value: fmtCountdown(target.getTime() - now.getTime()) };
+  }
+  const days = m.days ?? MON_FRI;
+  if (open) {
+    // Session close is today by definition (we're inside it).
+    const p = venueDateParts(now, m.tz);
+    const closeInst = zonedInstant(p.y, p.m, p.d, Math.floor(m.closeMin / 60), m.closeMin % 60, m.tz);
+    return { label: "Closes in", value: fmtCountdown(closeInst.getTime() - now.getTime()) };
+  }
+  const openInst = nextOccurrence(now, m.tz, m.openMin, days);
+  if (!openInst) return null;
+  return { label: "Opens in", value: fmtCountdown(openInst.getTime() - now.getTime()) };
+}
+
 export function MarketHoursCard() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    const id = window.setInterval(() => setNow(new Date()), 1_000);
     return () => window.clearInterval(id);
   }, []);
   const zone = ukZoneAbbr(now);
@@ -118,6 +197,7 @@ export function MarketHoursCard() {
               const isFx = m.id === "fx";
               const openUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.openMin);
               const closeUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.closeMin);
+              const countdown = marketCountdown(now, m, status.open);
               return (
                 <li
                   key={m.id}
@@ -141,6 +221,12 @@ export function MarketHoursCard() {
                           <span className="ml-1 text-muted-foreground/60">{zone}</span>
                           {m.note && <div className="text-[11px] text-muted-foreground/70">{m.note}</div>}
                         </>
+                      )}
+                      {countdown && (
+                        <div className="mt-0.5 text-[11px] text-foreground/70 num">
+                          <span className="text-muted-foreground/70">{countdown.label} </span>
+                          <span className="font-medium tabular-nums">{countdown.value}</span>
+                        </div>
                       )}
                     </div>
                   </div>
