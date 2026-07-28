@@ -506,7 +506,7 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
   if (isMobile) {
     return (
       <>
-        <Card className="overflow-hidden">
+        <Card ref={cardRef} className={`overflow-hidden ${highlightCls}`}>
           <button
             type="button"
             onClick={() => setOpen(true)}
