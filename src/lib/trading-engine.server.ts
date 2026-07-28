@@ -2468,6 +2468,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         executed,
         algoRegime,
       });
+      if (Array.isArray(routedOrders)) {
+        for (const result of routedOrders as Array<{
+          symbol?: string;
+          side?: "buy" | "sell";
+          status?: string;
+          skipped?: string;
+          reason?: string;
+        }>) {
+          const status = String(result.status ?? "").toLowerCase();
+          if (status !== "skipped" && status !== "error") continue;
+          const hit = executed.find(
+            (t) =>
+              t.symbol.toUpperCase() === String(result.symbol ?? "").toUpperCase() &&
+              t.side === result.side &&
+              !t.rejected,
+          );
+          if (hit) hit.rejected = result.skipped ?? result.reason ?? `broker routing ${status}`;
+        }
+      }
 
     } catch (e) {
       console.error("live routing failed", portfolioId, e);
@@ -2508,7 +2527,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       decisionId,
       runDate: asOf,
       model: "google/gemini-2.5-flash",
-      executed: executed as unknown as Parameters<typeof recordAiDecisionAudit>[0]["executed"],
+      executed: executed.map((t) => ({
+        ...t,
+        instrument_ccy: t.instrument_ccy ?? inferSaxoCurrency(t.symbol),
+      })) as unknown as Parameters<typeof recordAiDecisionAudit>[0]["executed"],
       heldAfter,
       features: features as unknown as Record<string, unknown>,
       regime: effectiveRegime,
