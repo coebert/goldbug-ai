@@ -529,7 +529,12 @@ async function currentPrices(symbols: string[], asOf: string): Promise<Map<strin
   await Promise.all(
     symbols.map(async (s) => {
       const p = await getPriceOn(s, asOf);
-      if (p != null) out.set(s, normalizeMarketPriceForTrading(s, p));
+      if (p != null) {
+        const norm = normalizeMarketPriceForTrading(s, p);
+        out.set(s, norm);
+        out.set(s.toUpperCase(), norm);
+        out.set(s.toLowerCase(), norm);
+      }
     }),
   );
   return out;
