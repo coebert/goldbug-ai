@@ -623,22 +623,61 @@ export async function getNewsForDate(
     }
   }
 
-
   // Use existing cache when we're not forcing a refresh and it looks healthy.
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
 
-  const gdelt = await fetchGdeltForDate(dateISO, max);
-  if (gdelt === null) {
-    // Provider unavailable — preserve whatever cache we already have instead
-    // of nuking it. Better a stale reel than an empty one.
-    console.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (provider unavailable)`);
+  // Fan out across every configured provider family in parallel — GDELT
+  // topical slices + curated RSS feeds. Failures in either family degrade
+  // gracefully; the surviving family still fills the reel.
+  const [gdeltResult, rssResult] = await Promise.all([
+    fetchGdeltForDate(dateISO, max),
+    fetchRssForDate(dateISO, 4).catch((err) => {
+      console.warn("news: rss fan-out threw", err instanceof Error ? err.message : String(err));
+      return [] as Array<NewsItem & { source_weight: number }>;
+    }),
+  ]);
+
+  const gdelt = gdeltResult ?? [];
+  const combined = [...gdelt, ...rssResult];
+
+  if (combined.length === 0) {
+    console.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (all providers unavailable)`);
     return cachedItems;
   }
-  if (gdelt.length === 0) return cachedItems;
 
+  // De-duplicate across sources by URL first (canonical), then normalised
+  // headline. Enforce a per-domain diversity cap so a single wire cannot
+  // dominate the reel. Weights break ties so tier-one wires beat regional
+  // aggregators for the same story.
+  const PER_DOMAIN_MAX = 3;
+  combined.sort((a, b) => (b.source_weight ?? 0) - (a.source_weight ?? 0));
+  const byUrl = new Set<string>();
+  const byHead = new Set<string>();
+  const perDomain = new Map<string, number>();
+  const merged: Array<NewsItem & { source_weight: number }> = [];
+  for (const it of combined) {
+    const urlKey = (it.url ?? "").split("?")[0].toLowerCase();
+    const headKey = it.headline.toLowerCase().replace(/\s+/g, " ").trim();
+    if (urlKey && byUrl.has(urlKey)) continue;
+    if (byHead.has(headKey)) continue;
+    const domain = (it.source ?? "").toLowerCase();
+    const dcount = perDomain.get(domain) ?? 0;
+    if (domain && dcount >= PER_DOMAIN_MAX) continue;
+    if (urlKey) byUrl.add(urlKey);
+    byHead.add(headKey);
+    if (domain) perDomain.set(domain, dcount + 1);
+    merged.push(it);
+    if (merged.length >= max * 2) break; // cap fan-in before translation
+  }
 
   // Translate before writing so the cache holds English + original metadata.
-  const fresh = await translateHeadlines(gdelt);
+  const translated = await translateHeadlines(merged);
+  // Re-attach source_weight after translation (translateHeadlines strips
+  // extra fields on the object spread path).
+  const fresh: Array<NewsItem & { source_weight: number }> = translated.map((t, i) => ({
+    ...t,
+    source_weight: merged[i]?.source_weight ?? 0.5,
+  }));
 
   // We have a real fresh set. Only NOW do we replace today's rows on
   // forceRefresh; otherwise merge (skip duplicates by headline).
@@ -661,7 +700,7 @@ export async function getNewsForDate(
       original_headline: n.original_headline,
       original_language: n.original_language,
       translation_confidence: n.translation_confidence,
-
+      source_weight: n.source_weight,
     }));
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("news_cache").insert(rows);
@@ -669,5 +708,6 @@ export async function getNewsForDate(
   }
   return fresh;
 }
+
 
 
