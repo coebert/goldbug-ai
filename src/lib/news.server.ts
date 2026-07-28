@@ -501,6 +501,8 @@ export function backfillTranslations(
 const GDELT_MAX_ATTEMPTS = 4;
 const GDELT_BASE_BACKOFF_MS = 1_500;
 const GDELT_MAX_BACKOFF_MS = 8_000;
+const GDELT_FETCH_TIMEOUT_MS = 5_000;
+const GDELT_REFRESH_BUDGET_MS = 18_000;
 
 function computeBackoffMs(attempt: number, retryAfterHeader: string | null): number {
   if (retryAfterHeader) {
@@ -529,12 +531,19 @@ async function fetchGdeltWithRetry(
   dateISO: string,
   breakerName: string,
   headers: Record<string, string>,
+  deadlineAt?: number,
 ): Promise<GdeltFetchResult> {
   let lastReason = "unknown";
   for (let attempt = 1; attempt <= GDELT_MAX_ATTEMPTS; attempt++) {
+    const remainingMs = deadlineAt ? deadlineAt - Date.now() : GDELT_FETCH_TIMEOUT_MS;
+    if (remainingMs < 1_500) {
+      lastReason = "refresh budget exceeded";
+      break;
+    }
+    const timeoutMs = Math.max(1_500, Math.min(GDELT_FETCH_TIMEOUT_MS, remainingMs - 250));
     try {
       const res = await runWithBreaker(breakerName, () =>
-        fetch(url, { headers, signal: AbortSignal.timeout(12_000) }),
+        fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) }),
       );
 
       if (res.status === 429 || res.status >= 500) {
@@ -542,7 +551,9 @@ async function fetchGdeltWithRetry(
         await closeBody(res);
         lastReason = `http ${res.status}`;
         if (attempt < GDELT_MAX_ATTEMPTS) {
-          const wait = computeBackoffMs(attempt, retryAfter);
+          const budgetWait = deadlineAt ? Math.max(0, deadlineAt - Date.now() - 500) : GDELT_MAX_BACKOFF_MS;
+          const wait = Math.min(computeBackoffMs(attempt, retryAfter), budgetWait);
+          if (wait <= 0) break;
           console.warn(
             `news: gdelt ${breakerName} ${lastReason} — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
           );
@@ -563,7 +574,9 @@ async function fetchGdeltWithRetry(
         // Plain-text rate-limit sentinel body — treat as soft 429.
         lastReason = "text rate-limit body";
         if (attempt < GDELT_MAX_ATTEMPTS) {
-          const wait = computeBackoffMs(attempt, null);
+          const budgetWait = deadlineAt ? Math.max(0, deadlineAt - Date.now() - 500) : GDELT_MAX_BACKOFF_MS;
+          const wait = Math.min(computeBackoffMs(attempt, null), budgetWait);
+          if (wait <= 0) break;
           console.warn(
             `news: gdelt ${breakerName} throttled body — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
           );
@@ -576,7 +589,9 @@ async function fetchGdeltWithRetry(
     } catch (err) {
       lastReason = err instanceof Error ? err.message : String(err);
       if (attempt < GDELT_MAX_ATTEMPTS) {
-        const wait = computeBackoffMs(attempt, null);
+        const budgetWait = deadlineAt ? Math.max(0, deadlineAt - Date.now() - 500) : GDELT_MAX_BACKOFF_MS;
+        const wait = Math.min(computeBackoffMs(attempt, null), budgetWait);
+        if (wait <= 0) break;
         console.warn(
           `news: gdelt ${breakerName} threw "${lastReason}" — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
         );
@@ -596,6 +611,7 @@ async function fetchGdeltQuery(
   query: string,
   max: number,
   breakerName: string,
+  deadlineAt: number,
 ): Promise<NewsItem[] | null> {
   const day = dateISO.replace(/-/g, "");
   const start = `${day}000000`;
@@ -604,7 +620,7 @@ async function fetchGdeltQuery(
   const headers = { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" };
   const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
 
-  const primary = await fetchGdeltWithRetry(dated, dateISO, breakerName, headers);
+  const primary = await fetchGdeltWithRetry(dated, dateISO, breakerName, headers, deadlineAt);
   if (primary.kind === "ok") return primary.items.slice(0, max);
   // "empty" from the dated window on prior days is a real answer (no news),
   // so only fall through to the 24h fallback for today's date.
@@ -612,10 +628,11 @@ async function fetchGdeltQuery(
   if (dateISO !== today) {
     return primary.kind === "failed" ? null : [];
   }
+  if (deadlineAt - Date.now() < 2_000) return primary.kind === "failed" ? null : [];
 
   await new Promise((r) => setTimeout(r, 400));
   const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
-  const fb = await fetchGdeltWithRetry(fallback, dateISO, `${breakerName}:24h`, headers);
+  const fb = await fetchGdeltWithRetry(fallback, dateISO, `${breakerName}:24h`, headers, deadlineAt);
   if (fb.kind === "ok") return fb.items.slice(0, max);
   if (fb.kind === "empty") return [];
   return null;
@@ -638,10 +655,18 @@ async function fetchGdeltForDate(
   // inside the hourly-run budget.
   const flat: Array<NewsItem & { source_weight: number }> = [];
   let anyReturnedNonNull = false;
+  const deadlineAt = Date.now() + GDELT_REFRESH_BUDGET_MS;
   for (let i = 0; i < GDELT_SOURCES.length; i++) {
     const src = GDELT_SOURCES[i];
-    if (i > 0) await new Promise((r) => setTimeout(r, 5_500));
-    const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
+    if (deadlineAt - Date.now() < 2_000) {
+      console.warn(`news: gdelt budget exhausted after ${i}/${GDELT_SOURCES.length} slices`);
+      break;
+    }
+    if (i > 0) {
+      const pause = Math.min(5_500, Math.max(0, deadlineAt - Date.now() - 2_000));
+      if (pause > 0) await new Promise((r) => setTimeout(r, pause));
+    }
+    const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`, deadlineAt);
     if (items) {
       anyReturnedNonNull = true;
       for (const it of items) flat.push({ ...it, source_weight: src.weight });
@@ -726,8 +751,9 @@ export async function getNewsForDate(
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
 
   // Fan out across every configured provider family in parallel — GDELT
-  // topical slices + curated RSS feeds. Failures in either family degrade
-  // gracefully; the surviving family still fills the reel.
+  // topical slices + curated RSS feeds. GDELT is useful but can be slow or
+  // aggressively throttled; its own global budget above prevents it from
+  // blocking the RSS-backed feed or the trading tick.
   const [gdeltResult, rssResult] = await Promise.all([
     fetchGdeltForDate(dateISO, max),
     fetchRssForDate(dateISO, 4).catch((err) => {

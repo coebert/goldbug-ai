@@ -1,7 +1,7 @@
 // Cron-triggered endpoint that runs an hourly AI market + news check.
 // Refreshes news + macro regime + latest prices, then runs a tick for every
 // paper-mode portfolio (multiple ticks per day are safe — snapshots upsert).
-// Auth via Supabase anon apikey header.
+// Auth via Lovable Cloud apikey header (legacy x-cron-secret remains accepted).
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -27,31 +27,45 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           }
         } catch { /* body optional */ }
         const { runHourlyCycle, RunInProgressError } = await import("@/lib/hourly-run.server");
-        try {
-          const result = await runHourlyCycle({
+        const task = runHourlyCycle({
             triggeredBy: manualTrigger ? "manual" : "cron",
             force: forceClear,
-          });
-          return Response.json(result);
-        } catch (error) {
+          })
+          .then((result) => {
+            console.log(
+              `hourly-run: background cycle finished (${result.news_headlines} headlines, ${result.portfolios} portfolios)`,
+            );
+          })
+          .catch((error) => {
           if (error instanceof RunInProgressError) {
-            return new Response(
-              JSON.stringify({
-                error: "run_in_progress",
+              console.warn("hourly-run: background cycle skipped", {
                 message: error.message,
                 held_by: error.heldBy,
                 acquired_at: error.acquiredAt,
                 age_ms: error.ageMs,
-              }),
-              { status: 409, headers: { "Content-Type": "application/json" } },
-            );
+              });
+              return;
           }
-          const message = error instanceof Error ? error.message : String(error);
-          return new Response(
-            JSON.stringify({ error: message }),
-            { status: 500, headers: { "Content-Type": "application/json" } },
-          );
+            console.error("hourly-run: background cycle failed", error);
+          });
+
+        const ctx = (globalThis as unknown as { __cfCtx?: { waitUntil?: (p: Promise<unknown>) => void } }).__cfCtx;
+        try {
+          ctx?.waitUntil?.(task);
+        } catch {
+          // In local/dev runtimes the promise continues on the event loop.
         }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            started: true,
+            triggered_by: manualTrigger ? "manual" : "cron",
+            force: forceClear,
+            at: new Date().toISOString(),
+          }),
+          { status: 202, headers: { "Content-Type": "application/json" } },
+        );
       },
     },
   },
