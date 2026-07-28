@@ -226,14 +226,16 @@ function AdminPage() {
 
   const manual = useMutation({
     mutationFn: (vars: { force?: boolean } = {}) => triggerRun({ data: { force: vars.force === true } }),
-    onSuccess: (r) => {
-      const ok = r.results.filter((x) => x.ok && !x.skipped).length;
-      const skipped = r.results.filter((x) => x.skipped).length;
-      const failed = r.results.filter((x) => !x.ok).length;
-      toast.success("Hourly run complete", {
-        description: `${ok} ticked · ${skipped} skipped · ${failed} failed · ${r.news_headlines ?? 0} headlines · ${((r.duration_ms ?? 0) / 1000).toFixed(1)}s`,
+    onSuccess: () => {
+      toast.success("Hourly run started", {
+        description:
+          "The full cycle (news, prices, per-portfolio ticks) is running in the background. Health and results will refresh over the next minute.",
       });
+      // Poll health a few times so the UI catches up without needing a manual refresh.
       q.refetch();
+      setTimeout(() => q.refetch(), 15_000);
+      setTimeout(() => q.refetch(), 45_000);
+      setTimeout(() => q.refetch(), 90_000);
     },
     onError: (e: Error & { code?: string; ageMs?: number | null }) => {
       if (e.code === "run_in_progress") {
@@ -245,6 +247,7 @@ function AdminPage() {
       }
     },
   });
+
 
   const s = q.data;
   const alerts = s ? computeAlerts(s) : [];
