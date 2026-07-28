@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
+import { buildHoldingSeries } from "@/lib/build-holding-series";
 
 
 
