@@ -68,7 +68,21 @@ import {
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
-import { normalizeMarketPriceForTrading } from "./market-price-units";
+import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
+
+// Resolve a live GBP-normalized price for a held symbol, tolerant of the
+// symbol casing mismatch between `holdings.symbol` (often lowercase, e.g.
+// "HSBA:xlon") and `priceMap` keys (uppercase). Falls back to the stored
+// avg_cost with GBX→GBP normalization so LSE common stocks don't inflate the
+// class-exposure buckets by 100× when the priceMap lookup misses.
+function holdingLivePrice(
+  priceMap: Map<string, number>,
+  h: { symbol: string; avg_cost: number | string; asset_class?: string | null },
+): number {
+  const live = priceMap.get(h.symbol) ?? priceMap.get(h.symbol.toUpperCase()) ?? priceMap.get(h.symbol.toLowerCase());
+  if (live != null && Number.isFinite(live)) return live;
+  return normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), h.asset_class ?? null);
+}
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
@@ -515,7 +529,12 @@ async function currentPrices(symbols: string[], asOf: string): Promise<Map<strin
   await Promise.all(
     symbols.map(async (s) => {
       const p = await getPriceOn(s, asOf);
-      if (p != null) out.set(s, normalizeMarketPriceForTrading(s, p));
+      if (p != null) {
+        const norm = normalizeMarketPriceForTrading(s, p);
+        out.set(s, norm);
+        out.set(s.toUpperCase(), norm);
+        out.set(s.toLowerCase(), norm);
+      }
     }),
   );
   return out;
@@ -656,7 +675,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const cash = Number(portfolio.current_cash);
   const holdingsValue = (holdings ?? []).reduce((sum, h) => {
-    const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const p = holdingLivePrice(priceMap, h);
     return sum + p * Number(h.quantity);
   }, 0);
   const totalValue = cash + holdingsValue;
@@ -1236,7 +1255,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Recompute per-asset-class exposure after auto-liquidation, based on live prices.
   const classExposure = new Map<string, number>();
   for (const h of holdingsByS.values()) {
-    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const price = holdingLivePrice(priceMap, h);
     classExposure.set(
       h.asset_class,
       (classExposure.get(h.asset_class) ?? 0) + price * Number(h.quantity),
@@ -1252,7 +1271,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     if (h.asset_class !== "commodity") continue;
     const grp = classifyCommoditySymbol(h.symbol);
     if (!grp) continue;
-    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const price = holdingLivePrice(priceMap, h);
     commodityGroupExposure.set(
       grp,
       (commodityGroupExposure.get(grp) ?? 0) + price * Number(h.quantity),
@@ -1598,7 +1617,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
       // Gross-exposure cap by regime (crisis/bear/correction)
       const currentHoldingsValue = Array.from(holdingsByS.values()).reduce((s, h) => {
-        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        const p = holdingLivePrice(priceMap, h);
         return s + p * Number(h.quantity);
       }, 0);
       const gross = grossExposureLimit(totalValue, currentHoldingsValue, effectiveRegime);
@@ -1690,7 +1709,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       let corrCapped = false;
       const existingExposureBySymbol = new Map<string, number>();
       for (const h of holdingsByS.values()) {
-        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        const p = holdingLivePrice(priceMap, h);
         existingExposureBySymbol.set(h.symbol, p * Number(h.quantity));
       }
       const corrRes = correlatedClusterAllowance({
@@ -1778,7 +1797,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         symbol: meta.symbol,
         assetClass: meta.asset_class,
       });
-      const MAX_ROUND_TRIP_FEE_BPS = 100; // ≥1% round-trip cost blocks the trade.
+      const MAX_ROUND_TRIP_FEE_BPS = 150; // ≥1.5% round-trip cost blocks the trade.
       if (saxoFee.roundTripBps > MAX_ROUND_TRIP_FEE_BPS) {
         // Auto-rescue: the fee guard is dominated by the per-side minimum on
         // small orders. If we have enough headroom, upsize `spend` to the
@@ -2146,7 +2165,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     const { computeTailHedge } = await import("./hedging/tail-hedge");
     const { applyTailHedgeToPaperPortfolio } = await import("./hedging/tail-hedge-executor.server");
     const preHedgeHoldingsValue = Array.from(holdingsByS.values()).reduce((s, h) => {
-      const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+      const p = holdingLivePrice(priceMap, h);
       return s + p * Number(h.quantity);
     }, 0);
     const preHedgeNav = workingCash + preHedgeHoldingsValue;
@@ -2258,7 +2277,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   // Recompute portfolio value with latest holdings
   const newHoldingsValue = Array.from(holdingsByS.values()).reduce((sum, h) => {
-    const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const p = holdingLivePrice(priceMap, h);
     return sum + p * Number(h.quantity);
   }, 0);
   const newTotal = workingCash + newHoldingsValue;
@@ -2617,7 +2636,7 @@ export async function snapshotPortfolio(portfolioId: string, asOf: string) {
     asOf,
   );
   const hv = (holdings ?? []).reduce((s, h) => {
-    const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const p = holdingLivePrice(priceMap, h);
     return s + p * Number(h.quantity);
   }, 0);
   const cash = Number(portfolio.current_cash);
