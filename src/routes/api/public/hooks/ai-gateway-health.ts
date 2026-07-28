@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/public/hooks/ai-gateway-health")({
           return Response.json({ ok: true, verdict, alerted: false, reason: "not actionable" });
         }
 
-        const alertDate = londonDateISO(new Date());
+        const alertDate = alertDateFmt.format(new Date());
         // Dedupe: (kind, alert_date). If a row exists, skip push.
         const ins = await supabaseAdmin
           .from("ai_gateway_health_alerts")
