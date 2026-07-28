@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getAdminHealth, type AdminHealthSnapshot, type BrokerEnvHealth } from "@/lib/admin.functions";
 import { triggerHourlyRunNow } from "@/lib/trading.functions";
+import { backfillHoldingsHistory } from "@/lib/backfill-holdings-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
