@@ -216,6 +216,7 @@ function BrokerCard({ env }: { env: BrokerEnvHealth }) {
 function AdminPage() {
   const fetchHealth = useServerFn(getAdminHealth);
   const triggerRun = useServerFn(triggerHourlyRunNow);
+  const runBackfill = useServerFn(backfillHoldingsHistory);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
