@@ -253,6 +253,17 @@ function AdminPage() {
     },
   });
 
+  const backfill = useMutation({
+    mutationFn: () => runBackfill({ data: { dryRun: false } }),
+    onSuccess: (r) => {
+      const msg = `${r.symbolsRefreshed}/${r.symbolsRefreshed + r.symbolsFailed} symbols refreshed · ${r.seriesBuilt} series rebuilt · ${r.issues.length} audit issues`;
+      if (r.issues.length === 0) toast.success("Holdings history recomputed", { description: msg });
+      else toast.warning("Holdings history recomputed with warnings", { description: msg });
+    },
+    onError: (e: Error) => toast.error("Backfill failed", { description: e.message }),
+  });
+
+
 
   const s = q.data;
   const alerts = s ? computeAlerts(s) : [];
