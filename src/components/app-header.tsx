@@ -32,6 +32,7 @@ import {
   User as UserIcon,
   PlusCircle,
   Banknote,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { HelpDrawer } from "@/components/help-drawer";
