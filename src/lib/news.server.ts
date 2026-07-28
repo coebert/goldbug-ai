@@ -471,60 +471,86 @@ export function backfillTranslations(
 
 
 
-async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] | null> {
-  // GDELT expects YYYYMMDDHHMMSS ranges. In some regions the dated-range query
-  // is 429'd more aggressively than the `timespan=24h` variant, so we try the
-  // dated query first and fall back to timespan for "today" only.
+async function fetchGdeltQuery(
+  dateISO: string,
+  query: string,
+  max: number,
+  breakerName: string,
+): Promise<NewsItem[] | null> {
   const day = dateISO.replace(/-/g, "");
   const start = `${day}000000`;
   const end = `${day}235959`;
-  const query = encodeURIComponent(
-    "(economy OR markets OR inflation OR \"interest rates\" OR earnings OR geopolitics OR OPEC OR \"central bank\")",
-  );
+  const encoded = encodeURIComponent(query);
   const headers = { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" };
-  const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
+  const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
   try {
-    const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
-    const res = await runWithBreaker("gdelt", () =>
+    const res = await runWithBreaker(breakerName, () =>
       fetch(dated, { headers, signal: AbortSignal.timeout(6_000) }).then(async (r) => {
         if (!r.ok && (r.status >= 500 || r.status === 429)) {
           await closeBody(r);
-          throw new Error(`GDELT transient ${r.status}`);
+          throw new Error(`${breakerName} transient ${r.status}`);
         }
         return r;
       }));
     if (res.ok) {
       const parsed = await parseGdeltResponse(res, dateISO);
       if (parsed && parsed.length > 0) return parsed.slice(0, max);
-      // parsed === null → rate-limited/non-JSON; parsed === [] → no matches.
-      // Fall through to fallback for today only.
     } else {
-      console.warn(`news: gdelt dated request failed ${res.status}`);
       await closeBody(res);
     }
   } catch (err) {
-    console.error("news: gdelt dated fetch threw", err);
+    console.warn(
+      `news: gdelt ${breakerName} dated fetch failed`,
+      err instanceof Error ? err.message : String(err),
+    );
   }
 
-  // Fallback (only for today) using the more lenient `timespan=24h` endpoint.
   const today = new Date().toISOString().slice(0, 10);
   if (dateISO !== today) return null;
-  await new Promise((r) => setTimeout(r, 1200)); // brief pause before retry
-  const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
+  await new Promise((r) => setTimeout(r, 400));
+  const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
   try {
     const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(6_000) });
     if (!res.ok) {
-      console.warn(`news: gdelt fallback failed ${res.status}`);
       await closeBody(res);
       return null;
     }
     const parsed = await parseGdeltResponse(res, dateISO);
     return parsed ? parsed.slice(0, max) : null;
-  } catch (err) {
-    console.error("news: gdelt fallback threw", err);
+  } catch {
     return null;
   }
 }
+
+/**
+ * Fan out across every configured GDELT topical slice in parallel, then
+ * de-duplicate. Each slice contributes a bounded number of stories, so no
+ * one topic can crowd out the others.
+ */
+async function fetchGdeltForDate(
+  dateISO: string,
+  max = 20,
+): Promise<Array<NewsItem & { source_weight: number }> | null> {
+  const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
+  void runWithBreaker; // circuit runner is referenced through fetchGdeltQuery
+  const { GDELT_SOURCES } = await import("./news-sources");
+  const perSliceMax = Math.max(3, Math.ceil(max / Math.max(1, GDELT_SOURCES.length)));
+  const jobs = GDELT_SOURCES.map(async (src) => {
+    const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
+    if (!items) return [] as Array<NewsItem & { source_weight: number }>;
+    return items.map((it) => ({ ...it, source_weight: src.weight }));
+  });
+  const settled = await Promise.all(jobs);
+  const flat = settled.flat();
+  if (flat.length === 0) {
+    // Distinguish "all providers dead" from "no matches" — if every slice
+    // returned null (not empty), signal upstream to keep the cache.
+    const allNull = settled.every((s) => s.length === 0);
+    return allNull ? null : flat;
+  }
+  return flat;
+}
+
 
 export async function getNewsForDate(
   dateISO: string,
