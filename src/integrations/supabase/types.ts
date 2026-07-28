@@ -383,6 +383,69 @@ export type Database = {
           },
         ]
       }
+      credit_budget_alerts: {
+        Row: {
+          alert_date: string
+          budget_credits: number
+          created_at: string
+          detail: string | null
+          id: string
+          kind: string
+          mtd_credits: number
+          projected_month_credits: number
+        }
+        Insert: {
+          alert_date: string
+          budget_credits: number
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind: string
+          mtd_credits: number
+          projected_month_credits: number
+        }
+        Update: {
+          alert_date?: string
+          budget_credits?: number
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind?: string
+          mtd_credits?: number
+          projected_month_credits?: number
+        }
+        Relationships: []
+      }
+      credit_budget_settings: {
+        Row: {
+          credits_per_ai_call: number
+          enabled: boolean
+          id: boolean
+          monthly_budget_credits: number
+          updated_at: string
+          warn_pct_mtd: number
+          warn_pct_projection: number
+        }
+        Insert: {
+          credits_per_ai_call?: number
+          enabled?: boolean
+          id?: boolean
+          monthly_budget_credits?: number
+          updated_at?: string
+          warn_pct_mtd?: number
+          warn_pct_projection?: number
+        }
+        Update: {
+          credits_per_ai_call?: number
+          enabled?: boolean
+          id?: boolean
+          monthly_budget_credits?: number
+          updated_at?: string
+          warn_pct_mtd?: number
+          warn_pct_projection?: number
+        }
+        Relationships: []
+      }
       daily_equity_changes: {
         Row: {
           change_date: string
