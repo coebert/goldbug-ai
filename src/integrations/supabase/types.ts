@@ -114,6 +114,30 @@ export type Database = {
           },
         ]
       }
+      ai_gateway_health_alerts: {
+        Row: {
+          alert_date: string
+          created_at: string
+          detail: string | null
+          id: string
+          kind: string
+        }
+        Insert: {
+          alert_date: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind: string
+        }
+        Update: {
+          alert_date?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind?: string
+        }
+        Relationships: []
+      }
       algo_regime_config_overrides: {
         Row: {
           config: Json

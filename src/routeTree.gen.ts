@@ -37,6 +37,7 @@ import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
 import { Route as ApiPublicHooksBackfillDailyEquityChangesRouteImport } from './routes/api/public/hooks/backfill-daily-equity-changes'
+import { Route as ApiPublicHooksAiGatewayHealthRouteImport } from './routes/api/public/hooks/ai-gateway-health'
 
 const TradesRoute = TradesRouteImport.update({
   id: '/trades',
@@ -186,6 +187,12 @@ const ApiPublicHooksBackfillDailyEquityChangesRoute =
     path: '/api/public/hooks/backfill-daily-equity-changes',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksAiGatewayHealthRoute =
+  ApiPublicHooksAiGatewayHealthRouteImport.update({
+    id: '/api/public/hooks/ai-gateway-health',
+    path: '/api/public/hooks/ai-gateway-health',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -236,6 +244,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -267,6 +276,7 @@ export interface FileRoutesById {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
@@ -359,6 +371,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/daily-run'
@@ -386,6 +399,7 @@ export interface RootRouteChildren {
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   ApiPublicAlgoRegimeAutotuneCronRoute: typeof ApiPublicAlgoRegimeAutotuneCronRoute
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
+  ApiPublicHooksAiGatewayHealthRoute: typeof ApiPublicHooksAiGatewayHealthRoute
   ApiPublicHooksBackfillDailyEquityChangesRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   ApiPublicHooksBatchRetrainRoute: typeof ApiPublicHooksBatchRetrainRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
@@ -596,6 +610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ai-gateway-health': {
+      id: '/api/public/hooks/ai-gateway-health'
+      path: '/api/public/hooks/ai-gateway-health'
+      fullPath: '/api/public/hooks/ai-gateway-health'
+      preLoaderRoute: typeof ApiPublicHooksAiGatewayHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -632,6 +653,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   ApiPublicAlgoRegimeAutotuneCronRoute: ApiPublicAlgoRegimeAutotuneCronRoute,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
+  ApiPublicHooksAiGatewayHealthRoute: ApiPublicHooksAiGatewayHealthRoute,
   ApiPublicHooksBackfillDailyEquityChangesRoute:
     ApiPublicHooksBackfillDailyEquityChangesRoute,
   ApiPublicHooksBatchRetrainRoute: ApiPublicHooksBatchRetrainRoute,
@@ -647,13 +669,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

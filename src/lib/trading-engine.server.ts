@@ -466,20 +466,31 @@ If no action is warranted, return an empty orders array.`;
           macd_hist: f.macd_hist,
         })),
         reason: msg,
+        cashValue: args.cashValue,
+        riskLevel: args.portfolio.risk_level,
       });
       return {
         briefing: heuristic.briefing,
         rationale: heuristic.rationale,
-        orders: heuristic.orders.map((o) => ({
-          symbol: o.symbol,
-          side: o.side,
-          percent: 100, // full-exit sell of the current holding
-          conviction: 0.5,
-          reason: o.reason,
-          signal_weights: {
-            sma_trend: 0, rsi: 0, price_change: 100, news_sentiment: 0, volatility: 0,
-          },
-        })),
+        orders: heuristic.orders.map((o) =>
+          o.side === "sell"
+            ? {
+                symbol: o.symbol,
+                side: "sell" as const,
+                percent: 100, // full-exit sell of the current holding
+                conviction: 0.5,
+                reason: o.reason,
+                signal_weights: { sma_trend: 0, rsi: 0, price_change: 100, news_sentiment: 0, volatility: 0 },
+              }
+            : {
+                symbol: o.symbol,
+                side: "buy" as const,
+                percent: o.percent,
+                conviction: 0.4, // lower than model — reflects rule-set uncertainty
+                reason: o.reason,
+                signal_weights: { sma_trend: 40, rsi: 20, price_change: 30, news_sentiment: 0, volatility: 10 },
+              },
+        ),
       };
     } catch (heuristicErr) {
       // Heuristic itself must never break the tick. Fall through to an
