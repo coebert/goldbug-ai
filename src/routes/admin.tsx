@@ -224,7 +224,7 @@ function AdminPage() {
   });
 
   const manual = useMutation({
-    mutationFn: () => triggerRun(),
+    mutationFn: (vars: { force?: boolean } = {}) => triggerRun({ data: { force: vars.force === true } }),
     onSuccess: (r) => {
       const ok = r.results.filter((x) => x.ok && !x.skipped).length;
       const skipped = r.results.filter((x) => x.skipped).length;
@@ -234,9 +234,11 @@ function AdminPage() {
       });
       q.refetch();
     },
-    onError: (e: Error & { code?: string }) => {
+    onError: (e: Error & { code?: string; ageMs?: number | null }) => {
       if (e.code === "run_in_progress") {
-        toast.warning("Run already in progress", { description: e.message });
+        toast.warning("Run already in progress", {
+          description: `${e.message} Use "Force clear lock & run" if the previous run crashed.`,
+        });
       } else {
         toast.error("Manual run failed", { description: e.message });
       }
