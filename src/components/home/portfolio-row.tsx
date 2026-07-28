@@ -491,13 +491,18 @@ export function PortfolioRow({
                     P&amp;L blocked
                     <span className="ml-1 text-[10px] text-muted-foreground">currency mismatch</span>
                   </div>
-                ) : (
-                  <div className={`text-xs tabular-nums ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                    {pnl >= 0 ? "+" : ""}
-                    {pnlPct.toFixed(2)}%
-                    <span className="ml-1 text-[10px] text-muted-foreground">cash vs start</span>
+                ) : (() => {
+                  const startCash = Number(portfolio.starting_cash);
+                  const equityPnl = totalEquity - startCash;
+                  const equityPnlPct = startCash > 0 ? (equityPnl / startCash) * 100 : 0;
+                  return (
+                  <div className={`text-xs tabular-nums ${equityPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                    {equityPnl >= 0 ? "+" : ""}
+                    {equityPnlPct.toFixed(2)}%
+                    <span className="ml-1 text-[10px] text-muted-foreground">equity vs start</span>
                   </div>
-                )}
+                  );
+                })()}
               </>
             )}
           </div>
