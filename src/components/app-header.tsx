@@ -244,6 +244,14 @@ export function AppHeader({ email }: { email?: string | null }) {
                   </Link>
                 ))}
                 <Link
+                  to="/settings"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex items-center gap-3 rounded-md px-3 py-3 text-foreground hover:bg-muted"
+                >
+                  <SettingsIcon className="h-4 w-4 text-muted-foreground" />
+                  <span>Settings & notifications</span>
+                </Link>
+                <Link
                   to="/admin"
                   onClick={() => setOpen(false)}
                   className="inline-flex items-center gap-3 rounded-md px-3 py-3 text-foreground hover:bg-muted"
