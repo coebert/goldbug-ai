@@ -73,7 +73,7 @@ export function LiveHoldingsCard({
     if (!series) return;
     const list = Object.entries(series).map(([symbol, s]) => ({
       symbol,
-      avg_cost: s.avg_cost,
+      avg_cost: s.closes[0] ?? 0,
       closes: s.closes,
       currentPrice: s.currentPrice,
       pctChangeSincePurchase: s.pctChangeSincePurchase,
