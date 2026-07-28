@@ -23,6 +23,7 @@ import { RunMetricsCard } from "@/components/run-metrics-card";
 import { MicrostructureCalibrationCard } from "@/components/microstructure-calibration-card";
 import { OrderReconciliationCard } from "@/components/order-reconciliation-card";
 import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-card";
+import { CashSyncReconciliationCard } from "@/components/cash-sync-reconciliation-card";
 import { CreditBudgetCard } from "@/components/credit-budget-card";
 
 
