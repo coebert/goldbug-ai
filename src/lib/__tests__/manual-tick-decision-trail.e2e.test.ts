@@ -305,7 +305,7 @@ describe("E2E: manual tick creates live_orders and audit trail matches broker ou
     // 4. Every non-skipped audit row is linked to the matching live_orders row.
     for (const [key, ar] of auditByKey) {
       if (ar.action === "hold" || ar.outcome === "skipped") continue;
-      const lo = byKey.get(key);
+      const lo = byKey.get(key as `${string}|buy` | `${string}|sell`);
       expect(lo, `live_orders row missing for ${key}`).toBeDefined();
       expect(ar.order_id).toBe(lo!.id);
     }
