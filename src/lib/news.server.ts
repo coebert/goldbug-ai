@@ -552,21 +552,7 @@ async function fetchGdeltForDate(
   return flat;
 }
 
-  const jobs = GDELT_SOURCES.map(async (src) => {
-    const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
-    if (!items) return [] as Array<NewsItem & { source_weight: number }>;
-    return items.map((it) => ({ ...it, source_weight: src.weight }));
-  });
-  const settled = await Promise.all(jobs);
-  const flat = settled.flat();
-  if (flat.length === 0) {
-    // Distinguish "all providers dead" from "no matches" — if every slice
-    // returned null (not empty), signal upstream to keep the cache.
-    const allNull = settled.every((s) => s.length === 0);
-    return allNull ? null : flat;
-  }
-  return flat;
-}
+
 
 
 export async function getNewsForDate(
