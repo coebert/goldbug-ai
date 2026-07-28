@@ -321,68 +321,47 @@ export async function syncLiveCashFromBroker(
   let canTreatDriftAsDeposit = false;
   let depositGateReason: string | null = null;
   if (p.mode === "live_prod") {
-    if (!hasLocalHoldings) {
-      canTreatDriftAsDeposit = true;
-      depositGateReason = "no local holdings — first funding";
-    } else {
+    let explainedCashDelta = 0;
+    if (hasLocalHoldings) {
       const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const recentFills = await db
         .from("live_fills")
         .select("side, quantity, fill_price, fee")
         .eq("portfolio_id", portfolioId)
         .gte("filled_at", sinceIso);
-      const explainedCashDelta = (recentFills.data ?? []).reduce((sum, f) => {
+      explainedCashDelta = (recentFills.data ?? []).reduce((sum, f) => {
         const notional = Number(f.quantity) * Number(f.fill_price);
         const fee = Number(f.fee ?? 0);
         // buys reduce cash, sells increase cash; both incur fees
         return sum + (f.side === "sell" ? notional - fee : -notional - fee);
       }, 0);
-      const unexplained = delta - explainedCashDelta;
-      if (Math.abs(unexplained) >= DRIFT_EPSILON) {
-        // Cross-check: a genuine external deposit/withdrawal moves BOTH
-        // cash AND TotalValue by ~the same amount. If TotalValue barely
-        // moved while cash swung, the drift is internal broker
-        // reallocation (sub-account aggregation quirks, settlement of
-        // pending items, cash-vs-positions reclassification) and MUST
-        // NOT be booked against starting_cash — doing so inflates the
-        // baseline and corrupts every % change downstream. See the
-        // 2026-07-28 incident: cash reported +£2049 then +£1601 across
-        // two syncs, TotalValue flat, portfolio starting_cash silently
-        // inflated to £13,841 and the 1M card headline read −25.6%.
-        if (brokerTotalValue != null && brokerTotalValue > 0) {
-          const { data: latestSnap } = await db
-            .from("equity_snapshots")
-            .select("total_value, snapshot_date")
-            .eq("portfolio_id", portfolioId)
-            .lt("snapshot_date", todayIso)
-            .order("snapshot_date", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          const prevTotalValue = Number(latestSnap?.total_value);
-          if (Number.isFinite(prevTotalValue) && prevTotalValue > 0) {
-            const totalValueDelta = brokerTotalValue - prevTotalValue;
-            // Tolerance: allow 10% of |cashDelta| or £1 (whichever is
-            // larger) to absorb intraday marks + fees while still
-            // catching the "cash rose but total value flat" case.
-            const tolerance = Math.max(1, Math.abs(delta) * 0.1);
-            if (Math.abs(totalValueDelta - delta) <= tolerance) {
-              canTreatDriftAsDeposit = true;
-              depositGateReason = `corroborated by TotalValueΔ=${totalValueDelta.toFixed(2)}`;
-            } else {
-              depositGateReason =
-                `blocked: cashΔ=${delta.toFixed(2)} vs totalValueΔ=${totalValueDelta.toFixed(2)} — internal reallocation, not a deposit`;
-            }
-          } else {
-            canTreatDriftAsDeposit = true;
-            depositGateReason = "no prior TotalValue reference";
-          }
-        } else {
-          canTreatDriftAsDeposit = true;
-          depositGateReason = "broker did not return TotalValue";
-        }
-      }
     }
+    let prevTotalValue: number | null = null;
+    if (hasLocalHoldings && brokerTotalValue != null && brokerTotalValue > 0) {
+      const { data: latestSnap } = await db
+        .from("equity_snapshots")
+        .select("total_value, snapshot_date")
+        .eq("portfolio_id", portfolioId)
+        .lt("snapshot_date", todayIso)
+        .order("snapshot_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const n = Number(latestSnap?.total_value);
+      prevTotalValue = Number.isFinite(n) && n > 0 ? n : null;
+    }
+    const { evaluateDepositGate } = await import("@/lib/deposit-gate");
+    const decision = evaluateDepositGate({
+      mode: "live_prod",
+      hasLocalHoldings,
+      delta,
+      explainedCashDelta,
+      brokerTotalValue,
+      prevTotalValue,
+    });
+    canTreatDriftAsDeposit = decision.canTreatDriftAsDeposit;
+    depositGateReason = decision.depositGateReason;
   }
+
 
   // starting_cash is monotonic in the deposit direction — once the user has
   // put money in, we never let a subsequent fill or fee silently reduce the
