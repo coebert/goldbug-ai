@@ -24,10 +24,11 @@ import { isLsePenceQuoted } from "@/lib/market-price-units";
 const RANGES = {
   // LSE common stocks quoted in GBX (pence). Real-world FTSE prices span
   // ~10p (small caps) through ~10,000p (Berkeley Group). Values in £s
-  // (0.01–100) after a phantom /100 would still fall inside — this range
-  // catches the *other* direction: an already-normalised GBP figure
-  // sneaking back in as if it were GBX.
-  lseStockGbx: { min: 5, max: 50_000 }, // pence
+  // Real-world FTSE prices span ~20p (small caps) through ~10,000p
+  // (Berkeley Group). A GBP figure landing here (say £15.55) falls below
+  // the 20p floor and is caught as a suspected double-normalisation.
+  lseStockGbx: { min: 20, max: 50_000 }, // pence
+
   // LSE ETFs / ETCs / ETNs quote in GBP directly (£3–£500 typical).
   lseEtfGbp: { min: 0.5, max: 2_000 },
   // Generic "reasonable price" for anything else. Splits/reverse-splits
