@@ -2226,6 +2226,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         executed_at: executedAt,
         trade_date: asOf,
         reason: t.reason + (t.rejected ? ` [REJECTED: ${t.rejected}]` : ""),
+        instrument_ccy: t.instrument_ccy ?? inferSaxoCurrency(t.symbol),
       }));
     if (tradesRows.length > 0) await admin.from("trades").insert(tradesRows);
 
@@ -2246,6 +2247,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           avg_cost: Number(h.avg_cost),
           opened_at: hExt.opened_at ?? new Date().toISOString(),
           high_water_mark: hExt.high_water_mark ?? Number(h.avg_cost),
+          instrument_ccy:
+            (h as unknown as { instrument_ccy?: string | null }).instrument_ccy ??
+            inferSaxoCurrency(h.symbol),
         };
       });
     if (holdingsRows.length > 0) await admin.from("holdings").insert(holdingsRows);
