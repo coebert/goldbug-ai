@@ -277,7 +277,7 @@ function TradesPage() {
                   <span>{group.length} order{group.length === 1 ? "" : "s"}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                  {group.map(row => <TradeCard key={row.order.id} row={row} />)}
+                  {group.map(row => <TradeCard key={row.order.id} row={row} highlight={row.order.id === highlightOrderId} />)}
                 </div>
               </div>
             ))}
