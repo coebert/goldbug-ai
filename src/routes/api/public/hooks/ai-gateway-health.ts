@@ -21,7 +21,10 @@ export const Route = createFileRoute("/api/public/hooks/ai-gateway-health")({
 
         const { probeAiGateway } = await import("@/lib/ai-gateway-health.server");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { londonDateISO } = await import("@/lib/uk-time");
+        // UK-local YYYY-MM-DD for dedupe (Europe/London handles GMT/BST auto)
+        const alertDateFmt = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit",
+        });
 
         const verdict = await probeAiGateway();
 
