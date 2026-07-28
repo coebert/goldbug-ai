@@ -68,7 +68,21 @@ import {
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
-import { normalizeMarketPriceForTrading } from "./market-price-units";
+import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
+
+// Resolve a live GBP-normalized price for a held symbol, tolerant of the
+// symbol casing mismatch between `holdings.symbol` (often lowercase, e.g.
+// "HSBA:xlon") and `priceMap` keys (uppercase). Falls back to the stored
+// avg_cost with GBX→GBP normalization so LSE common stocks don't inflate the
+// class-exposure buckets by 100× when the priceMap lookup misses.
+function holdingLivePrice(
+  priceMap: Map<string, number>,
+  h: { symbol: string; avg_cost: number | string; asset_class?: string | null },
+): number {
+  const live = priceMap.get(h.symbol) ?? priceMap.get(h.symbol.toUpperCase()) ?? priceMap.get(h.symbol.toLowerCase());
+  if (live != null && Number.isFinite(live)) return live;
+  return normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), h.asset_class ?? null);
+}
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
