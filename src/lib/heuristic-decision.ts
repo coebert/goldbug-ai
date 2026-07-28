@@ -17,7 +17,10 @@ export type HeuristicFeature = {
   change5d: number | null;
   change30d: number | null;
   macd_hist: number | null;
+  /** Optional — when present, heuristic buys are restricted to "stock". */
+  assetClass?: string | null;
 };
+
 
 export type HeuristicHolding = {
   symbol: string;
