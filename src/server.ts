@@ -64,8 +64,13 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Expose the Cloudflare ExecutionContext to server functions so they can
+      // use waitUntil() for fire-and-forget background work (e.g. the manual
+      // hourly-run trigger, which exceeds the request wall-time budget).
+      (globalThis as unknown as { __cfCtx?: unknown }).__cfCtx = ctx;
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
+
       const normalized = await normalizeCatastrophicSsrResponse(response);
       return withHtmlCacheControl(normalized);
     } catch (error) {

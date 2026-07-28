@@ -226,14 +226,16 @@ function AdminPage() {
 
   const manual = useMutation({
     mutationFn: (vars: { force?: boolean } = {}) => triggerRun({ data: { force: vars.force === true } }),
-    onSuccess: (r) => {
-      const ok = r.results.filter((x) => x.ok && !x.skipped).length;
-      const skipped = r.results.filter((x) => x.skipped).length;
-      const failed = r.results.filter((x) => !x.ok).length;
-      toast.success("Hourly run complete", {
-        description: `${ok} ticked · ${skipped} skipped · ${failed} failed · ${r.news_headlines ?? 0} headlines · ${((r.duration_ms ?? 0) / 1000).toFixed(1)}s`,
+    onSuccess: () => {
+      toast.success("Hourly run started", {
+        description:
+          "The full cycle (news, prices, per-portfolio ticks) is running in the background. Health and results will refresh over the next minute.",
       });
+      // Poll health a few times so the UI catches up without needing a manual refresh.
       q.refetch();
+      setTimeout(() => q.refetch(), 15_000);
+      setTimeout(() => q.refetch(), 45_000);
+      setTimeout(() => q.refetch(), 90_000);
     },
     onError: (e: Error & { code?: string; ageMs?: number | null }) => {
       if (e.code === "run_in_progress") {
@@ -245,6 +247,7 @@ function AdminPage() {
       }
     },
   });
+
 
   const s = q.data;
   const alerts = s ? computeAlerts(s) : [];
@@ -309,10 +312,7 @@ function AdminPage() {
             </Button>
             {manual.isSuccess && manual.data && (
               <span className="text-xs text-muted-foreground">
-                Last manual run: {manual.data.results.filter((x) => x.ok && !x.skipped).length} ticked,{" "}
-                {manual.data.results.filter((x) => x.skipped).length} skipped,{" "}
-                {manual.data.results.filter((x) => !x.ok).length} failed ·{" "}
-                {((manual.data.duration_ms ?? 0) / 1000).toFixed(1)}s
+                Run started — results will surface as the background cycle completes (usually within a minute or two).
               </span>
             )}
           </div>
@@ -322,49 +322,7 @@ function AdminPage() {
               <AlertDescription>{(manual.error as Error).message}</AlertDescription>
             </Alert>
           )}
-          {manual.isSuccess && manual.data && manual.data.results.length > 0 && (
-            <details className="rounded-md border bg-muted/30 p-3 text-xs">
-              <summary className="cursor-pointer font-medium">
-                Market-hours audit — tradeable vs excluded per portfolio
-              </summary>
-              <div className="mt-3 space-y-3">
-                {manual.data.results.map((r) => {
-                  const tradeable = r.tradeable_symbols ?? [];
-                  const excluded = r.excluded_symbols ?? [];
-                  if (tradeable.length === 0 && excluded.length === 0) return null;
-                  return (
-                    <div key={r.id} className="space-y-1 border-l-2 border-primary/40 pl-3">
-                      <div className="font-mono text-[11px] text-muted-foreground">
-                        {r.mode} · {r.id.slice(0, 8)}
-                        {r.skipped ? ` · skipped: ${r.skipped}` : ""}
-                        {!r.ok ? ` · error: ${r.error ?? "unknown"}` : ""}
-                      </div>
-                      <div>
-                        <span className="text-emerald-500 font-medium">
-                          Tradeable ({tradeable.length}):
-                        </span>{" "}
-                        <span className="font-mono">
-                          {tradeable.length > 0 ? tradeable.join(", ") : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-amber-500 font-medium">
-                          Excluded ({excluded.length}):
-                        </span>{" "}
-                        <span className="font-mono">
-                          {excluded.length > 0
-                            ? excluded
-                                .map((e) => `${e.symbol} (${e.venue}/${e.phase})`)
-                                .join(", ")
-                            : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
-          )}
+
         </CardContent>
       </Card>
 
