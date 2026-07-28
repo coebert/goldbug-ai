@@ -50,6 +50,8 @@ export function LiveHoldingsCard({
   invested,
   mode,
   series,
+  portfolioId,
+  allowManualSell = true,
 }: {
   holdings: Holding[];
   currency: string;
@@ -65,7 +67,11 @@ export function LiveHoldingsCard({
   invested?: number;
   mode: string;
   series?: Record<string, HoldingSeriesInfo>;
+  /** When provided, enables per-row manual sell buttons. */
+  portfolioId?: string;
+  allowManualSell?: boolean;
 }) {
+  const [sellTarget, setSellTarget] = useState<Holding | null>(null);
 
   const isLive = mode === "live_prod";
 
