@@ -89,7 +89,7 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
       bySymbol.set(p.symbol, arr);
     }
 
-    return list.map((h) => {
+    const result = list.map((h) => {
       const assetClass = (h as { asset_class?: string | null }).asset_class ?? null;
       // Normalise both `avg_cost` (broker-native) and cached closes into the
       // LSE base currency (GBP) so downstream weighting / P&L math never
