@@ -474,6 +474,16 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           }
         }
 
+        if (qty > 0) {
+          const { notifyTradeFilled } = await import("./trade-fill-notify.server");
+          notifyTradeFilled({
+            userId, portfolioId, orderId: row.id as string,
+            symbol: row.symbol as string, side: row.side as string,
+            quantity: qty, fillPrice: fillPrice || null,
+            currency: "GBP", source: "reconciler:presumed",
+          });
+        }
+
         summary.filled++;
         summary.rows.push({
           orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
