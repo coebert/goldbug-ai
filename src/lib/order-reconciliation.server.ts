@@ -134,6 +134,30 @@ export async function reconcileOrderStatusesForPortfolio(params: {
   }
   const workingById = new Map(working.map((w) => [w.brokerOrderId, w]));
 
+  // Lazy broker-position lookup. On Saxo LIVE tenants where `/hist/v3/orders`
+  // returns 404 (`HIST_ORDERS_UNSUPPORTED`) we can't confirm fills from
+  // history, so a BUY that leaves the working list would otherwise sit at
+  // `submitted` forever until sim-style presumption kicks in. Instead, ask
+  // the authoritative `/port/v1/netpositions/me` endpoint: if the position
+  // is really there at the broker, the order filled — use the broker's
+  // AverageOpenPrice rather than a guessed close.
+  let positionsByBase: Map<string, Awaited<ReturnType<SaxoAdapter["getPositions"]>>[number]> | null = null;
+  let positionsLoadError: string | null = null;
+  const getPositionsByBase = async () => {
+    if (positionsByBase || positionsLoadError) return positionsByBase;
+    try {
+      const list = await adapter.getPositions();
+      positionsByBase = new Map();
+      for (const p of list) {
+        const key = baseTicker(p.symbol);
+        if (key) positionsByBase.set(key, p);
+      }
+    } catch (e) {
+      positionsLoadError = e instanceof Error ? e.message : String(e);
+    }
+    return positionsByBase;
+  };
+
   const summary: OrderReconcileSummary = {
     scanned: rows.length, filled: 0, partial: 0, rejected: 0, cancelled: 0,
     stillWorking: 0, unknown: 0, rows: [],
