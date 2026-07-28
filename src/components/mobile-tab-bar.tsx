@@ -45,16 +45,18 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="pointer-events-none fixed inset-x-0 z-40 px-3 md:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 md:hidden"
       style={{
-        // Anchor the pill just above the home-indicator safe area. Using
-        // `bottom` (capped) instead of `padding-bottom` avoids a bug where
-        // an inflated `env(safe-area-inset-bottom)` in some preview/iframe
-        // contexts would inflate the nav's own height and push the pill
-        // toward the middle of the screen.
-        bottom: "calc(min(env(safe-area-inset-bottom), 2rem) + 0.5rem)",
+        // Anchor the pill inside the viewport-relative safe area. `bottom-0`
+        // pins us to the true viewport edge on every orientation, and the
+        // padding-bottom (capped, with a floor) lifts the pill above the
+        // home-indicator without letting an inflated
+        // `env(safe-area-inset-bottom)` from preview/iframe contexts or
+        // landscape rotation push the pill toward the middle of the screen.
+        paddingBottom: "max(0.5rem, min(env(safe-area-inset-bottom), 1.25rem))",
       }}
     >
+
       <div className="pointer-events-auto mx-auto flex max-w-md items-stretch gap-1 rounded-full px-2 py-1.5 floating-nav">
         {LEFT.map(item)}
 
