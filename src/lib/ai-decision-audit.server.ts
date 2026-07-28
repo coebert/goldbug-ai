@@ -64,7 +64,7 @@ function classifySource(entry: ExecutedAuditEntry): string {
 }
 
 function outcomeFor(entry: ExecutedAuditEntry, orderId: string | null): {
-  outcome: "skipped" | "placed" | "hold";
+  outcome: string;
   detail: string | null;
 } {
   if (entry.rejected) return { outcome: "skipped", detail: entry.rejected };
@@ -77,21 +77,54 @@ function outcomeFor(entry: ExecutedAuditEntry, orderId: string | null): {
   return { outcome: "placed", detail: null };
 }
 
+function outcomeForOrderStatus(status: string | null | undefined, detail: string | null | undefined): {
+  outcome: string;
+  detail: string | null;
+} | null {
+  switch ((status ?? "").toLowerCase()) {
+    case "filled":
+      return { outcome: "filled", detail: detail ?? null };
+    case "partial":
+    case "partially_filled":
+      return { outcome: "partial", detail: detail ?? null };
+    case "rejected":
+      return { outcome: "rejected", detail: detail ?? null };
+    case "cancelled":
+    case "canceled":
+      return { outcome: "cancelled", detail: detail ?? null };
+    case "error":
+      return { outcome: "error", detail: detail ?? null };
+    case "pending":
+    case "working":
+    case "submitted":
+    case "accepted":
+      return { outcome: "placed", detail: detail ?? null };
+    default:
+      return null;
+  }
+}
+
 export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   // Fetch live_orders created for this decision so we can attach their ids.
   // Match on (symbol, side); Saxo's client_order_id is deterministic per
   // (portfolio, date, symbol, side) so there's exactly one row per pair.
-  let orderIdMap = new Map<string, string>();
+  const orderIdMap = new Map<string, string>();
+  const orderStatusMap = new Map<string, { status: string | null; rejectReason: string | null }>();
   if (ctx.decisionId) {
     const { data: orders } = await supabaseAdmin
       .from("live_orders")
-      .select("id, symbol, side")
+      .select("id, symbol, side, status, reject_reason")
       .eq("portfolio_id", ctx.portfolioId)
       .eq("decision_id", ctx.decisionId);
     for (const o of orders ?? []) {
-      orderIdMap.set(`${String(o.symbol).toUpperCase()}|${o.side}`, o.id as string);
+      const key = `${String(o.symbol).toUpperCase()}|${o.side}`;
+      orderIdMap.set(key, o.id as string);
+      orderStatusMap.set(key, {
+        status: (o.status as string | null) ?? null,
+        rejectReason: (o.reject_reason as string | null) ?? null,
+      });
     }
   }
 
@@ -108,7 +141,10 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
     if (!sym) continue;
     const key = `${sym}|${e.side}`;
     const orderId = orderIdMap.get(key) ?? null;
-    const { outcome, detail } = outcomeFor(e, orderId);
+    const orderOutcome = orderStatusMap.has(key)
+      ? outcomeForOrderStatus(orderStatusMap.get(key)?.status, orderStatusMap.get(key)?.rejectReason)
+      : null;
+    const { outcome, detail } = orderOutcome ?? outcomeFor(e, orderId);
     const source = classifySource(e);
     if (e.side === "sell") sellSymbols.add(sym);
     const featureBlock = (features as Record<string, unknown>)[sym] ?? null;
