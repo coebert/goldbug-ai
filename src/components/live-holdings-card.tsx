@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info, TrendingDown as SellIcon } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
 import {
   Tooltip,
@@ -15,8 +16,9 @@ import {
   roundMoney,
 } from "@/lib/format-money";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
+import { HoldingSellDialog } from "@/components/holding-sell-dialog";
 
 
 
