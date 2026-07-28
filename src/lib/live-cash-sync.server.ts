@@ -319,9 +319,11 @@ export async function syncLiveCashFromBroker(
   //   * Broker currency vs portfolio currency is enforced upstream by the
   //     preflight check above.
   let canTreatDriftAsDeposit = false;
+  let depositGateReason: string | null = null;
   if (p.mode === "live_prod") {
     if (!hasLocalHoldings) {
       canTreatDriftAsDeposit = true;
+      depositGateReason = "no local holdings — first funding";
     } else {
       const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const recentFills = await db
@@ -336,10 +338,48 @@ export async function syncLiveCashFromBroker(
         return sum + (f.side === "sell" ? notional - fee : -notional - fee);
       }, 0);
       const unexplained = delta - explainedCashDelta;
-      // Any material unexplained cash move (in either direction) is treated
-      // as an external deposit/withdrawal against the starting pot.
       if (Math.abs(unexplained) >= DRIFT_EPSILON) {
-        canTreatDriftAsDeposit = true;
+        // Cross-check: a genuine external deposit/withdrawal moves BOTH
+        // cash AND TotalValue by ~the same amount. If TotalValue barely
+        // moved while cash swung, the drift is internal broker
+        // reallocation (sub-account aggregation quirks, settlement of
+        // pending items, cash-vs-positions reclassification) and MUST
+        // NOT be booked against starting_cash — doing so inflates the
+        // baseline and corrupts every % change downstream. See the
+        // 2026-07-28 incident: cash reported +£2049 then +£1601 across
+        // two syncs, TotalValue flat, portfolio starting_cash silently
+        // inflated to £13,841 and the 1M card headline read −25.6%.
+        if (brokerTotalValue != null && brokerTotalValue > 0) {
+          const { data: latestSnap } = await db
+            .from("equity_snapshots")
+            .select("total_value, snapshot_date")
+            .eq("portfolio_id", portfolioId)
+            .lt("snapshot_date", todayIso)
+            .order("snapshot_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const prevTotalValue = Number(latestSnap?.total_value);
+          if (Number.isFinite(prevTotalValue) && prevTotalValue > 0) {
+            const totalValueDelta = brokerTotalValue - prevTotalValue;
+            // Tolerance: allow 10% of |cashDelta| or £1 (whichever is
+            // larger) to absorb intraday marks + fees while still
+            // catching the "cash rose but total value flat" case.
+            const tolerance = Math.max(1, Math.abs(delta) * 0.1);
+            if (Math.abs(totalValueDelta - delta) <= tolerance) {
+              canTreatDriftAsDeposit = true;
+              depositGateReason = `corroborated by TotalValueΔ=${totalValueDelta.toFixed(2)}`;
+            } else {
+              depositGateReason =
+                `blocked: cashΔ=${delta.toFixed(2)} vs totalValueΔ=${totalValueDelta.toFixed(2)} — internal reallocation, not a deposit`;
+            }
+          } else {
+            canTreatDriftAsDeposit = true;
+            depositGateReason = "no prior TotalValue reference";
+          }
+        } else {
+          canTreatDriftAsDeposit = true;
+          depositGateReason = "broker did not return TotalValue";
+        }
       }
     }
   }
@@ -418,6 +458,8 @@ export async function syncLiveCashFromBroker(
       newCash: brokerCash,
       newStarting,
       startingCashAdjusted: startingCashActuallyChanged,
+      depositGateReason,
+      previousStarting: prevStarting,
       currency,
     }),
     error: upd.error?.message ?? null,
