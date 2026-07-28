@@ -491,7 +491,7 @@ async function fetchGdeltQuery(
   const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
   try {
     const res = await runWithBreaker(breakerName, () =>
-      fetch(dated, { headers, signal: AbortSignal.timeout(6_000) }).then(async (r) => {
+      fetch(dated, { headers, signal: AbortSignal.timeout(12_000) }).then(async (r) => {
         if (!r.ok && (r.status >= 500 || r.status === 429)) {
           await closeBody(r);
           throw new Error(`${breakerName} transient ${r.status}`);
@@ -516,7 +516,7 @@ async function fetchGdeltQuery(
   await new Promise((r) => setTimeout(r, 400));
   const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
   try {
-    const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(6_000) });
+    const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(12_000) });
     if (!res.ok) {
       await closeBody(res);
       return null;
@@ -538,17 +538,22 @@ async function fetchGdeltForDate(
   max = 20,
 ): Promise<Array<NewsItem & { source_weight: number }> | null> {
   const perSliceMax = Math.max(3, Math.ceil(max / Math.max(1, GDELT_SOURCES.length)));
-  const jobs = GDELT_SOURCES.map(async (src) => {
+  // GDELT enforces "≤1 request every 5 seconds" per client. Fan-out in
+  // parallel caused every slice to 429 and abort. Serialize with pacing so
+  // each slice actually returns data — total worst case ~ N * 5.5s well
+  // inside the hourly-run budget.
+  const flat: Array<NewsItem & { source_weight: number }> = [];
+  let anyReturnedNonNull = false;
+  for (let i = 0; i < GDELT_SOURCES.length; i++) {
+    const src = GDELT_SOURCES[i];
+    if (i > 0) await new Promise((r) => setTimeout(r, 5_500));
     const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
-    if (!items) return [] as Array<NewsItem & { source_weight: number }>;
-    return items.map((it) => ({ ...it, source_weight: src.weight }));
-  });
-  const settled = await Promise.all(jobs);
-  const flat = settled.flat();
-  if (flat.length === 0) {
-    const allNull = settled.every((s) => s.length === 0);
-    return allNull ? null : flat;
+    if (items) {
+      anyReturnedNonNull = true;
+      for (const it of items) flat.push({ ...it, source_weight: src.weight });
+    }
   }
+  if (flat.length === 0 && !anyReturnedNonNull) return null;
   return flat;
 }
 
