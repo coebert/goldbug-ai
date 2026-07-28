@@ -157,5 +157,9 @@ export const runOneDay = createServerFn({ method: "POST" })
       rationale: result.decision.rationale,
       totalValue: result.totalValue,
       executedCount: result.executed.filter((e) => !e.rejected).length,
+      orders: result.decision.orders ?? [],
+      executed: result.executed ?? [],
+      asOf,
     };
   });
+

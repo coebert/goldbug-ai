@@ -328,11 +328,16 @@ function PortfolioPage() {
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
     onSuccess: (r) => {
-      toast.success(`AI ran. ${r.executedCount} trade(s) executed.`);
+      const rejected = (r.executed ?? []).filter((e) => e.rejected).length;
+      toast.success(
+        `AI ran. ${r.executedCount} filled${rejected ? `, ${rejected} rejected` : ""}. Showing decision trail…`,
+      );
       qc.invalidateQueries({ queryKey: ["portfolio", id] });
+      setTab("decisions");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   const [lastBtMetrics, setLastBtMetrics] = useState<
     import("@/lib/backtest-metrics").BacktestMetrics | null
