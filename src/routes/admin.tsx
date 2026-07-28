@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getAdminHealth, type AdminHealthSnapshot, type BrokerEnvHealth } from "@/lib/admin.functions";
 import { triggerHourlyRunNow } from "@/lib/trading.functions";
+import { backfillHoldingsHistory } from "@/lib/backfill-holdings-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -215,6 +216,7 @@ function BrokerCard({ env }: { env: BrokerEnvHealth }) {
 function AdminPage() {
   const fetchHealth = useServerFn(getAdminHealth);
   const triggerRun = useServerFn(triggerHourlyRunNow);
+  const runBackfill = useServerFn(backfillHoldingsHistory);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
@@ -250,6 +252,17 @@ function AdminPage() {
       }
     },
   });
+
+  const backfill = useMutation({
+    mutationFn: () => runBackfill({ data: { dryRun: false } }),
+    onSuccess: (r) => {
+      const msg = `${r.symbolsRefreshed}/${r.symbolsRefreshed + r.symbolsFailed} symbols refreshed · ${r.seriesBuilt} series rebuilt · ${r.issues.length} audit issues`;
+      if (r.issues.length === 0) toast.success("Holdings history recomputed", { description: msg });
+      else toast.warning("Holdings history recomputed with warnings", { description: msg });
+    },
+    onError: (e: Error) => toast.error("Backfill failed", { description: e.message }),
+  });
+
 
 
   const s = q.data;
@@ -312,6 +325,17 @@ function AdminPage() {
               disabled={manual.isPending}
             >
               Force clear lock & run
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => backfill.mutate()}
+              disabled={backfill.isPending}
+              className="gap-2"
+              title="Refresh price_cache back to each holding's opened_at and re-audit every sparkline. Idempotent."
+            >
+              <RefreshCw className={`h-4 w-4 ${backfill.isPending ? "animate-spin" : ""}`} />
+              {backfill.isPending ? "Recomputing…" : "Recompute holdings history"}
             </Button>
             {manual.isSuccess && manual.data && (
               <span className="text-xs text-muted-foreground">
