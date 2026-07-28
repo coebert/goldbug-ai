@@ -537,10 +537,21 @@ async function fetchGdeltForDate(
   dateISO: string,
   max = 20,
 ): Promise<Array<NewsItem & { source_weight: number }> | null> {
-  const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
-  void runWithBreaker; // circuit runner is referenced through fetchGdeltQuery
-  const { GDELT_SOURCES } = await import("./news-sources");
   const perSliceMax = Math.max(3, Math.ceil(max / Math.max(1, GDELT_SOURCES.length)));
+  const jobs = GDELT_SOURCES.map(async (src) => {
+    const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
+    if (!items) return [] as Array<NewsItem & { source_weight: number }>;
+    return items.map((it) => ({ ...it, source_weight: src.weight }));
+  });
+  const settled = await Promise.all(jobs);
+  const flat = settled.flat();
+  if (flat.length === 0) {
+    const allNull = settled.every((s) => s.length === 0);
+    return allNull ? null : flat;
+  }
+  return flat;
+}
+
   const jobs = GDELT_SOURCES.map(async (src) => {
     const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
     if (!items) return [] as Array<NewsItem & { source_weight: number }>;
