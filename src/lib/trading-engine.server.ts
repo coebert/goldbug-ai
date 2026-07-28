@@ -464,7 +464,9 @@ If no action is warranted, return an empty orders array.`;
           change5d: f.change5d,
           change30d: f.change30d,
           macd_hist: f.macd_hist,
+          assetClass: (f as { asset_class?: string | null }).asset_class ?? null,
         })),
+
         reason: msg,
         cashValue: args.cashValue,
         riskLevel: args.portfolio.risk_level,
