@@ -71,6 +71,20 @@ function mapSaxoStatus(status: string, filledQty: number, amount: number):
   return "unknown";
 }
 
+/**
+ * Extract the exchange-agnostic base ticker from either a Yahoo-style
+ * ("HSBA.L", "SAP.DE") or Saxo-style ("HSBA:xlon", "SAP:xetr") symbol so we
+ * can match a local `live_orders.symbol` against a Saxo `BrokerPosition.symbol`.
+ */
+function baseTicker(symbol: string): string {
+  const upper = String(symbol ?? "").toUpperCase().trim();
+  if (!upper) return "";
+  const colonIdx = upper.indexOf(":");
+  const stripped = colonIdx >= 0 ? upper.slice(0, colonIdx) : upper;
+  const dotIdx = stripped.lastIndexOf(".");
+  return dotIdx > 0 ? stripped.slice(0, dotIdx) : stripped;
+}
+
 export async function reconcileOrderStatusesForPortfolio(params: {
   portfolioId: string;
   userId: string;
