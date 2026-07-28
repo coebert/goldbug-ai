@@ -36,6 +36,9 @@ const NewsReel = lazy(() =>
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
 );
+const MarketHoursCard = lazy(() =>
+  import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
+);
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -164,6 +167,10 @@ function Home() {
         />
 
         <NewHereBanner />
+
+        <Suspense fallback={<div className="mb-6 h-40 rounded-md border bg-card/50" aria-hidden="true" />}>
+          <MarketHoursCard />
+        </Suspense>
 
         {!focusMode && (
           <>
