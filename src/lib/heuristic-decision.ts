@@ -131,9 +131,15 @@ export function buildHeuristicBuys(
 
   for (const f of features) {
     if (heldSet.has(f.symbol)) continue;
+    // Heuristic buys are restricted to plain equities. Crypto/commodity ETPs
+    // require Saxo instrument-cache verification (see crypto-validation.server
+    // + commodity-validation.server) which the rule-set can't perform — the
+    // trading engine would reject them fail-fast with a "not verified as
+    // Saxo-tradable" note, leaving cash idle for the tick.
+    if (f.assetClass != null && f.assetClass !== "stock") continue;
     if (typeof f.change30d !== "number" || f.change30d < 0.02) continue;
-    if (typeof f.change5d !== "number" || f.change5d < 0.005) continue;
-    if (typeof f.rsi14 !== "number" || f.rsi14 < 45 || f.rsi14 > 65) continue;
+    if (typeof f.change5d !== "number" || f.change5d < 0.002) continue;
+    if (typeof f.rsi14 !== "number" || f.rsi14 < 45 || f.rsi14 > 70) continue;
     if (typeof f.macd_hist !== "number" || f.macd_hist < 0) continue;
     const score = f.change30d * 2 + f.change5d * 5 + f.macd_hist * 0.5;
     scored.push({
@@ -142,6 +148,7 @@ export function buildHeuristicBuys(
       reason: `heuristic momentum entry: 30d ${(f.change30d * 100).toFixed(1)}%, 5d ${(f.change5d * 100).toFixed(1)}%, RSI ${f.rsi14.toFixed(0)}, MACD+`,
     });
   }
+
   if (scored.length === 0) return [];
   scored.sort((a, b) => b.score - a.score);
 
