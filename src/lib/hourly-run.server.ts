@@ -69,7 +69,6 @@ async function runHourlyCycleInner(
   const { acquireRunLock } = await import("@/lib/run-lock.server");
   const { runDailyTick } = await import("@/lib/trading-engine.server");
   const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
-  const { getNewsForDate } = await import("@/lib/news.server");
   const { refreshLatestCandles } = await import("@/lib/market-data.server");
   const { filterUniverse } = await import("@/lib/universe.server");
   const { getMarketStatusForSymbol } = await import("@/lib/market-hours");
@@ -127,10 +126,13 @@ async function runHourlyCycleInner(
     try {
       const { invalidateContextCache } = await import("@/lib/market-context-cache.server");
       invalidateContextCache();
-      const items = await getNewsForDate(today, 15, { forceRefresh: true });
-      newsCount = items.length;
+      const { count } = await supabaseAdmin
+        .from("news_cache")
+        .select("id", { count: "exact", head: true })
+        .eq("news_date", today);
+      newsCount = count ?? 0;
     } catch (e) {
-      console.error("hourly-run: news refresh failed", e);
+      console.error("hourly-run: news cache count failed", e);
     }
 
     let regimeInfo: unknown = null;

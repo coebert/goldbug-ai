@@ -3,7 +3,7 @@
 // - Caches results directly on news_cache (sentiment, entities, source_weight).
 // - Applies source weighting and exponential recency decay when aggregating.
 
-import { generateText, Output, NoObjectGeneratedError } from "ai";
+import { generateText } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -38,12 +38,32 @@ export function sourceWeight(source: string | null | undefined): number {
 const HeadlineScoreSchema = z.object({
   scores: z.array(
     z.object({
-      i: z.number(),
+      i: z.number().optional(),
       sentiment: z.number(), // -1..+1
       entities: z.array(z.string()), // tickers, companies, macro topics
     }),
   ),
 });
+
+function parseScorePayload(
+  raw: string,
+  requested: { i: number }[],
+): Array<{ i: number; sentiment: number; entities: string[] }> {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  const parsed = JSON.parse(cleaned) as unknown;
+  const normalized = Array.isArray(parsed) ? { scores: parsed } : parsed;
+  const result = HeadlineScoreSchema.safeParse(normalized);
+  if (!result.success) return [];
+  return result.data.scores.flatMap((score, idx) => {
+    const originalIndex = score.i ?? requested[idx]?.i;
+    if (originalIndex == null) return [];
+    return [{ i: originalIndex, sentiment: score.sentiment, entities: score.entities }];
+  });
+}
 
 async function scoreBatch(
   items: { i: number; headline: string; source: string | null }[],
@@ -55,18 +75,17 @@ async function scoreBatch(
   const gateway = createLovableAiGatewayProvider(key);
   const model = gateway("google/gemini-3.1-flash-lite");
 
-  const prompt = `Score each financial news headline for market sentiment on -1 (very bearish) to +1 (very bullish), 0 = neutral. Extract entities as short uppercase strings (tickers or company/topic names). Reply strictly in the schema.
+  const prompt = `Score each financial news headline for market sentiment on -1 (very bearish) to +1 (very bullish), 0 = neutral. Extract entities as short uppercase strings (tickers or company/topic names). Reply only as JSON in this exact shape: {"scores":[{"i":0,"sentiment":0,"entities":["EXAMPLE"]}]}.
 
 Headlines:
 ${items.map((it) => `${it.i}. [${it.source ?? "unknown"}] ${it.headline}`).join("\n")}`;
 
   try {
-    const { output } = await generateText({
+    const { text } = await generateText({
       model,
       prompt,
-      output: Output.object({ schema: HeadlineScoreSchema }),
     });
-    for (const s of output.scores) {
+    for (const s of parseScorePayload(text, items)) {
       const clamped = Math.max(-1, Math.min(1, Number(s.sentiment) || 0));
       const ents = Array.isArray(s.entities)
         ? s.entities.map((e) => String(e).toUpperCase().slice(0, 24)).slice(0, 8)
@@ -74,9 +93,7 @@ ${items.map((it) => `${it.i}. [${it.source ?? "unknown"}] ${it.headline}`).join(
       out.set(s.i, { sentiment: clamped, entities: ents });
     }
   } catch (err) {
-    if (!NoObjectGeneratedError.isInstance(err)) {
-      console.warn("sentiment: LLM scoring failed", err);
-    }
+    console.warn("sentiment: LLM scoring failed", err);
   }
   return out;
 }
