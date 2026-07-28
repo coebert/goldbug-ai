@@ -308,9 +308,20 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
-function TradeCard({ row }: { row: TradeRow }) {
+function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: boolean }) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!highlight) return;
+    // Scroll the linked trade into view and auto-expand its details.
+    const t = setTimeout(() => {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setOpen(true);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [highlight]);
+  const highlightCls = highlight ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "";
   const buy = row.order.side.toLowerCase() === "buy";
   const fillPct = row.order.quantity > 0
     ? Math.min(100, (row.filledQty / row.order.quantity) * 100)
