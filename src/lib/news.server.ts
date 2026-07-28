@@ -491,7 +491,7 @@ async function fetchGdeltQuery(
   const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
   try {
     const res = await runWithBreaker(breakerName, () =>
-      fetch(dated, { headers, signal: AbortSignal.timeout(6_000) }).then(async (r) => {
+      fetch(dated, { headers, signal: AbortSignal.timeout(12_000) }).then(async (r) => {
         if (!r.ok && (r.status >= 500 || r.status === 429)) {
           await closeBody(r);
           throw new Error(`${breakerName} transient ${r.status}`);
