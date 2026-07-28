@@ -36,6 +36,9 @@ const NewsReel = lazy(() =>
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
 );
+const MarketHoursCard = lazy(() =>
+  import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
+);
 
 export const Route = createFileRoute("/")({
   ssr: false,
