@@ -478,10 +478,35 @@ export function PortfolioRow({
                 <div className="font-display text-2xl font-bold leading-tight tabular-nums">
                   {portfolio.currency} {formatMoneyAmount(totalEquity, equityDecimals)}
                 </div>
-                <div className="mt-1 text-xs tabular-nums text-muted-foreground">
-                  {formatMoney(Number(portfolio.current_cash), portfolio.currency, equityDecimals)}
-                  <span className="ml-1 text-[10px]">cash</span>
-                </div>
+                {(() => {
+                  const cashAmt = Number(portfolio.current_cash);
+                  const holdingsAmt = Math.max(0, totalEquity - cashAmt);
+                  const denom = totalEquity > 0 ? totalEquity : 1;
+                  const cashPct = (cashAmt / denom) * 100;
+                  const holdPct = (holdingsAmt / denom) * 100;
+                  return (
+                    <div
+                      className="mt-1 flex flex-col items-end gap-0.5 text-[11px] tabular-nums text-muted-foreground"
+                      title="Cash vs holdings split of total equity"
+                      data-testid="equity-split-breakdown"
+                    >
+                      <div>
+                        <span className="text-foreground">
+                          {formatMoney(holdingsAmt, portfolio.currency, equityDecimals)}
+                        </span>
+                        <span className="ml-1 text-[10px]">holdings</span>
+                        <span className="ml-1 text-[10px]">({holdPct.toFixed(1)}%)</span>
+                      </div>
+                      <div>
+                        <span className="text-foreground">
+                          {formatMoney(cashAmt, portfolio.currency, equityDecimals)}
+                        </span>
+                        <span className="ml-1 text-[10px]">cash</span>
+                        <span className="ml-1 text-[10px]">({cashPct.toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {currencyMismatch ? (
                   <div
                     data-testid="pnl-currency-blocked"
@@ -495,12 +520,24 @@ export function PortfolioRow({
                   const startCash = Number(portfolio.starting_cash);
                   const equityPnl = totalEquity - startCash;
                   const equityPnlPct = startCash > 0 ? (equityPnl / startCash) * 100 : 0;
+                  const cashPnl = Number(portfolio.current_cash) - startCash;
+                  const cashPnlPct = startCash > 0 ? (cashPnl / startCash) * 100 : 0;
                   return (
-                  <div className={`text-xs tabular-nums ${equityPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                    {equityPnl >= 0 ? "+" : ""}
-                    {equityPnlPct.toFixed(2)}%
-                    <span className="ml-1 text-[10px] text-muted-foreground">equity vs start</span>
-                  </div>
+                    <div className="mt-1 flex flex-col items-end gap-0.5">
+                      <div className={`text-xs tabular-nums ${equityPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                        {equityPnl >= 0 ? "+" : ""}
+                        {equityPnlPct.toFixed(2)}%
+                        <span className="ml-1 text-[10px] text-muted-foreground">equity vs start</span>
+                      </div>
+                      <div
+                        className="text-[11px] tabular-nums text-muted-foreground"
+                        title="Cash-only change vs starting cash; drops as cash is deployed into holdings"
+                      >
+                        {cashPnl >= 0 ? "+" : ""}
+                        {cashPnlPct.toFixed(2)}%
+                        <span className="ml-1 text-[10px]">cash vs start</span>
+                      </div>
+                    </div>
                   );
                 })()}
               </>
