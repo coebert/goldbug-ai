@@ -197,6 +197,7 @@ export function MarketHoursCard() {
               const isFx = m.id === "fx";
               const openUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.openMin);
               const closeUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.closeMin);
+              const countdown = marketCountdown(now, m, status.open);
               return (
                 <li
                   key={m.id}
@@ -220,6 +221,12 @@ export function MarketHoursCard() {
                           <span className="ml-1 text-muted-foreground/60">{zone}</span>
                           {m.note && <div className="text-[11px] text-muted-foreground/70">{m.note}</div>}
                         </>
+                      )}
+                      {countdown && (
+                        <div className="mt-0.5 text-[11px] text-foreground/70 num">
+                          <span className="text-muted-foreground/70">{countdown.label} </span>
+                          <span className="font-medium tabular-nums">{countdown.value}</span>
+                        </div>
                       )}
                     </div>
                   </div>
