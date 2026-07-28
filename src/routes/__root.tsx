@@ -16,6 +16,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { GlobalShortcutsHost } from "@/lib/keyboard-shortcuts";
 import { DensityHost } from "@/lib/use-density";
+import { installChunkReloadHandler } from "@/lib/chunk-reload";
 
 function NotFoundComponent() {
   return (
@@ -123,6 +124,7 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    installChunkReloadHandler();
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         router.invalidate();
