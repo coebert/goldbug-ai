@@ -134,5 +134,19 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
       };
     });
 
+    // Runtime sanity: catch sparkline ↔ headline % drift server-side before
+    // the payload ever hits the UI. Log-only; never throws.
+    const issues = auditHoldingSeriesBatch(
+      result.map((r) => ({
+        symbol: r.symbol,
+        avg_cost: r.avg_cost,
+        closes: r.closes,
+        currentPrice: r.currentPrice,
+        pctChangeSincePurchase: r.pctChangeSincePurchase,
+        points: r.points,
+      })),
+    );
+    for (const i of issues) console.warn(formatIssue(i));
+    return result;
   });
 
