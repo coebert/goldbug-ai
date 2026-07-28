@@ -24,6 +24,7 @@
 export type { ScopedDbClient, OwnedDbClient } from "@/lib/_server/owned-client";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
 import { asJson } from "@/lib/_server/db-json";
+import { readWallet, walletBalance, writeWalletFieldsWithBaseCash } from "@/lib/portfolio-wallet";
 
 const DRIFT_EPSILON = 0.5;
 
@@ -56,7 +57,7 @@ export async function syncLiveCashFromBroker(
 
   const portfolioQuery = db
     .from("portfolios")
-    .select("id, user_id, mode, current_cash, starting_cash, live_paused, currency")
+    .select("id, user_id, mode, current_cash, starting_cash, live_paused, currency, cash_by_ccy")
     .eq("id", portfolioId);
   const { data: p, error } = await (isAdmin
     ? portfolioQuery.eq("user_id", userId)
@@ -204,6 +205,30 @@ export async function syncLiveCashFromBroker(
   // fetched broker values before deciding whether to skip.
   const todayIso = new Date().toISOString().slice(0, 10);
   if (Math.abs(delta) < DRIFT_EPSILON) {
+    const walletBefore = readWallet({
+      currency: p.currency,
+      current_cash: Number(p.current_cash ?? 0),
+      cash_by_ccy: (p.cash_by_ccy as Record<string, number> | null) ?? null,
+    });
+    const baseWalletCash = walletBalance(walletBefore, portfolioCurrency);
+    let walletRewritten = false;
+    if (Math.abs(baseWalletCash - brokerCash) >= DRIFT_EPSILON) {
+      const fields = writeWalletFieldsWithBaseCash(
+        {
+          currency: p.currency,
+          current_cash: Number(p.current_cash ?? 0),
+          cash_by_ccy: (p.cash_by_ccy as Record<string, number> | null) ?? null,
+        },
+        brokerCash,
+      );
+      const walletUpdate = await db
+        .from("portfolios")
+        .update({ cash_by_ccy: asJson(fields.cash_by_ccy), current_cash: fields.current_cash })
+        .eq("id", portfolioId);
+      if (walletUpdate.error) return { skipped: true, reason: walletUpdate.error.message };
+      walletRewritten = true;
+    }
+
     const { data: todaySnap } = await db
       .from("equity_snapshots")
       .select("cash, holdings_value, total_value")
@@ -247,6 +272,28 @@ export async function syncLiveCashFromBroker(
           brokerTotalValue,
           delta,
           snapshotRewritten: true, holdingsValueForSnapshot, currency,
+          walletRewritten,
+        }),
+        error: null,
+      });
+    } else if (walletRewritten) {
+      await db.from("live_broker_log").insert({
+        portfolio_id: portfolioId, user_id: p.user_id,
+        broker: "saxo", env,
+        method: "CASH_SYNC", path: "/sync/cash",
+        status: 200,
+        request: asJson({
+          previousCash: prevCash, hasLocalHoldings: null, mode: p.mode,
+          reason: "wallet-base-refresh-only",
+        }),
+        response: asJson({
+          brokerCash,
+          brokerSpendableCash,
+          brokerCashBasis: "ledger",
+          brokerTotalValue,
+          delta,
+          walletRewritten: true,
+          currency,
         }),
         error: null,
       });
@@ -310,8 +357,20 @@ export async function syncLiveCashFromBroker(
   // % change (see the 2026-07-27 real-money tile incident: 3 spurious
   // -£109.62/-£175.40 rows produced +270.84%).
   const startingCashActuallyChanged = newStarting !== prevStarting;
+  const fields = writeWalletFieldsWithBaseCash(
+    {
+      currency: p.currency,
+      current_cash: Number(p.current_cash ?? 0),
+      cash_by_ccy: (p.cash_by_ccy as Record<string, number> | null) ?? null,
+    },
+    brokerCash,
+  );
   const upd = await db.from("portfolios")
-    .update({ current_cash: brokerCash, starting_cash: newStarting })
+    .update({
+      current_cash: fields.current_cash,
+      cash_by_ccy: asJson(fields.cash_by_ccy),
+      starting_cash: newStarting,
+    })
     .eq("id", portfolioId);
 
   // Prefer the broker's authoritative TotalValue for today's equity snapshot
