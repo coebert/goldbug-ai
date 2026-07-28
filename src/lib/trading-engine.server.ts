@@ -1784,7 +1784,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         // original size to respect the model's conviction and at remaining
         // cash / sizing budget).
         const minNotional = (2 * saxoFee.tier.min * 10_000) / MAX_ROUND_TRIP_FEE_BPS;
-        const headroom = Math.min(spend * 2, remainingCash);
+        const headroom = Math.min(spend * 2, Math.max(0, workingCash - cashFloor));
         if (Number.isFinite(minNotional) && minNotional > spend && minNotional <= headroom) {
           const bumped = Math.ceil(minNotional);
           sizingNotes.push(`fee-rescue ${spend.toFixed(0)}→${bumped}`);
