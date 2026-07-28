@@ -49,10 +49,18 @@ export function deriveStripAllocation(
 ): StripAllocation {
   const built = holdings.map((h) => {
     const qty = Number(h.quantity);
-    const avg = Number(h.avg_cost);
+    const avgRaw = Number(h.avg_cost);
+    // Normalise LSE common-stock GBX (pence) avg_cost into GBP so a
+    // pence-quoted row like HSBA:xlon (avg_cost=1555.19p) does not
+    // swamp GBP-quoted ETF rows (VUKE/VMID) and round their weights
+    // to 0.0%. LSE ETFs and non-LSE symbols pass through unchanged.
+    const avg = Number.isFinite(avgRaw)
+      ? normalizeLseDisplayPriceToBase(h.symbol, avgRaw, h.asset_class ?? null)
+      : avgRaw;
     const raw = Number.isFinite(qty) && Number.isFinite(avg) ? qty * avg : 0;
     return { ...h, qty, avg, raw };
   });
+
   const rawInvested = built.reduce((s, r) => s + r.raw, 0);
 
   const safeTotal = Number.isFinite(totalEquity) && totalEquity > 0 ? totalEquity : 0;
