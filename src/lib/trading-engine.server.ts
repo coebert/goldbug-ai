@@ -675,7 +675,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const cash = Number(portfolio.current_cash);
   const holdingsValue = (holdings ?? []).reduce((sum, h) => {
-    const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const p = holdingLivePrice(priceMap, h);
     return sum + p * Number(h.quantity);
   }, 0);
   const totalValue = cash + holdingsValue;
@@ -1255,7 +1255,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Recompute per-asset-class exposure after auto-liquidation, based on live prices.
   const classExposure = new Map<string, number>();
   for (const h of holdingsByS.values()) {
-    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const price = holdingLivePrice(priceMap, h);
     classExposure.set(
       h.asset_class,
       (classExposure.get(h.asset_class) ?? 0) + price * Number(h.quantity),
@@ -1271,7 +1271,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     if (h.asset_class !== "commodity") continue;
     const grp = classifyCommoditySymbol(h.symbol);
     if (!grp) continue;
-    const price = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const price = holdingLivePrice(priceMap, h);
     commodityGroupExposure.set(
       grp,
       (commodityGroupExposure.get(grp) ?? 0) + price * Number(h.quantity),
@@ -1617,7 +1617,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
       // Gross-exposure cap by regime (crisis/bear/correction)
       const currentHoldingsValue = Array.from(holdingsByS.values()).reduce((s, h) => {
-        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        const p = holdingLivePrice(priceMap, h);
         return s + p * Number(h.quantity);
       }, 0);
       const gross = grossExposureLimit(totalValue, currentHoldingsValue, effectiveRegime);
@@ -1709,7 +1709,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       let corrCapped = false;
       const existingExposureBySymbol = new Map<string, number>();
       for (const h of holdingsByS.values()) {
-        const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+        const p = holdingLivePrice(priceMap, h);
         existingExposureBySymbol.set(h.symbol, p * Number(h.quantity));
       }
       const corrRes = correlatedClusterAllowance({
@@ -2165,7 +2165,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     const { computeTailHedge } = await import("./hedging/tail-hedge");
     const { applyTailHedgeToPaperPortfolio } = await import("./hedging/tail-hedge-executor.server");
     const preHedgeHoldingsValue = Array.from(holdingsByS.values()).reduce((s, h) => {
-      const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+      const p = holdingLivePrice(priceMap, h);
       return s + p * Number(h.quantity);
     }, 0);
     const preHedgeNav = workingCash + preHedgeHoldingsValue;
@@ -2277,7 +2277,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   // Recompute portfolio value with latest holdings
   const newHoldingsValue = Array.from(holdingsByS.values()).reduce((sum, h) => {
-    const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const p = holdingLivePrice(priceMap, h);
     return sum + p * Number(h.quantity);
   }, 0);
   const newTotal = workingCash + newHoldingsValue;
@@ -2636,7 +2636,7 @@ export async function snapshotPortfolio(portfolioId: string, asOf: string) {
     asOf,
   );
   const hv = (holdings ?? []).reduce((s, h) => {
-    const p = priceMap.get(h.symbol) ?? Number(h.avg_cost);
+    const p = holdingLivePrice(priceMap, h);
     return s + p * Number(h.quantity);
   }, 0);
   const cash = Number(portfolio.current_cash);
