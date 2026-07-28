@@ -2343,7 +2343,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     workingCash,
     cashFloor,
     proposedOrders: (decision.orders ?? []).map((o) => ({
-      symbol: o.symbol, side: o.side, quantity: o.quantity,
+      symbol: o.symbol, side: o.side,
     })),
     executed: executed.map((e) => ({
       symbol: e.symbol, side: e.side, quantity: e.quantity,
@@ -2351,11 +2351,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       rejected: (e as { rejected?: string | null }).rejected ?? null,
       reason: (e as { reason?: string | null }).reason ?? null,
     })),
-    halts: (halts ?? []).map((h) => ({
-      code: (h as { code?: string }).code ?? "halt",
-      reason: (h as { reason?: string }).reason,
-    })),
-    droppedForCash,
+    halts: halts?.any_halt
+      ? [{ code: halts.daily_loss_halt ? "daily_loss" : "drawdown", reason: halts.reason ?? undefined }]
+      : [],
+    droppedForCash: droppedForCash.map((d) => `${d.symbol} (${d.reason})`),
     brokerBlocked: brokerBlockedSymbols,
     budgetNotes,
   });
