@@ -2113,6 +2113,23 @@ function DecisionCard({
           </div>
         )}
 
+        {raw.plain_explanation?.text && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+            <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+              <span>Plain-English summary</span>
+              {raw.plain_explanation.category && (
+                <Badge variant="outline" className="text-[10px]">
+                  {raw.plain_explanation.category === "traded" && "Traded"}
+                  {raw.plain_explanation.category === "held_cash" && "Held cash"}
+                  {raw.plain_explanation.category === "halted" && "Safety halt"}
+                  {raw.plain_explanation.category === "no_signal" && "No signal"}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm">{raw.plain_explanation.text}</p>
+          </div>
+        )}
+
         {decision.briefing && (
           <div>
             <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
