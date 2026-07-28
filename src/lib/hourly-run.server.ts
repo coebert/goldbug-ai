@@ -320,7 +320,16 @@ async function runHourlyCycleInner(
             userId: p.user_id as string,
             portfolioName: p.name ?? null,
           });
+          const { maybeAlertIntendedVsExecuted } = await import(
+            "@/lib/intended-vs-executed-alert.server"
+          );
+          maybeAlertIntendedVsExecuted({
+            portfolioId: p.id,
+            userId: p.user_id as string,
+            portfolioName: p.name ?? null,
+          });
         }
+
 
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

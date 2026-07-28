@@ -3,6 +3,8 @@ import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { PerformanceAnalyticsCard } from "@/components/performance-analytics-card";
+import { IntendedVsExecutedCard } from "@/components/intended-vs-executed-card";
+
 import { ExecutionQualityCard } from "@/components/execution-quality-card";
 import { AlgoRegimeHistoryCard } from "@/components/algo-regime-history-card";
 import { AlgoRegimeCalibrationCard } from "@/components/algo-regime-calibration-card";
@@ -43,6 +45,8 @@ function AnalyticsPage() {
         </Link>
         <h1 className="text-xl font-semibold">Performance analytics</h1>
         <PerformanceAnalyticsCard portfolioId={id} />
+        <IntendedVsExecutedCard portfolioId={id} />
+
         <ExecutionQualityCard portfolioId={id} />
         <AlgoRegimeHistoryCard portfolioId={id} />
         <AlgoRegimeCalibrationCard portfolioId={id} />
