@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { Bell, Check, CheckCheck, RefreshCw, Trash2, ShieldAlert } from "lucide-react";
+import { Bell, Check, CheckCheck, RefreshCw, Trash2, ShieldAlert, Settings as SettingsIcon } from "lucide-react";
 import {
   listNotifications,
   markNotificationsRead,
@@ -74,6 +75,11 @@ export function NotificationsPanel() {
         <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
           <Button variant="ghost" size="sm" onClick={() => q.refetch()} disabled={q.isFetching} aria-label="Refresh">
             <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
+          </Button>
+          <Button variant="ghost" size="sm" asChild aria-label="Notification settings">
+            <Link to="/settings">
+              <SettingsIcon className="h-4 w-4" />
+            </Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => mAll.mutate()} disabled={unreadCount === 0 || isBusy}>
             <CheckCheck className="mr-1 h-4 w-4" /> Mark all read

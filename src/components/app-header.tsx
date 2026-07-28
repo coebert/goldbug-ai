@@ -32,6 +32,7 @@ import {
   User as UserIcon,
   PlusCircle,
   Banknote,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { HelpDrawer } from "@/components/help-drawer";
@@ -41,7 +42,7 @@ import { EnvBadge } from "@/components/env-badge";
 
 /** Primary destinations that appear in the desktop context row. */
 const NAV: ReadonlyArray<{
-  to: "/" | "/trades" | "/compare" | "/learn" | "/saxo-status";
+  to: "/" | "/trades" | "/compare" | "/learn" | "/saxo-status" | "/settings";
   label: string;
   icon: typeof TrendingUp;
   exact?: boolean;
@@ -51,6 +52,7 @@ const NAV: ReadonlyArray<{
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/saxo-status", label: "Broker", icon: Plug },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 
@@ -165,6 +167,11 @@ export function AppHeader({ email }: { email?: string | null }) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
+                  <Link to="/settings" className="flex items-center gap-2">
+                    <SettingsIcon className="h-4 w-4" /> Settings & notifications
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                   <Link to="/admin" className="flex items-center gap-2">
                     <Shield className="h-4 w-4" /> Admin
                   </Link>
@@ -236,6 +243,14 @@ export function AppHeader({ email }: { email?: string | null }) {
                     <span>{label}</span>
                   </Link>
                 ))}
+                <Link
+                  to="/settings"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex items-center gap-3 rounded-md px-3 py-3 text-foreground hover:bg-muted"
+                >
+                  <SettingsIcon className="h-4 w-4 text-muted-foreground" />
+                  <span>Settings & notifications</span>
+                </Link>
                 <Link
                   to="/admin"
                   onClick={() => setOpen(false)}
