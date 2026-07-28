@@ -1,9 +1,15 @@
-// Lightweight global news fetcher using GDELT DOC API (free, no key).
+// Lightweight global news fetcher. Draws from GDELT DOC (topical slices)
+// and a diversified list of public RSS feeds so no single wire dominates.
 // Caches results by date in news_cache.
 
 import { z } from "zod";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { runWithBreaker } from "@/lib/_server/provider-circuit";
+import { GDELT_SOURCES } from "./news-sources";
+import { fetchRssForDate } from "./news-rss.server";
+
+
 
 
 export type NewsItem = {
