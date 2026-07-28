@@ -76,6 +76,11 @@ export function NotificationsPanel() {
           <Button variant="ghost" size="sm" onClick={() => q.refetch()} disabled={q.isFetching} aria-label="Refresh">
             <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
           </Button>
+          <Button variant="ghost" size="sm" asChild aria-label="Notification settings">
+            <Link to="/settings">
+              <SettingsIcon className="h-4 w-4" />
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={() => mAll.mutate()} disabled={unreadCount === 0 || isBusy}>
             <CheckCheck className="mr-1 h-4 w-4" /> Mark all read
           </Button>
