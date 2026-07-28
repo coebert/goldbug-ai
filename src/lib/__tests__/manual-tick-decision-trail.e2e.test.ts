@@ -139,6 +139,12 @@ async function runManualTick(input: {
       clientOrderId,
     });
 
+    // Broker returns "filled" even for partial fills; the executor computes
+    // the terminal live_orders.status from filledQuantity vs requested.
+    const filledQty = Number(res.filledQuantity ?? (res.status === "filled" ? e.quantity : 0));
+    const terminalStatus =
+      res.status === "filled" && filledQty > 0 && filledQty < e.quantity ? "partial" : res.status;
+
     const row: LiveOrderRow = {
       id: `lo-${liveOrders.length + 1}`,
       portfolio_id: portfolioId,
@@ -148,7 +154,8 @@ async function runManualTick(input: {
       quantity: e.quantity,
       order_type: "market",
       limit_price: e.price,
-      status: res.status,
+      status: terminalStatus,
+
       broker_order_id: res.brokerOrderId ?? null,
       reject_reason: res.reason ?? null,
       client_order_id: clientOrderId,
