@@ -2331,6 +2331,34 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     console.warn("wallet_snapshots upsert skipped:", e);
   }
 
+  // Plain-language explanation of this run (what was bought/sold, or why cash
+  // was held). Stored inside `raw` so the decision UI can render it without an
+  // extra fetch. Deterministic fallback inside the helper keeps the run
+  // succeeding even when the AI gateway is unavailable.
+  const { generateRunExplanation } = await import("./run-explanation.server");
+  const runExplanation = await generateRunExplanation({
+    portfolioName: (portfolio as { name?: string | null }).name ?? null,
+    currency: portfolio.currency || "GBP",
+    totalValue: newTotal,
+    workingCash,
+    cashFloor,
+    proposedOrders: (decision.orders ?? []).map((o) => ({
+      symbol: o.symbol, side: o.side,
+    })),
+    executed: executed.map((e) => ({
+      symbol: e.symbol, side: e.side, quantity: e.quantity,
+      value: (e as { value?: number }).value,
+      rejected: (e as { rejected?: string | null }).rejected ?? null,
+      reason: (e as { reason?: string | null }).reason ?? null,
+    })),
+    halts: halts?.any_halt
+      ? [{ code: halts.daily_loss_halt ? "daily_loss" : "drawdown", reason: halts.reason ?? undefined }]
+      : [],
+    droppedForCash: droppedForCash.map((d) => `${d.symbol} (${d.reason})`),
+    brokerBlocked: brokerBlockedSymbols,
+    budgetNotes,
+  });
+
   const decisionInsert = await admin.from("decisions").insert({
     portfolio_id: portfolioId,
     run_date: asOf,
@@ -2412,6 +2440,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         stats: learning.stats,
         lessons: learning.lessons,
         lessons_as_of: learning.lessons_as_of,
+      },
+      plain_explanation: {
+        text: runExplanation.text,
+        model: runExplanation.model,
+        category: runExplanation.category,
       },
 
     }),
