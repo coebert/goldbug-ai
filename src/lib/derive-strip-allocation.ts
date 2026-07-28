@@ -11,11 +11,15 @@
 // headline Invested figure, which would otherwise disagree with the
 // broker snapshot and produce percentages that don't add to 100.
 
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+
 export type StripHolding = {
   symbol: string;
   quantity: number;
   avg_cost: number;
+  asset_class?: string | null;
 };
+
 
 export type StripChip = StripHolding & {
   qty: number;
