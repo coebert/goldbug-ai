@@ -1770,13 +1770,33 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       // silently eaten by fees.
       const featExec = featureBySymbol.get(meta.symbol);
       const tradeCcy = inferSaxoCurrency(meta.symbol);
-      const saxoFee = estimateSaxoCommission({
+      let saxoFee = estimateSaxoCommission({
         notional: spend,
         currency: tradeCcy,
         symbol: meta.symbol,
         assetClass: meta.asset_class,
       });
       const MAX_ROUND_TRIP_FEE_BPS = 100; // ≥1% round-trip cost blocks the trade.
+      if (saxoFee.roundTripBps > MAX_ROUND_TRIP_FEE_BPS) {
+        // Auto-rescue: the fee guard is dominated by the per-side minimum on
+        // small orders. If we have enough headroom, upsize `spend` to the
+        // smallest notional that clears the guard (capped at 2× the AI's
+        // original size to respect the model's conviction and at remaining
+        // cash / sizing budget).
+        const minNotional = (2 * saxoFee.tier.min * 10_000) / MAX_ROUND_TRIP_FEE_BPS;
+        const headroom = Math.min(spend * 2, remainingCash);
+        if (Number.isFinite(minNotional) && minNotional > spend && minNotional <= headroom) {
+          const bumped = Math.ceil(minNotional);
+          sizingNotes.push(`fee-rescue ${spend.toFixed(0)}→${bumped}`);
+          spend = bumped;
+          saxoFee = estimateSaxoCommission({
+            notional: spend,
+            currency: tradeCcy,
+            symbol: meta.symbol,
+            assetClass: meta.asset_class,
+          });
+        }
+      }
       if (saxoFee.roundTripBps > MAX_ROUND_TRIP_FEE_BPS) {
         executed.push({
           symbol: meta.symbol,
@@ -1792,6 +1812,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
+
       const symTuning = symbolTuning.get(meta.symbol.toUpperCase());
       const feeAdjustedParams = {
         ...(cfg.execution_params ?? {}),
