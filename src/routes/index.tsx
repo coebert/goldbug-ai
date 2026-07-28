@@ -168,6 +168,10 @@ function Home() {
 
         <NewHereBanner />
 
+        <Suspense fallback={<div className="mb-6 h-40 rounded-md border bg-card/50" aria-hidden="true" />}>
+          <MarketHoursCard />
+        </Suspense>
+
         {!focusMode && (
           <>
             <section className="mb-6" aria-labelledby="section-overview">
