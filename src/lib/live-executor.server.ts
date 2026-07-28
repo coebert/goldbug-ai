@@ -1374,6 +1374,7 @@ export async function routeOrdersToBroker(params: {
         side: order.side,
         quantity: qty,
         order_type: "market",
+        limit_price: order.price,
         status: "pending",
         submitted_at: new Date().toISOString(),
         instrument_ccy: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
@@ -1455,7 +1456,10 @@ export async function routeOrdersToBroker(params: {
         side: order.side,
         quantity: brokerRes.filledQuantity,
         fill_price: brokerRes.avgFillPrice,
+        fee: 0,
+        currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
         broker_fill_id: brokerRes.brokerOrderId || null,
+        filled_at: new Date().toISOString(),
       });
     }
 

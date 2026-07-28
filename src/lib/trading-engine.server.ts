@@ -68,6 +68,7 @@ import {
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
+import { normalizeMarketPriceForTrading } from "./market-price-units";
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
@@ -240,6 +241,7 @@ export type ExecutedTrade = {
   value: number;
   reason: string;
   rejected?: string;
+  instrument_ccy?: string;
   // Sizing telemetry — populated for commodity trades so the decision/executed
   // rows expose the same slippage/liquidity numbers the sizer used.
   liquidity?: import("./commodity-liquidity-metrics").CommodityTradeLiquidity;
@@ -513,7 +515,7 @@ async function currentPrices(symbols: string[], asOf: string): Promise<Map<strin
   await Promise.all(
     symbols.map(async (s) => {
       const p = await getPriceOn(s, asOf);
-      if (p != null) out.set(s, p);
+      if (p != null) out.set(s, normalizeMarketPriceForTrading(s, p));
     }),
   );
   return out;
@@ -2224,6 +2226,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         executed_at: executedAt,
         trade_date: asOf,
         reason: t.reason + (t.rejected ? ` [REJECTED: ${t.rejected}]` : ""),
+        instrument_ccy: t.instrument_ccy ?? inferSaxoCurrency(t.symbol),
       }));
     if (tradesRows.length > 0) await admin.from("trades").insert(tradesRows);
 
@@ -2244,6 +2247,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           avg_cost: Number(h.avg_cost),
           opened_at: hExt.opened_at ?? new Date().toISOString(),
           high_water_mark: hExt.high_water_mark ?? Number(h.avg_cost),
+          instrument_ccy:
+            (h as unknown as { instrument_ccy?: string | null }).instrument_ccy ??
+            inferSaxoCurrency(h.symbol),
         };
       });
     if (holdingsRows.length > 0) await admin.from("holdings").insert(holdingsRows);
@@ -2466,6 +2472,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         executed,
         algoRegime,
       });
+      if (Array.isArray(routedOrders)) {
+        for (const result of routedOrders as Array<{
+          symbol?: string;
+          side?: "buy" | "sell";
+          status?: string;
+          skipped?: string;
+          reason?: string;
+        }>) {
+          const status = String(result.status ?? "").toLowerCase();
+          if (status !== "skipped" && status !== "error") continue;
+          const hit = executed.find(
+            (t) =>
+              t.symbol.toUpperCase() === String(result.symbol ?? "").toUpperCase() &&
+              t.side === result.side &&
+              !t.rejected,
+          );
+          if (hit) hit.rejected = result.skipped ?? result.reason ?? `broker routing ${status}`;
+        }
+      }
 
     } catch (e) {
       console.error("live routing failed", portfolioId, e);
@@ -2506,7 +2531,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       decisionId,
       runDate: asOf,
       model: "google/gemini-2.5-flash",
-      executed: executed as unknown as Parameters<typeof recordAiDecisionAudit>[0]["executed"],
+      executed: executed.map((t) => ({
+        ...t,
+        instrument_ccy: t.instrument_ccy ?? inferSaxoCurrency(t.symbol),
+      })) as unknown as Parameters<typeof recordAiDecisionAudit>[0]["executed"],
       heldAfter,
       features: features as unknown as Record<string, unknown>,
       regime: effectiveRegime,

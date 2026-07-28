@@ -44,6 +44,7 @@ type Portfolio = {
   starting_cash: number;
   live_paused: boolean;
   currency: string;
+  cash_by_ccy?: Record<string, number> | null;
 };
 type Holding = { id: string; portfolio_id: string };
 type Fill = {
@@ -373,5 +374,47 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
       total_value: 301.83,
     });
     expect(store.live_broker_log).toHaveLength(0);
+  });
+
+  it("refreshes a stale base-currency wallet even when scalar cash already matches the broker", async () => {
+    // Regression for the 2026-07-28 live trading blockage: current_cash had
+    // already synced to the topped-up broker balance, but cash_by_ccy.GBP was
+    // still the pre-deposit amount. Downstream affordability checks read the
+    // JSON wallet, so the trading engine saw only £124.60 available despite
+    // £10,014.98 ledger cash. A no-drift sync must still rewrite the wallet.
+    const today = new Date().toISOString().slice(0, 10);
+    const store = makeStore(
+      [{
+        id: PID, user_id: UID, mode: "live_prod",
+        current_cash: 10014.98, starting_cash: 10190.38,
+        live_paused: false, currency: "GBP",
+        cash_by_ccy: { GBP: 124.6 },
+      }],
+      [{ id: "h1", portfolio_id: PID }],
+      [],
+    );
+    store.equity_snapshots.push({
+      id: "today", portfolio_id: PID, snapshot_date: today,
+      cash: 10014.98, holdings_value: 0, total_value: 10014.98,
+    });
+    balanceStub.mockResolvedValue({
+      cash: 10014.98,
+      cashAvailable: 10014.98,
+      spendingPower: 10014.98,
+      totalValue: 10014.98,
+      currency: "GBP",
+    });
+
+    const res = await syncLiveCashFromBroker(PID, makeOwned(store, UID));
+
+    expect(res).toMatchObject({ skipped: true, reason: "no material drift" });
+    expect(store.portfolios[0].current_cash).toBe(10014.98);
+    expect(store.portfolios[0].cash_by_ccy).toEqual({ GBP: 10014.98 });
+    expect(store.portfolios[0].starting_cash).toBe(10190.38);
+    expect(store.live_broker_log.at(-1)).toMatchObject({
+      method: "CASH_SYNC",
+      status: 200,
+      error: null,
+    });
   });
 });
