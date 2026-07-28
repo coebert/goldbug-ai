@@ -24,7 +24,9 @@ import { MicrostructureCalibrationCard } from "@/components/microstructure-calib
 import { OrderReconciliationCard } from "@/components/order-reconciliation-card";
 import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-card";
 import { CashSyncReconciliationCard } from "@/components/cash-sync-reconciliation-card";
+import { PriceScalingAuditCard } from "@/components/price-scaling-audit-card";
 import { CreditBudgetCard } from "@/components/credit-budget-card";
+
 
 
 export const Route = createFileRoute("/admin")({
