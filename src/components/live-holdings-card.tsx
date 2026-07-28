@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info, TrendingDown as SellIcon } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
 import {
   Tooltip,
@@ -15,8 +16,9 @@ import {
   roundMoney,
 } from "@/lib/format-money";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
+import { HoldingSellDialog } from "@/components/holding-sell-dialog";
 
 
 
@@ -48,6 +50,8 @@ export function LiveHoldingsCard({
   invested,
   mode,
   series,
+  portfolioId,
+  allowManualSell = true,
 }: {
   holdings: Holding[];
   currency: string;
@@ -63,7 +67,11 @@ export function LiveHoldingsCard({
   invested?: number;
   mode: string;
   series?: Record<string, HoldingSeriesInfo>;
+  /** When provided, enables per-row manual sell buttons. */
+  portfolioId?: string;
+  allowManualSell?: boolean;
 }) {
+  const [sellTarget, setSellTarget] = useState<Holding | null>(null);
 
   const isLive = mode === "live_prod";
 
@@ -471,12 +479,44 @@ export function LiveHoldingsCard({
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
                   </div>
+
+                  {allowManualSell && portfolioId && (
+                    <div className="mt-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          const src = holdings.find((x) => x.id === r.id);
+                          if (src) setSellTarget(src);
+                        }}
+                      >
+                        <SellIcon className="mr-1 h-3 w-3" />
+                        Sell now
+                      </Button>
+                    </div>
+                  )}
                 </li>
               );
 
             })}
           </ul>
         )}
+
+        {sellTarget && (
+          <HoldingSellDialog
+            holding={{
+              id: sellTarget.id,
+              symbol: sellTarget.symbol,
+              quantity: Number(sellTarget.quantity),
+              asset_class: sellTarget.asset_class ?? null,
+              instrument_ccy: sellTarget.instrument_ccy ?? null,
+            }}
+            mode={mode}
+            onClose={() => setSellTarget(null)}
+          />
+        )}
+
 
         {isLive && (
           <p className="text-[11px] text-muted-foreground">
