@@ -42,7 +42,7 @@ import { EnvBadge } from "@/components/env-badge";
 
 /** Primary destinations that appear in the desktop context row. */
 const NAV: ReadonlyArray<{
-  to: "/" | "/trades" | "/compare" | "/learn" | "/saxo-status";
+  to: "/" | "/trades" | "/compare" | "/learn" | "/saxo-status" | "/settings";
   label: string;
   icon: typeof TrendingUp;
   exact?: boolean;
@@ -52,6 +52,7 @@ const NAV: ReadonlyArray<{
   { to: "/compare", label: "Compare", icon: GitCompare },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/saxo-status", label: "Broker", icon: Plug },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 
