@@ -1797,7 +1797,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         symbol: meta.symbol,
         assetClass: meta.asset_class,
       });
-      const MAX_ROUND_TRIP_FEE_BPS = 100; // ≥1% round-trip cost blocks the trade.
+      const MAX_ROUND_TRIP_FEE_BPS = 150; // ≥1.5% round-trip cost blocks the trade.
       if (saxoFee.roundTripBps > MAX_ROUND_TRIP_FEE_BPS) {
         // Auto-rescue: the fee guard is dominated by the per-side minimum on
         // small orders. If we have enough headroom, upsize `spend` to the
