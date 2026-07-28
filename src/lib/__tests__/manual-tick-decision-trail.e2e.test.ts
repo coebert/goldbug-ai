@@ -235,9 +235,10 @@ const RUN_DATE = "2026-07-28";
 describe("E2E: manual tick creates live_orders and audit trail matches broker outcomes", () => {
   it("routes buys+sells, inserts one live_orders row per routed order, and mirrors status into the audit trail", async () => {
     const script: Record<string, BrokerOrderResult> = {
-      "AAPL|buy":  { brokerOrderId: "b-aapl", status: "filled",   filledQuantity: 5, avgFillPrice: 190 },
-      "MSFT|buy":  { brokerOrderId: "b-msft", status: "rejected", reason: "InsufficientCash" },
-      "GOOG|buy":  { brokerOrderId: "b-goog", status: "partial",  filledQuantity: 1, avgFillPrice: 140 },
+      "AAPL|buy":  { brokerOrderId: "b-aapl", status: "filled",              filledQuantity: 5, avgFillPrice: 190 },
+      "MSFT|buy":  { brokerOrderId: "b-msft", status: "rejected",            reason: "InsufficientCash" },
+      "GOOG|buy":  { brokerOrderId: "b-goog", status: "filled",              filledQuantity: 1, avgFillPrice: 140 },
+
       "TSLA|buy":  { brokerOrderId: "b-tsla", status: "submitted" },
       "NVDA|sell": { brokerOrderId: "b-nvda", status: "filled",   filledQuantity: 3, avgFillPrice: 900 },
     };
