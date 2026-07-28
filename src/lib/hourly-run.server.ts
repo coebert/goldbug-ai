@@ -306,6 +306,22 @@ async function runHourlyCycleInner(
             console.warn("hourly-run: order reconcile failed", p.id, e);
           }
         }
+
+        // Intended-vs-executed reconciliation. If the AI wanted to trade
+        // but no live_orders rows appeared for two consecutive ticks, we
+        // consider the executor stalled and raise an alert. live_prod only
+        // — paper / live_sim don't write to live_orders in the same way.
+        if (p.mode === "live_prod" && p.user_id) {
+          const { maybeAlertOrdersReconciliation } = await import(
+            "@/lib/orders-reconciliation-alert.server"
+          );
+          maybeAlertOrdersReconciliation({
+            portfolioId: p.id,
+            userId: p.user_id as string,
+            portfolioName: p.name ?? null,
+          });
+        }
+
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
