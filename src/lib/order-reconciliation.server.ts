@@ -355,6 +355,16 @@ export async function reconcileOrderStatusesForPortfolio(params: {
               error: ins.error.message,
             });
           }
+          if (!ins.error || ins.error.code === "23505") {
+            const { notifyTradeFilled } = await import("./trade-fill-notify.server");
+            notifyTradeFilled({
+              userId, portfolioId, orderId: row.id as string,
+              symbol: row.symbol as string, side: row.side as string,
+              quantity: qty, fillPrice: fillPrice,
+              currency: pos.currency ?? "GBP",
+              source: "reconciler:position",
+            });
+          }
           summary.filled++;
           summary.rows.push({
             orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
@@ -462,6 +472,16 @@ export async function reconcileOrderStatusesForPortfolio(params: {
               error: ins.error.message,
             });
           }
+        }
+
+        if (qty > 0) {
+          const { notifyTradeFilled } = await import("./trade-fill-notify.server");
+          notifyTradeFilled({
+            userId, portfolioId, orderId: row.id as string,
+            symbol: row.symbol as string, side: row.side as string,
+            quantity: qty, fillPrice: fillPrice || null,
+            currency: "GBP", source: "reconciler:presumed",
+          });
         }
 
         summary.filled++;
@@ -644,6 +664,17 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         });
       }
     }
+
+    if ((mapped === "filled" || mapped === "partial") && hist.filledAmount > 0 && !fillInsertError) {
+      const { notifyTradeFilled } = await import("./trade-fill-notify.server");
+      notifyTradeFilled({
+        userId, portfolioId, orderId: row.id as string,
+        symbol: row.symbol as string, side: row.side as string,
+        quantity: hist.filledAmount, fillPrice: hist.avgPrice ?? null,
+        currency: "GBP", source: "reconciler:history",
+      });
+    }
+
 
     if (mapped === "filled") summary.filled++;
     else if (mapped === "partial") summary.partial++;
