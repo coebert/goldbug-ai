@@ -1717,6 +1717,11 @@ type DecisionRaw = {
   signals?: SignalRow[];
   news?: NewsRow[];
   guardrails?: Guardrails;
+  plain_explanation?: {
+    text?: string | null;
+    model?: string | null;
+    category?: "traded" | "held_cash" | "halted" | "no_signal";
+  } | null;
 };
 
 
