@@ -95,12 +95,27 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
       // mixes GBX-quoted stocks with GBP-quoted ETFs in the same total.
       const avg = normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), assetClass);
       const openedAt = h.opened_at ?? null;
+      const openedDate = openedAt ? openedAt.slice(0, 10) : null;
       const yahoo = resolve(h.symbol);
       const all = bySymbol.get(yahoo) ?? [];
-      const closes = all.map((p) =>
+      // Only plot closes on/after the purchase date so the sparkline trend
+      // matches the "since purchase" %. Pre-purchase history is discarded to
+      // avoid the visual contradiction of an upward-sloping chart next to a
+      // negative % change (or vice versa).
+      const postPurchase = openedDate
+        ? all.filter((p) => (p.date as string) >= openedDate)
+        : all;
+      const postCloses = postPurchase.map((p) =>
         normalizeLseDisplayPriceToBase(h.symbol, Number(p.close), assetClass),
       );
-      const currentPrice = closes.length > 0 ? closes[closes.length - 1] : null;
+      // Anchor the series at avg_cost so a fresh purchase (0-1 closes after
+      // opened_at) still renders a meaningful two-point trend from cost →
+      // latest close, and every subsequent point is measured relative to
+      // the same baseline used for the % change.
+      const closes = avg > 0 ? [avg, ...postCloses] : postCloses;
+      const currentPrice = postCloses.length > 0
+        ? postCloses[postCloses.length - 1]
+        : (closes.length > 0 ? closes[closes.length - 1] : null);
       const pct =
         currentPrice != null && avg > 0 ? (currentPrice - avg) / avg : null;
       const valueChange =
