@@ -1448,6 +1448,7 @@ export async function routeOrdersToBroker(params: {
       .eq("id", liveOrderId);
 
     if (brokerRes.status === "filled" && brokerRes.filledQuantity && brokerRes.avgFillPrice) {
+      const fillCcy = routeSymToCcy.get(order.symbol) ?? portfolioCurrency;
       await supabaseAdmin.from("live_fills").insert({
         order_id: liveOrderId,
         portfolio_id: portfolio.id,
@@ -1457,9 +1458,21 @@ export async function routeOrdersToBroker(params: {
         quantity: brokerRes.filledQuantity,
         fill_price: brokerRes.avgFillPrice,
         fee: 0,
-        currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
+        currency: fillCcy,
         broker_fill_id: brokerRes.brokerOrderId || null,
         filled_at: new Date().toISOString(),
+      });
+      const { notifyTradeFilled } = await import("./trade-fill-notify.server");
+      notifyTradeFilled({
+        userId,
+        portfolioId: portfolio.id,
+        orderId: liveOrderId,
+        symbol: order.symbol,
+        side: order.side,
+        quantity: brokerRes.filledQuantity,
+        fillPrice: brokerRes.avgFillPrice,
+        currency: fillCcy,
+        source: "live_executor",
       });
     }
 
