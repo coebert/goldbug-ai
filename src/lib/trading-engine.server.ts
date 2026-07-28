@@ -68,6 +68,7 @@ import {
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
+import { normalizeMarketPriceForTrading } from "./market-price-units";
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
@@ -240,6 +241,7 @@ export type ExecutedTrade = {
   value: number;
   reason: string;
   rejected?: string;
+  instrument_ccy?: string;
   // Sizing telemetry — populated for commodity trades so the decision/executed
   // rows expose the same slippage/liquidity numbers the sizer used.
   liquidity?: import("./commodity-liquidity-metrics").CommodityTradeLiquidity;
@@ -513,7 +515,7 @@ async function currentPrices(symbols: string[], asOf: string): Promise<Map<strin
   await Promise.all(
     symbols.map(async (s) => {
       const p = await getPriceOn(s, asOf);
-      if (p != null) out.set(s, p);
+      if (p != null) out.set(s, normalizeMarketPriceForTrading(s, p));
     }),
   );
   return out;
