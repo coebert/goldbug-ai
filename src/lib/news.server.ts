@@ -516,7 +516,7 @@ async function fetchGdeltQuery(
   await new Promise((r) => setTimeout(r, 400));
   const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
   try {
-    const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(6_000) });
+    const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(12_000) });
     if (!res.ok) {
       await closeBody(res);
       return null;
