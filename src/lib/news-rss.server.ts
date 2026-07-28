@@ -99,12 +99,12 @@ export function parseRssFeed(
       extractTag(chunk, "pubDate") ??
       extractTag(chunk, "updated") ??
       extractTag(chunk, "date");
-    // Filter to the target day when a pubDate is present; drop obviously
-    // stale items so `getNewsForDate(YYYY-MM-DD)` doesn't leak week-old
-    // headlines into today's reel. When a feed omits dates entirely we
-    // trust the fetch and stamp today.
-    const feedDate = isoDate(pub) ?? dateISO;
-    if (feedDate !== dateISO) continue;
+    // Accept items published within the last ~48h and stamp them against
+    // the requested date. A strict `feedDate === dateISO` filter dropped
+    // most items in low-activity hours or right after UTC midnight because
+    // feeds still show yesterday's stories — leaving the reel empty.
+    const hrs = ageHours(pub);
+    if (hrs !== null && hrs > 48) continue;
     out.push({
       date: dateISO,
       source: domainFromUrl(link) ?? fallbackSource,
