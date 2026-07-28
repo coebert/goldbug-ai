@@ -10,8 +10,8 @@ import { returnCorrelation } from "./signals-extended.server";
 export type LossCooldowns = Record<string, string>; // symbol -> ISO date it becomes eligible again
 
 const COOLDOWN_DAYS = 5;
-const CORR_CLUSTER_THRESHOLD = 0.7;
-const CORR_CLUSTER_MAX_PCT = 0.35; // max 35% of portfolio in a single correlated cluster
+const CORR_CLUSTER_THRESHOLD = 0.8;
+const CORR_CLUSTER_MAX_PCT = 0.5; // max 50% of portfolio in a single correlated cluster
 
 export async function loadLossCooldowns(portfolioId: string): Promise<LossCooldowns> {
   const { data } = await supabaseAdmin
