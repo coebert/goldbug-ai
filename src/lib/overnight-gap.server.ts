@@ -12,8 +12,11 @@ export type GapVerdict = {
 };
 
 /**
- * Returns triggered=true when the most recent 1-day return is > 2σ vs the
- * 20-day daily volatility.
+ * Returns triggered=true when the most recent 1-day return is > 4σ vs the
+ * 20-day daily volatility. Tuned looser than the original 2σ threshold: a
+ * 2σ move happens ~5% of trading days on most large-caps and was permanently
+ * benching names like ULVR.L after any single earnings gap. 4σ keeps the
+ * guard for genuine dislocations while letting ordinary large moves through.
  */
 export async function checkOvernightGap(symbol: string, asOf: string): Promise<GapVerdict> {
   try {
@@ -27,7 +30,7 @@ export async function checkOvernightGap(symbol: string, asOf: string): Promise<G
     if (!prev) return { symbol, triggered: false, z: null, note: "no prev" };
     const r = (last - prev) / prev;
     const z = r / vol;
-    const triggered = Math.abs(z) >= 2;
+    const triggered = Math.abs(z) >= 4;
     return {
       symbol,
       triggered,
