@@ -31,6 +31,7 @@ import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/ap
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
+import { Route as ApiPublicHooksNewsRefreshRouteImport } from './routes/api/public/hooks/news-refresh'
 import { Route as ApiPublicHooksMarketOpenAlertsRouteImport } from './routes/api/public/hooks/market-open-alerts'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
@@ -154,6 +155,12 @@ const ApiPublicHooksSaxoRefreshRoute =
     path: '/api/public/hooks/saxo-refresh',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksNewsRefreshRoute =
+  ApiPublicHooksNewsRefreshRouteImport.update({
+    id: '/api/public/hooks/news-refresh',
+    path: '/api/public/hooks/news-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksMarketOpenAlertsRoute =
   ApiPublicHooksMarketOpenAlertsRouteImport.update({
     id: '/api/public/hooks/market-open-alerts',
@@ -236,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
+  '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
@@ -269,6 +277,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
+  '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
@@ -303,6 +312,7 @@ export interface FileRoutesById {
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
+  '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
@@ -338,6 +348,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/market-open-alerts'
+    | '/api/public/hooks/news-refresh'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
@@ -371,6 +382,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/market-open-alerts'
+    | '/api/public/hooks/news-refresh'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
@@ -404,6 +416,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/hourly-run'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/market-open-alerts'
+    | '/api/public/hooks/news-refresh'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
@@ -434,6 +447,7 @@ export interface RootRouteChildren {
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
   ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
   ApiPublicHooksMarketOpenAlertsRoute: typeof ApiPublicHooksMarketOpenAlertsRoute
+  ApiPublicHooksNewsRefreshRoute: typeof ApiPublicHooksNewsRefreshRoute
   ApiPublicHooksSaxoRefreshRoute: typeof ApiPublicHooksSaxoRefreshRoute
   ApiPublicHooksTranslationRefreshRoute: typeof ApiPublicHooksTranslationRefreshRoute
   ApiPublicSaxoCallbackRoute: typeof ApiPublicSaxoCallbackRoute
@@ -595,6 +609,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSaxoRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/news-refresh': {
+      id: '/api/public/hooks/news-refresh'
+      path: '/api/public/hooks/news-refresh'
+      fullPath: '/api/public/hooks/news-refresh'
+      preLoaderRoute: typeof ApiPublicHooksNewsRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/market-open-alerts': {
       id: '/api/public/hooks/market-open-alerts'
       path: '/api/public/hooks/market-open-alerts'
@@ -705,6 +726,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
   ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
   ApiPublicHooksMarketOpenAlertsRoute: ApiPublicHooksMarketOpenAlertsRoute,
+  ApiPublicHooksNewsRefreshRoute: ApiPublicHooksNewsRefreshRoute,
   ApiPublicHooksSaxoRefreshRoute: ApiPublicHooksSaxoRefreshRoute,
   ApiPublicHooksTranslationRefreshRoute: ApiPublicHooksTranslationRefreshRoute,
   ApiPublicSaxoCallbackRoute: ApiPublicSaxoCallbackRoute,
