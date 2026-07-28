@@ -11,12 +11,13 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const triggerHourlyRunNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .inputValidator((data: { force?: boolean } | undefined) => ({ force: data?.force === true }))
+  .handler(async ({ data }) => {
     const started = Date.now();
     const { runHourlyCycle, RunInProgressError } = await import("@/lib/hourly-run.server");
     let obj: Record<string, unknown>;
     try {
-      obj = await runHourlyCycle({ triggeredBy: "manual" }) as unknown as Record<string, unknown>;
+      obj = await runHourlyCycle({ triggeredBy: "manual", force: data.force }) as unknown as Record<string, unknown>;
     } catch (error) {
       if (error instanceof RunInProgressError) {
         const err = new Error(error.message) as Error & { code?: string; heldBy?: string | null; ageMs?: number | null };

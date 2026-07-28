@@ -224,7 +224,7 @@ function AdminPage() {
   });
 
   const manual = useMutation({
-    mutationFn: () => triggerRun(),
+    mutationFn: (vars: { force?: boolean } = {}) => triggerRun({ data: { force: vars.force === true } }),
     onSuccess: (r) => {
       const ok = r.results.filter((x) => x.ok && !x.skipped).length;
       const skipped = r.results.filter((x) => x.skipped).length;
@@ -234,9 +234,11 @@ function AdminPage() {
       });
       q.refetch();
     },
-    onError: (e: Error & { code?: string }) => {
+    onError: (e: Error & { code?: string; ageMs?: number | null }) => {
       if (e.code === "run_in_progress") {
-        toast.warning("Run already in progress", { description: e.message });
+        toast.warning("Run already in progress", {
+          description: `${e.message} Use "Force clear lock & run" if the previous run crashed.`,
+        });
       } else {
         toast.error("Manual run failed", { description: e.message });
       }
@@ -285,12 +287,24 @@ function AdminPage() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              onClick={() => manual.mutate()}
+              onClick={() => manual.mutate({})}
               disabled={manual.isPending}
               className="gap-2"
             >
               <PlayCircle className={`h-4 w-4 ${manual.isPending ? "animate-pulse" : ""}`} />
               {manual.isPending ? "Running full cycle…" : "Trigger hourly run now"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (window.confirm("Force clear the current run lock and start a fresh run? Only use this if the previous run crashed or is genuinely stuck.")) {
+                  manual.mutate({ force: true });
+                }
+              }}
+              disabled={manual.isPending}
+            >
+              Force clear lock & run
             </Button>
             {manual.isSuccess && manual.data && (
               <span className="text-xs text-muted-foreground">
