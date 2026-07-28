@@ -540,7 +540,7 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <Card className="overflow-hidden">
+      <Card ref={cardRef} className={`overflow-hidden ${highlightCls}`}>
         <CollapsibleTrigger asChild>
           <button className="block w-full text-left hover:bg-muted/40">
             {summary}
