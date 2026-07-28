@@ -477,6 +477,120 @@ export function backfillTranslations(
 
 
 
+
+// ---------------------------------------------------------------------------
+// GDELT retry / backoff helper
+// ---------------------------------------------------------------------------
+// GDELT DOC returns HTTP 200 with a plain-text body ("Please limit requests
+// to no more than one every 5 seconds…") when the client is throttled,
+// **and** occasionally returns an actual HTTP 429. Both must trigger a
+// bounded retry with exponential backoff so a single throttled slice
+// doesn't silently produce zero headlines for the whole run.
+//
+// Behaviour:
+//   • up to GDELT_MAX_ATTEMPTS attempts per URL (initial + retries)
+//   • honours a `Retry-After` header when the server supplies one
+//   • otherwise waits `base * 2^(attempt-1)` with ±25% jitter, capped at
+//     GDELT_MAX_BACKOFF_MS
+//   • retries on: 429, 5xx, fetch/timeout errors, and the plain-text
+//     rate-limit sentinel body detected by parseGdeltResponse (null return)
+//   • gives up loudly with a single console.warn identifying the URL and
+//     final failure mode so a run's news_ingest logs always show *why*
+//     GDELT contributed nothing.
+
+const GDELT_MAX_ATTEMPTS = 4;
+const GDELT_BASE_BACKOFF_MS = 1_500;
+const GDELT_MAX_BACKOFF_MS = 8_000;
+
+function computeBackoffMs(attempt: number, retryAfterHeader: string | null): number {
+  if (retryAfterHeader) {
+    const secs = Number(retryAfterHeader);
+    if (Number.isFinite(secs) && secs > 0) {
+      return Math.min(GDELT_MAX_BACKOFF_MS * 2, Math.floor(secs * 1_000));
+    }
+    const dateMs = Date.parse(retryAfterHeader);
+    if (Number.isFinite(dateMs)) {
+      const delta = dateMs - Date.now();
+      if (delta > 0) return Math.min(GDELT_MAX_BACKOFF_MS * 2, delta);
+    }
+  }
+  const raw = GDELT_BASE_BACKOFF_MS * Math.pow(2, Math.max(0, attempt - 1));
+  const jitter = raw * (0.75 + Math.random() * 0.5);
+  return Math.min(GDELT_MAX_BACKOFF_MS, Math.floor(jitter));
+}
+
+type GdeltFetchResult =
+  | { kind: "ok"; items: NewsItem[] }
+  | { kind: "empty" }
+  | { kind: "failed"; reason: string };
+
+async function fetchGdeltWithRetry(
+  url: string,
+  dateISO: string,
+  breakerName: string,
+  headers: Record<string, string>,
+): Promise<GdeltFetchResult> {
+  let lastReason = "unknown";
+  for (let attempt = 1; attempt <= GDELT_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await runWithBreaker(breakerName, () =>
+        fetch(url, { headers, signal: AbortSignal.timeout(12_000) }),
+      );
+
+      if (res.status === 429 || res.status >= 500) {
+        const retryAfter = res.headers.get("retry-after");
+        await closeBody(res);
+        lastReason = `http ${res.status}`;
+        if (attempt < GDELT_MAX_ATTEMPTS) {
+          const wait = computeBackoffMs(attempt, retryAfter);
+          console.warn(
+            `news: gdelt ${breakerName} ${lastReason} — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
+          );
+          await new Promise((r) => setTimeout(r, wait));
+          continue;
+        }
+        break;
+      }
+
+      if (!res.ok) {
+        await closeBody(res);
+        lastReason = `http ${res.status}`;
+        break; // non-retriable client error (4xx other than 429)
+      }
+
+      const parsed = await parseGdeltResponse(res, dateISO);
+      if (parsed === null) {
+        // Plain-text rate-limit sentinel body — treat as soft 429.
+        lastReason = "text rate-limit body";
+        if (attempt < GDELT_MAX_ATTEMPTS) {
+          const wait = computeBackoffMs(attempt, null);
+          console.warn(
+            `news: gdelt ${breakerName} throttled body — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
+          );
+          await new Promise((r) => setTimeout(r, wait));
+          continue;
+        }
+        break;
+      }
+      return parsed.length > 0 ? { kind: "ok", items: parsed } : { kind: "empty" };
+    } catch (err) {
+      lastReason = err instanceof Error ? err.message : String(err);
+      if (attempt < GDELT_MAX_ATTEMPTS) {
+        const wait = computeBackoffMs(attempt, null);
+        console.warn(
+          `news: gdelt ${breakerName} threw "${lastReason}" — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
+        );
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      }
+    }
+  }
+  console.warn(
+    `news: gdelt ${breakerName} gave up after ${GDELT_MAX_ATTEMPTS} attempts — reason: ${lastReason} — url: ${url}`,
+  );
+  return { kind: "failed", reason: lastReason };
+}
+
 async function fetchGdeltQuery(
   dateISO: string,
   query: string,
@@ -489,44 +603,24 @@ async function fetchGdeltQuery(
   const encoded = encodeURIComponent(query);
   const headers = { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" };
   const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
-  try {
-    const res = await runWithBreaker(breakerName, () =>
-      fetch(dated, { headers, signal: AbortSignal.timeout(12_000) }).then(async (r) => {
-        if (!r.ok && (r.status >= 500 || r.status === 429)) {
-          await closeBody(r);
-          throw new Error(`${breakerName} transient ${r.status}`);
-        }
-        return r;
-      }));
-    if (res.ok) {
-      const parsed = await parseGdeltResponse(res, dateISO);
-      if (parsed && parsed.length > 0) return parsed.slice(0, max);
-    } else {
-      await closeBody(res);
-    }
-  } catch (err) {
-    console.warn(
-      `news: gdelt ${breakerName} dated fetch failed`,
-      err instanceof Error ? err.message : String(err),
-    );
+
+  const primary = await fetchGdeltWithRetry(dated, dateISO, breakerName, headers);
+  if (primary.kind === "ok") return primary.items.slice(0, max);
+  // "empty" from the dated window on prior days is a real answer (no news),
+  // so only fall through to the 24h fallback for today's date.
+  const today = new Date().toISOString().slice(0, 10);
+  if (dateISO !== today) {
+    return primary.kind === "failed" ? null : [];
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  if (dateISO !== today) return null;
   await new Promise((r) => setTimeout(r, 400));
   const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
-  try {
-    const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(12_000) });
-    if (!res.ok) {
-      await closeBody(res);
-      return null;
-    }
-    const parsed = await parseGdeltResponse(res, dateISO);
-    return parsed ? parsed.slice(0, max) : null;
-  } catch {
-    return null;
-  }
+  const fb = await fetchGdeltWithRetry(fallback, dateISO, `${breakerName}:24h`, headers);
+  if (fb.kind === "ok") return fb.items.slice(0, max);
+  if (fb.kind === "empty") return [];
+  return null;
 }
+
 
 /**
  * Fan out across every configured GDELT topical slice in parallel, then
