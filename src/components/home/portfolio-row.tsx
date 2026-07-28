@@ -159,8 +159,9 @@ export function PortfolioRow({
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
-  const pnl = Number(portfolio.current_cash) - Number(portfolio.starting_cash);
-  const pnlPct = Number(portfolio.starting_cash) > 0 ? (pnl / Number(portfolio.starting_cash)) * 100 : 0;
+  // Compare TOTAL EQUITY (cash + holdings value) vs starting cash — comparing
+  // cash-only was misleading because deploying cash into holdings shows a fake
+  // loss even when equity is up.
 
   return (
     <Card>
