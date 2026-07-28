@@ -1,9 +1,15 @@
-// Lightweight global news fetcher using GDELT DOC API (free, no key).
+// Lightweight global news fetcher. Draws from GDELT DOC (topical slices)
+// and a diversified list of public RSS feeds so no single wire dominates.
 // Caches results by date in news_cache.
 
 import { z } from "zod";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { runWithBreaker } from "@/lib/_server/provider-circuit";
+import { GDELT_SOURCES } from "./news-sources";
+import { fetchRssForDate } from "./news-rss.server";
+
+
 
 
 export type NewsItem = {
@@ -471,60 +477,83 @@ export function backfillTranslations(
 
 
 
-async function fetchGdeltForDate(dateISO: string, max = 20): Promise<NewsItem[] | null> {
-  // GDELT expects YYYYMMDDHHMMSS ranges. In some regions the dated-range query
-  // is 429'd more aggressively than the `timespan=24h` variant, so we try the
-  // dated query first and fall back to timespan for "today" only.
+async function fetchGdeltQuery(
+  dateISO: string,
+  query: string,
+  max: number,
+  breakerName: string,
+): Promise<NewsItem[] | null> {
   const day = dateISO.replace(/-/g, "");
   const start = `${day}000000`;
   const end = `${day}235959`;
-  const query = encodeURIComponent(
-    "(economy OR markets OR inflation OR \"interest rates\" OR earnings OR geopolitics OR OPEC OR \"central bank\")",
-  );
+  const encoded = encodeURIComponent(query);
   const headers = { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" };
-  const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
+  const dated = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&startdatetime=${start}&enddatetime=${end}`;
   try {
-    const { runWithBreaker } = await import("@/lib/_server/provider-circuit");
-    const res = await runWithBreaker("gdelt", () =>
+    const res = await runWithBreaker(breakerName, () =>
       fetch(dated, { headers, signal: AbortSignal.timeout(6_000) }).then(async (r) => {
         if (!r.ok && (r.status >= 500 || r.status === 429)) {
           await closeBody(r);
-          throw new Error(`GDELT transient ${r.status}`);
+          throw new Error(`${breakerName} transient ${r.status}`);
         }
         return r;
       }));
     if (res.ok) {
       const parsed = await parseGdeltResponse(res, dateISO);
       if (parsed && parsed.length > 0) return parsed.slice(0, max);
-      // parsed === null → rate-limited/non-JSON; parsed === [] → no matches.
-      // Fall through to fallback for today only.
     } else {
-      console.warn(`news: gdelt dated request failed ${res.status}`);
       await closeBody(res);
     }
   } catch (err) {
-    console.error("news: gdelt dated fetch threw", err);
+    console.warn(
+      `news: gdelt ${breakerName} dated fetch failed`,
+      err instanceof Error ? err.message : String(err),
+    );
   }
 
-  // Fallback (only for today) using the more lenient `timespan=24h` endpoint.
   const today = new Date().toISOString().slice(0, 10);
   if (dateISO !== today) return null;
-  await new Promise((r) => setTimeout(r, 1200)); // brief pause before retry
-  const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
+  await new Promise((r) => setTimeout(r, 400));
+  const fallback = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encoded}&mode=ArtList&format=json&maxrecords=${max}&sort=hybridrel&timespan=24h`;
   try {
     const res = await fetch(fallback, { headers, signal: AbortSignal.timeout(6_000) });
     if (!res.ok) {
-      console.warn(`news: gdelt fallback failed ${res.status}`);
       await closeBody(res);
       return null;
     }
     const parsed = await parseGdeltResponse(res, dateISO);
     return parsed ? parsed.slice(0, max) : null;
-  } catch (err) {
-    console.error("news: gdelt fallback threw", err);
+  } catch {
     return null;
   }
 }
+
+/**
+ * Fan out across every configured GDELT topical slice in parallel, then
+ * de-duplicate. Each slice contributes a bounded number of stories, so no
+ * one topic can crowd out the others.
+ */
+async function fetchGdeltForDate(
+  dateISO: string,
+  max = 20,
+): Promise<Array<NewsItem & { source_weight: number }> | null> {
+  const perSliceMax = Math.max(3, Math.ceil(max / Math.max(1, GDELT_SOURCES.length)));
+  const jobs = GDELT_SOURCES.map(async (src) => {
+    const items = await fetchGdeltQuery(dateISO, src.query, perSliceMax, `gdelt:${src.id}`);
+    if (!items) return [] as Array<NewsItem & { source_weight: number }>;
+    return items.map((it) => ({ ...it, source_weight: src.weight }));
+  });
+  const settled = await Promise.all(jobs);
+  const flat = settled.flat();
+  if (flat.length === 0) {
+    const allNull = settled.every((s) => s.length === 0);
+    return allNull ? null : flat;
+  }
+  return flat;
+}
+
+
+
 
 export async function getNewsForDate(
   dateISO: string,
@@ -594,22 +623,61 @@ export async function getNewsForDate(
     }
   }
 
-
   // Use existing cache when we're not forcing a refresh and it looks healthy.
   if (!opts?.forceRefresh && cachedItems.length >= 5) return cachedItems;
 
-  const gdelt = await fetchGdeltForDate(dateISO, max);
-  if (gdelt === null) {
-    // Provider unavailable — preserve whatever cache we already have instead
-    // of nuking it. Better a stale reel than an empty one.
-    console.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (provider unavailable)`);
+  // Fan out across every configured provider family in parallel — GDELT
+  // topical slices + curated RSS feeds. Failures in either family degrade
+  // gracefully; the surviving family still fills the reel.
+  const [gdeltResult, rssResult] = await Promise.all([
+    fetchGdeltForDate(dateISO, max),
+    fetchRssForDate(dateISO, 4).catch((err) => {
+      console.warn("news: rss fan-out threw", err instanceof Error ? err.message : String(err));
+      return [] as Array<NewsItem & { source_weight: number }>;
+    }),
+  ]);
+
+  const gdelt = gdeltResult ?? [];
+  const combined = [...gdelt, ...rssResult];
+
+  if (combined.length === 0) {
+    console.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (all providers unavailable)`);
     return cachedItems;
   }
-  if (gdelt.length === 0) return cachedItems;
 
+  // De-duplicate across sources by URL first (canonical), then normalised
+  // headline. Enforce a per-domain diversity cap so a single wire cannot
+  // dominate the reel. Weights break ties so tier-one wires beat regional
+  // aggregators for the same story.
+  const PER_DOMAIN_MAX = 3;
+  combined.sort((a, b) => (b.source_weight ?? 0) - (a.source_weight ?? 0));
+  const byUrl = new Set<string>();
+  const byHead = new Set<string>();
+  const perDomain = new Map<string, number>();
+  const merged: Array<NewsItem & { source_weight: number }> = [];
+  for (const it of combined) {
+    const urlKey = (it.url ?? "").split("?")[0].toLowerCase();
+    const headKey = it.headline.toLowerCase().replace(/\s+/g, " ").trim();
+    if (urlKey && byUrl.has(urlKey)) continue;
+    if (byHead.has(headKey)) continue;
+    const domain = (it.source ?? "").toLowerCase();
+    const dcount = perDomain.get(domain) ?? 0;
+    if (domain && dcount >= PER_DOMAIN_MAX) continue;
+    if (urlKey) byUrl.add(urlKey);
+    byHead.add(headKey);
+    if (domain) perDomain.set(domain, dcount + 1);
+    merged.push(it);
+    if (merged.length >= max * 2) break; // cap fan-in before translation
+  }
 
   // Translate before writing so the cache holds English + original metadata.
-  const fresh = await translateHeadlines(gdelt);
+  const translated = await translateHeadlines(merged);
+  // Re-attach source_weight after translation (translateHeadlines strips
+  // extra fields on the object spread path).
+  const fresh: Array<NewsItem & { source_weight: number }> = translated.map((t, i) => ({
+    ...t,
+    source_weight: merged[i]?.source_weight ?? 0.5,
+  }));
 
   // We have a real fresh set. Only NOW do we replace today's rows on
   // forceRefresh; otherwise merge (skip duplicates by headline).
@@ -632,7 +700,7 @@ export async function getNewsForDate(
       original_headline: n.original_headline,
       original_language: n.original_language,
       translation_confidence: n.translation_confidence,
-
+      source_weight: n.source_weight,
     }));
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("news_cache").insert(rows);
@@ -640,5 +708,6 @@ export async function getNewsForDate(
   }
   return fresh;
 }
+
 
 
