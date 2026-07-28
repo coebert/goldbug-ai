@@ -326,6 +326,17 @@ function AdminPage() {
             >
               Force clear lock & run
             </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => backfill.mutate()}
+              disabled={backfill.isPending}
+              className="gap-2"
+              title="Refresh price_cache back to each holding's opened_at and re-audit every sparkline. Idempotent."
+            >
+              <RefreshCw className={`h-4 w-4 ${backfill.isPending ? "animate-spin" : ""}`} />
+              {backfill.isPending ? "Recomputing…" : "Recompute holdings history"}
+            </Button>
             {manual.isSuccess && manual.data && (
               <span className="text-xs text-muted-foreground">
                 Run started — results will surface as the background cycle completes (usually within a minute or two).
