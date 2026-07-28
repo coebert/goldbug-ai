@@ -458,6 +458,8 @@ export async function syncLiveCashFromBroker(
       newCash: brokerCash,
       newStarting,
       startingCashAdjusted: startingCashActuallyChanged,
+      depositGateReason,
+      previousStarting: prevStarting,
       currency,
     }),
     error: upd.error?.message ?? null,
