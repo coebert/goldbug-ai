@@ -71,6 +71,20 @@ function mapSaxoStatus(status: string, filledQty: number, amount: number):
   return "unknown";
 }
 
+/**
+ * Extract the exchange-agnostic base ticker from either a Yahoo-style
+ * ("HSBA.L", "SAP.DE") or Saxo-style ("HSBA:xlon", "SAP:xetr") symbol so we
+ * can match a local `live_orders.symbol` against a Saxo `BrokerPosition.symbol`.
+ */
+function baseTicker(symbol: string): string {
+  const upper = String(symbol ?? "").toUpperCase().trim();
+  if (!upper) return "";
+  const colonIdx = upper.indexOf(":");
+  const stripped = colonIdx >= 0 ? upper.slice(0, colonIdx) : upper;
+  const dotIdx = stripped.lastIndexOf(".");
+  return dotIdx > 0 ? stripped.slice(0, dotIdx) : stripped;
+}
+
 export async function reconcileOrderStatusesForPortfolio(params: {
   portfolioId: string;
   userId: string;
@@ -119,6 +133,30 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     });
   }
   const workingById = new Map(working.map((w) => [w.brokerOrderId, w]));
+
+  // Lazy broker-position lookup. On Saxo LIVE tenants where `/hist/v3/orders`
+  // returns 404 (`HIST_ORDERS_UNSUPPORTED`) we can't confirm fills from
+  // history, so a BUY that leaves the working list would otherwise sit at
+  // `submitted` forever until sim-style presumption kicks in. Instead, ask
+  // the authoritative `/port/v1/netpositions/me` endpoint: if the position
+  // is really there at the broker, the order filled — use the broker's
+  // AverageOpenPrice rather than a guessed close.
+  let positionsByBase: Map<string, Awaited<ReturnType<SaxoAdapter["getPositions"]>>[number]> | null = null;
+  let positionsLoadError: string | null = null;
+  const getPositionsByBase = async () => {
+    if (positionsByBase || positionsLoadError) return positionsByBase;
+    try {
+      const list = await adapter.getPositions();
+      positionsByBase = new Map();
+      for (const p of list) {
+        const key = baseTicker(p.symbol);
+        if (key) positionsByBase.set(key, p);
+      }
+    } catch (e) {
+      positionsLoadError = e instanceof Error ? e.message : String(e);
+    }
+    return positionsByBase;
+  };
 
   const summary: OrderReconcileSummary = {
     scanned: rows.length, filled: 0, partial: 0, rejected: 0, cancelled: 0,
@@ -270,6 +308,86 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         reasonCode: "history_fetch_failed",
         reason: `Saxo /hist call threw: ${histError}`,
       });
+    }
+
+    // ---- Position-based fallback (LIVE tenants with /hist unsupported) ----
+    // When history is silent (either 404 for LIVE tenants where Saxo has not
+    // enabled the hist endpoint for this client, or genuinely absent), a BUY
+    // that has left the working list has almost certainly filled — the
+    // authoritative signal is `/port/v1/netpositions/me`. If Saxo really
+    // shows the position, mark the order filled at the broker's own
+    // AverageOpenPrice instead of guessing via the sim presumption path.
+    // This runs before decideSimFill so LIVE never falls back to a
+    // heuristic when the broker can give us the truth directly.
+    if (!hist && (row.side as string) === "buy") {
+      const qty = Number(row.quantity ?? 0);
+      if (qty > 0) {
+        const positions = await getPositionsByBase();
+        const key = baseTicker(row.symbol as string);
+        const pos = positions?.get(key) ?? null;
+        if (pos && Math.abs(pos.quantity) >= qty - 1e-6 && pos.avgPrice > 0) {
+          const fillPrice = pos.avgPrice;
+          const upd = await supabaseAdmin
+            .from("live_orders")
+            .update({ status: "filled" })
+            .eq("id", row.id as string);
+          let fillInsertError: string | null = null;
+          const ins = await supabaseAdmin.from("live_fills").insert({
+            order_id: row.id as string,
+            portfolio_id: portfolioId,
+            user_id: userId,
+            symbol: row.symbol as string,
+            side: row.side as string,
+            quantity: qty,
+            fill_price: fillPrice,
+            fee: 0,
+            currency: pos.currency ?? "GBP",
+            broker_fill_id: brokerOrderId,
+            filled_at: new Date().toISOString(),
+          });
+          if (ins.error && ins.error.code !== "23505") {
+            fillInsertError = ins.error.message;
+            await supabaseAdmin.from("live_broker_log").insert({
+              portfolio_id: portfolioId, user_id: userId, broker: "saxo",
+              env: adapter.env, method: "ORDER_RECON_POSITION_FILL_INSERT_FAILED",
+              path: "live_fills", status: null,
+              request: asJson({ orderId: row.id, brokerOrderId }),
+              error: ins.error.message,
+            });
+          }
+          summary.filled++;
+          summary.rows.push({
+            orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
+            outcome: "filled", previousStatus: row.status as string, newStatus: "filled",
+            filledQuantity: qty, avgFillPrice: fillPrice,
+            reason: "confirmed via /port/v1/netpositions/me (hist unavailable)",
+          });
+          await logReconcileEvent({
+            ...commonEvent,
+            source: `${source}:position_fill`,
+            newStatus: "filled",
+            outcome: "filled",
+            reasonCode: "broker_history_filled",
+            reason: `broker position confirms fill of ${qty} @ ${fillPrice} (hist endpoint unavailable)`,
+            filledQuantity: qty,
+            avgFillPrice: fillPrice,
+            saxoStatus: "position_confirmed",
+            saxoReason: upd.error
+              ? `status update failed: ${upd.error.message}`
+              : fillInsertError
+                ? `live_fills insert failed: ${fillInsertError}`
+                : null,
+            saxoResponse: {
+              histError, positionsLoadError,
+              position: {
+                symbol: pos.symbol, quantity: pos.quantity,
+                avgPrice: pos.avgPrice, currency: pos.currency,
+              },
+            },
+          });
+          continue;
+        }
+      }
     }
 
     if (!hist) {
