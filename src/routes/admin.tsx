@@ -287,12 +287,24 @@ function AdminPage() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              onClick={() => manual.mutate()}
+              onClick={() => manual.mutate({})}
               disabled={manual.isPending}
               className="gap-2"
             >
               <PlayCircle className={`h-4 w-4 ${manual.isPending ? "animate-pulse" : ""}`} />
               {manual.isPending ? "Running full cycle…" : "Trigger hourly run now"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (window.confirm("Force clear the current run lock and start a fresh run? Only use this if the previous run crashed or is genuinely stuck.")) {
+                  manual.mutate({ force: true });
+                }
+              }}
+              disabled={manual.isPending}
+            >
+              Force clear lock & run
             </Button>
             {manual.isSuccess && manual.data && (
               <span className="text-xs text-muted-foreground">
