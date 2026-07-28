@@ -23,6 +23,7 @@ import { RunMetricsCard } from "@/components/run-metrics-card";
 import { MicrostructureCalibrationCard } from "@/components/microstructure-calibration-card";
 import { OrderReconciliationCard } from "@/components/order-reconciliation-card";
 import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-card";
+import { CreditBudgetCard } from "@/components/credit-budget-card";
 
 
 export const Route = createFileRoute("/admin")({
@@ -392,6 +393,8 @@ function AdminPage() {
           <SaxoOAuthPanel />
         </CardContent>
       </Card>
+
+      <CreditBudgetCard />
 
       <PushNotificationsCard />
 
