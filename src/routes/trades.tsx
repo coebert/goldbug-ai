@@ -43,6 +43,9 @@ import {
 import { getTradesDashboard, type TradeRow } from "@/lib/trades.functions";
 
 export const Route = createFileRoute("/trades")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    order: typeof search.order === "string" ? search.order : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Trades — Aegis" },
@@ -103,6 +106,7 @@ function fmtTime(iso: string | null | undefined) {
 }
 
 function TradesPage() {
+  const { order: highlightOrderId } = Route.useSearch();
   const [email, setEmail] = useState<string | null>(null);
   const [portfolioId, setPortfolioId] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
@@ -274,7 +278,7 @@ function TradesPage() {
                   <span>{group.length} order{group.length === 1 ? "" : "s"}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                  {group.map(row => <TradeCard key={row.order.id} row={row} />)}
+                  {group.map(row => <TradeCard key={row.order.id} row={row} highlight={row.order.id === highlightOrderId} />)}
                 </div>
               </div>
             ))}
@@ -304,9 +308,20 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
-function TradeCard({ row }: { row: TradeRow }) {
+function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: boolean }) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!highlight) return;
+    // Scroll the linked trade into view and auto-expand its details.
+    const t = setTimeout(() => {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setOpen(true);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [highlight]);
+  const highlightCls = highlight ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "";
   const buy = row.order.side.toLowerCase() === "buy";
   const fillPct = row.order.quantity > 0
     ? Math.min(100, (row.filledQty / row.order.quantity) * 100)
@@ -491,7 +506,7 @@ function TradeCard({ row }: { row: TradeRow }) {
   if (isMobile) {
     return (
       <>
-        <Card className="overflow-hidden">
+        <Card ref={cardRef} className={`overflow-hidden ${highlightCls}`}>
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -525,7 +540,7 @@ function TradeCard({ row }: { row: TradeRow }) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <Card className="overflow-hidden">
+      <Card ref={cardRef} className={`overflow-hidden ${highlightCls}`}>
         <CollapsibleTrigger asChild>
           <button className="block w-full text-left hover:bg-muted/40">
             {summary}

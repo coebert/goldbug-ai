@@ -54,8 +54,19 @@ export function notifyTradeFilled(input: TradeFillNotifyInput): void {
 
       const sideUpper = input.side.toUpperCase();
       const priceStr = fmtPrice(input.fillPrice, input.currency);
-      const title = `Trade filled: ${sideUpper} ${fmtQty(input.quantity)} ${input.symbol}`;
-      const body = priceStr ? `Filled at ${priceStr}` : `Order ${input.orderId.slice(0, 8)} filled`;
+      const qtyStr = fmtQty(input.quantity);
+      const notional =
+        input.fillPrice != null && Number.isFinite(input.fillPrice)
+          ? fmtPrice(input.quantity * input.fillPrice, input.currency)
+          : "";
+      const title = `${sideUpper} ${qtyStr} ${input.symbol}${priceStr ? ` @ ${priceStr}` : ""}`;
+      const bodyParts = [
+        `${sideUpper} ${qtyStr} ${input.symbol}`,
+        priceStr ? `@ ${priceStr}` : null,
+        notional ? `(${notional})` : null,
+      ].filter(Boolean);
+      const body = `${bodyParts.join(" ")} — tap to view trade`;
+      const url = `/trades?order=${encodeURIComponent(input.orderId)}`;
 
       await supabaseAdmin.from("notifications").insert({
         user_id: input.userId,
@@ -72,13 +83,14 @@ export function notifyTradeFilled(input: TradeFillNotifyInput): void {
           fill_price: input.fillPrice,
           currency: input.currency,
           source: input.source,
+          url,
         },
       });
 
       await sendPushToUser(input.userId, {
         title,
         body,
-        url: `/portfolio/${input.portfolioId}`,
+        url,
         tag: `trade-${input.orderId}`,
       });
     } catch (err) {
