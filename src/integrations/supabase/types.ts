@@ -1033,6 +1033,24 @@ export type Database = {
         }
         Relationships: []
       }
+      market_open_alerts_sent: {
+        Row: {
+          alert_date: string
+          sent_at: string
+          venue: string
+        }
+        Insert: {
+          alert_date: string
+          sent_at?: string
+          venue: string
+        }
+        Update: {
+          alert_date?: string
+          sent_at?: string
+          venue?: string
+        }
+        Relationships: []
+      }
       market_regimes: {
         Row: {
           as_of: string
