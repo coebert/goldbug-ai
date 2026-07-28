@@ -57,13 +57,6 @@ function ageHours(raw: string | null): number | null {
   return (Date.now() - d.getTime()) / 3_600_000;
 }
 
-function ageHours(raw: string | null): number | null {
-  if (!raw) return null;
-  const d = new Date(raw.trim());
-  if (Number.isNaN(d.getTime())) return null;
-  return (Date.now() - d.getTime()) / 3_600_000;
-}
-
 function domainFromUrl(u: string | null): string | null {
   if (!u) return null;
   try {
