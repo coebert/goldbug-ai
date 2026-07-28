@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { Bell, Check, CheckCheck, RefreshCw, Trash2, ShieldAlert } from "lucide-react";
+import { Bell, Check, CheckCheck, RefreshCw, Trash2, ShieldAlert, Settings as SettingsIcon } from "lucide-react";
 import {
   listNotifications,
   markNotificationsRead,
