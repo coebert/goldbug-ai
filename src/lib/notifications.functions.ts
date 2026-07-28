@@ -46,10 +46,12 @@ export const listNotifications = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     if (error) throw new Error(`notifications query failed: ${error.message}`);
 
-    const { count, error: countErr } = await supabase
+    let cq = supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .is("read_at", null);
+    if (data.category) cq = cq.eq("category", data.category);
+    const { count, error: countErr } = await cq;
     if (countErr) throw new Error(`notifications unread count failed: ${countErr.message}`);
 
     return { rows: (rows ?? []) as NotificationRow[], unreadCount: count ?? 0 };
