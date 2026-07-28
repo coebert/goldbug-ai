@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+
+
 
 export type HoldingSeries = {
   symbol: string;
@@ -28,9 +31,10 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<HoldingSeries[]> => {
     const { data: holdings } = await context.supabase
       .from("holdings")
-      .select("symbol, quantity, avg_cost, opened_at")
+      .select("symbol, quantity, avg_cost, opened_at, asset_class")
       .eq("portfolio_id", data.portfolioId);
     const list = (holdings ?? []).filter((h) => Number(h.quantity) > 0);
+
     if (list.length === 0) return [];
 
     // Holdings may store broker-native symbols (e.g. "VUKE:xlon") while the
@@ -85,14 +89,17 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
     }
 
     return list.map((h) => {
-      const avg = Number(h.avg_cost);
+      const assetClass = (h as { asset_class?: string | null }).asset_class ?? null;
+      // Normalise both `avg_cost` (broker-native) and cached closes into the
+      // LSE base currency (GBP) so downstream weighting / P&L math never
+      // mixes GBX-quoted stocks with GBP-quoted ETFs in the same total.
+      const avg = normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), assetClass);
       const openedAt = h.opened_at ?? null;
       const yahoo = resolve(h.symbol);
       const all = bySymbol.get(yahoo) ?? [];
-      // Show up to ~30 days of context ending today. Do NOT clip to
-      // opened_at — a same-day purchase would otherwise leave only one
-      // close and hide the trend entirely.
-      const closes = all.map((p) => p.close);
+      const closes = all.map((p) =>
+        normalizeLseDisplayPriceToBase(h.symbol, Number(p.close), assetClass),
+      );
       const currentPrice = closes.length > 0 ? closes[closes.length - 1] : null;
       const pct =
         currentPrice != null && avg > 0 ? (currentPrice - avg) / avg : null;
@@ -110,5 +117,6 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
         points: closes.length,
       };
     });
+
   });
 
