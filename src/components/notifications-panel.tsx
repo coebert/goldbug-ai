@@ -63,16 +63,16 @@ export function NotificationsPanel() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Bell className="h-4 w-4 text-primary" />
-          Notifications
+      <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base min-w-0">
+          <Bell className="h-4 w-4 text-primary shrink-0" />
+          <span>Notifications</span>
           {unreadCount > 0 && (
-            <Badge variant="destructive" className="ml-1">{unreadCount} unread</Badge>
+            <Badge variant="destructive">{unreadCount} unread</Badge>
           )}
         </CardTitle>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
+        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+          <Button variant="ghost" size="sm" onClick={() => q.refetch()} disabled={q.isFetching} aria-label="Refresh">
             <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
           </Button>
           <Button variant="outline" size="sm" onClick={() => mAll.mutate()} disabled={unreadCount === 0 || isBusy}>
