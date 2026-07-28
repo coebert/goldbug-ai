@@ -2441,6 +2441,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         lessons: learning.lessons,
         lessons_as_of: learning.lessons_as_of,
       },
+      plain_explanation: {
+        text: runExplanation.text,
+        model: runExplanation.model,
+        category: runExplanation.category,
+      },
 
     }),
   }).select("id").single();
