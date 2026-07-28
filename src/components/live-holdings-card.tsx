@@ -15,6 +15,8 @@ import {
   roundMoney,
 } from "@/lib/format-money";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { useEffect } from "react";
+import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
 
 
 
@@ -64,6 +66,22 @@ export function LiveHoldingsCard({
 }) {
 
   const isLive = mode === "live_prod";
+
+  // Runtime sanity: sparklines and headline % must agree. Report once per
+  // change to the series payload so console spam is bounded.
+  useEffect(() => {
+    if (!series) return;
+    const list = Object.entries(series).map(([symbol, s]) => ({
+      symbol,
+      avg_cost: s.closes[0] ?? 0,
+      closes: s.closes,
+      currentPrice: s.currentPrice,
+      pctChangeSincePurchase: s.pctChangeSincePurchase,
+      points: s.closes.length,
+    }));
+    const issues = auditHoldingSeriesBatch(list);
+    for (const i of issues) console.warn(formatIssue(i));
+  }, [series]);
 
   const rawRows = holdings
     .map((h) => {

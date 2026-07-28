@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
 
 
 
@@ -88,7 +89,7 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
       bySymbol.set(p.symbol, arr);
     }
 
-    return list.map((h) => {
+    const result = list.map((h) => {
       const assetClass = (h as { asset_class?: string | null }).asset_class ?? null;
       // Normalise both `avg_cost` (broker-native) and cached closes into the
       // LSE base currency (GBP) so downstream weighting / P&L math never
@@ -133,5 +134,19 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
       };
     });
 
+    // Runtime sanity: catch sparkline ↔ headline % drift server-side before
+    // the payload ever hits the UI. Log-only; never throws.
+    const issues = auditHoldingSeriesBatch(
+      result.map((r) => ({
+        symbol: r.symbol,
+        avg_cost: r.avg_cost,
+        closes: r.closes,
+        currentPrice: r.currentPrice,
+        pctChangeSincePurchase: r.pctChangeSincePurchase,
+        points: r.points,
+      })),
+    );
+    for (const i of issues) console.warn(formatIssue(i));
+    return result;
   });
 
