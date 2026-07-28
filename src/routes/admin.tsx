@@ -369,6 +369,7 @@ function AdminPage() {
       <SecurityAuditCard />
 
       <StartingCashIntegrityCard />
+      <CashSyncReconciliationCard />
 
       <TranslationQualityCard />
 
