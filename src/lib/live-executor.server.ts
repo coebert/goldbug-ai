@@ -1459,6 +1459,7 @@ export async function routeOrdersToBroker(params: {
         fee: 0,
         currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
         broker_fill_id: brokerRes.brokerOrderId || null,
+        filled_at: new Date().toISOString(),
       });
     }
 
