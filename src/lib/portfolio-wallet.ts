@@ -70,3 +70,18 @@ export function writeWalletFields(
     current_cash: walletBalance(cash_by_ccy, base),
   };
 }
+
+/**
+ * Merge a freshly broker-synced base-currency cash value into the JSON wallet
+ * while preserving any non-base currency balances. This keeps `cash_by_ccy`
+ * from going stale when `current_cash` is refreshed from the broker.
+ */
+export function writeWalletFieldsWithBaseCash(
+  p: PortfolioCashLike,
+  brokerBaseCash: number,
+): { cash_by_ccy: Wallet; current_cash: number } {
+  const base = norm(p.base_ccy ?? p.currency);
+  const wallet = readWallet(p);
+  wallet[base] = Number.isFinite(brokerBaseCash) ? brokerBaseCash : walletBalance(wallet, base);
+  return writeWalletFields(wallet, base);
+}
