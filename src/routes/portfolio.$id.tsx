@@ -791,6 +791,7 @@ function PortfolioPage() {
                 invested={holdingsValue}
                 mode={p.mode}
                 series={holdingsSeries}
+                portfolioId={id}
                />
 
             </div>
