@@ -106,6 +106,7 @@ function fmtTime(iso: string | null | undefined) {
 }
 
 function TradesPage() {
+  const { order: highlightOrderId } = Route.useSearch();
   const [email, setEmail] = useState<string | null>(null);
   const [portfolioId, setPortfolioId] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
