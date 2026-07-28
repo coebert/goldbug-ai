@@ -14,6 +14,8 @@ import {
   formatMoneySigned,
   roundMoney,
 } from "@/lib/format-money";
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+
 
 
 
@@ -66,7 +68,11 @@ export function LiveHoldingsCard({
   const rawRows = holdings
     .map((h) => {
       const qty = Number(h.quantity);
-      const avg = Number(h.avg_cost);
+      // Fold GBX-quoted LSE stocks into GBP so the raw weight used by
+      // largest-remainder allocation is comparable across all rows. Without
+      // this, one HSBA row in pence (~1550) dwarfs an ETF row in pounds
+      // (~36) by a factor of 100 and the ETFs get 0.0% of the portfolio.
+      const avg = normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), h.asset_class);
       const s = series?.[h.symbol];
       // Prefer live price when we have one, otherwise fall back to cost.
       // `pricedAtCost` flags rows whose value is computed off `avg_cost`
@@ -78,6 +84,7 @@ export function LiveHoldingsCard({
       const costBasis = qty * avg;
       return { ...h, qty, avg, mark, rawValue, costBasis, series: s, pricedAtCost: !hasLive };
     });
+
   const rawSum = rawRows.reduce((s, r) => s + r.rawValue, 0);
   // Authoritative invested value: prefer the parent-supplied number (from
   // `derivePortfolioMetrics`, which reads the server-side equity snapshot),
