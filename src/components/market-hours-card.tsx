@@ -171,7 +171,7 @@ function marketCountdown(now: Date, m: Market, open: boolean): { label: string; 
 export function MarketHoursCard() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    const id = window.setInterval(() => setNow(new Date()), 1_000);
     return () => window.clearInterval(id);
   }, []);
   const zone = ukZoneAbbr(now);
