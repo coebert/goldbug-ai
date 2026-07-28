@@ -50,11 +50,11 @@ function extractLink(itemXml: string): string | null {
   return rss ? rss.trim() : null;
 }
 
-function isoDate(raw: string | null): string | null {
+function ageHours(raw: string | null): number | null {
   if (!raw) return null;
   const d = new Date(raw.trim());
   if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+  return (Date.now() - d.getTime()) / 3_600_000;
 }
 
 function ageHours(raw: string | null): number | null {
