@@ -58,6 +58,26 @@ export function VanguardBenchmarkCard({
     () => compareToVanguard(startingCash, equity, deposits, cagr),
     [startingCash, equity, deposits, cagr],
   );
+  const series = useMemo(
+    () => buildBenchmarkSeries(startingCash, equity, deposits, cagr),
+    [startingCash, equity, deposits, cagr],
+  );
+  const fmtCompact = useMemo(
+    () =>
+      new Intl.NumberFormat("en-GB", {
+        style: "currency",
+        currency,
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }),
+    [currency],
+  );
+  const fmtShortDate = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isFinite(d.getTime())
+      ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
+      : iso;
+  };
 
   const hasData = equity.length > 0;
   const beating = cmp.alphaPct > 0.05;
