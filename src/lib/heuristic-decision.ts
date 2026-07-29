@@ -94,6 +94,7 @@ export type HeuristicDecision = {
 
 import type { AlgoRegimeSnapshot } from "./microstructure/algo-regime";
 import { summarizeAlgoRegime } from "./microstructure/algo-regime-prompt";
+import { detectRetailMania } from "./microstructure/retail-mania";
 
 /**
  * Rule-based BUY generator used only when the AI Gateway is unavailable.
