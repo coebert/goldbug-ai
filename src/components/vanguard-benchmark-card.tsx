@@ -63,6 +63,10 @@ export function VanguardBenchmarkCard({
     () => buildBenchmarkSeries(startingCash, equity, deposits, cagr),
     [startingCash, equity, deposits, cagr],
   );
+  const attr = useMemo(
+    () => attributeAlpha(cmp, equity, deposits, cagr),
+    [cmp, equity, deposits, cagr],
+  );
   const fmtCompact = useMemo(
     () =>
       new Intl.NumberFormat("en-GB", {
