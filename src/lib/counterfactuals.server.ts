@@ -13,10 +13,12 @@ export type BlockCategory =
   | "per_symbol_cap"
   | "min_trade_size"
   | "circuit_breaker"
+  | "retail_mania"
   | "other";
 
 export function categorize(reason: string): BlockCategory {
   const r = reason.toLowerCase();
+  if (r.includes("retail-mania") || r.includes("retail mania")) return "retail_mania";
   if (r.includes("gap")) return "gap_guard";
   if (r.includes("cooldown")) return "cooldown";
   if (r.includes("asset-class") || r.includes("class cap")) return "asset_class_cap";
