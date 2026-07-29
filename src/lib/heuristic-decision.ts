@@ -86,15 +86,29 @@ export type HeuristicOrder =
   | { symbol: string; side: "sell"; quantity: number; reason: string }
   | { symbol: string; side: "buy"; percent: number; reason: string };
 
+export type HeuristicManiaBlock = {
+  symbol: string;
+  action: "block" | "trim";
+  score: number;
+  tier: "watch" | "mania";
+  reason: string;
+  breakdown: ManiaScoreItem[];
+};
+
 export type HeuristicDecision = {
   briefing: string;
   rationale: string;
   orders: HeuristicOrder[];
+  maniaBlocks: HeuristicManiaBlock[];
 };
 
 import type { AlgoRegimeSnapshot } from "./microstructure/algo-regime";
 import { summarizeAlgoRegime } from "./microstructure/algo-regime-prompt";
-import { detectRetailMania } from "./microstructure/retail-mania";
+import {
+  detectRetailMania,
+  formatManiaExplanation,
+  type ManiaScoreItem,
+} from "./microstructure/retail-mania";
 
 /**
  * Rule-based BUY generator used only when the AI Gateway is unavailable.
