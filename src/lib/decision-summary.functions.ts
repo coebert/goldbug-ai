@@ -63,6 +63,7 @@ const BLOCK_LABEL: Record<string, string> = {
   per_symbol_cap: "Per-symbol cap",
   min_trade_size: "Below minimum trade size",
   circuit_breaker: "Circuit breaker",
+  retail_mania: "Retail-mania guardrail",
   other: "Other guardrail",
 };
 

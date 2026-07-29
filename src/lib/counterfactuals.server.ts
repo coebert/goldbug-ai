@@ -13,10 +13,12 @@ export type BlockCategory =
   | "per_symbol_cap"
   | "min_trade_size"
   | "circuit_breaker"
+  | "retail_mania"
   | "other";
 
 export function categorize(reason: string): BlockCategory {
   const r = reason.toLowerCase();
+  if (r.includes("retail-mania") || r.includes("retail mania")) return "retail_mania";
   if (r.includes("gap")) return "gap_guard";
   if (r.includes("cooldown")) return "cooldown";
   if (r.includes("asset-class") || r.includes("class cap")) return "asset_class_cap";
@@ -65,6 +67,7 @@ export async function evaluatePendingCounterfactuals(asOf: string) {
     .from("counterfactuals")
     .select("id, symbol, side, hypothetical_price, as_of")
     .is("evaluated_at", null)
+    .gt("hypothetical_price", 0)
     .lte("as_of", cutoffStr)
     .limit(200);
   if (!pending || pending.length === 0) return 0;

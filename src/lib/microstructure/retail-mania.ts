@@ -30,16 +30,39 @@ export type ManiaInput = {
 
 export type ManiaTier = "none" | "watch" | "mania";
 
+export type ManiaComponent =
+  | "parabola5d"
+  | "parabola30d"
+  | "rsi"
+  | "volume"
+  | "shortSqueeze"
+  | "gamma"
+  | "social";
+
+/** One score contribution — displayable as "5d parabola +2.0". */
+export type ManiaScoreItem = {
+  component: ManiaComponent;
+  /** Short human-readable label ("5d parabola", "RSI extreme"). */
+  label: string;
+  /** Weight this component added to the total score. */
+  weight: number;
+  /** Rendered detail ("+62% ≥ +50%", "RSI 88"). */
+  detail: string;
+};
+
 export type ManiaSignal = {
   symbol: string;
   tier: ManiaTier;
   score: number;
   reasons: string[];
+  /** Per-component score contributions, in fire order. */
+  scoreBreakdown: ManiaScoreItem[];
   /** If true, callers MUST reject new BUYs on this symbol. */
   blockNewBuys: boolean;
   /** If true, callers should trim an existing long into strength. */
   trimExistingLong: boolean;
 };
+
 
 /**
  * Evaluate a single symbol for retail-mania / short-squeeze conditions.
@@ -50,7 +73,14 @@ export type ManiaSignal = {
  */
 export function detectRetailMania(input: ManiaInput): ManiaSignal {
   const reasons: string[] = [];
+  const scoreBreakdown: ManiaScoreItem[] = [];
   let score = 0;
+
+  const add = (item: ManiaScoreItem) => {
+    scoreBreakdown.push(item);
+    reasons.push(`${item.label}: ${item.detail}`);
+    score += item.weight;
+  };
 
   const c5 = input.change5d ?? null;
   const c30 = input.change30d ?? null;
@@ -61,35 +91,33 @@ export function detectRetailMania(input: ManiaInput): ManiaSignal {
   const social = input.socialMentionRatio ?? null;
 
   if (typeof c5 === "number" && c5 >= 0.5) {
-    reasons.push(`5d +${(c5 * 100).toFixed(0)}% ≥ +50%`);
-    score += 2;
+    add({ component: "parabola5d", label: "5d parabola", weight: 2, detail: `+${(c5 * 100).toFixed(0)}% ≥ +50%` });
   }
   if (typeof c30 === "number" && c30 >= 1.0) {
-    reasons.push(`30d +${(c30 * 100).toFixed(0)}% ≥ +100%`);
-    score += 2;
+    add({ component: "parabola30d", label: "30d parabola", weight: 2, detail: `+${(c30 * 100).toFixed(0)}% ≥ +100%` });
   }
   if (typeof rsi === "number" && rsi >= 85) {
-    reasons.push(`RSI ${rsi.toFixed(0)} ≥ 85 (extreme overbought)`);
-    score += 1.5;
+    add({ component: "rsi", label: "RSI extreme", weight: 1.5, detail: `RSI ${rsi.toFixed(0)} ≥ 85` });
   }
   if (typeof vol === "number" && vol >= 5) {
-    reasons.push(`volume ${vol.toFixed(1)}× 20d median`);
-    score += 1;
+    add({ component: "volume", label: "Volume surge", weight: 1, detail: `${vol.toFixed(1)}× 20d median` });
   }
   // Short-squeeze booster — crowded short + fast ramp is the GME setup.
   if (typeof si === "number" && si >= 0.2 && typeof c5 === "number" && c5 >= 0.3) {
-    reasons.push(`short interest ${(si * 100).toFixed(0)}% of float + 5d +${(c5 * 100).toFixed(0)}%`);
-    score += 2;
+    add({
+      component: "shortSqueeze",
+      label: "Short squeeze",
+      weight: 2,
+      detail: `SI ${(si * 100).toFixed(0)}% float + 5d +${(c5 * 100).toFixed(0)}%`,
+    });
   }
   // Gamma-squeeze latent — dealer short-gamma amplifies the up-move.
   if (typeof gamma === "number" && gamma >= 5) {
-    reasons.push(`weekly OTM call OI ${gamma.toFixed(1)}× baseline`);
-    score += 1;
+    add({ component: "gamma", label: "Gamma squeeze", weight: 1, detail: `weekly OTM call OI ${gamma.toFixed(1)}× baseline` });
   }
   // Social velocity confirms crowding (caution, not alpha).
   if (typeof social === "number" && social >= 5) {
-    reasons.push(`retail mentions ${social.toFixed(1)}× baseline`);
-    score += 0.5;
+    add({ component: "social", label: "Retail crowding", weight: 0.5, detail: `mentions ${social.toFixed(1)}× baseline` });
   }
 
   let tier: ManiaTier = "none";
@@ -101,8 +129,20 @@ export function detectRetailMania(input: ManiaInput): ManiaSignal {
     tier === "mania" ||
     (typeof rsi === "number" && rsi >= 85 && typeof c5 === "number" && c5 >= 0.5);
 
-  return { symbol: input.symbol, tier, score, reasons, blockNewBuys, trimExistingLong };
+  return { symbol: input.symbol, tier, score, reasons, scoreBreakdown, blockNewBuys, trimExistingLong };
 }
+
+/**
+ * Compact one-line explanation suitable for logging into `counterfactuals.block_reason`
+ * and rendering in the decision-summary card. Always starts with the tier so
+ * downstream categorization is trivial.
+ */
+export function formatManiaExplanation(sig: ManiaSignal, action: "block" | "trim" = "block"): string {
+  const verb = action === "trim" ? "trim" : "block new buys";
+  const parts = sig.scoreBreakdown.map((s) => `${s.label} ${s.detail} (+${s.weight})`);
+  return `retail-mania guardrail (${sig.tier}, score ${sig.score.toFixed(1)}): ${verb} — ${parts.join("; ")}`;
+}
+
 
 /** Batch helper — returns only symbols that should hard-skip on BUY. */
 export function symbolsToBlockForBuy(inputs: ManiaInput[]): Set<string> {
