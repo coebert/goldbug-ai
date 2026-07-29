@@ -507,8 +507,21 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
     }
     out.tod_venue_overrides = Object.keys(parsed).length > 0 ? (parsed as RiskConfig["tod_venue_overrides"]) : null;
   }
+  // Per-currency exposure caps for non-base holdings (e.g. { JPY: 0.15 }).
+  if (r.fx_currency_limits && typeof r.fx_currency_limits === "object") {
+    const limits: Partial<Record<string, number>> = {};
+    for (const [k, v] of Object.entries(r.fx_currency_limits as Record<string, unknown>)) {
+      const code = String(k || "").toUpperCase().trim();
+      if (!/^[A-Z]{3}$/.test(code)) continue;
+      if (v == null || v === "") continue;
+      const n = Number(v);
+      if (Number.isFinite(n)) limits[code] = Math.max(0, Math.min(1, n));
+    }
+    out.fx_currency_limits = limits;
+  }
   return out;
 }
+
 
 
 // ---------------------------------------------------------------------------
