@@ -11,6 +11,8 @@ export type MarketVenue =
   | "LSE"
   | "NYSE"
   | "NASDAQ"
+  | "TSE_JP"
+  | "ASX"
   | "CRYPTO"
   | "FX"
   | "OTHER";
@@ -20,6 +22,7 @@ export type MarketPhase =
   | "pre_open"
   | "post_close"
   | "weekend"
+  | "lunch"
   | "always_open"
   | "unknown";
 
@@ -45,11 +48,21 @@ export interface MarketStatus {
 // Session windows in local venue time. Kept intentionally simple — we do NOT
 // model holidays here (Saxo will simply hold the order over any calendar
 // day the exchange is closed; the reconciler treats "queued" the same way it
-// treats a weekend).
-const SESSIONS: Record<MarketVenue, { openMin: number; closeMin: number; tz: string } | null> = {
+// treats a weekend). TSE_JP has an intra-day lunch break (11:30–12:30 JST);
+// during that window `isOpen` is false and the phase is "lunch". Orders
+// queued during lunch reconcile normally once the afternoon session opens.
+const SESSIONS: Record<MarketVenue, {
+  openMin: number;
+  closeMin: number;
+  tz: string;
+  /** Optional intra-day break as [startMin, endMin) in local time. */
+  breakMin?: [number, number];
+} | null> = {
   LSE:    { openMin: 8 * 60,          closeMin: 16 * 60 + 30, tz: "Europe/London" },
   NYSE:   { openMin: 9 * 60 + 30,     closeMin: 16 * 60,       tz: "America/New_York" },
   NASDAQ: { openMin: 9 * 60 + 30,     closeMin: 16 * 60,       tz: "America/New_York" },
+  TSE_JP: { openMin: 9 * 60,          closeMin: 15 * 60,       tz: "Asia/Tokyo",       breakMin: [11 * 60 + 30, 12 * 60 + 30] },
+  ASX:    { openMin: 10 * 60,         closeMin: 16 * 60,       tz: "Australia/Sydney" },
   CRYPTO: null, // 24/7
   FX:     null, // Global FX runs ~24/5, but our per-tick decisions treat it as always_open.
   OTHER:  null,
@@ -63,6 +76,10 @@ export function inferVenue(symbol: string): MarketVenue {
   // Crypto spot pairs use `-USD` (Yahoo) or contain common ticker fragments.
   if (/-USD$|-USDT$|-EUR$/.test(s)) return "CRYPTO";
   if (/^(BTC|ETH|SOL|ADA|USDT|USDC)/.test(s)) return "CRYPTO";
+  // Tokyo — Yahoo `.T` or Saxo `SYMBOL:XTKS`.
+  if (s.endsWith(".T") || s.endsWith(":XTKS")) return "TSE_JP";
+  // ASX — Yahoo `.AX` or Saxo `SYMBOL:XASX`.
+  if (s.endsWith(".AX") || s.endsWith(":XASX")) return "ASX";
   // LSE — either Yahoo `.L` or Saxo `SYMBOL:XLON` form.
   if (s.endsWith(".L") || s.endsWith(":XLON")) return "LSE";
   // Anything else that looks like a 1-5 letter equity ticker → US listed.
