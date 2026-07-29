@@ -273,7 +273,8 @@ export class SaxoAdapter implements BrokerAdapter {
     // IMPORTANT: do NOT fold `TotalValue` into the cash figure — TotalValue is
     // cash + open positions valued at market, so including it double-counts
     // holdings once the account owns anything and inflates the reported cash.
-    const settled = Number(bal.CashBalance ?? 0);
+    const settledRaw = bal.CashBalance == null ? null : Number(bal.CashBalance);
+    const settled = Number.isFinite(settledRaw) ? settledRaw : null;
     const notBookedRaw = bal.TransactionsNotBooked == null
       ? null
       : Number(bal.TransactionsNotBooked);
@@ -281,7 +282,7 @@ export class SaxoAdapter implements BrokerAdapter {
     const spending = bal.SpendingPower != null ? Number(bal.SpendingPower) : null;
     const availTrading =
       bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : null;
-    const cash = Number.isFinite(settled)
+    const cash = settled != null
       ? settled + (notBooked ?? 0)
       : (availTrading ?? spending ?? 0);
     // Preserve availability semantics for guardrails: what's tradable *right now*.
@@ -305,7 +306,7 @@ export class SaxoAdapter implements BrokerAdapter {
       request: asJson({ source, clientLookupError }),
       response: asJson({
         cash, cashAvailable, notBooked: notBooked ?? null,
-        settled, spending, availTrading,
+        settled: settled ?? null, spending, availTrading,
         totalValue: bal.TotalValue ?? null,
         currency: bal.Currency ?? null,
       }),
@@ -318,7 +319,7 @@ export class SaxoAdapter implements BrokerAdapter {
       currency: bal.Currency ?? "GBP",
       cashAvailable,
       spendingPower: spending ?? undefined,
-      transactionsNotBooked: notBooked,
+      transactionsNotBooked: notBooked ?? undefined,
       reservedCash,
       unrealizedPnl:
         bal.UnrealizedMarginProfitLoss != null
