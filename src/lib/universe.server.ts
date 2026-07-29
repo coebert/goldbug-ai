@@ -45,6 +45,23 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "VMID.L", name: "Vanguard FTSE 250 ETF", asset_class: "etf" },
   { symbol: "VWRL.L", name: "Vanguard FTSE All-World ETF", asset_class: "etf" },
   { symbol: "VUSA.L", name: "Vanguard S&P 500 ETF (LON)", asset_class: "etf" },
+  // Japan — Tokyo Stock Exchange (Yahoo `.T` suffix → Saxo TSE_JP). Curated
+  // large-cap, high-liquidity names plus a Nikkei 225 ETF so JPY exposure
+  // is reachable via either single stocks or a broad index wrapper. Saxo
+  // cash accounts route these natively; settlement FX (GBP/EUR → JPY) is
+  // handled by the wallet layer, no separate crypto/futures pathway needed.
+  { symbol: "7203.T", name: "Toyota Motor (TSE)", asset_class: "stock" },
+  { symbol: "6758.T", name: "Sony Group (TSE)", asset_class: "stock" },
+  { symbol: "9984.T", name: "SoftBank Group (TSE)", asset_class: "stock" },
+  { symbol: "6861.T", name: "Keyence (TSE)", asset_class: "stock" },
+  { symbol: "8306.T", name: "Mitsubishi UFJ Financial (TSE)", asset_class: "stock" },
+  { symbol: "8035.T", name: "Tokyo Electron (TSE)", asset_class: "stock" },
+  { symbol: "9432.T", name: "Nippon Telegraph & Telephone (TSE)", asset_class: "stock" },
+  { symbol: "7974.T", name: "Nintendo (TSE)", asset_class: "stock" },
+  { symbol: "6098.T", name: "Recruit Holdings (TSE)", asset_class: "stock" },
+  { symbol: "8058.T", name: "Mitsubishi Corp (TSE)", asset_class: "stock" },
+  { symbol: "1321.T", name: "Nomura Nikkei 225 ETF (TSE)", asset_class: "etf" },
+  { symbol: "1306.T", name: "iShares TOPIX ETF (TSE)", asset_class: "etf" },
   // Crypto — spot pairs (Yahoo price feed only; NOT Saxo-tradable, kept for
   // reference/backtesting where the fetchers already understand them).
   { symbol: "BTC-USD", name: "Bitcoin", asset_class: "crypto" },
