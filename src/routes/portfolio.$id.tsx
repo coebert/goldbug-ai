@@ -78,6 +78,11 @@ const WalletAffordabilityCard = lazy(() =>
 const WalletHistoryCard = lazy(() =>
   import("@/components/wallet-history-card").then((m) => ({ default: m.WalletHistoryCard })),
 );
+const MultiCurrencyExposureCard = lazy(() =>
+  import("@/components/multi-currency-exposure-card").then((m) => ({
+    default: m.MultiCurrencyExposureCard,
+  })),
+);
 
 
 
@@ -896,6 +901,14 @@ function PortfolioPage() {
               <div className="mb-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
+                </Suspense>
+              </div>
+            )}
+
+            {p && (
+              <div className="mb-4">
+                <Suspense fallback={<div className="h-48 rounded-xl border bg-card" aria-hidden />}>
+                  <MultiCurrencyExposureCard portfolioId={id} active={tab === "overview"} />
                 </Suspense>
               </div>
             )}
