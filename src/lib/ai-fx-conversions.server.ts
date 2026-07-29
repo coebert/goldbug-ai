@@ -20,6 +20,12 @@ import { readWallet, walletBalance, writeWalletFields, type Wallet } from "./por
 import { getFxCircuitState } from "./fx-circuit.server";
 import { asJson } from "./_server/db-json";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  applyFxCost,
+  quoteFxCost,
+  summarizeRoundTripCosts,
+} from "./fx-cost-model";
+
 
 export const FxConversionOrderSchema = z.object({
   from_ccy: z.string().length(3),
@@ -226,6 +232,21 @@ export async function buildFxContext(args: {
     })
     .join("\n");
 
+  // Per-pair FX conversion cost table. Encodes the spread + wallet markup
+  // the AI must subtract from an expected return before entering (or holding)
+  // a foreign-currency position. JPY/AUD crosses are wider than EURUSD.
+  const costCcys = currenciesInPlay.filter((c) => c !== baseCcy);
+  const walletCosts = summarizeRoundTripCosts(baseCcy, costCcys, "wallet");
+  const spotCosts = summarizeRoundTripCosts(baseCcy, costCcys, "spot");
+  const spotByCcy = new Map(spotCosts.map((r) => [r.ccy, r]));
+  const costRows = walletCosts
+    .map((r) => {
+      const spot = spotByCcy.get(r.ccy);
+      const spotLbl = spot ? `${spot.totalBps}bps` : "n/a";
+      return `- ${baseCcy}↔${r.ccy} (${r.pairClass}): entry ${r.entryBps}bps, exit ${r.exitBps}bps, round-trip ${r.totalBps}bps wallet / ${spotLbl} spot`;
+    })
+    .join("\n");
+
   const contextBlock = `FX WALLET & EXPOSURE (base = ${baseCcy}):
 Wallet balances:
 ${walletRows || "- (empty)"}
@@ -237,8 +258,12 @@ FX rates vs base:
 ${ratesRows || "- (unavailable)"}
 ${circuitLine}
 
+FX CONVERSION COSTS (mid → effective, bps deducted per leg):
+${costRows || "- (base only)"}
+
 FX pair signals (vs ${baseCcy}):
 ${signalsRows || "- (unavailable)"}`;
+
 
   // Rewritten playbook: concrete, rule-based, references the fields the
   // model actually sees above so its rationale can cite specific values.
@@ -274,9 +299,12 @@ Decision rules — evaluate in order, stop at the first that fires:
 
 SAFETY:
 - Never convert more than 40% of any single currency's balance in a single tick.
-- Book-entry conversions carry a ~25 bps effective spread — factor that in.
+- Every leg pays the pair-specific spread shown in FX CONVERSION COSTS above.
+  A JPY or AUD entry only makes sense when the expected forward return
+  exceeds the round-trip cost with margin — cite that math in your reason.
 - Every fx_conversion.reason MUST cite the rule number and the numeric trigger
   (e.g. "rule 3: exposureUSD 63% of NAV, vol20 18.4%").
+
 
 Format: fx_conversions is an array of { from_ccy, to_ccy, amount_percent (1..100 of the from balance), reason }.`;
 
@@ -385,14 +413,16 @@ export async function applyAiFxConversions(args: {
         applied.push({ ...base, rate: q.rate, source: q.source, rejected: `stale rate (${q.source})` });
         continue;
       }
-      // Apply the same 25 bps effective spread as the manual preview so book
-      // math and the UI stay consistent.
-      rate = q.rate * (1 - 25 / 10_000);
-      source = `ai:${q.source}`;
+      // Per-pair spread + wallet markup from the shared cost model — JPY/AUD
+      // crosses price wider than EURUSD, exotics wider still.
+      const costQuote = quoteFxCost(from, to, "wallet");
+      rate = applyFxCost(q.rate, costQuote);
+      source = `ai:${q.source}:${costQuote.pairClass}:${costQuote.totalBps}bps`;
     } catch (e) {
       applied.push({ ...base, rejected: e instanceof Error ? e.message : "fx quote failed" });
       continue;
     }
+
 
     const plan = planFxConversion({ wallet, from, to, amountFrom, rate });
     if (!plan.ok) {

@@ -991,13 +991,18 @@ export async function routeOrdersToBroker(params: {
         instrument_ccy: symToCcy.get(o.symbol) ?? portfolioCurrency,
       }));
 
+      const { quoteFxCost } = await import("./fx-cost-model");
+      const fxCostBps = (from: string, to: string) =>
+        quoteFxCost(from, to, fxExecutionMode === "spot" ? "spot" : "wallet").totalBps;
+
       let trim = trimBuysToBudgetByCurrency(
         buyOrders,
         wallet,
         portfolioCurrency,
         fxLookup,
-        { safetyBufferPct, allowFxConversion: true, isRateStale: isStale },
+        { safetyBufferPct, allowFxConversion: true, isRateStale: isStale, fxCostBps },
       );
+
 
       // Phase C: real spot FX. When fx_execution_mode='spot' and the adapter
       // implements placeFxSpot, submit each planned leg to the broker and
@@ -1080,8 +1085,9 @@ export async function routeOrdersToBroker(params: {
             wallet,
             portfolioCurrency,
             fxLookup,
-            { safetyBufferPct, allowFxConversion: true, isRateStale: isStale },
+            { safetyBufferPct, allowFxConversion: true, isRateStale: isStale, fxCostBps },
           );
+
           for (const [sym, reason] of droppedSymbols) {
             preSkips.set(`${sym}:buy`, `fx spot failed: ${reason}`);
           }
