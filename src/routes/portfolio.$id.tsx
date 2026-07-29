@@ -226,29 +226,76 @@ function PortfolioPage() {
   });
 
   // Auto-refresh live portfolios from the broker while the user has the page
-  // open. Runs a full cash + holdings reconcile on mount and every 5 minutes
-  // so what's shown here matches Saxo after AI trades or manual broker
-  // activity, without waiting for the nightly cron.
+  // open. Two layers keep the tile in sync with Saxo without waiting for the
+  // nightly cron:
+  //   1. Realtime: subscribe to live_orders + live_fills for this portfolio.
+  //      Any INSERT/UPDATE triggers an immediate reconcile so a broker fill
+  //      appears within ~1s of hitting the DB, and starts a "hot" window.
+  //   2. Adaptive polling: while hot (recent order activity) reconcile every
+  //      30s; otherwise fall back to a 5-minute pulse. This catches broker-
+  //      side fills that arrive without a Lovable-issued order webhook.
   const reconcileFn = useServerFn(reconcilePortfolio);
   const mode = q.data?.portfolio?.mode;
   const isLiveMode = mode === "live_prod" || mode === "live_sim";
   useEffect(() => {
     if (!ready || !isLiveMode) return;
     let cancelled = false;
-    const run = async () => {
+    let hotUntil = 0;
+    let timer: number | null = null;
+
+    const runReconcile = async (reason: string) => {
       try {
         await reconcileFn({ data: { portfolioId: id } });
-        if (!cancelled) {
-          qc.invalidateQueries({ queryKey: ["portfolio", id] });
-          qc.invalidateQueries({ queryKey: ["holdings-history", id] });
-        }
+        if (cancelled) return;
+        qc.invalidateQueries({ queryKey: ["portfolio", id] });
+        qc.invalidateQueries({ queryKey: ["holdings-history", id] });
+        qc.invalidateQueries({ queryKey: ["live-orders", id] });
+        qc.invalidateQueries({ queryKey: ["trades", id] });
       } catch (e) {
-        console.warn("auto broker reconcile failed", e);
+        console.warn(`auto broker reconcile failed (${reason})`, e);
       }
     };
-    run();
-    const t = window.setInterval(run, 5 * 60 * 1000);
-    return () => { cancelled = true; window.clearInterval(t); };
+
+    const schedule = () => {
+      if (cancelled) return;
+      const hot = Date.now() < hotUntil;
+      const delay = hot ? 30_000 : 5 * 60_000;
+      timer = window.setTimeout(async () => {
+        await runReconcile(hot ? "hot-pulse" : "idle-pulse");
+        schedule();
+      }, delay);
+    };
+
+    const goHot = (reason: string) => {
+      // Keep pulsing fast for 5 minutes after the last order/fill event so
+      // partial fills, cancellations, and settlement side-effects all land.
+      hotUntil = Date.now() + 5 * 60_000;
+      if (timer !== null) { window.clearTimeout(timer); timer = null; }
+      runReconcile(reason).then(schedule);
+    };
+
+    // Initial reconcile + baseline schedule.
+    runReconcile("mount").then(schedule);
+
+    const channel = supabase
+      .channel(`portfolio-live-${id}`)
+      .on(
+        "postgres_changes" as never,
+        { event: "*", schema: "public", table: "live_orders", filter: `portfolio_id=eq.${id}` },
+        (payload: { eventType: string }) => goHot(`live_orders:${payload.eventType}`),
+      )
+      .on(
+        "postgres_changes" as never,
+        { event: "*", schema: "public", table: "live_fills", filter: `portfolio_id=eq.${id}` },
+        (payload: { eventType: string }) => goHot(`live_fills:${payload.eventType}`),
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, isLiveMode, id]);
 
