@@ -71,6 +71,10 @@ export function VanguardBenchmarkCard({
     () => attributeAlpha(cmp, equity, deposits, cagr),
     [cmp, equity, deposits, cagr],
   );
+  const riskSim = useMemo(
+    () => simulateAlphaAtRiskLevels(attr, riskLevel ?? null),
+    [attr, riskLevel],
+  );
   const fmtCompact = useMemo(
     () =>
       new Intl.NumberFormat("en-GB", {
