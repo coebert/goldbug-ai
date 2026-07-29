@@ -260,26 +260,30 @@ export class SaxoAdapter implements BrokerAdapter {
       source = "me";
     }
 
-    // Saxo reports several money fields. CashBalance is settled cash only, so a
-    // brand-new account with a pending deposit shows 0 there even though the
-    // funds are visible in SpendingPower / CashAvailableForTrading /
-    // TransactionsNotBooked. Take the max of those *cash-only* fields so a
-    // pending deposit counts before it settles.
+    // Saxo's app-visible cash is CashBalance adjusted by TransactionsNotBooked.
+    // A negative TransactionsNotBooked means recent buys have executed but have
+    // not settled/booked yet; showing raw CashBalance makes Aegis report too
+    // much cash and too little invested value. A positive value captures a
+    // pending deposit before settlement.
+    //
+    // SpendingPower is intentionally NOT used as cash: it can include margin /
+    // collateral effects and would inflate the cash tile. Keep it only for
+    // pre-trade guardrails via `cashAvailable` / `spendingPower`.
     //
     // IMPORTANT: do NOT fold `TotalValue` into the cash figure — TotalValue is
     // cash + open positions valued at market, so including it double-counts
     // holdings once the account owns anything and inflates the reported cash.
     const settled = Number(bal.CashBalance ?? 0);
-    const notBooked = Number(bal.TransactionsNotBooked ?? 0);
+    const notBookedRaw = bal.TransactionsNotBooked == null
+      ? null
+      : Number(bal.TransactionsNotBooked);
+    const notBooked = Number.isFinite(notBookedRaw) ? notBookedRaw : null;
     const spending = bal.SpendingPower != null ? Number(bal.SpendingPower) : null;
     const availTrading =
       bal.CashAvailableForTrading != null ? Number(bal.CashAvailableForTrading) : null;
-    const cash = Math.max(
-      settled,
-      settled + notBooked,
-      spending ?? 0,
-      availTrading ?? 0,
-    );
+    const cash = Number.isFinite(settled)
+      ? settled + (notBooked ?? 0)
+      : (availTrading ?? spending ?? 0);
     // Preserve availability semantics for guardrails: what's tradable *right now*.
     const cashAvailable = spending ?? availTrading ?? cash;
     const reservedCash = Math.max(0, cash - cashAvailable);
@@ -300,7 +304,7 @@ export class SaxoAdapter implements BrokerAdapter {
       status: 200,
       request: asJson({ source, clientLookupError }),
       response: asJson({
-        cash, cashAvailable, notBooked,
+        cash, cashAvailable, notBooked: notBooked ?? null,
         settled, spending, availTrading,
         totalValue: bal.TotalValue ?? null,
         currency: bal.Currency ?? null,
