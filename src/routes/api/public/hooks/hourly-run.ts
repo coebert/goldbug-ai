@@ -27,45 +27,63 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           }
         } catch { /* body optional */ }
         const { runHourlyCycle, RunInProgressError } = await import("@/lib/hourly-run.server");
-        const task = runHourlyCycle({
+
+        // We used to fire-and-forget via ctx.waitUntil, but observed in
+        // production that the background promise silently never executed on
+        // some cron ticks — leaving decisions empty and the run_locks row
+        // stuck. Awaiting inline is safe: the endpoint's runHourlyCycleInner
+        // enforces its own RUN_BUDGET_MS (≈115s) and does mostly I/O, well
+        // within Worker wall-time limits. Cron (pg_net) does not care about
+        // response latency.
+        try {
+          const result = await runHourlyCycle({
             triggeredBy: manualTrigger ? "manual" : "cron",
             force: forceClear,
-          })
-          .then((result) => {
-            console.log(
-              `hourly-run: background cycle finished (${result.news_headlines} headlines, ${result.portfolios} portfolios)`,
-            );
-          })
-          .catch((error) => {
+          });
+          console.log(
+            `hourly-run: cycle finished (${result.news_headlines} headlines, ${result.portfolios} portfolios)`,
+          );
+          return new Response(
+            JSON.stringify({
+              success: true,
+              completed: true,
+              triggered_by: manualTrigger ? "manual" : "cron",
+              force: forceClear,
+              at: new Date().toISOString(),
+              portfolios: result.portfolios,
+              news_headlines: result.news_headlines,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        } catch (error) {
           if (error instanceof RunInProgressError) {
-              console.warn("hourly-run: background cycle skipped", {
-                message: error.message,
+            console.warn("hourly-run: cycle skipped", {
+              message: error.message,
+              held_by: error.heldBy,
+              acquired_at: error.acquiredAt,
+              age_ms: error.ageMs,
+            });
+            return new Response(
+              JSON.stringify({
+                success: true,
+                skipped: "run-in-progress",
                 held_by: error.heldBy,
                 acquired_at: error.acquiredAt,
                 age_ms: error.ageMs,
-              });
-              return;
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
           }
-            console.error("hourly-run: background cycle failed", error);
-          });
-
-        const ctx = (globalThis as unknown as { __cfCtx?: { waitUntil?: (p: Promise<unknown>) => void } }).__cfCtx;
-        try {
-          ctx?.waitUntil?.(task);
-        } catch {
-          // In local/dev runtimes the promise continues on the event loop.
+          console.error("hourly-run: cycle failed", error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            }),
+            { status: 500, headers: { "Content-Type": "application/json" } },
+          );
         }
 
-        return new Response(
-          JSON.stringify({
-            success: true,
-            started: true,
-            triggered_by: manualTrigger ? "manual" : "cron",
-            force: forceClear,
-            at: new Date().toISOString(),
-          }),
-          { status: 202, headers: { "Content-Type": "application/json" } },
-        );
       },
     },
   },

@@ -80,10 +80,31 @@ async function runHourlyCycleInner(
     await supabaseAdmin.from("run_locks").delete().eq("name", "hourly-run");
   }
 
+  // Defensive stale sweep: if a previous run's worker isolate died before
+  // the try/finally could release the lock, the row can wedge every future
+  // cron tick. Unconditionally drop any hourly-run row older than the
+  // staleness window so acquireRunLock always starts from a clean slate.
+  const STALE_MS = 3 * 60 * 1000;
+  try {
+    const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+    const swept = await supabaseAdmin
+      .from("run_locks")
+      .delete()
+      .eq("name", "hourly-run")
+      .lt("acquired_at", cutoff)
+      .select("owner, acquired_at");
+    if (swept.data && swept.data.length > 0) {
+      console.warn("hourly-run: swept stale run_locks row", swept.data[0]);
+    }
+  } catch (e) {
+    console.error("hourly-run: stale-lock sweep failed", e);
+  }
+
   const lock = await acquireRunLock("hourly-run", {
     owner: manualTrigger ? "manual" : "cron",
-    staleMs: 3 * 60 * 1000,
+    staleMs: STALE_MS,
   });
+
   if (!lock.acquired) {
     throw new RunInProgressError(
       `An hourly run is already in progress (started by ${lock.heldBy ?? "unknown"} ${Math.round(lock.ageMs / 1000)}s ago). Please wait for it to finish before triggering another.`,

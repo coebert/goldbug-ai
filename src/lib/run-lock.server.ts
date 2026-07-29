@@ -67,20 +67,32 @@ export async function acquireRunLock(
   const ageMs = Date.now() - new Date(acquiredAt).getTime();
 
   if (ageMs > staleMs) {
-    // Evict stale lock and claim it.
-    const takeover = await supabaseAdmin
+    // Evict stale lock and claim it. Use delete-then-insert (rather than an
+    // in-place UPDATE) so a crashed worker whose row somehow survived can
+    // never wedge future runs. The delete is scoped by (name, acquired_at)
+    // so a concurrent healthy holder that already renewed the row is not
+    // clobbered.
+    const del = await supabaseAdmin
       .from("run_locks")
-      .update({ owner, acquired_at: now.toISOString() })
+      .delete()
       .eq("name", name)
       .eq("acquired_at", acquiredAt)
-      .select("owner")
+      .select("name")
       .maybeSingle();
-    if (takeover.data) {
-      console.warn(`run-lock: evicted stale "${name}" (age ${Math.round(ageMs / 1000)}s)`);
-      return { acquired: true, owner, release: () => releaseRunLock(name, owner) };
+    if (del.data) {
+      const claim = await supabaseAdmin
+        .from("run_locks")
+        .insert({ name, acquired_at: now.toISOString(), owner })
+        .select("owner, acquired_at")
+        .maybeSingle();
+      if (claim.data) {
+        console.warn(`run-lock: evicted stale "${name}" (age ${Math.round(ageMs / 1000)}s, prev owner ${cur.data.owner ?? "unknown"})`);
+        return { acquired: true, owner, release: () => releaseRunLock(name, owner) };
+      }
     }
     // Someone else won the takeover race — fall through to busy.
   }
+
 
   return {
     acquired: false,
