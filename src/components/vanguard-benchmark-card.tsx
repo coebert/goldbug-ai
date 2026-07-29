@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  attributeAlpha,
   buildBenchmarkSeries,
   compareToVanguard,
   VANGUARD_CAGR,
