@@ -128,3 +128,34 @@ export function compareToVanguard(
     days,
   };
 }
+
+export type BenchmarkSeriesPoint = {
+  date: string;
+  portfolio: number;
+  benchmark: number;
+};
+
+/**
+ * Build an aligned equity-curve series for portfolio vs the passive
+ * Vanguard 60/40 proxy, using the portfolio's own snapshot dates as the
+ * time axis. Benchmark values are compounded from the first snapshot,
+ * with deposits added on their own date.
+ */
+export function buildBenchmarkSeries(
+  startingCash: number,
+  equity: EquityPoint[],
+  deposits: DepositLike[] = [],
+  cagr = VANGUARD_CAGR,
+): BenchmarkSeriesPoint[] {
+  const clean = equity
+    .filter((e) => Number.isFinite(Number(e.total_value)) && !!e.snapshot_date)
+    .slice()
+    .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+  if (!clean.length) return [];
+  const startDate = clean[0].snapshot_date;
+  return clean.map((p) => ({
+    date: p.snapshot_date,
+    portfolio: Number(p.total_value),
+    benchmark: benchmarkValueAt(startingCash, startDate, deposits, p.snapshot_date, cagr),
+  }));
+}
