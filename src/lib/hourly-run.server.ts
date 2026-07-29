@@ -75,8 +75,6 @@ async function runHourlyCycleInner(
   const runPreflightRefresh = opts.preflightRefresh ?? RUN_BUDGET_MS > 30_000;
   const { acquireRunLock } = await import("@/lib/run-lock.server");
   const { runDailyTick } = await import("@/lib/trading-engine.server");
-  const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
-  const { refreshLatestCandles } = await import("@/lib/market-data.server");
   const { filterUniverse } = await import("@/lib/universe.server");
   const { getMarketStatusForSymbol } = await import("@/lib/market-hours");
 
@@ -189,6 +187,7 @@ async function runHourlyCycleInner(
     let regimeInfo: unknown = null;
     if (runPreflightRefresh) {
       try {
+        const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
         regimeInfo = await detectAndPersistRegime(today);
       } catch (e) {
         console.error("hourly-run: regime detection failed", e);
@@ -219,6 +218,7 @@ async function runHourlyCycleInner(
     let priceRefresh = { refreshed: 0, errors: 0 };
     if (runPreflightRefresh && symbolSet.size > 0) {
       try {
+        const { refreshLatestCandles } = await import("@/lib/market-data.server");
         priceRefresh = await refreshLatestCandles(Array.from(symbolSet));
       } catch (e) {
         console.error("hourly-run: price refresh failed", e);
