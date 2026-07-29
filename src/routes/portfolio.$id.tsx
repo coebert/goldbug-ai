@@ -224,6 +224,33 @@ function PortfolioPage() {
     enabled: ready,
   });
 
+  // Auto-refresh live portfolios from the broker while the user has the page
+  // open. Runs a full cash + holdings reconcile on mount and every 5 minutes
+  // so what's shown here matches Saxo after AI trades or manual broker
+  // activity, without waiting for the nightly cron.
+  const reconcileFn = useServerFn(reconcilePortfolio);
+  const mode = q.data?.portfolio?.mode;
+  const isLiveMode = mode === "live_prod" || mode === "live_sim";
+  useEffect(() => {
+    if (!ready || !isLiveMode) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        await reconcileFn({ data: { portfolioId: id } });
+        if (!cancelled) {
+          qc.invalidateQueries({ queryKey: ["portfolio", id] });
+          qc.invalidateQueries({ queryKey: ["holdings-history", id] });
+        }
+      } catch (e) {
+        console.warn("auto broker reconcile failed", e);
+      }
+    };
+    run();
+    const t = window.setInterval(run, 5 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, isLiveMode, id]);
+
   const getHistory = useServerFn(getHoldingsHistory);
   const holdingsHistoryQ = useQuery({
     queryKey: ["holdings-history", id],
