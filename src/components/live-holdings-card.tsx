@@ -245,11 +245,26 @@ export function LiveHoldingsCard({
               {rows.length} {rows.length === 1 ? "position" : "positions"}
             </Badge>
           </CardTitle>
-          {isLive && (
-            <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
-              Real cash
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {isLive && (
+              <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
+                Real cash
+              </Badge>
+            )}
+            {isAnyLive && portfolioId && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={() => syncMut.mutate()}
+                disabled={syncMut.isPending}
+                aria-label="Sync holdings and cash from Saxo"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncMut.isPending ? "animate-spin" : ""}`} />
+                {syncMut.isPending ? "Syncing…" : "Sync now"}
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
