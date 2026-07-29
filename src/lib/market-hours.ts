@@ -180,12 +180,18 @@ export function getMarketStatusForVenue(venue: MarketVenue, now: Date = new Date
   const p = projectToVenueTime(now, session.tz);
   const minute = p.hh * 60 + p.mm;
   const isWeekend = p.weekday === 0 || p.weekday === 6;
-  const midSession = !isWeekend && minute >= session.openMin && minute < session.closeMin;
+  const inSessionWindow = !isWeekend && minute >= session.openMin && minute < session.closeMin;
+  const inLunch = !!session.breakMin
+    && inSessionWindow
+    && minute >= session.breakMin[0]
+    && minute < session.breakMin[1];
+  const midSession = inSessionWindow && !inLunch;
   const preOpen = !isWeekend && minute < session.openMin;
 
   let phase: MarketPhase;
   if (isWeekend) phase = "weekend";
   else if (midSession) phase = "open";
+  else if (inLunch) phase = "lunch";
   else if (preOpen) phase = "pre_open";
   else phase = "post_close";
 
