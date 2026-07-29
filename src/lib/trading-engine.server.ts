@@ -350,6 +350,7 @@ HARD RULES YOU MUST NEVER BREAK:
 - Keep at least ${(effectiveCashFloorPct(cfg, args.portfolio.risk_level) * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
 - Asset-class exposure caps: ${classLimitsStr}.
+${fxCcyLimitsStr ? `- Non-base currency exposure caps (base=${args.portfolio.currency.toUpperCase()}, sum of foreign-denominated holdings in base terms): ${fxCcyLimitsStr}. Buys that would breach these caps are rejected — never rely on borrowing.` : ""}
 - Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
 - Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
