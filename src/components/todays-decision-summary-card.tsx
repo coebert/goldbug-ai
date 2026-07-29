@@ -256,6 +256,10 @@ export function TodaysDecisionSummaryCard({ portfolioId, currency }: Props) {
                       e.outcomeDetail ||
                       (e.rationale ? e.rationale.split(/\n|\. /)[0] : null) ||
                       (e.action === "hold" ? "No signal strong enough to act." : "—");
+                    const mania =
+                      e.blockCategory === "retail_mania" && e.blockReason
+                        ? parseManiaReason(e.blockReason)
+                        : null;
                     return (
                       <div key={e.symbol} className="flex flex-col gap-1.5 p-2.5 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 flex-1 space-y-1">
@@ -268,10 +272,33 @@ export function TodaysDecisionSummaryCard({ portfolioId, currency }: Props) {
                                 {BLOCK_LABEL[e.blockCategory] ?? e.blockCategory}
                               </Badge>
                             )}
+                            {mania && (
+                              <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-500">
+                                {mania.tier} · score {mania.score}
+                              </Badge>
+                            )}
                           </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {reason}
-                          </p>
+                          {mania ? (
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">
+                                Retail-mania detector recommends{" "}
+                                <span className="font-medium text-foreground">{mania.verb}</span>. Score components:
+                              </p>
+                              <ul className="ml-3 space-y-0.5 text-[11px] text-muted-foreground">
+                                {mania.components.map((c, i) => (
+                                  <li key={i} className="flex flex-wrap items-baseline gap-1.5">
+                                    <span className="font-medium text-foreground">{c.label}</span>
+                                    <span>{c.detail}</span>
+                                    <span className="font-mono text-red-500">+{c.weight}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {reason}
+                            </p>
+                          )}
                         </div>
                         <div className="shrink-0 text-right text-[11px] text-muted-foreground">
                           {e.notional != null && (
