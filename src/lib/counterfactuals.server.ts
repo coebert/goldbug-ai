@@ -67,6 +67,7 @@ export async function evaluatePendingCounterfactuals(asOf: string) {
     .from("counterfactuals")
     .select("id, symbol, side, hypothetical_price, as_of")
     .is("evaluated_at", null)
+    .gt("hypothetical_price", 0)
     .lte("as_of", cutoffStr)
     .limit(200);
   if (!pending || pending.length === 0) return 0;
