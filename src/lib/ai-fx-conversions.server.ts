@@ -39,6 +39,11 @@ const SUPPORTED = ["GBP", "USD", "EUR", "CHF", "JPY", "CAD", "AUD"] as const;
 export function inferSymbolCurrency(symbol: string, portfolioCcy: string): string {
   const s = symbol.toUpperCase();
   if (s.endsWith(".L")) return "GBP";
+  if (s.endsWith(".T") || s.endsWith(":XTKS")) return "JPY";
+  if (s.endsWith(".AX") || s.endsWith(":XASX")) return "AUD";
+  if (s.endsWith(".DE") || s.endsWith(".PA") || s.endsWith(".MI") || s.endsWith(".AS")) return "EUR";
+  if (s.endsWith(".SW")) return "CHF";
+  if (s.endsWith(".TO")) return "CAD";
   if (s.endsWith("-USD")) return "USD";
   if (s.endsWith("=F")) return "USD";
   if (s.endsWith("=X")) return "USD"; // FX pairs settle via quote ccy — treat as USD-denominated notional here
