@@ -64,4 +64,37 @@ describe("vanguard-benchmark", () => {
     expect(cmp.contributed).toBe(1500);
     expect(cmp.portfolioReturnPct).toBeCloseTo(((1600 - 1500) / 1500) * 100, 2);
   });
+
+  it("computes time-weighted return that nets out mid-run deposits", () => {
+    const twr = portfolioTWR(
+      [
+        { snapshot_date: "2025-01-01", total_value: 1000 },
+        { snapshot_date: "2025-07-01", total_value: 1600 }, // +100 skill after 500 deposit
+        { snapshot_date: "2026-01-01", total_value: 1760 }, // +10% on 1600
+      ],
+      [{ date: "2025-06-15", amount: 500 }],
+    );
+    // seg1: (1600 - 500)/1000 - 1 = 0.10; seg2: 1760/1600 - 1 = 0.10 → 1.21 - 1
+    expect(twr).toBeCloseTo(0.21, 4);
+  });
+
+  it("decomposes alpha into timing, allocation, and deposit-timing that sum to total", () => {
+    const equity = [
+      { snapshot_date: "2025-01-01", total_value: 1000 },
+      { snapshot_date: "2026-01-01", total_value: 1600 },
+    ];
+    const deposits = [{ date: "2025-07-01", amount: 500 }];
+    const cmp = compareToVanguard(1000, equity, deposits);
+    const attr = attributeAlpha(cmp, equity, deposits);
+    // Components must reconcile to total currency alpha.
+    expect(attr.timing + attr.allocation + attr.depositTiming).toBeCloseTo(
+      cmp.alphaCcy,
+      6,
+    );
+    // Portfolio TWR is positive here, so timing skill should be positive.
+    expect(attr.timing).toBeGreaterThan(0);
+    // Late deposit in a rising benchmark hurts the passive baseline →
+    // depositTiming (lump-sum − actual passive) is positive.
+    expect(attr.depositTiming).toBeGreaterThan(0);
+  });
 });
