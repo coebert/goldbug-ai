@@ -232,6 +232,21 @@ export async function buildFxContext(args: {
     })
     .join("\n");
 
+  // Per-pair FX conversion cost table. Encodes the spread + wallet markup
+  // the AI must subtract from an expected return before entering (or holding)
+  // a foreign-currency position. JPY/AUD crosses are wider than EURUSD.
+  const costCcys = currenciesInPlay.filter((c) => c !== baseCcy);
+  const walletCosts = summarizeRoundTripCosts(baseCcy, costCcys, "wallet");
+  const spotCosts = summarizeRoundTripCosts(baseCcy, costCcys, "spot");
+  const spotByCcy = new Map(spotCosts.map((r) => [r.ccy, r]));
+  const costRows = walletCosts
+    .map((r) => {
+      const spot = spotByCcy.get(r.ccy);
+      const spotLbl = spot ? `${spot.totalBps}bps` : "n/a";
+      return `- ${baseCcy}↔${r.ccy} (${r.pairClass}): entry ${r.entryBps}bps, exit ${r.exitBps}bps, round-trip ${r.totalBps}bps wallet / ${spotLbl} spot`;
+    })
+    .join("\n");
+
   const contextBlock = `FX WALLET & EXPOSURE (base = ${baseCcy}):
 Wallet balances:
 ${walletRows || "- (empty)"}
@@ -243,8 +258,12 @@ FX rates vs base:
 ${ratesRows || "- (unavailable)"}
 ${circuitLine}
 
+FX CONVERSION COSTS (mid → effective, bps deducted per leg):
+${costRows || "- (base only)"}
+
 FX pair signals (vs ${baseCcy}):
 ${signalsRows || "- (unavailable)"}`;
+
 
   // Rewritten playbook: concrete, rule-based, references the fields the
   // model actually sees above so its rationale can cite specific values.
