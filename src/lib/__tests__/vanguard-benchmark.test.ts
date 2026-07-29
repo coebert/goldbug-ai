@@ -5,6 +5,7 @@ import {
   compareToVanguard,
   compound,
   portfolioTWR,
+  simulateAlphaAtRiskLevels,
   VANGUARD_CAGR,
 } from "@/lib/vanguard-benchmark";
 
