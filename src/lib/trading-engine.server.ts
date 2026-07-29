@@ -1418,6 +1418,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           );
         }
       }
+      {
+        const sellCcy = inferSymbolCurrency(meta.symbol, portfolioBaseCcy).toUpperCase();
+        if (sellCcy !== portfolioBaseCcy) {
+          currencyExposure.set(
+            sellCcy,
+            Math.max(0, (currencyExposure.get(sellCcy) ?? 0) - value),
+          );
+        }
+      }
+
       // Recompute slice plan against the actual executed notional so telemetry matches fills.
       const eaFinal = applyExecAlphaSell(meta.symbol, value, price);
       executed.push({
