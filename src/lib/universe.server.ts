@@ -118,10 +118,20 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "SLV", name: "iShares Silver Trust (NYSE)", asset_class: "commodity" },
   { symbol: "USO", name: "United States Oil Fund (NYSE)", asset_class: "commodity" },
   { symbol: "DBC", name: "Invesco DB Commodity Index (NYSE)", asset_class: "commodity" },
-  // FX
+  // FX — reference/context symbols used by price cache warming, FX signals
+  // (Yahoo `${FROM}${TO}=X`) and the AI conversion planner. Adding a pair here
+  // does NOT route orders; settlement legs are driven by wallet cash_by_ccy
+  // and the FX conversion planner. JPY/AUD pairs support the Tokyo (`.T`) and
+  // ASX (`.AX`) instruments in the equity universe above.
   { symbol: "GBPUSD=X", name: "GBP/USD", asset_class: "fx" },
   { symbol: "EURUSD=X", name: "EUR/USD", asset_class: "fx" },
   { symbol: "GBPEUR=X", name: "GBP/EUR", asset_class: "fx" },
+  { symbol: "USDJPY=X", name: "USD/JPY", asset_class: "fx" },
+  { symbol: "GBPJPY=X", name: "GBP/JPY", asset_class: "fx" },
+  { symbol: "EURJPY=X", name: "EUR/JPY", asset_class: "fx" },
+  { symbol: "AUDUSD=X", name: "AUD/USD", asset_class: "fx" },
+  { symbol: "GBPAUD=X", name: "GBP/AUD", asset_class: "fx" },
+  { symbol: "EURAUD=X", name: "EUR/AUD", asset_class: "fx" },
 ];
 
 export function filterUniverse(classes: AssetClass[]): UniverseSymbol[] {
