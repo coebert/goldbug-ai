@@ -15,6 +15,7 @@ import {
   attributeAlpha,
   buildBenchmarkSeries,
   compareToVanguard,
+  simulateAlphaAtRiskLevels,
   VANGUARD_CAGR,
   type DepositLike,
   type EquityPoint,
