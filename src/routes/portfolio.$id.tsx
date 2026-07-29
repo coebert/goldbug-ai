@@ -1395,7 +1395,7 @@ function PortfolioPage() {
               </TabsContent>
 
               <TabsContent value="risk" className="mt-4 space-y-4">
-                <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} />
+                <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} baseCurrency={p.currency} />
                 <ExecutionCalibrationCard
                   portfolioId={id}
                   execParams={(p.risk_config as { execution_params?: Parameters<typeof ExecutionCalibrationCard>[0]["execParams"] } | null)?.execution_params ?? null}
