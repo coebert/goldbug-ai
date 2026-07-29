@@ -20,6 +20,12 @@ import { readWallet, walletBalance, writeWalletFields, type Wallet } from "./por
 import { getFxCircuitState } from "./fx-circuit.server";
 import { asJson } from "./_server/db-json";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  applyFxCost,
+  quoteFxCost,
+  summarizeRoundTripCosts,
+} from "./fx-cost-model";
+
 
 export const FxConversionOrderSchema = z.object({
   from_ccy: z.string().length(3),
