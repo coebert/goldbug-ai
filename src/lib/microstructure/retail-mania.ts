@@ -30,16 +30,39 @@ export type ManiaInput = {
 
 export type ManiaTier = "none" | "watch" | "mania";
 
+export type ManiaComponent =
+  | "parabola5d"
+  | "parabola30d"
+  | "rsi"
+  | "volume"
+  | "shortSqueeze"
+  | "gamma"
+  | "social";
+
+/** One score contribution — displayable as "5d parabola +2.0". */
+export type ManiaScoreItem = {
+  component: ManiaComponent;
+  /** Short human-readable label ("5d parabola", "RSI extreme"). */
+  label: string;
+  /** Weight this component added to the total score. */
+  weight: number;
+  /** Rendered detail ("+62% ≥ +50%", "RSI 88"). */
+  detail: string;
+};
+
 export type ManiaSignal = {
   symbol: string;
   tier: ManiaTier;
   score: number;
   reasons: string[];
+  /** Per-component score contributions, in fire order. */
+  scoreBreakdown: ManiaScoreItem[];
   /** If true, callers MUST reject new BUYs on this symbol. */
   blockNewBuys: boolean;
   /** If true, callers should trim an existing long into strength. */
   trimExistingLong: boolean;
 };
+
 
 /**
  * Evaluate a single symbol for retail-mania / short-squeeze conditions.
