@@ -120,5 +120,21 @@ export async function runReconciliation(
     console.warn("order-status reconciliation failed", e);
   }
 
-  return { drift, cashDrift, positionDrift: symDrift, orderRecon };
+  return {
+    drift,
+    cashDrift,
+    positionDrift: symDrift,
+    orderRecon,
+    brokerCash: bal.cash,
+    brokerTotalValue: bal.totalValue,
+    currency: bal.currency,
+    brokerPositions: pos.map((p) => ({
+      symbol: p.symbol,
+      quantity: Number(p.quantity),
+      avgPrice: Number(p.avgPrice),
+      marketPrice: Number(p.marketPrice),
+      currency: p.currency,
+    })),
+    localPositions,
+  };
 }
