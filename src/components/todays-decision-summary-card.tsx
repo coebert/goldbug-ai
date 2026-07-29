@@ -41,8 +41,38 @@ const BLOCK_LABEL: Record<string, string> = {
   per_symbol_cap: "Per-symbol cap",
   min_trade_size: "Below minimum trade size",
   circuit_breaker: "Circuit breaker",
+  retail_mania: "Retail-mania guardrail",
   other: "Other guardrail",
 };
+
+/**
+ * Parse the compact `formatManiaExplanation()` string emitted by
+ * `src/lib/microstructure/retail-mania.ts` back into displayable rows.
+ * Format: "retail-mania guardrail (tier, score N.N): verb — Label detail (+w); ..."
+ */
+type ManiaBreakdown = {
+  tier: string;
+  score: string;
+  verb: string;
+  components: Array<{ label: string; detail: string; weight: string }>;
+};
+
+function parseManiaReason(reason: string): ManiaBreakdown | null {
+  const head = reason.match(/^retail-mania guardrail \(([^,]+), score ([\d.]+)\):\s*([^—]+?)\s*—\s*(.+)$/i);
+  if (!head) return null;
+  const [, tier, score, verb, tail] = head;
+  const components = tail
+    .split(";")
+    .map((s) => s.trim())
+    .map((seg) => {
+      const m = seg.match(/^(.*?)\s+(.+?)\s*\(\+([\d.]+)\)\s*$/);
+      if (!m) return null;
+      return { label: m[1].trim(), detail: m[2].trim(), weight: m[3] };
+    })
+    .filter((x): x is { label: string; detail: string; weight: string } => x !== null);
+  if (components.length === 0) return null;
+  return { tier: tier.trim(), score, verb: verb.trim(), components };
+}
 
 function outcomeBadge(outcome: string | null) {
   const map: Record<string, { label: string; className: string; Icon: React.ComponentType<{ className?: string }> }> = {
