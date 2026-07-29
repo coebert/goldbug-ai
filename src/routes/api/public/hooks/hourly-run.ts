@@ -28,17 +28,15 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         } catch { /* body optional */ }
         const { runHourlyCycle, RunInProgressError } = await import("@/lib/hourly-run.server");
 
-        // We used to fire-and-forget via ctx.waitUntil, but observed in
-        // production that the background promise silently never executed on
-        // some cron ticks — leaving decisions empty and the run_locks row
-        // stuck. Awaiting inline is safe: the endpoint's runHourlyCycleInner
-        // enforces its own RUN_BUDGET_MS (≈115s) and does mostly I/O, well
-        // within Worker wall-time limits. Cron (pg_net) does not care about
-        // response latency.
+        // Run inline, but with a request-safe budget. Longer background work
+        // has been observed getting dropped by the worker lifecycle, leaving
+        // run_locks stuck; a bounded inline run is safer and releases locks.
         try {
           const result = await runHourlyCycle({
             triggeredBy: manualTrigger ? "manual" : "cron",
             force: forceClear,
+            timeBudgetMs: 22_000,
+            skipNewsInTicks: true,
           });
           console.log(
             `hourly-run: cycle finished (${result.news_headlines} headlines, ${result.portfolios} portfolios)`,
