@@ -57,6 +57,10 @@ const TradeErrorDashboardCard = lazy(() =>
 const TradeOutcomePanelCard = lazy(() =>
   import("@/components/trade-outcome-panel-card").then((m) => ({ default: m.TradeOutcomePanelCard })),
 );
+const TodaysDecisionSummaryCard = lazy(() =>
+  import("@/components/todays-decision-summary-card").then((m) => ({ default: m.TodaysDecisionSummaryCard })),
+);
+
 const FxHealthCard = lazy(() =>
   import("@/components/fx-health-card").then((m) => ({ default: m.FxHealthCard })),
 );
