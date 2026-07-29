@@ -1282,7 +1282,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // enforce cfg.fx_currency_limits without allowing leverage — cap can only
   // shrink a proposed buy, never inflate one, and never permit borrowing.
   const { inferSymbolCurrency } = await import("./ai-fx-conversions.server");
-  const portfolioBaseCcy = (args.portfolio.currency || "USD").toUpperCase();
+  const portfolioBaseCcy = (portfolio.currency || "USD").toUpperCase();
   const currencyExposure = new Map<string, number>();
   for (const h of holdingsByS.values()) {
     const ccy = inferSymbolCurrency(h.symbol, portfolioBaseCcy).toUpperCase();
