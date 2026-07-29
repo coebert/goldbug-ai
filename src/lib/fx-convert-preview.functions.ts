@@ -65,11 +65,12 @@ export const previewFxConversion = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "FX_UNAVAILABLE", detail: `No FX quote for ${fromCcy}->${toCcy}.` };
     }
 
-    const spreadBps = data.execution === "spot" ? SPREAD_BPS.spot : SPREAD_BPS.wallet;
-    // Effective rate after applying half-spread to each side; single-leg
-    // approximation: rate * (1 - bps/10000).
-    const effectiveRate = midQuote.rate * (1 - spreadBps / 10_000);
-    const feeFrom = Math.round(data.amountFrom * (spreadBps / 10_000) * 100) / 100;
+    const costQuote = quoteFxCost(fromCcy, toCcy, data.execution);
+    const spreadBps = costQuote.totalBps;
+    // Effective rate after applying the per-pair spread + wallet markup.
+    const effectiveRate = applyFxCost(midQuote.rate, costQuote);
+    const { fee: feeFrom } = feeInFromCcy(data.amountFrom, fromCcy, toCcy, data.execution);
+
 
     const plan = planFxConversion({
       wallet,
