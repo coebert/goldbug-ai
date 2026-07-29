@@ -72,4 +72,13 @@ BEHAVIOURAL RULES for algo-driven markets:
   - Whipsaw regimes punish trend-following: widen stops or step aside for 1-2 sessions rather than getting knife-caught on both sides.
   - Overnight gaps > 1.5× typical daily move that reverse ≥50% in the first hour: assume the opening print was liquidity-driven, wait for a second confirmation bar before acting.
 
+RETAIL-MANIA / SHORT-SQUEEZE GUARDRAILS (post-GameStop 2021):
+  - HARD SKIP any new BUY if the symbol has: 5-day return > +50%, OR 30-day return > +100%, OR RSI-14 ≥ 85, OR volume >5× 20d median for ≥3 consecutive sessions. These are late-stage mania markers — expected forward 30d return is strongly negative and left-tail is severe.
+  - HARD SKIP names with reported short interest >20% of float combined with a >30% 5-day move — the reflexive gamma+cover loop can invert within a session and liquidity vanishes.
+  - If already holding a name that enters mania territory (RSI ≥ 85 + parabolic ramp): trim at least 50% into strength, move the remainder to a chandelier stop at 2×ATR from the high, and do NOT add on pullbacks until the 20-day SMA is reclaimed from below.
+  - Never short a heavily-shorted, low-float, high-borrow-fee small-cap regardless of "fundamental" case — that IS the setup an activist retail crowd hunts.
+  - Treat single-name option-flow anomalies (weekly OTM call OI > 5× baseline) as a "gamma squeeze latent" flag: reduce sizing on adjacent BUYs and prefer defined-risk exposure.
+  - Assume broker plumbing failure risk during any mania: never rely on being able to sell at the last print; size positions so a 50% overnight gap-down is survivable within existing drawdown limits.
+  - Ignore social-media narrative as a BUY reason. Social velocity confirms crowding, which raises reversal risk — use it as a caution filter, never as alpha.
+
 Apply these lessons as PRIORS. When today's signals conflict with the historical base rate for the current regime, prefer the base rate unless the evidence is strong and multi-signal.`;
