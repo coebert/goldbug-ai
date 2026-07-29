@@ -180,7 +180,11 @@ export function trimBuysToBudgetByCurrency(
     }
 
     // base × rate = native → baseNeeded = shortfall / rate.
-    const baseNeeded = shortfall / rateInfo.rate;
+    // Inflate the base debit by the pair-specific FX cost so we set aside
+    // enough GBP/EUR to survive the wallet spread + markup at settlement.
+    const bps = Math.max(0, opts?.fxCostBps?.(base, ccy) ?? 0);
+    const grossUp = bps > 0 ? 1 + bps / 10_000 : 1;
+    const baseNeeded = (shortfall / rateInfo.rate) * grossUp;
     const baseAvailable = buffered[base] ?? 0;
     if (baseNeeded > baseAvailable + 1e-6) {
       decisions.push({
@@ -205,6 +209,7 @@ export function trimBuysToBudgetByCurrency(
       triggeredBySymbol: o.symbol,
     };
     fxLegs.push(leg);
+
 
     debit(ccy, notionalNative);
     bump(totalAllowedByCcy, ccy, notionalNative);
