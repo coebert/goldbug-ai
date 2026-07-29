@@ -41,9 +41,22 @@ type RiskConfig = {
   commodity_group_limits: Partial<Record<CommodityGroup, number>>;
   commodity_min_adv_usd: number;
   commodity_max_atr_pct: number;
+  fx_currency_limits: Partial<Record<string, number>>;
   diversification_tilt?: "off" | "balanced" | "strong";
   risk_level?: number;
 };
+
+// Currencies the app can settle in today. Base currency is filtered out in the
+// UI since caps only apply to non-base holdings.
+const FX_CCY_OPTIONS: { code: string; label: string }[] = [
+  { code: "USD", label: "US Dollar" },
+  { code: "EUR", label: "Euro" },
+  { code: "GBP", label: "Pound sterling" },
+  { code: "JPY", label: "Japanese yen" },
+  { code: "AUD", label: "Australian dollar" },
+  { code: "CAD", label: "Canadian dollar" },
+  { code: "CHF", label: "Swiss franc" },
+];
 
 const DEFAULTS: RiskConfig = {
   asset_class_limits: { stock: 0.6, etf: 0.8, crypto: 0.2, commodity: 0.3, fx: 0.3 },
@@ -59,7 +72,9 @@ const DEFAULTS: RiskConfig = {
   commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
   commodity_min_adv_usd: 250_000,
   commodity_max_atr_pct: 0.06,
+  fx_currency_limits: {},
 };
+
 
 function parseCfg(raw: unknown): RiskConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULTS };
