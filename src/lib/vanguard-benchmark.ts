@@ -241,3 +241,85 @@ export function attributeAlpha(
     benchmarkTwrPct: bTwr * 100,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Risk-level "what-if" simulation
+// ---------------------------------------------------------------------------
+
+export type RiskLevelKey = "conservative" | "balanced" | "aggressive";
+
+/**
+ * Preset profile per risk level, mirroring `riskProfile()` in
+ * universe.server.ts. Duplicated here (as plain numbers) so this module
+ * stays server-runtime free and safe to import from the client bundle.
+ */
+export const RISK_PRESETS: Record<
+  RiskLevelKey,
+  { maxPositionPct: number; cashFloorPct: number; label: string }
+> = {
+  conservative: { maxPositionPct: 0.10, cashFloorPct: 0.20, label: "Conservative" },
+  balanced:     { maxPositionPct: 0.15, cashFloorPct: 0.10, label: "Balanced" },
+  aggressive:   { maxPositionPct: 0.25, cashFloorPct: 0.00, label: "Aggressive" },
+};
+
+function normaliseRiskKey(level: string | null | undefined): RiskLevelKey {
+  const k = (level ?? "").toLowerCase();
+  if (k === "conservative" || k === "balanced" || k === "aggressive") return k;
+  return "balanced";
+}
+
+export interface SimulatedAlpha {
+  level: RiskLevelKey;
+  label: string;
+  isCurrent: boolean;
+  timing: number;
+  allocation: number;
+  depositTiming: number;
+  total: number;
+  exposureFactor: number;   // scales timing (equity exposure vs current)
+  concentrationFactor: number; // scales allocation (position cap vs current)
+}
+
+/**
+ * Project what the alpha attribution would have looked like under each risk
+ * preset, given the *current* run's realised drivers.
+ *
+ * Model (kept deliberately simple and transparent):
+ *   • Timing scales with equity exposure     = (1 − cashFloor(level)) / (1 − cashFloor(current))
+ *   • Allocation scales with position cap    = maxPos(level) / maxPos(current)
+ *   • Deposit timing is untouched — it lives in the passive baseline, not the AI.
+ *
+ * This is a linear counterfactual, not a full re-simulation of trades. It's
+ * meant to show the *shape* of how risk dials would have amplified or
+ * dampened the two skill components, not a promise of exact P&L.
+ */
+export function simulateAlphaAtRiskLevels(
+  attr: AlphaAttribution,
+  currentLevel: string | null | undefined,
+): SimulatedAlpha[] {
+  const current = normaliseRiskKey(currentLevel);
+  const cur = RISK_PRESETS[current];
+  const curExposure = Math.max(0.01, 1 - cur.cashFloorPct);
+  const curPos = Math.max(0.001, cur.maxPositionPct);
+
+  const levels: RiskLevelKey[] = ["conservative", "balanced", "aggressive"];
+  return levels.map((level) => {
+    const p = RISK_PRESETS[level];
+    const exposureFactor = (1 - p.cashFloorPct) / curExposure;
+    const concentrationFactor = p.maxPositionPct / curPos;
+    const timing = attr.timing * exposureFactor;
+    const allocation = attr.allocation * concentrationFactor;
+    const depositTiming = attr.depositTiming;
+    return {
+      level,
+      label: p.label,
+      isCurrent: level === current,
+      timing,
+      allocation,
+      depositTiming,
+      total: timing + allocation + depositTiming,
+      exposureFactor,
+      concentrationFactor,
+    };
+  });
+}
