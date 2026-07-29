@@ -92,10 +92,32 @@ export function LiveHoldingsCard({
       return reconcileFn({ data: { portfolioId } });
     },
     onSuccess: (r) => {
-      const drift = r && typeof r === "object" && "drift" in r ? (r as { drift?: boolean }).drift : undefined;
-      toast[drift ? "warning" : "success"](
-        drift ? "Synced — drift vs broker detected (see reconciliation log)" : "Synced with Saxo",
-      );
+      const res = (r ?? {}) as {
+        drift?: boolean;
+        cashDrift?: number;
+        positionDrift?: string[];
+        brokerCash?: number;
+        brokerTotalValue?: number;
+        currency?: string;
+        brokerPositions?: Array<{ symbol: string; quantity: number }>;
+      };
+      const ccy = res.currency ?? "GBP";
+      const count = res.brokerPositions?.length ?? 0;
+      const total = res.brokerTotalValue;
+      const cash = res.brokerCash;
+      const summary =
+        total != null && cash != null
+          ? `Saxo: ${count} position${count === 1 ? "" : "s"} · cash ${ccy} ${cash.toFixed(2)} · total ${ccy} ${total.toFixed(2)}`
+          : `Saxo returned ${count} position${count === 1 ? "" : "s"}`;
+      if (res.drift) {
+        const posDetail = (res.positionDrift ?? []).slice(0, 4).join(", ");
+        toast.warning(`Drift vs broker — ${summary}`, {
+          description: posDetail || (res.cashDrift ? `cash Δ=${res.cashDrift.toFixed(2)}` : undefined),
+          duration: 8000,
+        });
+      } else {
+        toast.success(`Up to date with Saxo`, { description: summary, duration: 6000 });
+      }
       if (portfolioId) {
         qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
         qc.invalidateQueries({ queryKey: ["holdings-history", portfolioId] });
