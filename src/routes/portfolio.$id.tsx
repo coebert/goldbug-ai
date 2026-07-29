@@ -889,6 +889,7 @@ function PortfolioPage() {
                   currency={String(p.currency ?? "GBP")}
                   equity={equity as { snapshot_date: string; total_value: number }[]}
                   deposits={depositEvents}
+                  riskLevel={p.risk_level}
                 />
               </div>
             )}

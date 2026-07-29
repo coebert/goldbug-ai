@@ -5,6 +5,7 @@ import {
   compareToVanguard,
   compound,
   portfolioTWR,
+  simulateAlphaAtRiskLevels,
   VANGUARD_CAGR,
 } from "@/lib/vanguard-benchmark";
 
@@ -96,5 +97,41 @@ describe("vanguard-benchmark", () => {
     // Late deposit in a rising benchmark hurts the passive baseline →
     // depositTiming (lump-sum − actual passive) is positive.
     expect(attr.depositTiming).toBeGreaterThan(0);
+  });
+
+  it("simulates alpha at each risk level, scaling timing and allocation", () => {
+    const attr = {
+      timing: 100,
+      allocation: 50,
+      depositTiming: 20,
+      total: 170,
+      portfolioTwrPct: 10,
+      benchmarkTwrPct: 5,
+    };
+    const sim = simulateAlphaAtRiskLevels(attr, "balanced");
+    expect(sim.map((s) => s.level)).toEqual([
+      "conservative",
+      "balanced",
+      "aggressive",
+    ]);
+    const bal = sim.find((s) => s.level === "balanced")!;
+    expect(bal.isCurrent).toBe(true);
+    expect(bal.exposureFactor).toBeCloseTo(1, 6);
+    expect(bal.concentrationFactor).toBeCloseTo(1, 6);
+    expect(bal.timing).toBeCloseTo(100, 6);
+    expect(bal.allocation).toBeCloseTo(50, 6);
+
+    const cons = sim.find((s) => s.level === "conservative")!;
+    expect(cons.timing).toBeLessThan(bal.timing);
+    expect(cons.allocation).toBeLessThan(bal.allocation);
+    expect(cons.depositTiming).toBe(20);
+
+    const agg = sim.find((s) => s.level === "aggressive")!;
+    expect(agg.timing).toBeGreaterThan(bal.timing);
+    expect(agg.allocation).toBeGreaterThan(bal.allocation);
+
+    for (const r of sim) {
+      expect(r.total).toBeCloseTo(r.timing + r.allocation + r.depositTiming, 6);
+    }
   });
 });

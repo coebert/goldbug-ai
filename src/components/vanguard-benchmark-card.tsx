@@ -15,6 +15,7 @@ import {
   attributeAlpha,
   buildBenchmarkSeries,
   compareToVanguard,
+  simulateAlphaAtRiskLevels,
   VANGUARD_CAGR,
   type DepositLike,
   type EquityPoint,
@@ -36,6 +37,8 @@ interface Props {
   equity: EquityPoint[];
   deposits?: DepositLike[];
   cagr?: number;
+  /** Portfolio's current risk_level (conservative | balanced | aggressive). */
+  riskLevel?: string | null;
 }
 
 export function VanguardBenchmarkCard({
@@ -44,6 +47,7 @@ export function VanguardBenchmarkCard({
   equity,
   deposits = [],
   cagr = VANGUARD_CAGR,
+  riskLevel,
 }: Props) {
   const fmtCcy = useMemo(
     () =>
@@ -66,6 +70,10 @@ export function VanguardBenchmarkCard({
   const attr = useMemo(
     () => attributeAlpha(cmp, equity, deposits, cagr),
     [cmp, equity, deposits, cagr],
+  );
+  const riskSim = useMemo(
+    () => simulateAlphaAtRiskLevels(attr, riskLevel ?? null),
+    [attr, riskLevel],
   );
   const fmtCompact = useMemo(
     () =>
@@ -246,6 +254,63 @@ export function VanguardBenchmarkCard({
               </p>
             </div>
 
+            <div className="rounded-md border bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Risk-level what-if
+                </div>
+                <div className="font-mono text-[10px] text-muted-foreground">
+                  vs Vanguard
+                </div>
+              </div>
+              <div className="-mx-1 overflow-x-auto">
+                <table className="w-full min-w-[380px] text-xs">
+                  <thead>
+                    <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <th className="px-1 py-1 font-medium">Level</th>
+                      <th className="px-1 py-1 text-right font-medium">Timing</th>
+                      <th className="px-1 py-1 text-right font-medium">Allocation</th>
+                      <th className="px-1 py-1 text-right font-medium">Total α</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {riskSim.map((r) => (
+                      <tr
+                        key={r.level}
+                        className={
+                          r.isCurrent
+                            ? "border-t border-primary/40 bg-primary/5"
+                            : "border-t border-border/50"
+                        }
+                      >
+                        <td className="px-1 py-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">{r.label}</span>
+                            {r.isCurrent && (
+                              <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                                current
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="font-mono text-[10px] text-muted-foreground">
+                            exp ×{r.exposureFactor.toFixed(2)} · conc ×{r.concentrationFactor.toFixed(2)}
+                          </div>
+                        </td>
+                        <SimCell amount={r.timing} fmt={fmtCcy} />
+                        <SimCell amount={r.allocation} fmt={fmtCcy} />
+                        <SimCell amount={r.total} fmt={fmtCcy} bold />
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Linear counterfactual: timing scales with equity exposure
+                (1 − cash floor), allocation scales with the position cap.
+                Deposit timing is unchanged. Not a full re-simulation.
+              </p>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
               <span className={`font-medium ${alphaCls}`}>{verdict}</span>
               <span className="font-mono text-muted-foreground">
@@ -314,3 +379,27 @@ function AttrRow({
     </div>
   );
 }
+
+function SimCell({
+  amount,
+  fmt,
+  bold,
+}: {
+  amount: number;
+  fmt: Intl.NumberFormat;
+  bold?: boolean;
+}) {
+  const positive = amount >= 0;
+  const cls = positive
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-destructive";
+  return (
+    <td
+      className={`px-1 py-1.5 text-right tabular-nums ${cls} ${bold ? "font-semibold" : ""}`}
+    >
+      {positive ? "+" : ""}
+      {fmt.format(amount)}
+    </td>
+  );
+}
+
