@@ -113,6 +113,18 @@ function parseCfg(raw: unknown): RiskConfig {
     commodity_max_atr_pct: Number.isFinite(Number(r.commodity_max_atr_pct))
       ? Number(r.commodity_max_atr_pct)
       : DEFAULTS.commodity_max_atr_pct,
+    fx_currency_limits: (() => {
+      const src = (r.fx_currency_limits ?? {}) as Record<string, unknown>;
+      const out: Partial<Record<string, number>> = {};
+      for (const [k, v] of Object.entries(src)) {
+        const code = String(k || "").toUpperCase().trim();
+        if (!/^[A-Z]{3}$/.test(code)) continue;
+        if (v == null || v === "") continue;
+        const n = Number(v);
+        if (Number.isFinite(n)) out[code] = Math.max(0, Math.min(1, n));
+      }
+      return out;
+    })(),
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
     diversification_tilt:
       r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
@@ -120,6 +132,7 @@ function parseCfg(raw: unknown): RiskConfig {
         : "off",
   };
 }
+
 
 
 const CLASSES: { key: AssetClass; label: string }[] = [
