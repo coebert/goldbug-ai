@@ -159,3 +159,85 @@ export function buildBenchmarkSeries(
     benchmark: benchmarkValueAt(startingCash, startDate, deposits, p.snapshot_date, cagr),
   }));
 }
+
+/**
+ * Time-weighted return of the portfolio computed from an equity series
+ * and dated deposits. Segment returns are chained after netting deposits
+ * that land inside each segment, so cash top-ups don't inflate skill.
+ */
+export function portfolioTWR(
+  equity: EquityPoint[],
+  deposits: DepositLike[] = [],
+): number {
+  const clean = equity
+    .filter((e) => Number.isFinite(Number(e.total_value)) && !!e.snapshot_date)
+    .slice()
+    .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+  if (clean.length < 2) return 0;
+  const deps = deposits
+    .filter((d) => Number.isFinite(Number(d.amount)) && !!d.date)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  let twr = 1;
+  for (let i = 1; i < clean.length; i++) {
+    const prev = clean[i - 1];
+    const cur = clean[i];
+    const prevVal = Number(prev.total_value);
+    const curVal = Number(cur.total_value);
+    if (!(prevVal > 0)) continue;
+    const depsIn = deps.reduce((a, d) => {
+      const t = d.date;
+      return t > prev.snapshot_date && t <= cur.snapshot_date
+        ? a + Number(d.amount)
+        : a;
+    }, 0);
+    const seg = (curVal - depsIn) / prevVal - 1;
+    if (Number.isFinite(seg)) twr *= 1 + seg;
+  }
+  return twr - 1;
+}
+
+export interface AlphaAttribution {
+  timing: number; // selection skill per £, sized to contributed capital
+  allocation: number; // residual: deposit-weighted vs time-weighted skill diff
+  depositTiming: number; // effect of deposit schedule on the passive baseline
+  total: number; // alphaCcy = timing + allocation + depositTiming
+  portfolioTwrPct: number;
+  benchmarkTwrPct: number;
+}
+
+/**
+ * Decompose the currency alpha vs the Vanguard 60/40 passive proxy into
+ * three intuitive drivers:
+ *
+ *   • Timing (skill)  = contributed × (portfolio TWR − benchmark TWR)
+ *   • Deposits timing = lump-sum-passive − actual-passive  (schedule effect)
+ *   • Allocation      = residual (portfolio final − TWR-implied final)
+ *
+ * By construction: timing + allocation + depositTiming === alphaCcy.
+ */
+export function attributeAlpha(
+  cmp: VanguardComparison,
+  equity: EquityPoint[],
+  deposits: DepositLike[] = [],
+  cagr = VANGUARD_CAGR,
+): AlphaAttribution {
+  const pTwr = portfolioTWR(equity, deposits);
+  const bTwr = cmp.days > 0 ? Math.pow(1 + cagr, cmp.days / 365) - 1 : 0;
+  const lumpSumBench = cmp.contributed * (1 + bTwr);
+  const lumpSumPort = cmp.contributed * (1 + pTwr);
+
+  const timing = lumpSumPort - lumpSumBench;
+  const depositTiming = lumpSumBench - cmp.benchmarkValue;
+  const allocation = cmp.portfolioValue - lumpSumPort;
+
+  return {
+    timing,
+    allocation,
+    depositTiming,
+    total: cmp.alphaCcy,
+    portfolioTwrPct: pTwr * 100,
+    benchmarkTwrPct: bTwr * 100,
+  };
+}

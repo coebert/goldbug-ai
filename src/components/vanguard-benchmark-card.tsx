@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  attributeAlpha,
   buildBenchmarkSeries,
   compareToVanguard,
   VANGUARD_CAGR,
@@ -61,6 +62,10 @@ export function VanguardBenchmarkCard({
   const series = useMemo(
     () => buildBenchmarkSeries(startingCash, equity, deposits, cagr),
     [startingCash, equity, deposits, cagr],
+  );
+  const attr = useMemo(
+    () => attributeAlpha(cmp, equity, deposits, cagr),
+    [cmp, equity, deposits, cagr],
   );
   const fmtCompact = useMemo(
     () =>
@@ -206,6 +211,41 @@ export function VanguardBenchmarkCard({
               </div>
             )}
 
+            <div className="rounded-md border bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Where the alpha came from
+                </div>
+                <div className="font-mono text-[10px] text-muted-foreground">
+                  TWR {fmtPct(attr.portfolioTwrPct)} vs {fmtPct(attr.benchmarkTwrPct)}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <AttrRow
+                  label="Timing"
+                  amount={attr.timing}
+                  fmt={fmtCcy}
+                  hint="Skill per £: portfolio TWR vs passive TWR, sized to contributed capital."
+                />
+                <AttrRow
+                  label="Allocation"
+                  amount={attr.allocation}
+                  fmt={fmtCcy}
+                  hint="Residual: how deposit-weighted returns differed from time-weighted skill (mix / sizing effect)."
+                />
+                <AttrRow
+                  label="Deposit timing"
+                  amount={attr.depositTiming}
+                  fmt={fmtCcy}
+                  hint="Effect of when top-ups landed vs a lump-sum-on-day-1 passive baseline."
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Components sum to the total alpha above; positive values mean
+                that driver added to your edge over the passive baseline.
+              </p>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
               <span className={`font-medium ${alphaCls}`}>{verdict}</span>
               <span className="font-mono text-muted-foreground">
@@ -243,6 +283,34 @@ function Tile({
         {value}
       </div>
       {sub && <div className={`text-xs tabular-nums ${cls ?? "text-muted-foreground"}`}>{sub}</div>}
+    </div>
+  );
+}
+
+function AttrRow({
+  label,
+  amount,
+  fmt,
+  hint,
+}: {
+  label: string;
+  amount: number;
+  fmt: Intl.NumberFormat;
+  hint: string;
+}) {
+  const positive = amount >= 0;
+  const cls = positive
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-destructive";
+  const display = `${positive ? "+" : ""}${fmt.format(amount)}`;
+  return (
+    <div className="rounded-md border bg-card/40 p-2" title={hint}>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className={`mt-0.5 text-sm font-semibold tabular-nums ${cls}`}>
+        {display}
+      </div>
     </div>
   );
 }
