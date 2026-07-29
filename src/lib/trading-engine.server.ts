@@ -1703,6 +1703,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
+      // Enforce per-currency FX exposure cap for non-base holdings. Cap-only
+      // — never inflates spend and never permits borrowing. Applies whether
+      // the symbol's asset class is stock/etf/crypto/commodity/fx.
+      const buyCcy = inferSymbolCurrency(meta.symbol, portfolioBaseCcy).toUpperCase();
+      let fxCurrencyRejected: string | null = null;
+      if (buyCcy !== portfolioBaseCcy) {
+        const ccyCap = cfg.fx_currency_limits?.[buyCcy];
+        if (ccyCap != null) {
+          const ccyMax = totalValue * ccyCap;
+          const roomInCcy = Math.max(0, ccyMax - (currencyExposure.get(buyCcy) ?? 0));
+          if (roomInCcy <= 0) {
+            fxCurrencyRejected = `fx-currency cap reached for ${buyCcy} (max ${(ccyCap * 100).toFixed(0)}% of NAV)`;
+          }
+          spend = Math.min(spend, roomInCcy);
+        }
+      }
+
+
+
       // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue.
       // Phase 5 — when risk_parity_enabled, scale the vol budget by |alpha|
       // so higher-conviction systematic setups earn a bigger share of the
