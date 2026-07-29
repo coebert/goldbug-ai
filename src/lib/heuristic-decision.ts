@@ -142,6 +142,18 @@ export function buildHeuristicBuys(
     if (typeof f.change5d !== "number" || f.change5d < 0.002) continue;
     if (typeof f.rsi14 !== "number" || f.rsi14 < 45 || f.rsi14 > 70) continue;
     if (typeof f.macd_hist !== "number" || f.macd_hist < 0) continue;
+    // Retail-mania / short-squeeze guardrail (post-GameStop 2021): hard-skip
+    // names showing parabolic ramps even if the momentum filter above would
+    // otherwise clear them. The RSI 45–70 window already blocks the classic
+    // GME setup, but this makes the intent explicit and defends against
+    // combinations where RSI has just rolled back into range mid-parabola.
+    const mania = detectRetailMania({
+      symbol: f.symbol,
+      change5d: f.change5d,
+      change30d: f.change30d,
+      rsi14: f.rsi14,
+    });
+    if (mania.blockNewBuys) continue;
     const score = f.change30d * 2 + f.change5d * 5 + f.macd_hist * 0.5;
     scored.push({
       symbol: f.symbol,
