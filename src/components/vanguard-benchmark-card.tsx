@@ -3,6 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Scale, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  buildBenchmarkSeries,
   compareToVanguard,
   VANGUARD_CAGR,
   type DepositLike,
