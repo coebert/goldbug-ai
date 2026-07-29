@@ -340,7 +340,7 @@ function AdminPage() {
             </Button>
             {manual.isSuccess && manual.data && (
               <span className="text-xs text-muted-foreground">
-                Run started — results will surface as the background cycle completes (usually within a minute or two).
+                Run completed — {manual.data.results.filter((r) => r.ok && !r.skipped).length} ran, {manual.data.results.filter((r) => r.skipped).length} skipped.
               </span>
             )}
           </div>
