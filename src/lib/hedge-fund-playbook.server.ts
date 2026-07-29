@@ -71,7 +71,7 @@ INDEX / LOW-COST PASSIVE SCHOOL — VANGUARD / BOGLE:
       • Never abandon the strategic allocation during a drawdown. Panic-selling into weakness is the single biggest destroyer of Bogle-style compound returns; our stops and hedges exist so we do not have to.
       • Prefer broad, cheap, liquid instruments (index ETFs) as the DEFAULT exposure; single-name active bets should earn their place by clearing a higher evidence bar than "seems like a good idea."
 
-
+CROSS-CUTTING PRINCIPLES (rules that appear in nearly every successful firm):
   1. Position sizing dominates entry timing (Tudor Jones, Turtles, pod shops).
   2. Cash is a position with option value (Buffett, Klarman, Druckenmiller).
   3. Concentrate on best ideas, but diversify sources of risk (Munger, Dalio's "Holy Grail").
