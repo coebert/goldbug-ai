@@ -1992,6 +1992,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           (commodityGroupExposure.get(commodityGroupKey) ?? 0) + outcome.effectiveSpend,
         );
       }
+      if (buyCcy !== portfolioBaseCcy) {
+        currencyExposure.set(
+          buyCcy,
+          (currencyExposure.get(buyCcy) ?? 0) + outcome.effectiveSpend,
+        );
+      }
+
       // Phase 6 — slice plan telemetry (attached to executed row).
       const slicePlan = cfg.execution_slicing_enabled
         ? planOrderSlices({
