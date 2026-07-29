@@ -210,6 +210,67 @@ describe("SaxoAdapter.getClientKey (via getHistoricalOrder)", () => {
 });
 
 // ------------------------------------------------------------------------
+// 1b. getBalance — app-visible cash after unsettled transactions
+// ------------------------------------------------------------------------
+
+describe("SaxoAdapter.getBalance", () => {
+  it("subtracts negative TransactionsNotBooked so cash matches the Saxo app after unsettled buys", async () => {
+    const { SaxoAdapter } = await importAdapter();
+    fetchHandler = (url) => {
+      if (url.includes("/port/v1/accounts/me")) {
+        return jsonResponse({
+          Data: [{ AccountKey: "ACC-1", Active: true, LegalAssetTypes: ["Stock", "Etf"] }],
+        });
+      }
+      if (url.includes("/port/v1/balances") && url.includes("AccountKey=ACC-1")) {
+        return jsonResponse({
+          CashBalance: 8419.49,
+          TransactionsNotBooked: -5917.54,
+          CashAvailableForTrading: 2501.95,
+          SpendingPower: 2501.95,
+          TotalValue: 10282.95,
+          Currency: "GBP",
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    };
+
+    const adapter = new SaxoAdapter({ env: "live", token: "t", userId: "u" });
+    const balance = await adapter.getBalance();
+
+    expect(balance.cash).toBeCloseTo(2501.95, 10);
+    expect(balance.totalValue).toBeCloseTo(10282.95, 10);
+    expect(balance.transactionsNotBooked).toBeCloseTo(-5917.54, 10);
+    expect(balance.cash).not.toBeCloseTo(8419.49, 2);
+  });
+
+  it("does not treat margin-style SpendingPower as cash", async () => {
+    const { SaxoAdapter } = await importAdapter();
+    fetchHandler = (url) => {
+      if (url.includes("/port/v1/accounts/me")) {
+        return jsonResponse({ Data: [{ AccountKey: "ACC-1", Active: true }] });
+      }
+      if (url.includes("/port/v1/balances") && url.includes("AccountKey=ACC-1")) {
+        return jsonResponse({
+          CashBalance: 100,
+          TransactionsNotBooked: 0,
+          SpendingPower: 1000,
+          TotalValue: 600,
+          Currency: "GBP",
+        });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    };
+
+    const adapter = new SaxoAdapter({ env: "live", token: "t", userId: "u" });
+    const balance = await adapter.getBalance();
+
+    expect(balance.cash).toBe(100);
+    expect(balance.spendingPower).toBe(1000);
+  });
+});
+
+// ------------------------------------------------------------------------
 // 2. getPositions — valuation fallbacks when CurrentPrice = 0
 // ------------------------------------------------------------------------
 
