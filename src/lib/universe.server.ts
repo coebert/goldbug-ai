@@ -252,7 +252,15 @@ export type RiskConfig = {
   // propose diversifiers whenever the guardrail room is available. Purely a
   // prompt-level bias — it never overrides hard `asset_class_limits`.
   diversification_tilt: "off" | "balanced" | "strong";
+  // Per-non-base-currency exposure caps (0..1) as fraction of NAV in
+  // base-currency terms. Applies to any holding whose instrument currency is
+  // NOT the portfolio's base currency (e.g. JPY holdings for a GBP portfolio).
+  // Keys are ISO 4217 codes (uppercase). Missing/empty = no cap for that
+  // currency. Cap-only: it can only shrink a proposed buy, never force one,
+  // and never permits borrowing.
+  fx_currency_limits: Partial<Record<string, number>>;
 };
+
 
 /**
  * Effective cash-floor fraction (0..1). Prefers the per-portfolio override on
