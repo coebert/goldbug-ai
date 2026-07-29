@@ -37,6 +37,8 @@ interface Props {
   equity: EquityPoint[];
   deposits?: DepositLike[];
   cagr?: number;
+  /** Portfolio's current risk_level (conservative | balanced | aggressive). */
+  riskLevel?: string | null;
 }
 
 export function VanguardBenchmarkCard({
@@ -45,6 +47,7 @@ export function VanguardBenchmarkCard({
   equity,
   deposits = [],
   cagr = VANGUARD_CAGR,
+  riskLevel,
 }: Props) {
   const fmtCcy = useMemo(
     () =>
