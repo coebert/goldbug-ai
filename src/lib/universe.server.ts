@@ -62,6 +62,26 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "8058.T", name: "Mitsubishi Corp (TSE)", asset_class: "stock" },
   { symbol: "1321.T", name: "Nomura Nikkei 225 ETF (TSE)", asset_class: "etf" },
   { symbol: "1306.T", name: "iShares TOPIX ETF (TSE)", asset_class: "etf" },
+  // Australia — ASX (Yahoo `.AX` suffix → Saxo ASX). Curated large-cap,
+  // high-liquidity names spanning banks, miners, healthcare and consumer,
+  // plus an ASX 200 index ETF for broad AUD exposure. Saxo cash accounts
+  // route these natively; settlement FX (GBP/EUR → AUD) is handled by the
+  // wallet layer. Market hours 10:00–16:00 Australia/Sydney are already
+  // wired in `market-hours-card.tsx`.
+  { symbol: "BHP.AX", name: "BHP Group (ASX)", asset_class: "stock" },
+  { symbol: "CBA.AX", name: "Commonwealth Bank of Australia (ASX)", asset_class: "stock" },
+  { symbol: "CSL.AX", name: "CSL Ltd (ASX)", asset_class: "stock" },
+  { symbol: "NAB.AX", name: "National Australia Bank (ASX)", asset_class: "stock" },
+  { symbol: "WBC.AX", name: "Westpac Banking (ASX)", asset_class: "stock" },
+  { symbol: "ANZ.AX", name: "ANZ Group (ASX)", asset_class: "stock" },
+  { symbol: "RIO.AX", name: "Rio Tinto (ASX)", asset_class: "stock" },
+  { symbol: "FMG.AX", name: "Fortescue (ASX)", asset_class: "stock" },
+  { symbol: "WES.AX", name: "Wesfarmers (ASX)", asset_class: "stock" },
+  { symbol: "WOW.AX", name: "Woolworths Group (ASX)", asset_class: "stock" },
+  { symbol: "TLS.AX", name: "Telstra Group (ASX)", asset_class: "stock" },
+  { symbol: "MQG.AX", name: "Macquarie Group (ASX)", asset_class: "stock" },
+  { symbol: "STW.AX", name: "SPDR S&P/ASX 200 ETF (ASX)", asset_class: "etf" },
+  { symbol: "IOZ.AX", name: "iShares Core S&P/ASX 200 ETF (ASX)", asset_class: "etf" },
   // Crypto — spot pairs (Yahoo price feed only; NOT Saxo-tradable, kept for
   // reference/backtesting where the fetchers already understand them).
   { symbol: "BTC-USD", name: "Bitcoin", asset_class: "crypto" },
