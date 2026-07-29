@@ -296,10 +296,15 @@ function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
 export function RiskControlsCard({
   portfolioId,
   riskConfig,
+  baseCurrency,
 }: {
   portfolioId: string;
   riskConfig: unknown;
+  baseCurrency?: string;
 }) {
+  const base = (baseCurrency ?? "GBP").toUpperCase();
+  const fxOptions = FX_CCY_OPTIONS.filter((o) => o.code !== base);
+
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
   const [level, setLevel] = useState<number>(
