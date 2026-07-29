@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Globe2 } from "lucide-react";
+import { ChevronDown, Globe2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/home/section-header";
 import { ukZoneAbbr } from "@/lib/uk-time";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * Home-screen card that lists every venue the AI can trade on, with
