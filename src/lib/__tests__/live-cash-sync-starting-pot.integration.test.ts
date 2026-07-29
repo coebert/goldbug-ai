@@ -113,6 +113,10 @@ function makeDb(store: Store): ScopedDbClient {
         filters.push((r) => String(r[col]) >= val);
         return builder;
       },
+      lt(col: string, val: string) {
+        filters.push((r) => String(r[col]) < val);
+        return builder;
+      },
       order(col: string, opts: { ascending: boolean }) {
         order = { col, asc: opts.ascending };
         return builder;

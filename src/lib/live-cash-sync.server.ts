@@ -5,10 +5,10 @@
 //
 // Rules:
 //  * Only touches live_sim / live_prod portfolios.
-//  * The delta (broker ledger cash − local cash) is applied to BOTH current_cash and
+//  * The delta (broker account cash − local cash) is applied to BOTH current_cash and
 //    starting_cash so PnL/return calculations don't spike as a fake gain/loss
 //    when the user deposits or withdraws money at the broker.
-//  * Never use broker spendable cash / SpendingPower for equity snapshots:
+//  * Never use broker margin-style spendable cash / SpendingPower for equity snapshots:
 //    it can be lower than settled cash when cash is reserved or ring-fenced,
 //    and comparing that spendable figure with ledger snapshots creates false
 //    "stale real-money equity" warnings.
@@ -268,7 +268,7 @@ export async function syncLiveCashFromBroker(
         response: asJson({
           brokerCash,
           brokerSpendableCash,
-          brokerCashBasis: "ledger",
+          brokerCashBasis: "settled_plus_transactions_not_booked",
           brokerTotalValue,
           delta,
           snapshotRewritten: true, holdingsValueForSnapshot, currency,
@@ -289,7 +289,7 @@ export async function syncLiveCashFromBroker(
         response: asJson({
           brokerCash,
           brokerSpendableCash,
-          brokerCashBasis: "ledger",
+          brokerCashBasis: "settled_plus_transactions_not_booked",
           brokerTotalValue,
           delta,
           walletRewritten: true,
@@ -431,7 +431,7 @@ export async function syncLiveCashFromBroker(
     response: asJson({
       brokerCash,
       brokerSpendableCash,
-      brokerCashBasis: "ledger",
+      brokerCashBasis: "settled_plus_transactions_not_booked",
       brokerTotalValue,
       delta,
       newCash: brokerCash,
