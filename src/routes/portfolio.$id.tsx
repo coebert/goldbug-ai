@@ -78,6 +78,11 @@ const WalletAffordabilityCard = lazy(() =>
 const WalletHistoryCard = lazy(() =>
   import("@/components/wallet-history-card").then((m) => ({ default: m.WalletHistoryCard })),
 );
+const MultiCurrencyExposureCard = lazy(() =>
+  import("@/components/multi-currency-exposure-card").then((m) => ({
+    default: m.MultiCurrencyExposureCard,
+  })),
+);
 
 
 
