@@ -299,9 +299,12 @@ Decision rules — evaluate in order, stop at the first that fires:
 
 SAFETY:
 - Never convert more than 40% of any single currency's balance in a single tick.
-- Book-entry conversions carry a ~25 bps effective spread — factor that in.
+- Every leg pays the pair-specific spread shown in FX CONVERSION COSTS above.
+  A JPY or AUD entry only makes sense when the expected forward return
+  exceeds the round-trip cost with margin — cite that math in your reason.
 - Every fx_conversion.reason MUST cite the rule number and the numeric trigger
   (e.g. "rule 3: exposureUSD 63% of NAV, vol20 18.4%").
+
 
 Format: fx_conversions is an array of { from_ccy, to_ccy, amount_percent (1..100 of the from balance), reason }.`;
 
