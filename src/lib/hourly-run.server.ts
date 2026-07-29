@@ -56,20 +56,25 @@ function classesFromUniverse(u: unknown): Array<"stock" | "etf" | "crypto" | "co
 export async function runHourlyCycle(opts: {
   triggeredBy: "manual" | "cron";
   force?: boolean;
+  /** Keep request-bound runs below platform timeout. Defaults to 24s. */
+  timeBudgetMs?: number;
+  /** Skip per-tick news scoring; news-refresh cron keeps cache warm separately. */
+  skipNewsInTicks?: boolean;
+  /** Run broad token/news/regime/price refreshes before portfolio ticks. */
+  preflightRefresh?: boolean;
 }): Promise<HourlyRunResult> {
   return withRunMetrics((metrics) => runHourlyCycleInner(opts, metrics));
 }
 
 async function runHourlyCycleInner(
-  opts: { triggeredBy: "manual" | "cron"; force?: boolean },
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean },
   metrics: import("@/lib/run-metrics.server").RunMetrics,
 ): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
-  const RUN_BUDGET_MS = 115 * 1000;
+  const RUN_BUDGET_MS = Math.max(8_000, Math.min(opts.timeBudgetMs ?? 24_000, 115_000));
+  const runPreflightRefresh = opts.preflightRefresh ?? RUN_BUDGET_MS > 30_000;
   const { acquireRunLock } = await import("@/lib/run-lock.server");
   const { runDailyTick } = await import("@/lib/trading-engine.server");
-  const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
-  const { refreshLatestCandles } = await import("@/lib/market-data.server");
   const { filterUniverse } = await import("@/lib/universe.server");
   const { getMarketStatusForSymbol } = await import("@/lib/market-hours");
 
@@ -117,52 +122,6 @@ async function runHourlyCycleInner(
   try {
     const today = new Date().toISOString().slice(0, 10);
 
-    const saxoRefresh: Record<string, { ok: boolean; error?: string; skipped?: string }> = {};
-    try {
-      const { forceRefreshTokens, getOAuthStatus } = await import("@/lib/brokers/saxo-oauth.server");
-      for (const env of ["sim", "live"] as const) {
-        try {
-          const status = await getOAuthStatus(env);
-          if (!status.appConfigured) {
-            saxoRefresh[env] = { ok: true, skipped: "app not configured" };
-            continue;
-          }
-          if (!status.connected || status.usingLegacyToken) {
-            saxoRefresh[env] = { ok: true, skipped: "no oauth row yet" };
-            continue;
-          }
-          const r = await forceRefreshTokens(env);
-          saxoRefresh[env] = r.refreshed ? { ok: true } : { ok: true, skipped: r.reason };
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.error(`hourly-run: saxo refresh failed for ${env}`, msg);
-          saxoRefresh[env] = { ok: false, error: msg };
-        }
-      }
-    } catch (e) {
-      console.error("hourly-run: saxo refresh module load failed", e);
-    }
-
-    let newsCount = 0;
-    try {
-      const { invalidateContextCache } = await import("@/lib/market-context-cache.server");
-      invalidateContextCache();
-      const { count } = await supabaseAdmin
-        .from("news_cache")
-        .select("id", { count: "exact", head: true })
-        .eq("news_date", today);
-      newsCount = count ?? 0;
-    } catch (e) {
-      console.error("hourly-run: news cache count failed", e);
-    }
-
-    let regimeInfo: unknown = null;
-    try {
-      regimeInfo = await detectAndPersistRegime(today);
-    } catch (e) {
-      console.error("hourly-run: regime detection failed", e);
-    }
-
     const { data: allPortfolios, error } = await supabaseAdmin
       .from("portfolios")
       .select("id, name, user_id, universe, mode, live_paused")
@@ -173,7 +132,67 @@ async function runHourlyCycleInner(
     const portfolios = (allPortfolios ?? []).filter(
       (p) => !(p.mode !== "paper" && p.live_paused),
     );
+    portfolios.sort((a, b) => {
+      const priority = (mode: string) => (mode === "live_prod" ? 0 : mode === "live_sim" ? 1 : 2);
+      return priority(String(a.mode)) - priority(String(b.mode));
+    });
     const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
+
+    const saxoRefresh: Record<string, { ok: boolean; error?: string; skipped?: string }> = {};
+    if (runPreflightRefresh) {
+      try {
+        const { forceRefreshTokens, getOAuthStatus } = await import("@/lib/brokers/saxo-oauth.server");
+        for (const env of ["sim", "live"] as const) {
+          try {
+            const status = await getOAuthStatus(env);
+            if (!status.appConfigured) {
+              saxoRefresh[env] = { ok: true, skipped: "app not configured" };
+              continue;
+            }
+            if (!status.connected || status.usingLegacyToken) {
+              saxoRefresh[env] = { ok: true, skipped: "no oauth row yet" };
+              continue;
+            }
+            const r = await forceRefreshTokens(env);
+            saxoRefresh[env] = r.refreshed ? { ok: true } : { ok: true, skipped: r.reason };
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error(`hourly-run: saxo refresh failed for ${env}`, msg);
+            saxoRefresh[env] = { ok: false, error: msg };
+          }
+        }
+      } catch (e) {
+        console.error("hourly-run: saxo refresh module load failed", e);
+      }
+    } else {
+      saxoRefresh.live = { ok: true, skipped: "bounded run — broker access refreshes inside live tick" };
+      saxoRefresh.sim = { ok: true, skipped: "bounded run — broker access refreshes inside live tick" };
+    }
+
+    let newsCount = 0;
+    if (runPreflightRefresh) {
+      try {
+        const { invalidateContextCache } = await import("@/lib/market-context-cache.server");
+        invalidateContextCache();
+        const { count } = await supabaseAdmin
+          .from("news_cache")
+          .select("id", { count: "exact", head: true })
+          .eq("news_date", today);
+        newsCount = count ?? 0;
+      } catch (e) {
+        console.error("hourly-run: news cache count failed", e);
+      }
+    }
+
+    let regimeInfo: unknown = null;
+    if (runPreflightRefresh) {
+      try {
+        const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
+        regimeInfo = await detectAndPersistRegime(today);
+      } catch (e) {
+        console.error("hourly-run: regime detection failed", e);
+      }
+    }
 
     const symbolSet = new Set<string>();
     for (const p of portfolios) {
@@ -197,8 +216,9 @@ async function runHourlyCycleInner(
     for (const h of heldRows ?? []) symbolSet.add(h.symbol);
 
     let priceRefresh = { refreshed: 0, errors: 0 };
-    if (symbolSet.size > 0) {
+    if (runPreflightRefresh && symbolSet.size > 0) {
       try {
+        const { refreshLatestCandles } = await import("@/lib/market-data.server");
         priceRefresh = await refreshLatestCandles(Array.from(symbolSet));
       } catch (e) {
         console.error("hourly-run: price refresh failed", e);
@@ -290,7 +310,7 @@ async function runHourlyCycleInner(
           }
         }
 
-        const r = await runDailyTick(p.id, today);
+        const r = await runDailyTick(p.id, today, { skipNews: opts.skipNewsInTicks ?? true });
         bumpPortfolio("ok");
         results.push({
           id: p.id,

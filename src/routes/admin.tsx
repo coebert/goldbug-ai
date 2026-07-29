@@ -231,10 +231,11 @@ function AdminPage() {
 
   const manual = useMutation({
     mutationFn: (vars: { force?: boolean } = {}) => triggerRun({ data: { force: vars.force === true } }),
-    onSuccess: () => {
-      toast.success("Hourly run started", {
-        description:
-          "The full cycle (news, prices, per-portfolio ticks) is running in the background. Health and results will refresh over the next minute.",
+    onSuccess: (result) => {
+      const ran = result.results.filter((r) => r.ok && !r.skipped).length;
+      const skipped = result.results.filter((r) => r.skipped).length;
+      toast.success("Hourly run completed", {
+        description: `${ran} portfolio tick(s) ran, ${skipped} skipped. Live portfolios are prioritised to keep manual runs reliable.`,
       });
       // Poll health a few times so the UI catches up without needing a manual refresh.
       q.refetch();
@@ -339,7 +340,7 @@ function AdminPage() {
             </Button>
             {manual.isSuccess && manual.data && (
               <span className="text-xs text-muted-foreground">
-                Run started — results will surface as the background cycle completes (usually within a minute or two).
+                Run completed — {manual.data.results.filter((r) => r.ok && !r.skipped).length} ran, {manual.data.results.filter((r) => r.skipped).length} skipped.
               </span>
             )}
           </div>
