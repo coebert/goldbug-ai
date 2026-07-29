@@ -56,16 +56,20 @@ function classesFromUniverse(u: unknown): Array<"stock" | "etf" | "crypto" | "co
 export async function runHourlyCycle(opts: {
   triggeredBy: "manual" | "cron";
   force?: boolean;
+  /** Keep request-bound runs below platform timeout. Defaults to 24s. */
+  timeBudgetMs?: number;
+  /** Skip per-tick news scoring; news-refresh cron keeps cache warm separately. */
+  skipNewsInTicks?: boolean;
 }): Promise<HourlyRunResult> {
   return withRunMetrics((metrics) => runHourlyCycleInner(opts, metrics));
 }
 
 async function runHourlyCycleInner(
-  opts: { triggeredBy: "manual" | "cron"; force?: boolean },
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean },
   metrics: import("@/lib/run-metrics.server").RunMetrics,
 ): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
-  const RUN_BUDGET_MS = 115 * 1000;
+  const RUN_BUDGET_MS = Math.max(8_000, Math.min(opts.timeBudgetMs ?? 24_000, 115_000));
   const { acquireRunLock } = await import("@/lib/run-lock.server");
   const { runDailyTick } = await import("@/lib/trading-engine.server");
   const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
@@ -173,6 +177,10 @@ async function runHourlyCycleInner(
     const portfolios = (allPortfolios ?? []).filter(
       (p) => !(p.mode !== "paper" && p.live_paused),
     );
+    portfolios.sort((a, b) => {
+      const priority = (mode: string) => (mode === "live_prod" ? 0 : mode === "live_sim" ? 1 : 2);
+      return priority(String(a.mode)) - priority(String(b.mode));
+    });
     const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
 
     const symbolSet = new Set<string>();
@@ -290,7 +298,7 @@ async function runHourlyCycleInner(
           }
         }
 
-        const r = await runDailyTick(p.id, today);
+        const r = await runDailyTick(p.id, today, { skipNews: opts.skipNewsInTicks ?? true });
         bumpPortfolio("ok");
         results.push({
           id: p.id,

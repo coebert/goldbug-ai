@@ -450,12 +450,18 @@ Return:
 If no action is warranted, return an empty orders array.`;
 
 
+  const timeoutRaw = Number(process.env.AI_DECISION_TIMEOUT_MS ?? 15_000);
+  const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 15_000;
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+
   try {
     const { output } = await generateText({
       model,
       system,
       prompt: user,
       output: Output.object({ schema: DecisionSchema }),
+      abortSignal: abortController.signal,
     });
     return output;
   } catch (error) {
@@ -467,7 +473,10 @@ If no action is warranted, return an empty orders array.`;
     // risk keeps coming down even when the model is unreachable. No BUYs
     // are proposed without the model's risk view.
     const parseFail = NoObjectGeneratedError.isInstance(error);
-    const msg = parseFail
+    const aborted = error instanceof Error && error.name === "AbortError";
+    const msg = aborted
+      ? `AI decision timed out after ${Math.round(timeoutMs / 1000)}s`
+      : parseFail
       ? (error.text?.slice(0, 300) ?? "structured output parse error")
       : (error instanceof Error ? error.message : String(error));
     console.warn(
@@ -527,6 +536,8 @@ If no action is warranted, return an empty orders array.`;
         orders: [],
       };
     }
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
