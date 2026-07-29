@@ -11,6 +11,8 @@ export type MarketVenue =
   | "LSE"
   | "NYSE"
   | "NASDAQ"
+  | "TSE_JP"
+  | "ASX"
   | "CRYPTO"
   | "FX"
   | "OTHER";
@@ -20,6 +22,7 @@ export type MarketPhase =
   | "pre_open"
   | "post_close"
   | "weekend"
+  | "lunch"
   | "always_open"
   | "unknown";
 
@@ -45,11 +48,21 @@ export interface MarketStatus {
 // Session windows in local venue time. Kept intentionally simple — we do NOT
 // model holidays here (Saxo will simply hold the order over any calendar
 // day the exchange is closed; the reconciler treats "queued" the same way it
-// treats a weekend).
-const SESSIONS: Record<MarketVenue, { openMin: number; closeMin: number; tz: string } | null> = {
+// treats a weekend). TSE_JP has an intra-day lunch break (11:30–12:30 JST);
+// during that window `isOpen` is false and the phase is "lunch". Orders
+// queued during lunch reconcile normally once the afternoon session opens.
+const SESSIONS: Record<MarketVenue, {
+  openMin: number;
+  closeMin: number;
+  tz: string;
+  /** Optional intra-day break as [startMin, endMin) in local time. */
+  breakMin?: [number, number];
+} | null> = {
   LSE:    { openMin: 8 * 60,          closeMin: 16 * 60 + 30, tz: "Europe/London" },
   NYSE:   { openMin: 9 * 60 + 30,     closeMin: 16 * 60,       tz: "America/New_York" },
   NASDAQ: { openMin: 9 * 60 + 30,     closeMin: 16 * 60,       tz: "America/New_York" },
+  TSE_JP: { openMin: 9 * 60,          closeMin: 15 * 60,       tz: "Asia/Tokyo",       breakMin: [11 * 60 + 30, 12 * 60 + 30] },
+  ASX:    { openMin: 10 * 60,         closeMin: 16 * 60,       tz: "Australia/Sydney" },
   CRYPTO: null, // 24/7
   FX:     null, // Global FX runs ~24/5, but our per-tick decisions treat it as always_open.
   OTHER:  null,
@@ -63,6 +76,10 @@ export function inferVenue(symbol: string): MarketVenue {
   // Crypto spot pairs use `-USD` (Yahoo) or contain common ticker fragments.
   if (/-USD$|-USDT$|-EUR$/.test(s)) return "CRYPTO";
   if (/^(BTC|ETH|SOL|ADA|USDT|USDC)/.test(s)) return "CRYPTO";
+  // Tokyo — Yahoo `.T` or Saxo `SYMBOL:XTKS`.
+  if (s.endsWith(".T") || s.endsWith(":XTKS")) return "TSE_JP";
+  // ASX — Yahoo `.AX` or Saxo `SYMBOL:XASX`.
+  if (s.endsWith(".AX") || s.endsWith(":XASX")) return "ASX";
   // LSE — either Yahoo `.L` or Saxo `SYMBOL:XLON` form.
   if (s.endsWith(".L") || s.endsWith(":XLON")) return "LSE";
   // Anything else that looks like a 1-5 letter equity ticker → US listed.
@@ -163,12 +180,18 @@ export function getMarketStatusForVenue(venue: MarketVenue, now: Date = new Date
   const p = projectToVenueTime(now, session.tz);
   const minute = p.hh * 60 + p.mm;
   const isWeekend = p.weekday === 0 || p.weekday === 6;
-  const midSession = !isWeekend && minute >= session.openMin && minute < session.closeMin;
+  const inSessionWindow = !isWeekend && minute >= session.openMin && minute < session.closeMin;
+  const inLunch = !!session.breakMin
+    && inSessionWindow
+    && minute >= session.breakMin[0]
+    && minute < session.breakMin[1];
+  const midSession = inSessionWindow && !inLunch;
   const preOpen = !isWeekend && minute < session.openMin;
 
   let phase: MarketPhase;
   if (isWeekend) phase = "weekend";
   else if (midSession) phase = "open";
+  else if (inLunch) phase = "lunch";
   else if (preOpen) phase = "pre_open";
   else phase = "post_close";
 
@@ -198,6 +221,12 @@ export function getMarketStatusForVenue(venue: MarketVenue, now: Date = new Date
   if (phase === "pre_open") {
     nextOpenInstant = venueWallclockToInstant(
       p.yyyy, p.mo, p.dd, Math.floor(session.openMin / 60), session.openMin % 60, session.tz,
+    );
+  } else if (phase === "lunch" && session.breakMin) {
+    // Afternoon session opens at the end of the lunch break, same calendar day.
+    const reopenMin = session.breakMin[1];
+    nextOpenInstant = venueWallclockToInstant(
+      p.yyyy, p.mo, p.dd, Math.floor(reopenMin / 60), reopenMin % 60, session.tz,
     );
   } else if (phase === "open") {
     // Next scheduled open is tomorrow (or Monday after Friday).
@@ -244,6 +273,9 @@ export function getMarketStatusForVenue(venue: MarketVenue, now: Date = new Date
       break;
     case "pre_open":
       explanation = `${venue} pre-open — session opens in ${formatDuration(minutesUntilOpen)} (${humanNextOpen} UK)`;
+      break;
+    case "lunch":
+      explanation = `${venue} lunch break — afternoon session opens in ${formatDuration(minutesUntilOpen)} (${humanNextOpen} UK)`;
       break;
     case "post_close":
       explanation = `${venue} closed for the day — reopens ${humanNextOpen} UK (in ${formatDuration(minutesUntilOpen)})`;
@@ -343,5 +375,5 @@ function formatDuration(minutes: number): string {
  * duplicate the per-venue calls.
  */
 export function getMarketStatusOverview(now: Date = new Date()): MarketStatus[] {
-  return (["LSE", "NYSE", "CRYPTO", "FX"] as const).map((v) => getMarketStatusForVenue(v, now));
+  return (["LSE", "NYSE", "TSE_JP", "ASX", "CRYPTO", "FX"] as const).map((v) => getMarketStatusForVenue(v, now));
 }

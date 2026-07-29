@@ -82,24 +82,40 @@ export function planOrderSlices(args: {
 // Time-of-day filter — treats London trading hours as canonical for LSE names,
 // falls back to US session windows for US-listed symbols.
 
-export type Venue = "LSE" | "NYSE" | "NASDAQ" | "CRYPTO" | "OTHER";
+export type Venue = "LSE" | "NYSE" | "NASDAQ" | "TSE_JP" | "ASX" | "CRYPTO" | "OTHER";
 
 export function inferVenueFromSymbol(symbol: string): Venue {
   const s = symbol.toUpperCase();
   if (/-USD$|BTC|ETH|USDT|USDC/.test(s)) return "CRYPTO";
   if (s.endsWith(".L") || s.endsWith(":XLON")) return "LSE";
+  if (s.endsWith(".T") || s.endsWith(":XTKS")) return "TSE_JP";
+  if (s.endsWith(".AX") || s.endsWith(":XASX")) return "ASX";
   if (/^[A-Z]{1,5}$/.test(s)) return "NYSE";
   return "OTHER";
 }
 
 // Session windows in minutes-since-midnight, local venue timezone. These are
 // the defaults; per-venue overrides via `resolveVenueTodConfig` can widen or
-// narrow them at runtime.
+// narrow them at runtime. TSE_JP has a lunch break — for the TOD haircut we
+// treat the whole 09:00–15:00 span as one session; the intra-day break is
+// modelled in market-hours.ts and blocks routing directly there.
 const SESSIONS: Record<Venue, { openMin: number; closeMin: number } | null> = {
   LSE: { openMin: 8 * 60, closeMin: 16 * 60 + 30 },
   NYSE: { openMin: 9 * 60 + 30, closeMin: 16 * 60 },
   NASDAQ: { openMin: 9 * 60 + 30, closeMin: 16 * 60 },
+  TSE_JP: { openMin: 9 * 60, closeMin: 15 * 60 },
+  ASX: { openMin: 10 * 60, closeMin: 16 * 60 },
   CRYPTO: null, // 24/7
+  OTHER: null,
+};
+
+const VENUE_TZ: Record<Venue, string | null> = {
+  LSE: "Europe/London",
+  NYSE: "America/New_York",
+  NASDAQ: "America/New_York",
+  TSE_JP: "Asia/Tokyo",
+  ASX: "Australia/Sydney",
+  CRYPTO: null,
   OTHER: null,
 };
 
@@ -108,8 +124,8 @@ const SESSIONS: Record<Venue, { openMin: number; closeMin: number } | null> = {
  * timezone dependency. For CRYPTO/OTHER returns null (no session concept).
  */
 export function venueMinuteOfDay(now: Date, venue: Venue): number | null {
-  if (venue === "CRYPTO" || venue === "OTHER") return null;
-  const tz = venue === "LSE" ? "Europe/London" : "America/New_York";
+  const tz = VENUE_TZ[venue];
+  if (!tz) return null;
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: tz,
     hour: "2-digit",
