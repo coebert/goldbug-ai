@@ -189,6 +189,50 @@ export function buildHeuristicBuys(
   }));
 }
 
+/**
+ * Run the retail-mania detector over the current features, splitting into
+ * "block new buy" (unheld symbols) and "trim existing long" (currently held).
+ * Exposed so callers (trading engine) can log counterfactuals and surface
+ * per-component score breakdowns in the decision-summary card.
+ */
+export function collectHeuristicManiaBlocks(
+  holdings: HeuristicHolding[],
+  features: HeuristicFeature[],
+): HeuristicManiaBlock[] {
+  const heldSet = new Set(holdings.filter((h) => h.quantity > 0).map((h) => h.symbol));
+  const out: HeuristicManiaBlock[] = [];
+  for (const f of features) {
+    const sig = detectRetailMania({
+      symbol: f.symbol,
+      change5d: f.change5d,
+      change30d: f.change30d,
+      rsi14: f.rsi14,
+    });
+    if (sig.tier === "none") continue;
+    const held = heldSet.has(f.symbol);
+    if (!held && sig.blockNewBuys) {
+      out.push({
+        symbol: f.symbol,
+        action: "block",
+        score: sig.score,
+        tier: sig.tier,
+        reason: formatManiaExplanation(sig, "block"),
+        breakdown: sig.scoreBreakdown,
+      });
+    } else if (held && sig.trimExistingLong) {
+      out.push({
+        symbol: f.symbol,
+        action: "trim",
+        score: sig.score,
+        tier: sig.tier,
+        reason: formatManiaExplanation(sig, "trim"),
+        breakdown: sig.scoreBreakdown,
+      });
+    }
+  }
+  return out;
+}
+
 export function buildHeuristicDecision(args: {
   holdings: HeuristicHolding[];
   features: HeuristicFeature[];
@@ -208,11 +252,15 @@ export function buildHeuristicDecision(args: {
         algoRegime: args.algoRegime,
       })
     : [];
+  const maniaBlocks = collectHeuristicManiaBlocks(args.holdings, args.features);
   const regimeTag = args.algoRegime ? ` · ${summarizeAlgoRegime(args.algoRegime)}` : "";
   const orders: HeuristicOrder[] = [...sells, ...buys];
+  const maniaTag = maniaBlocks.length > 0
+    ? ` · retail-mania guardrail: ${maniaBlocks.length} name(s) (${maniaBlocks.filter((m) => m.action === "block").length} blocked, ${maniaBlocks.filter((m) => m.action === "trim").length} flagged for trim)`
+    : "";
   const briefing = orders.length > 0
-    ? `AI unavailable — heuristic proposed ${sells.length} protective sell(s) and ${buys.length} conservative buy(s).${regimeTag}`
-    : `AI unavailable — heuristic found no signals; guardrail exits still enforced.${regimeTag}`;
+    ? `AI unavailable — heuristic proposed ${sells.length} protective sell(s) and ${buys.length} conservative buy(s).${regimeTag}${maniaTag}`
+    : `AI unavailable — heuristic found no signals; guardrail exits still enforced.${regimeTag}${maniaTag}`;
   return {
     briefing,
     rationale:
@@ -225,6 +273,8 @@ export function buildHeuristicDecision(args: {
         ? ` Algo-regime tier=${args.algoRegime.tier} → protective-sell cap raised to ${maxSells}, heuristic buys suppressed.`
         : ""),
     orders,
+    maniaBlocks,
   };
 }
+
 
