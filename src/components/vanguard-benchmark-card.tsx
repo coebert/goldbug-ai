@@ -286,3 +286,31 @@ function Tile({
     </div>
   );
 }
+
+function AttrRow({
+  label,
+  amount,
+  fmt,
+  hint,
+}: {
+  label: string;
+  amount: number;
+  fmt: Intl.NumberFormat;
+  hint: string;
+}) {
+  const positive = amount >= 0;
+  const cls = positive
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-destructive";
+  const display = `${positive ? "+" : ""}${fmt.format(amount)}`;
+  return (
+    <div className="rounded-md border bg-card/40 p-2" title={hint}>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className={`mt-0.5 text-sm font-semibold tabular-nums ${cls}`}>
+        {display}
+      </div>
+    </div>
+  );
+}
