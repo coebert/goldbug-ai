@@ -52,6 +52,25 @@ MULTI-STRATEGY / POD-SHOP SCHOOL:
   - Citadel, Millennium, Point72, Balyasny: dozens of independent portfolio managers, each on tight risk budgets (~5% drawdown stops); strict market-neutral or beta-hedged; alpha from many small edges combined. Lesson: risk management IS the edge; single-PM alpha decays fast without ruthless stops.
   - Application: enforce per-position and per-sector caps; a losing thesis at -5% is a stop-out, not an "add" opportunity, unless the setup has genuinely improved.
 
+INDEX / LOW-COST PASSIVE SCHOOL — VANGUARD / BOGLE:
+  - Jack Bogle / Vanguard (founded 1975; VFINX first retail S&P 500 index fund, 1976; ~$9T AUM today at cost basis): the mathematics of costs. Aggregate active managers must, before fees, earn the market return; after fees they must underearn it by the amount of those fees. Over 15–20 years ~85–90% of active US equity funds lag their benchmark net of fees (SPIVA scorecards). Ergo: minimise costs, minimise turnover, own the market.
+  - "Don't look for the needle in the haystack. Just buy the haystack." Cap-weighted broad-market ownership captures the entire upside distribution — the small number of stocks that produce nearly all long-run equity returns (Bessembinder 2018: ~4% of US stocks generated the entire net wealth creation of the market since 1926).
+  - Costs compound negatively at the same rate returns compound positively. A 1% annual fee drag over 40 years costs ~28% of terminal wealth; a 2% drag costs ~50%. Every basis point of round-trip cost avoided is a basis point of alpha, guaranteed.
+  - Asset allocation drives ~90% of the variance of long-term portfolio returns (Brinson/Hood/Beebower 1986/1991). Get the stock/bond/cash mix right first; security selection is a rounding error against that decision.
+  - Three-Fund Portfolio (Vanguard-adjacent orthodoxy — Bogleheads): total US market + total international + total bond, rebalanced annually. Simple, tax-efficient, hard to beat.
+  - Behaviour is the biggest tax. Dalbar's QAIB studies show the average equity-fund investor earns ~2–4% less per year than the funds themselves, entirely from mistimed inflows/outflows. Discipline > cleverness.
+  - Rebalancing is the only "market timing" that reliably adds value: sell what has appreciated, buy what has lagged, back to policy weights. Do it on a schedule or on ±5% drift bands, not on feelings.
+  - "Stay the course." Bear-market selling converts temporary drawdowns into permanent losses. Vanguard's own research: an investor who missed the best 10 days in the S&P 1990–2020 halved their annualised return; most of those best days occur within two weeks of the worst days.
+  - Tax-efficiency as alpha: ETF creation/redemption + low turnover keeps realised capital gains near zero. Location matters — bonds in tax-sheltered accounts, equities in taxable.
+  - Application to an ACTIVE AI portfolio: use Vanguard's rules as a hard-to-beat BENCHMARK and as guardrails on our own activity —
+      • Every proposed trade must pass an implicit cost-hurdle test: expected edge must exceed round-trip cost + spread + tax drag. If it does not, do nothing.
+      • Excess turnover is a tax on future returns. Prefer holding to trading; require a positive marginal-information reason to churn.
+      • Anchor to a strategic asset allocation (policy weights per risk level). Deviations from policy are TACTICAL BETS that must be sized and time-bounded, not drifting exposures.
+      • Rebalance on drift bands, not on narrative; take from what has run, add to what has lagged, within the same asset class.
+      • Track live performance vs a low-cost passive benchmark (e.g. 60/40 VT+BND for balanced) net of all costs. If we cannot beat it over rolling 3-year windows, the correct action is to REDUCE active bet size, not increase it.
+      • Never abandon the strategic allocation during a drawdown. Panic-selling into weakness is the single biggest destroyer of Bogle-style compound returns; our stops and hedges exist so we do not have to.
+      • Prefer broad, cheap, liquid instruments (index ETFs) as the DEFAULT exposure; single-name active bets should earn their place by clearing a higher evidence bar than "seems like a good idea."
+
 CROSS-CUTTING PRINCIPLES (rules that appear in nearly every successful firm):
   1. Position sizing dominates entry timing (Tudor Jones, Turtles, pod shops).
   2. Cash is a position with option value (Buffett, Klarman, Druckenmiller).
@@ -63,5 +82,7 @@ CROSS-CUTTING PRINCIPLES (rules that appear in nearly every successful firm):
   8. Be skeptical of stories with aggressive accounting or negative FCF (Chanos).
   9. Prefer convex payoffs around known event risk; buy cheap tail insurance (Ackman, Taleb, Paulson).
   10. Do less. Most trades are noise; the edge comes from a handful of high-conviction ideas held long enough (Buffett, Smith, Munger).
+  11. Costs and turnover compound against you at the same rate returns compound for you — every avoided basis point of round-trip cost is guaranteed alpha (Bogle/Vanguard).
+  12. Asset allocation, not security selection, drives most of long-run return variance — anchor to a policy mix per risk level and treat deviations as sized, time-bounded tactical bets (Vanguard/Brinson).
 
 Apply these as PRIORS alongside the historical playbook and the portfolio's own learned lessons. When today's signal aligns with multiple schools' rules, conviction is higher; when it contradicts them all, prefer inaction.`;
