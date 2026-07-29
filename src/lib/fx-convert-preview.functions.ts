@@ -112,6 +112,10 @@ export const previewFxConversion = createServerFn({ method: "POST" })
       midRate: midQuote.rate,
       effectiveRate,
       spreadBps,
+      pairClass: costQuote.pairClass,
+      spotSpreadBps: costQuote.spreadBps,
+      walletMarkupBps: costQuote.walletMarkupBps,
+
       feeFrom,
       feeCcy: plan.fromCcy,
       rateSource: midQuote.source,
