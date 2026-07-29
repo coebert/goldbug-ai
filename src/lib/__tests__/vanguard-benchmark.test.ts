@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  attributeAlpha,
   benchmarkValueAt,
   compareToVanguard,
   compound,
+  portfolioTWR,
   VANGUARD_CAGR,
 } from "@/lib/vanguard-benchmark";
 
