@@ -252,7 +252,15 @@ export type RiskConfig = {
   // propose diversifiers whenever the guardrail room is available. Purely a
   // prompt-level bias — it never overrides hard `asset_class_limits`.
   diversification_tilt: "off" | "balanced" | "strong";
+  // Per-non-base-currency exposure caps (0..1) as fraction of NAV in
+  // base-currency terms. Applies to any holding whose instrument currency is
+  // NOT the portfolio's base currency (e.g. JPY holdings for a GBP portfolio).
+  // Keys are ISO 4217 codes (uppercase). Missing/empty = no cap for that
+  // currency. Cap-only: it can only shrink a proposed buy, never force one,
+  // and never permits borrowing.
+  fx_currency_limits: Partial<Record<string, number>>;
 };
+
 
 /**
  * Effective cash-floor fraction (0..1). Prefers the per-portfolio override on
@@ -324,8 +332,10 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   tod_venue_overrides: null,
   cash_floor_pct: null,
   diversification_tilt: "off",
+  fx_currency_limits: {},
 
 };
+
 
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
@@ -497,8 +507,21 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
     }
     out.tod_venue_overrides = Object.keys(parsed).length > 0 ? (parsed as RiskConfig["tod_venue_overrides"]) : null;
   }
+  // Per-currency exposure caps for non-base holdings (e.g. { JPY: 0.15 }).
+  if (r.fx_currency_limits && typeof r.fx_currency_limits === "object") {
+    const limits: Partial<Record<string, number>> = {};
+    for (const [k, v] of Object.entries(r.fx_currency_limits as Record<string, unknown>)) {
+      const code = String(k || "").toUpperCase().trim();
+      if (!/^[A-Z]{3}$/.test(code)) continue;
+      if (v == null || v === "") continue;
+      const n = Number(v);
+      if (Number.isFinite(n)) limits[code] = Math.max(0, Math.min(1, n));
+    }
+    out.fx_currency_limits = limits;
+  }
   return out;
 }
+
 
 
 // ---------------------------------------------------------------------------

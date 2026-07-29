@@ -31,7 +31,11 @@ export const updateRiskConfig = createServerFn({ method: "POST" })
       max_drawdown_halt_pct: z.number().min(0).max(0.9).default(0.20),
       diversification_tilt: z.enum(["off", "balanced", "strong"]).optional(),
       risk_level: z.number().int().min(1).max(5).optional(),
+      fx_currency_limits: z
+        .record(z.string().regex(/^[A-Z]{3}$/), z.number().min(0).max(1))
+        .optional(),
     });
+
     return z
       .object({
         portfolio_id: z.string().uuid(),

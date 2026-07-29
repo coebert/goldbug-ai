@@ -41,9 +41,22 @@ type RiskConfig = {
   commodity_group_limits: Partial<Record<CommodityGroup, number>>;
   commodity_min_adv_usd: number;
   commodity_max_atr_pct: number;
+  fx_currency_limits?: Partial<Record<string, number>>;
   diversification_tilt?: "off" | "balanced" | "strong";
   risk_level?: number;
 };
+
+// Currencies the app can settle in today. Base currency is filtered out in the
+// UI since caps only apply to non-base holdings.
+const FX_CCY_OPTIONS: { code: string; label: string }[] = [
+  { code: "USD", label: "US Dollar" },
+  { code: "EUR", label: "Euro" },
+  { code: "GBP", label: "Pound sterling" },
+  { code: "JPY", label: "Japanese yen" },
+  { code: "AUD", label: "Australian dollar" },
+  { code: "CAD", label: "Canadian dollar" },
+  { code: "CHF", label: "Swiss franc" },
+];
 
 const DEFAULTS: RiskConfig = {
   asset_class_limits: { stock: 0.6, etf: 0.8, crypto: 0.2, commodity: 0.3, fx: 0.3 },
@@ -59,7 +72,9 @@ const DEFAULTS: RiskConfig = {
   commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
   commodity_min_adv_usd: 250_000,
   commodity_max_atr_pct: 0.06,
+  fx_currency_limits: {},
 };
+
 
 function parseCfg(raw: unknown): RiskConfig {
   if (!raw || typeof raw !== "object") return { ...DEFAULTS };
@@ -98,6 +113,18 @@ function parseCfg(raw: unknown): RiskConfig {
     commodity_max_atr_pct: Number.isFinite(Number(r.commodity_max_atr_pct))
       ? Number(r.commodity_max_atr_pct)
       : DEFAULTS.commodity_max_atr_pct,
+    fx_currency_limits: (() => {
+      const src = (r.fx_currency_limits ?? {}) as Record<string, unknown>;
+      const out: Partial<Record<string, number>> = {};
+      for (const [k, v] of Object.entries(src)) {
+        const code = String(k || "").toUpperCase().trim();
+        if (!/^[A-Z]{3}$/.test(code)) continue;
+        if (v == null || v === "") continue;
+        const n = Number(v);
+        if (Number.isFinite(n)) out[code] = Math.max(0, Math.min(1, n));
+      }
+      return out;
+    })(),
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
     diversification_tilt:
       r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
@@ -105,6 +132,7 @@ function parseCfg(raw: unknown): RiskConfig {
         : "off",
   };
 }
+
 
 
 const CLASSES: { key: AssetClass; label: string }[] = [
@@ -268,10 +296,15 @@ function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
 export function RiskControlsCard({
   portfolioId,
   riskConfig,
+  baseCurrency,
 }: {
   portfolioId: string;
   riskConfig: unknown;
+  baseCurrency?: string;
 }) {
+  const base = (baseCurrency ?? "GBP").toUpperCase();
+  const fxOptions = FX_CCY_OPTIONS.filter((o) => o.code !== base);
+
   const initial = useMemo(() => parseCfg(riskConfig), [riskConfig]);
   const [cfg, setCfg] = useState<RiskConfig>(initial);
   const [level, setLevel] = useState<number>(
@@ -812,6 +845,49 @@ export function RiskControlsCard({
                 </div>
               </div>
             </div>
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Per-currency exposure caps</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Caps the base-currency value of holdings priced in each non-base currency. Buys that would breach a cap are shrunk or rejected — no borrowing is used. Portfolio base: <span className="font-medium">{base}</span>. Leave blank to disable a cap.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {fxOptions.map((opt) => {
+                  const raw = cfg.fx_currency_limits?.[opt.code];
+                  const value = raw == null ? "" : String(Math.round(raw * 100));
+                  return (
+                    <div key={opt.code} className="flex items-center gap-2">
+                      <label className="w-28 text-xs" htmlFor={`fxcap-${opt.code}`}>
+                        {opt.code} · {opt.label}
+                      </label>
+                      <Input
+                        id={`fxcap-${opt.code}`}
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        placeholder="—"
+                        value={value}
+                        onChange={(e) => {
+                          const next = { ...(cfg.fx_currency_limits ?? {}) };
+                          const v = e.target.value.trim();
+                          if (v === "") {
+                            delete next[opt.code];
+                          } else {
+                            const n = Number(v);
+                            if (Number.isFinite(n)) next[opt.code] = Math.max(0, Math.min(1, n / 100));
+                          }
+                          setCfg({ ...cfg, fx_currency_limits: next });
+                        }}
+                        className="h-8 w-24"
+                      />
+                      <span className="text-xs text-muted-foreground">% of NAV</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
 
 
 

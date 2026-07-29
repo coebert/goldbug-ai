@@ -316,6 +316,11 @@ export async function callAiForDecision(args: {
   const classLimitsStr = Object.entries(cfg.asset_class_limits)
     .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}%`)
     .join(", ");
+  const fxCcyLimitsStr = Object.entries(cfg.fx_currency_limits ?? {})
+    .filter(([, v]) => Number.isFinite(v as number) && (v as number) > 0)
+    .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}% of NAV`)
+    .join(", ");
+
 
   const r = args.regime;
   const regimeBlock = `MACRO REGIME (auto-detected from SPY/VIX/GLD/TLT as of ${r.as_of}):
@@ -345,6 +350,7 @@ HARD RULES YOU MUST NEVER BREAK:
 - Keep at least ${(effectiveCashFloorPct(cfg, args.portfolio.risk_level) * 100).toFixed(0)}% of portfolio value in cash.
 - Open at most ${risk.maxNewPositionsPerDay} NEW positions per day.
 - Asset-class exposure caps: ${classLimitsStr}.
+${fxCcyLimitsStr ? `- Non-base currency exposure caps (base=${args.portfolio.currency.toUpperCase()}, sum of foreign-denominated holdings in base terms): ${fxCcyLimitsStr}. Buys that would breach these caps are rejected — never rely on borrowing.` : ""}
 - Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
 - Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
@@ -1278,6 +1284,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     );
   }
 
+  // Per-currency exposure (base-ccy value) for non-base holdings. Used to
+  // enforce cfg.fx_currency_limits without allowing leverage — cap can only
+  // shrink a proposed buy, never inflate one, and never permit borrowing.
+  const { inferSymbolCurrency } = await import("./ai-fx-conversions.server");
+  const portfolioBaseCcy = (portfolio.currency || "USD").toUpperCase();
+  const currencyExposure = new Map<string, number>();
+  for (const h of holdingsByS.values()) {
+    const ccy = inferSymbolCurrency(h.symbol, portfolioBaseCcy).toUpperCase();
+    if (ccy === portfolioBaseCcy) continue;
+    const price = holdingLivePrice(priceMap, h);
+    currencyExposure.set(ccy, (currencyExposure.get(ccy) ?? 0) + price * Number(h.quantity));
+  }
+
+
+
 
 
   // Build correlation map covering current holdings + candidate buys
@@ -1403,6 +1424,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           );
         }
       }
+      {
+        const sellCcy = inferSymbolCurrency(meta.symbol, portfolioBaseCcy).toUpperCase();
+        if (sellCcy !== portfolioBaseCcy) {
+          currencyExposure.set(
+            sellCcy,
+            Math.max(0, (currencyExposure.get(sellCcy) ?? 0) - value),
+          );
+        }
+      }
+
       // Recompute slice plan against the actual executed notional so telemetry matches fills.
       const eaFinal = applyExecAlphaSell(meta.symbol, value, price);
       executed.push({
@@ -1678,6 +1709,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
+      // Enforce per-currency FX exposure cap for non-base holdings. Cap-only
+      // — never inflates spend and never permits borrowing. Applies whether
+      // the symbol's asset class is stock/etf/crypto/commodity/fx.
+      const buyCcy = inferSymbolCurrency(meta.symbol, portfolioBaseCcy).toUpperCase();
+      let fxCurrencyRejected: string | null = null;
+      if (buyCcy !== portfolioBaseCcy) {
+        const ccyCap = cfg.fx_currency_limits?.[buyCcy];
+        if (ccyCap != null) {
+          const ccyMax = totalValue * ccyCap;
+          const roomInCcy = Math.max(0, ccyMax - (currencyExposure.get(buyCcy) ?? 0));
+          if (roomInCcy <= 0) {
+            fxCurrencyRejected = `fx-currency cap reached for ${buyCcy} (max ${(ccyCap * 100).toFixed(0)}% of NAV)`;
+          }
+          spend = Math.min(spend, roomInCcy);
+        }
+      }
+
+
+
       // Volatility-based sizing: cap spend so position * vol ≈ vol_target * totalValue.
       // Phase 5 — when risk_parity_enabled, scale the vol budget by |alpha|
       // so higher-conviction systematic setups earn a bigger share of the
@@ -1733,15 +1783,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           price,
           value: 0,
           reason: order.reason,
-          rejected: commodityGroupRejected
-            ? commodityGroupRejected
-            : classRejected
-              ? `asset-class cap reached for ${meta.asset_class}`
-              : corrCapped
-                ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
-                : volCapped
-                  ? "volatility sizing leaves no room"
-                  : "guardrails leave no room to buy",
+          rejected: fxCurrencyRejected
+            ? fxCurrencyRejected
+            : commodityGroupRejected
+              ? commodityGroupRejected
+              : classRejected
+                ? `asset-class cap reached for ${meta.asset_class}`
+                : corrCapped
+                  ? `correlated-cluster cap reached (${corrRes.cluster.slice(0, 3).join(",")})`
+                  : volCapped
+                    ? "volatility sizing leaves no room"
+                    : "guardrails leave no room to buy",
+
         });
         continue;
       }
@@ -1945,6 +1998,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           (commodityGroupExposure.get(commodityGroupKey) ?? 0) + outcome.effectiveSpend,
         );
       }
+      if (buyCcy !== portfolioBaseCcy) {
+        currencyExposure.set(
+          buyCcy,
+          (currencyExposure.get(buyCcy) ?? 0) + outcome.effectiveSpend,
+        );
+      }
+
       // Phase 6 — slice plan telemetry (attached to executed row).
       const slicePlan = cfg.execution_slicing_enabled
         ? planOrderSlices({
