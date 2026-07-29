@@ -391,14 +391,16 @@ export async function applyAiFxConversions(args: {
         applied.push({ ...base, rate: q.rate, source: q.source, rejected: `stale rate (${q.source})` });
         continue;
       }
-      // Apply the same 25 bps effective spread as the manual preview so book
-      // math and the UI stay consistent.
-      rate = q.rate * (1 - 25 / 10_000);
-      source = `ai:${q.source}`;
+      // Per-pair spread + wallet markup from the shared cost model — JPY/AUD
+      // crosses price wider than EURUSD, exotics wider still.
+      const costQuote = quoteFxCost(from, to, "wallet");
+      rate = applyFxCost(q.rate, costQuote);
+      source = `ai:${q.source}:${costQuote.pairClass}:${costQuote.totalBps}bps`;
     } catch (e) {
       applied.push({ ...base, rejected: e instanceof Error ? e.message : "fx quote failed" });
       continue;
     }
+
 
     const plan = planFxConversion({ wallet, from, to, amountFrom, rate });
     if (!plan.ok) {
