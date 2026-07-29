@@ -379,3 +379,27 @@ function AttrRow({
     </div>
   );
 }
+
+function SimCell({
+  amount,
+  fmt,
+  bold,
+}: {
+  amount: number;
+  fmt: Intl.NumberFormat;
+  bold?: boolean;
+}) {
+  const positive = amount >= 0;
+  const cls = positive
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-destructive";
+  return (
+    <td
+      className={`px-1 py-1.5 text-right tabular-nums ${cls} ${bold ? "font-semibold" : ""}`}
+    >
+      {positive ? "+" : ""}
+      {fmt.format(amount)}
+    </td>
+  );
+}
+
