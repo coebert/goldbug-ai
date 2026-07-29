@@ -57,6 +57,10 @@ const TradeErrorDashboardCard = lazy(() =>
 const TradeOutcomePanelCard = lazy(() =>
   import("@/components/trade-outcome-panel-card").then((m) => ({ default: m.TradeOutcomePanelCard })),
 );
+const TodaysDecisionSummaryCard = lazy(() =>
+  import("@/components/todays-decision-summary-card").then((m) => ({ default: m.TodaysDecisionSummaryCard })),
+);
+
 const FxHealthCard = lazy(() =>
   import("@/components/fx-health-card").then((m) => ({ default: m.FxHealthCard })),
 );
@@ -1404,6 +1408,9 @@ function PortfolioPage() {
               </TabsContent>
 
               <TabsContent value="decisions" className="mt-4 space-y-4">
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <TodaysDecisionSummaryCard portfolioId={p.id} currency={p.currency} />
+                </Suspense>
                 {decisions.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No AI decisions yet. Run one day or a backtest to see the AI's reasoning here.
@@ -1413,6 +1420,7 @@ function PortfolioPage() {
                   <DecisionCard key={d.id} decision={d} currency={p.currency} />
                 ))}
               </TabsContent>
+
 
               <TabsContent value="audit" className="mt-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
