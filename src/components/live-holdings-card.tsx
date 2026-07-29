@@ -78,6 +78,32 @@ export function LiveHoldingsCard({
   const [sellTarget, setSellTarget] = useState<Holding | null>(null);
 
   const isLive = mode === "live_prod";
+  const isAnyLive = mode === "live_prod" || mode === "live_sim";
+
+  // Manual "Sync now" — pulls cash + positions + order statuses from Saxo and
+  // rewrites local holdings + today's equity snapshot. Auto-sync every 5min
+  // handles the passive case; this button is for when the user wants the
+  // tile to catch up immediately after they know a trade filled.
+  const qc = useQueryClient();
+  const reconcileFn = useServerFn(reconcilePortfolio);
+  const syncMut = useMutation({
+    mutationFn: () => {
+      if (!portfolioId) throw new Error("portfolioId required");
+      return reconcileFn({ data: { portfolioId } });
+    },
+    onSuccess: (r) => {
+      const drift = r && typeof r === "object" && "drift" in r ? (r as { drift?: boolean }).drift : undefined;
+      toast[drift ? "warning" : "success"](
+        drift ? "Synced — drift vs broker detected (see reconciliation log)" : "Synced with Saxo",
+      );
+      if (portfolioId) {
+        qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+        qc.invalidateQueries({ queryKey: ["holdings-history", portfolioId] });
+        qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
+      }
+    },
+    onError: (e: Error) => toast.error(`Sync failed: ${e.message}`),
+  });
 
   // Runtime sanity: sparklines and headline % must agree. Report once per
   // change to the series payload so console spam is bounded.
