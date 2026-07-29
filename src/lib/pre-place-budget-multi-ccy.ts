@@ -83,11 +83,20 @@ export function trimBuysToBudgetByCurrency(
     /** When false, cross-currency buys can only draw from that same currency. */
     allowFxConversion?: boolean;
     isRateStale?: FxStaleFlag;
+    /**
+     * Optional FX cost hook. When provided, the trimmer inflates the
+     * base-currency debit by (1 + bps/10000) so a JPY/AUD shortfall funded
+     * from GBP actually reserves the extra cash the broker will consume as
+     * spread/markup — otherwise the buy squeezes through wallet math but
+     * fails at the broker.
+     */
+    fxCostBps?: (fromCcy: string, toCcy: string) => number;
   },
 ): TrimBuysMultiCcyResult {
   const safetyPct = opts?.safetyBufferPct ?? 0.01;
   const allowFx = opts?.allowFxConversion ?? true;
   const base = baseCcy.toUpperCase();
+
 
   // Working wallet — apply the buffer up-front so every downstream compare is
   // against the "safe" balance, not the raw one. The persisted balance still
