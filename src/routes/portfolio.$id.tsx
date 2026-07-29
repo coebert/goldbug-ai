@@ -11,6 +11,7 @@ import {
   getBenchmarkSeries,
 } from "@/lib/trading.functions";
 import { explainDecisionOrder, type ExplainOrderInput } from "@/lib/order-explanations.functions";
+import { reconcilePortfolio } from "@/lib/live.functions";
 import { getCurrentRegime } from "@/lib/regime.functions";
 import { OrderConfidenceBadge } from "@/components/order-confidence-badge";
 import type { ConfidenceRegime } from "@/lib/order-confidence";
