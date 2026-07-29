@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info, TrendingDown as SellIcon } from "lucide-react";
+import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info, TrendingDown as SellIcon, RefreshCw } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
 import {
   Tooltip,
@@ -19,6 +19,10 @@ import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
 import { useEffect, useState } from "react";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
 import { HoldingSellDialog } from "@/components/holding-sell-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { reconcilePortfolio } from "@/lib/live.functions";
+import { toast } from "sonner";
 
 
 
@@ -74,6 +78,32 @@ export function LiveHoldingsCard({
   const [sellTarget, setSellTarget] = useState<Holding | null>(null);
 
   const isLive = mode === "live_prod";
+  const isAnyLive = mode === "live_prod" || mode === "live_sim";
+
+  // Manual "Sync now" — pulls cash + positions + order statuses from Saxo and
+  // rewrites local holdings + today's equity snapshot. Auto-sync every 5min
+  // handles the passive case; this button is for when the user wants the
+  // tile to catch up immediately after they know a trade filled.
+  const qc = useQueryClient();
+  const reconcileFn = useServerFn(reconcilePortfolio);
+  const syncMut = useMutation({
+    mutationFn: () => {
+      if (!portfolioId) throw new Error("portfolioId required");
+      return reconcileFn({ data: { portfolioId } });
+    },
+    onSuccess: (r) => {
+      const drift = r && typeof r === "object" && "drift" in r ? (r as { drift?: boolean }).drift : undefined;
+      toast[drift ? "warning" : "success"](
+        drift ? "Synced — drift vs broker detected (see reconciliation log)" : "Synced with Saxo",
+      );
+      if (portfolioId) {
+        qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+        qc.invalidateQueries({ queryKey: ["holdings-history", portfolioId] });
+        qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
+      }
+    },
+    onError: (e: Error) => toast.error(`Sync failed: ${e.message}`),
+  });
 
   // Runtime sanity: sparklines and headline % must agree. Report once per
   // change to the series payload so console spam is bounded.
@@ -215,11 +245,26 @@ export function LiveHoldingsCard({
               {rows.length} {rows.length === 1 ? "position" : "positions"}
             </Badge>
           </CardTitle>
-          {isLive && (
-            <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
-              Real cash
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {isLive && (
+              <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
+                Real cash
+              </Badge>
+            )}
+            {isAnyLive && portfolioId && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={() => syncMut.mutate()}
+                disabled={syncMut.isPending}
+                aria-label="Sync holdings and cash from Saxo"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncMut.isPending ? "animate-spin" : ""}`} />
+                {syncMut.isPending ? "Syncing…" : "Sync now"}
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
