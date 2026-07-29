@@ -3,19 +3,17 @@
 // base-currency delta, and post-conversion wallet) without touching the
 // broker or writing to the DB.
 //
-// Fees are estimated as a spread over mid-market:
-//   - wallet mode: 25 bps (matches typical retail wallet FX spreads)
-//   - spot mode:    5 bps (indicative Saxo SIM/live spot spread)
-// The spread is applied to the source amount so the fee is denominated in
-// the source currency; the destination amount reflects the post-fee rate.
+// Costs come from the shared `fx-cost-model` so majors, JPY/AUD crosses,
+// and exotics are all priced consistently across the manual preview, the
+// AI's wallet moves, and the pre-buy funding legs.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { planFxConversion } from "./fx-convert-plan";
 import { readWallet } from "./portfolio-wallet";
+import { applyFxCost, feeInFromCcy, quoteFxCost } from "./fx-cost-model";
 
-const SPREAD_BPS = { wallet: 25, spot: 5 } as const;
 
 export const previewFxConversion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
