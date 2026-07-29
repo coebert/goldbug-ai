@@ -82,5 +82,7 @@ CROSS-CUTTING PRINCIPLES (rules that appear in nearly every successful firm):
   8. Be skeptical of stories with aggressive accounting or negative FCF (Chanos).
   9. Prefer convex payoffs around known event risk; buy cheap tail insurance (Ackman, Taleb, Paulson).
   10. Do less. Most trades are noise; the edge comes from a handful of high-conviction ideas held long enough (Buffett, Smith, Munger).
+  11. Costs and turnover compound against you at the same rate returns compound for you — every avoided basis point of round-trip cost is guaranteed alpha (Bogle/Vanguard).
+  12. Asset allocation, not security selection, drives most of long-run return variance — anchor to a policy mix per risk level and treat deviations as sized, time-bounded tactical bets (Vanguard/Brinson).
 
 Apply these as PRIORS alongside the historical playbook and the portfolio's own learned lessons. When today's signal aligns with multiple schools' rules, conviction is higher; when it contradicts them all, prefer inaction.`;
