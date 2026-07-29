@@ -292,7 +292,11 @@ export class SaxoAdapter implements BrokerAdapter {
       userId: this.userId,
       env: this.env,
       method: "BALANCE_FETCH",
-      path: source === "client" ? "/port/v1/balances?ClientKey" : "/port/v1/balances/me",
+      path: source === "account"
+        ? "/port/v1/balances?AccountKey"
+        : source === "client"
+          ? "/port/v1/balances?ClientKey"
+          : "/port/v1/balances/me",
       status: 200,
       request: asJson({ source, clientLookupError }),
       response: asJson({
