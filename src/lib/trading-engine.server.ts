@@ -1278,6 +1278,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     );
   }
 
+  // Per-currency exposure (base-ccy value) for non-base holdings. Used to
+  // enforce cfg.fx_currency_limits without allowing leverage — cap can only
+  // shrink a proposed buy, never inflate one, and never permit borrowing.
+  const { inferSymbolCurrency } = await import("./ai-fx-conversions.server");
+  const portfolioBaseCcy = (args.portfolio.currency || "USD").toUpperCase();
+  const currencyExposure = new Map<string, number>();
+  for (const h of holdingsByS.values()) {
+    const ccy = inferSymbolCurrency(h.symbol, portfolioBaseCcy).toUpperCase();
+    if (ccy === portfolioBaseCcy) continue;
+    const price = holdingLivePrice(priceMap, h);
+    currencyExposure.set(ccy, (currencyExposure.get(ccy) ?? 0) + price * Number(h.quantity));
+  }
+
+
+
 
 
   // Build correlation map covering current holdings + candidate buys
