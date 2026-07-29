@@ -332,8 +332,10 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   tod_venue_overrides: null,
   cash_floor_pct: null,
   diversification_tilt: "off",
+  fx_currency_limits: {},
 
 };
+
 
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
