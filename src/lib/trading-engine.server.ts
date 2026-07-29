@@ -316,6 +316,11 @@ export async function callAiForDecision(args: {
   const classLimitsStr = Object.entries(cfg.asset_class_limits)
     .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}%`)
     .join(", ");
+  const fxCcyLimitsStr = Object.entries(cfg.fx_currency_limits ?? {})
+    .filter(([, v]) => Number.isFinite(v as number) && (v as number) > 0)
+    .map(([k, v]) => `${k}: ${((v as number) * 100).toFixed(0)}% of NAV`)
+    .join(", ");
+
 
   const r = args.regime;
   const regimeBlock = `MACRO REGIME (auto-detected from SPY/VIX/GLD/TLT as of ${r.as_of}):
