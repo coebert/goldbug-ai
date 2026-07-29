@@ -1085,8 +1085,9 @@ export async function routeOrdersToBroker(params: {
             wallet,
             portfolioCurrency,
             fxLookup,
-            { safetyBufferPct, allowFxConversion: true, isRateStale: isStale },
+            { safetyBufferPct, allowFxConversion: true, isRateStale: isStale, fxCostBps },
           );
+
           for (const [sym, reason] of droppedSymbols) {
             preSkips.set(`${sym}:buy`, `fx spot failed: ${reason}`);
           }
