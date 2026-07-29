@@ -375,5 +375,5 @@ function formatDuration(minutes: number): string {
  * duplicate the per-venue calls.
  */
 export function getMarketStatusOverview(now: Date = new Date()): MarketStatus[] {
-  return (["LSE", "NYSE", "CRYPTO", "FX"] as const).map((v) => getMarketStatusForVenue(v, now));
+  return (["LSE", "NYSE", "TSE_JP", "ASX", "CRYPTO", "FX"] as const).map((v) => getMarketStatusForVenue(v, now));
 }
