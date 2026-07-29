@@ -150,6 +150,7 @@ import { CryptoBacktestCard } from "@/components/crypto-backtest-card";
 
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
+import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
@@ -876,6 +877,17 @@ function PortfolioPage() {
                   currency={String(p.currency ?? "GBP")}
                   equity={equity as { snapshot_date: string; total_value: number }[]}
                   trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
+                  deposits={depositEvents}
+                />
+              </div>
+            )}
+
+            {p && (
+              <div className="mb-4">
+                <VanguardBenchmarkCard
+                  startingCash={Number(p.starting_cash ?? 0)}
+                  currency={String(p.currency ?? "GBP")}
+                  equity={equity as { snapshot_date: string; total_value: number }[]}
                   deposits={depositEvents}
                 />
               </div>
