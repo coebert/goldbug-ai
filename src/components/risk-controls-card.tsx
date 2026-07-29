@@ -41,7 +41,7 @@ type RiskConfig = {
   commodity_group_limits: Partial<Record<CommodityGroup, number>>;
   commodity_min_adv_usd: number;
   commodity_max_atr_pct: number;
-  fx_currency_limits: Partial<Record<string, number>>;
+  fx_currency_limits?: Partial<Record<string, number>>;
   diversification_tilt?: "off" | "balanced" | "strong";
   risk_level?: number;
 };
