@@ -222,6 +222,12 @@ export function getMarketStatusForVenue(venue: MarketVenue, now: Date = new Date
     nextOpenInstant = venueWallclockToInstant(
       p.yyyy, p.mo, p.dd, Math.floor(session.openMin / 60), session.openMin % 60, session.tz,
     );
+  } else if (phase === "lunch" && session.breakMin) {
+    // Afternoon session opens at the end of the lunch break, same calendar day.
+    const reopenMin = session.breakMin[1];
+    nextOpenInstant = venueWallclockToInstant(
+      p.yyyy, p.mo, p.dd, Math.floor(reopenMin / 60), reopenMin % 60, session.tz,
+    );
   } else if (phase === "open") {
     // Next scheduled open is tomorrow (or Monday after Friday).
     let ahead = 1;
