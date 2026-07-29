@@ -907,6 +907,14 @@ function PortfolioPage() {
 
             {p && (
               <div className="mb-4">
+                <Suspense fallback={<div className="h-48 rounded-xl border bg-card" aria-hidden />}>
+                  <MultiCurrencyExposureCard portfolioId={id} active={tab === "overview"} />
+                </Suspense>
+              </div>
+            )}
+
+            {p && (
+              <div className="mb-4">
                 <Suspense fallback={<div className="h-64 rounded-xl border bg-card" aria-hidden />}>
                   <WalletHistoryCard portfolioId={id} active={tab === "overview"} />
                 </Suspense>
