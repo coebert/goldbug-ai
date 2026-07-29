@@ -215,29 +215,45 @@ export class SaxoAdapter implements BrokerAdapter {
       InitialMargin?: { CollateralAvailable?: number };
     };
 
-    // Deposit-detection fix: `/port/v1/balances/me` returns the balance for
-    // the caller's default account context only. When a Saxo user has multiple
-    // sub-accounts (or the deposit lands in a cash-only wallet distinct from
-    // the trading account), a fresh top-up shows in the Saxo web UI (which
-    // aggregates the whole client) but never appears in `/balances/me`, so
-    // AI-driven CASH_SYNC keeps writing the same stale figure. Query the
-    // ClientKey-scoped aggregate first so any deposit against any sub-account
-    // is picked up automatically; fall back to `/balances/me` when we can't
-    // resolve a ClientKey (or the aggregated call fails), preserving the
-    // previous behaviour rather than breaking sync.
+    // Balance scoping: match what the user sees in the Saxo app for THEIR
+    // trading account, not an aggregate that folds in unrelated sub-accounts
+    // (a separate cash wallet, a legacy ISA, a joint account). Preference is:
+    //   1. AccountKey-scoped   — matches the specific tradable account this
+    //      integration was configured for (SAXO_ACCOUNT_KEY or the account
+    //      we auto-discovered via /port/v1/accounts/me).
+    //   2. ClientKey-aggregate — catches deposits landing in any sub-account
+    //      when we can't resolve a specific AccountKey.
+    //   3. /balances/me        — final fallback (caller's default context).
+    // Without step 1 an aggregated cash figure over-reports vs the Saxo app
+    // and pre-trade affordability rejects orders the user *thinks* they can
+    // afford from the balance they see.
     let bal: SaxoBalance | null = null;
-    let source: "client" | "me" = "me";
+    let source: "account" | "client" | "me" = "me";
     let clientLookupError: string | null = null;
     try {
-      const ck = await this.getClientKey();
-      if (ck) {
+      const ak = await this.getDefaultAccountKey();
+      if (ak) {
         bal = await this.req<SaxoBalance>("GET", "/port/v1/balances", {
-          query: { ClientKey: ck },
+          query: { AccountKey: ak },
         });
-        source = "client";
+        source = "account";
       }
     } catch (e) {
-      clientLookupError = e instanceof Error ? e.message : String(e);
+      clientLookupError = `account-scope: ${e instanceof Error ? e.message : String(e)}`;
+    }
+    if (bal == null) {
+      try {
+        const ck = await this.getClientKey();
+        if (ck) {
+          bal = await this.req<SaxoBalance>("GET", "/port/v1/balances", {
+            query: { ClientKey: ck },
+          });
+          source = "client";
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        clientLookupError = clientLookupError ? `${clientLookupError}; client-scope: ${msg}` : `client-scope: ${msg}`;
+      }
     }
     if (bal == null) {
       bal = await this.req<SaxoBalance>("GET", "/port/v1/balances/me");
