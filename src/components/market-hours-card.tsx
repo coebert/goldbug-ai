@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Globe2 } from "lucide-react";
+import { ChevronDown, Globe2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/home/section-header";
 import { ukZoneAbbr } from "@/lib/uk-time";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * Home-screen card that lists every venue the AI can trade on, with
@@ -170,11 +172,16 @@ function marketCountdown(now: Date, m: Market, open: boolean): { label: string; 
 
 export function MarketHoursCard() {
   const [now, setNow] = useState(() => new Date());
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState<boolean | null>(null);
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1_000);
     return () => window.clearInterval(id);
   }, []);
+  // Default collapsed on mobile, expanded on desktop. User can toggle.
+  const isOpen = open ?? !isMobile;
   const zone = ukZoneAbbr(now);
+  const openVenues = MARKETS.filter((m) => marketStatus(now, m).open).length;
 
   return (
     <section className="mb-6" aria-labelledby="section-market-hours">
@@ -183,65 +190,84 @@ export function MarketHoursCard() {
         icon={Globe2}
         title={<span id="section-market-hours">Market hours (UK time)</span>}
         description={`Opening times of every venue the AI trades on, shown in your local UK time (${zone}).`}
-      />
-      <Card>
-        <CardContent className="p-3 sm:p-4">
-          <ul
-            role="list"
-            aria-label="Global market opening hours in UK time"
-            className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        trailing={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setOpen(!isOpen)}
+            aria-expanded={isOpen}
+            aria-controls="market-hours-list"
+            className="h-8 gap-1.5 px-2 text-xs"
           >
-            {MARKETS.map((m) => {
-              const status = marketStatus(now, m);
-              const is247 = m.id === "crypto";
-              const isFx = m.id === "fx";
-              const openUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.openMin);
-              const closeUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.closeMin);
-              const countdown = marketCountdown(now, m, status.open);
-              return (
-                <li
-                  key={m.id}
-                  className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-surface-sunken/40 px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-foreground">{m.label}</span>
-                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                        {m.region}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground num">
-                      {is247 || isFx ? (
-                        <span>{m.note}</span>
-                      ) : (
-                        <>
-                          <span className="text-foreground/80">{openUk}</span>
-                          <span className="mx-1 text-muted-foreground/60">→</span>
-                          <span className="text-foreground/80">{closeUk}</span>
-                          <span className="ml-1 text-muted-foreground/60">{zone}</span>
-                          {m.note && <div className="text-[11px] text-muted-foreground/70">{m.note}</div>}
-                        </>
-                      )}
-                      {countdown && (
-                        <div className="mt-0.5 text-[11px] text-foreground/70 num">
-                          <span className="text-muted-foreground/70">{countdown.label} </span>
-                          <span className="font-medium tabular-nums">{countdown.value}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <Badge
-                    variant={status.open ? "default" : "secondary"}
-                    className={`shrink-0 ${status.open ? "" : "opacity-70"}`}
+            <span className="tabular-nums text-muted-foreground">{openVenues}/{MARKETS.length} open</span>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </Button>
+        }
+      />
+      {isOpen && (
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <ul
+              id="market-hours-list"
+              role="list"
+              aria-label="Global market opening hours in UK time"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {MARKETS.map((m) => {
+                const status = marketStatus(now, m);
+                const is247 = m.id === "crypto";
+                const isFx = m.id === "fx";
+                const openUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.openMin);
+                const closeUk = is247 || isFx ? null : formatVenueMinInUk(now, m.tz, m.closeMin);
+                const countdown = marketCountdown(now, m, status.open);
+                return (
+                  <li
+                    key={m.id}
+                    className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-surface-sunken/40 px-3 py-2"
                   >
-                    {status.label}
-                  </Badge>
-                </li>
-              );
-            })}
-          </ul>
-        </CardContent>
-      </Card>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-foreground">{m.label}</span>
+                        <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                          {m.region}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground num">
+                        {is247 || isFx ? (
+                          <span>{m.note}</span>
+                        ) : (
+                          <>
+                            <span className="text-foreground/80">{openUk}</span>
+                            <span className="mx-1 text-muted-foreground/60">→</span>
+                            <span className="text-foreground/80">{closeUk}</span>
+                            <span className="ml-1 text-muted-foreground/60">{zone}</span>
+                            {m.note && <div className="text-[11px] text-muted-foreground/70">{m.note}</div>}
+                          </>
+                        )}
+                        {countdown && (
+                          <div className="mt-0.5 text-[11px] text-foreground/70 num">
+                            <span className="text-muted-foreground/70">{countdown.label} </span>
+                            <span className="font-medium tabular-nums">{countdown.value}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Badge
+                      variant={status.open ? "default" : "secondary"}
+                      className={`shrink-0 ${status.open ? "" : "opacity-70"}`}
+                    >
+                      {status.label}
+                    </Badge>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </section>
   );
 }
