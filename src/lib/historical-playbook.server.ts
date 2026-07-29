@@ -50,7 +50,13 @@ A large share of daily volume is now algorithmic / AI-driven (HFT market makers,
   - Flash Crash (May 6, 2010): S&P -9% in minutes, fully recovered same session. Liquidity providers withdrew simultaneously. Lesson: market orders in thin tape get filled at absurd prints; always cap slippage.
   - Vol-mageddon (Feb 5, 2018): short-vol ETPs (XIV) blew up as VIX doubled in a day. Cross-asset systematic de-leveraging cascaded. Lesson: vol-targeting funds ALL sell together when vol spikes — expect correlated de-risking.
   - Mar 2020 Covid gamma unwind: dealer short-gamma amplified the sell-off; realised vol > 80%. Lesson: option-driven feedback loops accelerate one-way moves; widen stops, cut size.
-  - Jan 2021 meme-squeeze: retail options + forced-cover shorts drove single names +1000%. Lesson: momentum ignition is a real regime — do not chase parabolic 1-day moves.
+  - Jan 2021 GameStop / WSB meme-squeeze (case study): GME rose from ~$17 (Jan 4) to an intraday $483 (Jan 28) — roughly +2,700% in under four weeks — then round-tripped back below $50 within a fortnight. AMC, BBBY, BB, NOK ran in sympathy. Mechanics: (1) reported short interest >100% of float created a structural forced-cover setup; (2) coordinated retail buying on r/WallStreetBets concentrated in short-dated OTM calls, forcing dealers into a gamma squeeze (delta-hedge buying accelerated as spot rose); (3) social virality (DFV "YOLO" posts, Elon "Gamestonk!!" tweet Jan 26) collapsed information latency; (4) Melvin Capital lost ~53% in Jan-2021 and took a $2.75B rescue from Citadel/Point72 — a top-quartile fund was carried out on a single crowded short; (5) Robinhood's Jan 28 buy-side restriction (imposed by NSCC $3B collateral call, not a "conspiracy") broke the reflexive loop and marked the top. Fresh lessons beyond "don't chase parabolas":
+      • Crowded shorts with short-interest >20% of float, high borrow fee, and low float ARE the setup — screen for and AVOID shorting them, and treat any long already held into that condition as a candidate to trim.
+      • Options gamma is now a first-class price driver on single names: when weekly call open interest balloons and dealers are net short gamma, expect UP-side vol to compound; conventional mean-reversion sizing under-estimates the tail.
+      • Social-media velocity (WSB mention counts, ticker trend velocity on X/Reddit/StockTwits) is a leading indicator of retail-mania regimes — treat a >5× baseline mention spike as a caution flag, not a buy signal.
+      • Broker/plumbing risk is real: DTCC/NSCC collateral rules can freeze BUY-side liquidity on squeezed names. Never assume you can exit at posted prices during a mania; size so a 50% gap-down is survivable.
+      • The unwind is faster than the ramp. From the Jan 28 peak, GME lost ~90% in 14 sessions. Chasing on day 3+ of a parabola is nearly always a losing trade even if the story "wins" long term.
+      • Fundamentals reasserted eventually but on a multi-year timescale (GME's 2021 revenue was ~$6B vs a peak market cap of ~$33B implying >5x sales for a declining bricks-and-mortar retailer). Narrative can dominate for weeks; cash flow dominates for years.
   - Aug 5 2024 yen-carry unwind: Nikkei -12% overnight, VIX to 65, S&P recovered within a week. Lesson: cross-asset carry unwinds are fast and mostly retrace; do not panic-sell into the vacuum, but do NOT add on day-1 either.
   - Recurring "0DTE" gamma pins and afternoon reversals: intraday microstructure now dominates the last 30-60 minutes. Lesson: prefer end-of-day fills over lunchtime chases.
 
@@ -65,5 +71,14 @@ BEHAVIOURAL RULES for algo-driven markets:
   - When correlation spike + vol burst fire together, cut new-buy size by 50%+ and BOOST tail-hedge notional; do not "buy the dip" with full size.
   - Whipsaw regimes punish trend-following: widen stops or step aside for 1-2 sessions rather than getting knife-caught on both sides.
   - Overnight gaps > 1.5× typical daily move that reverse ≥50% in the first hour: assume the opening print was liquidity-driven, wait for a second confirmation bar before acting.
+
+RETAIL-MANIA / SHORT-SQUEEZE GUARDRAILS (post-GameStop 2021):
+  - HARD SKIP any new BUY if the symbol has: 5-day return > +50%, OR 30-day return > +100%, OR RSI-14 ≥ 85, OR volume >5× 20d median for ≥3 consecutive sessions. These are late-stage mania markers — expected forward 30d return is strongly negative and left-tail is severe.
+  - HARD SKIP names with reported short interest >20% of float combined with a >30% 5-day move — the reflexive gamma+cover loop can invert within a session and liquidity vanishes.
+  - If already holding a name that enters mania territory (RSI ≥ 85 + parabolic ramp): trim at least 50% into strength, move the remainder to a chandelier stop at 2×ATR from the high, and do NOT add on pullbacks until the 20-day SMA is reclaimed from below.
+  - Never short a heavily-shorted, low-float, high-borrow-fee small-cap regardless of "fundamental" case — that IS the setup an activist retail crowd hunts.
+  - Treat single-name option-flow anomalies (weekly OTM call OI > 5× baseline) as a "gamma squeeze latent" flag: reduce sizing on adjacent BUYs and prefer defined-risk exposure.
+  - Assume broker plumbing failure risk during any mania: never rely on being able to sell at the last print; size positions so a 50% overnight gap-down is survivable within existing drawdown limits.
+  - Ignore social-media narrative as a BUY reason. Social velocity confirms crowding, which raises reversal risk — use it as a caution filter, never as alpha.
 
 Apply these lessons as PRIORS. When today's signals conflict with the historical base rate for the current regime, prefer the base rate unless the evidence is strong and multi-signal.`;
