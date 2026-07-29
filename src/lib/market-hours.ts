@@ -274,6 +274,9 @@ export function getMarketStatusForVenue(venue: MarketVenue, now: Date = new Date
     case "pre_open":
       explanation = `${venue} pre-open — session opens in ${formatDuration(minutesUntilOpen)} (${humanNextOpen} UK)`;
       break;
+    case "lunch":
+      explanation = `${venue} lunch break — afternoon session opens in ${formatDuration(minutesUntilOpen)} (${humanNextOpen} UK)`;
+      break;
     case "post_close":
       explanation = `${venue} closed for the day — reopens ${humanNextOpen} UK (in ${formatDuration(minutesUntilOpen)})`;
       break;
