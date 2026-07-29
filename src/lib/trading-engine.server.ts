@@ -502,6 +502,28 @@ If no action is warranted, return an empty orders array.`;
         cashValue: args.cashValue,
         riskLevel: args.portfolio.risk_level,
       });
+      // Log any retail-mania guardrail hits (blocks + trims) as counterfactuals
+      // so they surface in the decision-summary card with the full per-component
+      // score breakdown (parabola 5d/30d, RSI, volume, short-interest, gamma,
+      // social velocity). Best-effort — must never break the tick.
+      if (heuristic.maniaBlocks.length > 0) {
+        Promise.all(
+          heuristic.maniaBlocks.map((mb) =>
+            logCounterfactual({
+              portfolioId: args.portfolio.id,
+              asOf: args.asOf,
+              symbol: mb.symbol,
+              side: mb.action === "trim" ? "sell" : "buy",
+              hypotheticalPrice: 0,
+              blockReason: mb.reason,
+            }).catch(() => {
+              /* ignore */
+            }),
+          ),
+        ).catch(() => {
+          /* ignore */
+        });
+      }
       return {
         briefing: heuristic.briefing,
         rationale: heuristic.rationale,
