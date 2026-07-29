@@ -846,6 +846,49 @@ export function RiskControlsCard({
               </div>
             </div>
 
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Per-currency exposure caps</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Caps the base-currency value of holdings priced in each non-base currency. Buys that would breach a cap are shrunk or rejected — no borrowing is used. Portfolio base: <span className="font-medium">{base}</span>. Leave blank to disable a cap.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {fxOptions.map((opt) => {
+                  const raw = cfg.fx_currency_limits?.[opt.code];
+                  const value = raw == null ? "" : String(Math.round(raw * 100));
+                  return (
+                    <div key={opt.code} className="flex items-center gap-2">
+                      <label className="w-28 text-xs" htmlFor={`fxcap-${opt.code}`}>
+                        {opt.code} · {opt.label}
+                      </label>
+                      <Input
+                        id={`fxcap-${opt.code}`}
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        placeholder="—"
+                        value={value}
+                        onChange={(e) => {
+                          const next = { ...(cfg.fx_currency_limits ?? {}) };
+                          const v = e.target.value.trim();
+                          if (v === "") {
+                            delete next[opt.code];
+                          } else {
+                            const n = Number(v);
+                            if (Number.isFinite(n)) next[opt.code] = Math.max(0, Math.min(1, n / 100));
+                          }
+                          setCfg({ ...cfg, fx_currency_limits: next });
+                        }}
+                        className="h-8 w-24"
+                      />
+                      <span className="text-xs text-muted-foreground">% of NAV</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+
 
 
 
