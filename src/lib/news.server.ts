@@ -99,15 +99,20 @@ const TranslateSchema = z.object({
 });
 
 
-// Fast heuristic: skip translation when a headline is plainly ASCII/Latin
-// and does not obviously contain non-English words. We keep this permissive
-// (any non-ASCII char routes through the LLM) so accented Latin scripts and
-// mixed-script headlines still get language-detected.
+// Language gate for the translation pipeline. Previously this was a bare
+// non-ASCII test, which silently passed over every Latin-script non-English
+// headline ("Governo aprova novo imposto"). It now delegates to the shared
+// deterministic detector, which combines script detection, per-language
+// function-word markers and diacritic evidence, with English function-word
+// density as counter-evidence. The LLM still has the final say on the
+// language name and the translation — this only decides whether to ask.
 export function looksNonEnglish(s: string): boolean {
-  // Any char outside basic ASCII printable + common punctuation triggers
-  // translation. Cheap, safe over-approximation.
-  return /[^\x00-\x7F]/.test(s);
+  return needsTranslation(s);
 }
+
+/** Re-exported so read paths can label an item consistently without an LLM. */
+export { detectLanguage } from "./language-detect";
+
 
 // -------- Translation caching --------
 //
