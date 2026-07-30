@@ -16,6 +16,9 @@ type MinimalDb = {
 };
 
 /** Start of the UTC hour containing `d`, as an ISO timestamp. */
+// Truncating to the UTC hour is also a Europe/London hour boundary: London is
+// always a whole number of hours (0 or +1) from UTC, so GMT/BST never splits an
+// hour. Chart labels convert these instants back to London time via uk-time.
 export function hourBucket(d: Date = new Date()): string {
   const b = new Date(d);
   b.setUTCMinutes(0, 0, 0);
