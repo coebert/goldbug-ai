@@ -1006,7 +1006,7 @@ function DivergenceNarrativesCard({
                     >
                       <span
                         className="inline-block h-2 w-2 rounded-full"
-                        style={{ background: colors[names.indexOf(p.name)] ?? "#888" }}
+                        style={{ background: colors[names.indexOf(p.name)] ?? CHART_NEUTRAL_SERIES }}
                       />
                       <span className="font-medium">{p.name}</span>
                       <span className="uppercase opacity-80">{p.action}</span>

@@ -434,11 +434,11 @@ function PortfolioPage() {
     if (chartContrast === "cb") {
       // Okabe–Ito palette: distinguishable across deuteranopia, protanopia, tritanopia.
       return {
-        equity: "#56B4E9",
+        equity: OKABE_ITO.skyBlue,
         equityFillTop: 0.5,
         equityFillBottom: 0.05,
         benchmark: OKABE_ITO.orange,
-        drawdown: "#D55E00",
+        drawdown: OKABE_ITO.vermillion,
         peak: "#E8E8E8",
         gridOpacity: 0.55,
         axis: "#CFCFCF",
@@ -453,9 +453,9 @@ function PortfolioPage() {
       equityFillBottom: 0,
       benchmark: "#f59e0b",
       drawdown: "var(--destructive)",
-      peak: "var(--muted-foreground)",
+      peak: CHART_NEUTRAL_SERIES,
       gridOpacity: 0.35,
-      axis: "var(--border)",
+      axis: AXIS_LINE_STROKE,
       axisText: "var(--foreground)",
       strokeWidth: 2.5,
       surface: "transparent",
