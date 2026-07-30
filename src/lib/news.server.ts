@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runWithBreaker } from "@/lib/_server/provider-circuit";
 import { GDELT_SOURCES } from "./news-sources";
 import { fetchRssForDate } from "./news-rss.server";
+import { buildSeenKeySet, filterUnseen } from "./news-dedupe";
 
 
 
@@ -805,18 +806,32 @@ export async function getNewsForDate(
   }));
 
   // We have a real fresh set. Only NOW do we replace today's rows on
-  // forceRefresh; otherwise merge (skip duplicates by headline).
+  // forceRefresh; otherwise merge (skip duplicates).
   if (opts?.forceRefresh) {
     await supabaseAdmin.from("news_cache").delete().eq("news_date", dateISO);
   }
-  const existingHeads = new Set(
-    opts?.forceRefresh
-      ? []
-      : cachedItems.flatMap((c) => [c.headline, c.original_headline ?? ""].filter(Boolean)),
-  );
-  const rows = fresh
-    .filter((n) => !existingHeads.has(n.headline) && !(n.original_headline && existingHeads.has(n.original_headline)))
-    .map((n) => ({
+
+  // De-dupe against everything already cached in the reel's visible window,
+  // not just today's rows: GDELT/RSS re-publish the same story on consecutive
+  // days, so a date-scoped check let cron insert visible repeats.
+  const windowStart = new Date(Date.parse(`${dateISO}T00:00:00Z`) - 7 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const { data: recentRows } = await supabaseAdmin
+    .from("news_cache")
+    .select("headline, url, original_headline")
+    .gte("news_date", windowStart)
+    .limit(1000);
+  const seen = buildSeenKeySet([
+    ...(recentRows ?? []).map((r) => ({
+      headline: (r.headline as string) ?? "",
+      url: (r.url as string | null) ?? null,
+      original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+    })),
+    // forceRefresh already deleted today's rows above, so don't re-block them.
+    ...(opts?.forceRefresh ? [] : cachedItems),
+  ]);
+  const rows = filterUnseen(fresh, seen).map((n) => ({
       news_date: n.date,
       source: n.source,
       headline: n.headline,
