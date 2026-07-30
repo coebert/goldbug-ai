@@ -43,6 +43,11 @@ async function hasVerifiedFactor(userId: string): Promise<boolean> {
   return hasFactor;
 }
 
+/** Pure policy: enforcement kicks in only once a factor is verified. */
+export function aal2Satisfied(aal: string | null, hasVerifiedFactor: boolean): boolean {
+  return aal === "aal2" || !hasVerifiedFactor;
+}
+
 /**
  * `requireSupabaseAuth` + a hard aal2 check. Use on every server function that
  * can move money or change trading safety settings.
@@ -53,7 +58,7 @@ export const requireAal2 = createMiddleware({ type: "function" })
     const claims = context.claims as Record<string, unknown> | undefined;
     const aal = typeof claims?.aal === "string" ? claims.aal : null;
 
-    if (aal !== "aal2" && (await hasVerifiedFactor(context.userId))) {
+    if (!aal2Satisfied(aal, aal === "aal2" ? true : await hasVerifiedFactor(context.userId))) {
       throw new MfaRequiredError();
     }
 
