@@ -20,6 +20,7 @@ import {
 import { getWalletHistory } from "@/lib/wallet-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 interface Props {
   portfolioId: string;
@@ -134,18 +135,18 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
               <ResponsiveContainer>
                 <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                  <YAxis
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
+                  <YAxis width={64}
                     yAxisId="left"
-                    tick={{ fontSize: 11 }}
+                    tick={AXIS_TICK}
                     tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
                     }
                   />
-                  <YAxis
+                  <YAxis width={64}
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 11 }}
+                    tick={AXIS_TICK}
                     tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
                     }
@@ -161,7 +162,7 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
                     labelFormatter={(l) => String(l)}
                   />
                   <Legend
-                    wrapperStyle={{ fontSize: 11 }}
+                    wrapperStyle={{ fontSize: 12 }}
                     formatter={(v) => (v === "__baseTotal" ? `Total (${baseCcy})` : v)}
                   />
                   {currencies.map((c, i) => (

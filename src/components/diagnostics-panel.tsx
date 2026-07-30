@@ -18,6 +18,7 @@ import {
 import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge, Globe2 } from "lucide-react";
 import { eventColor, type EventCategory } from "@/lib/global-events";
 import { Explain } from "@/components/explain";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 type Props = { portfolioId: string };
 
@@ -127,15 +128,15 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                   <XAxis
                     dataKey="index"
-                    tick={{ fontSize: 11 }}
-                    label={{ value: "Trade #", position: "insideBottom", offset: -2, fontSize: 11 }}
+                    tick={AXIS_TICK}
+                    label={{ value: "Trade #", position: "insideBottom", offset: -2, fontSize: 12 }}
                   />
                   <YAxis
                     tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                     domain={[0, 1]}
-                    tick={{ fontSize: 11 }}
+                    tick={AXIS_TICK}
                     width={64}
-                    label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
+                    label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
                   />
 
                   <ReferenceLine y={0.5} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
@@ -168,24 +169,24 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                 <XAxis
                   dataKey="bucket"
-                  tick={{ fontSize: 11 }}
-                  label={{ value: "Order size bucket", position: "insideBottom", offset: -2, fontSize: 11 }}
+                  tick={AXIS_TICK}
+                  label={{ value: "Order size bucket", position: "insideBottom", offset: -2, fontSize: 12 }}
                 />
                 <YAxis
                   yAxisId="left"
                   tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                   domain={[0, 1]}
-                  tick={{ fontSize: 11 }}
-                  width={60}
-                  label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
+                  tick={AXIS_TICK}
+                  width={64}
+                  label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
                   tickFormatter={(v) => `${v.toFixed(1)}%`}
-                  tick={{ fontSize: 11 }}
+                  tick={AXIS_TICK}
                   width={68}
-                  label={{ value: "Avg fwd return (%)", angle: 90, position: "insideRight", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
+                  label={{ value: "Avg fwd return (%)", angle: 90, position: "insideRight", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
                 />
 
                 <Tooltip

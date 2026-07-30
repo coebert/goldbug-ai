@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, RefreshCw } from "lucide-react";
+import { AXIS_TICK } from "@/lib/chart-palette";
 import {
   Area,
   CartesianGrid,
@@ -286,15 +287,15 @@ function ModeChart({
                   <CartesianGrid stroke={GRID_COLOR} strokeOpacity={0.18} strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: isMobile ? 10 : 11, fill: AXIS_COLOR }}
+                    tick={AXIS_TICK}
                     stroke={AXIS_COLOR}
                     strokeOpacity={0.6}
                     minTickGap={isMobile ? 56 : 40}
                     tickFormatter={(v) => (isMobile ? shortDate(String(v)) : String(v))}
                   />
                   <YAxis
-                    width={isMobile ? 44 : 64}
-                    tick={{ fontSize: isMobile ? 10 : 11, fill: AXIS_COLOR }}
+                    width={isMobile ? 56 : 64}
+                    tick={AXIS_TICK}
                     stroke={AXIS_COLOR}
                     strokeOpacity={0.6}
                     tickFormatter={(v) => (isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v)))}

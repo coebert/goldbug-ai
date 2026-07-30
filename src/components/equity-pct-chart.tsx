@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { AXIS_TICK } from "@/lib/chart-palette";
 import {
   CartesianGrid,
   Line,
@@ -75,17 +76,17 @@ export function EquityPctChart({
               <CartesianGrid stroke="var(--foreground)" strokeOpacity={0.12} strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 10, fill: "currentColor" }}
+                tick={AXIS_TICK}
                 stroke="currentColor"
                 strokeOpacity={0.4}
                 minTickGap={40}
                 tickFormatter={(v) => shortDate(String(v))}
               />
               <YAxis
-                width={56}
+                width={64}
                 tickMargin={4}
                 domain={domain}
-                tick={{ fontSize: 10, fill: "currentColor" }}
+                tick={AXIS_TICK}
                 stroke="currentColor"
                 strokeOpacity={0.4}
                 tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
@@ -93,7 +94,7 @@ export function EquityPctChart({
               <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.6} strokeDasharray="4 3" />
               <Tooltip
                 contentStyle={{
-                  fontSize: 11,
+                  fontSize: 12,
                   background: "var(--popover)",
                   border: "1px solid var(--border)",
                   borderRadius: 8,

@@ -208,7 +208,7 @@ function ReportPage() {
                         label={{ value: "Date", position: "insideBottom", offset: -4, style: { fontSize: 12, fill: "var(--foreground)" } }}
                         minTickGap={40}
                       />
-                      <YAxis
+                      <YAxis width={64}
                         tick={AXIS_TICK}
                         tickFormatter={(v) => `${(v as number).toLocaleString()}`}
                         label={{ value: `Value (${currency})`, angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "var(--foreground)" } }}
@@ -221,7 +221,7 @@ function ReportPage() {
                         ]}
                       />
                       <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
-                      <ReferenceLine y={data.portfolio.starting_cash} stroke="var(--foreground)" strokeOpacity={0.5} strokeDasharray="4 4" label={{ value: "Start", fill: "var(--foreground)", fontSize: 11 }} />
+                      <ReferenceLine y={data.portfolio.starting_cash} stroke="var(--foreground)" strokeOpacity={0.5} strokeDasharray="4 4" label={{ value: "Start", fill: "var(--foreground)", fontSize: 12 }} />
                       <Line type="monotone" dataKey="strategy" name="Strategy" stroke={CHART_ROLE.positive} strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="benchmark" name={data.benchmark} stroke={CHART_ROLE.benchmark} strokeWidth={2} strokeDasharray="6 3" dot={false} />
                     </LineChart>

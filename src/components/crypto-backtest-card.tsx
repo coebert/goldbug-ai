@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 type Props = { portfolioId: string };
 
@@ -132,8 +133,8 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
-                      <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmtGbp(Number(v))} width={72} />
+                      <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
+                      <YAxis tick={AXIS_TICK} tickFormatter={(v) => fmtGbp(Number(v))} width={72} />
                       <Tooltip
                         formatter={(v: number | string, name) => [fmtGbp(Number(v)), benchLabelFromKey(String(name))]}
                       />
@@ -160,8 +161,8 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
-                      <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} domain={["dataMin", 0]} />
+                      <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
+                      <YAxis tick={AXIS_TICK} tickFormatter={(v) => `${v}%`} width={64} domain={["dataMin", 0]} />
                       <Tooltip formatter={(v: number | string) => [`${v}%`, "Drawdown"]} />
                       <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="color-mix(in oklab, var(--destructive) 25%, transparent)" />
                     </AreaChart>

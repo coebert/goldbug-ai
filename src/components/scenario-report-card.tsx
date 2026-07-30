@@ -14,6 +14,7 @@ import {
   type BuildScenarioReportInput, type ScenarioReport,
 } from "@/lib/scenario-report";
 import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 const PALETTE = [
   "hsl(217 91% 60%)",
@@ -90,9 +91,9 @@ export function ScenarioReportCard(props: {
             <ResponsiveContainer>
               <LineChart data={equityChartData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                <YAxis
-                  tick={{ fontSize: 11 }}
+                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
+                <YAxis width={64}
+                  tick={AXIS_TICK}
                   tickFormatter={(v) => Number(v).toLocaleString()}
                 />
                 <Tooltip
@@ -125,9 +126,9 @@ export function ScenarioReportCard(props: {
             <ResponsiveContainer>
               <LineChart data={drawdownChartData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                <YAxis
-                  tick={{ fontSize: 11 }}
+                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
+                <YAxis width={64}
+                  tick={AXIS_TICK}
                   tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
                   domain={["auto", 0]}
                 />
@@ -266,11 +267,11 @@ function ExecutionQualitySection(props: {
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 10 }}
+                tick={AXIS_TICK}
                 minTickGap={16}
               />
-              <YAxis
-                tick={{ fontSize: 11 }}
+              <YAxis width={64}
+                tick={AXIS_TICK}
                 domain={[0, 1]}
                 tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
               />
@@ -312,11 +313,11 @@ function ExecutionQualitySection(props: {
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 10 }}
+                tick={AXIS_TICK}
                 minTickGap={16}
               />
-              <YAxis
-                tick={{ fontSize: 11 }}
+              <YAxis width={64}
+                tick={AXIS_TICK}
                 tickFormatter={(v) => `${Number(v).toFixed(0)}`}
               />
               <Tooltip

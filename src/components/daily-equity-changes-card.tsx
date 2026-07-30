@@ -215,7 +215,7 @@ export function DailyEquityChangesCard({
                   <YAxis
                     tick={AXIS_TICK}
                     tickFormatter={(v: number) => `${v.toFixed(1)}%`}
-                    width={44}
+                    width={64}
                   />
                   <ReferenceLine y={0} stroke="var(--foreground)" strokeOpacity={0.4} />
                   <Tooltip

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import { AXIS_TICK } from "@/lib/chart-palette";
 import {
   BarChart,
   Bar,
@@ -359,18 +360,18 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
           <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10 }}
+              tick={AXIS_TICK}
               interval="preserveStartEnd"
             />
-            <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+            <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
             <Tooltip
-              contentStyle={{ fontSize: 11 }}
+              contentStyle={{ fontSize: 12 }}
               labelFormatter={(_, payload) => {
                 const iso = payload?.[0]?.payload?.hour as string | undefined;
                 return iso ? formatUkTime(iso) : "";
               }}
             />
-            <Legend wrapperStyle={{ fontSize: 10 }} iconSize={8} />
+            <Legend wrapperStyle={{ fontSize: 12 }} iconSize={8} />
             <Bar dataKey="ok" name="Live" stackId="s" fill="var(--chart-2)" />
             <Bar dataKey="cache" name="Cache" stackId="s" fill="var(--muted-foreground)" />
             <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
@@ -416,12 +417,12 @@ function PairTimelineChart({
           <BarChart data={data} margin={{ top: 2, right: 6, left: -24, bottom: 0 }}>
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 9 }}
+              tick={AXIS_TICK}
               interval="preserveStartEnd"
             />
-            <YAxis tick={{ fontSize: 9 }} allowDecimals={false} width={20} />
+            <YAxis tick={AXIS_TICK} allowDecimals={false} width={64} />
             <Tooltip
-              contentStyle={{ fontSize: 11 }}
+              contentStyle={{ fontSize: 12 }}
               labelFormatter={(_, payload) => {
                 const iso = payload?.[0]?.payload?.hour as string | undefined;
                 return iso ? formatUkTime(iso) : "";
