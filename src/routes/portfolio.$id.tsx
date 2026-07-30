@@ -987,12 +987,6 @@ function PortfolioPage() {
                     portfolioId={id}
                   />
                 </div>
-                <div className="mb-6">
-                  <TailHedgeCard portfolioId={id} currency={p.currency} />
-                </div>
-                <div className="mb-6">
-                  <TailHedgeReportCard portfolioId={id} currency={p.currency} />
-                </div>
                 <Card className="mb-6">
                   <CardContent className="flex flex-wrap items-center gap-3 py-4">
                     <UITooltipProvider delayDuration={100}>
@@ -1056,6 +1050,18 @@ function PortfolioPage() {
                   </CardContent>
                 </Card>
 
+                <div className="mb-6 space-y-3">
+                  <div>
+                    <h3 className="font-display text-base font-semibold tracking-tight">Look deeper</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Optional detail. Nothing here needs your attention day to day.
+                    </p>
+                  </div>
+                  <AdvancedSection
+                    title="How this portfolio is performing"
+                    summary="Return, risk and how it compares with a simple index fund."
+                    defaultOpen={advancedLevel}
+                  >
                 {p && (
                   <div className="mb-4">
                     <PerformanceDashboardCard
@@ -1067,7 +1073,6 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <VanguardBenchmarkCard
@@ -1079,7 +1084,12 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="What changed your value"
+                    summary="Day by day, separating trading gains from money you paid in."
+                    defaultOpen={advancedLevel}
+                  >
                 {p && (
                   <div className="mb-4">
                     <EquityChangeBreakdownCard
@@ -1089,7 +1099,6 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <DailyEquityChangesCard
@@ -1099,7 +1108,12 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="Cash, currencies and spending power"
+                    summary="What is left to spend, in which currency, and how that has moved."
+                    defaultOpen={advancedLevel}
+                  >
                 {p && (
                   <div className="mb-4">
                     <Suspense
@@ -1109,7 +1123,6 @@ function PortfolioPage() {
                     </Suspense>
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <Suspense
@@ -1119,7 +1132,6 @@ function PortfolioPage() {
                     </Suspense>
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <Suspense
@@ -1129,7 +1141,24 @@ function PortfolioPage() {
                     </Suspense>
                   </div>
                 )}
-
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="Crash protection"
+                    summary="The hedge that cushions the portfolio when markets fall sharply."
+                    defaultOpen={advancedLevel}
+                  >
+                <div className="mb-6">
+                  <TailHedgeCard portfolioId={id} currency={p.currency} />
+                </div>
+                <div className="mb-6">
+                  <TailHedgeReportCard portfolioId={id} currency={p.currency} />
+                </div>
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="Practice runs on past data"
+                    summary="Backtests — how this strategy would have done in the past."
+                    defaultOpen={advancedLevel}
+                  >
                 {lastBtMetrics && (
                   <Card className="mb-4">
                     <CardHeader className="pb-2">
@@ -1197,7 +1226,6 @@ function PortfolioPage() {
                     </CardContent>
                   </Card>
                 )}
-
                 {backtestRunToken > 0 && lastBtDays != null && (
                   <Suspense
                     fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
@@ -1210,10 +1238,11 @@ function PortfolioPage() {
                     />
                   </Suspense>
                 )}
-
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
                 </Suspense>
+                  </AdvancedSection>
+                </div>
 
                 {(() => {
                   const cb = p.circuit_breaker as {
