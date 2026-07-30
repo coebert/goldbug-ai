@@ -130,44 +130,59 @@ export async function startNewsBackfill(
   return { job: rowToJob(data as Record<string, unknown>), resumed: false };
 }
 
+type DomainHistory = {
+  articles: Array<{ day: string; headline: string; url: string | null; source: string }>;
+  status: "ok" | "rate_limited" | "error";
+};
+
 /** One GDELT publisher-scoped query across the whole window, bucketed by day. */
-async function fetchDomainHistory(
-  domain: string,
-  startISO: string,
-  endISO: string,
-): Promise<Array<{ day: string; headline: string; url: string | null; source: string }>> {
+async function fetchDomainHistory(domain: string, startISO: string, endISO: string): Promise<DomainHistory> {
   const start = `${startISO.replace(/-/g, "")}000000`;
   const end = `${endISO.replace(/-/g, "")}235959`;
-  const query = encodeURIComponent(`domainis:${domain}`);
+  // `domain:` matches the publisher domain *and* its subdomains; `domainis:`
+  // demands an exact host match, which never matches a feed hostname.
+  const query = encodeURIComponent(`domain:${domain}`);
   const url =
     `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json` +
     `&maxrecords=${MAX_RECORDS}&sort=datedesc&startdatetime=${start}&enddatetime=${end}`;
-  try {
-    const res = await runWithBreaker(`gdelt:backfill:${domain}`, () =>
-      fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
-        signal: AbortSignal.timeout(GDELT_TIMEOUT_MS),
-      }),
-    );
-    if (!res.ok) {
-      try { await res.body?.cancel(); } catch { /* noop */ }
-      return [];
+
+  let lastStatus: DomainHistory["status"] = "error";
+  for (let attempt = 0; attempt < GDELT_MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, GDELT_RETRY_MS * attempt));
+    try {
+      const res = await runWithBreaker(`gdelt:backfill:${domain}`, () =>
+        fetch(url, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
+          signal: AbortSignal.timeout(GDELT_TIMEOUT_MS),
+        }),
+      );
+      if (!res.ok) {
+        try { await res.body?.cancel(); } catch { /* noop */ }
+        lastStatus = res.status === 429 ? "rate_limited" : "error";
+        continue;
+      }
+      const text = (await res.text()).trim();
+      if (!text.startsWith("{") && !text.startsWith("[")) {
+        // Plain-text body = GDELT's throttle sentinel. Back off and retry.
+        lastStatus = "rate_limited";
+        continue;
+      }
+      const json = JSON.parse(text) as { articles?: GdeltArticle[] };
+      const out: Array<{ day: string; headline: string; url: string | null; source: string }> = [];
+      for (const a of json.articles ?? []) {
+        if (!a.title) continue;
+        const day = seenDateToISODay(a.seendate);
+        if (!day || daysBetween(startISO, day) < 0 || daysBetween(day, endISO) < 0) continue;
+        out.push({ day, headline: a.title, url: a.url ?? null, source: (a.domain ?? domain).toLowerCase() });
+      }
+      return { articles: out, status: "ok" };
+    } catch {
+      lastStatus = "error";
     }
-    const text = (await res.text()).trim();
-    if (!text.startsWith("{") && !text.startsWith("[")) return []; // rate-limit sentinel
-    const json = JSON.parse(text) as { articles?: GdeltArticle[] };
-    const out: Array<{ day: string; headline: string; url: string | null; source: string }> = [];
-    for (const a of json.articles ?? []) {
-      if (!a.title) continue;
-      const day = seenDateToISODay(a.seendate);
-      if (!day || daysBetween(startISO, day) < 0 || daysBetween(day, endISO) < 0) continue;
-      out.push({ day, headline: a.title, url: a.url ?? null, source: (a.domain ?? domain).toLowerCase() });
-    }
-    return out;
-  } catch {
-    return [];
   }
+  return { articles: [], status: lastStatus };
 }
+
 
 /** Existing headline/url keys across the whole window, for cross-day dedupe. */
 async function windowSeenKeys(startISO: string, endISO: string): Promise<Set<string>> {
