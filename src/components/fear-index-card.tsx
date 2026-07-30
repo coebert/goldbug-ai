@@ -1,9 +1,32 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFearIndexSnapshot } from "@/lib/fear-index.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ChartFrame } from "@/components/chart-frame";
 import { Gauge } from "lucide-react";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+const SESSION_OPTIONS = [14, 30, 90] as const;
+
 
 interface Props {
   portfolioId: string;
