@@ -135,31 +135,85 @@ export function FearIndexCard({ portfolioId, active = true }: Props) {
             </div>
 
             <div>
-              <p className="text-sm font-medium mb-2">Last run's sizing decisions</p>
-              {d && d.impacts.length > 0 ? (
-                <ul className="space-y-1.5">
-                  {d.impacts.map((i) => (
-                    <li
-                      key={`${i.side}-${i.symbol}`}
-                      className="flex items-center justify-between gap-2 text-sm flex-wrap"
-                    >
-                      <span className="flex items-center gap-2 min-w-0">
-                        <Badge variant={i.side === "buy" ? "default" : "secondary"}>
-                          {i.side.toUpperCase()}
-                        </Badge>
-                        <span className="truncate">{i.symbol}</span>
-                      </span>
-                      <span className="text-muted-foreground tabular-nums">
-                        {i.multiplier != null ? `sized ×${i.multiplier.toFixed(2)}` : i.note}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                <p className="text-sm font-medium">Sizing comparison — last run</p>
+                {resized.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setOnlyResized((v) => !v)}
+                  >
+                    {onlyResized ? "Show all" : `Only resized (${resized.length})`}
+                  </Button>
+                )}
+              </div>
+              {visibleImpacts.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-muted-foreground">
+                        <th className="py-1 pr-2 font-medium">Symbol</th>
+                        <th className="py-1 px-2 font-medium text-right">Without fear</th>
+                        <th className="py-1 px-2 font-medium text-right">Actual</th>
+                        <th className="py-1 pl-2 font-medium text-right">Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleImpacts.map((i) => {
+                        const delta = i.deltaPct;
+                        const deltaTone =
+                          delta == null || Math.abs(delta) < 0.5
+                            ? "text-muted-foreground"
+                            : delta < 0
+                              ? "text-destructive"
+                              : "text-emerald-500";
+                        return (
+                          <tr key={`${i.side}-${i.symbol}`} className="border-t border-border/60">
+                            <td className="py-1.5 pr-2">
+                              <span className="flex items-center gap-2 min-w-0">
+                                <Badge variant={i.side === "buy" ? "default" : "secondary"}>
+                                  {i.side.toUpperCase()}
+                                </Badge>
+                                <span className="truncate">{i.symbol}</span>
+                              </span>
+                            </td>
+                            <td className="py-1.5 px-2 text-right tabular-nums text-muted-foreground">
+                              {i.unadjustedValue != null
+                                ? formatMoney(i.unadjustedValue, currency, 0)
+                                : "—"}
+                            </td>
+                            <td className="py-1.5 px-2 text-right tabular-nums">
+                              {formatMoney(i.value, currency, 0)}
+                            </td>
+                            <td className={`py-1.5 pl-2 text-right tabular-nums ${deltaTone}`}>
+                              {delta != null
+                                ? `${delta > 0 ? "+" : ""}${delta.toFixed(0)}%`
+                                : i.note}
+                              {i.fearScore != null && (
+                                <span className="block text-[11px] text-muted-foreground">
+                                  fear {i.fearScore.toFixed(0)}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   The fear index didn't change sizing on the last run.
                 </p>
               )}
+              {resized.length > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {resized.length} order{resized.length === 1 ? "" : "s"} resized by the fear index —
+                  net {formatMoney(netDelta, currency, 0)} vs unadjusted sizing.
+                </p>
+              )}
+
             </div>
 
             <div>
