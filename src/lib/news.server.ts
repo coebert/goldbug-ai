@@ -304,7 +304,7 @@ export function refreshStaleTranslations(
 
       // Evict from memory so translateWithCache is forced to re-hit the LLM
       // instead of returning the about-to-expire entry.
-      for (const h of originals) translationCache.delete(h);
+      for (const h of originals) cacheDelete(h);
 
       // Re-translate (in-memory + persistent cache both get rewritten with a
       // fresh 30-day TTL via persistTranslations).
