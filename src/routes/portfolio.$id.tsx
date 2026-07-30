@@ -139,6 +139,7 @@ import {
   TooltipTrigger as UITooltipTrigger,
 } from "@/components/ui/tooltip";
 import { RegimePanel } from "@/components/regime-panel";
+import { FearIndexCard } from "@/components/fear-index-card";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
 import { SignalDecayCard } from "@/components/signal-decay-card";
@@ -1929,6 +1930,8 @@ function PortfolioPage() {
 
                 <div className="mt-6 grid gap-4 lg:grid-cols-2">
                   <RegimePanel />
+                  <FearIndexCard portfolioId={id} active={tab === "overview"} />
+
                   <LearningPanel portfolioId={p.id} />
                 </div>
               </TabsContent>
