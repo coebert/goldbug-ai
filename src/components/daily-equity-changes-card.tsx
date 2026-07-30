@@ -121,6 +121,7 @@ export function DailyEquityChangesCard({
       equity: r.equity,
       prevEquity: r.prevEquity,
       netFlow: r.netFlow,
+      basisReset: r.basisReset,
       // rawDelta is reconstructed so the assertion can verify pnl fully
       // accounts for netFlow (identity by construction is fine — the
       // real check is the pure-flow-day and pct-derivation branches).
@@ -142,7 +143,8 @@ export function DailyEquityChangesCard({
             <CalendarDays className="h-4 w-4" /> Daily equity change
           </CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Trading-only day-over-day % change. Deposits and withdrawals are excluded.
+            Trading-only day-over-day % change. Deposits, withdrawals and
+            account re-baselining days are excluded.
           </p>
         </div>
         <div
@@ -241,6 +243,12 @@ export function DailyEquityChangesCard({
                           {d.netFlow !== 0 ? (
                             <div className="text-muted-foreground tabular-nums">
                               Flow {formatMoney(d.netFlow, currency, 2)} (excluded)
+                            </div>
+                          ) : null}
+                          {d.basisReset ? (
+                            <div className="mt-1 text-muted-foreground">
+                              Account re-baselined by a cash transfer — trading P&amp;L
+                              isn't measurable for this day.
                             </div>
                           ) : null}
                         </div>

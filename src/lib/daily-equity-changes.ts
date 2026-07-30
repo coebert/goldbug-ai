@@ -29,7 +29,18 @@ export type DailyEquityChange = {
   netFlow: number;
   pnl: number;
   pct: number;
+  /**
+   * True when the day's cash flow dwarfs the prior equity base (e.g. a
+   * broker cash-sync that re-baselines a £300 pot to £10,300). The
+   * residual after netting the flow is basis noise, not trading P&L, so
+   * pnl/pct are forced to 0 rather than shown as an implausible swing.
+   */
+  basisReset: boolean;
 };
+
+// A flow this many times larger than the prior equity base means the
+// snapshot basis was reset, not that the portfolio traded.
+const BASIS_RESET_FLOW_RATIO = 5;
 
 export function computeDailyEquityChanges(
   equity: EquitySnapshotLite[],
@@ -57,8 +68,12 @@ export function computeDailyEquityChanges(
       if (d.date > prev.date && d.date <= curr.date) netFlow += d.amount;
     }
     const rawDelta = curr.value - prev.value;
-    const pnl = rawDelta - netFlow;
-    const pct = prev.value > 0 ? (pnl / prev.value) * 100 : 0;
+    const basisReset =
+      netFlow !== 0 &&
+      prev.value > 0 &&
+      Math.abs(netFlow) / prev.value >= BASIS_RESET_FLOW_RATIO;
+    const pnl = basisReset ? 0 : rawDelta - netFlow;
+    const pct = !basisReset && prev.value > 0 ? (pnl / prev.value) * 100 : 0;
     out.push({
       date: curr.date,
       prevDate: prev.date,
@@ -68,6 +83,7 @@ export function computeDailyEquityChanges(
       netFlow,
       pnl,
       pct,
+      basisReset,
     });
   }
   assertNoFlowLeakage(out, "computeDailyEquityChanges");
@@ -89,6 +105,7 @@ export type FlowLeakRow = {
   netFlow: number;
   pnl: number;
   pct: number;
+  basisReset?: boolean;
 };
 
 /**
@@ -109,6 +126,9 @@ export function assertNoFlowLeakage(
   const absEps = opts.absTolerance ?? FLOW_LEAK_EPS_ABS;
   const pctEps = opts.pctTolerance ?? FLOW_LEAK_EPS_PCT;
   for (const r of rows) {
+    // Basis-reset days (flow ≫ prior equity) intentionally report
+    // pnl = pct = 0; the netting identity does not apply to them.
+    if (r.basisReset) continue;
     const arithmeticDrift = Math.abs(r.pnl + r.netFlow - r.rawDelta);
     if (arithmeticDrift > absEps) {
       throw new Error(
