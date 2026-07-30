@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
-import { formatUkAxisDay, formatUkAxisHour, ukDayKey, ukZoneAbbr } from "@/lib/uk-time";
+import {
+  formatUkAxisDay,
+  formatUkAxisHour,
+  formatUkAxisMonth,
+  formatUkAxisTime,
+  ukDayKey,
+  ukZoneAbbr,
+} from "@/lib/uk-time";
 import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
 
@@ -34,8 +41,8 @@ function fmtHour(iso: string) {
 
 /**
  * Days covered by a series, used to pick x-axis labels. Hourly data plotted
- * over months has no room for "02 Aug, 14" on every tick, so once the span
- * outgrows a week the axis falls back to dates while the points stay hourly.
+ * over months has no room for "02 Aug, 14:00" on every tick, so as the span
+ * grows the labels get shorter while the points stay hourly.
  */
 export function spanDays(rows: Array<{ at: string }>): number {
   if (rows.length < 2) return 0;
@@ -44,6 +51,73 @@ export function spanDays(rows: Array<{ at: string }>): number {
   if (!Number.isFinite(first) || !Number.isFinite(last)) return 0;
   return Math.max(0, (last - first) / 86_400_000);
 }
+
+export type TickStyle = "time" | "hour" | "day" | "month";
+
+export type XAxisTicks = {
+  /** Which label shape to render. */
+  style: TickStyle;
+  /** Minimum horizontal pixels recharts must leave between two rendered labels. */
+  minTickGap: number;
+  format: (iso: string) => string;
+};
+
+/** Widest label each style can produce, in approximate pixels at 11px type. */
+const LABEL_WIDTH_PX: Record<TickStyle, number> = {
+  time: 34, // "14:00"
+  hour: 82, // "02 Aug, 14:00"
+  day: 42, // "02 Aug"
+  month: 44, // "Aug 26"
+};
+
+/**
+ * Pick x-axis label shape and spacing from the span actually being plotted.
+ *
+ * Two failure modes this exists to prevent:
+ *  - long-form labels ("02 Aug, 14:00") on a multi-month hourly series, which
+ *    collide into an unreadable smear;
+ *  - a fixed `minTickGap` that is narrower than the label it has to separate,
+ *    so recharts happily renders touching ticks on dense series.
+ *
+ * The gap is always at least the widest label plus breathing room, then scaled
+ * up further as point density rises so long spans thin their ticks out instead
+ * of crowding them.
+ */
+export function xAxisTicks(
+  resolution: Resolution,
+  span: number,
+  pointCount: number,
+): XAxisTicks {
+  const style: TickStyle =
+    resolution === "hourly"
+      ? span <= 1.5
+        ? "time"
+        : span <= 7
+          ? "hour"
+          : span <= 120
+            ? "day"
+            : "month"
+      : span <= 120
+        ? "day"
+        : "month";
+
+  const format =
+    style === "time"
+      ? formatUkAxisTime
+      : style === "hour"
+        ? formatUkAxisHour
+        : style === "day"
+          ? formatUkAxisDay
+          : formatUkAxisMonth;
+
+  // Density bonus: with hundreds of points crammed into one axis, neighbouring
+  // candidate ticks sit a pixel apart, so widen the required gap.
+  const densityBonus = Math.min(48, Math.floor(Math.max(0, pointCount - 60) / 40) * 8);
+  const minTickGap = LABEL_WIDTH_PX[style] + 12 + densityBonus;
+
+  return { style, minTickGap, format: (iso: string) => format(iso) };
+}
+
 
 /** Whole days from `inception` (or the first snapshot) to now, for the fetch window. */
 export function historyDays(inception: string | null | undefined, now = new Date()): number {
@@ -249,9 +323,9 @@ export function EquityPctChart({
 
   const up = last >= 0;
   const color = up ? "var(--success)" : "var(--destructive)";
-  // Hourly points over a long window still get date-only ticks so the axis
-  // can carry all-time history without the labels colliding.
-  const fmtX = resolution === "hourly" && spanDays(data) <= 7 ? fmtHour : fmtDay;
+  // Label shape and spacing follow the span actually plotted, so an all-time
+  // hourly series thins to month labels instead of colliding.
+  const ticks = xAxisTicks(resolution, spanDays(data), data.length);
   const money = (v: number) =>
     `${v < 0 ? "−" : "+"}${new Intl.NumberFormat("en-GB", {
       style: "currency",
@@ -306,13 +380,15 @@ export function EquityPctChart({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
+              <ComposedChart data={data} margin={{ top: 6, right: 12, bottom: 6, left: 4 }}>
                 <CartesianGrid {...GRID_PROPS} />
                 <XAxis
                   dataKey="at"
                   tick={AXIS_TICK}
-                  minTickGap={resolution === "hourly" ? 64 : 40}
-                  tickFormatter={(v) => fmtX(String(v))}
+                  minTickGap={ticks.minTickGap}
+                  tickMargin={6}
+                  interval="preserveStartEnd"
+                  tickFormatter={(v) => ticks.format(String(v))}
                   axisLine={AXIS_LINE}
                   tickLine={TICK_LINE}
                 />
