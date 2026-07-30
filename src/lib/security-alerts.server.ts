@@ -18,6 +18,7 @@ export type AuditEventKind =
   | "holdings"
   | "insights"
   | "backtest"
+  | "cron_auth"
   | "generic";
 
 export function maybeNotifySecurityEvent(params: {
@@ -27,7 +28,17 @@ export function maybeNotifySecurityEvent(params: {
   portfolioId?: string | null;
 }) {
   const userId = params.actorUserId;
-  if (!userId) return; // Cannot notify without an owner.
+  if (!userId) {
+    // Actor-less rejections (unknown portfolio, missing ids, probing) still
+    // matter — fan them out to the administrators instead of dropping them.
+    notifyAdminsSecurityEvent({
+      event: params.event,
+      reason: params.reason,
+      details: { portfolioId: params.portfolioId ?? null },
+    });
+    return;
+  }
+
   void (async () => {
     try {
       const { data: settings } = await supabaseAdmin
