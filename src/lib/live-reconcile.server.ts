@@ -4,6 +4,7 @@
 // reconciliation core that the cron route imports directly.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
 import { asJson } from "@/lib/_server/db-json";
 import { withOwnedClient } from "@/lib/_server/owned-client";
 import type { ScopedDbClient } from "@/lib/_server/owned-client";
@@ -74,7 +75,7 @@ export async function runReconciliation(
   // On the admin branch RLS is bypassed, so re-scope by user_id. On the
   // authenticated branch the RLS policy already restricts the row set.
   const portfolioQuery = db.from("portfolios")
-    .select("id, user_id, mode, current_cash")
+    .select("id, user_id, mode, current_cash, broker, broker_account_id")
     .eq("id", portfolioId);
   const p = await (isAdmin ? portfolioQuery.eq("user_id", userId) : portfolioQuery)
     .maybeSingle();
@@ -84,9 +85,14 @@ export async function runReconciliation(
     return { skipped: true, reason: "not live" };
   }
 
+  const link = resolvePortfolioBrokerLink(p.data);
+  if (!link.linked) return { skipped: true, reason: link.reason };
+
   const env = p.data.mode === "live_prod" ? "live" : "sim";
   const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-  const adapter = await buildSaxoAdapter({ userId, portfolioId, envOverride: env });
+  const adapter = await buildSaxoAdapter({
+    userId, portfolioId, envOverride: env, accountKey: link.accountKey,
+  });
   const [bal, pos, hold] = await Promise.all([
     adapter.getBalance(),
     adapter.getPositions(),
