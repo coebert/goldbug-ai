@@ -2585,6 +2585,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       },
       regime: regime ?? null,
       algo_regime: algoRegime ?? null,
+      fear_index: { score: fearIndex.score, label: fearIndex.label, size_multiplier: fearIndex.sizeMultiplier, reason: fearIndex.reason },
       tail_hedge: tailHedgeDecision,
       tail_hedge_execution: tailHedgeExecution,
       tail_hedge_reconciliation: tailHedgeReconciliation,
