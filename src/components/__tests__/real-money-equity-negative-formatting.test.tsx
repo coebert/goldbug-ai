@@ -131,7 +131,11 @@ describe("real-money equity tile — negative equity & negative PnL formatting",
     expect(summary.pnl).toBeCloseTo(-20, 10);
     expect(summary.pct).toBeCloseTo(-6.6666, 3);
     expect(html).toContain("text-destructive");
-    expect(html).not.toContain("text-success");
+    // The delta row must not carry the positive tone. (The "Real" mode badge
+    // legitimately uses text-success, so scope the check to the delta row.)
+    const deltaRow = html.match(/tabular-nums text-(success|destructive)/)?.[1];
+    expect(deltaRow).toBe("destructive");
+
     // Percent to exactly 2dp, no double-sign.
     expect(html).toContain("-6.67%");
     expect(html).not.toContain("+-6.67%");
