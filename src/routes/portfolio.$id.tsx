@@ -154,6 +154,7 @@ import { PerformanceDashboardCard } from "@/components/performance-dashboard-car
 import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
+import { EquityPctChart } from "@/components/equity-pct-chart";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 const BacktestResultsCard = lazy(() =>
@@ -836,10 +837,14 @@ function PortfolioPage() {
                 </div>
               </div>
             )}
-
-
+            <EquityPctChart
+              className="mb-4 md:hidden"
+              equity={equity as { snapshot_date: string; total_value: number }[]}
+              startingCash={startingCash}
+            />
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
+
               {/* Mobile: single-row horizontally scrollable strip with snap so
                   the tab set doesn't consume 3–4 vertical rows on 375px.
                   Desktop keeps the wrap-free flex layout. */}
