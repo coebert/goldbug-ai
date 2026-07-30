@@ -163,7 +163,7 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} domain={["dataMin", 0]} />
                       <Tooltip formatter={(v: number | string) => [`${v}%`, "Drawdown"]} />
-                      <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="color-mix(in oklab, var(--destructive) 0.25%, transparent)" />
+                      <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="color-mix(in oklab, var(--destructive) 25%, transparent)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

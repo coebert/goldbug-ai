@@ -246,7 +246,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
               />
               <ReferenceLine y={0} stroke="var(--border)" />
               <Tooltip
-                cursor={{ fill: "color-mix(in oklab, var(--muted) 0.4%, transparent)" }}
+                cursor={{ fill: "color-mix(in oklab, var(--muted) 40%, transparent)" }}
                 content={({ active, payload }) => {
                   if (!active || !payload || payload.length === 0) return null;
                   const p = payload[0].payload as {

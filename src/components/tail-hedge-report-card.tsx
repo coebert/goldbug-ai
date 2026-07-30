@@ -169,7 +169,7 @@ export function TailHedgeReportCard({
                     dataKey="advised"
                     name="Advised notional"
                     stroke="var(--primary)"
-                    fill="color-mix(in oklab, var(--primary) 0.2%, transparent)"
+                    fill="color-mix(in oklab, var(--primary) 20%, transparent)"
                   />
                   <Line
                     type="monotone"

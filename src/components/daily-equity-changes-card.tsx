@@ -219,7 +219,7 @@ export function DailyEquityChangesCard({
                   />
                   <ReferenceLine y={0} stroke="var(--foreground)" strokeOpacity={0.4} />
                   <Tooltip
-                    cursor={{ fill: "color-mix(in oklab, var(--muted) 0.3%, transparent)" }}
+                    cursor={{ fill: "color-mix(in oklab, var(--muted) 30%, transparent)" }}
                     content={({ active, payload }) => {
                       if (!active || !payload || payload.length === 0) return null;
                       const d = payload[0].payload as (typeof chartData)[number];
