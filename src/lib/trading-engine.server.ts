@@ -34,6 +34,7 @@ import {
 } from "./signals-extended.server";
 import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
+import { classifyPanicSell } from "./fear-sell-guard";
 import { computeFearIndex, formatFearIndexBlock } from "./fear-index";
 import {
   computeCrossSectionalRanks,
@@ -1429,6 +1430,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     const pct = Math.max(0, Math.min(100, order.percent)) / 100;
 
     if (order.side === "sell") {
+      // PANIC-SELL GUARD — the fear index must never trigger liquidations.
+      const panicVerdict = classifyPanicSell({
+        reason: order.reason,
+        fearScore: fearIndex.score,
+      });
+      if (panicVerdict.block) {
+        executed.push({
+          symbol: meta.symbol, side: "sell", quantity: 0, price, value: 0,
+          reason: order.reason,
+          rejected: panicVerdict.reason,
+        });
+        continue;
+      }
       const cur = holdingsByS.get(meta.symbol);
       if (!cur || Number(cur.quantity) <= 0) {
         executed.push({

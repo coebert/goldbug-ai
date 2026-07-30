@@ -173,6 +173,12 @@ export function formatFearIndexBlock(f: FearIndexResult): string {
   }
   if (f.blockNewBuys) guidance.push("Fear is at panic levels — new BUY orders will be blocked by guardrails this tick.");
   guidance.push(`New-buy size multiplier enforced by guardrails: ×${f.sizeMultiplier.toFixed(2)}.`);
+  guidance.push(
+    "BUY-SIDE ONLY: this gauge must never justify selling. Do NOT propose sells because fear/VIX/panic is elevated — " +
+      "guardrails will reject any sell whose reason cites market fear without an independent exit rule " +
+      "(stop-loss, trailing/ATR stop, take-profit, rebalance, position/correlation cap, broken thesis, risk halt). " +
+      "Hold through fear spikes; use cash and hedges instead of liquidating.",
+  );
 
   const rows = f.components
     .map((c) => `- ${c.name}: ${c.value == null ? "n/a" : c.value.toFixed(2)}${c.score == null ? "" : ` → fear ${c.score.toFixed(0)}/100`}`)
@@ -182,5 +188,5 @@ export function formatFearIndexBlock(f: FearIndexResult): string {
 - Score: ${f.score.toFixed(0)}/100 → ${humanFearLabel(f.label)}
 ${rows}
 ${guidance.map((g) => `• ${g}`).join("\n")}
-Treat this gauge as a hard overlay: conviction must be discounted when fear is elevated, regardless of how strong the trend looks.`;
+Treat this gauge as a hard overlay on NEW BUYS ONLY: conviction must be discounted when fear is elevated, regardless of how strong the trend looks. It is never a sell signal.`;
 }
