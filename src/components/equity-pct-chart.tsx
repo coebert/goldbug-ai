@@ -89,6 +89,8 @@ export function EquityPctChart({
   /** Baseline pot with later deposits stripped out (`baselineStartingCash`). */
   startingCash: number;
   deposits?: Array<{ date: string; amount: number }>;
+  /** `YYYY-MM-DD` the portfolio went live; earlier points are not plotted. */
+  inceptionDate?: string | null;
   className?: string;
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
