@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { citationHref, newsSearchUrl } from "@/lib/news-citation";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -797,7 +798,7 @@ export function NewsReel() {
                             </a>
                           ) : (
                             <a
-                              href={`https://www.google.com/search?q=${encodeURIComponent(item.headline)}&tbm=nws`}
+                              href={newsSearchUrl(item.headline)}
                               target="_blank"
                               rel="noreferrer noopener"
                               className="inline-flex items-center gap-1 rounded-sm border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
@@ -851,7 +852,7 @@ export function NewsReel() {
                                 </a>
                               ) : (
                                 <a
-                                  href={`https://www.google.com/search?q=${encodeURIComponent(item.headline)}&tbm=nws`}
+                                  href={newsSearchUrl(item.headline)}
                                   target="_blank"
                                   rel="noreferrer noopener"
                                   className="inline-flex items-center gap-1 rounded-sm border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
@@ -1169,7 +1170,7 @@ export function NewsReel() {
                   </Button>
                   <Button asChild size="sm">
                     <a
-                      href={item.url ?? `https://www.google.com/search?q=${encodeURIComponent(item.headline)}&tbm=nws`}
+                      href={citationHref(item)}
                       target="_blank"
                       rel="noreferrer noopener"
                     >
