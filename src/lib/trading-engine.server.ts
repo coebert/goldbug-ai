@@ -2604,6 +2604,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }).select("id").single();
   const decisionId = decisionInsert.data?.id ?? null;
 
+  // Fear-index threshold alert (fire-and-forget): notifies when panic blocks
+  // fresh buys or elevated/complacent readings changed buy sizing.
+  try {
+    const { maybeNotifyFearIndex } = await import("./fear-index-notify.server");
+    maybeNotifyFearIndex({
+      portfolioId,
+      userId: portfolio.user_id ?? null,
+      fearIndex: {
+        score: fearIndex.score,
+        label: fearIndex.label,
+        sizeMultiplier: fearIndex.sizeMultiplier,
+        blockNewBuys: fearIndex.blockNewBuys,
+        reason: fearIndex.reason,
+      },
+      orders: executed.map((o) => ({
+        symbol: o.symbol,
+        side: o.side,
+        value: o.value,
+        rejected: o.rejected ?? null,
+        reason: o.reason ?? null,
+      })),
+    });
+  } catch (e) {
+    console.warn("fear-index alert hook failed", e instanceof Error ? e.message : String(e));
+  }
+
   // Shadow variant B (fire-and-forget): runs an alternate prompt in the background
   // so we can weekly-compare divergences without affecting live execution.
   if (!breakerTripped) {
