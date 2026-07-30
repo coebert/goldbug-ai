@@ -42,6 +42,12 @@ export type DailyEquityChange = {
 // snapshot basis was reset, not that the portfolio traded.
 const BASIS_RESET_FLOW_RATIO = 5;
 
+// Even when the flow dwarfs the base, the day is only a basis reset if
+// the residual (rawDelta - netFlow) is ALSO implausible for one day of
+// trading on the prior base. A documented £999,000 deposit that leaves a
+// £5 residual on a £1,000 pot is a real (tiny) trading day, not noise.
+const BASIS_RESET_RESIDUAL_RATIO = 0.25;
+
 export function computeDailyEquityChanges(
   equity: EquitySnapshotLite[],
   deposits: DepositLite[] = [],
@@ -68,11 +74,13 @@ export function computeDailyEquityChanges(
       if (d.date > prev.date && d.date <= curr.date) netFlow += d.amount;
     }
     const rawDelta = curr.value - prev.value;
+    const residual = rawDelta - netFlow;
     const basisReset =
       netFlow !== 0 &&
       prev.value > 0 &&
-      Math.abs(netFlow) / prev.value >= BASIS_RESET_FLOW_RATIO;
-    const pnl = basisReset ? 0 : rawDelta - netFlow;
+      Math.abs(netFlow) / prev.value >= BASIS_RESET_FLOW_RATIO &&
+      Math.abs(residual) / prev.value >= BASIS_RESET_RESIDUAL_RATIO;
+    const pnl = basisReset ? 0 : residual;
     const pct = !basisReset && prev.value > 0 ? (pnl / prev.value) * 100 : 0;
     out.push({
       date: curr.date,
