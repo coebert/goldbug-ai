@@ -1293,10 +1293,11 @@ function PortfolioPage() {
 
                 <div className="grid gap-4 lg:grid-cols-3">
                   <Card className="lg:col-span-2">
-                    <CardHeader>
-                      <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
-                        <span>Equity curve</span>
+                    <CardHeader className="gap-3">
+                      <CardTitle className="text-base">Equity curve</CardTitle>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                         <div className="flex items-center gap-2">
+
                           <label className="text-xs font-normal text-muted-foreground">
                             Benchmark
                           </label>
