@@ -847,7 +847,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     },
     notes: "regime detection unavailable",
   };
+
+  // Composite FEAR INDEX — blends VIX level/term structure/VVIX/SKEW/put-call
+  // proxy with the index drawdown into a single 0..100 gauge. It is threaded
+  // into the AI prompt AND enforced deterministically in the buy-sizing chain.
+  const fearIndex = computeFearIndex({
+    vix: options?.vix ?? effectiveRegime.signals.vix_level ?? null,
+    vix9d: options?.vix9d ?? null,
+    vix3m: options?.vix3m ?? null,
+    vvix: options?.vvix ?? null,
+    skew: options?.skew ?? null,
+    putCallProxy: options?.put_call_proxy ?? null,
+    drawdownPct: effectiveRegime.signals.spy_drawdown_pct ?? null,
+  });
+  const fearBlock = formatFearIndexBlock(fearIndex);
+
   const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
+
   const cfg = tightened.cfg;
   const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
   const cashFloor = totalValue * cashFloorPctEff;
