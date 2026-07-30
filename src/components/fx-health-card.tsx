@@ -371,10 +371,10 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
               }}
             />
             <Legend wrapperStyle={{ fontSize: 10 }} iconSize={8} />
-            <Bar dataKey="ok" name="Live" stackId="s" fill="hsl(var(--chart-2, 142 71% 45%))" />
-            <Bar dataKey="cache" name="Cache" stackId="s" fill="hsl(var(--muted-foreground))" />
+            <Bar dataKey="ok" name="Live" stackId="s" fill="var(--chart-2)" />
+            <Bar dataKey="cache" name="Cache" stackId="s" fill="var(--muted-foreground)" />
             <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
-            <Bar dataKey="fallback" name="Fallback" stackId="s" fill="hsl(var(--destructive))" />
+            <Bar dataKey="fallback" name="Fallback" stackId="s" fill="var(--destructive)" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -427,10 +427,10 @@ function PairTimelineChart({
                 return iso ? formatUkTime(iso) : "";
               }}
             />
-            <Bar dataKey="ok" name="Live" stackId="s" fill="hsl(var(--chart-2, 142 71% 45%))" />
-            <Bar dataKey="cache" name="Cache" stackId="s" fill="hsl(var(--muted-foreground))" />
+            <Bar dataKey="ok" name="Live" stackId="s" fill="var(--chart-2)" />
+            <Bar dataKey="cache" name="Cache" stackId="s" fill="var(--muted-foreground)" />
             <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
-            <Bar dataKey="fallback" name="Fallback" stackId="s" fill="hsl(var(--destructive))" />
+            <Bar dataKey="fallback" name="Fallback" stackId="s" fill="var(--destructive)" />
           </BarChart>
         </ResponsiveContainer>
       </div>

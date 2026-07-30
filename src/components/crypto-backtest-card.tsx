@@ -137,7 +137,7 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                       <Tooltip
                         formatter={(v: number | string, name) => [fmtGbp(Number(v)), benchLabelFromKey(String(name))]}
                       />
-                      <Line type="monotone" dataKey="equity" name="Sleeve" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+                      <Line type="monotone" dataKey="equity" name="Sleeve" stroke="var(--primary)" dot={false} strokeWidth={2} />
                       {benchmarks
                         .filter((b) => !b.label.startsWith("Sleeve"))
                         .map((b) => (
@@ -163,7 +163,7 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} domain={["dataMin", 0]} />
                       <Tooltip formatter={(v: number | string) => [`${v}%`, "Drawdown"]} />
-                      <Area type="monotone" dataKey="drawdown" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive) / 0.25)" />
+                      <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="color-mix(in oklab, var(--destructive) 25%, transparent)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -302,9 +302,9 @@ function benchLabelFromKey(key: string): string {
   }
 }
 function benchColor(label: string): string {
-  if (label.startsWith("Sleeve")) return "hsl(var(--primary))";
+  if (label.startsWith("Sleeve")) return "var(--primary)";
   if (label.startsWith("BTC")) return "#f7931a";       // bitcoin orange
   if (label.startsWith("ETH")) return "#627eea";       // ethereum blue
-  if (label.startsWith("Cash")) return "hsl(var(--muted-foreground))";
-  return "hsl(var(--muted-foreground))";
+  if (label.startsWith("Cash")) return "var(--muted-foreground)";
+  return "var(--muted-foreground)";
 }

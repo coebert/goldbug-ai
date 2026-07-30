@@ -144,7 +144,7 @@ export function RunMetricsCard() {
                     <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="duration_s" name="duration (s)" stroke="hsl(var(--primary))" dot={false} />
+                    <Line type="monotone" dataKey="duration_s" name="duration (s)" stroke="var(--primary)" dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -178,7 +178,7 @@ export function RunMetricsCard() {
                     <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="saxo_total" name="total" fill="hsl(var(--primary))" />
+                    <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />
                     <Bar dataKey="saxo_err" name="errors" fill="hsl(0 84% 60%)" />
                     <Bar dataKey="saxo_429" name="429 retries" fill="hsl(38 92% 50%)" />
                   </BarChart>

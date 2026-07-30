@@ -360,7 +360,7 @@ function ComparePage() {
                           >
                             <span
                               className="inline-block h-2 w-2 rounded-full"
-                              style={{ background: off ? "hsl(var(--muted-foreground))" : color }}
+                              style={{ background: off ? "var(--muted-foreground)" : color }}
                             />
                             <span className="max-w-[140px] truncate">{r.portfolio.name}</span>
                           </button>
@@ -369,24 +369,24 @@ function ComparePage() {
                     </div>
                     <ResponsiveContainer width="100%" height={320}>
                       <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
                         <XAxis
                           dataKey="date"
-                          stroke="hsl(var(--muted-foreground))"
+                          stroke="var(--muted-foreground)"
                           fontSize={11}
-                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: "var(--muted-foreground)", fontSize: 12 }}
                         />
                         <YAxis
-                          stroke="hsl(var(--muted-foreground))"
+                          stroke="var(--muted-foreground)"
                           fontSize={11}
                           width={70}
                           tickFormatter={(v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(1)}%`}
-                          label={{ value: "Cumulative return vs start (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          label={{ value: "Cumulative return vs start (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "var(--muted-foreground)", fontSize: 12 }}
                         />
 
-                        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                        <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                         <Tooltip
-                          cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                          cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
                             if (!active || !payload?.length) return null;
                             const sorted = [...payload].sort(
@@ -445,27 +445,27 @@ function ComparePage() {
                       </div>
                       <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={drawdownData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
                           <XAxis
                             dataKey="date"
-                            stroke="hsl(var(--muted-foreground))"
+                            stroke="var(--muted-foreground)"
                             fontSize={11}
-                            label={{ value: "Date", position: "insideBottom", offset: -2, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                            label={{ value: "Date", position: "insideBottom", offset: -2, fill: "var(--muted-foreground)", fontSize: 12 }}
                           />
                           <YAxis
-                            stroke="hsl(var(--muted-foreground))"
+                            stroke="var(--muted-foreground)"
                             fontSize={11}
                             width={70}
                             tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                            label={{ value: "Drawdown (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                            label={{ value: "Drawdown (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "var(--muted-foreground)", fontSize: 12 }}
                           />
 
-                          <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                          <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                           <Tooltip
-                            cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                            cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }}
                             contentStyle={{
-                              background: "hsl(var(--card))",
-                              border: "1px solid hsl(var(--border))",
+                              background: "var(--card)",
+                              border: "1px solid var(--border)",
                               borderRadius: 6,
                               fontSize: 12,
                             }}

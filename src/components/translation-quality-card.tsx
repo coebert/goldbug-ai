@@ -37,13 +37,13 @@ import {
 import { Languages, RefreshCw } from "lucide-react";
 
 const COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--destructive))",
-  "hsl(var(--chart-3, 200 80% 55%))",
-  "hsl(var(--chart-4, 40 90% 55%))",
-  "hsl(var(--chart-5, 280 70% 60%))",
-  "hsl(var(--chart-6, 160 70% 45%))",
-  "hsl(var(--muted-foreground))",
+  "var(--primary)",
+  "var(--destructive)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-1)",
+  "var(--muted-foreground)",
 ];
 
 function pct(n: number): string {
@@ -167,7 +167,7 @@ export function TranslationQualityCard() {
                   <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} />
                   <Tooltip
-                    contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))" }}
+                    contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)" }}
                     formatter={(v: number | string) => (typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "—")}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />

@@ -130,7 +130,7 @@ export function FeeDragCharts({
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={daily} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
               <YAxis
                 tick={AXIS_TICK}
@@ -142,8 +142,8 @@ export function FeeDragCharts({
               />
               <Tooltip
                 contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
                   borderRadius: 6,
                   fontSize: 12,
                 }}
@@ -198,7 +198,7 @@ export function FeeDragCharts({
               layout="vertical"
               margin={{ top: 4, right: 24, bottom: 4, left: 8 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
                 type="number"
                 tick={AXIS_TICK}
@@ -209,8 +209,8 @@ export function FeeDragCharts({
               <YAxis type="category" dataKey="symbol" tick={AXIS_TICK} width={80} />
               <Tooltip
                 contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
                   borderRadius: 6,
                   fontSize: 12,
                 }}

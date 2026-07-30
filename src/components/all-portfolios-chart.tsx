@@ -46,7 +46,7 @@ const LINE_COLORS = ["#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c", "#60
 const SIM_COLOR = "#22d3ee";
 const REAL_COLOR = "#34d399";
 const AXIS_COLOR = "oklch(0.96 0.01 90)";
-const GRID_COLOR = "hsl(var(--foreground))";
+const GRID_COLOR = "var(--foreground)";
 
 type Range = "7d" | "30d" | "90d" | "1y" | "all";
 

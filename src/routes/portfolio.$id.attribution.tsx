@@ -128,13 +128,13 @@ function AttributionPage() {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.overall.rows.map((r) => ({ signal: r.signal, contribution: r.contribution_pct, win: r.win_rate == null ? null : r.win_rate * 100 }))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="signal" tick={AXIS_TICK} stroke="hsl(var(--foreground))" />
-                      <YAxis yAxisId="left" tick={AXIS_TICK} stroke="hsl(var(--foreground))" label={{ value: "Contribution to P&L (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--foreground))", style: { fontSize: 12 } }} />
-                      <YAxis yAxisId="right" tick={AXIS_TICK} orientation="right" stroke="hsl(var(--foreground))" domain={[0, 100]} label={{ value: "Win rate (%)", angle: 90, position: "insideRight", fill: "hsl(var(--foreground))", style: { fontSize: 12 } }} />
-                      <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                      <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
-                      <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.5} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="signal" tick={AXIS_TICK} stroke="var(--foreground)" />
+                      <YAxis yAxisId="left" tick={AXIS_TICK} stroke="var(--foreground)" label={{ value: "Contribution to P&L (%)", angle: -90, position: "insideLeft", fill: "var(--foreground)", style: { fontSize: 12 } }} />
+                      <YAxis yAxisId="right" tick={AXIS_TICK} orientation="right" stroke="var(--foreground)" domain={[0, 100]} label={{ value: "Win rate (%)", angle: 90, position: "insideRight", fill: "var(--foreground)", style: { fontSize: 12 } }} />
+                      <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                      <Legend wrapperStyle={{ color: "var(--foreground)" }} />
+                      <ReferenceLine yAxisId="left" y={0} stroke="var(--foreground)" strokeOpacity={0.5} />
                       <Bar yAxisId="left" dataKey="contribution" name="Signed contribution (%)">
                         {data.overall.rows.map((r) => (
                           <Cell
@@ -145,7 +145,7 @@ function AttributionPage() {
                         <LabelList
                           dataKey="contribution"
                           position="top"
-                          style={{ fontSize: 11, fill: "hsl(var(--foreground))", fontVariantNumeric: "tabular-nums" }}
+                          style={{ fontSize: 11, fill: "var(--foreground)", fontVariantNumeric: "tabular-nums" }}
                           formatter={(v: number) =>
                             v == null ? "" : `${v >= 0 ? "▲ +" : "▼ "}${v.toFixed(2)}%`
                           }
@@ -181,12 +181,12 @@ function AttributionPage() {
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.cumulative_alpha}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="trade_date" stroke="hsl(var(--muted-foreground))" label={{ value: "Trade date", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" label={{ value: "Cumulative return (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                        <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="trade_date" stroke="var(--muted-foreground)" label={{ value: "Trade date", position: "insideBottom", offset: -5, fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
+                        <YAxis stroke="var(--muted-foreground)" label={{ value: "Cumulative return (%)", angle: -90, position: "insideLeft", fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
+                        <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
                         <Legend />
-                        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                        <ReferenceLine y={0} stroke="var(--muted-foreground)" />
                         <Line type="monotone" dataKey="strategy" name="Strategy (solid)" stroke={CHART_ROLE.positive} strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="benchmark" name="SPY (dashed)" stroke={CHART_ROLE.benchmark} strokeWidth={2} strokeDasharray="6 3" dot={false} />
                         <Line type="monotone" dataKey="alpha" name="Alpha = Strategy − SPY (dotted)" stroke={CHART_ROLE.highlight} strokeWidth={2} strokeDasharray="2 3" dot={false} />
@@ -213,12 +213,12 @@ function AttributionPage() {
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.cumulative_by_signal}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="trade_date" stroke="hsl(var(--muted-foreground))" label={{ value: "Trade date", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" label={{ value: "Cumulative return contribution (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                        <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="trade_date" stroke="var(--muted-foreground)" label={{ value: "Trade date", position: "insideBottom", offset: -5, fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
+                        <YAxis stroke="var(--muted-foreground)" label={{ value: "Cumulative return contribution (%)", angle: -90, position: "insideLeft", fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
+                        <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
                         <Legend />
-                        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                        <ReferenceLine y={0} stroke="var(--muted-foreground)" />
                         {SIGNALS.map((k) => (
                           <Line key={k} type="monotone" dataKey={k} stroke={SIGNAL_COLORS[k]} strokeWidth={2} dot={false} />
                         ))}
@@ -242,11 +242,11 @@ function AttributionPage() {
                     <div className="h-60">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data.news_buckets}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="bucket" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
-                          <YAxis stroke="hsl(var(--muted-foreground))" label={{ value: "Avg forward return (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                          <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                          <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                          <XAxis dataKey="bucket" stroke="var(--muted-foreground)" tick={{ fontSize: 10 }} />
+                          <YAxis stroke="var(--muted-foreground)" label={{ value: "Avg forward return (%)", angle: -90, position: "insideLeft", fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
+                          <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                          <ReferenceLine y={0} stroke="var(--muted-foreground)" />
                           <Bar dataKey="avg_return_pct" name="Avg return (%)" fill="#22c55e" />
                         </BarChart>
                       </ResponsiveContainer>
@@ -259,11 +259,11 @@ function AttributionPage() {
                     <div className="h-56 mt-2">
                       <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis type="number" dataKey="news_score" name="News score" domain={[-1, 1]} stroke="hsl(var(--muted-foreground))" label={{ value: "News score (-1..+1)", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                          <YAxis type="number" dataKey="forward_return_pct" name="Return (%)" stroke="hsl(var(--muted-foreground))" label={{ value: "Forward return (%)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", style: { fontSize: 11 } }} />
-                          <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                          <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                          <XAxis type="number" dataKey="news_score" name="News score" domain={[-1, 1]} stroke="var(--muted-foreground)" label={{ value: "News score (-1..+1)", position: "insideBottom", offset: -5, fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
+                          <YAxis type="number" dataKey="forward_return_pct" name="Return (%)" stroke="var(--muted-foreground)" label={{ value: "Forward return (%)", angle: -90, position: "insideLeft", fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
+                          <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                          <ReferenceLine y={0} stroke="var(--muted-foreground)" />
                           <Scatter
                             data={data.trades.filter((t) => t.forward_return_pct != null && t.news_score != null).map((t) => ({
                               news_score: t.news_score,

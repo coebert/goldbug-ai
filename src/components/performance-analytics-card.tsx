@@ -98,7 +98,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     labelClassName="text-xs"
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Line type="monotone" dataKey="equity" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+                  <Line type="monotone" dataKey="equity" stroke="var(--primary)" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </ChartBlock>
@@ -108,8 +108,8 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                 <AreaChart data={data.drawdownCurve} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.05} />
+                      <stop offset="0%" stopColor="var(--destructive)" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -120,8 +120,8 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     labelClassName="text-xs"
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="2 2" />
-                  <Area type="monotone" dataKey="drawdownPct" stroke="hsl(var(--destructive))" fill="url(#ddFill)" />
+                  <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="2 2" />
+                  <Area type="monotone" dataKey="drawdownPct" stroke="var(--destructive)" fill="url(#ddFill)" />
                 </AreaChart>
               </ResponsiveContainer>
             </ChartBlock>
@@ -203,10 +203,10 @@ function AttributionBlock({
                 labelClassName="text-xs"
                 contentStyle={{ fontSize: 12 }}
               />
-              <ReferenceLine x={0} stroke="hsl(var(--muted-foreground))" />
+              <ReferenceLine x={0} stroke="var(--muted-foreground)" />
               <Bar dataKey="realizedPnl" radius={[0, 4, 4, 0]}>
                 {chartData.map((s) => (
-                  <Cell key={s.key} fill={s.realizedPnl >= 0 ? "hsl(var(--primary))" : "hsl(var(--destructive))"} />
+                  <Cell key={s.key} fill={s.realizedPnl >= 0 ? "var(--primary)" : "var(--destructive)"} />
                 ))}
               </Bar>
             </BarChart>
