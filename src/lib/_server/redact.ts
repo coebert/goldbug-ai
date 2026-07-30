@@ -14,10 +14,23 @@ const SENSITIVE_KEY_RE =
   /(token|secret|key|password|authorization|cookie|session|apikey)/i;
 const LONG_HEX_RE = /[a-f0-9]{24,}/gi;
 const BEARER_RE = /Bearer\s+[A-Za-z0-9._-]+/gi;
+// JWT-shaped values (Saxo/Supabase access tokens) and any long opaque
+// base64url blob — broker token endpoints echo these back in error bodies.
+const JWT_RE = /\beyJ[A-Za-z0-9._-]{10,}/g;
+const LONG_B64_RE = /\b[A-Za-z0-9+/_-]{40,}={0,2}\b/g;
+// `refresh_token=...`, `"access_token":"..."` style pairs in raw payloads.
+const KV_SECRET_RE =
+  /((?:access|refresh|id)?_?(?:token|secret|password|apikey|api_key)"?\s*[:=]\s*"?)([^"&,\s}]+)/gi;
 
 function redactString(s: string): string {
-  return s.replace(BEARER_RE, "Bearer [redacted]").replace(LONG_HEX_RE, "[redacted]");
+  return s
+    .replace(BEARER_RE, "Bearer [redacted]")
+    .replace(KV_SECRET_RE, "$1[redacted]")
+    .replace(JWT_RE, "[redacted]")
+    .replace(LONG_HEX_RE, "[redacted]")
+    .replace(LONG_B64_RE, "[redacted]");
 }
+
 
 function redactValue(v: unknown, depth = 0): unknown {
   if (depth > 3) return "[truncated]";
