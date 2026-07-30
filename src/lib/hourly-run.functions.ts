@@ -7,6 +7,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAal2 } from "@/lib/_server/require-aal2";
 
 type ManualRunResult = {
   ok: true;
@@ -23,7 +24,7 @@ type ManualRunResult = {
 };
 
 export const triggerHourlyRunNow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((data: { force?: boolean } | undefined) => ({ force: data?.force === true }))
   .handler(async ({ data }): Promise<ManualRunResult> => {
     const started = Date.now();

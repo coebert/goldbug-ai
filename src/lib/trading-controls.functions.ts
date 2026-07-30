@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAal2 } from "@/lib/_server/require-aal2";
 
 export interface TradingControls {
   trading_enabled: boolean;
@@ -41,7 +42,7 @@ export const getTradingControls = createServerFn({ method: "GET" })
   });
 
 export const updateTradingControls = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((data) =>
     z
       .object({
