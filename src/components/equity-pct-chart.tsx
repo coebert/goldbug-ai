@@ -38,6 +38,28 @@ function fmtHour(iso: string) {
 }
 
 /**
+ * Days covered by a series, used to pick x-axis labels. Hourly data plotted
+ * over months has no room for "02 Aug, 14" on every tick, so once the span
+ * outgrows a week the axis falls back to dates while the points stay hourly.
+ */
+export function spanDays(rows: Array<{ at: string }>): number {
+  if (rows.length < 2) return 0;
+  const first = new Date(rows[0].at).getTime();
+  const last = new Date(rows[rows.length - 1].at).getTime();
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return 0;
+  return Math.max(0, (last - first) / 86_400_000);
+}
+
+/** Whole days from `inception` (or the first snapshot) to now, for the fetch window. */
+export function historyDays(inception: string | null | undefined, now = new Date()): number {
+  if (!inception) return 3650;
+  const start = new Date(`${String(inception).slice(0, 10)}T00:00:00Z`).getTime();
+  if (!Number.isFinite(start)) return 3650;
+  const days = Math.ceil((now.getTime() - start) / 86_400_000) + 1;
+  return Math.min(3650, Math.max(1, days));
+}
+
+/**
  * Invested capital at each point in time: the baseline starting pot plus every
  * deposit made on or before that date.
  *
@@ -144,9 +166,16 @@ export function EquityPctChart({
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
   const intradayFn = useServerFn(getIntradayEquity);
+  // Ask for the portfolio's whole life, not a rolling month: the Hourly view
+  // should be a higher-resolution version of the all-time chart, not a
+  // shorter one.
+  const lookbackDays = useMemo(
+    () => historyDays(inceptionDate ?? equity[0]?.snapshot_date ?? null),
+    [inceptionDate, equity],
+  );
   const intradayQ = useQuery({
-    queryKey: ["equity-intraday", portfolioId],
-    queryFn: () => intradayFn({ data: { portfolio_id: portfolioId!, days: 30 } }),
+    queryKey: ["equity-intraday", portfolioId, lookbackDays],
+    queryFn: () => intradayFn({ data: { portfolio_id: portfolioId!, days: lookbackDays } }),
     enabled: resolution === "hourly" && !!portfolioId,
     staleTime: 60_000,
   });
@@ -225,7 +254,9 @@ export function EquityPctChart({
 
   const up = last >= 0;
   const color = up ? "var(--success)" : "var(--destructive)";
-  const fmtX = resolution === "hourly" ? fmtHour : fmtDay;
+  // Hourly points over a long window still get date-only ticks so the axis
+  // can carry all-time history without the labels colliding.
+  const fmtX = resolution === "hourly" && spanDays(data) <= 7 ? fmtHour : fmtDay;
   const money = (v: number) =>
     `${v < 0 ? "−" : "+"}${new Intl.NumberFormat("en-GB", {
       style: "currency",
@@ -310,7 +341,7 @@ export function EquityPctChart({
                     color: "var(--popover-foreground)",
                   }}
                   labelStyle={{ color: "var(--muted-foreground)" }}
-                  labelFormatter={(l) => fmtX(String(l))}
+                  labelFormatter={(l) => (resolution === "hourly" ? fmtHour(String(l)) : fmtDay(String(l)))}
                   formatter={(v, name, item) => {
                     if (name === "delta") {
                       const d = Number(v);
@@ -327,7 +358,7 @@ export function EquityPctChart({
                   yAxisId="delta"
                   dataKey="deltaPct"
                   name="delta"
-                  barSize={resolution === "hourly" ? 3 : 6}
+                  barSize={resolution === "hourly" ? Math.max(1, Math.min(3, Math.floor(600 / Math.max(1, data.length)))) : 6}
                   isAnimationActive={false}
                   radius={[1, 1, 1, 1]}
                 >
