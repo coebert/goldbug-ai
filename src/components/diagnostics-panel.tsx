@@ -196,7 +196,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                 />
                 <ReferenceLine yAxisId="right" y={0} stroke="var(--muted-foreground)" />
                 <Bar yAxisId="left" dataKey="winRate" fill="var(--primary)" name="Win rate" />
-                <Bar yAxisId="right" dataKey="avgReturn" fill="hsl(var(--chart-2, 173 58% 39%))" name="Avg return" />
+                <Bar yAxisId="right" dataKey="avgReturn" fill="var(--chart-2)" name="Avg return" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -323,7 +323,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                               const v = Math.max(0, Number(e.weights[k] ?? 0));
                               const palette = [
                                 "var(--primary)",
-                                "hsl(var(--chart-2, 173 58% 39%))",
+                                "var(--chart-2)",
                                 "hsl(43 90% 55%)",
                                 "hsl(280 70% 62%)",
                                 "hsl(0 84% 60%)",

@@ -493,7 +493,7 @@ export function NewsReel() {
                   <li
                     className={`relative rounded-md border p-3 transition-colors ${
                       isNew
-                        ? "border-primary bg-primary/10 shadow-[0_0_0_1px_color-mix(in oklab, var(--primary) 40%, transparent)] ring-2 ring-primary/40 animate-pulse"
+                        ? "border-primary bg-primary/10 shadow-[0_0_0_1px_var(--primary)] ring-2 ring-primary/40 animate-pulse"
                         : cited
                         ? "border-primary/40 bg-primary/[0.04]"
                         : "border-border bg-card/40"

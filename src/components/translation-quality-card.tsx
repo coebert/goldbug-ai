@@ -39,10 +39,10 @@ import { Languages, RefreshCw } from "lucide-react";
 const COLORS = [
   "var(--primary)",
   "var(--destructive)",
-  "hsl(var(--chart-3, 200 80% 55%))",
-  "hsl(var(--chart-4, 40 90% 55%))",
-  "hsl(var(--chart-5, 280 70% 60%))",
-  "hsl(var(--chart-6, 160 70% 45%))",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
   "var(--muted-foreground)",
 ];
 
