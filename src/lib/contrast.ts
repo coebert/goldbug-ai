@@ -43,9 +43,7 @@ function oklchToRgb(L: number, C: number, hDeg: number): Rgb {
 }
 
 function parseOklch(input: string): Rgb {
-  const m = input.trim().match(
-    /^oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)\s*\)$/i,
-  );
+  const m = input.trim().match(/^oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)\s*\)$/i);
   if (!m) throw new Error(`unsupported oklch value: ${input}`);
   const rawL = m[1];
   const L = rawL.endsWith("%") ? Number(rawL.slice(0, -1)) / 100 : Number(rawL);
