@@ -1,6 +1,8 @@
 // Headline de-duplication shared by the ingestion path (cron + manual refresh)
 // and the reel read path. GDELT/RSS re-publish the same story across days and
 // across sources, so without this the reel shows visible repeats.
+import { transliterationKey } from "./news-transliterate";
+
 
 /** Canonical URL key: origin+path, lowercased, tracking params and trailing slash removed. */
 export function canonicalUrlKey(url: string | null | undefined): string {
