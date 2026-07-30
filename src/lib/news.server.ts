@@ -473,7 +473,7 @@ export function backfillTranslations(
           .update({
             headline: t.translation,
             original_headline: originalHeadline,
-            original_language: t.lang,
+            original_language: t.lang ?? detectLanguageName(originalHeadline),
             translation_confidence: t.confidence,
           })
           .eq("news_date", dateISO)
