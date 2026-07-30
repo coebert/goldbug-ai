@@ -775,8 +775,10 @@ export function NewsReel() {
                           originalLanguage={item.original_language}
                           originalHeadline={item.original_headline}
                           confidence={item.translation_confidence}
+                          headline={item.headline}
                           className="mt-1"
                         />
+
 
 
                         <div className="mt-1 flex flex-wrap items-center gap-2">
