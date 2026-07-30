@@ -72,6 +72,8 @@ describe("chart axis readability", () => {
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<YAxis\b[\s\S]*?\/>/g) ?? []) {
         if (/type=\{?"category"/.test(tag)) continue;
+        // A hidden axis paints nothing: no ticks to fit, no line to colour.
+        if (/\bhide\b/.test(tag)) continue;
         const widths = [...tag.matchAll(/width=\{(?:isMobile \? )?(\d+)/g)].map((m) => Number(m[1]));
         if (widths.length === 0 || widths.some((w) => w < 56)) {
           offenders.push(p.replace(SRC, "src"));
@@ -141,6 +143,7 @@ describe("chart gridline and axis-line styling", () => {
     for (const p of chartFiles) {
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<(?:X|Y)Axis\b[\s\S]*?\/>/g) ?? []) {
+        if (/\bhide\b/.test(tag)) continue;
         if (!/axisLine=/.test(tag)) offenders.push(`${p.replace(SRC, "src")}: missing axisLine`);
         if (!/tickLine=/.test(tag)) offenders.push(`${p.replace(SRC, "src")}: missing tickLine`);
       }
