@@ -10,12 +10,26 @@ import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
 import { relevanceBand, relevanceBandLabel, sortByRelevance } from "@/lib/news-relevance";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
+
+/** Badge colour per relevance band — semantic tokens only. */
+function relevanceCls(score: number): string {
+  switch (relevanceBand(score)) {
+    case "critical":
+      return "bg-primary/15 text-primary";
+    case "high":
+      return "bg-primary/10 text-primary";
+    case "moderate":
+      return "bg-muted text-foreground";
+    default:
+      return "bg-muted/60 text-muted-foreground";
+  }
+}
 import { NEWS_TOPICS, classifyNewsTopic } from "@/lib/news-topics";
 
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles, Target } from "lucide-react";
 
 // Absolute sentiment threshold treated as a "strong" market-moving signal.
 const STRONG_SENTIMENT_THRESHOLD = 0.4;
