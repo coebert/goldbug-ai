@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runWithBreaker } from "@/lib/_server/provider-circuit";
 import { GDELT_SOURCES } from "./news-sources";
 import { fetchRssForDate } from "./news-rss.server";
-import { buildSeenKeySet, filterUnseen } from "./news-dedupe";
+import { buildSeenKeySet, filterUnseen, normalizeHeadlineKey } from "./news-dedupe";
 import { detectLanguage, needsTranslation } from "./language-detect";
 
 
