@@ -135,7 +135,7 @@ export function EquityPctChart({
   ]);
 
 
-  const { data, domain, last } = useMemo(() => {
+  const { data, domain, deltaDomain, last } = useMemo(() => {
     const base = Number(startingCash);
     const raw: Array<{ at: string; value: number }> =
       resolution === "hourly"
@@ -153,6 +153,7 @@ export function EquityPctChart({
               const capital = capitalAt(base, deposits, r.at);
               return {
                 at: r.at,
+                value: r.value,
                 pct: capital > 0 ? ((r.value - capital) / capital) * 100 : NaN,
               };
             })
@@ -161,10 +162,12 @@ export function EquityPctChart({
             .filter((r) => Number.isFinite(r.pct) && r.pct > -100)
         : [];
 
-    const vals = rows.map((r) => r.pct);
+    const withDelta = addDeltas(rows, deposits);
+    const vals = withDelta.map((r) => r.pct);
     return {
-      data: rows,
+      data: withDelta,
       domain: pctDomain(vals),
+      deltaDomain: deltaDomainFor(withDelta.map((r) => r.deltaPct)),
       last: vals.length ? vals[vals.length - 1] : 0,
     };
   }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate]);
@@ -175,6 +178,12 @@ export function EquityPctChart({
   const up = last >= 0;
   const color = up ? "var(--success)" : "var(--destructive)";
   const fmtX = resolution === "hourly" ? fmtHour : fmtDay;
+  const money = (v: number) =>
+    `${v < 0 ? "−" : "+"}${new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: currency || "GBP",
+      maximumFractionDigits: 2,
+    }).format(Math.abs(v))}`;
 
   return (
     <div className={className}>
