@@ -938,6 +938,7 @@ function PortfolioPage() {
               equity={equity as { snapshot_date: string; total_value: number }[]}
               startingCash={baselineStartingCash}
               deposits={depositEvents}
+              inceptionDate={q.data?.inceptionDate ?? null}
             />
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
