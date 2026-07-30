@@ -149,7 +149,10 @@ function RootComponent() {
         tabIndex={-1}
         className="pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
       >
-        <Outlet />
+        <MfaGate>
+          <Outlet />
+        </MfaGate>
+
       </div>
       <MobileTabBar />
       <GlobalShortcutsHost />
