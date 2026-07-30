@@ -52,10 +52,40 @@ function parseOklch(input: string): Rgb {
   return oklchToRgb(L, Number(m[2]), Number(m[3]));
 }
 
+// "hsl(H S% L%)" / "hsl(H, S%, L%)" — the syntax used by event-category hues.
+function parseHsl(input: string): Rgb {
+  const m = input
+    .trim()
+    .match(/^hsla?\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%\s*(?:[,/].*)?\)$/i);
+  if (!m) throw new Error(`unsupported hsl value: ${input}`);
+  const h = Number(m[1]) / 360;
+  const s = Number(m[2]) / 100;
+  const l = Number(m[3]) / 100;
+  const hue = (p: number, q: number, t: number) => {
+    const u = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return { r: v, g: v, b: v };
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return {
+    r: Math.round(hue(p, q, h + 1 / 3) * 255),
+    g: Math.round(hue(p, q, h) * 255),
+    b: Math.round(hue(p, q, h - 1 / 3) * 255),
+  };
+}
+
 export function parseColor(input: string): Rgb {
   const s = input.trim();
   if (s.startsWith("#")) return parseHex(s);
   if (s.toLowerCase().startsWith("oklch")) return parseOklch(s);
+  if (s.toLowerCase().startsWith("hsl")) return parseHsl(s);
   throw new Error(`unsupported colour syntax: ${input}`);
 }
 
