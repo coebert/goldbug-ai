@@ -161,6 +161,11 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         }
         for (const a of trimmed) bucket.symbols.add(a.symbol);
         infl.set(head, bucket);
+        // Same bucket under the folded romanised key, so a citation logged in
+        // Cyrillic still resolves against a romanised reel row (and vice versa).
+        const tKey = transliterationKey(n.headline, normalizeHeadlineKey);
+        if (tKey) inflTranslit.set(tKey, bucket);
+
       }
     }
 
