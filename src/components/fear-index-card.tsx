@@ -47,14 +47,16 @@ function toneFor(score: number) {
  */
 export function FearIndexCard({ portfolioId, active = true }: Props) {
   const fetchSnapshot = useServerFn(getFearIndexSnapshot);
+  const [sessions, setSessions] = useState<number>(30);
   const query = useQuery({
-    queryKey: ["fear-index", portfolioId],
-    queryFn: () => fetchSnapshot({ data: { portfolio_id: portfolioId } }),
+    queryKey: ["fear-index", portfolioId, sessions],
+    queryFn: () => fetchSnapshot({ data: { portfolio_id: portfolioId, sessions } }),
     enabled: active,
     staleTime: 60_000,
   });
 
   const d = query.data;
+  const history = d?.history ?? [];
   const score = d?.score ?? null;
   const tone = toneFor(score ?? 50);
 
