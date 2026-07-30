@@ -16,6 +16,7 @@ import {
   AXIS_TICK,
   GRID_PROPS,
   GRID_STROKE,
+  REFERENCE_LINE_STROKE,
   TICK_LINE,
   TICK_LINE_STROKE,
 } from "@/lib/chart-palette";
@@ -173,5 +174,73 @@ describe("chart gridline and axis-line styling", () => {
       // ...without competing with axis labels or plotted series
       expect(ratio, `grid on ${name}`).toBeLessThan(AA_NON_TEXT);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Light-theme parity.
+//
+// The tokens are theme-agnostic (they mix `--foreground`, which flips with the
+// theme), but the *same* alpha buys less contrast over a light surface than
+// over a dark one: a near-black foreground at 45% over white lands at ~2.9:1,
+// under the 3:1 non-text bar, while over `--surface-1` it clears 4:1. The
+// app currently ships dark-only, so these surfaces model a plausible light
+// palette (page → card → raised, plus pure white) and pin the ladder to the
+// weaker of the two themes so a future light theme cannot ship illegible axes.
+const LIGHT_SURFACES = {
+  background: "oklch(0.99 0.005 250)",
+  card: "oklch(0.97 0.006 250)",
+  raised: "oklch(0.94 0.008 250)",
+  white: "#ffffff",
+} as const;
+
+const LIGHT_FOREGROUND = "oklch(0.22 0.02 250)";
+
+const THEMES = [
+  { name: "dark", fg: FOREGROUND, surfaces: SURFACES as Record<string, string> },
+  { name: "light", fg: LIGHT_FOREGROUND, surfaces: LIGHT_SURFACES as Record<string, string> },
+] as const;
+
+describe("chart axis legibility across themes", () => {
+  it("keeps axis tick labels above AA text contrast in both themes", () => {
+    for (const { name, fg, surfaces } of THEMES) {
+      for (const [surface, bg] of Object.entries(surfaces)) {
+        expect(contrastRatio(fg, bg), `${name}/${surface}`).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
+      }
+    }
+  });
+
+  it("keeps tick marks, the axis frame and reference rules at or above 3:1 in both themes", () => {
+    const rules = [
+      ["tick line", TICK_LINE_STROKE],
+      ["axis line", AXIS_LINE_STROKE],
+      ["reference line", REFERENCE_LINE_STROKE],
+    ] as const;
+    for (const { name, fg, surfaces } of THEMES) {
+      for (const [surface, bg] of Object.entries(surfaces)) {
+        for (const [label, token] of rules) {
+          const stroke = composite(fg, bg, alphaOf(token));
+          expect(contrastRatio(stroke, bg), `${label} on ${name}/${surface}`).toBeGreaterThanOrEqual(
+            AA_NON_TEXT,
+          );
+        }
+      }
+    }
+  });
+
+  it("keeps gridlines perceptible but subordinate in both themes", () => {
+    for (const { name, fg, surfaces } of THEMES) {
+      for (const [surface, bg] of Object.entries(surfaces)) {
+        const ratio = contrastRatio(composite(fg, bg, alphaOf(GRID_STROKE)), bg);
+        expect(ratio, `grid on ${name}/${surface}`).toBeGreaterThan(1.1);
+        expect(ratio, `grid on ${name}/${surface}`).toBeLessThan(AA_NON_TEXT);
+      }
+    }
+  });
+
+  it("preserves the grid < tick < axis < reference ladder", () => {
+    expect(alphaOf(GRID_STROKE)).toBeLessThan(alphaOf(TICK_LINE_STROKE));
+    expect(alphaOf(TICK_LINE_STROKE)).toBeLessThan(alphaOf(AXIS_LINE_STROKE));
+    expect(alphaOf(AXIS_LINE_STROKE)).toBeLessThan(alphaOf(REFERENCE_LINE_STROKE));
   });
 });
