@@ -14,6 +14,7 @@ import type {
   BrokerPosition,
 } from "./adapter";
 import { asJson } from "@/lib/_server/db-json";
+import { redactedError } from "@/lib/_server/redact";
 
 const BASE = {
   sim: "https://gateway.saxobank.com/sim/openapi",
