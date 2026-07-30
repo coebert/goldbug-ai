@@ -3,19 +3,34 @@ interface SparklineProps {
   width?: number;
   height?: number;
   className?: string;
+  /**
+   * Let the drawing fill its container instead of keeping the 120x36 aspect
+   * ratio. Without this the SVG is letterboxed inside a wide column, which
+   * leaves large empty margins either side of the line.
+   */
+  stretch?: boolean;
+  /** Optional accessible label describing the series. */
+  label?: string;
 }
 
 /**
  * Compact SVG sparkline showing recent trend of a numeric series.
  * Colors itself based on net change (positive → primary, negative → destructive).
  */
-export function Sparkline({ values, width = 120, height = 36, className }: SparklineProps) {
+export function Sparkline({
+  values,
+  width = 120,
+  height = 36,
+  className,
+  stretch = false,
+  label,
+}: SparklineProps) {
   const clean = values.filter((v) => Number.isFinite(v));
   if (clean.length < 2) {
     return (
       <div
         className={className}
-        style={{ width, height }}
+        style={stretch ? undefined : { width, height }}
         aria-label="Not enough data for trend"
       />
     );
@@ -40,12 +55,13 @@ export function Sparkline({ values, width = 120, height = 36, className }: Spark
 
   return (
     <svg
-      width={width}
-      height={height}
+      width={stretch ? "100%" : width}
+      height={stretch ? "100%" : height}
       viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={stretch ? "none" : undefined}
       className={className}
       role="img"
-      aria-label={`Trend ${up ? "up" : "down"}`}
+      aria-label={label ?? `Trend ${up ? "up" : "down"}`}
     >
       <defs>
         <linearGradient id={areaId} x1="0" y1="0" x2="0" y2="1">
@@ -54,7 +70,9 @@ export function Sparkline({ values, width = 120, height = 36, className }: Spark
         </linearGradient>
       </defs>
       <path d={areaD} fill={`url(#${areaId})`} />
-      <path d={pathD} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={pathD} fill="none" stroke={stroke} strokeWidth={1.5}
+        vectorEffect={stretch ? "non-scaling-stroke" : undefined}
+        strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }

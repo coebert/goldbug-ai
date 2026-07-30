@@ -716,6 +716,9 @@ function PortfolioPage() {
     for (const h of holdingsHistoryQ.data ?? []) {
       map[h.symbol] = {
         closes: h.closes,
+        hourly: h.hourly,
+        hourlyAt: h.hourlyAt,
+
         currentPrice: h.currentPrice,
         pctChangeSincePurchase: h.pctChangeSincePurchase,
         valueChangeSincePurchase: h.valueChangeSincePurchase,

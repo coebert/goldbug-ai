@@ -39,6 +39,9 @@ type Holding = {
 
 export type HoldingSeriesInfo = {
   closes: number[];
+  /** Hour-bucketed prices since purchase (may be empty on older payloads). */
+  hourly?: number[];
+  hourlyAt?: string[];
   currentPrice: number | null;
   pctChangeSincePurchase: number | null;
   valueChangeSincePurchase: number | null;
@@ -76,6 +79,10 @@ export function LiveHoldingsCard({
   allowManualSell?: boolean;
 }) {
   const [sellTarget, setSellTarget] = useState<Holding | null>(null);
+  // Trend resolution shared by every row so the rows stay comparable.
+  const [trendRes, setTrendRes] = useState<"hourly" | "daily">("hourly");
+  const hasHourly = Object.values(series ?? {}).some((s) => (s.hourly?.length ?? 0) >= 2);
+  const resolution = hasHourly ? trendRes : "daily";
 
   const isLive = mode === "live_prod";
   const isAnyLive = mode === "live_prod" || mode === "live_sim";
@@ -273,6 +280,29 @@ export function LiveHoldingsCard({
                 Real cash
               </Badge>
             )}
+            {hasHourly && (
+              <div
+                className="flex overflow-hidden rounded-md border text-[11px]"
+                role="group"
+                aria-label="Price trend resolution"
+              >
+                {(["hourly", "daily"] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setTrendRes(r)}
+                    aria-pressed={resolution === r}
+                    className={`px-2 py-1 capitalize transition-colors ${
+                      resolution === r
+                        ? "bg-secondary text-secondary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            )}
             {isAnyLive && portfolioId && (
               <Button
                 size="sm"
@@ -422,30 +452,19 @@ export function LiveHoldingsCard({
               const changeVal = s?.valueChangeSincePurchase ?? null;
               const up = (changePct ?? 0) >= 0;
               const openedLabel = fmtOpened(r.opened_at ?? s?.opened_at ?? null);
-              const hasSeries = (s?.closes.length ?? 0) >= 2;
+              const hourlyPts = s?.hourly ?? [];
+              const useHourly = resolution === "hourly" && hourlyPts.length >= 2;
+              const trendValues = useHourly ? hourlyPts : (s?.closes ?? []);
+              const hasSeries = trendValues.length >= 2;
+              const trendLabel = useHourly
+                ? `${hourlyPts.length} hourly points`
+                : `${s?.closes.length ?? 0} daily closes`;
               const sparklineBlock = (
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                  <div className="min-w-0">
-                    {hasSeries ? (
-                      <Sparkline
-                        values={s!.closes}
-                        width={220}
-                        height={36}
-                        className="w-full max-w-full"
-                      />
-                    ) : (
-                      <div
-                        className="flex h-9 items-center rounded-md border border-dashed border-border/60 px-2 text-[10px] text-muted-foreground"
-                        aria-label="No price history available yet"
-                      >
-                        No price history yet
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
                     {changePct != null ? (
-                      <>
-                        <div
+                      <div className="flex items-baseline gap-2">
+                        <span
                           className={`inline-flex items-center gap-1 text-xs font-semibold tabular-nums ${
                             up ? "text-emerald-500" : "text-rose-400"
                           }`}
@@ -456,24 +475,50 @@ export function LiveHoldingsCard({
                             <TrendingDown className="h-3 w-3" />
                           )}
                           {fmtPct(changePct)}
-                        </div>
+                        </span>
                         {changeVal != null && (
-                          <div
+                          <span
                             className={`text-[11px] tabular-nums ${
                               up ? "text-emerald-500/80" : "text-rose-400/80"
                             }`}
                           >
                             {fmtSigned(changeVal)}
-                          </div>
+                          </span>
                         )}
-                        <div className="text-[10px] text-muted-foreground">since purchase</div>
-                      </>
-                    ) : (
-                      <div className="text-[10px] text-muted-foreground">
-                        Awaiting price data
+                        <span className="text-[10px] text-muted-foreground">since purchase</span>
                       </div>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">
+                        Awaiting price data
+                      </span>
+                    )}
+                    {hasSeries && (
+                      <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                        {trendLabel}
+                      </span>
                     )}
                   </div>
+                  {hasSeries ? (
+                    // Full-bleed: the line fills the row instead of sitting in a
+                    // 220px island with empty space either side of it.
+                    <div className="h-14 w-full sm:h-16">
+                      <Sparkline
+                        values={trendValues}
+                        stretch
+                        className="h-full w-full"
+                        label={`${r.symbol} price trend, ${trendLabel}`}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex h-14 items-center justify-center rounded-md border border-dashed border-border/60 px-2 text-[10px] text-muted-foreground sm:h-16"
+                      aria-label="No price history available yet"
+                    >
+                      {resolution === "hourly" && hourlyPts.length < 2
+                        ? "Hourly detail builds up as syncs run"
+                        : "No price history yet"}
+                    </div>
+                  )}
                 </div>
               );
               return (

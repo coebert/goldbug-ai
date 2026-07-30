@@ -17,6 +17,8 @@
 // broker read failures leave local state alone.
 
 import { recordIntradayEquity } from "@/lib/equity-intraday.server";
+import { recordIntradayPrices } from "@/lib/price-intraday.server";
+
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
@@ -207,6 +209,14 @@ export async function reconcileLiveHoldingsFromBroker(
     holdingsValue,
     totalValue: newTotal,
   });
+
+  // The broker just told us each instrument's live price; bucket it by hour so
+  // holding sparklines can show intraday detail instead of one daily close.
+  await recordIntradayPrices(
+    db as never,
+    positions.map((p) => ({ symbol: p.symbol, price: p.marketPrice || p.avgPrice || 0 })),
+  );
+
 
   await db.from("live_broker_log").insert({
     portfolio_id: portfolioId, user_id: p.user_id,

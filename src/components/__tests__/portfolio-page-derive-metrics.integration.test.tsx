@@ -13,7 +13,7 @@
 // `derivePortfolioMetrics` output — not recomputed independently.
 
 import { describe, expect, it } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderWithQuery as renderToStaticMarkup } from "@/components/__tests__/render-with-query";
 import { LiveHoldingsCard } from "@/components/live-holdings-card";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 
