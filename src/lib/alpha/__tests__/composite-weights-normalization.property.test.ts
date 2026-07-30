@@ -48,6 +48,12 @@ const ALIAS_STRINGS = [
 
 const EPS = 1e-9;
 
+// Pinned so fast-check replays the exact same sample sequence on every run —
+// a property that only fails for one-in-a-thousand inputs must fail on CI too,
+// not intermittently. Bump deliberately (and re-run) when broadening coverage.
+const FC_SEED = 20260731;
+const FC_RUN = { seed: FC_SEED, endOnFailure: true } as const;
+
 const sum = (w: StrategyWeights): number =>
   KINDS.reduce((acc, k) => acc + w[k], 0);
 
@@ -167,7 +173,7 @@ describe("regime matrix: property-based fuzz (arbitrary input strings)", () => {
           expect(sum(eff)).toBeCloseTo(1, 9);
         },
       ),
-      { numRuns: 300 },
+      { numRuns: 300, ...FC_RUN },
     );
   });
 
@@ -192,7 +198,7 @@ describe("regime matrix: property-based fuzz (arbitrary input strings)", () => {
           expect(sum(effectiveWeightsForRegime(mutated))).toBeCloseTo(1, 9);
         },
       ),
-      { numRuns: 200 },
+      { numRuns: 200, ...FC_RUN },
     );
   });
 });
