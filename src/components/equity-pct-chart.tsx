@@ -167,7 +167,7 @@ export function EquityPctChart({
       domain: pctDomain(vals),
       last: vals.length ? vals[vals.length - 1] : 0,
     };
-  }, [equity, hourlyPoints, deposits, startingCash, resolution]);
+  }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate]);
 
   const hasDaily = equity.length >= 2;
   if (!hasDaily) return null;
