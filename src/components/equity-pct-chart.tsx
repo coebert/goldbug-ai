@@ -277,7 +277,7 @@ export function EquityPctChart({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
+              <ComposedChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
                 <CartesianGrid {...GRID_PROPS} />
                 <XAxis
                   dataKey="at"
@@ -288,6 +288,7 @@ export function EquityPctChart({
                   tickLine={TICK_LINE}
                 />
                 <YAxis
+                  yAxisId="pct"
                   width={64}
                   tickMargin={4}
                   domain={domain}
@@ -296,7 +297,8 @@ export function EquityPctChart({
                   axisLine={AXIS_LINE}
                   tickLine={TICK_LINE}
                 />
-                <ReferenceLine {...REFERENCE_LINE} y={0} />
+                <YAxis yAxisId="delta" orientation="right" domain={deltaDomain} hide />
+                <ReferenceLine yAxisId="pct" {...REFERENCE_LINE} y={0} />
                 <Tooltip
                   contentStyle={{
                     fontSize: 12,
@@ -307,9 +309,39 @@ export function EquityPctChart({
                   }}
                   labelStyle={{ color: "var(--muted-foreground)" }}
                   labelFormatter={(l) => fmtX(String(l))}
-                  formatter={(v) => [`${Number(v).toFixed(2)}%`, "vs capital"]}
+                  formatter={(v, name, item) => {
+                    if (name === "delta") {
+                      const d = Number(v);
+                      const money_ = money(Number(item?.payload?.deltaValue ?? 0));
+                      return [
+                        `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(2)} pp · ${money_}`,
+                        resolution === "hourly" ? "vs prev hour" : "vs prev day",
+                      ];
+                    }
+                    return [`${Number(v).toFixed(2)}%`, "vs capital"];
+                  }}
                 />
+                <Bar
+                  yAxisId="delta"
+                  dataKey="deltaPct"
+                  name="delta"
+                  barSize={resolution === "hourly" ? 3 : 6}
+                  isAnimationActive={false}
+                  radius={[1, 1, 1, 1]}
+                >
+                  {data.map((d, i) => (
+                    <Cell
+                      key={i}
+                      fill={
+                        d.deltaPct >= 0
+                          ? "color-mix(in oklab, var(--success) 45%, transparent)"
+                          : "color-mix(in oklab, var(--destructive) 45%, transparent)"
+                      }
+                    />
+                  ))}
+                </Bar>
                 <Line
+                  yAxisId="pct"
                   type="monotone"
                   dataKey="pct"
                   stroke={color}
@@ -317,7 +349,7 @@ export function EquityPctChart({
                   dot={false}
                   isAnimationActive={false}
                 />
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
