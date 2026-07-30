@@ -107,7 +107,7 @@ export const AXIS_PROPS = {
 // the grid but must never compete with a data series, so they land between
 // the axis frame and the plotted colours. `--border` and `--muted-foreground`
 // are NOT substitutes: both drop under 3:1 on `--surface-1`.
-export const REFERENCE_LINE_STROKE = "color-mix(in oklab, var(--foreground) 55%, transparent)";
+export const REFERENCE_LINE_STROKE = "color-mix(in oklab, var(--foreground) 75%, transparent)";
 export const REFERENCE_LINE = {
   stroke: REFERENCE_LINE_STROKE,
   strokeDasharray: "3 3",
