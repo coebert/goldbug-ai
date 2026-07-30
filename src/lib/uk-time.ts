@@ -122,3 +122,26 @@ export function formatUkAxisHour(input: string | number | Date): string {
     hour12: false,
   }).format(d);
 }
+
+/** Time-only axis label for intraday points inside a single day: "14:00". */
+export function formatUkAxisTime(input: string | number | Date): string {
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return String(input);
+  return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+/** Month-level axis label for multi-month spans: "Aug 26". */
+export function formatUkAxisMonth(input: string | number | Date): string {
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return String(input);
+  return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TZ,
+    month: "short",
+    year: "2-digit",
+  }).format(d);
+}
