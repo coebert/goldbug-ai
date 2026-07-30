@@ -17,6 +17,8 @@
 // broker read failures leave local state alone.
 
 import { recordIntradayEquity } from "@/lib/equity-intraday.server";
+import { recordIntradayPrices } from "@/lib/price-intraday.server";
+
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
