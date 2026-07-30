@@ -205,14 +205,8 @@ export function NewsReel() {
       };
       return [...filtered].sort((a, b) => score(b) - score(a));
     }
-    // Latest first: use the precise ingestion timestamp when available.
-    const ts = (it: (typeof filtered)[number]) => {
-      const t = it.fetched_at ? Date.parse(it.fetched_at) : NaN;
-      if (Number.isFinite(t)) return t;
-      const d = Date.parse(`${it.date}T00:00:00Z`);
-      return Number.isFinite(d) ? d : 0;
-    };
-    return [...filtered].sort((a, b) => ts(b) - ts(a));
+    // Latest first: shared helper keeps this identical to the server ordering.
+    return sortNewsLatestFirst(filtered);
   }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
 
   // Timestamp of the freshest headline currently in the reel — lets the user
