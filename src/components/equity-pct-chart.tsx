@@ -6,9 +6,11 @@ import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
 
 import {
+  Bar,
   CartesianGrid,
+  Cell,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
