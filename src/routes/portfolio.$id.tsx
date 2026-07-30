@@ -620,24 +620,34 @@ function PortfolioPage() {
     return out;
   }, [depositEvents, equityData, includeDeposits]);
 
+  /**
+   * Invested capital on a given date, using exactly the same rule as the
+   * equity-% chart and every equity tile: baseline pot + deposits on or before
+   * that date. With `includeDeposits` on, the user has asked to see the raw
+   * curve, so the base stays at the full contributed pot.
+   */
+  const baseAt = useCallback(
+    (date: string) =>
+      includeDeposits ? startingCashForChart : capitalAt(baselineStartingCash, depositEvents, date),
+    [includeDeposits, startingCashForChart, baselineStartingCash, depositEvents],
+  );
+
   const displayChartData = useMemo(() => {
-    if (compareMode === "raw" || startingCashForChart <= 0) return chartData;
-    const base = startingCashForChart;
+    if (compareMode === "raw") return chartData;
     return chartData.map((row) => {
       const r = row as typeof row & { benchmark?: number | null };
-      const dep = cumulativeDepositsByDate.get(row.date) ?? 0;
-      const adjValue = row.value - dep;
-      const adjPeak = row.peak - dep;
+      const base = baseAt(row.date);
+      if (!(base > 0)) return row;
       return {
         ...row,
-        value: ((adjValue - base) / base) * 100,
-        peak: ((adjPeak - base) / base) * 100,
+        value: ((row.value - base) / base) * 100,
+        peak: ((row.peak - base) / base) * 100,
         drawdown: row.drawdown,
         benchmark:
           r.benchmark != null ? ((r.benchmark - base) / base) * 100 : (r.benchmark ?? null),
       };
     });
-  }, [chartData, compareMode, startingCashForChart, cumulativeDepositsByDate]);
+  }, [chartData, compareMode, baseAt]);
 
   const perfMetrics = useMemo(() => {
     const rows = chartData.filter((r) => Number.isFinite(r.value));
