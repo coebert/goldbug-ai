@@ -597,28 +597,6 @@ function PortfolioPage() {
     () => (q.data?.deposits ?? []) as Array<{ date: string; amount: number }>,
     [q.data?.deposits],
   );
-  // Cumulative post-start deposit map. When `includeDeposits` is true
-  // we short-circuit to an empty map so the raw equity curve shows
-  // through unchanged.
-  const cumulativeDepositsByDate = useMemo(() => {
-    if (includeDeposits) return new Map<string, number>();
-    const startDate = equityData[0]?.date;
-    if (!startDate) return new Map<string, number>();
-    const byDate = new Map<string, number>();
-    for (const d of depositEvents) {
-      if (!d || d.date <= startDate) continue;
-      const amt = Number(d.amount);
-      if (!Number.isFinite(amt)) continue;
-      byDate.set(d.date, (byDate.get(d.date) ?? 0) + amt);
-    }
-    const out = new Map<string, number>();
-    let cum = 0;
-    for (const row of equityData) {
-      cum += byDate.get(row.date) ?? 0;
-      out.set(row.date, cum);
-    }
-    return out;
-  }, [depositEvents, equityData, includeDeposits]);
 
   /**
    * Invested capital on a given date, using exactly the same rule as the
