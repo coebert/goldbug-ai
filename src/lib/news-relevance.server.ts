@@ -18,6 +18,14 @@ import {
   type RelevanceScore,
   type RiskLevel,
 } from "./news-relevance";
+import {
+  classifyLlmFailure,
+  formatRunTelemetry,
+  summarizeRelevanceRun,
+  type RelevanceBatchTelemetry,
+  type RelevanceFailureReason,
+  type RelevanceRunTelemetry,
+} from "./news-relevance-telemetry";
 
 const RISK_ORDER: RiskLevel[] = ["conservative", "balanced", "aggressive"];
 
@@ -115,9 +123,24 @@ const BATCH = 25;
 async function scoreBatchWithLlm(
   items: Array<{ i: number; headline: string; source: string | null }>,
   ctx: RelevanceContext,
+  batchIndex: number,
+  telemetry: RelevanceBatchTelemetry[],
 ): Promise<Map<number, RelevanceScore>> {
+  const record = (
+    scored: number,
+    latencyMs: number,
+    failure: RelevanceFailureReason | null,
+    detail?: string,
+  ) => {
+    telemetry.push({ index: batchIndex, items: items.length, scored, latencyMs, failure, detail });
+  };
+
   const key = process.env.LOVABLE_API_KEY;
-  if (!key || items.length === 0) return new Map();
+  if (items.length === 0) return new Map();
+  if (!key) {
+    record(0, 0, "missing_api_key", "LOVABLE_API_KEY not configured");
+    return new Map();
+  }
 
   const gateway = createLovableAiGatewayProvider(key);
   const model = gateway("google/gemini-3.1-flash-lite");
@@ -143,14 +166,31 @@ Reply ONLY as JSON: {"scores":[{"i":0,"score":72,"reason":"one short sentence","
 Headlines:
 ${items.map((it) => `${it.i}. [${it.source ?? "unknown"}] ${it.headline}`).join("\n")}`;
 
+  const startedAt = Date.now();
   try {
     const { text } = await generateText({ model, prompt });
-    return parseLlmPayload(text);
+    const parsed = parseLlmPayload(text);
+    const latency = Date.now() - startedAt;
+    if (parsed.size === 0) {
+      const empty = text.trim().length === 0;
+      record(0, latency, empty ? "empty_reply" : "unparseable_reply", text.trim().slice(0, 160));
+      console.warn(
+        `news-relevance: batch ${batchIndex} returned no usable scores (${empty ? "empty" : "unparseable"} reply) in ${latency}ms`,
+      );
+    } else {
+      record(parsed.size, latency, null);
+    }
+    return parsed;
   } catch (err) {
-    console.warn("news-relevance: LLM scoring failed", err instanceof Error ? err.message : String(err));
+    const latency = Date.now() - startedAt;
+    const reason = classifyLlmFailure(err);
+    const detail = err instanceof Error ? err.message : String(err);
+    record(0, latency, reason, detail.slice(0, 200));
+    console.warn(`news-relevance: batch ${batchIndex} failed after ${latency}ms (${reason})`, detail);
     return new Map();
   }
 }
+
 
 export type RelevanceScoredRow = {
   id: string;
@@ -167,10 +207,11 @@ export type RelevanceScoredRow = {
  */
 export async function ensureRelevanceScored(
   dateISO: string,
-  opts?: { rescore?: boolean; max?: number; ctx?: RelevanceContext },
-): Promise<{ scored: number; skipped: number; date: string }> {
+  opts?: { rescore?: boolean; max?: number; ctx?: RelevanceContext; trigger?: string },
+): Promise<{ scored: number; skipped: number; date: string; telemetry: RelevanceRunTelemetry | null }> {
   const ctx = opts?.ctx ?? (await loadRelevanceContext());
   const max = Math.max(1, Math.min(200, opts?.max ?? 120));
+  const trigger = opts?.trigger ?? "unknown";
 
   let query = supabaseAdmin
     .from("news_cache")
@@ -183,10 +224,10 @@ export async function ensureRelevanceScored(
   const { data: rows, error } = await query;
   if (error) {
     console.warn("news-relevance: read failed", error.message);
-    return { scored: 0, skipped: 0, date: dateISO };
+    return { scored: 0, skipped: 0, date: dateISO, telemetry: null };
   }
   const pending = rows ?? [];
-  if (pending.length === 0) return { scored: 0, skipped: 0, date: dateISO };
+  if (pending.length === 0) return { scored: 0, skipped: 0, date: dateISO, telemetry: null };
 
   // Heuristic first — it is the guaranteed floor even if the LLM call fails.
   const heuristics = pending.map((r) =>
@@ -201,14 +242,17 @@ export async function ensureRelevanceScored(
     ),
   );
 
+  const batchTelemetry: RelevanceBatchTelemetry[] = [];
   const llm = new Map<number, RelevanceScore>();
+  let batchIndex = 0;
   for (let start = 0; start < pending.length; start += BATCH) {
     const slice = pending.slice(start, start + BATCH).map((r, k) => ({
       i: start + k,
       headline: (r.headline as string) ?? "",
       source: (r.source as string | null) ?? null,
     }));
-    const batch = await scoreBatchWithLlm(slice, ctx);
+    const batch = await scoreBatchWithLlm(slice, ctx, batchIndex, batchTelemetry);
+    batchIndex += 1;
     for (const [i, v] of batch) llm.set(i, v);
   }
 
@@ -229,5 +273,38 @@ export async function ensureRelevanceScored(
     }),
   );
 
-  return { scored, skipped: pending.length - scored, date: dateISO };
+  const telemetry = summarizeRelevanceRun({
+    date: dateISO,
+    trigger,
+    items: pending.length,
+    batches: batchTelemetry,
+  });
+  console.info(`news-relevance[${trigger}] ${formatRunTelemetry(telemetry)}`);
+  await persistRunTelemetry(telemetry);
+
+  return { scored, skipped: pending.length - scored, date: dateISO, telemetry };
 }
+
+/** Best-effort persistence so the UI can show recent scoring health. */
+async function persistRunTelemetry(t: RelevanceRunTelemetry): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin.from("news_relevance_runs").insert({
+      news_date: t.date,
+      trigger: t.trigger,
+      items: t.items,
+      batches: t.batches,
+      batch_failures: t.batchFailures,
+      llm_scored: t.llmScored,
+      fallback_items: t.fallbackItems,
+      latency_ms_total: t.latencyMsTotal,
+      latency_ms_p50: t.latencyMsP50,
+      latency_ms_max: t.latencyMsMax,
+      failure_reasons: t.failureReasons,
+      fallback_reason: t.fallbackReason,
+    });
+    if (error) console.warn("news-relevance: telemetry insert failed", error.message);
+  } catch (err) {
+    console.warn("news-relevance: telemetry insert threw", err instanceof Error ? err.message : String(err));
+  }
+}
+
