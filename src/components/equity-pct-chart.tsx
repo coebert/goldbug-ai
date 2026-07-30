@@ -1,5 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import {
   CartesianGrid,
   Line,
@@ -11,113 +14,217 @@ import {
   YAxis,
 } from "recharts";
 
-function shortDate(s: string) {
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return String(s);
+type Resolution = "daily" | "hourly";
+
+function fmtDay(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
 }
 
+function fmtHour(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    timeZone: "Europe/London",
+  });
+}
+
 /**
- * Percentage change in equity versus the portfolio's starting pot.
- * Zero on the y-axis is the starting investment, so the line crosses
- * below the baseline whenever equity falls under the starting value.
+ * Invested capital at each point in time: the baseline starting pot plus every
+ * deposit made on or before that date.
+ *
+ * This is the crux of the chart's correctness. Measuring against the *final*
+ * `starting_cash` is wrong whenever capital was added later: a £300 portfolio
+ * that is topped up to £10,300 in month two reads as −97% for its whole first
+ * month, as if the money had been lost rather than not yet deposited. Netting
+ * the deposit out of the baseline as well as the equity keeps the line at the
+ * portfolio's real performance and makes −100% (total loss) the true floor.
+ */
+export function capitalAt(
+  baseline: number,
+  deposits: Array<{ date: string; amount: number }>,
+  onOrBefore: string,
+): number {
+  const day = onOrBefore.slice(0, 10);
+  let capital = baseline;
+  for (const d of deposits) {
+    const amt = Number(d?.amount);
+    if (!Number.isFinite(amt)) continue;
+    if (String(d.date).slice(0, 10) <= day) capital += amt;
+  }
+  return capital;
+}
+
+/** Symmetric-free, data-driven y domain that always contains zero. */
+export function pctDomain(values: number[]): [number, number] {
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (finite.length === 0) return [-1, 1];
+  const lo = Math.min(0, ...finite);
+  const hi = Math.max(0, ...finite);
+  const pad = Math.max(0.25, (hi - lo) * 0.15);
+  // Equity can never fall below −100% of contributed capital.
+  return [Math.max(-100, lo - pad), hi + pad];
+}
+
+/**
+ * Percentage change in equity versus the capital invested at the time.
+ * Zero on the y-axis is the money put in, so the line only goes negative when
+ * the portfolio is actually worth less than what was contributed.
  */
 export function EquityPctChart({
+  portfolioId,
   equity,
   startingCash,
+  deposits = [],
   className,
 }: {
+  portfolioId?: string;
   equity: Array<{ snapshot_date: string; total_value: number | string }>;
+  /** Baseline pot with later deposits stripped out (`baselineStartingCash`). */
   startingCash: number;
+  deposits?: Array<{ date: string; amount: number }>;
   className?: string;
 }) {
+  const [resolution, setResolution] = useState<Resolution>("daily");
+  const intradayFn = useServerFn(getIntradayEquity);
+  const intradayQ = useQuery({
+    queryKey: ["equity-intraday", portfolioId],
+    queryFn: () => intradayFn({ data: { portfolio_id: portfolioId!, days: 30 } }),
+    enabled: resolution === "hourly" && !!portfolioId,
+    staleTime: 60_000,
+  });
+
+  const hourlyPoints = intradayQ.data?.points ?? [];
+
   const { data, domain, last } = useMemo(() => {
     const base = Number(startingCash);
+    const source: Array<{ at: string; value: number }> =
+      resolution === "hourly"
+        ? hourlyPoints.map((p) => ({ at: p.at, value: Number(p.total_value) }))
+        : equity.map((e) => ({ at: String(e.snapshot_date), value: Number(e.total_value) }));
+
     const rows =
       base > 0
-        ? equity
-            .map((e) => ({
-              date: String(e.snapshot_date),
-              pct: ((Number(e.total_value) - base) / base) * 100,
-            }))
-            .filter((r) => Number.isFinite(r.pct))
+        ? source
+            .map((r) => {
+              const capital = capitalAt(base, deposits, r.at);
+              return {
+                at: r.at,
+                pct: capital > 0 ? ((r.value - capital) / capital) * 100 : NaN,
+              };
+            })
+            // Equity of exactly 0 usually means "not yet synced" rather than a
+            // wipeout; a placeholder row must not print as −100%.
+            .filter((r) => Number.isFinite(r.pct) && r.pct > -100)
         : [];
+
     const vals = rows.map((r) => r.pct);
-    const mag = Math.max(0.5, ...vals.map((v) => Math.abs(v))) * 1.2;
     return {
       data: rows,
-      domain: [-mag, mag] as [number, number],
+      domain: pctDomain(vals),
       last: vals.length ? vals[vals.length - 1] : 0,
     };
-  }, [equity, startingCash]);
+  }, [equity, hourlyPoints, deposits, startingCash, resolution]);
 
-  if (data.length < 2) return null;
+  const hasDaily = equity.length >= 2;
+  if (!hasDaily) return null;
 
   const up = last >= 0;
-  const color = up ? "#4ade80" : "#f87171";
+  const color = up ? "var(--success)" : "var(--destructive)";
+  const fmtX = resolution === "hourly" ? fmtHour : fmtDay;
 
   return (
     <div className={className}>
       <div className="rounded-lg border bg-card p-3">
-        <div className="mb-1 flex items-baseline justify-between gap-2">
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
           <span className="text-xs font-medium text-muted-foreground">
-            Equity change vs starting pot
+            Equity change vs invested capital
           </span>
-          <span
-            className={`text-sm font-semibold tabular-nums ${up ? "text-primary" : "text-destructive"}`}
-          >
-            {up ? "+" : ""}
-            {last.toFixed(2)}%
-          </span>
+          <div className="flex items-center gap-2">
+            {portfolioId && (
+              <div className="flex overflow-hidden rounded-md border text-[11px]">
+                {(["daily", "hourly"] as Resolution[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setResolution(r)}
+                    className={`px-2 py-0.5 capitalize transition-colors ${
+                      resolution === r
+                        ? "bg-secondary text-secondary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            )}
+            <span
+              className={`text-sm font-semibold tabular-nums ${up ? "text-primary" : "text-destructive"}`}
+            >
+              {up ? "+" : ""}
+              {last.toFixed(2)}%
+            </span>
+          </div>
         </div>
         <div className="h-[160px] w-full landscape:h-[200px] md:h-[240px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
-              <CartesianGrid {...GRID_PROPS} />
-              <XAxis
-                dataKey="date"
-                tick={AXIS_TICK}
-                stroke="currentColor"
-                strokeOpacity={0.4}
-                minTickGap={40}
-                tickFormatter={(v) => shortDate(String(v))}
-                axisLine={AXIS_LINE}
-                tickLine={TICK_LINE}
-              />
-              <YAxis
-                width={64}
-                tickMargin={4}
-                domain={domain}
-                tick={AXIS_TICK}
-                stroke="currentColor"
-                strokeOpacity={0.4}
-                tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                axisLine={AXIS_LINE}
-                tickLine={TICK_LINE}
-              />
-              <ReferenceLine {...REFERENCE_LINE} y={0} />
-              <Tooltip
-                contentStyle={{
-                  fontSize: 12,
-                  background: "var(--popover)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  color: "var(--popover-foreground)",
-                }}
-                labelStyle={{ color: "var(--muted-foreground)" }}
-                labelFormatter={(l) => shortDate(String(l))}
-                formatter={(v) => [`${Number(v).toFixed(2)}%`, "vs start"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="pct"
-                stroke={color}
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {data.length < 2 ? (
+            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+              {resolution === "hourly"
+                ? intradayQ.isLoading
+                  ? "Loading hourly points…"
+                  : "No hourly points recorded yet — they accumulate as runs complete."
+                : "Not enough history yet."}
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
+                <CartesianGrid {...GRID_PROPS} />
+                <XAxis
+                  dataKey="at"
+                  tick={AXIS_TICK}
+                  minTickGap={resolution === "hourly" ? 64 : 40}
+                  tickFormatter={(v) => fmtX(String(v))}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
+                <YAxis
+                  width={64}
+                  tickMargin={4}
+                  domain={domain}
+                  tick={AXIS_TICK}
+                  tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
+                <ReferenceLine {...REFERENCE_LINE} y={0} />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    color: "var(--popover-foreground)",
+                  }}
+                  labelStyle={{ color: "var(--muted-foreground)" }}
+                  labelFormatter={(l) => fmtX(String(l))}
+                  formatter={(v) => [`${Number(v).toFixed(2)}%`, "vs capital"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="pct"
+                  stroke={color}
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

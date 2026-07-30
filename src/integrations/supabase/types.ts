@@ -570,6 +570,44 @@ export type Database = {
         }
         Relationships: []
       }
+      equity_intraday: {
+        Row: {
+          bucket_hour: string
+          cash: number
+          created_at: string
+          holdings_value: number
+          id: string
+          portfolio_id: string
+          total_value: number
+        }
+        Insert: {
+          bucket_hour: string
+          cash: number
+          created_at?: string
+          holdings_value: number
+          id?: string
+          portfolio_id: string
+          total_value: number
+        }
+        Update: {
+          bucket_hour?: string
+          cash?: number
+          created_at?: string
+          holdings_value?: number
+          id?: string
+          portfolio_id?: string
+          total_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equity_intraday_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       equity_snapshots: {
         Row: {
           cash: number
