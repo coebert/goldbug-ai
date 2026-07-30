@@ -6,6 +6,7 @@ import { getGlobalNewsReel, refreshGlobalNews } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TranslationBadge } from "@/components/translation-badge";
+import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -214,6 +215,19 @@ export function NewsReel() {
     return [...filtered].sort((a, b) => ts(b) - ts(a));
   }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
 
+  // Timestamp of the freshest headline currently in the reel — lets the user
+  // confirm at a glance that newest-first ordering is in effect.
+  const newestHeadlineAt = useMemo(() => {
+    let max = 0;
+    for (const it of allItems) {
+      const t = it.fetched_at ? Date.parse(it.fetched_at) : Date.parse(`${it.date}T00:00:00Z`);
+      if (Number.isFinite(t) && t > max) max = t;
+    }
+    return max > 0 ? max : null;
+  }, [allItems]);
+
+
+
 
   // Detect newly-arrived headlines that match current filters and carry a strong sentiment signal,
   // then flash-highlight them in the list and surface a toast notification.
@@ -378,9 +392,25 @@ export function NewsReel() {
                 {q.isFetching || refreshing ? "Refreshing…" : "Refresh global news"}
               </Button>
             </div>
-            <div className="text-[10px] text-muted-foreground" title={lastUpdated ? new Date(lastUpdated).toLocaleString("en-GB", { timeZone: "Europe/London" }) : "Not yet loaded"}>
-              {q.isFetching || refreshing ? "Refreshing…" : `Updated ${formatAgo(lastUpdated, now)}`}
-              {refreshMs === 0 ? " · auto-refresh off" : ""}
+            <div
+              className="text-right text-[10px] leading-tight text-muted-foreground"
+              title={lastUpdated ? formatUkDateTime(lastUpdated) : "Not yet loaded"}
+            >
+              <div className="font-medium text-foreground">
+                {q.isFetching || refreshing
+                  ? "Refreshing…"
+                  : lastUpdated
+                    ? `Last updated ${formatUkTime(lastUpdated)} ${ukZoneAbbr(lastUpdated)} · ${formatAgo(lastUpdated, now)}`
+                    : "Last updated —"}
+              </div>
+              <div>
+                {newestHeadlineAt
+                  ? `Newest headline ${formatUkTime(newestHeadlineAt)} ${ukZoneAbbr(newestHeadlineAt)}`
+                  : "No headlines yet"}
+                {" · "}
+                {sortMode === "latest" ? "newest first" : "most reliable first"}
+                {refreshMs === 0 ? " · auto-refresh off" : ""}
+              </div>
             </div>
           </div>
         </div>
