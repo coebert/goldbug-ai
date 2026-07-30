@@ -17,6 +17,8 @@ import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { GlobalShortcutsHost } from "@/lib/keyboard-shortcuts";
 import { DensityHost } from "@/lib/use-density";
 import { installChunkReloadHandler } from "@/lib/chunk-reload";
+import { MfaGate } from "@/components/mfa-gate";
+
 
 function NotFoundComponent() {
   return (
@@ -147,7 +149,10 @@ function RootComponent() {
         tabIndex={-1}
         className="pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
       >
-        <Outlet />
+        <MfaGate>
+          <Outlet />
+        </MfaGate>
+
       </div>
       <MobileTabBar />
       <GlobalShortcutsHost />
