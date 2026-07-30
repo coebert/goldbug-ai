@@ -198,7 +198,9 @@ import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 import {
   AXIS_LINE,
+  AXIS_LINE_STROKE,
   AXIS_TICK,
+  CHART_NEUTRAL_SERIES,
   GRID_PROPS,
   OKABE_ITO,
   REFERENCE_LINE,
