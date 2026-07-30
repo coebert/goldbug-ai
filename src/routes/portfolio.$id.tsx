@@ -123,6 +123,10 @@ import { RiskControlsCard } from "@/components/risk-controls-card";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { AdvancedSection } from "@/components/advanced-section";
+import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
+import { useIsAdvanced } from "@/lib/use-experience-level";
+
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
