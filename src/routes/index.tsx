@@ -8,21 +8,27 @@ import { computeSparkByPortfolio } from "@/lib/spark-by-portfolio";
 import { computeModeSummary } from "@/lib/mode-summary";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
 import { useEquityDecimals } from "@/lib/use-equity-decimals";
+import { useExperienceLevel } from "@/lib/use-experience-level";
+import { deriveNextAction } from "@/lib/next-action";
+import { getMarketStatusOverview } from "@/lib/market-hours";
+import { ukHour, ukZoneAbbr } from "@/lib/uk-time";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
 import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
-import { Sparkles, Banknote, PlusCircle, Newspaper, Brain, LineChart } from "lucide-react";
+import { AdvancedSection } from "@/components/advanced-section";
+import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
+import { Sparkles, PlusCircle } from "lucide-react";
 
 import { TodayHero } from "@/components/home/today-hero";
 import { DashboardSettings } from "@/components/home/dashboard-settings";
-import { SectionHeader } from "@/components/home/section-header";
-import { useFocusMode } from "@/components/home/use-focus-mode";
 import { NewHereBanner } from "@/components/home/new-here-banner";
+import { NextActionCard } from "@/components/home/next-action-card";
 import { PortfolioRow } from "@/components/home/portfolio-row";
 import { CreatePortfolioCard } from "@/components/home/create-portfolio-card";
+import { useFocusMode } from "@/components/home/use-focus-mode";
 
 // Re-export so existing tests importing from "@/routes/index" keep working.
 export { ModeSummaryTile } from "@/components/home/mode-summary-tile";
@@ -94,6 +100,8 @@ function Home() {
   const [includeDeposits, setIncludeDeposits] = useIncludeDeposits();
   const [equityDecimals, setEquityDecimals] = useEquityDecimals();
   const [focusMode, setFocusMode] = useFocusMode();
+  const [level] = useExperienceLevel();
+  const advanced = level === "advanced";
 
   const todaySummary = useMemo(() => {
     const series = (equityQ.data?.series ?? []) as Array<Record<string, unknown> & { date: string }>;
@@ -104,22 +112,45 @@ function Home() {
     return computeModeSummary(series, portfolios, deposits, { includeDeposits });
   }, [equityQ.data, includeDeposits]);
 
+  // "What to do next" — one action, derived from real state.
+  const nextAction = useMemo(() => {
+    const now = new Date();
+    const nextRunLabel = `${String((ukHour(now) + 1) % 24).padStart(2, "0")}:00 ${ukZoneAbbr(now)}`;
+    let marketOpen = false;
+    try {
+      marketOpen = getMarketStatusOverview(now).some((s) => s.phase === "open");
+    } catch {
+      marketOpen = false;
+    }
+    return deriveNextAction({
+      portfolios: (q.data ?? []) as Array<{ id: string; mode?: string | null }>,
+      snapshotCount: (equityQ.data?.series ?? []).length,
+      marketOpen,
+      nextRunLabel,
+    });
+  }, [q.data, equityQ.data]);
+
   if (!ready || !session) return <PageLoading />;
+
+  const portfolioCount = q.data?.length ?? 0;
 
   return (
     <div className="min-h-dvh bg-surface-1">
       <AppHeader email={session.user.email} />
       <HomeCoachMarks />
       <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
-        {/* Page heading + primary actions */}
-        <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:mb-8 sm:flex sm:items-start sm:justify-between">
+        {/* Page heading + density control */}
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:mb-7">
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Your portfolios</h1>
+            <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Your money</h1>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Create a portfolio, pick a risk level, run a backtest, then let the AI make hourly decisions.
+              {portfolioCount === 0
+                ? "Nothing set up yet — start with pretend money and watch how the AI invests."
+                : "Everything below updates by itself. The AI reviews the market every hour."}
             </p>
           </div>
-          <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <div className="flex shrink-0 items-center gap-2">
+            <ExperienceLevelToggle />
             <DashboardSettings
               includeDeposits={includeDeposits}
               onIncludeDepositsChange={setIncludeDeposits}
@@ -128,28 +159,12 @@ function Home() {
               focusMode={focusMode}
               onFocusModeChange={setFocusMode}
             />
-            <Link to="/get-started">
-              <Button variant="secondary" size="sm">
-                <Sparkles className="mr-1 h-4 w-4" /> £1000 demo
+            <a href="#create-portfolio" className="hidden sm:inline-flex">
+              <Button size="sm">
+                <PlusCircle className="mr-1 h-4 w-4" /> New portfolio
               </Button>
-            </Link>
-            <Link to="/saxo-status">
-              <Button variant="outline" size="sm" title="Connect your Saxo account to trade real money">
-                <Banknote className="mr-1 h-4 w-4" /> Real money setup
-              </Button>
-            </Link>
-          </div>
-          {/* Mobile primary CTA + settings */}
-          <div className="flex shrink-0 items-center gap-2 sm:hidden">
-            <DashboardSettings
-              includeDeposits={includeDeposits}
-              onIncludeDepositsChange={setIncludeDeposits}
-              equityDecimals={equityDecimals}
-              onEquityDecimalsChange={setEquityDecimals}
-              focusMode={focusMode}
-              onFocusModeChange={setFocusMode}
-            />
-            <a href="#create-portfolio">
+            </a>
+            <a href="#create-portfolio" className="sm:hidden">
               <Button size="sm" className="h-8">
                 <PlusCircle className="mr-1 h-4 w-4" /> New
               </Button>
@@ -159,68 +174,29 @@ function Home() {
 
         <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
 
-        {/* Hero "Today" band — combined equity, delta, next-run countdown, mode tiles */}
-        <TodayHero
-          summary={todaySummary}
-          mixedCurrency={equityQ.data?.mixedCurrency ?? false}
-          currencies={equityQ.data?.currencies ?? []}
-        />
+        {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
+        <div className="mb-6 grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <TodayHero
+              summary={todaySummary}
+              mixedCurrency={equityQ.data?.mixedCurrency ?? false}
+              currencies={equityQ.data?.currencies ?? []}
+            />
+          </div>
+          <NextActionCard action={nextAction} />
+        </div>
 
         <NewHereBanner />
 
-        <Suspense fallback={<div className="mb-6 h-40 rounded-md border bg-card/50" aria-hidden="true" />}>
-          <MarketHoursCard />
-        </Suspense>
-
-        {!focusMode && (
-          <>
-            <section className="mb-6" aria-labelledby="section-overview">
-              <SectionHeader
-                as="h2"
-                icon={LineChart}
-                title={<span id="section-overview">All portfolios overview</span>}
-                description="Combined equity across every portfolio you own."
-              />
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <AllPortfoliosChart />
-              </Suspense>
-            </section>
-
-            <section className="mb-6" data-coach="news-reel" aria-labelledby="section-news">
-              <SectionHeader
-                as="h2"
-                icon={Newspaper}
-                title={<span id="section-news">Market news the AI is reading</span>}
-                description="Fresh headlines feeding this hour's decisions — grouped by asset."
-              />
-              <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <NewsReel />
-              </Suspense>
-            </section>
-
-            <section className="mb-6" aria-labelledby="section-decisions">
-              <SectionHeader
-                as="h2"
-                icon={Brain}
-                title={<span id="section-decisions">Why the AI is trading what it's trading</span>}
-                description="Latest decisions traced back to the news and signals behind them."
-              />
-              <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <DecisionNewsBreakdown />
-              </Suspense>
-            </section>
-          </>
-        )}
-
-        {/* Portfolios grid + create card */}
+        {/* Portfolios — the second thing anyone looks for */}
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">
-            <SectionHeader
-              as="h2"
-              icon={Sparkles}
-              title="Your portfolios"
-              description="One card per portfolio — headline equity, sparkline, and quick actions."
-            />
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="font-display text-lg font-semibold tracking-tight">Your portfolios</h2>
+              <span className="text-xs text-muted-foreground">
+                {portfolioCount === 0 ? "" : `${portfolioCount} in total`}
+              </span>
+            </div>
             {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
             {q.data && q.data.length === 0 && (
               <Card className="border-primary/40 bg-primary/5">
@@ -230,7 +206,8 @@ function Home() {
                       <Sparkles className="h-4 w-4 text-primary" /> Start with a guided £1000 demo
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      A 3-step walkthrough that creates your first paper portfolio and runs the AI's first trades — no real money.
+                      A 3-step walkthrough that creates your first practice portfolio and runs the AI's first
+                      trades — no real money involved.
                     </p>
                   </div>
                   <Link to="/get-started">
@@ -270,6 +247,59 @@ function Home() {
             <CreatePortfolioCard />
           </div>
         </div>
+
+        {/* Everything expert-level lives here: present, labelled in plain
+            English, but folded away unless asked for. */}
+        {!focusMode && (
+          <div className="mt-8 space-y-3">
+            <h2 className="font-display text-lg font-semibold tracking-tight">Look deeper</h2>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Optional detail. Nothing here needs your attention day to day.
+            </p>
+
+            <AdvancedSection
+              title="When markets are open"
+              summary="Trading hours for each exchange the AI uses, in UK time."
+              defaultOpen={advanced}
+            >
+              <Suspense fallback={<div className="h-40 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <MarketHoursCard />
+              </Suspense>
+            </AdvancedSection>
+
+            <AdvancedSection
+              title="All portfolios on one chart"
+              summary="Your combined value over time, every portfolio added together."
+              defaultOpen={advanced}
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <AllPortfoliosChart />
+              </Suspense>
+            </AdvancedSection>
+
+            <AdvancedSection
+              title="News the AI is reading"
+              summary="Headlines feeding this hour's decisions, grouped by company or asset."
+              defaultOpen={advanced}
+            >
+              <div data-coach="news-reel">
+                <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
+                  <NewsReel />
+                </Suspense>
+              </div>
+            </AdvancedSection>
+
+            <AdvancedSection
+              title="Why the AI bought and sold"
+              summary="Each recent decision traced back to the news and signals behind it."
+              defaultOpen={advanced}
+            >
+              <Suspense fallback={<div className="h-80 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <DecisionNewsBreakdown />
+              </Suspense>
+            </AdvancedSection>
+          </div>
+        )}
       </main>
     </div>
   );
