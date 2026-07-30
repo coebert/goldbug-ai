@@ -39,8 +39,10 @@ export type LanguageDetection = {
 };
 
 const SCRIPT_RANGES: Array<{ script: DetectedScript; re: RegExp; name: string | null; code: string | null }> = [
-  { script: "han", re: /[\u4E00-\u9FFF\u3400-\u4DBF]/, name: "Chinese", code: "zh" },
+  // Kana first: Japanese headlines mix kana with kanji, so a han-first test
+  // would misreport them as Chinese.
   { script: "kana", re: /[\u3040-\u30FF]/, name: "Japanese", code: "ja" },
+  { script: "han", re: /[\u4E00-\u9FFF\u3400-\u4DBF]/, name: "Chinese", code: "zh" },
   { script: "hangul", re: /[\uAC00-\uD7AF\u1100-\u11FF]/, name: "Korean", code: "ko" },
   { script: "cyrillic", re: /[\u0400-\u04FF]/, name: null, code: null },
   { script: "greek", re: /[\u0370-\u03FF]/, name: "Greek", code: "el" },
@@ -144,10 +146,11 @@ export function detectLanguage(text: string | null | undefined): LanguageDetecti
   }
 
   const foreignHits = best?.hits ?? 0;
-  // Counter-evidence: clear English function-word density outweighs a single
-  // ambiguous marker (e.g. "a", "de" appearing in an English headline).
-  if (foreignHits <= 1 && englishHits >= 2 && diacritics === 0) {
-    return { code: "en", name: "English", script, confidence: 0.7, isEnglish: true };
+  // Counter-evidence: a single ambiguous marker word ("a", "do", "de") is not
+  // enough on its own — English headlines routinely contain foreign proper
+  // nouns ("Banco do Brasil posts a record profit").
+  if (diacritics === 0 && foreignHits < 2) {
+    return { code: "en", name: "English", script, confidence: englishHits >= 2 ? 0.75 : 0.6, isEnglish: true };
   }
   if (foreignHits === 0 && diacritics > 0 && englishHits >= 2) {
     // Accented proper noun inside an otherwise English headline.
