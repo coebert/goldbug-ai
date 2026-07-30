@@ -10,8 +10,16 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { AXIS_TICK } from "@/lib/chart-palette";
-import { AA_NORMAL_TEXT, contrastRatio } from "@/lib/contrast";
+import {
+  AXIS_LINE,
+  AXIS_LINE_STROKE,
+  AXIS_TICK,
+  GRID_PROPS,
+  GRID_STROKE,
+  TICK_LINE,
+  TICK_LINE_STROKE,
+} from "@/lib/chart-palette";
+import { AA_NON_TEXT, AA_NORMAL_TEXT, contrastRatio, parseColor } from "@/lib/contrast";
 
 const SRC = join(process.cwd(), "src");
 
