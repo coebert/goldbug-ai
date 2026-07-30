@@ -231,7 +231,15 @@ export async function advanceNewsBackfill(opts?: {
     return { job, inserted: 0, domains_processed: 0, done: true, reason: `Job is ${job.status}.` };
   }
 
-  const domains = job.new_sources.map((s) => s.domain).filter(Boolean);
+  // Older jobs stored *feed* hostnames (feeds.bbci.co.uk), which GDELT never
+  // matches. Re-derive the publisher domain from the catalogue so in-flight
+  // jobs heal themselves instead of sweeping 50 dead queries.
+  const domains = job.new_sources
+    .map((s) => {
+      const src = RSS_SOURCES.find((c) => c.id === s.id);
+      return publisherDomain(src?.url ?? `https://${s.domain}/`) ?? "";
+    })
+    .filter(Boolean);
   if (domains.length === 0) {
     const finished = await finishJob(job.id, "completed", null);
     return { job: finished, inserted: 0, domains_processed: 0, done: true, reason: "No newly added feeds to backfill." };
@@ -243,17 +251,19 @@ export async function advanceNewsBackfill(opts?: {
   const seen = await windowSeenKeys(job.start_date, job.end_date);
   let inserted = 0;
   let processed = 0;
+  let throttled = 0;
 
   try {
     for (let i = startIdx; i < domains.length; i++) {
       if (Date.now() > deadlineAt - GDELT_PACE_MS) break;
       if (processed > 0) await new Promise((r) => setTimeout(r, GDELT_PACE_MS));
 
-      const articles = await fetchDomainHistory(domains[i], job.start_date, job.end_date);
+      const history = await fetchDomainHistory(domains[i], job.start_date, job.end_date);
       processed++;
+      if (history.status === "rate_limited") throttled++;
 
       const weight = RSS_SOURCES.find((s) => s.id === job.new_sources[i]?.id)?.weight ?? 0.6;
-      const candidates = articles.map((a) => ({
+      const candidates = history.articles.map((a) => ({
         date: a.day,
         source: a.source,
         headline: a.headline,
@@ -263,7 +273,7 @@ export async function advanceNewsBackfill(opts?: {
         original_language: null as string | null,
         translation_confidence: null as number | null,
       }));
-      const unseen = filterUnseen(candidates, seen);
+      const unseen = filterUnseen(candidates, seen) as typeof candidates;
       if (unseen.length > 0) {
         const rows = unseen.map((n) => ({
           news_date: n.date,
@@ -284,6 +294,10 @@ export async function advanceNewsBackfill(opts?: {
         .update({
           days_done: i + 1,
           headlines_inserted: job.headlines_inserted + inserted,
+          last_error:
+            throttled > 0 && inserted === 0
+              ? "GDELT is throttling history requests — the job will pick up where it left off on the next pass."
+              : null,
           cursor_date: addDaysISO(job.end_date, -Math.floor(((i + 1) / domains.length) * (job.days_total - 1))),
         })
         .eq("id", job.id);
@@ -300,6 +314,10 @@ export async function advanceNewsBackfill(opts?: {
   const final = completed
     ? await finishJob(job.id, "completed", null)
     : await latestBackfillJob(opts?.userId ?? null);
+
+  const throttleNote =
+    throttled > 0 ? ` ${throttled} feed${throttled === 1 ? " was" : "s were"} throttled by GDELT — run it again to retry.` : "";
+
 
   return {
     job: final,
