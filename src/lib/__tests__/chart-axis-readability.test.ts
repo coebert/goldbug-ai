@@ -100,7 +100,8 @@ function composite(fg: string, bg: string, alpha: number): string {
   const f = parseColor(fg);
   const b = parseColor(bg);
   const mix = (x: number, y: number) => Math.round(x * alpha + y * (1 - alpha));
-  return `rgb(${mix(f.r, b.r)}, ${mix(f.g, b.g)}, ${mix(f.b, b.b)})`;
+  const hex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${hex(mix(f.r, b.r))}${hex(mix(f.g, b.g))}${hex(mix(f.b, b.b))}`;
 }
 
 function alphaOf(token: string): number {
