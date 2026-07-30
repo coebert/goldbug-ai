@@ -935,34 +935,41 @@ function PortfolioPage() {
                   Desktop keeps the wrap-free flex layout. */}
               <TabsList className="-mx-4 flex w-auto max-w-none justify-start gap-1 h-auto overflow-x-auto scroll-smooth snap-x snap-mandatory px-4 p-1 md:mx-0 md:w-full md:max-w-full md:flex-nowrap md:overflow-x-auto md:px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <TabsTrigger value="overview" className="min-h-10 shrink-0 snap-start">
-                  Overview
+                  Summary
                 </TabsTrigger>
                 <TabsTrigger value="trades" className="min-h-10 shrink-0 snap-start">
-                  Trades ({trades.length})
+                  Buys &amp; sells ({trades.length})
                 </TabsTrigger>
                 <TabsTrigger value="decisions" className="min-h-10 shrink-0 snap-start">
-                  Decisions ({decisions.length})
-                </TabsTrigger>
-                <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">
-                  Audit
-                </TabsTrigger>
-                <TabsTrigger value="errors" className="min-h-10 shrink-0 snap-start">
-                  Errors
-                </TabsTrigger>
-
-                <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">
-                  Confidence
+                  Why ({decisions.length})
                 </TabsTrigger>
                 <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">
-                  Risk
+                  Safety limits
                 </TabsTrigger>
-                <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">
-                  Diagnostics
-                </TabsTrigger>
-                <TabsTrigger value="reports" className="min-h-10 shrink-0 snap-start">
-                  Reports
-                </TabsTrigger>
+                {/* Expert-only tabs. Hidden in Simple mode so a newcomer sees
+                    four choices instead of nine — the Simple/Advanced switch
+                    above brings them straight back. */}
+                {advancedLevel && (
+                  <>
+                    <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">
+                      Audit trail
+                    </TabsTrigger>
+                    <TabsTrigger value="errors" className="min-h-10 shrink-0 snap-start">
+                      Errors
+                    </TabsTrigger>
+                    <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">
+                      Confidence
+                    </TabsTrigger>
+                    <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">
+                      Diagnostics
+                    </TabsTrigger>
+                    <TabsTrigger value="reports" className="min-h-10 shrink-0 snap-start">
+                      Reports
+                    </TabsTrigger>
+                  </>
+                )}
               </TabsList>
+
 
               <TabsContent value="overview" className="mt-4">
                 <CurrencyDiagnosticsBanner
