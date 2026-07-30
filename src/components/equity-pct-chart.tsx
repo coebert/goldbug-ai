@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 import { getIntradayEquity } from "@/lib/equity-intraday.functions";
+import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
+
 import {
   CartesianGrid,
   Line,
