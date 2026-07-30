@@ -12,6 +12,7 @@ import {
   type DecisionBreakdownItem,
 } from "./news-reel.server";
 import type { NewsRefreshResult } from "./news-refresh.server";
+import { sortNewsLatestFirst } from "./news-reel-sort";
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -187,17 +188,10 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       };
     });
 
-    // Sort: strictly newest first (ingestion timestamp, falling back to news date),
-    // with citation count only as a tie-breaker within the same instant.
-    const ts = (i: NewsReelItem) => {
-      const t = i.fetched_at ? Date.parse(i.fetched_at) : NaN;
-      if (Number.isFinite(t)) return t;
-      const d = Date.parse(`${i.date}T00:00:00Z`);
-      return Number.isFinite(d) ? d : 0;
-    };
-    items.sort((a, b) => ts(b) - ts(a) || b.decisions_count - a.decisions_count);
+    // Sort: strictly newest first (shared helper, also used by the reel UI).
+    const sorted = sortNewsLatestFirst(items);
 
-    const sliced = items.slice(0, limit);
+    const sliced = sorted.slice(0, limit);
     return { items: sliced, as_of: asOf.toISOString(), has_more: items.length > limit, since_days: sinceDays, limit };
   });
 
