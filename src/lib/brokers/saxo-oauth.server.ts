@@ -43,6 +43,13 @@ function stateSecret(): string {
   return s;
 }
 
+/** Secrets a state signature may verify under (covers CRON_SECRET rotation). */
+function stateSecrets(): string[] {
+  return [process.env.CRON_SECRET, process.env.CRON_SECRET_NEXT].filter(
+    (s): s is string => typeof s === "string" && s.length > 0,
+  );
+}
+
 /** Signed, time-bound state parameter: env|ts|hmac(env|ts). */
 export function signState(env: BrokerEnv): string {
   const ts = Date.now().toString();
@@ -57,12 +64,15 @@ export function verifyState(state: string): { env: BrokerEnv } | null {
   if (env !== "sim" && env !== "live") return null;
   const ageMs = Date.now() - Number(ts);
   if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > 15 * 60 * 1000) return null;
-  const expected = createHmac("sha256", stateSecret()).update(`${env}|${ts}`).digest("hex");
   const a = Buffer.from(mac, "hex");
-  const b = Buffer.from(expected, "hex");
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  return { env };
+  for (const secret of stateSecrets()) {
+    const expected = createHmac("sha256", secret).update(`${env}|${ts}`).digest("hex");
+    const b = Buffer.from(expected, "hex");
+    if (a.length === b.length && timingSafeEqual(a, b)) return { env };
+  }
+  return null;
 }
+
 
 function appCreds(env: BrokerEnv): { key: string; secret: string } {
   // Saxo issues SEPARATE app credentials for SIM and LIVE (different auth hosts,
