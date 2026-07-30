@@ -1,3 +1,4 @@
+import { ChartFrame } from "@/components/chart-frame";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -1585,7 +1586,7 @@ function PortfolioPage() {
                       </div>
                     )}
                     <CardContent
-                      className="h-64 sm:h-80"
+                      className="h-64 min-w-0 max-w-full overflow-hidden sm:h-80"
 
                       style={
                         chartTheme.surface !== "transparent"
@@ -1598,6 +1599,7 @@ function PortfolioPage() {
                           Run a backtest or the daily AI to see the curve.
                         </p>
                       ) : (
+                        <ChartFrame className="h-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <ComposedChart
                             data={displayChartData}
@@ -1887,6 +1889,7 @@ function PortfolioPage() {
                             />
                           </ComposedChart>
                         </ResponsiveContainer>
+                        </ChartFrame>
                       )}
                     </CardContent>
                   </Card>

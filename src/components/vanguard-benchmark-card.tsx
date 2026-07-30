@@ -1,3 +1,4 @@
+import { ChartFrame } from "@/components/chart-frame";
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -167,8 +168,8 @@ export function VanguardBenchmarkCard({
             </div>
 
             {series.length >= 2 && (
-              <div
-                className="h-56 w-full"
+              <ChartFrame
+                className="h-56"
                 role="img"
                 aria-label="Portfolio equity curve compared to Vanguard LifeStrategy 60% Equity proxy over time"
               >
@@ -225,7 +226,7 @@ export function VanguardBenchmarkCard({
                     />
                   </LineChart>
                 </ResponsiveContainer>
-              </div>
+              </ChartFrame>
             )}
 
             <div className="rounded-md border bg-muted/20 p-3">
