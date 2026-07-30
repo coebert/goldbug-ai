@@ -149,9 +149,18 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     }
 
     // 4. Assemble reel items with a plain-English note per headline.
+    //    Citations are matched on the NORMALISED key of both the (possibly
+    //    translated) headline and the original-language headline, so a story
+    //    the AI cited before a translation backfill — or cited in its source
+    //    language — still shows its decision links after the row flips to
+    //    English.
     const items: NewsReelItem[] = news.map((r) => {
-      const bucket = infl.get(r.headline.trim());
+      const original = (r as { original_headline?: string | null }).original_headline ?? null;
+      const bucket =
+        infl.get(normalizeHeadlineKey(r.headline)) ??
+        (original ? infl.get(normalizeHeadlineKey(original)) : undefined);
       const rows = bucket?.rows ?? [];
+
       const avg = bucket && bucket.n > 0 ? bucket.sum / bucket.n : null;
       let note: string;
       if (rows.length === 0) {
