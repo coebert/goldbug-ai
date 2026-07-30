@@ -77,9 +77,19 @@ plus a daily cron) runs three blocking checks:
 
 1. **Security headers** — `check:security-headers` locks the SSR policy in
    `security-headers.ts`: required headers present, HSTS >= 1 year with
-   subdomains, no wildcard/`http:` script or connect source, `object-src 'none'`,
-   scoped `frame-ancestors`. Loosening the policy fails CI until the contract
-   test is updated in the same commit.
+   subdomains, no wildcard/`http:` source, no `unsafe-eval` or editor origins in
+   production, `connect-src` scoped to self + the backend origin, and no
+   directive that merely repeats the `default-src` fallback. Loosening the
+   policy fails CI until the contract test is updated in the same commit.
+
+   The policy is **per endpoint class** (`classifyEndpoint`):
+   `/api/*` gets `default-src 'none'` (JSON renders and fetches nothing),
+   hashed assets get transport headers only, and documents get the app CSP.
+   Sources are enumerated from what the client actually loads — same-origin
+   bundles, Google Fonts, `data:` for the MFA QR, and the Supabase origin over
+   https + wss. Dev additionally allows `unsafe-eval`, `ws:` and the Lovable
+   editor origins for HMR; production has none of them, and only production
+   sends `upgrade-insecure-requests`.
 2. **Dependency scan** — `check:deps` fails on any high/critical advisory.
    CI runs it with `--strict`, so an unreachable advisory registry is a failure
    rather than a silent pass.

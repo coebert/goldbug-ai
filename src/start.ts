@@ -19,10 +19,18 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
-const securityHeadersMiddleware = createMiddleware().server(async ({ next }) => {
+const securityHeadersMiddleware = createMiddleware().server(async ({ next, request }) => {
   const result = await next();
   const response = (result as { response?: Response }).response;
-  if (response?.headers) applySecurityHeaders(response.headers);
+  if (response?.headers) {
+    let pathname = "/";
+    try {
+      pathname = new URL(request.url).pathname;
+    } catch {
+      /* non-absolute URL in some runtimes — fall back to the document policy */
+    }
+    applySecurityHeaders(response.headers, pathname);
+  }
   return result;
 });
 
