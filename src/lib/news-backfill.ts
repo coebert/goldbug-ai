@@ -93,6 +93,38 @@ export function hostFromUrl(url: string | null | undefined): string | null {
 export type CatalogueSourceLike = { id: string; url: string; label?: string; weight?: number };
 
 /**
+ * Feed hostnames are not publisher domains: `feeds.bbci.co.uk` publishes as
+ * `bbc.co.uk`, `rss.dw.com` as `dw.com`. The cache stores publisher domains
+ * and GDELT indexes publisher domains, so every comparison and query must go
+ * through this normalisation — otherwise every feed looks "new" and every
+ * history query returns nothing.
+ */
+const PUBLISHER_OVERRIDES: Record<string, string> = {
+  "feeds.bbci.co.uk": "bbc.co.uk",
+  "feeds.a.dj.com": "wsj.com",
+  "feeds.content.dowjones.io": "wsj.com",
+  "feeds.skynews.com": "news.sky.com",
+  "www3.nhk.or.jp": "nhk.or.jp",
+  "feeds.marketwatch.com": "marketwatch.com",
+};
+
+/** Aggregators have no publisher history of their own — never backfill them. */
+export const AGGREGATOR_DOMAINS = new Set(["news.google.com", "google.com", "bing.com"]);
+
+const FEED_LABELS = new Set(["feeds", "feed", "rss", "rss2", "xml", "syndication", "www2", "www3", "api"]);
+
+/** Publisher domain for a feed URL (null when unusable or an aggregator). */
+export function publisherDomain(url: string | null | undefined): string | null {
+  const host = hostFromUrl(url);
+  if (!host) return null;
+  if (PUBLISHER_OVERRIDES[host]) return PUBLISHER_OVERRIDES[host];
+  if (AGGREGATOR_DOMAINS.has(host)) return null;
+  const parts = host.split(".");
+  while (parts.length > 2 && (FEED_LABELS.has(parts[0]) || parts[0].length === 1)) parts.shift();
+  return parts.join(".");
+}
+
+/**
  * A catalogue feed counts as "newly added" when its publisher domain has
  * never appeared in the cache. That is the signal that the expanded source
  * list has no history behind it yet.
@@ -104,18 +136,22 @@ export function newCatalogueSources<T extends CatalogueSourceLike>(
   const seen = new Set<string>();
   for (const d of seenDomains) {
     const norm = (d ?? "").toLowerCase().replace(/^www\./, "").trim();
-    if (norm) seen.add(norm);
+    if (!norm) continue;
+    seen.add(norm);
+    const pub = publisherDomain(`https://${norm}/`);
+    if (pub) seen.add(pub);
   }
   const out: T[] = [];
   const taken = new Set<string>();
   for (const src of sources) {
-    const host = hostFromUrl(src.url);
+    const host = publisherDomain(src.url);
     if (!host || seen.has(host) || taken.has(host)) continue;
     taken.add(host);
     out.push(src);
   }
   return out;
 }
+
 
 /** GDELT `seendate` (`20260701T120000Z`) → ISO day, or null when unparseable. */
 export function seenDateToISODay(seendate: string | null | undefined): string | null {

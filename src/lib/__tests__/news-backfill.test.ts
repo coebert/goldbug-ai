@@ -8,6 +8,7 @@ import {
   describeBackfillStatus,
   hostFromUrl,
   newCatalogueSources,
+  publisherDomain,
   nextBackfillDate,
   planBackfillWindow,
   seenDateToISODay,
@@ -156,5 +157,27 @@ describe("hostFromUrl / describeBackfillStatus", () => {
     expect(describeBackfillStatus(job)).toMatch(/50% done/);
     expect(describeBackfillStatus({ ...job, status: "completed" })).toMatch(/complete/);
     expect(describeBackfillStatus({ ...job, status: "failed" })).toMatch(/resume/);
+  });
+});
+
+describe("publisherDomain", () => {
+  it("maps feed hostnames onto publisher domains", () => {
+    expect(publisherDomain("https://feeds.bbci.co.uk/news/world/rss.xml")).toBe("bbc.co.uk");
+    expect(publisherDomain("https://rss.dw.com/rdf/rss-en-top")).toBe("dw.com");
+    expect(publisherDomain("https://feeds.reuters.com/Reuters/worldNews")).toBe("reuters.com");
+    expect(publisherDomain("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")).toBe("nytimes.com");
+    expect(publisherDomain("https://feeds.a.dj.com/rss/RSSMarketsMain.xml")).toBe("wsj.com");
+    expect(publisherDomain("https://www3.nhk.or.jp/nhkworld/en/news/feeds/")).toBe("nhk.or.jp");
+    expect(publisherDomain("https://www.theguardian.com/world/rss")).toBe("theguardian.com");
+  });
+
+  it("skips aggregators and junk", () => {
+    expect(publisherDomain("https://news.google.com/rss")).toBeNull();
+    expect(publisherDomain("garbage")).toBeNull();
+  });
+
+  it("treats a feed host as seen when the publisher domain is already cached", () => {
+    const sources = [{ id: "bbc", url: "https://feeds.bbci.co.uk/news/rss.xml" }];
+    expect(newCatalogueSources(sources, ["bbc.co.uk"])).toHaveLength(0);
   });
 });
