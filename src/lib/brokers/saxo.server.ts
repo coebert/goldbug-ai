@@ -1158,7 +1158,17 @@ function firstPositiveNumber(...values: Array<number | undefined | null>): numbe
 }
 
 export async function buildSaxoAdapter(opts: {
-  userId: string; portfolioId?: string | null; envOverride?: BrokerEnv;
+  userId: string;
+  portfolioId?: string | null;
+  envOverride?: BrokerEnv;
+  /**
+   * Account this adapter is scoped to. Callers acting on behalf of a
+   * portfolio MUST pass that portfolio's `broker_account_id`; otherwise
+   * every portfolio shares the process-wide default account and their
+   * holdings/cash converge onto one another. Only account-agnostic admin
+   * probes may omit it.
+   */
+  accountKey?: string | null;
 }): Promise<SaxoAdapter> {
   const env = (opts.envOverride ?? (process.env.SAXO_ENV as BrokerEnv) ?? "sim");
   if (env !== "sim" && env !== "live") throw new Error(`Invalid SAXO_ENV=${env}`);
@@ -1166,7 +1176,8 @@ export async function buildSaxoAdapter(opts: {
   const token = await getAccessToken(env);
   return new SaxoAdapter({
     env, token, userId: opts.userId, portfolioId: opts.portfolioId ?? null,
-    accountKey: process.env.SAXO_ACCOUNT_KEY, clientKey: process.env.SAXO_CLIENT_KEY,
+    accountKey: opts.accountKey ?? process.env.SAXO_ACCOUNT_KEY,
+    clientKey: process.env.SAXO_CLIENT_KEY,
   });
 }
 
