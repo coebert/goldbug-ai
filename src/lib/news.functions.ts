@@ -31,7 +31,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       (
         await context.supabase
           .from("news_cache")
-          .select("id, news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
+          .select("id, news_date, fetched_at, source, headline, url, summary, original_headline, original_language, translation_confidence")
           .gte("news_date", since)
           .order("news_date", { ascending: false })
           .order("fetched_at", { ascending: false })
