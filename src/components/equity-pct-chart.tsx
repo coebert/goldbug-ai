@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
-import { formatUkAxisDay, formatUkAxisHour, ukDayKey, ukZoneAbbr } from "@/lib/uk-time";
+import {
+  formatUkAxisDay,
+  formatUkAxisHour,
+  formatUkAxisMonth,
+  formatUkAxisTime,
+  ukDayKey,
+  ukZoneAbbr,
+} from "@/lib/uk-time";
 import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
 
@@ -316,9 +323,9 @@ export function EquityPctChart({
 
   const up = last >= 0;
   const color = up ? "var(--success)" : "var(--destructive)";
-  // Hourly points over a long window still get date-only ticks so the axis
-  // can carry all-time history without the labels colliding.
-  const fmtX = resolution === "hourly" && spanDays(data) <= 7 ? fmtHour : fmtDay;
+  // Label shape and spacing follow the span actually plotted, so an all-time
+  // hourly series thins to month labels instead of colliding.
+  const ticks = xAxisTicks(resolution, spanDays(data), data.length);
   const money = (v: number) =>
     `${v < 0 ? "−" : "+"}${new Intl.NumberFormat("en-GB", {
       style: "currency",
@@ -378,8 +385,10 @@ export function EquityPctChart({
                 <XAxis
                   dataKey="at"
                   tick={AXIS_TICK}
-                  minTickGap={resolution === "hourly" ? 64 : 40}
-                  tickFormatter={(v) => fmtX(String(v))}
+                  minTickGap={ticks.minTickGap}
+                  tickMargin={6}
+                  interval="preserveStartEnd"
+                  tickFormatter={(v) => ticks.format(String(v))}
                   axisLine={AXIS_LINE}
                   tickLine={TICK_LINE}
                 />
