@@ -1,6 +1,7 @@
 // Core trading engine. Called once per "tick" (day) for a portfolio.
 // Uses AI SDK -> Lovable AI Gateway with structured output.
 
+import { recordIntradayEquity } from "@/lib/equity-intraday.server";
 import { generateText, Output, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { asJson } from "@/lib/_server/db-json";
@@ -2403,6 +2404,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     { onConflict: "portfolio_id,snapshot_date" },
   );
 
+  await recordIntradayEquity(admin as never, portfolioId, {
+    cash: workingCash,
+    holdingsValue: newHoldingsValue,
+    totalValue: newTotal,
+  });
+
   // Per-currency wallet snapshot for the wallet-history chart.
   try {
     const { readWallet, walletBalance } = await import("@/lib/portfolio-wallet");
@@ -2743,4 +2750,10 @@ export async function snapshotPortfolio(portfolioId: string, asOf: string) {
     },
     { onConflict: "portfolio_id,snapshot_date" },
   );
+
+  await recordIntradayEquity(supabaseAdmin as never, portfolioId, {
+    cash,
+    holdingsValue: hv,
+    totalValue: cash + hv,
+  });
 }

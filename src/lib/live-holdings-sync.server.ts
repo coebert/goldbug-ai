@@ -16,6 +16,7 @@
 // are still applied because the broker is authoritative here; only true
 // broker read failures leave local state alone.
 
+import { recordIntradayEquity } from "@/lib/equity-intraday.server";
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
@@ -200,6 +201,12 @@ export async function reconcileLiveHoldingsFromBroker(
     },
     { onConflict: "portfolio_id,snapshot_date" },
   );
+
+  await recordIntradayEquity(db as never, portfolioId, {
+    cash: brokerCash,
+    holdingsValue,
+    totalValue: newTotal,
+  });
 
   await db.from("live_broker_log").insert({
     portfolio_id: portfolioId, user_id: p.user_id,
