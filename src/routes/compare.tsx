@@ -63,7 +63,7 @@ export const Route = createFileRoute("/compare")({
   component: ComparePage,
 });
 
-const COLORS = ["#22d3ee", "#a78bfa", "#f472b6", "#facc15", "#4ade80", "#fb923c"];
+const COLORS = CHART_SEQUENCE;
 
 type ComparisonResult = Awaited<ReturnType<typeof getComparison>>["results"][number];
 
