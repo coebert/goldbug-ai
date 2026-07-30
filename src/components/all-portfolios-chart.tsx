@@ -288,10 +288,29 @@ function ModeChart({
                     </linearGradient>
                   </defs>
                   <CartesianGrid {...GRID_PROPS} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} stroke={AXIS_COLOR} strokeOpacity={0.6} minTickGap={isMobile ? 56 : 40} tickFormatter={(v) => (isMobile ? shortDate(String(v)) : String(v))} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                  <YAxis width={isMobile ? 56 : 64} tick={AXIS_TICK} stroke={AXIS_COLOR} strokeOpacity={0.6} tickFormatter={(v) =>
+                  <XAxis
+                    dataKey="date"
+                    tick={AXIS_TICK}
+                    stroke={AXIS_COLOR}
+                    strokeOpacity={0.6}
+                    minTickGap={isMobile ? 56 : 40}
+                    tickFormatter={(v) => (isMobile ? shortDate(String(v)) : String(v))}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
+                  <YAxis
+                    width={isMobile ? 56 : 64}
+                    tick={AXIS_TICK}
+                    stroke={AXIS_COLOR}
+                    strokeOpacity={0.6}
+                    tickFormatter={(v) =>
                       isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v))
-                    } domain={yDomain} allowDataOverflow axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                    }
+                    domain={yDomain}
+                    allowDataOverflow
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
                   <Tooltip
                     cursor={{ stroke: AXIS_COLOR, strokeOpacity: 0.4, strokeDasharray: "3 3" }}
                     wrapperStyle={{ zIndex: 40, maxWidth: "min(85vw, 320px)" }}

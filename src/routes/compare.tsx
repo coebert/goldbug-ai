@@ -400,16 +400,28 @@ function ComparePage() {
                     <ResponsiveContainer width="100%" height={320}>
                       <LineChart data={chartData}>
                         <CartesianGrid {...GRID_PROPS} />
-                        <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} label={{
+                        <XAxis
+                          dataKey="date"
+                          stroke="var(--muted-foreground)"
+                          fontSize={11}
+                          label={{
                             value: "Date",
                             position: "insideBottom",
                             offset: -2,
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                        <YAxis stroke="var(--muted-foreground)" fontSize={11} width={70} tickFormatter={(v) =>
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
+                        <YAxis
+                          stroke="var(--muted-foreground)"
+                          fontSize={11}
+                          width={70}
+                          tickFormatter={(v) =>
                             `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(1)}%`
-                          } label={{
+                          }
+                          label={{
                             value: "Cumulative return vs start (%)",
                             angle: -90,
                             position: "insideLeft",
@@ -417,7 +429,10 @@ function ComparePage() {
                             style: { textAnchor: "middle" },
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
 
                         <ReferenceLine
                           y={0}
@@ -487,14 +502,26 @@ function ComparePage() {
                       <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={drawdownData}>
                           <CartesianGrid {...GRID_PROPS} />
-                          <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} label={{
+                          <XAxis
+                            dataKey="date"
+                            stroke="var(--muted-foreground)"
+                            fontSize={11}
+                            label={{
                               value: "Date",
                               position: "insideBottom",
                               offset: -2,
                               fill: "var(--muted-foreground)",
                               fontSize: 12,
-                            }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                          <YAxis stroke="var(--muted-foreground)" fontSize={11} width={70} tickFormatter={(v) => `${Number(v).toFixed(1)}%`} label={{
+                            }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
+                          />
+                          <YAxis
+                            stroke="var(--muted-foreground)"
+                            fontSize={11}
+                            width={70}
+                            tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                            label={{
                               value: "Drawdown (%)",
                               angle: -90,
                               position: "insideLeft",
@@ -502,7 +529,10 @@ function ComparePage() {
                               style: { textAnchor: "middle" },
                               fill: "var(--muted-foreground)",
                               fontSize: 12,
-                            }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                            }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
+                          />
 
                           <ReferenceLine
                             y={0}

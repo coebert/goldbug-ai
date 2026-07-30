@@ -25,7 +25,14 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/portfolio/$id/attribution")({
   head: () => ({
@@ -159,21 +166,45 @@ function AttributionPage() {
                       }))}
                     >
                       <CartesianGrid {...GRID_PROPS} />
-                      <XAxis dataKey="signal" tick={AXIS_TICK} stroke="var(--foreground)" axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                      <YAxis width={64} yAxisId="left" tick={AXIS_TICK} stroke="var(--foreground)" label={{
+                      <XAxis
+                        dataKey="signal"
+                        tick={AXIS_TICK}
+                        stroke="var(--foreground)"
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
+                      <YAxis
+                        width={64}
+                        yAxisId="left"
+                        tick={AXIS_TICK}
+                        stroke="var(--foreground)"
+                        label={{
                           value: "Contribution to P&L (%)",
                           angle: -90,
                           position: "insideLeft",
                           fill: "var(--foreground)",
                           style: { fontSize: 12 },
-                        }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                      <YAxis width={64} yAxisId="right" tick={AXIS_TICK} orientation="right" stroke="var(--foreground)" domain={[0, 100]} label={{
+                        }}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
+                      <YAxis
+                        width={64}
+                        yAxisId="right"
+                        tick={AXIS_TICK}
+                        orientation="right"
+                        stroke="var(--foreground)"
+                        domain={[0, 100]}
+                        label={{
                           value: "Win rate (%)",
                           angle: 90,
                           position: "insideRight",
                           fill: "var(--foreground)",
                           style: { fontSize: 12 },
-                        }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                        }}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
                       <Tooltip
                         contentStyle={{
                           background: "var(--card)",
@@ -281,20 +312,32 @@ function AttributionPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.cumulative_alpha}>
                         <CartesianGrid {...GRID_PROPS} />
-                        <XAxis dataKey="trade_date" stroke="var(--muted-foreground)" label={{
+                        <XAxis
+                          dataKey="trade_date"
+                          stroke="var(--muted-foreground)"
+                          label={{
                             value: "Trade date",
                             position: "insideBottom",
                             offset: -5,
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                        <YAxis width={64} stroke="var(--muted-foreground)" label={{
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
+                        <YAxis
+                          width={64}
+                          stroke="var(--muted-foreground)"
+                          label={{
                             value: "Cumulative return (%)",
                             angle: -90,
                             position: "insideLeft",
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
                         <Tooltip
                           contentStyle={{
                             background: "var(--card)",
@@ -360,20 +403,32 @@ function AttributionPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.cumulative_by_signal}>
                         <CartesianGrid {...GRID_PROPS} />
-                        <XAxis dataKey="trade_date" stroke="var(--muted-foreground)" label={{
+                        <XAxis
+                          dataKey="trade_date"
+                          stroke="var(--muted-foreground)"
+                          label={{
                             value: "Trade date",
                             position: "insideBottom",
                             offset: -5,
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                        <YAxis width={64} stroke="var(--muted-foreground)" label={{
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
+                        <YAxis
+                          width={64}
+                          stroke="var(--muted-foreground)"
+                          label={{
                             value: "Cumulative return contribution (%)",
                             angle: -90,
                             position: "insideLeft",
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
                         <Tooltip
                           contentStyle={{
                             background: "var(--card)",
@@ -419,14 +474,26 @@ function AttributionPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data.news_buckets}>
                           <CartesianGrid {...GRID_PROPS} />
-                          <XAxis dataKey="bucket" stroke="var(--muted-foreground)" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                          <YAxis width={64} stroke="var(--muted-foreground)" label={{
+                          <XAxis
+                            dataKey="bucket"
+                            stroke="var(--muted-foreground)"
+                            tick={AXIS_TICK}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
+                          />
+                          <YAxis
+                            width={64}
+                            stroke="var(--muted-foreground)"
+                            label={{
                               value: "Avg forward return (%)",
                               angle: -90,
                               position: "insideLeft",
                               fill: "var(--muted-foreground)",
                               style: { fontSize: 12 },
-                            }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                            }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
+                          />
                           <Tooltip
                             contentStyle={{
                               background: "var(--card)",
@@ -451,20 +518,38 @@ function AttributionPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart>
                           <CartesianGrid {...GRID_PROPS} />
-                          <XAxis type="number" dataKey="news_score" name="News score" domain={[-1, 1]} stroke="var(--muted-foreground)" label={{
+                          <XAxis
+                            type="number"
+                            dataKey="news_score"
+                            name="News score"
+                            domain={[-1, 1]}
+                            stroke="var(--muted-foreground)"
+                            label={{
                               value: "News score (-1..+1)",
                               position: "insideBottom",
                               offset: -5,
                               fill: "var(--muted-foreground)",
                               style: { fontSize: 12 },
-                            }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                          <YAxis width={64} type="number" dataKey="forward_return_pct" name="Return (%)" stroke="var(--muted-foreground)" label={{
+                            }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
+                          />
+                          <YAxis
+                            width={64}
+                            type="number"
+                            dataKey="forward_return_pct"
+                            name="Return (%)"
+                            stroke="var(--muted-foreground)"
+                            label={{
                               value: "Forward return (%)",
                               angle: -90,
                               position: "insideLeft",
                               fill: "var(--muted-foreground)",
                               style: { fontSize: 12 },
-                            }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                            }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
+                          />
                           <Tooltip
                             contentStyle={{
                               background: "var(--card)",

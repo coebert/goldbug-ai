@@ -20,7 +20,14 @@ import {
 import { getWalletHistory } from "@/lib/wallet-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 
 interface Props {
   portfolioId: string;
@@ -135,13 +142,34 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
               <ResponsiveContainer>
                 <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid {...GRID_PROPS} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                  <YAxis width={64} yAxisId="left" tick={AXIS_TICK} tickFormatter={(v) =>
+                  <XAxis
+                    dataKey="date"
+                    tick={AXIS_TICK}
+                    minTickGap={24}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
+                  <YAxis
+                    width={64}
+                    yAxisId="left"
+                    tick={AXIS_TICK}
+                    tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
-                    } axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                  <YAxis width={64} yAxisId="right" orientation="right" tick={AXIS_TICK} tickFormatter={(v) =>
+                    }
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
+                  <YAxis
+                    width={64}
+                    yAxisId="right"
+                    orientation="right"
+                    tick={AXIS_TICK}
+                    tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
-                    } axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                    }
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
                   <Tooltip
                     contentStyle={TOOLTIP_CONTENT_STYLE}
                     formatter={(value: number | string, name: string) => {

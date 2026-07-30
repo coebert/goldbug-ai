@@ -175,8 +175,24 @@ export function VanguardBenchmarkCard({
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={series} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
                     <CartesianGrid {...GRID_PROPS} />
-                    <XAxis dataKey="date" tickFormatter={fmtShortDate} minTickGap={32} tick={AXIS_TICK} stroke="var(--border)" axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                    <YAxis domain={["auto", "auto"]} tickFormatter={(v: number) => fmtCompact.format(v)} tick={AXIS_TICK} stroke="var(--border)" width={64} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={fmtShortDate}
+                      minTickGap={32}
+                      tick={AXIS_TICK}
+                      stroke="var(--border)"
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
+                    <YAxis
+                      domain={["auto", "auto"]}
+                      tickFormatter={(v: number) => fmtCompact.format(v)}
+                      tick={AXIS_TICK}
+                      stroke="var(--border)"
+                      width={64}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
                     <Tooltip
                       labelFormatter={(l) => formatUk(String(l))}
                       formatter={(value: number, name) => [fmtCcy.format(Number(value)), name]}

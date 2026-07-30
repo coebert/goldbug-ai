@@ -171,7 +171,13 @@ export function TailHedgeReportCard({
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ left: 4, right: 4, top: 8 }}>
                   <CartesianGrid {...GRID_PROPS} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={20} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <XAxis
+                    dataKey="date"
+                    tick={AXIS_TICK}
+                    minTickGap={20}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
                   <YAxis tick={AXIS_TICK} width={64} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                   <Tooltip
                     formatter={(v: number) => money(v, currency)}

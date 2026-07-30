@@ -437,16 +437,29 @@ function LongHorizonPage() {
                     <ResponsiveContainer width="100%" height={360}>
                       <LineChart data={chartData}>
                         <CartesianGrid {...GRID_PROPS} />
-                        <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} minTickGap={40} label={{
+                        <XAxis
+                          dataKey="date"
+                          stroke="var(--muted-foreground)"
+                          fontSize={11}
+                          minTickGap={40}
+                          label={{
                             value: "Date",
                             position: "insideBottom",
                             offset: -2,
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                        <YAxis stroke="var(--muted-foreground)" fontSize={11} width={72} tickFormatter={(v) =>
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
+                        <YAxis
+                          stroke="var(--muted-foreground)"
+                          fontSize={11}
+                          width={72}
+                          tickFormatter={(v) =>
                             `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`
-                          } label={{
+                          }
+                          label={{
                             value: "Cumulative return (%)",
                             angle: -90,
                             position: "insideLeft",
@@ -454,7 +467,10 @@ function LongHorizonPage() {
                             style: { textAnchor: "middle" },
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                          }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
+                        />
 
                         <ReferenceLine
                           y={0}

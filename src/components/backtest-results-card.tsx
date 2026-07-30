@@ -17,7 +17,16 @@ import {
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, CHART_SEQUENCE, GRID_PROPS, OKABE_ITO, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  CHART_SEQUENCE,
+  GRID_PROPS,
+  OKABE_ITO,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
 const PALETTE = CHART_SEQUENCE;
@@ -191,8 +200,22 @@ export function BacktestResultsCard({
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={equityData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                 <CartesianGrid {...GRID_PROPS} />
-                <XAxis dataKey="date" type="category" allowDuplicatedCategory={false} tick={AXIS_TICK} minTickGap={24} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={64} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                <XAxis
+                  dataKey="date"
+                  type="category"
+                  allowDuplicatedCategory={false}
+                  tick={AXIS_TICK}
+                  minTickGap={24}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
+                <YAxis
+                  tick={AXIS_TICK}
+                  tickFormatter={fmtCompact}
+                  width={64}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
                 <Tooltip
                   formatter={(v: number) => fmtCurrency(v)}
                   labelFormatter={(l) => `${l}`}
@@ -240,8 +263,21 @@ export function BacktestResultsCard({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={drawdownData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                 <CartesianGrid {...GRID_PROPS} />
-                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                <YAxis tick={AXIS_TICK} width={64} tickFormatter={(v: number) => `${v.toFixed(0)}%`} domain={[(min: number) => Math.min(0, Math.floor(min)), 0]} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                <XAxis
+                  dataKey="date"
+                  tick={AXIS_TICK}
+                  minTickGap={24}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
+                <YAxis
+                  tick={AXIS_TICK}
+                  width={64}
+                  tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                  domain={[(min: number) => Math.min(0, Math.floor(min)), 0]}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
                 <Tooltip
                   formatter={(v: number) => `${v.toFixed(2)}%`}
                   labelFormatter={(l) => `${l}`}
@@ -284,8 +320,20 @@ export function BacktestResultsCard({
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={holdingsPoints} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                   <CartesianGrid {...GRID_PROPS} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                  <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={64} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <XAxis
+                    dataKey="date"
+                    tick={AXIS_TICK}
+                    minTickGap={24}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
+                  <YAxis
+                    tick={AXIS_TICK}
+                    tickFormatter={fmtCompact}
+                    width={64}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
                   <Tooltip
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
                     contentStyle={TOOLTIP_CONTENT_STYLE}

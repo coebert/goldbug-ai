@@ -74,8 +74,27 @@ export function EquityPctChart({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
               <CartesianGrid {...GRID_PROPS} />
-              <XAxis dataKey="date" tick={AXIS_TICK} stroke="currentColor" strokeOpacity={0.4} minTickGap={40} tickFormatter={(v) => shortDate(String(v))} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-              <YAxis width={64} tickMargin={4} domain={domain} tick={AXIS_TICK} stroke="currentColor" strokeOpacity={0.4} tickFormatter={(v) => `${Number(v).toFixed(1)}%`} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+              <XAxis
+                dataKey="date"
+                tick={AXIS_TICK}
+                stroke="currentColor"
+                strokeOpacity={0.4}
+                minTickGap={40}
+                tickFormatter={(v) => shortDate(String(v))}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+              />
+              <YAxis
+                width={64}
+                tickMargin={4}
+                domain={domain}
+                tick={AXIS_TICK}
+                stroke="currentColor"
+                strokeOpacity={0.4}
+                tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+              />
               <ReferenceLine
                 y={0}
                 stroke="currentColor"

@@ -164,7 +164,13 @@ export function RunMetricsCard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid {...GRID_PROPS} />
-                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                    <XAxis
+                      dataKey="label"
+                      tick={AXIS_TICK}
+                      minTickGap={24}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
                     <YAxis width={64} tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
@@ -188,8 +194,20 @@ export function RunMetricsCard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid {...GRID_PROPS} />
-                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                    <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                    <XAxis
+                      dataKey="label"
+                      tick={AXIS_TICK}
+                      minTickGap={24}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
+                    <YAxis
+                      width={64}
+                      tick={AXIS_TICK}
+                      allowDecimals={false}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="ok" name="success" stackId="p" fill="hsl(142 71% 45%)" />
@@ -208,8 +226,20 @@ export function RunMetricsCard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid {...GRID_PROPS} />
-                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                    <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                    <XAxis
+                      dataKey="label"
+                      tick={AXIS_TICK}
+                      minTickGap={24}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
+                    <YAxis
+                      width={64}
+                      tick={AXIS_TICK}
+                      allowDecimals={false}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />

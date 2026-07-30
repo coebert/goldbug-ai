@@ -252,18 +252,32 @@ function ReportPage() {
                       margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
                     >
                       <CartesianGrid {...GRID_PROPS} />
-                      <XAxis dataKey="date" tick={AXIS_TICK} label={{
+                      <XAxis
+                        dataKey="date"
+                        tick={AXIS_TICK}
+                        label={{
                           value: "Date",
                           position: "insideBottom",
                           offset: -4,
                           style: { fontSize: 12, fill: "var(--foreground)" },
-                        }} minTickGap={40} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                      <YAxis width={64} tick={AXIS_TICK} tickFormatter={(v) => `${(v as number).toLocaleString()}`} label={{
+                        }}
+                        minTickGap={40}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
+                      <YAxis
+                        width={64}
+                        tick={AXIS_TICK}
+                        tickFormatter={(v) => `${(v as number).toLocaleString()}`}
+                        label={{
                           value: `Value (${currency})`,
                           angle: -90,
                           position: "insideLeft",
                           style: { fontSize: 12, fill: "var(--foreground)" },
-                        }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                        }}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
                       <Tooltip
                         contentStyle={{
                           background: "var(--card)",

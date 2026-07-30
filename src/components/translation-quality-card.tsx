@@ -169,7 +169,13 @@ export function TranslationQualityCard() {
                 <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid {...GRID_PROPS} />
                   <XAxis dataKey="day" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                  <YAxis width={64} domain={[0, 1]} tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <YAxis
+                    width={64}
+                    domain={[0, 1]}
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
                   <Tooltip
                     contentStyle={{
                       background: "var(--popover)",

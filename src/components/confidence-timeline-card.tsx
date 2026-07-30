@@ -151,8 +151,19 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={rows} margin={{ top: 10, right: 16, bottom: 8, left: 0 }}>
                   <CartesianGrid {...GRID_PROPS} />
-                  <XAxis dataKey="dateLabel" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
-                  <YAxis width={64} domain={[0, 100]} tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <XAxis
+                    dataKey="dateLabel"
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
+                  <YAxis
+                    width={64}
+                    domain={[0, 100]}
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
                   <Tooltip content={<TimelineTooltip />} />
                   <Legend wrapperStyle={LEGEND_STYLE} />
                   <Line
