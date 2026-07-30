@@ -31,8 +31,12 @@ export const Route = createFileRoute("/api/public/hooks/news-refresh")({
           // Body is optional; defaults are intentionally safe.
         }
 
-        const task = (async () => {
-          const today = new Date().toISOString().slice(0, 10);
+        // Do the work inline. The previous version returned 202 immediately
+        // and relied on waitUntil, but the Worker tears the isolate down as
+        // soon as the response is sent when no execution context is bound —
+        // so the cache was never written and the reel went stale.
+        const today = new Date().toISOString().slice(0, 10);
+        try {
           const { getNewsForDate } = await import("@/lib/news.server");
           const { ensureSentimentScored } = await import("@/lib/sentiment.server");
           const items = await getNewsForDate(today, max, { forceRefresh });
@@ -41,21 +45,25 @@ export const Route = createFileRoute("/api/public/hooks/news-refresh")({
           console.log(
             `news-refresh: completed for ${today} (${items.length} headlines, ${scoredCount} scored)`,
           );
-        })().catch((error) => {
-          console.error("news-refresh: background refresh failed", error);
-        });
-
-        const ctx = (globalThis as unknown as { __cfCtx?: { waitUntil?: (p: Promise<unknown>) => void } }).__cfCtx;
-        try {
-          ctx?.waitUntil?.(task);
-        } catch {
-          // In local/dev runtimes the promise continues on the event loop.
+          return new Response(
+            JSON.stringify({
+              success: true,
+              date: today,
+              headlines: items.length,
+              scored: scoredCount,
+              at: new Date().toISOString(),
+              max,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        } catch (error) {
+          console.error("news-refresh: refresh failed", error);
+          return new Response(
+            JSON.stringify({ success: false, date: today, error: String(error) }),
+            { status: 500, headers: { "Content-Type": "application/json" } },
+          );
         }
 
-        return new Response(
-          JSON.stringify({ success: true, started: true, at: new Date().toISOString(), max }),
-          { status: 202, headers: { "Content-Type": "application/json" } },
-        );
       },
     },
   },
