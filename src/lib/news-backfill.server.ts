@@ -321,16 +321,18 @@ export async function advanceNewsBackfill(opts?: {
   const throttleNote =
     throttled > 0 ? ` ${throttled} feed${throttled === 1 ? " was" : "s were"} throttled by GDELT — run it again to retry.` : "";
 
-
   return {
     job: final,
     inserted,
     domains_processed: processed,
     done: completed,
-    reason: completed
-      ? `Backfill complete across ${domains.length} newly added feed${domains.length === 1 ? "" : "s"}.`
-      : `Swept ${processed} feed${processed === 1 ? "" : "s"} this pass — more queued.`,
+    reason:
+      (completed
+        ? `Backfill complete across ${domains.length} newly added feed${domains.length === 1 ? "" : "s"}.`
+        : `Swept ${processed} feed${processed === 1 ? "" : "s"} this pass, ${inserted} headline${inserted === 1 ? "" : "s"} added — more queued.`) +
+      throttleNote,
   };
+
 }
 
 async function finishJob(id: string, status: string, error: string | null): Promise<NewsBackfillJob | null> {
