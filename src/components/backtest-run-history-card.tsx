@@ -1,3 +1,4 @@
+import { ChartFrame } from "@/components/chart-frame";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -544,7 +545,7 @@ export function BacktestRunHistoryCard({
                   </div>
                 </div>
                 <div className="mb-1 text-xs text-muted-foreground">Equity curve</div>
-                <div className="h-56 w-full">
+                <ChartFrame className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={mergedOverlay}
@@ -592,9 +593,9 @@ export function BacktestRunHistoryCard({
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartFrame>
                 <div className="mb-1 mt-4 text-xs text-muted-foreground">Drawdown curve</div>
-                <div className="h-48 w-full">
+                <ChartFrame className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={mergedOverlay}
@@ -643,7 +644,7 @@ export function BacktestRunHistoryCard({
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartFrame>
               </div>
             )}
 

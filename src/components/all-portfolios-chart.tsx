@@ -1,3 +1,4 @@
+import { ChartFrame } from "@/components/chart-frame";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -283,7 +284,7 @@ function ModeChart({
                 )}
               </div>
             </div>
-            <div className="h-[260px] w-full sm:h-[280px]">
+            <ChartFrame className="h-[260px] sm:h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={series}
@@ -383,7 +384,7 @@ function ModeChart({
                   ))}
                 </ComposedChart>
               </ResponsiveContainer>
-            </div>
+            </ChartFrame>
           </>
         )}
       </SectionCardBody>

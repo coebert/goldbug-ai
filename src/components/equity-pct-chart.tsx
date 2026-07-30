@@ -1,3 +1,4 @@
+import { ChartFrame } from "@/components/chart-frame";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -368,7 +369,7 @@ export function EquityPctChart({
             </span>
           </div>
         </div>
-        <div className="h-[160px] w-full landscape:h-[200px] md:h-[240px]">
+        <ChartFrame className="h-[160px] landscape:h-[200px] md:h-[240px]">
           {data.length < 2 ? (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
               {resolution === "hourly"
@@ -457,7 +458,7 @@ export function EquityPctChart({
               </ComposedChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </ChartFrame>
       </div>
     </div>
   );
