@@ -34,6 +34,7 @@ import { Explain } from "@/components/explain";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { lttb } from "@/lib/downsample";
+import { AXIS_LINE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/long-horizon/$id")({
   ssr: false,
@@ -435,7 +436,7 @@ function LongHorizonPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={360}>
                       <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                        <CartesianGrid {...GRID_PROPS} />
                         <XAxis
                           dataKey="date"
                           stroke="var(--muted-foreground)"
@@ -448,6 +449,8 @@ function LongHorizonPage() {
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
                         <YAxis
                           stroke="var(--muted-foreground)"
@@ -465,6 +468,8 @@ function LongHorizonPage() {
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
 
                         <ReferenceLine

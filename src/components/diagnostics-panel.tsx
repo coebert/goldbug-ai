@@ -18,7 +18,7 @@ import {
 import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge, Globe2 } from "lucide-react";
 import { eventColor, type EventCategory } from "@/lib/global-events";
 import { Explain } from "@/components/explain";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 type Props = { portfolioId: string };
 
@@ -130,7 +130,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
             <div className="h-48 w-full">
               <ResponsiveContainer>
                 <LineChart data={rolling}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                  <CartesianGrid {...GRID_PROPS} />
                   <XAxis
                     dataKey="index"
                     tick={AXIS_TICK}
@@ -141,6 +141,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                       fontSize: 12,
                       fill: "var(--foreground)",
                     }}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
                   <YAxis
                     tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
@@ -156,6 +158,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                       fontSize: 12,
                       fill: "var(--foreground)",
                     }}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
 
                   <ReferenceLine y={0.5} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
@@ -196,7 +200,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
           <div className="h-56 w-full">
             <ResponsiveContainer>
               <BarChart data={calibration}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                <CartesianGrid {...GRID_PROPS} />
                 <XAxis
                   dataKey="bucket"
                   tick={AXIS_TICK}
@@ -207,6 +211,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     fontSize: 12,
                     fill: "var(--foreground)",
                   }}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
                 />
                 <YAxis
                   yAxisId="left"
@@ -223,6 +229,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     fontSize: 12,
                     fill: "var(--foreground)",
                   }}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
                 />
                 <YAxis
                   yAxisId="right"
@@ -239,6 +247,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     fontSize: 12,
                     fill: "var(--foreground)",
                   }}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
                 />
 
                 <Tooltip

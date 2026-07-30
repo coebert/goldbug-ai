@@ -23,7 +23,7 @@ import {
   type EquitySnapshotLite,
 } from "@/lib/daily-equity-changes";
 import { formatMoney } from "@/lib/format-money";
-import { AXIS_TICK, CHART_ROLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, TICK_LINE } from "@/lib/chart-palette";
 
 type Range = "7d" | "30d" | "90d" | "ytd" | "all";
 
@@ -208,11 +208,15 @@ export function DailyEquityChangesCard({
                     tick={AXIS_TICK}
                     interval="preserveStartEnd"
                     minTickGap={16}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
                   <YAxis
                     tick={AXIS_TICK}
                     tickFormatter={(v: number) => `${v.toFixed(1)}%`}
                     width={64}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
                   <ReferenceLine y={0} stroke="var(--foreground)" strokeOpacity={0.4} />
                   <Tooltip

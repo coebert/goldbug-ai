@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
 import { buildConfidenceTimeline, type ConfidencePoint } from "@/lib/confidence-timeline";
 
 type Decision = { id: string; run_date: string; raw: unknown };
@@ -150,9 +150,20 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
             <div className="h-56 w-full sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={rows} margin={{ top: 10, right: 16, bottom: 8, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="dateLabel" tick={AXIS_TICK} />
-                  <YAxis width={64} domain={[0, 100]} tick={AXIS_TICK} />
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis
+                    dataKey="dateLabel"
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
+                  <YAxis
+                    width={64}
+                    domain={[0, 100]}
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                  />
                   <Tooltip content={<TimelineTooltip />} />
                   <Legend wrapperStyle={LEGEND_STYLE} />
                   <Line

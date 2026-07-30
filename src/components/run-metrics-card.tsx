@@ -27,7 +27,7 @@ import {
 } from "recharts";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -163,9 +163,15 @@ export function RunMetricsCard() {
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
-                    <YAxis width={64} tick={AXIS_TICK} />
+                    <CartesianGrid {...GRID_PROPS} />
+                    <XAxis
+                      dataKey="label"
+                      tick={AXIS_TICK}
+                      minTickGap={24}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
+                    <YAxis width={64} tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
                     <Line
@@ -187,9 +193,21 @@ export function RunMetricsCard() {
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
-                    <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
+                    <CartesianGrid {...GRID_PROPS} />
+                    <XAxis
+                      dataKey="label"
+                      tick={AXIS_TICK}
+                      minTickGap={24}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
+                    <YAxis
+                      width={64}
+                      tick={AXIS_TICK}
+                      allowDecimals={false}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="ok" name="success" stackId="p" fill="hsl(142 71% 45%)" />
@@ -207,9 +225,21 @@ export function RunMetricsCard() {
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
-                    <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
+                    <CartesianGrid {...GRID_PROPS} />
+                    <XAxis
+                      dataKey="label"
+                      tick={AXIS_TICK}
+                      minTickGap={24}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
+                    <YAxis
+                      width={64}
+                      tick={AXIS_TICK}
+                      allowDecimals={false}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                    />
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />

@@ -25,7 +25,14 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
-import { AXIS_TICK, CHART_ROLE, LEGEND_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/portfolio/$id/attribution")({
   head: () => ({
@@ -158,8 +165,14 @@ function AttributionPage() {
                         win: r.win_rate == null ? null : r.win_rate * 100,
                       }))}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="signal" tick={AXIS_TICK} stroke="var(--foreground)" />
+                      <CartesianGrid {...GRID_PROPS} />
+                      <XAxis
+                        dataKey="signal"
+                        tick={AXIS_TICK}
+                        stroke="var(--foreground)"
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
                       <YAxis
                         width={64}
                         yAxisId="left"
@@ -172,6 +185,8 @@ function AttributionPage() {
                           fill: "var(--foreground)",
                           style: { fontSize: 12 },
                         }}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
                       />
                       <YAxis
                         width={64}
@@ -187,6 +202,8 @@ function AttributionPage() {
                           fill: "var(--foreground)",
                           style: { fontSize: 12 },
                         }}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
                       />
                       <Tooltip
                         contentStyle={{
@@ -294,7 +311,7 @@ function AttributionPage() {
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.cumulative_alpha}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <CartesianGrid {...GRID_PROPS} />
                         <XAxis
                           dataKey="trade_date"
                           stroke="var(--muted-foreground)"
@@ -305,6 +322,8 @@ function AttributionPage() {
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
                         <YAxis
                           width={64}
@@ -316,6 +335,8 @@ function AttributionPage() {
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
                         <Tooltip
                           contentStyle={{
@@ -381,7 +402,7 @@ function AttributionPage() {
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={data.cumulative_by_signal}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <CartesianGrid {...GRID_PROPS} />
                         <XAxis
                           dataKey="trade_date"
                           stroke="var(--muted-foreground)"
@@ -392,6 +413,8 @@ function AttributionPage() {
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
                         <YAxis
                           width={64}
@@ -403,6 +426,8 @@ function AttributionPage() {
                             fill: "var(--muted-foreground)",
                             style: { fontSize: 12 },
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
                         <Tooltip
                           contentStyle={{
@@ -448,11 +473,13 @@ function AttributionPage() {
                     <div className="h-60">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data.news_buckets}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                          <CartesianGrid {...GRID_PROPS} />
                           <XAxis
                             dataKey="bucket"
                             stroke="var(--muted-foreground)"
                             tick={AXIS_TICK}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
                           />
                           <YAxis
                             width={64}
@@ -464,6 +491,8 @@ function AttributionPage() {
                               fill: "var(--muted-foreground)",
                               style: { fontSize: 12 },
                             }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
                           />
                           <Tooltip
                             contentStyle={{
@@ -488,7 +517,7 @@ function AttributionPage() {
                     <div className="h-56 mt-2">
                       <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                          <CartesianGrid {...GRID_PROPS} />
                           <XAxis
                             type="number"
                             dataKey="news_score"
@@ -502,6 +531,8 @@ function AttributionPage() {
                               fill: "var(--muted-foreground)",
                               style: { fontSize: 12 },
                             }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
                           />
                           <YAxis
                             width={64}
@@ -516,6 +547,8 @@ function AttributionPage() {
                               fill: "var(--muted-foreground)",
                               style: { fontSize: 12 },
                             }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
                           />
                           <Tooltip
                             contentStyle={{

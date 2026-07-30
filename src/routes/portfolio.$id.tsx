@@ -196,7 +196,7 @@ import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 type PortfolioTab =
   | "overview"
@@ -1570,11 +1570,7 @@ function PortfolioPage() {
                                 />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid
-                              stroke={chartTheme.axis}
-                              strokeOpacity={chartTheme.gridOpacity}
-                              strokeDasharray="3 3"
-                            />
+                            <CartesianGrid {...GRID_PROPS} />
                             <XAxis
                               dataKey="date"
                               tick={AXIS_TICK}
@@ -1592,6 +1588,8 @@ function PortfolioPage() {
                                       fontSize: 12,
                                     }
                               }
+                              axisLine={AXIS_LINE}
+                              tickLine={TICK_LINE}
                             />
                             <YAxis
                               domain={["auto", "auto"]}
@@ -1618,6 +1616,8 @@ function PortfolioPage() {
                                       fontSize: 12,
                                     }
                               }
+                              axisLine={AXIS_LINE}
+                              tickLine={TICK_LINE}
                             />
 
                             <Tooltip

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 import {
   CartesianGrid,
   Line,
@@ -73,11 +73,7 @@ export function EquityPctChart({
         <div className="h-[160px] w-full landscape:h-[200px] md:h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
-              <CartesianGrid
-                stroke="var(--foreground)"
-                strokeOpacity={0.12}
-                strokeDasharray="3 3"
-              />
+              <CartesianGrid {...GRID_PROPS} />
               <XAxis
                 dataKey="date"
                 tick={AXIS_TICK}
@@ -85,6 +81,8 @@ export function EquityPctChart({
                 strokeOpacity={0.4}
                 minTickGap={40}
                 tickFormatter={(v) => shortDate(String(v))}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
               />
               <YAxis
                 width={64}
@@ -94,6 +92,8 @@ export function EquityPctChart({
                 stroke="currentColor"
                 strokeOpacity={0.4}
                 tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
               />
               <ReferenceLine
                 y={0}

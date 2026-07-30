@@ -25,7 +25,7 @@ import {
   type ScenarioReport,
 } from "@/lib/scenario-report";
 import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
-import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
 
 const PALETTE = [
   "hsl(217 91% 60%)",
@@ -97,12 +97,20 @@ export function ScenarioReportCard(props: { title?: string; input: BuildScenario
           <div className="h-72 w-full">
             <ResponsiveContainer>
               <LineChart data={equityChartData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
+                <CartesianGrid {...GRID_PROPS} />
+                <XAxis
+                  dataKey="date"
+                  tick={AXIS_TICK}
+                  minTickGap={24}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
                 <YAxis
                   width={64}
                   tick={AXIS_TICK}
                   tickFormatter={(v) => Number(v).toLocaleString()}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
                 />
                 <Tooltip
                   formatter={(v: number) => fmtMoney(v)}
@@ -134,13 +142,21 @@ export function ScenarioReportCard(props: { title?: string; input: BuildScenario
           <div className="h-56 w-full">
             <ResponsiveContainer>
               <LineChart data={drawdownChartData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
+                <CartesianGrid {...GRID_PROPS} />
+                <XAxis
+                  dataKey="date"
+                  tick={AXIS_TICK}
+                  minTickGap={24}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
+                />
                 <YAxis
                   width={64}
                   tick={AXIS_TICK}
                   tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
                   domain={["auto", 0]}
+                  axisLine={AXIS_LINE}
+                  tickLine={TICK_LINE}
                 />
                 <Tooltip
                   formatter={(v: number) => `${v.toFixed(2)}%`}
@@ -255,13 +271,21 @@ function ExecutionQualitySection(props: {
         <div className="h-56 w-full">
           <ResponsiveContainer>
             <LineChart data={fillData}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={16} />
+              <CartesianGrid {...GRID_PROPS} />
+              <XAxis
+                dataKey="label"
+                tick={AXIS_TICK}
+                minTickGap={16}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+              />
               <YAxis
                 width={64}
                 tick={AXIS_TICK}
                 domain={[0, 1]}
                 tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
               />
               <Tooltip
                 formatter={(v: number) => `${(v * 100).toFixed(1)}%`}
@@ -301,9 +325,21 @@ function ExecutionQualitySection(props: {
         <div className="h-56 w-full">
           <ResponsiveContainer>
             <LineChart data={liqSlipData}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={16} />
-              <YAxis width={64} tick={AXIS_TICK} tickFormatter={(v) => `${Number(v).toFixed(0)}`} />
+              <CartesianGrid {...GRID_PROPS} />
+              <XAxis
+                dataKey="label"
+                tick={AXIS_TICK}
+                minTickGap={16}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+              />
+              <YAxis
+                width={64}
+                tick={AXIS_TICK}
+                tickFormatter={(v) => `${Number(v).toFixed(0)}`}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+              />
               <Tooltip
                 formatter={(v: number) => `${v.toFixed(2)} bps`}
                 labelFormatter={(l) => `Decision: ${l}`}

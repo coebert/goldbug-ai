@@ -13,7 +13,15 @@ import {
   YAxis,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
-import { CHART_ROLE, CHART_SEQUENCE, AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  CHART_SEQUENCE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 import type { PerTradeFeeRow } from "@/lib/fee-breakdown";
 
 /** Builds a cumulative-fee-drag-over-time series and a per-asset stacked
@@ -148,8 +156,14 @@ export function FeeDragCharts({
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={daily} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
+              <CartesianGrid {...GRID_PROPS} />
+              <XAxis
+                dataKey="date"
+                tick={AXIS_TICK}
+                minTickGap={40}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+              />
               <YAxis
                 width={64}
                 tick={AXIS_TICK}
@@ -160,6 +174,8 @@ export function FeeDragCharts({
                       : v.toFixed(0)
                     : `${v.toFixed(0)}bps`
                 }
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
               />
               <Tooltip
                 contentStyle={{
@@ -232,15 +248,24 @@ export function FeeDragCharts({
               layout="vertical"
               margin={{ top: 4, right: 24, bottom: 4, left: 8 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <CartesianGrid {...GRID_PROPS} />
               <XAxis
                 type="number"
                 tick={AXIS_TICK}
                 tickFormatter={(v: number) =>
                   v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0)
                 }
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
               />
-              <YAxis type="category" dataKey="symbol" tick={AXIS_TICK} width={80} />
+              <YAxis
+                type="category"
+                dataKey="symbol"
+                tick={AXIS_TICK}
+                width={80}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+              />
               <Tooltip
                 contentStyle={{
                   background: "var(--card)",

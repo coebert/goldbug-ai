@@ -39,6 +39,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Explain } from "@/components/explain";
+import { AXIS_LINE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 import {
   Sheet,
   SheetContent,
@@ -398,7 +399,7 @@ function ComparePage() {
                     </div>
                     <ResponsiveContainer width="100%" height={320}>
                       <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                        <CartesianGrid {...GRID_PROPS} />
                         <XAxis
                           dataKey="date"
                           stroke="var(--muted-foreground)"
@@ -410,6 +411,8 @@ function ComparePage() {
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
                         <YAxis
                           stroke="var(--muted-foreground)"
@@ -427,6 +430,8 @@ function ComparePage() {
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
                           }}
+                          axisLine={AXIS_LINE}
+                          tickLine={TICK_LINE}
                         />
 
                         <ReferenceLine
@@ -496,11 +501,7 @@ function ComparePage() {
                       </div>
                       <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={drawdownData}>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="var(--border)"
-                            opacity={0.4}
-                          />
+                          <CartesianGrid {...GRID_PROPS} />
                           <XAxis
                             dataKey="date"
                             stroke="var(--muted-foreground)"
@@ -512,6 +513,8 @@ function ComparePage() {
                               fill: "var(--muted-foreground)",
                               fontSize: 12,
                             }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
                           />
                           <YAxis
                             stroke="var(--muted-foreground)"
@@ -527,6 +530,8 @@ function ComparePage() {
                               fill: "var(--muted-foreground)",
                               fontSize: 12,
                             }}
+                            axisLine={AXIS_LINE}
+                            tickLine={TICK_LINE}
                           />
 
                           <ReferenceLine

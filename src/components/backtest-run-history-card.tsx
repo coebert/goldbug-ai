@@ -22,7 +22,14 @@ import {
   YAxis,
 } from "recharts";
 import type { BacktestMetrics } from "@/lib/backtest-metrics";
-import { AXIS_TICK, LEGEND_STYLE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 
 export type BacktestEquityPoint = { snapshot_date: string; total_value: number };
 
@@ -541,7 +548,7 @@ export function BacktestRunHistoryCard({
                       data={mergedOverlay}
                       margin={{ top: 8, right: 16, bottom: 4, left: 4 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <CartesianGrid {...GRID_PROPS} />
                       <XAxis
                         dataKey="t"
                         tick={AXIS_TICK}
@@ -552,11 +559,15 @@ export function BacktestRunHistoryCard({
                           fontSize: 12,
                           fill: "var(--foreground)",
                         }}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
                       />
                       <YAxis
                         tick={AXIS_TICK}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                         width={64}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
                       />
                       <Tooltip
                         formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
@@ -587,7 +598,7 @@ export function BacktestRunHistoryCard({
                       data={mergedOverlay}
                       margin={{ top: 8, right: 16, bottom: 4, left: 4 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <CartesianGrid {...GRID_PROPS} />
                       <XAxis
                         dataKey="t"
                         tick={AXIS_TICK}
@@ -598,12 +609,16 @@ export function BacktestRunHistoryCard({
                           fontSize: 12,
                           fill: "var(--foreground)",
                         }}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
                       />
                       <YAxis
                         tick={AXIS_TICK}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                         width={64}
                         domain={["auto", 0]}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
                       />
                       <Tooltip
                         formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}

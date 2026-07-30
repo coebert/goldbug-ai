@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, RefreshCw } from "lucide-react";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 import {
   Area,
   CartesianGrid,
@@ -287,7 +287,7 @@ function ModeChart({
                       <stop offset="100%" stopColor={color} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke={GRID_COLOR} strokeOpacity={0.18} strokeDasharray="3 3" />
+                  <CartesianGrid {...GRID_PROPS} />
                   <XAxis
                     dataKey="date"
                     tick={AXIS_TICK}
@@ -295,6 +295,8 @@ function ModeChart({
                     strokeOpacity={0.6}
                     minTickGap={isMobile ? 56 : 40}
                     tickFormatter={(v) => (isMobile ? shortDate(String(v)) : String(v))}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
                   <YAxis
                     width={isMobile ? 56 : 64}
@@ -306,6 +308,8 @@ function ModeChart({
                     }
                     domain={yDomain}
                     allowDataOverflow
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
                   <Tooltip
                     cursor={{ stroke: AXIS_COLOR, strokeOpacity: 0.4, strokeDasharray: "3 3" }}

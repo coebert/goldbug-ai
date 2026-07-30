@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 type Props = { portfolioId: string };
 
@@ -171,9 +171,21 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                       data={chartData}
                       margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                      <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                      <YAxis tick={AXIS_TICK} tickFormatter={(v) => fmtGbp(Number(v))} width={72} />
+                      <CartesianGrid {...GRID_PROPS} />
+                      <XAxis
+                        dataKey="date"
+                        tick={AXIS_TICK}
+                        minTickGap={40}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
+                      <YAxis
+                        tick={AXIS_TICK}
+                        tickFormatter={(v) => fmtGbp(Number(v))}
+                        width={72}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
                       <Tooltip
                         formatter={(v: number | string, name) => [
                           fmtGbp(Number(v)),
@@ -208,13 +220,21 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                 <div className="h-40">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                      <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
+                      <CartesianGrid {...GRID_PROPS} />
+                      <XAxis
+                        dataKey="date"
+                        tick={AXIS_TICK}
+                        minTickGap={40}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
+                      />
                       <YAxis
                         tick={AXIS_TICK}
                         tickFormatter={(v) => `${v}%`}
                         width={64}
                         domain={["dataMin", 0]}
+                        axisLine={AXIS_LINE}
+                        tickLine={TICK_LINE}
                       />
                       <Tooltip formatter={(v: number | string) => [`${v}%`, "Drawdown"]} />
                       <Area
