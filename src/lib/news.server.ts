@@ -410,16 +410,21 @@ export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]>
     if (!t) return it;
     const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
     if (isEnglish || !t.translation) return it;
+    // Label consistency: if the model translated but did not name the
+    // language, fall back to the deterministic detector so the same headline
+    // is always presented with the same "Translated from X" label.
+    const detected = detectLanguageName(it.headline);
     return {
       ...it,
       headline: t.translation,
       original_headline: it.headline,
-      original_language: t.lang,
+      original_language: t.lang ?? detected,
       translation_confidence: t.confidence,
     };
 
   });
 }
+
 
 // Repair pass: translate rows already cached with a null original_language
 // but a non-ASCII headline. Prior ingests (before translation shipped, or
