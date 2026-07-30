@@ -5,11 +5,19 @@ import { humanFearLabel, labelFor, type FearLabel } from "./fear-index";
 export type FearIndexSizingImpact = {
   symbol: string;
   side: "buy" | "sell";
+  /** Notional actually spent, after the fear multiplier was applied. */
   value: number;
+  /** Notional that would have been spent with no fear adjustment. */
+  unadjustedValue: number | null;
+  /** Signed % change vs the unadjusted size (e.g. -40 = trimmed 40%). */
+  deltaPct: number | null;
+  /** The fear score stamped on this order's sizing note. */
+  fearScore: number | null;
   /** e.g. "fear72×0.60" pulled out of the order's sizing notes. */
   note: string;
   multiplier: number | null;
 };
+
 
 export type FearIndexSnapshot = {
   score: number | null;
@@ -36,12 +44,19 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 const FEAR_NOTE = /fear(\d+(?:\.\d+)?)\s*×\s*(\d+(?:\.\d+)?)/i;
 
 /** Extract the "fearNN×M.MM" fragment a run stamped onto an order's reason. */
-export function parseFearNote(reason: unknown): { note: string; multiplier: number | null } | null {
+export function parseFearNote(
+  reason: unknown,
+): { note: string; multiplier: number | null; score: number | null } | null {
   if (typeof reason !== "string") return null;
   const m = reason.match(FEAR_NOTE);
   if (!m) return null;
   const mult = Number(m[2]);
-  return { note: m[0], multiplier: Number.isFinite(mult) ? mult : null };
+  const sc = Number(m[1]);
+  return {
+    note: m[0],
+    multiplier: Number.isFinite(mult) ? mult : null,
+    score: Number.isFinite(sc) ? sc : null,
+  };
 }
 
 export function buildFearIndexSnapshot(rows: DecisionRow[]): FearIndexSnapshot {
@@ -72,12 +87,18 @@ export function buildFearIndexSnapshot(rows: DecisionRow[]): FearIndexSnapshot {
         }
         const parsed = parseFearNote(rec.reason);
         if (!parsed) continue;
+        const value = num(rec.value) ?? 0;
+        const mult = parsed.multiplier;
+        const unadjusted = mult != null && mult > 0 ? value / mult : null;
         impacts.push({
           symbol,
           side: rec.side === "sell" ? "sell" : "buy",
-          value: num(rec.value) ?? 0,
+          value,
+          unadjustedValue: unadjusted,
+          deltaPct: mult != null ? (mult - 1) * 100 : null,
+          fearScore: parsed.score,
           note: parsed.note,
-          multiplier: parsed.multiplier,
+          multiplier: mult,
         });
       }
       const label = (typeof fear?.label === "string" ? (fear.label as FearLabel) : labelFor(score));
@@ -89,7 +110,12 @@ export function buildFearIndexSnapshot(rows: DecisionRow[]): FearIndexSnapshot {
         reason: typeof fear?.reason === "string" ? fear.reason : null,
         runDate,
         blockedBuys,
-        impacts: impacts.sort((a, b) => b.value - a.value).slice(0, 8),
+        impacts: impacts
+          .sort(
+            (a, b) =>
+              Math.abs(b.deltaPct ?? 0) - Math.abs(a.deltaPct ?? 0) || b.value - a.value,
+          )
+          .slice(0, 12),
         history: [],
       };
     }
