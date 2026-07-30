@@ -112,11 +112,18 @@ export function parseRssFeed(
   return out;
 }
 
+// The Worker runtime keeps only a handful of outbound connections open at
+// once, so firing ~70 feeds simultaneously would leave most of them queued
+// until their 5s abort timer fires. A bounded worker pool plus a wall-clock
+// deadline keeps the whole fan-out predictable regardless of catalogue size.
+const RSS_CONCURRENCY = 8;
+const RSS_FANOUT_BUDGET_MS = 45_000;
+
 /**
- * Fetch every configured RSS source in parallel and return a merged list.
- * Each feed is bounded (`perFeedMax`), timeouts are aggressive (~5s), and
- * failing feeds are silently skipped so the reel is only as slow as the
- * slowest surviving feed.
+ * Fetch every configured RSS source (bounded concurrency) and return a merged
+ * list. Each feed is bounded (`perFeedMax`), timeouts are aggressive (~5s),
+ * and failing feeds are silently skipped so the reel is only as slow as the
+ * slowest surviving batch.
  */
 export async function fetchRssForDate(
   dateISO: string,
@@ -129,7 +136,12 @@ export async function fetchRssForDate(
     Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
   };
 
-  const jobs = RSS_SOURCES.map(async (src) => {
+  const deadlineAt = Date.now() + RSS_FANOUT_BUDGET_MS;
+  const out: Array<NewsItem & { source_weight: number }> = [];
+  let cursor = 0;
+  let skipped = 0;
+
+  const fetchOne = async (src: (typeof RSS_SOURCES)[number]) => {
     try {
       const res = await runWithBreaker(`rss:${src.id}`, () =>
         fetch(src.url, { headers, signal: AbortSignal.timeout(5_000) }).then(async (r) => {
@@ -142,18 +154,33 @@ export async function fetchRssForDate(
       );
       if (!res.ok) {
         try { await res.body?.cancel(); } catch { /* noop */ }
-        return [] as Array<NewsItem & { source_weight: number }>;
+        return;
       }
       const xml = await res.text();
       const items = parseRssFeed(xml, src.label, dateISO, perFeedMax);
-      return items.map((it) => ({ ...it, source_weight: src.weight }));
+      for (const it of items) out.push({ ...it, source_weight: src.weight });
     } catch {
       // Provider unavailable / breaker open / timeout — silently skip so
       // the surviving feeds still populate the reel.
-      return [] as Array<NewsItem & { source_weight: number }>;
     }
-  });
+  };
 
-  const settled = await Promise.all(jobs);
-  return settled.flat();
+  const worker = async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= RSS_SOURCES.length) return;
+      if (Date.now() >= deadlineAt) { skipped++; continue; }
+      await fetchOne(RSS_SOURCES[i]);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(RSS_CONCURRENCY, RSS_SOURCES.length) }, () => worker()),
+  );
+
+  if (skipped > 0) {
+    console.warn(`news: rss fan-out budget exhausted — skipped ${skipped}/${RSS_SOURCES.length} feeds`);
+  }
+  return out;
 }
+
