@@ -27,7 +27,14 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 
 export const Route = createFileRoute("/portfolio/$id/report")({
@@ -294,10 +301,8 @@ function ReportPage() {
                       />
                       <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
                       <ReferenceLine
+                        {...REFERENCE_LINE}
                         y={data.portfolio.starting_cash}
-                        stroke="var(--foreground)"
-                        strokeOpacity={0.5}
-                        strokeDasharray="4 4"
                         label={{ value: "Start", fill: "var(--foreground)", fontSize: 12 }}
                       />
                       <Line

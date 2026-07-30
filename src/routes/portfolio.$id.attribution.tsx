@@ -28,9 +28,12 @@ import {
 import {
   AXIS_LINE,
   AXIS_TICK,
+  CHART_NEUTRAL_SERIES,
   CHART_ROLE,
   GRID_PROPS,
   LEGEND_STYLE,
+  OKABE_ITO,
+  REFERENCE_LINE,
   TICK_LINE,
 } from "@/lib/chart-palette";
 
@@ -57,10 +60,10 @@ export const Route = createFileRoute("/portfolio/$id/attribution")({
 });
 
 const SIGNAL_COLORS: Record<string, string> = {
-  sma_trend: "#06b6d4",
+  sma_trend: OKABE_ITO.skyBlue,
   rsi: "#a855f7",
   price_change: "#f59e0b",
-  news_sentiment: "#22c55e",
+  news_sentiment: CHART_ROLE.positive,
   volatility: "#ef4444",
 };
 const SIGNALS = ["sma_trend", "rsi", "price_change", "news_sentiment", "volatility"] as const;
@@ -214,12 +217,7 @@ function AttributionPage() {
                         }}
                       />
                       <Legend wrapperStyle={{ color: "var(--foreground)" }} />
-                      <ReferenceLine
-                        yAxisId="left"
-                        y={0}
-                        stroke="var(--foreground)"
-                        strokeOpacity={0.5}
-                      />
+                      <ReferenceLine {...REFERENCE_LINE} yAxisId="left" y={0} />
                       <Bar yAxisId="left" dataKey="contribution" name="Signed contribution (%)">
                         {data.overall.rows.map((r) => (
                           <Cell
@@ -246,7 +244,7 @@ function AttributionPage() {
                         yAxisId="right"
                         dataKey="win"
                         name="Win rate (%)"
-                        fill="#64748b"
+                        fill={CHART_NEUTRAL_SERIES}
                         opacity={0.6}
                       />
                     </BarChart>
@@ -347,7 +345,7 @@ function AttributionPage() {
                           }}
                         />
                         <Legend wrapperStyle={LEGEND_STYLE} />
-                        <ReferenceLine y={0} stroke="var(--muted-foreground)" />
+                        <ReferenceLine {...REFERENCE_LINE} y={0} />
                         <Line
                           type="monotone"
                           dataKey="strategy"
@@ -438,7 +436,7 @@ function AttributionPage() {
                           }}
                         />
                         <Legend wrapperStyle={LEGEND_STYLE} />
-                        <ReferenceLine y={0} stroke="var(--muted-foreground)" />
+                        <ReferenceLine {...REFERENCE_LINE} y={0} />
                         {SIGNALS.map((k) => (
                           <Line
                             key={k}
@@ -502,8 +500,12 @@ function AttributionPage() {
                               color: "var(--popover-foreground)",
                             }}
                           />
-                          <ReferenceLine y={0} stroke="var(--muted-foreground)" />
-                          <Bar dataKey="avg_return_pct" name="Avg return (%)" fill="#22c55e" />
+                          <ReferenceLine {...REFERENCE_LINE} y={0} />
+                          <Bar
+                            dataKey="avg_return_pct"
+                            name="Avg return (%)"
+                            fill={CHART_ROLE.positive}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -558,7 +560,7 @@ function AttributionPage() {
                               color: "var(--popover-foreground)",
                             }}
                           />
-                          <ReferenceLine y={0} stroke="var(--muted-foreground)" />
+                          <ReferenceLine {...REFERENCE_LINE} y={0} />
                           <Scatter
                             data={data.trades
                               .filter((t) => t.forward_return_pct != null && t.news_score != null)
@@ -566,7 +568,7 @@ function AttributionPage() {
                                 news_score: t.news_score,
                                 forward_return_pct: t.forward_return_pct,
                               }))}
-                            fill="#06b6d4"
+                            fill={OKABE_ITO.skyBlue}
                           />
                         </ScatterChart>
                       </ResponsiveContainer>

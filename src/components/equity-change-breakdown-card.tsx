@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PieChart as PieChartIcon } from "lucide-react";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_TICK, OKABE_ITO, REFERENCE_LINE } from "@/lib/chart-palette";
 import {
   computeEquityChangeBreakdown,
   type DepositLike,
@@ -69,10 +69,10 @@ function formatPct(v: number) {
 // a WCAG AA (>=3:1) non-text contrast ratio against both the light and
 // dark app surfaces (verified against --background = white / near-black).
 const COLORS: Record<string, string> = {
-  deposits: "#0072B2", // blue — money in
-  withdrawals: "#E69F00", // orange — money out
-  tradingPnl: "#009E73", // bluish green — trading performance
-  feesDivInterest: "#CC79A7", // reddish purple — inferred fees/divs/interest
+  deposits: OKABE_ITO.blue, // blue — money in
+  withdrawals: OKABE_ITO.orange, // orange — money out
+  tradingPnl: OKABE_ITO.bluishGreen, // bluish green — trading performance
+  feesDivInterest: OKABE_ITO.reddishPurple, // reddish purple — inferred fees/divs/interest
 };
 
 const SHORT_LABELS: Record<string, string> = {
@@ -264,7 +264,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   Math.max(0, max) * 1.25 || 1,
                 ]}
               />
-              <ReferenceLine y={0} stroke="var(--border)" />
+              <ReferenceLine {...REFERENCE_LINE} y={0} />
               <Tooltip
                 cursor={{ fill: "color-mix(in oklab, var(--muted) 40%, transparent)" }}
                 content={({ active, payload }) => {

@@ -20,6 +20,7 @@ import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 import {
   AXIS_LINE,
   AXIS_TICK,
+  CHART_NEUTRAL_SERIES,
   CHART_ROLE,
   CHART_SEQUENCE,
   GRID_PROPS,
@@ -36,7 +37,7 @@ function colorFor(_symbol: string, index: number): string {
 }
 
 // Neutral cash band — kept low-chroma so per-symbol hues stand out.
-const CASH_COLOR = "hsl(220 9% 46%)";
+const CASH_COLOR = CHART_NEUTRAL_SERIES;
 const EQUITY_COLOR = CHART_ROLE.deposits; // blue reads as the primary series
 const BUY_COLOR = CHART_ROLE.positive;
 const SELL_COLOR = CHART_ROLE.negative;

@@ -39,7 +39,14 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Explain } from "@/components/explain";
-import { AXIS_LINE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  CHART_NEUTRAL_SERIES,
+  CHART_SEQUENCE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 import {
   Sheet,
   SheetContent,
@@ -63,7 +70,7 @@ export const Route = createFileRoute("/compare")({
   component: ComparePage,
 });
 
-const COLORS = ["#22d3ee", "#a78bfa", "#f472b6", "#facc15", "#4ade80", "#fb923c"];
+const COLORS = CHART_SEQUENCE;
 
 type ComparisonResult = Awaited<ReturnType<typeof getComparison>>["results"][number];
 
@@ -434,11 +441,7 @@ function ComparePage() {
                           tickLine={TICK_LINE}
                         />
 
-                        <ReferenceLine
-                          y={0}
-                          stroke="var(--muted-foreground)"
-                          strokeDasharray="3 3"
-                        />
+                        <ReferenceLine {...REFERENCE_LINE} y={0} />
                         <Tooltip
                           cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
@@ -534,11 +537,7 @@ function ComparePage() {
                             tickLine={TICK_LINE}
                           />
 
-                          <ReferenceLine
-                            y={0}
-                            stroke="var(--muted-foreground)"
-                            strokeDasharray="3 3"
-                          />
+                          <ReferenceLine {...REFERENCE_LINE} y={0} />
                           <Tooltip
                             cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }}
                             contentStyle={{
@@ -1008,7 +1007,7 @@ function DivergenceNarrativesCard({
                     >
                       <span
                         className="inline-block h-2 w-2 rounded-full"
-                        style={{ background: colors[names.indexOf(p.name)] ?? "#888" }}
+                        style={{ background: colors[names.indexOf(p.name)] ?? CHART_NEUTRAL_SERIES }}
                       />
                       <span className="font-medium">{p.name}</span>
                       <span className="uppercase opacity-80">{p.action}</span>

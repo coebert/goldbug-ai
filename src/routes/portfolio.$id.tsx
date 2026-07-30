@@ -196,7 +196,16 @@ import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_LINE_STROKE,
+  AXIS_TICK,
+  CHART_NEUTRAL_SERIES,
+  GRID_PROPS,
+  OKABE_ITO,
+  REFERENCE_LINE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 type PortfolioTab =
   | "overview"
@@ -427,11 +436,11 @@ function PortfolioPage() {
     if (chartContrast === "cb") {
       // Okabe–Ito palette: distinguishable across deuteranopia, protanopia, tritanopia.
       return {
-        equity: "#56B4E9",
+        equity: OKABE_ITO.skyBlue,
         equityFillTop: 0.5,
         equityFillBottom: 0.05,
-        benchmark: "#E69F00",
-        drawdown: "#D55E00",
+        benchmark: OKABE_ITO.orange,
+        drawdown: OKABE_ITO.vermillion,
         peak: "#E8E8E8",
         gridOpacity: 0.55,
         axis: "#CFCFCF",
@@ -446,9 +455,9 @@ function PortfolioPage() {
       equityFillBottom: 0,
       benchmark: "#f59e0b",
       drawdown: "var(--destructive)",
-      peak: "var(--muted-foreground)",
+      peak: CHART_NEUTRAL_SERIES,
       gridOpacity: 0.35,
-      axis: "var(--border)",
+      axis: AXIS_LINE_STROKE,
       axisText: "var(--foreground)",
       strokeWidth: 2.5,
       surface: "transparent",
@@ -1732,9 +1741,8 @@ function PortfolioPage() {
                               }}
                             />
                             <ReferenceLine
+                              {...REFERENCE_LINE}
                               y={compareMode === "pct" ? 0 : startingCash}
-                              stroke={chartTheme.axis}
-                              strokeDasharray="3 3"
                               label={{
                                 value: "start",
                                 fill: chartTheme.axisText,

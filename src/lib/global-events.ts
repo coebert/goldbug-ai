@@ -48,7 +48,7 @@ export const GLOBAL_EVENTS: GlobalEvent[] = [
   { id: "tariffs-25", label: "Tariff / trade shock", short: "TAR", start: "2025-04-02", end: "2025-04-30", category: "policy", severity: 2, note: "Broad tariff announcements roil global equities." },
 ];
 
-const CATEGORY_COLORS: Record<EventCategory, string> = {
+export const CATEGORY_COLORS: Record<EventCategory, string> = {
   crisis: "hsl(0 84% 60%)",
   recession: "hsl(24 90% 55%)",
   policy: "hsl(210 80% 60%)",

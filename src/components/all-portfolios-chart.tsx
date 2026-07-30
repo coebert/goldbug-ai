@@ -11,7 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, RefreshCw } from "lucide-react";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  CHART_SEQUENCE,
+  GRID_PROPS,
+  OKABE_ITO,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 import {
   Area,
   CartesianGrid,
@@ -38,9 +46,9 @@ function shortDate(s: string) {
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
 }
 
-const LINE_COLORS = ["#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c", "#60a5fa"];
-const SIM_COLOR = "#22d3ee";
-const REAL_COLOR = "#34d399";
+const LINE_COLORS = CHART_SEQUENCE;
+const SIM_COLOR = OKABE_ITO.skyBlue;
+const REAL_COLOR = CHART_ROLE.positive;
 const AXIS_COLOR = "oklch(0.96 0.01 90)";
 const GRID_COLOR = "var(--foreground)";
 

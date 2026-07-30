@@ -25,8 +25,10 @@ import type { BacktestMetrics } from "@/lib/backtest-metrics";
 import {
   AXIS_LINE,
   AXIS_TICK,
+  CHART_ROLE,
   GRID_PROPS,
   LEGEND_STYLE,
+  OKABE_ITO,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
 } from "@/lib/chart-palette";
@@ -49,11 +51,11 @@ export type BacktestRunRecord = {
 // Deterministic overlay colours so a given run keeps its colour across
 // re-renders and toggles.
 const OVERLAY_PALETTE = [
-  "hsl(217 91% 60%)",
-  "hsl(142 71% 45%)",
-  "hsl(38 92% 50%)",
-  "hsl(291 64% 55%)",
-  "hsl(0 84% 60%)",
+  OKABE_ITO.skyBlue,
+  CHART_ROLE.positive,
+  CHART_ROLE.benchmark,
+  OKABE_ITO.reddishPurple,
+  CHART_ROLE.negative,
   "hsl(199 89% 48%)",
   "hsl(48 96% 53%)",
   "hsl(262 83% 58%)",

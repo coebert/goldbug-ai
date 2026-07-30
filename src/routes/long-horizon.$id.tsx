@@ -34,7 +34,7 @@ import { Explain } from "@/components/explain";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { lttb } from "@/lib/downsample";
-import { AXIS_LINE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/long-horizon/$id")({
   ssr: false,
@@ -472,11 +472,7 @@ function LongHorizonPage() {
                           tickLine={TICK_LINE}
                         />
 
-                        <ReferenceLine
-                          y={0}
-                          stroke="var(--muted-foreground)"
-                          strokeDasharray="3 3"
-                        />
+                        <ReferenceLine {...REFERENCE_LINE} y={0} />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={chartData.map((d) => String(d.date))}
