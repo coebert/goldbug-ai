@@ -37,7 +37,7 @@ async function latestFetchedAt(dateISO: string): Promise<number | null> {
  * Fetch + sentiment-score today's headlines into `news_cache`.
  * Throttled so repeated button presses cannot hammer upstream providers.
  */
-export async function refreshGlobalNewsNow(max = 30): Promise<NewsRefreshResult> {
+export async function refreshGlobalNewsNow(max = 60): Promise<NewsRefreshResult> {
   const today = new Date().toISOString().slice(0, 10);
   const last = await latestFetchedAt(today);
   if (last != null && Date.now() - last < THROTTLE_MS) {

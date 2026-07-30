@@ -651,19 +651,23 @@ async function fetchGdeltForDate(
 ): Promise<Array<NewsItem & { source_weight: number }> | null> {
   const perSliceMax = Math.max(3, Math.ceil(max / Math.max(1, GDELT_SOURCES.length)));
   // GDELT enforces "≤1 request every 5 seconds" per client. Fan-out in
-  // parallel caused every slice to 429 and abort. Serialize with pacing so
-  // each slice actually returns data — total worst case ~ N * 5.5s well
-  // inside the hourly-run budget.
+  // parallel caused every slice to 429 and abort, so slices are serialised
+  // with pacing. With more slices than fit in one budget window, we rotate
+  // the starting offset by the hour so every topic gets covered across
+  // successive refreshes instead of the tail never running.
   const flat: Array<NewsItem & { source_weight: number }> = [];
   let anyReturnedNonNull = false;
   const deadlineAt = Date.now() + GDELT_REFRESH_BUDGET_MS;
-  for (let i = 0; i < GDELT_SOURCES.length; i++) {
-    const src = GDELT_SOURCES[i];
+  const offset = GDELT_SOURCES.length > 0
+    ? Math.floor(Date.now() / 3_600_000) % GDELT_SOURCES.length
+    : 0;
+  for (let n = 0; n < GDELT_SOURCES.length; n++) {
+    const src = GDELT_SOURCES[(offset + n) % GDELT_SOURCES.length];
     if (deadlineAt - Date.now() < 2_000) {
-      console.warn(`news: gdelt budget exhausted after ${i}/${GDELT_SOURCES.length} slices`);
+      console.warn(`news: gdelt budget exhausted after ${n}/${GDELT_SOURCES.length} slices (offset ${offset})`);
       break;
     }
-    if (i > 0) {
+    if (n > 0) {
       const pause = Math.min(5_500, Math.max(0, deadlineAt - Date.now() - 2_000));
       if (pause > 0) await new Promise((r) => setTimeout(r, pause));
     }
@@ -673,6 +677,7 @@ async function fetchGdeltForDate(
       for (const it of items) flat.push({ ...it, source_weight: src.weight });
     }
   }
+
   if (flat.length === 0 && !anyReturnedNonNull) return null;
   return flat;
 }

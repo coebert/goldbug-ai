@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/hooks/news-refresh")({
         });
         if (!verified.ok) return verified.response;
 
-        let max = 30;
+        let max = 60;
         let forceRefresh = true;
         try {
           const text = await request.clone().text();
