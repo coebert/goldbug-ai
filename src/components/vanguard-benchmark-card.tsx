@@ -184,7 +184,7 @@ export function VanguardBenchmarkCard({
                       tickFormatter={(v: number) => fmtCompact.format(v)}
                       tick={AXIS_TICK}
                       stroke="var(--border)"
-                      width={56}
+                      width={64}
                     />
                     <Tooltip
                       labelFormatter={(l) => formatUk(String(l))}

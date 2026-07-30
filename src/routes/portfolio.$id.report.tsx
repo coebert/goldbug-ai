@@ -208,7 +208,7 @@ function ReportPage() {
                         label={{ value: "Date", position: "insideBottom", offset: -4, style: { fontSize: 12, fill: "var(--foreground)" } }}
                         minTickGap={40}
                       />
-                      <YAxis
+                      <YAxis width={64}
                         tick={AXIS_TICK}
                         tickFormatter={(v) => `${(v as number).toLocaleString()}`}
                         label={{ value: `Value (${currency})`, angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "var(--foreground)" } }}

@@ -166,7 +166,7 @@ export function TranslationQualityCard() {
                 <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="day" tick={AXIS_TICK} />
-                  <YAxis domain={[0, 1]} tick={AXIS_TICK} />
+                  <YAxis width={64} domain={[0, 1]} tick={AXIS_TICK} />
                   <Tooltip
                     contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)" }}
                     formatter={(v: number | string) => (typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "—")}

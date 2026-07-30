@@ -142,7 +142,7 @@ export function RunMetricsCard() {
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                     <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
-                    <YAxis tick={AXIS_TICK} />
+                    <YAxis width={64} tick={AXIS_TICK} />
                     <Tooltip />
                     <Legend />
                     <Line type="monotone" dataKey="duration_s" name="duration (s)" stroke="var(--primary)" dot={false} />
@@ -158,7 +158,7 @@ export function RunMetricsCard() {
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                     <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
-                    <YAxis tick={AXIS_TICK} allowDecimals={false} />
+                    <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="ok" name="success" stackId="p" fill="hsl(142 71% 45%)" />
@@ -176,7 +176,7 @@ export function RunMetricsCard() {
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                     <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
-                    <YAxis tick={AXIS_TICK} allowDecimals={false} />
+                    <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />

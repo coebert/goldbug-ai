@@ -177,7 +177,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                   domain={[0, 1]}
                   tick={AXIS_TICK}
-                  width={60}
+                  width={64}
                   label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
                 />
                 <YAxis

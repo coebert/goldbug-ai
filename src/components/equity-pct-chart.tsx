@@ -83,7 +83,7 @@ export function EquityPctChart({
                 tickFormatter={(v) => shortDate(String(v))}
               />
               <YAxis
-                width={56}
+                width={64}
                 tickMargin={4}
                 domain={domain}
                 tick={AXIS_TICK}

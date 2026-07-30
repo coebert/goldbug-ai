@@ -193,7 +193,7 @@ export function BacktestResultsCard({
                   tick={AXIS_TICK}
                   minTickGap={24}
                 />
-                <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={56} />
+                <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={64} />
                 <Tooltip
                   formatter={(v: number) => fmtCurrency(v)}
                   labelFormatter={(l) => `${l}`}
@@ -244,7 +244,7 @@ export function BacktestResultsCard({
                 <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
                 <YAxis
                   tick={AXIS_TICK}
-                  width={56}
+                  width={64}
                   tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                   domain={[(min: number) => Math.min(0, Math.floor(min)), 0]}
                 />
@@ -292,7 +292,7 @@ export function BacktestResultsCard({
                 <AreaChart data={holdingsPoints} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                   <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
-                  <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={56} />
+                  <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={64} />
                   <Tooltip
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
                     contentStyle={{ fontSize: 12 }}

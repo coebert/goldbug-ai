@@ -549,7 +549,7 @@ export function BacktestRunHistoryCard({
                       <YAxis
                         tick={AXIS_TICK}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                        width={44}
+                        width={64}
                       />
                       <Tooltip
                         formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
@@ -586,7 +586,7 @@ export function BacktestRunHistoryCard({
                       <YAxis
                         tick={AXIS_TICK}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                        width={44}
+                        width={64}
                         domain={["auto", 0]}
                       />
                       <Tooltip

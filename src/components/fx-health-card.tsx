@@ -363,7 +363,7 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
               tick={AXIS_TICK}
               interval="preserveStartEnd"
             />
-            <YAxis tick={AXIS_TICK} allowDecimals={false} />
+            <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
             <Tooltip
               contentStyle={{ fontSize: 11 }}
               labelFormatter={(_, payload) => {
@@ -420,7 +420,7 @@ function PairTimelineChart({
               tick={AXIS_TICK}
               interval="preserveStartEnd"
             />
-            <YAxis tick={AXIS_TICK} allowDecimals={false} width={20} />
+            <YAxis tick={AXIS_TICK} allowDecimals={false} width={64} />
             <Tooltip
               contentStyle={{ fontSize: 11 }}
               labelFormatter={(_, payload) => {

@@ -132,7 +132,7 @@ export function FeeDragCharts({
             <AreaChart data={daily} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-              <YAxis
+              <YAxis width={64}
                 tick={AXIS_TICK}
                 tickFormatter={(v: number) =>
                   scale === "cost"

@@ -162,7 +162,7 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                     <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                      <YAxis tick={AXIS_TICK} tickFormatter={(v) => `${v}%`} width={40} domain={["dataMin", 0]} />
+                      <YAxis tick={AXIS_TICK} tickFormatter={(v) => `${v}%`} width={64} domain={["dataMin", 0]} />
                       <Tooltip formatter={(v: number | string) => [`${v}%`, "Drawdown"]} />
                       <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="color-mix(in oklab, var(--destructive) 25%, transparent)" />
                     </AreaChart>

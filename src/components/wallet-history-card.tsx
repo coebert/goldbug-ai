@@ -136,14 +136,14 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
                 <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
-                  <YAxis
+                  <YAxis width={64}
                     yAxisId="left"
                     tick={AXIS_TICK}
                     tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
                     }
                   />
-                  <YAxis
+                  <YAxis width={64}
                     yAxisId="right"
                     orientation="right"
                     tick={AXIS_TICK}

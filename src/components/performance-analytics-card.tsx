@@ -115,7 +115,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => `${v.toFixed(0)}%`} width={50} />
+                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => `${v.toFixed(0)}%`} width={64} />
                   <Tooltip
                     formatter={(v: number) => `${v.toFixed(2)}%`}
                     labelClassName="text-xs"

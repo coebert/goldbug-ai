@@ -293,7 +293,7 @@ function ModeChart({
                     minTickGap={isMobile ? 56 : 40}
                     tickFormatter={(v) => (isMobile ? shortDate(String(v)) : String(v))}
                   />
-                  <YAxis
+                  <YAxis width={64}
                     width={isMobile ? 44 : 64}
                     tick={AXIS_TICK}
                     stroke={AXIS_COLOR}

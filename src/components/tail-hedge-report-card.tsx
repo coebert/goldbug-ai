@@ -159,7 +159,7 @@ export function TailHedgeReportCard({
                 <ComposedChart data={chartData} margin={{ left: 4, right: 4, top: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={20} />
-                  <YAxis tick={AXIS_TICK} width={44} />
+                  <YAxis tick={AXIS_TICK} width={64} />
                   <Tooltip
                     formatter={(v: number) => money(v, currency)}
                     labelStyle={{ color: "var(--foreground)" }}

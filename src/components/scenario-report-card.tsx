@@ -92,7 +92,7 @@ export function ScenarioReportCard(props: {
               <LineChart data={equityChartData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                 <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
-                <YAxis
+                <YAxis width={64}
                   tick={AXIS_TICK}
                   tickFormatter={(v) => Number(v).toLocaleString()}
                 />
@@ -127,7 +127,7 @@ export function ScenarioReportCard(props: {
               <LineChart data={drawdownChartData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                 <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
-                <YAxis
+                <YAxis width={64}
                   tick={AXIS_TICK}
                   tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
                   domain={["auto", 0]}
@@ -270,7 +270,7 @@ function ExecutionQualitySection(props: {
                 tick={AXIS_TICK}
                 minTickGap={16}
               />
-              <YAxis
+              <YAxis width={64}
                 tick={AXIS_TICK}
                 domain={[0, 1]}
                 tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
@@ -316,7 +316,7 @@ function ExecutionQualitySection(props: {
                 tick={AXIS_TICK}
                 minTickGap={16}
               />
-              <YAxis
+              <YAxis width={64}
                 tick={AXIS_TICK}
                 tickFormatter={(v) => `${Number(v).toFixed(0)}`}
               />
