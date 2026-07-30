@@ -11,7 +11,7 @@ export {
   rateLessonFeedback,
 } from "./lessons.functions";
 export { getBenchmarkSeries } from "./benchmark.functions";
-export { getGlobalNewsReel, getDecisionNewsBreakdown } from "./news.functions";
+export { getGlobalNewsReel, getDecisionNewsBreakdown, refreshGlobalNews } from "./news.functions";
 export { triggerHourlyRunNow } from "./hourly-run.functions";
 export { getPerformanceReport, getComparison, getTradeComparison } from "./reports.functions";
 export { getDiagnostics } from "./diagnostics.functions";
