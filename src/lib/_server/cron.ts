@@ -147,6 +147,22 @@ function auditAuthFailure(context: {
   })();
 }
 
+/**
+ * Secrets accepted right now, most-current first.
+ *
+ * ROTATION (zero downtime): set `CRON_SECRET_NEXT` to the new value and point
+ * the scheduler vault at it. Both the old and the new value are accepted while
+ * the overlap window is open, so a deploy/vault update in either order cannot
+ * drop a scheduled run. Once every job has run cleanly on the new value,
+ * promote it to `CRON_SECRET` and delete `CRON_SECRET_NEXT`.
+ */
+function acceptedSecrets(opts: VerifyCronOptions): string[] {
+  if (opts.expectedSecret) return [opts.expectedSecret];
+  return [process.env.CRON_SECRET, process.env.CRON_SECRET_NEXT].filter(
+    (s): s is string => typeof s === "string" && s.length > 0,
+  );
+}
+
 export async function verifyCronRequest(
   request: Request,
   opts: VerifyCronOptions,
@@ -164,12 +180,16 @@ export async function verifyCronRequest(
     request.headers.get("x-cron-secret") ??
     request.headers.get("X-Cron-Secret") ??
     "";
-  const expected = opts.expectedSecret ?? process.env.CRON_SECRET ?? "";
+  const candidates = acceptedSecrets(opts);
 
-  if (!expected) return reject("cron_secret_not_configured");
-  if (!provided || !timingSafeEqual(provided, expected)) {
-    return reject("bad_or_missing_secret");
+  if (candidates.length === 0) return reject("cron_secret_not_configured");
+  // Constant-time compare against every accepted value; the matched one is the
+  // key the signature must verify under.
+  let matched: string | null = null;
+  for (const c of candidates) {
+    if (provided && timingSafeEqual(provided, c)) matched = c;
   }
+  if (!matched) return reject("bad_or_missing_secret");
 
   const timestamp =
     request.headers.get("x-cron-timestamp") ??
@@ -190,7 +210,7 @@ export async function verifyCronRequest(
     const skew = Math.abs(Date.now() / 1000 - ts);
     if (skew > (opts.maxSkewSeconds ?? 300)) return reject("stale_signature");
 
-    const want = await signPayload(expected, `${timestamp}.${path}`);
+    const want = await signPayload(matched, `${timestamp}.${path}`);
     if (!timingSafeEqual(signature.toLowerCase(), want)) {
       return reject("bad_signature");
     }
@@ -198,3 +218,4 @@ export async function verifyCronRequest(
 
   return { ok: true, ip: rl.ip };
 }
+
