@@ -57,7 +57,9 @@ export function foldRomanization(text: string): string {
     .replace(/j/g, "i")
     .replace(/y/g, "i")
     .replace(/e/g, "i")
-    .replace(/h/g, "")
+    // Ukrainian/Russian г romanises as both "h" and "g" (prohramu/programu),
+    // and kh/h already folded above — drop both so the spellings converge.
+    .replace(/[hg]/g, "")
     .replace(/(.)\1+/g, "$1");
 }
 
