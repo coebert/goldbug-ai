@@ -14,6 +14,7 @@ import {
 import type { NewsRefreshResult } from "./news-refresh.server";
 import { sortNewsLatestFirst } from "./news-reel-sort";
 import { dedupeNewsItems, normalizeHeadlineKey } from "./news-dedupe";
+import { transliterationKey } from "./news-transliterate";
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -107,6 +108,8 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         symbols: Set<string>;
       }
     >();
+    // Secondary index on the folded romanised key (transliteration-tolerant).
+    const inflTranslit = new Map<string, ReturnType<typeof infl.get> extends undefined ? never : NonNullable<ReturnType<typeof infl.get>>>();
     for (const d of decisions ?? []) {
       const p = pMap.get(d.portfolio_id);
       const name = p?.name ?? "Portfolio";
@@ -161,6 +164,11 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         }
         for (const a of trimmed) bucket.symbols.add(a.symbol);
         infl.set(head, bucket);
+        // Same bucket under the folded romanised key, so a citation logged in
+        // Cyrillic still resolves against a romanised reel row (and vice versa).
+        const tKey = transliterationKey(n.headline, normalizeHeadlineKey);
+        if (tKey) inflTranslit.set(tKey, bucket);
+
       }
     }
 
@@ -174,7 +182,11 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       const original = (r as { original_headline?: string | null }).original_headline ?? null;
       const bucket =
         infl.get(normalizeHeadlineKey(r.headline)) ??
-        (original ? infl.get(normalizeHeadlineKey(original)) : undefined);
+        (original ? infl.get(normalizeHeadlineKey(original)) : undefined) ??
+        inflTranslit.get(transliterationKey(r.headline, normalizeHeadlineKey)) ??
+        (original
+          ? inflTranslit.get(transliterationKey(original, normalizeHeadlineKey))
+          : undefined);
       const rows = bucket?.rows ?? [];
 
       const avg = bucket && bucket.n > 0 ? bucket.sum / bucket.n : null;

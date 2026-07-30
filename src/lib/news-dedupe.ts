@@ -1,6 +1,8 @@
 // Headline de-duplication shared by the ingestion path (cron + manual refresh)
 // and the reel read path. GDELT/RSS re-publish the same story across days and
 // across sources, so without this the reel shows visible repeats.
+import { transliterationKey } from "./news-transliterate";
+
 
 /** Canonical URL key: origin+path, lowercased, tracking params and trailing slash removed. */
 export function canonicalUrlKey(url: string | null | undefined): string {
@@ -49,6 +51,10 @@ export type DedupableNewsItem = {
  * Language-aware: a translated row occupies BOTH its English key and the key
  * of its original-language headline, so the same story arriving later in its
  * source language (or before/after a translation backfill) still collapses.
+ *
+ * Transliteration-aware: Cyrillic headlines also occupy a folded romanised key
+ * (`t:`), so "Газпром увеличил добычу газа" and a wire's romanised
+ * "Gazprom uvelichil dobychu gaza" collapse onto one row.
  */
 export function dedupeKeysFor(item: DedupableNewsItem): string[] {
   const keys: string[] = [];
@@ -58,8 +64,20 @@ export function dedupeKeysFor(item: DedupableNewsItem): string[] {
   if (h) keys.push(`h:${h}`);
   const o = normalizeHeadlineKey(item.original_headline);
   if (o && o !== h) keys.push(`h:${o}`);
+  for (const t of headlineTransliterationKeys(item)) keys.push(`t:${t}`);
   return keys;
 }
+
+/** Folded romanised keys for a row's headline and original-language headline. */
+export function headlineTransliterationKeys(item: DedupableNewsItem): string[] {
+  const out: string[] = [];
+  for (const text of [item.headline, item.original_headline]) {
+    const t = transliterationKey(text, normalizeHeadlineKey);
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
 
 
 /**
