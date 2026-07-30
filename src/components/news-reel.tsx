@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { getGlobalNewsReel } from "@/lib/trading.functions";
+import { getGlobalNewsReel, refreshGlobalNews } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TranslationBadge } from "@/components/translation-badge";
@@ -89,6 +89,8 @@ function formatAgo(from: number | null, now: number): string {
 
 export function NewsReel() {
   const fetchReel = useServerFn(getGlobalNewsReel);
+  const refreshSource = useServerFn(refreshGlobalNews);
+  const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState<RefreshKey>(() => {
     if (typeof window === "undefined") return "5m";
     const stored = window.localStorage.getItem(REFRESH_STORAGE_KEY) as RefreshKey | null;
@@ -344,18 +346,33 @@ export function NewsReel() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => q.refetch()}
-                disabled={q.isFetching}
+                onClick={async () => {
+                  if (refreshing) return;
+                  setRefreshing(true);
+                  try {
+                    // Rebuild the upstream cache first, then re-read it —
+                    // otherwise "Refresh now" only re-shows stale rows.
+                    const res = await refreshSource({ data: { max: 30 } });
+                    if (res.skipped && res.reason) toast.info(res.reason);
+                    else toast.success(`Pulled ${res.headlines} headlines (${res.scored} scored).`);
+                  } catch (err) {
+                    toast.error(`Could not fetch new headlines: ${String(err)}`);
+                  } finally {
+                    setRefreshing(false);
+                    await q.refetch();
+                  }
+                }}
+                disabled={q.isFetching || refreshing}
                 aria-label="Refresh news now"
                 title="Fetch the latest headlines immediately"
                 className="h-8 gap-1.5 px-2 text-xs"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} />
-                {q.isFetching ? "Refreshing…" : "Refresh now"}
+                <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching || refreshing ? "animate-spin" : ""}`} />
+                {q.isFetching || refreshing ? "Refreshing…" : "Refresh now"}
               </Button>
             </div>
             <div className="text-[10px] text-muted-foreground" title={lastUpdated ? new Date(lastUpdated).toLocaleString("en-GB", { timeZone: "Europe/London" }) : "Not yet loaded"}>
-              {q.isFetching ? "Refreshing…" : `Updated ${formatAgo(lastUpdated, now)}`}
+              {q.isFetching || refreshing ? "Refreshing…" : `Updated ${formatAgo(lastUpdated, now)}`}
               {refreshMs === 0 ? " · auto-refresh off" : ""}
             </div>
           </div>
