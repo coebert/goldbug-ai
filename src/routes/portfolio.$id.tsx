@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -176,7 +176,7 @@ import { PerformanceDashboardCard } from "@/components/performance-dashboard-car
 import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
-import { EquityPctChart } from "@/components/equity-pct-chart";
+import { capitalAt, EquityPctChart } from "@/components/equity-pct-chart";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 const BacktestResultsCard = lazy(() =>
@@ -597,47 +597,35 @@ function PortfolioPage() {
     () => (q.data?.deposits ?? []) as Array<{ date: string; amount: number }>,
     [q.data?.deposits],
   );
-  // Cumulative post-start deposit map. When `includeDeposits` is true
-  // we short-circuit to an empty map so the raw equity curve shows
-  // through unchanged.
-  const cumulativeDepositsByDate = useMemo(() => {
-    if (includeDeposits) return new Map<string, number>();
-    const startDate = equityData[0]?.date;
-    if (!startDate) return new Map<string, number>();
-    const byDate = new Map<string, number>();
-    for (const d of depositEvents) {
-      if (!d || d.date <= startDate) continue;
-      const amt = Number(d.amount);
-      if (!Number.isFinite(amt)) continue;
-      byDate.set(d.date, (byDate.get(d.date) ?? 0) + amt);
-    }
-    const out = new Map<string, number>();
-    let cum = 0;
-    for (const row of equityData) {
-      cum += byDate.get(row.date) ?? 0;
-      out.set(row.date, cum);
-    }
-    return out;
-  }, [depositEvents, equityData, includeDeposits]);
+
+  /**
+   * Invested capital on a given date, using exactly the same rule as the
+   * equity-% chart and every equity tile: baseline pot + deposits on or before
+   * that date. With `includeDeposits` on, the user has asked to see the raw
+   * curve, so the base stays at the full contributed pot.
+   */
+  const baseAt = useCallback(
+    (date: string) =>
+      includeDeposits ? startingCashForChart : capitalAt(baselineStartingCash, depositEvents, date),
+    [includeDeposits, startingCashForChart, baselineStartingCash, depositEvents],
+  );
 
   const displayChartData = useMemo(() => {
-    if (compareMode === "raw" || startingCashForChart <= 0) return chartData;
-    const base = startingCashForChart;
+    if (compareMode === "raw") return chartData;
     return chartData.map((row) => {
       const r = row as typeof row & { benchmark?: number | null };
-      const dep = cumulativeDepositsByDate.get(row.date) ?? 0;
-      const adjValue = row.value - dep;
-      const adjPeak = row.peak - dep;
+      const base = baseAt(row.date);
+      if (!(base > 0)) return row;
       return {
         ...row,
-        value: ((adjValue - base) / base) * 100,
-        peak: ((adjPeak - base) / base) * 100,
+        value: ((row.value - base) / base) * 100,
+        peak: ((row.peak - base) / base) * 100,
         drawdown: row.drawdown,
         benchmark:
           r.benchmark != null ? ((r.benchmark - base) / base) * 100 : (r.benchmark ?? null),
       };
     });
-  }, [chartData, compareMode, startingCashForChart, cumulativeDepositsByDate]);
+  }, [chartData, compareMode, baseAt]);
 
   const perfMetrics = useMemo(() => {
     const rows = chartData.filter((r) => Number.isFinite(r.value));
@@ -1651,25 +1639,26 @@ function PortfolioPage() {
                                   isPct
                                     ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
                                     : `${p.currency} ${v.toFixed(2)}`;
-                                // Net cumulative deposits out of the raw
-                                // tooltip pnl so it never shows a top-up
-                                // as profit (matches ModeSummaryTile).
-                                const dep = cumulativeDepositsByDate.get(String(label)) ?? 0;
-                                const pnlFromStart = isPct
-                                  ? row.value
-                                  : row.value - dep - startingCash;
+                                // Measure against invested capital on that
+                                // date (baseline pot + deposits so far) — the
+                                // same rule the equity-% chart and every
+                                // equity tile use, so a top-up never reads as
+                                // profit and the "start" line means the same
+                                // thing everywhere.
+                                const capital = baseAt(String(label));
+                                const pnlFromStart = isPct ? row.value : row.value - capital;
                                 const pnlPctFromStart = isPct
                                   ? row.value
-                                  : startingCash > 0
-                                    ? (pnlFromStart / startingCash) * 100
+                                  : capital > 0
+                                    ? (pnlFromStart / capital) * 100
                                     : 0;
                                 const benchPct =
                                   row.benchmark == null
                                     ? null
                                     : isPct
                                       ? row.benchmark
-                                      : startingCash > 0
-                                        ? ((row.benchmark - startingCash) / startingCash) * 100
+                                      : capital > 0
+                                        ? ((row.benchmark - capital) / capital) * 100
                                         : null;
                                 const active_events = eventsOn
                                   ? eventsInRange(String(label), String(label)).filter(
@@ -1695,10 +1684,10 @@ function PortfolioPage() {
                                       <div className="tabular-nums text-muted-foreground pl-3.5">
                                         vs start: {pnlFromStart >= 0 ? "+" : ""}
                                         {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
-                                        {dep !== 0 && (
+                                        {capital - baselineStartingCash !== 0 && (
                                           <span
                                             className="ml-1"
-                                            title={`Excludes ${p.currency} ${dep.toFixed(2)} of ${dep >= 0 ? "deposits" : "withdrawals"}`}
+                                            title={`Measured against ${p.currency} ${capital.toFixed(2)} of invested capital, including ${p.currency} ${Math.abs(capital - baselineStartingCash).toFixed(2)} of ${capital >= baselineStartingCash ? "deposits" : "withdrawals"}`}
                                           >
                                             · trading only
                                           </span>

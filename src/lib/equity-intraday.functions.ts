@@ -1,11 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 
 /**
  * Hourly equity points for one portfolio. RLS scopes rows to the owner, so no
  * extra ownership check is needed beyond the authenticated client.
+ *
+ * Rows are clipped to the portfolio's inception with the same helper the daily
+ * series uses, so the Hourly and Daily views always start on the same day.
  */
+
 export const getIntradayEquity = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -25,8 +30,20 @@ export const getIntradayEquity = createServerFn({ method: "GET" })
       .gte("bucket_hour", since)
       .order("bucket_hour", { ascending: true });
     if (error) throw new Error(error.message);
+
+    const { data: pf } = await context.supabase
+      .from("portfolios")
+      .select("created_at, live_activated_at")
+      .eq("id", data.portfolio_id)
+      .maybeSingle();
+    const inception = portfolioInceptionDate(pf as never);
+    const clipped = clipToInception(rows ?? [], inception, (r) =>
+      String((r as { bucket_hour?: unknown }).bucket_hour ?? ""),
+    );
+
     return {
-      points: (rows ?? []).map((r) => ({
+      inceptionDate: inception,
+      points: clipped.map((r) => ({
         at: String(r.bucket_hour),
         total_value: Number(r.total_value),
       })),
