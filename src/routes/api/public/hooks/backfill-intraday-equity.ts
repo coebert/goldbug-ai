@@ -8,6 +8,7 @@
 // so running it hourly is safe.
 
 import { createFileRoute } from "@tanstack/react-router";
+import type { IntradayBackfillResult } from "@/lib/equity-intraday-backfill.server";
 
 export const Route = createFileRoute("/api/public/hooks/backfill-intraday-equity")({
   server: {
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/api/public/hooks/backfill-intraday-equity
         if (!verified.ok) return verified.response;
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { backfillPortfolioIntradayEquity, type IntradayBackfillResult } = await import(
+        const { backfillPortfolioIntradayEquity } = await import(
           "@/lib/equity-intraday-backfill.server"
         );
 
