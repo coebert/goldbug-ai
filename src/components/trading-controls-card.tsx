@@ -41,7 +41,13 @@ export function TradingControlsCard() {
     };
   }, [load]);
 
-  async function apply(patch: Parameters<typeof save>[0]["data"]) {
+  type ControlsPatch = {
+    trading_enabled?: boolean;
+    daily_notional_limit?: number;
+    halt_reason?: string | null;
+  };
+
+  async function apply(patch: ControlsPatch) {
     setBusy(true);
     try {
       await save({ data: patch });
