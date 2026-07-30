@@ -40,7 +40,15 @@ function SettingsPage() {
         </p>
       </header>
 
+      <section aria-labelledby="security-heading" className="space-y-3">
+        <h2 id="security-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Account security
+        </h2>
+        <MfaCard />
+      </section>
+
       <section aria-labelledby="notifications-heading" className="space-y-3">
+
         <h2 id="notifications-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Notifications
         </h2>
