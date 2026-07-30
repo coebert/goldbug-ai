@@ -144,7 +144,7 @@ export const GDELT_SOURCES: Extract<NewsSource, { kind: "gdelt" }>[] = [
   { kind: "gdelt", id: "gdelt-crypto",    label: "GDELT · Crypto",       weight: 0.6, topic: "crypto",
     query: "(bitcoin OR ethereum OR \"crypto ETF\" OR stablecoin OR blockchain OR \"digital asset\")" },
   { kind: "gdelt", id: "gdelt-fx",        label: "GDELT · FX",           weight: 0.65, topic: "fx",
-  { kind: "gdelt", id: "gdelt-fx",        label: "GDELT · FX",           weight: 0.65, topic: "fx",
+
     query: "(\"foreign exchange\" OR \"currency market\" OR \"dollar index\" OR yuan OR yen OR sterling OR euro)" },
   { kind: "gdelt", id: "gdelt-commods",   label: "GDELT · Commodities",  weight: 0.65, topic: "commodities",
     query: "(gold OR copper OR \"iron ore\" OR wheat OR \"commodity prices\" OR lithium OR uranium)" },
