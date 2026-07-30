@@ -10,6 +10,7 @@ import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
 import { relevanceBand, relevanceBandLabel, sortByRelevance } from "@/lib/news-relevance";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
+import { NewsBackfillControls } from "@/components/news-backfill-controls";
 
 /** Badge colour per relevance band — semantic tokens only. */
 function relevanceCls(score: number): string {
