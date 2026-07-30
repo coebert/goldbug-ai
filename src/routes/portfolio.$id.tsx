@@ -1480,12 +1480,12 @@ function PortfolioPage() {
                     )}
                     {perfMetrics && (
                       <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
-                        <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
-                          <span>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <span className="min-w-0 truncate">
                             Performance vs {benchmark === "none" ? "benchmark" : benchmark}
                           </span>
                           {perfMetrics.correlation != null && (
-                            <span className="tabular-nums">
+                            <span className="shrink-0 tabular-nums">
                               Correlation:{" "}
                               <span className="font-medium text-foreground">
                                 {perfMetrics.correlation.toFixed(2)}
@@ -1493,7 +1493,8 @@ function PortfolioPage() {
                             </span>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
+
                           {(
                             [
                               {
