@@ -138,13 +138,13 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
                   />
 
-                  <ReferenceLine y={0.5} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                  <ReferenceLine y={0.5} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                   <Tooltip
                     formatter={(v: number) => `${(v * 100).toFixed(0)}%`}
                     labelFormatter={(l) => `Trade #${l}`}
-                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }}
                   />
-                  <Line type="monotone" dataKey="winRate" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
+                  <Line type="monotone" dataKey="winRate" stroke="var(--primary)" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -189,13 +189,13 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                 />
 
                 <Tooltip
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }}
                   formatter={(v: number, name) =>
                     name === "winRate" ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(2)}%`
                   }
                 />
-                <ReferenceLine yAxisId="right" y={0} stroke="hsl(var(--muted-foreground))" />
-                <Bar yAxisId="left" dataKey="winRate" fill="hsl(var(--primary))" name="Win rate" />
+                <ReferenceLine yAxisId="right" y={0} stroke="var(--muted-foreground)" />
+                <Bar yAxisId="left" dataKey="winRate" fill="var(--primary)" name="Win rate" />
                 <Bar yAxisId="right" dataKey="avgReturn" fill="hsl(var(--chart-2, 173 58% 39%))" name="Avg return" />
               </BarChart>
             </ResponsiveContainer>
@@ -280,7 +280,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   {eventImpact.map((e) => {
                     const isCalm = e.id === "__calm";
                     const color = isCalm
-                      ? "hsl(var(--muted-foreground))"
+                      ? "var(--muted-foreground)"
                       : eventColor(e.category as EventCategory);
                     const winPct = (e.winRate * 100).toFixed(0);
                     const avgRet = (e.avgReturn * 100).toFixed(2);
@@ -322,7 +322,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                             {(Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).map((k, i) => {
                               const v = Math.max(0, Number(e.weights[k] ?? 0));
                               const palette = [
-                                "hsl(var(--primary))",
+                                "var(--primary)",
                                 "hsl(var(--chart-2, 173 58% 39%))",
                                 "hsl(43 90% 55%)",
                                 "hsl(280 70% 62%)",

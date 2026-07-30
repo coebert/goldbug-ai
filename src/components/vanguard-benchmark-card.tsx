@@ -175,22 +175,22 @@ export function VanguardBenchmarkCard({
                       dataKey="date"
                       tickFormatter={fmtShortDate}
                       minTickGap={32}
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      stroke="hsl(var(--border))"
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      stroke="var(--border)"
                     />
                     <YAxis
                       domain={["auto", "auto"]}
                       tickFormatter={(v: number) => fmtCompact.format(v)}
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      stroke="hsl(var(--border))"
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      stroke="var(--border)"
                       width={56}
                     />
                     <Tooltip
                       labelFormatter={(l) => formatUk(String(l))}
                       formatter={(value: number, name) => [fmtCcy.format(Number(value)), name]}
                       contentStyle={{
-                        background: "hsl(var(--popover))",
-                        border: "1px solid hsl(var(--border))",
+                        background: "var(--popover)",
+                        border: "1px solid var(--border)",
                         borderRadius: 6,
                         fontSize: 12,
                       }}
@@ -199,7 +199,7 @@ export function VanguardBenchmarkCard({
                       type="monotone"
                       dataKey="portfolio"
                       name="Portfolio"
-                      stroke="hsl(var(--primary))"
+                      stroke="var(--primary)"
                       strokeWidth={2}
                       dot={false}
                       isAnimationActive={false}
@@ -208,7 +208,7 @@ export function VanguardBenchmarkCard({
                       type="monotone"
                       dataKey="benchmark"
                       name="Vanguard 60/40"
-                      stroke="hsl(var(--muted-foreground))"
+                      stroke="var(--muted-foreground)"
                       strokeDasharray="4 4"
                       strokeWidth={1.75}
                       dot={false}

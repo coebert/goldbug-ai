@@ -72,7 +72,7 @@ export function EquityPctChart({
         <div className="h-[160px] w-full landscape:h-[200px] md:h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
-              <CartesianGrid stroke="hsl(var(--foreground))" strokeOpacity={0.12} strokeDasharray="3 3" />
+              <CartesianGrid stroke="var(--foreground)" strokeOpacity={0.12} strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
                 tick={{ fontSize: 10, fill: "currentColor" }}
@@ -94,12 +94,12 @@ export function EquityPctChart({
               <Tooltip
                 contentStyle={{
                   fontSize: 11,
-                  background: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
+                  background: "var(--popover)",
+                  border: "1px solid var(--border)",
                   borderRadius: 8,
-                  color: "hsl(var(--popover-foreground))",
+                  color: "var(--popover-foreground)",
                 }}
-                labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                labelStyle={{ color: "var(--muted-foreground)" }}
                 labelFormatter={(l) => shortDate(String(l))}
                 formatter={(v) => [`${Number(v).toFixed(2)}%`, "vs start"]}
               />

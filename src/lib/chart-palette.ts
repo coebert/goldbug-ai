@@ -43,5 +43,5 @@ export const CHART_SEQUENCE: readonly string[] = [
 // Axis/tick styling. `--foreground` clears WCAG AA against both light
 // and dark card surfaces; 12px is the smallest size that keeps AA
 // legibility for numeric axes.
-export const AXIS_TICK = { fontSize: 12, fill: "hsl(var(--foreground))" } as const;
-export const AXIS_LABEL = { fontSize: 12, fill: "hsl(var(--foreground))" } as const;
+export const AXIS_TICK = { fontSize: 12, fill: "var(--foreground)" } as const;
+export const AXIS_LABEL = { fontSize: 12, fill: "var(--foreground)" } as const;

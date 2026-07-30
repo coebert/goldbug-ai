@@ -143,7 +143,7 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
             <div className="h-56 w-full sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={rows} margin={{ top: 10, right: 16, bottom: 8, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="dateLabel" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                   <Tooltip content={<TimelineTooltip />} />

@@ -205,23 +205,23 @@ function ReportPage() {
                       <XAxis
                         dataKey="date"
                         tick={AXIS_TICK}
-                        label={{ value: "Date", position: "insideBottom", offset: -4, style: { fontSize: 12, fill: "hsl(var(--foreground))" } }}
+                        label={{ value: "Date", position: "insideBottom", offset: -4, style: { fontSize: 12, fill: "var(--foreground)" } }}
                         minTickGap={40}
                       />
                       <YAxis
                         tick={AXIS_TICK}
                         tickFormatter={(v) => `${(v as number).toLocaleString()}`}
-                        label={{ value: `Value (${currency})`, angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "hsl(var(--foreground))" } }}
+                        label={{ value: `Value (${currency})`, angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "var(--foreground)" } }}
                       />
                       <Tooltip
-                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }}
+                        contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }}
                         formatter={(val: number | string, name) => [
                           typeof val === "number" ? `${val.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}` : val,
                           name,
                         ]}
                       />
-                      <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--foreground))" }} />
-                      <ReferenceLine y={data.portfolio.starting_cash} stroke="hsl(var(--foreground))" strokeOpacity={0.5} strokeDasharray="4 4" label={{ value: "Start", fill: "hsl(var(--foreground))", fontSize: 11 }} />
+                      <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
+                      <ReferenceLine y={data.portfolio.starting_cash} stroke="var(--foreground)" strokeOpacity={0.5} strokeDasharray="4 4" label={{ value: "Start", fill: "var(--foreground)", fontSize: 11 }} />
                       <Line type="monotone" dataKey="strategy" name="Strategy" stroke={CHART_ROLE.positive} strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="benchmark" name={data.benchmark} stroke={CHART_ROLE.benchmark} strokeWidth={2} strokeDasharray="6 3" dot={false} />
                     </LineChart>

@@ -161,21 +161,21 @@ export function TailHedgeReportCard({
                   <YAxis tick={{ fontSize: 10 }} width={44} />
                   <Tooltip
                     formatter={(v: number) => money(v, currency)}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
-                    contentStyle={{ background: "hsl(var(--card))", borderRadius: 6, fontSize: 11 }}
+                    labelStyle={{ color: "var(--foreground)" }}
+                    contentStyle={{ background: "var(--card)", borderRadius: 6, fontSize: 11 }}
                   />
                   <Area
                     type="monotone"
                     dataKey="advised"
                     name="Advised notional"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary) / 0.2)"
+                    stroke="var(--primary)"
+                    fill="color-mix(in oklab, var(--primary) 0.2%, transparent)"
                   />
                   <Line
                     type="monotone"
                     dataKey="observed"
                     name="Observed notional"
-                    stroke="hsl(var(--foreground))"
+                    stroke="var(--foreground)"
                     dot={false}
                     strokeWidth={1.5}
                   />

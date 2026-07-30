@@ -217,9 +217,9 @@ export function DailyEquityChangesCard({
                     tickFormatter={(v: number) => `${v.toFixed(1)}%`}
                     width={44}
                   />
-                  <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.4} />
+                  <ReferenceLine y={0} stroke="var(--foreground)" strokeOpacity={0.4} />
                   <Tooltip
-                    cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+                    cursor={{ fill: "color-mix(in oklab, var(--muted) 0.3%, transparent)" }}
                     content={({ active, payload }) => {
                       if (!active || !payload || payload.length === 0) return null;
                       const d = payload[0].payload as (typeof chartData)[number];

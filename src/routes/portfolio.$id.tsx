@@ -400,11 +400,11 @@ function PortfolioPage() {
       equityFillTop: 0.35,
       equityFillBottom: 0,
       benchmark: "#f59e0b",
-      drawdown: "hsl(var(--destructive))",
-      peak: "hsl(var(--muted-foreground))",
+      drawdown: "var(--destructive)",
+      peak: "var(--muted-foreground)",
       gridOpacity: 0.35,
-      axis: "hsl(var(--border))",
-      axisText: "hsl(var(--foreground))",
+      axis: "var(--border)",
+      axisText: "var(--foreground)",
       strokeWidth: 2.5,
       surface: "transparent",
     } as const;
@@ -1425,7 +1425,7 @@ function PortfolioPage() {
                           stroke={chartTheme.equity}
                           strokeWidth={chartTheme.strokeWidth}
                           dot={false}
-                          activeDot={{ r: 5, fill: chartTheme.equity, stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                          activeDot={{ r: 5, fill: chartTheme.equity, stroke: "var(--background)", strokeWidth: 2 }}
                         />
                         {benchmark !== "none" && (
                           <Line
@@ -1438,7 +1438,7 @@ function PortfolioPage() {
                             dot={false}
                             connectNulls
                             isAnimationActive={false}
-                            activeDot={{ r: 4, fill: chartTheme.benchmark, stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                            activeDot={{ r: 4, fill: chartTheme.benchmark, stroke: "var(--background)", strokeWidth: 2 }}
                           />
                         )}
                         <Legend

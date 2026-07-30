@@ -384,23 +384,23 @@ function LongHorizonPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={360}>
                       <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
                         <XAxis
                           dataKey="date"
-                          stroke="hsl(var(--muted-foreground))"
+                          stroke="var(--muted-foreground)"
                           fontSize={11}
                           minTickGap={40}
-                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: "var(--muted-foreground)", fontSize: 12 }}
                         />
                         <YAxis
-                          stroke="hsl(var(--muted-foreground))"
+                          stroke="var(--muted-foreground)"
                           fontSize={11}
                           width={72}
                           tickFormatter={(v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`}
-                          label={{ value: "Cumulative return (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          label={{ value: "Cumulative return (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "var(--muted-foreground)", fontSize: 12 }}
                         />
 
-                        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                        <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={chartData.map((d) => String(d.date))}
@@ -409,7 +409,7 @@ function LongHorizonPage() {
                           />
                         )}
                         <Tooltip
-                          cursor={{ stroke: "hsl(var(--muted-foreground))", strokeDasharray: "3 3" }}
+                          cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
                             if (!active || !payload?.length) return null;
                             const sorted = [...payload].sort(

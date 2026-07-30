@@ -227,14 +227,14 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
             >
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                tick={{ fontSize: 12, fill: "var(--foreground)" }}
                 interval={0}
                 tickMargin={6}
-                axisLine={{ stroke: "hsl(var(--border))" }}
+                axisLine={{ stroke: "var(--border)" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                tick={{ fontSize: 12, fill: "var(--foreground)" }}
                 tickFormatter={(v: number) => formatMoney(v, currency).replace("+", "")}
                 width={70}
                 axisLine={false}
@@ -244,9 +244,9 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   Math.max(0, max) * 1.25 || 1,
                 ]}
               />
-              <ReferenceLine y={0} stroke="hsl(var(--border))" />
+              <ReferenceLine y={0} stroke="var(--border)" />
               <Tooltip
-                cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
+                cursor={{ fill: "color-mix(in oklab, var(--muted) 0.4%, transparent)" }}
                 content={({ active, payload }) => {
                   if (!active || !payload || payload.length === 0) return null;
                   const p = payload[0].payload as {
@@ -268,7 +268,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   return (
                     <div
                       className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md"
-                      style={{ borderColor: "hsl(var(--border))" }}
+                      style={{ borderColor: "var(--border)" }}
                     >
                       <div className="mb-1 flex items-center gap-2 font-medium">
                         <span
@@ -307,7 +307,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
-                    fill: "hsl(var(--foreground))",
+                    fill: "var(--foreground)",
                   }}
                 />
               </Bar>

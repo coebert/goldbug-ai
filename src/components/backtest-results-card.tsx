@@ -185,7 +185,7 @@ export function BacktestResultsCard({
             </span>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={equityData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
-                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
                   type="category"
@@ -240,7 +240,7 @@ export function BacktestResultsCard({
             </span>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={drawdownData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
-                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
                 <YAxis
                   tick={AXIS_TICK}
@@ -290,14 +290,14 @@ export function BacktestResultsCard({
               </span>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={holdingsPoints} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
                   <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={56} />
                   <Tooltip
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 12, color: "hsl(var(--foreground))" }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
                   <Area
                     type="monotone"
                     dataKey="cash"
