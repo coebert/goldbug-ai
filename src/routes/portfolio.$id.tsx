@@ -244,12 +244,20 @@ export const Route = createFileRoute("/portfolio/$id")({
   component: PortfolioPage,
 });
 
+const SIMPLE_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk"];
+
 function PortfolioPage() {
   const { id } = Route.useParams();
-  const { tab } = Route.useSearch();
+  const { tab: rawTab } = Route.useSearch();
+  const advancedLevel = useIsAdvanced();
+  // In Simple mode the expert tabs aren't rendered, so a deep link to one
+  // would leave the tab strip with no active trigger — fall back to Summary.
+  const tab: PortfolioTab =
+    advancedLevel || SIMPLE_TABS.includes(rawTab) ? rawTab : "overview";
   const navigate = useNavigate();
   const setTab = (next: PortfolioTab) =>
     navigate({ to: "/portfolio/$id", params: { id }, search: { tab: next }, replace: true });
+
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tradeSort, setTradeSort] = useState<{
