@@ -294,14 +294,15 @@ export async function advanceNewsBackfill(opts?: {
 }
 
 async function finishJob(id: string, status: string, error: string | null): Promise<NewsBackfillJob | null> {
+  const patch: Record<string, unknown> = {
+    status,
+    last_error: error,
+    finished_at: new Date().toISOString(),
+  };
+  if (status === "completed") patch.cursor_date = null;
   const { data } = await supabaseAdmin
     .from("news_backfill_jobs")
-    .update({
-      status,
-      last_error: error,
-      finished_at: new Date().toISOString(),
-      cursor_date: status === "completed" ? null : undefined,
-    })
+    .update(patch)
     .eq("id", id)
     .select("*")
     .single();
