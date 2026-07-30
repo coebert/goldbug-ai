@@ -60,13 +60,13 @@ describe("real-money equity — extreme magnitude formatting", () => {
     it("millions render with locale grouping (no scientific notation)", () => {
       const html = render(1_234_567, 250_000, 25.37);
       assertHeadlineDelta(html, 1_234_567, 250_000, 25.37);
-      expect(html).toContain("text-emerald-400");
+      expect(html).toContain("text-success");
     });
 
     it("hundreds of millions render whole with grouping", () => {
       const html = render(987_654_321, -1_500_000, -0.152);
       assertHeadlineDelta(html, 987_654_321, -1_500_000, -0.152);
-      expect(html).toContain("text-red-400");
+      expect(html).toContain("text-destructive");
       expect(html).toContain("-0.15%");
     });
 
@@ -86,7 +86,7 @@ describe("real-money equity — extreme magnitude formatting", () => {
     it("large negative equity renders with locale minus and grouping", () => {
       const html = render(-987_654_321, -1_000_000, -0.101);
       assertHeadlineDelta(html, -987_654_321, -1_000_000, -0.101);
-      expect(html).toContain("text-red-400");
+      expect(html).toContain("text-destructive");
     });
   });
 
@@ -104,7 +104,7 @@ describe("real-money equity — extreme magnitude formatting", () => {
       expect(html).toContain(gbpWhole.format(-0.004)); // "-£0" or "£0" per locale
       expect(html).toContain("-0.00%");
       expect(html).toContain(numWhole.format(-0.004));
-      expect(html).toContain("text-red-400");
+      expect(html).toContain("text-destructive");
       assertNoBadTokens(html);
     });
 
@@ -130,7 +130,7 @@ describe("real-money equity — extreme magnitude formatting", () => {
       expect(html).toContain("+0.00%");
       expect(html).toContain(`+${numWhole.format(0)}`);
       // Zero pnl takes the >=0 branch → emerald tone.
-      expect(html).toContain("text-emerald-400");
+      expect(html).toContain("text-success");
       assertNoBadTokens(html);
     });
 
@@ -140,21 +140,21 @@ describe("real-money equity — extreme magnitude formatting", () => {
       expect(html).toContain(gbpWhole.format(0));
       // -0 >= 0 is true → "+" prefix, emerald tone.
       expect(html).toContain("+0.00%");
-      expect(html).toContain("text-emerald-400");
+      expect(html).toContain("text-success");
       assertNoBadTokens(html);
     });
 
     it("+epsilon PnL takes the positive branch", () => {
       const html = render(300, 1e-9, 1e-9);
       expect(html).toContain("+0.00%");
-      expect(html).toContain("text-emerald-400");
+      expect(html).toContain("text-success");
       assertNoBadTokens(html);
     });
 
     it("-epsilon PnL takes the negative branch (no '+' prefix)", () => {
       const html = render(300, -1e-9, -1e-9);
       expect(html).toContain("-0.00%");
-      expect(html).toContain("text-red-400");
+      expect(html).toContain("text-destructive");
       expect(html).not.toContain("+-0.00%");
       assertNoBadTokens(html);
     });
@@ -164,8 +164,8 @@ describe("real-money equity — extreme magnitude formatting", () => {
       const loss = render(300, -0.0001, -0.00003);
       expect(gain).toContain("+0.00%");
       expect(loss).toContain("-0.00%");
-      expect(gain).toContain("text-emerald-400");
-      expect(loss).toContain("text-red-400");
+      expect(gain).toContain("text-success");
+      expect(loss).toContain("text-destructive");
     });
   });
 

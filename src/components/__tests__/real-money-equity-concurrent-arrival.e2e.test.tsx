@@ -175,7 +175,7 @@ describe("real-money equity tile — concurrent same-day arrival e2e", () => {
     expect(rendered.summary.pct).toBeCloseTo((30 / 330) * 100, 5);
     expect(numericTokens(rendered.html)).toContain(360);
     expect(numericTokens(rendered.html)).not.toContain(330);
-    expect(rendered.html).toContain("text-emerald-400");
+    expect(rendered.html).toContain("text-success");
   });
 
   it("same-day arrivals with intraday drift resolve deterministically per accumulator", async () => {

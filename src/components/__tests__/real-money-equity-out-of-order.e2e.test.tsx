@@ -100,7 +100,7 @@ describe("real-money equity tile — out-of-order snapshot e2e", () => {
     expect(chronological.summary.now).toBe(360);
     expect(chronological.summary.pnl).toBe(30); // 360 - 330
     expect(numericTokens(chronological.html)).toContain(360);
-    expect(chronological.html).toContain("text-emerald-400");
+    expect(chronological.html).toContain("text-success");
   });
 
   it("a late-arriving OLDER snapshot never regresses the headline value", () => {
@@ -124,7 +124,7 @@ describe("real-money equity tile — out-of-order snapshot e2e", () => {
     expect(numericTokens(after.html)).toContain(360);
     expect(numericTokens(after.html)).not.toContain(250);
     // Tone stays positive (previous is still 330 → +30 gain).
-    expect(after.html).toContain("text-emerald-400");
+    expect(after.html).toContain("text-success");
   });
 
   it("a late-arriving OLDER row also does not distort the trailing delta", () => {

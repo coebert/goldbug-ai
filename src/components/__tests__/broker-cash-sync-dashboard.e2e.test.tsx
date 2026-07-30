@@ -287,7 +287,7 @@ describe("broker cash sync → dashboard real-money equity (e2e)", () => {
       />,
     );
     // Positive tone applied for a gain.
-    expect(html).toContain("text-emerald-400");
+    expect(html).toContain("text-success");
     // Neither of the earlier intra-day totals should appear as the headline.
     const nums = numericTokens(html);
     expect(nums).not.toContain(310);
