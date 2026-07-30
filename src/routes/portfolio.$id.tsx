@@ -1930,7 +1930,7 @@ function PortfolioPage() {
 
                 <div className="mt-6 grid gap-4 lg:grid-cols-2">
                   <RegimePanel />
-                  <FearIndexCard portfolioId={id} active={tab === "overview"} />
+                  <FearIndexCard portfolioId={id} active={tab === "overview"} currency={p.currency} />
 
                   <LearningPanel portfolioId={p.id} />
                 </div>
