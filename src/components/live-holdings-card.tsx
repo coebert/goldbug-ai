@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatUk } from "@/lib/uk-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info, TrendingDown as SellIcon, RefreshCw } from "lucide-react";
@@ -252,12 +253,7 @@ export function LiveHoldingsCard({
   const fmtOpened = (iso?: string | null) => {
     if (!iso) return null;
     try {
-      return new Date(iso).toLocaleDateString("en-GB", {
-        timeZone: "Europe/London",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+      return formatUk(iso, { year: "numeric", month: "short", day: "numeric" });
     } catch {
       return null;
     }

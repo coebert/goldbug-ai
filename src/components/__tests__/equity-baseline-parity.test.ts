@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { capitalAt } from "@/components/equity-pct-chart";
+import { ukDayKey } from "@/lib/uk-time";
 
 /**
  * The "zero" line on the equity chart is the invested-capital baseline, and it
@@ -17,10 +18,13 @@ describe("equity baseline parity: Daily vs Hourly", () => {
   ];
 
   it("resolves the same capital for every hour of a day as for that day", () => {
+    // Hours are matched to the *Europe/London* calendar day (the market clock),
+    // so 23:00Z in BST belongs to the next London day — compare each hourly
+    // instant against the daily value for the day it actually falls in.
     for (const day of ["2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"]) {
-      const daily = capitalAt(base, deposits, day);
       for (const hh of ["00", "07", "12", "16", "23"]) {
-        expect(capitalAt(base, deposits, `${day}T${hh}:00:00.000Z`)).toBe(daily);
+        const at = `${day}T${hh}:00:00.000Z`;
+        expect(capitalAt(base, deposits, at)).toBe(capitalAt(base, deposits, ukDayKey(at)));
       }
     }
   });

@@ -63,3 +63,62 @@ export function ukHour(input: string | number | Date = new Date()): number {
   }).format(d);
   return Number.parseInt(s, 10);
 }
+
+// ---------------------------------------------------------------------------
+// Chart/axis helpers — the single source of truth for how instants are bucketed
+// and labelled on time-series charts.
+//
+// Two bugs this prevents:
+//  1. `iso.slice(0, 10)` reads the *UTC* calendar day. Under BST, 23:30 London
+//     is 22:30 UTC on the same day, but 00:30 London is 23:30 UTC the day
+//     *before* — so late/early hourly points were attributed to the wrong day
+//     when matching deposits or clipping to inception.
+//  2. `toLocaleDateString(undefined, …)` renders in the *viewer's* timezone, so
+//     the x-axis and the tooltip could disagree with each other (and with the
+//     market) depending on where the browser sits.
+// Hour boundaries themselves are safe to truncate in UTC: Europe/London is
+// always a whole number of hours from UTC, so a UTC hour bucket is also a
+// London hour bucket.
+// ---------------------------------------------------------------------------
+
+/** `YYYY-MM-DD` for the Europe/London calendar day containing `input`. */
+export function ukDayKey(input: string | number | Date): string {
+  const raw = typeof input === "string" ? input : "";
+  // Date-only strings are already calendar days; re-parsing them can shift
+  // the day when the runtime treats them as UTC midnight.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return raw.slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  return parts; // en-CA formats as YYYY-MM-DD
+}
+
+/** Compact axis label for a day: "02 Aug" in Europe/London. */
+export function formatUkAxisDay(input: string | number | Date): string {
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return String(input);
+  return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TZ,
+    day: "2-digit",
+    month: "short",
+  }).format(d);
+}
+
+/** Axis/tooltip label for an hourly point: "02 Aug, 14:00" in Europe/London. */
+export function formatUkAxisHour(input: string | number | Date): string {
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return String(input);
+  return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TZ,
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}

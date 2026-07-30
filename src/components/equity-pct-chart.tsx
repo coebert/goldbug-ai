@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import { formatUkAxisDay, formatUkAxisHour, ukDayKey, ukZoneAbbr } from "@/lib/uk-time";
 import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
 
@@ -20,21 +21,15 @@ import {
 
 type Resolution = "daily" | "hourly";
 
+// All time labels and day bucketing go through the Europe/London helpers so
+// the axis, the tooltip and the deposit/inception matching agree with each
+// other and with the market clock, regardless of the viewer's own timezone.
 function fmtDay(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  return formatUkAxisDay(iso);
 }
 
 function fmtHour(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleString(undefined, {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    timeZone: "Europe/London",
-  });
+  return formatUkAxisHour(iso);
 }
 
 /**
@@ -75,12 +70,12 @@ export function capitalAt(
   deposits: Array<{ date: string; amount: number }>,
   onOrBefore: string,
 ): number {
-  const day = onOrBefore.slice(0, 10);
+  const day = ukDayKey(onOrBefore);
   let capital = baseline;
   for (const d of deposits) {
     const amt = Number(d?.amount);
     if (!Number.isFinite(amt)) continue;
-    if (String(d.date).slice(0, 10) <= day) capital += amt;
+    if (ukDayKey(String(d.date)) <= day) capital += amt;
   }
   return capital;
 }
@@ -117,11 +112,11 @@ export function addDeltas(
   return rows.map((r, i) => {
     if (i === 0) return { ...r, deltaPct: 0, deltaValue: 0 };
     const prev = rows[i - 1];
-    const prevDay = String(prev.at).slice(0, 10);
-    const day = String(r.at).slice(0, 10);
+    const prevDay = ukDayKey(String(prev.at));
+    const day = ukDayKey(String(r.at));
     const flows = deposits.reduce((sum, d) => {
       const amt = Number(d?.amount);
-      const dd = String(d?.date ?? "").slice(0, 10);
+      const dd = ukDayKey(String(d?.date ?? ""));
       return Number.isFinite(amt) && dd > prevDay && dd <= day ? sum + amt : sum;
     }, 0);
     return {
@@ -220,7 +215,7 @@ export function EquityPctChart({
         : equity.map((e) => ({ at: String(e.snapshot_date), value: Number(e.total_value) }));
     // Never plot points from before the portfolio went live.
     const source = inceptionDate
-      ? raw.filter((r) => String(r.at).slice(0, 10) >= inceptionDate)
+      ? raw.filter((r) => ukDayKey(String(r.at)) >= ukDayKey(inceptionDate))
       : raw;
 
     const rows =
@@ -270,6 +265,7 @@ export function EquityPctChart({
         <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
           <span className="text-xs font-medium text-muted-foreground">
             Equity change vs invested capital
+            {resolution === "hourly" ? ` · times ${ukZoneAbbr()}` : ""}
           </span>
           <div className="flex items-center gap-2">
             {portfolioId && (
