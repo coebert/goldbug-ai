@@ -1674,6 +1674,22 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         sizingNotes.push(`rank #${rankInfo.rank}/${rankInfo.universe_size} x0.5`);
       }
 
+      // FEAR INDEX overlay — panic blocks fresh buys outright, elevated fear
+      // shrinks them, complacency trims risk-taking slightly.
+      if (fearIndex.blockNewBuys) {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason,
+          rejected: `fear index ${fearIndex.score.toFixed(0)}/100 (panic) — new buys blocked`,
+        });
+        continue;
+      }
+      if (fearIndex.sizeMultiplier !== 1) {
+        spend *= fearIndex.sizeMultiplier;
+        sizingNotes.push(`fear${fearIndex.score.toFixed(0)}×${fearIndex.sizeMultiplier.toFixed(2)}`);
+      }
+
+
       // Portfolio-level 5-day drawdown → shrink new buys
       if (ddSizing.size_multiplier < 1) {
         spend *= ddSizing.size_multiplier;
