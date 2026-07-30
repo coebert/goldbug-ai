@@ -941,7 +941,12 @@ function PortfolioPage() {
               inceptionDate={q.data?.inceptionDate ?? null}
             />
 
+            <div className="mt-2 flex justify-end">
+              <ExperienceLevelToggle />
+            </div>
+
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
+
               {/* Mobile: single-row horizontally scrollable strip with snap so
                   the tab set doesn't consume 3–4 vertical rows on 375px.
                   Desktop keeps the wrap-free flex layout. */}
