@@ -1656,7 +1656,7 @@ function PortfolioPage() {
                             />
                             <YAxis
                               domain={["auto", "auto"]}
-                              width={isMobile ? 56 : 72}
+                              width={isMobile ? 56 : 92}
                               tick={AXIS_TICK}
                               stroke={chartTheme.axis}
                               tickFormatter={(v) =>
@@ -1673,12 +1673,13 @@ function PortfolioPage() {
                                       value: yAxisLabel(compareMode, p.currency),
                                       angle: -90,
                                       position: "insideLeft",
-                                      offset: 8,
+                                      offset: -2,
                                       style: { textAnchor: "middle" },
                                       fill: chartTheme.axisText,
                                       fontSize: 12,
                                     }
                               }
+
                               axisLine={AXIS_LINE}
                               tickLine={TICK_LINE}
                             />
