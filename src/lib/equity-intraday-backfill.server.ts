@@ -148,6 +148,7 @@ export async function backfillPortfolioIntradayEquity(
     portfolioId,
     snapshots: snaps?.length ?? 0,
     rowsWritten: written,
+    priceShapedRows: priceRows.length,
     fromBucket: rows[0].bucket_hour,
     toBucket: rows[rows.length - 1].bucket_hour,
   };
