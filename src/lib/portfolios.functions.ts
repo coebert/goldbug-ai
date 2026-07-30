@@ -350,13 +350,21 @@ export const getPortfolio = createServerFn({ method: "GET" })
       ? startingCash - startingCashAbsorbed
       : startingCash;
 
+    // Clip pre-inception snapshots: history that predates the portfolio (or,
+    // for live portfolios, the day it went live) is not its performance.
+    const inceptionDate = portfolioInceptionDate(portfolio as never);
+    const clippedEquity = clipToInception(equity ?? [], inceptionDate, (r) =>
+      String((r as { snapshot_date?: unknown }).snapshot_date ?? ""),
+    );
+
     return {
       portfolio,
       holdings: holdings ?? [],
       trades: trades ?? [],
       decisions: decisions ?? [],
-      equity: equity ?? [],
-      deposits,
+      equity: clippedEquity,
+      inceptionDate,
+      deposits: clipToInception(deposits, inceptionDate, (d) => d.date),
       // starting_cash with any already-absorbed deposits stripped out, so
       // `baselineStartingCash + deposits === starting_cash`.
       baselineStartingCash,
