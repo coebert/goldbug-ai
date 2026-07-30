@@ -1293,9 +1293,9 @@ function PortfolioPage() {
                           tickFormatter={(v) => formatDateTick(v, isMobile)}
                           label={isMobile ? undefined : { value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
                         />
-                        <YAxis width={64}
+                        <YAxis
                           domain={["auto", "auto"]}
-                          width={isMobile ? 44 : 72}
+                          width={isMobile ? 56 : 72}
                           tick={AXIS_TICK}
                           stroke={chartTheme.axis}
                           tickFormatter={(v) => formatValueTick(v, { currency: p.currency, isPct: compareMode === "pct", isMobile })}
