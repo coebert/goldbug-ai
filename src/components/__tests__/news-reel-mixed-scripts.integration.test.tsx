@@ -144,7 +144,12 @@ function order(html: string, items: NewsReelItem[]): string[] {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
 }
 
 let html = "";
@@ -153,12 +158,15 @@ beforeEach(() => {
 });
 
 describe("news reel with mixed Latin / CJK / Cyrillic headlines", () => {
-  it("renders every headline exactly once, in its original script", () => {
-    for (const it of ITEMS) {
-      const needle = escapeHtml(it.headline);
-      expect(html, `missing headline ${it.id}`).toContain(needle);
-      expect(html.split(needle).length - 1, `duplicate headline ${it.id}`).toBe(1);
+  it("renders every headline, in its original script, once per layout variant", () => {
+    // The reel emits a compact (mobile) and an expanded (desktop) variant of
+    // each row, so every headline appears the same number of times — mixing
+    // scripts must not drop or duplicate a row in one variant only.
+    const counts = ITEMS.map((it) => html.split(escapeHtml(it.headline)).length - 1);
+    for (const [i, n] of counts.entries()) {
+      expect(n, `missing headline ${ITEMS[i].id}`).toBeGreaterThan(0);
     }
+    expect(new Set(counts).size, `uneven render counts: ${counts.join(",")}`).toBe(1);
     // Non-Latin characters survive rendering un-mangled (no mojibake / escapes).
     expect(html).toContain("삼성전자");
     expect(html).toContain("Урожай пшеницы");
