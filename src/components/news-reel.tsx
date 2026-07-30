@@ -1048,8 +1048,10 @@ export function NewsReel() {
                     originalLanguage={item.original_language}
                     originalHeadline={item.original_headline}
                     confidence={item.translation_confidence}
+                    headline={item.headline}
                     className="mt-2"
                   />
+
 
 
 
