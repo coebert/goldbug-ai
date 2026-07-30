@@ -811,7 +811,7 @@ function PortfolioPage() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={email} />
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4">
         <Link
           to="/"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
