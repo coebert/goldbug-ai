@@ -62,7 +62,7 @@ export async function refreshGlobalNewsNow(max = 60): Promise<NewsRefreshResult>
   if (items.length > 0) {
     try {
       const { ensureRelevanceScored } = await import("./news-relevance.server");
-      relevanceScored = (await ensureRelevanceScored(today)).scored;
+      relevanceScored = (await ensureRelevanceScored(today, { trigger: "news-refresh" })).scored;
     } catch (err) {
       console.warn("news-refresh: relevance pass failed", err instanceof Error ? err.message : String(err));
     }

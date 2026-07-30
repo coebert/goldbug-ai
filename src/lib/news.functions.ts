@@ -67,7 +67,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       const dates = Array.from(new Set(unranked.map((r) => r.news_date as string))).slice(0, 3);
       try {
         const ctx = await loadRelevanceContext();
-        for (const d of dates) await ensureRelevanceScored(d, { ctx, max: 60 });
+        for (const d of dates) await ensureRelevanceScored(d, { ctx, max: 60, trigger: "reel-repair" });
         news = await readNews();
       } catch (err) {
         console.warn("news reel: relevance repair failed", err instanceof Error ? err.message : String(err));

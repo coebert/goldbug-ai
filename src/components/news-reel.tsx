@@ -11,6 +11,7 @@ import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
 import { relevanceBand, relevanceBandLabel, sortByRelevance } from "@/lib/news-relevance";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
 import { NewsBackfillControls } from "@/components/news-backfill-controls";
+import { NewsRelevanceTelemetryCard } from "@/components/news-relevance-telemetry-card";
 
 /** Badge colour per relevance band — semantic tokens only. */
 function relevanceCls(score: number): string {
@@ -513,6 +514,7 @@ export function NewsReel() {
 
         <div className="mt-3">
           <NewsBackfillControls />
+          <NewsRelevanceTelemetryCard />
         </div>
 
 

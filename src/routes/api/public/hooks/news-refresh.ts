@@ -48,7 +48,7 @@ export const Route = createFileRoute("/api/public/hooks/news-refresh")({
           let relevanceScored = 0;
           try {
             const { ensureRelevanceScored } = await import("@/lib/news-relevance.server");
-            relevanceScored = (await ensureRelevanceScored(today)).scored;
+            relevanceScored = (await ensureRelevanceScored(today, { trigger: "cron-hook" })).scored;
           } catch (err) {
             console.warn("news-refresh: relevance pass failed", err instanceof Error ? err.message : String(err));
           }
