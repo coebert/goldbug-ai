@@ -95,7 +95,7 @@ describe("newCatalogueSources", () => {
 
   it("returns only feeds whose publisher has no history in the cache", () => {
     const fresh = newCatalogueSources(sources, ["feeds.reuters.com"]);
-    expect(fresh.map((s) => s.id)).toEqual(["nikkei", "broken"].filter((id) => id !== "broken"));
+    expect(fresh.map((s) => s.id)).toEqual(["nikkei"]);
   });
 
   it("ignores www. prefixes and casing when matching known domains", () => {
