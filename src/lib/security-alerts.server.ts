@@ -57,7 +57,7 @@ export function maybeNotifySecurityEvent(params: {
         if (now - last < settings.cooldown_minutes * 60_000) return;
       }
 
-      const title = "Security alert: pending_slices";
+      const title = `Security alert: ${params.event}`;
       const body =
         `${total} SECURITY:${params.event} events in the last ${settings.window_minutes}m` +
         (params.reason ? ` (latest: ${params.reason})` : "");
