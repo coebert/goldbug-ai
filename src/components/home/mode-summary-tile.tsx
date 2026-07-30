@@ -27,11 +27,11 @@ export function ModeSummaryTile({
   const safeMoney = Number.isFinite(money) ? (Object.is(money, -0) ? 0 : money) : 0;
   const safePnl = Number.isFinite(pnl) ? (Object.is(pnl, -0) ? 0 : pnl) : 0;
   const safePct = Number.isFinite(pct) ? (Object.is(pct, -0) ? 0 : pct) : 0;
-  const borderTone = tone === "real" ? "border-emerald-500/50" : "border-cyan-500/40";
+  const borderTone = tone === "real" ? "border-success/50" : "border-info/40";
   const chipTone =
     tone === "real"
-      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
-      : "bg-cyan-500/15 text-cyan-300 border-cyan-500/40";
+      ? "bg-success-soft/60 text-success border-success/40"
+      : "bg-info-soft/60 text-info border-info/40";
   return (
     <div className={`min-w-0 rounded-lg border ${borderTone} bg-card px-3 py-3 sm:px-4`}>
       <div className="flex items-center justify-between gap-2">
@@ -42,14 +42,14 @@ export function ModeSummaryTile({
       </div>
       {empty ? (
         <div className="mt-1 text-sm text-muted-foreground">
-          No {tone === "real" ? "real-money" : "simulated"} portfolios
+          No {tone === "real" ? "real-money" : "practice"} portfolios
         </div>
       ) : (
         <>
           <div className="mt-1 truncate text-base font-semibold tabular-nums sm:text-lg">
             {new Intl.NumberFormat(undefined, { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(safeMoney)}
           </div>
-          <div className={`flex items-center gap-1 text-xs tabular-nums ${safePnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          <div className={`flex items-center gap-1 text-xs tabular-nums ${safePnl >= 0 ? "text-success" : "text-destructive"}`}>
             {safePnl >= 0 ? <TrendingUp className="h-3 w-3" aria-hidden="true" /> : <TrendingDown className="h-3 w-3" aria-hidden="true" />}
             <span>
               {safePnl >= 0 ? "+" : ""}

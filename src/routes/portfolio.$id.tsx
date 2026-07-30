@@ -123,6 +123,10 @@ import { RiskControlsCard } from "@/components/risk-controls-card";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { AdvancedSection } from "@/components/advanced-section";
+import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
+import { useIsAdvanced } from "@/lib/use-experience-level";
+
 import { ExecutionCalibrationCard } from "@/components/execution-calibration-card";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
@@ -244,12 +248,20 @@ export const Route = createFileRoute("/portfolio/$id")({
   component: PortfolioPage,
 });
 
+const SIMPLE_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk"];
+
 function PortfolioPage() {
   const { id } = Route.useParams();
-  const { tab } = Route.useSearch();
+  const { tab: rawTab } = Route.useSearch();
+  const advancedLevel = useIsAdvanced();
+  // In Simple mode the expert tabs aren't rendered, so a deep link to one
+  // would leave the tab strip with no active trigger — fall back to Summary.
+  const tab: PortfolioTab =
+    advancedLevel || SIMPLE_TABS.includes(rawTab) ? rawTab : "overview";
   const navigate = useNavigate();
   const setTab = (next: PortfolioTab) =>
     navigate({ to: "/portfolio/$id", params: { id }, search: { tab: next }, replace: true });
+
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tradeSort, setTradeSort] = useState<{
@@ -929,40 +941,52 @@ function PortfolioPage() {
               inceptionDate={q.data?.inceptionDate ?? null}
             />
 
+            <div className="mt-2 flex justify-end">
+              <ExperienceLevelToggle />
+            </div>
+
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
+
               {/* Mobile: single-row horizontally scrollable strip with snap so
                   the tab set doesn't consume 3–4 vertical rows on 375px.
                   Desktop keeps the wrap-free flex layout. */}
               <TabsList className="-mx-4 flex w-auto max-w-none justify-start gap-1 h-auto overflow-x-auto scroll-smooth snap-x snap-mandatory px-4 p-1 md:mx-0 md:w-full md:max-w-full md:flex-nowrap md:overflow-x-auto md:px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <TabsTrigger value="overview" className="min-h-10 shrink-0 snap-start">
-                  Overview
+                  Summary
                 </TabsTrigger>
                 <TabsTrigger value="trades" className="min-h-10 shrink-0 snap-start">
-                  Trades ({trades.length})
+                  Buys &amp; sells ({trades.length})
                 </TabsTrigger>
                 <TabsTrigger value="decisions" className="min-h-10 shrink-0 snap-start">
-                  Decisions ({decisions.length})
-                </TabsTrigger>
-                <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">
-                  Audit
-                </TabsTrigger>
-                <TabsTrigger value="errors" className="min-h-10 shrink-0 snap-start">
-                  Errors
-                </TabsTrigger>
-
-                <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">
-                  Confidence
+                  Why ({decisions.length})
                 </TabsTrigger>
                 <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">
-                  Risk
+                  Safety limits
                 </TabsTrigger>
-                <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">
-                  Diagnostics
-                </TabsTrigger>
-                <TabsTrigger value="reports" className="min-h-10 shrink-0 snap-start">
-                  Reports
-                </TabsTrigger>
+                {/* Expert-only tabs. Hidden in Simple mode so a newcomer sees
+                    four choices instead of nine — the Simple/Advanced switch
+                    above brings them straight back. */}
+                {advancedLevel && (
+                  <>
+                    <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">
+                      Audit trail
+                    </TabsTrigger>
+                    <TabsTrigger value="errors" className="min-h-10 shrink-0 snap-start">
+                      Errors
+                    </TabsTrigger>
+                    <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">
+                      Confidence
+                    </TabsTrigger>
+                    <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">
+                      Diagnostics
+                    </TabsTrigger>
+                    <TabsTrigger value="reports" className="min-h-10 shrink-0 snap-start">
+                      Reports
+                    </TabsTrigger>
+                  </>
+                )}
               </TabsList>
+
 
               <TabsContent value="overview" className="mt-4">
                 <CurrencyDiagnosticsBanner
@@ -986,12 +1010,6 @@ function PortfolioPage() {
                     series={holdingsSeries}
                     portfolioId={id}
                   />
-                </div>
-                <div className="mb-6">
-                  <TailHedgeCard portfolioId={id} currency={p.currency} />
-                </div>
-                <div className="mb-6">
-                  <TailHedgeReportCard portfolioId={id} currency={p.currency} />
                 </div>
                 <Card className="mb-6">
                   <CardContent className="flex flex-wrap items-center gap-3 py-4">
@@ -1056,6 +1074,18 @@ function PortfolioPage() {
                   </CardContent>
                 </Card>
 
+                <div className="mb-6 space-y-3">
+                  <div>
+                    <h3 className="font-display text-base font-semibold tracking-tight">Look deeper</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Optional detail. Nothing here needs your attention day to day.
+                    </p>
+                  </div>
+                  <AdvancedSection
+                    title="How this portfolio is performing"
+                    summary="Return, risk and how it compares with a simple index fund."
+                    defaultOpen={advancedLevel}
+                  >
                 {p && (
                   <div className="mb-4">
                     <PerformanceDashboardCard
@@ -1067,7 +1097,6 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <VanguardBenchmarkCard
@@ -1079,7 +1108,12 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="What changed your value"
+                    summary="Day by day, separating trading gains from money you paid in."
+                    defaultOpen={advancedLevel}
+                  >
                 {p && (
                   <div className="mb-4">
                     <EquityChangeBreakdownCard
@@ -1089,7 +1123,6 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <DailyEquityChangesCard
@@ -1099,7 +1132,12 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
-
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="Cash, currencies and spending power"
+                    summary="What is left to spend, in which currency, and how that has moved."
+                    defaultOpen={advancedLevel}
+                  >
                 {p && (
                   <div className="mb-4">
                     <Suspense
@@ -1109,7 +1147,6 @@ function PortfolioPage() {
                     </Suspense>
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <Suspense
@@ -1119,7 +1156,6 @@ function PortfolioPage() {
                     </Suspense>
                   </div>
                 )}
-
                 {p && (
                   <div className="mb-4">
                     <Suspense
@@ -1129,7 +1165,24 @@ function PortfolioPage() {
                     </Suspense>
                   </div>
                 )}
-
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="Crash protection"
+                    summary="The hedge that cushions the portfolio when markets fall sharply."
+                    defaultOpen={advancedLevel}
+                  >
+                <div className="mb-6">
+                  <TailHedgeCard portfolioId={id} currency={p.currency} />
+                </div>
+                <div className="mb-6">
+                  <TailHedgeReportCard portfolioId={id} currency={p.currency} />
+                </div>
+                  </AdvancedSection>
+                  <AdvancedSection
+                    title="Practice runs on past data"
+                    summary="Backtests — how this strategy would have done in the past."
+                    defaultOpen={advancedLevel}
+                  >
                 {lastBtMetrics && (
                   <Card className="mb-4">
                     <CardHeader className="pb-2">
@@ -1197,7 +1250,6 @@ function PortfolioPage() {
                     </CardContent>
                   </Card>
                 )}
-
                 {backtestRunToken > 0 && lastBtDays != null && (
                   <Suspense
                     fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
@@ -1210,10 +1262,11 @@ function PortfolioPage() {
                     />
                   </Suspense>
                 )}
-
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
                 </Suspense>
+                  </AdvancedSection>
+                </div>
 
                 {(() => {
                   const cb = p.circuit_breaker as {
