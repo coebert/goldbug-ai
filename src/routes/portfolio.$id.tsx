@@ -1539,11 +1539,9 @@ function PortfolioPage() {
                               },
                             ] as const
                           ).map((m) => {
-                            const fmt = (v: number | null | undefined) => {
-                              if (v == null || !Number.isFinite(v)) return "—";
-                              const s = m.signed && v > 0 ? "+" : "";
-                              return `${s}${v.toFixed(2)}${m.suffix}`;
-                            };
+                            const fmt = (v: number | null | undefined) =>
+                              formatMetricValue(v, m.signed, m.suffix);
+
                             const derived = (obj: { annReturn: number; annVol: number } | null) =>
                               obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
                             const pick = (obj: typeof perfMetrics.port | null) => {
