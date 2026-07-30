@@ -117,9 +117,10 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
 
       for (let i = 0; i < usedNews.length; i++) {
         const n = usedNews[i];
-        const head = (n.headline ?? "").trim();
+        const head = normalizeHeadlineKey(n.headline);
         if (!head) continue;
         const bucket = infl.get(head) ?? {
+
           sum: 0, n: 0, rows: [],
           assetClasses: new Set<string>(), riskLevels: new Set<string>(), symbols: new Set<string>(),
         };
