@@ -1,10 +1,19 @@
 import { useMemo, useState } from "react";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
-import { CHART_ROLE, CHART_SEQUENCE, AXIS_TICK } from "@/lib/chart-palette";
+import { CHART_ROLE, CHART_SEQUENCE, AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
 import type { PerTradeFeeRow } from "@/lib/fee-breakdown";
 
 /** Builds a cumulative-fee-drag-over-time series and a per-asset stacked
@@ -27,7 +36,11 @@ export function FeeDragCharts({
     >();
     for (const r of perTrade) {
       const row = map.get(r.symbol) ?? {
-        symbol: r.symbol, buyFee: 0, sellFee: 0, commission: 0, notional: 0,
+        symbol: r.symbol,
+        buyFee: 0,
+        sellFee: 0,
+        commission: 0,
+        notional: 0,
       };
       row.commission += r.commission;
       row.notional += r.notional;
@@ -51,7 +64,10 @@ export function FeeDragCharts({
     const byDate = new Map<string, { date: string; buy: number; sell: number; notional: number }>();
     for (const r of perTrade) {
       const row = byDate.get(r.trade_date) ?? {
-        date: r.trade_date, buy: 0, sell: 0, notional: 0,
+        date: r.trade_date,
+        buy: 0,
+        sell: 0,
+        notional: 0,
       };
       row.notional += r.notional;
       if (r.side === "buy") row.buy += r.commission;
@@ -59,7 +75,9 @@ export function FeeDragCharts({
       byDate.set(r.trade_date, row);
     }
     const sorted = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-    let cumBuy = 0, cumSell = 0, cumNotional = 0;
+    let cumBuy = 0,
+      cumSell = 0,
+      cumNotional = 0;
     return sorted.map((r) => {
       cumBuy += r.buy;
       cumSell += r.sell;
@@ -132,11 +150,14 @@ export function FeeDragCharts({
             <AreaChart data={daily} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-              <YAxis width={64}
+              <YAxis
+                width={64}
                 tick={AXIS_TICK}
                 tickFormatter={(v: number) =>
                   scale === "cost"
-                    ? v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0)
+                    ? v >= 1000
+                      ? `${(v / 1000).toFixed(1)}k`
+                      : v.toFixed(0)
                     : `${v.toFixed(0)}bps`
                 }
               />
@@ -146,31 +167,43 @@ export function FeeDragCharts({
                   border: "1px solid var(--border)",
                   borderRadius: 6,
                   fontSize: 12,
+                  color: "var(--popover-foreground)",
                 }}
                 formatter={(v: number, name: string) => {
                   if (name === "Drag (bps)") return [`${v.toFixed(1)} bps`, name];
                   return [money(Number(v)), name];
                 }}
               />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Legend wrapperStyle={LEGEND_STYLE} />
               {scale === "cost" ? (
                 <>
                   <Area
-                    type="monotone" dataKey="cumBuy" stackId="fees"
+                    type="monotone"
+                    dataKey="cumBuy"
+                    stackId="fees"
                     name="Cumulative buy fees"
-                    stroke={CHART_ROLE.positive} fill={CHART_ROLE.positive} fillOpacity={0.35}
+                    stroke={CHART_ROLE.positive}
+                    fill={CHART_ROLE.positive}
+                    fillOpacity={0.35}
                   />
                   <Area
-                    type="monotone" dataKey="cumSell" stackId="fees"
+                    type="monotone"
+                    dataKey="cumSell"
+                    stackId="fees"
                     name="Cumulative sell fees"
-                    stroke={CHART_ROLE.negative} fill={CHART_ROLE.negative} fillOpacity={0.35}
+                    stroke={CHART_ROLE.negative}
+                    fill={CHART_ROLE.negative}
+                    fillOpacity={0.35}
                   />
                 </>
               ) : (
                 <Area
-                  type="monotone" dataKey="cumDragBps"
+                  type="monotone"
+                  dataKey="cumDragBps"
                   name="Drag (bps)"
-                  stroke={CHART_ROLE.highlight} fill={CHART_ROLE.highlight} fillOpacity={0.35}
+                  stroke={CHART_ROLE.highlight}
+                  fill={CHART_ROLE.highlight}
+                  fillOpacity={0.35}
                 />
               )}
             </AreaChart>
@@ -184,7 +217,8 @@ export function FeeDragCharts({
           <div>
             <h4 className="text-sm font-medium">Fees by asset</h4>
             <p className="text-xs text-muted-foreground">
-              Top {topSymbols.length} of {perSymbol.length} symbols by total commission. Buy vs sell split shown.
+              Top {topSymbols.length} of {perSymbol.length} symbols by total commission. Buy vs sell
+              split shown.
             </p>
           </div>
           <Badge variant="outline" className="text-[10px] font-normal">
@@ -213,14 +247,17 @@ export function FeeDragCharts({
                   border: "1px solid var(--border)",
                   borderRadius: 6,
                   fontSize: 12,
+                  color: "var(--popover-foreground)",
                 }}
                 formatter={(v: number, name: string, entry) => {
                   const row = entry?.payload as (typeof topSymbols)[number] | undefined;
-                  const extra = row ? ` · ${row.dragBps.toFixed(1)} bps of ${money(row.notional)}` : "";
+                  const extra = row
+                    ? ` · ${row.dragBps.toFixed(1)} bps of ${money(row.notional)}`
+                    : "";
                   return [`${money(Number(v))}${extra}`, name];
                 }}
               />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Legend wrapperStyle={LEGEND_STYLE} />
               <Bar dataKey="buyFee" stackId="fees" name="Buy fees" fill={CHART_ROLE.positive}>
                 {topSymbols.map((_, i) => (
                   <Cell key={`buy-${i}`} fill={CHART_ROLE.positive} />
@@ -230,9 +267,11 @@ export function FeeDragCharts({
                 {topSymbols.map((_, i) => (
                   <Cell
                     key={`sell-${i}`}
-                    fill={CHART_SEQUENCE[i % CHART_SEQUENCE.length] === CHART_ROLE.negative
-                      ? CHART_ROLE.negative
-                      : CHART_ROLE.negative}
+                    fill={
+                      CHART_SEQUENCE[i % CHART_SEQUENCE.length] === CHART_ROLE.negative
+                        ? CHART_ROLE.negative
+                        : CHART_ROLE.negative
+                    }
                   />
                 ))}
               </Bar>
@@ -242,9 +281,9 @@ export function FeeDragCharts({
       </div>
 
       <p className="sr-only" aria-live="polite">
-        Total commissions {money(totalFees)} across {perTrade.length} trades. Cumulative drag
-        {" "}{totalDragBps.toFixed(1)} basis points of turnover. Top cost symbol:
-        {" "}{topSymbols[0]?.symbol ?? "n/a"} at {money(topSymbols[0]?.commission ?? 0)}.
+        Total commissions {money(totalFees)} across {perTrade.length} trades. Cumulative drag{" "}
+        {totalDragBps.toFixed(1)} basis points of turnover. Top cost symbol:{" "}
+        {topSymbols[0]?.symbol ?? "n/a"} at {money(topSymbols[0]?.commission ?? 0)}.
       </p>
     </div>
   );

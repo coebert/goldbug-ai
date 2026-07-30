@@ -20,11 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AXIS_TICK } from "@/lib/chart-palette";
-import {
-  buildConfidenceTimeline,
-  type ConfidencePoint,
-} from "@/lib/confidence-timeline";
+import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
+import { buildConfidenceTimeline, type ConfidencePoint } from "@/lib/confidence-timeline";
 
 type Decision = { id: string; run_date: string; raw: unknown };
 
@@ -41,7 +38,13 @@ function fmtDate(iso: string): string {
 
 type ChartRow = ConfidencePoint & { dateLabel: string };
 
-function TimelineTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: ChartRow }> }) {
+function TimelineTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartRow }>;
+}) {
   if (!active || !payload || payload.length === 0) return null;
   const p = payload[0].payload;
   return (
@@ -92,8 +95,8 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
           <CardTitle>Confidence over time</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          No AI decisions yet — run one day or a backtest to see confidence
-          scores plotted per asset.
+          No AI decisions yet — run one day or a backtest to see confidence scores plotted per
+          asset.
         </CardContent>
       </Card>
     );
@@ -105,8 +108,8 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
         <div>
           <CardTitle>Confidence over time</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            How each order's confidence score has evolved across decisions.
-            Regime shifts (▲) and news alignment are shown in the tooltip.
+            How each order's confidence score has evolved across decisions. Regime shifts (▲) and
+            news alignment are shown in the tooltip.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -134,10 +137,13 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
                 Avg: {Math.round(rows.reduce((a, r) => a + r.score, 0) / rows.length)}
               </Badge>
               <Badge variant="outline">
-                Range: {Math.min(...rows.map((r) => r.score))}–{Math.max(...rows.map((r) => r.score))}
+                Range: {Math.min(...rows.map((r) => r.score))}–
+                {Math.max(...rows.map((r) => r.score))}
               </Badge>
               {transitions.length > 0 && (
-                <Badge variant="secondary">{transitions.length} regime shift{transitions.length === 1 ? "" : "s"}</Badge>
+                <Badge variant="secondary">
+                  {transitions.length} regime shift{transitions.length === 1 ? "" : "s"}
+                </Badge>
               )}
             </div>
 
@@ -148,7 +154,7 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
                   <XAxis dataKey="dateLabel" tick={AXIS_TICK} />
                   <YAxis width={64} domain={[0, 100]} tick={AXIS_TICK} />
                   <Tooltip content={<TimelineTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={LEGEND_STYLE} />
                   <Line
                     type="monotone"
                     dataKey="score"
@@ -191,8 +197,8 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Orange rings mark decisions taken on a regime transition day —
-              hover any point for the full score breakdown.
+              Orange rings mark decisions taken on a regime transition day — hover any point for the
+              full score breakdown.
             </p>
           </>
         ) : (

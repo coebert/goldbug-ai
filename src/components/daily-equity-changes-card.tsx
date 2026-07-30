@@ -143,8 +143,8 @@ export function DailyEquityChangesCard({
             <CalendarDays className="h-4 w-4" /> Daily equity change
           </CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Trading-only day-over-day % change. Deposits, withdrawals and
-            account re-baselining days are excluded.
+            Trading-only day-over-day % change. Deposits, withdrawals and account re-baselining days
+            are excluded.
           </p>
         </div>
         <div
@@ -202,10 +202,7 @@ export function DailyEquityChangesCard({
                 Deposits and withdrawals are excluded.
               </span>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 8, right: 8, left: -16, bottom: 4 }}
-                >
+                <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
                   <XAxis
                     dataKey="label"
                     tick={AXIS_TICK}
@@ -247,8 +244,8 @@ export function DailyEquityChangesCard({
                           ) : null}
                           {d.basisReset ? (
                             <div className="mt-1 text-muted-foreground">
-                              Account re-baselined by a cash transfer — trading P&amp;L
-                              isn't measurable for this day.
+                              Account re-baselined by a cash transfer — trading P&amp;L isn't
+                              measurable for this day.
                             </div>
                           ) : null}
                         </div>

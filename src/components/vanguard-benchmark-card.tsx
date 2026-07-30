@@ -108,8 +108,7 @@ export function VanguardBenchmarkCard({
       ? "Trailing passive"
       : "In line with passive";
 
-  const fmtPct = (n: number) =>
-    `${n >= 0 ? "+" : ""}${Number.isFinite(n) ? n.toFixed(2) : "—"}%`;
+  const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${Number.isFinite(n) ? n.toFixed(2) : "—"}%`;
 
   return (
     <Card>
@@ -122,16 +121,16 @@ export function VanguardBenchmarkCard({
           </Badge>
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          What a boring, low-cost Vanguard LifeStrategy 60% Equity fund would
-          have done with the same starting pot and top-ups — the alpha below
-          is the value the AI is adding (or destroying) over pure passive.
+          What a boring, low-cost Vanguard LifeStrategy 60% Equity fund would have done with the
+          same starting pot and top-ups — the alpha below is the value the AI is adding (or
+          destroying) over pure passive.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {!hasData && (
           <p className="text-sm text-muted-foreground">
-            No equity snapshots yet — once the portfolio has a couple of
-            daily marks, the passive comparison will appear here.
+            No equity snapshots yet — once the portfolio has a couple of daily marks, the passive
+            comparison will appear here.
           </p>
         )}
 
@@ -142,7 +141,11 @@ export function VanguardBenchmarkCard({
                 label="Portfolio"
                 value={fmtCcy.format(cmp.portfolioValue)}
                 sub={fmtPct(cmp.portfolioReturnPct)}
-                cls={cmp.portfolioReturnPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}
+                cls={
+                  cmp.portfolioReturnPct >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-destructive"
+                }
               />
               <Tile
                 label="Vanguard 60/40"
@@ -194,6 +197,7 @@ export function VanguardBenchmarkCard({
                         border: "1px solid var(--border)",
                         borderRadius: 6,
                         fontSize: 12,
+                        color: "var(--popover-foreground)",
                       }}
                     />
                     <Line
@@ -250,8 +254,8 @@ export function VanguardBenchmarkCard({
                 />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
-                Components sum to the total alpha above; positive values mean
-                that driver added to your edge over the passive baseline.
+                Components sum to the total alpha above; positive values mean that driver added to
+                your edge over the passive baseline.
               </p>
             </div>
 
@@ -260,9 +264,7 @@ export function VanguardBenchmarkCard({
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Risk-level what-if
                 </div>
-                <div className="font-mono text-[10px] text-muted-foreground">
-                  vs Vanguard
-                </div>
+                <div className="font-mono text-[10px] text-muted-foreground">vs Vanguard</div>
               </div>
               <div className="-mx-1 overflow-x-auto">
                 <table className="w-full min-w-[380px] text-xs">
@@ -294,7 +296,8 @@ export function VanguardBenchmarkCard({
                             )}
                           </div>
                           <div className="font-mono text-[10px] text-muted-foreground">
-                            exp ×{r.exposureFactor.toFixed(2)} · conc ×{r.concentrationFactor.toFixed(2)}
+                            exp ×{r.exposureFactor.toFixed(2)} · conc ×
+                            {r.concentrationFactor.toFixed(2)}
                           </div>
                         </td>
                         <SimCell amount={r.timing} fmt={fmtCcy} />
@@ -306,9 +309,9 @@ export function VanguardBenchmarkCard({
                 </table>
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
-                Linear counterfactual: timing scales with equity exposure
-                (1 − cash floor), allocation scales with the position cap.
-                Deposit timing is unchanged. Not a full re-simulation.
+                Linear counterfactual: timing scales with equity exposure (1 − cash floor),
+                allocation scales with the position cap. Deposit timing is unchanged. Not a full
+                re-simulation.
               </p>
             </div>
 
@@ -342,12 +345,8 @@ function Tile({
 }) {
   return (
     <div className="rounded-md border bg-card/40 p-3">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className={`mt-1 text-lg font-semibold tabular-nums ${cls ?? ""}`}>
-        {value}
-      </div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`mt-1 text-lg font-semibold tabular-nums ${cls ?? ""}`}>{value}</div>
       {sub && <div className={`text-xs tabular-nums ${cls ?? "text-muted-foreground"}`}>{sub}</div>}
     </div>
   );
@@ -365,18 +364,12 @@ function AttrRow({
   hint: string;
 }) {
   const positive = amount >= 0;
-  const cls = positive
-    ? "text-emerald-600 dark:text-emerald-400"
-    : "text-destructive";
+  const cls = positive ? "text-emerald-600 dark:text-emerald-400" : "text-destructive";
   const display = `${positive ? "+" : ""}${fmt.format(amount)}`;
   return (
     <div className="rounded-md border bg-card/40 p-2" title={hint}>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className={`mt-0.5 text-sm font-semibold tabular-nums ${cls}`}>
-        {display}
-      </div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`mt-0.5 text-sm font-semibold tabular-nums ${cls}`}>{display}</div>
     </div>
   );
 }
@@ -391,16 +384,11 @@ function SimCell({
   bold?: boolean;
 }) {
   const positive = amount >= 0;
-  const cls = positive
-    ? "text-emerald-600 dark:text-emerald-400"
-    : "text-destructive";
+  const cls = positive ? "text-emerald-600 dark:text-emerald-400" : "text-destructive";
   return (
-    <td
-      className={`px-1 py-1.5 text-right tabular-nums ${cls} ${bold ? "font-semibold" : ""}`}
-    >
+    <td className={`px-1 py-1.5 text-right tabular-nums ${cls} ${bold ? "font-semibold" : ""}`}>
       {positive ? "+" : ""}
       {fmt.format(amount)}
     </td>
   );
 }
-

@@ -46,11 +46,16 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
     return <p className="text-sm text-muted-foreground">Computing diagnostics…</p>;
   }
   if (error) {
-    return <p className="text-sm text-destructive">Failed to load diagnostics: {(error as Error).message}</p>;
+    return (
+      <p className="text-sm text-destructive">
+        Failed to load diagnostics: {(error as Error).message}
+      </p>
+    );
   }
   if (!data) return null;
 
-  const { summary, calibration, perSignal, weightDrift, behavior, flags, rolling, eventImpact } = data;
+  const { summary, calibration, perSignal, weightDrift, behavior, flags, rolling, eventImpact } =
+    data;
 
   return (
     <div className="space-y-4">
@@ -129,23 +134,48 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   <XAxis
                     dataKey="index"
                     tick={AXIS_TICK}
-                    label={{ value: "Trade #", position: "insideBottom", offset: -2, fontSize: 12 }}
+                    label={{
+                      value: "Trade #",
+                      position: "insideBottom",
+                      offset: -2,
+                      fontSize: 12,
+                      fill: "var(--foreground)",
+                    }}
                   />
                   <YAxis
                     tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                     domain={[0, 1]}
                     tick={AXIS_TICK}
                     width={64}
-                    label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
+                    label={{
+                      value: "Win rate (%)",
+                      angle: -90,
+                      position: "insideLeft",
+                      offset: 8,
+                      style: { textAnchor: "middle" },
+                      fontSize: 12,
+                      fill: "var(--foreground)",
+                    }}
                   />
 
                   <ReferenceLine y={0.5} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                   <Tooltip
                     formatter={(v: number) => `${(v * 100).toFixed(0)}%`}
                     labelFormatter={(l) => `Trade #${l}`}
-                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }}
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      fontSize: 12,
+                      color: "var(--popover-foreground)",
+                    }}
                   />
-                  <Line type="monotone" dataKey="winRate" stroke="var(--primary)" dot={false} strokeWidth={2} />
+                  <Line
+                    type="monotone"
+                    dataKey="winRate"
+                    stroke="var(--primary)"
+                    dot={false}
+                    strokeWidth={2}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -160,8 +190,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
         </CardHeader>
         <CardContent>
           <p className="mb-3 text-xs text-muted-foreground">
-            Larger allocations should correspond to higher win rates and returns. Diverging bars suggest the AI's
-            confidence isn't matching outcomes.
+            Larger allocations should correspond to higher win rates and returns. Diverging bars
+            suggest the AI's confidence isn't matching outcomes.
           </p>
           <div className="h-56 w-full">
             <ResponsiveContainer>
@@ -170,7 +200,13 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                 <XAxis
                   dataKey="bucket"
                   tick={AXIS_TICK}
-                  label={{ value: "Order size bucket", position: "insideBottom", offset: -2, fontSize: 12 }}
+                  label={{
+                    value: "Order size bucket",
+                    position: "insideBottom",
+                    offset: -2,
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                  }}
                 />
                 <YAxis
                   yAxisId="left"
@@ -178,7 +214,15 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   domain={[0, 1]}
                   tick={AXIS_TICK}
                   width={64}
-                  label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
+                  label={{
+                    value: "Win rate (%)",
+                    angle: -90,
+                    position: "insideLeft",
+                    offset: 8,
+                    style: { textAnchor: "middle" },
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                  }}
                 />
                 <YAxis
                   yAxisId="right"
@@ -186,11 +230,24 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   tickFormatter={(v) => `${v.toFixed(1)}%`}
                   tick={AXIS_TICK}
                   width={68}
-                  label={{ value: "Avg fwd return (%)", angle: 90, position: "insideRight", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
+                  label={{
+                    value: "Avg fwd return (%)",
+                    angle: 90,
+                    position: "insideRight",
+                    offset: 8,
+                    style: { textAnchor: "middle" },
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                  }}
                 />
 
                 <Tooltip
-                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }}
+                  contentStyle={{
+                    background: "var(--card)",
+                    border: "1px solid var(--border)",
+                    fontSize: 12,
+                    color: "var(--popover-foreground)",
+                  }}
                   formatter={(v: number, name) =>
                     name === "winRate" ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(2)}%`
                   }
@@ -261,8 +318,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
           </CardHeader>
           <CardContent>
             <p className="mb-3 text-xs text-muted-foreground">
-              Trades placed inside major event windows vs calm periods. Compare which signals dominated the AI's
-              rationale and whether conviction matched outcomes.
+              Trades placed inside major event windows vs calm periods. Compare which signals
+              dominated the AI's rationale and whether conviction matched outcomes.
             </p>
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full min-w-[560px] text-sm">
@@ -320,30 +377,38 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex h-2 w-full overflow-hidden rounded bg-muted/30">
-                            {(Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).map((k, i) => {
-                              const v = Math.max(0, Number(e.weights[k] ?? 0));
-                              const palette = [
-                                "var(--primary)",
-                                "var(--chart-2)",
-                                "hsl(43 90% 55%)",
-                                "hsl(280 70% 62%)",
-                                "hsl(0 84% 60%)",
-                              ];
-                              return (
-                                <div
-                                  key={k}
-                                  style={{ width: `${Math.min(100, v)}%`, background: palette[i % palette.length] }}
-                                  title={`${SIGNAL_LABELS[k]}: ${v.toFixed(0)}%`}
-                                />
-                              );
-                            })}
+                            {(Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).map(
+                              (k, i) => {
+                                const v = Math.max(0, Number(e.weights[k] ?? 0));
+                                const palette = [
+                                  "var(--primary)",
+                                  "var(--chart-2)",
+                                  "hsl(43 90% 55%)",
+                                  "hsl(280 70% 62%)",
+                                  "hsl(0 84% 60%)",
+                                ];
+                                return (
+                                  <div
+                                    key={k}
+                                    style={{
+                                      width: `${Math.min(100, v)}%`,
+                                      background: palette[i % palette.length],
+                                    }}
+                                    title={`${SIGNAL_LABELS[k]}: ${v.toFixed(0)}%`}
+                                  />
+                                );
+                              },
+                            )}
                           </div>
                           <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground tabular-nums">
-                            {(Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).map((k) => (
-                              <span key={k}>
-                                {SIGNAL_LABELS[k]}: {Math.max(0, Number(e.weights[k] ?? 0)).toFixed(0)}%
-                              </span>
-                            ))}
+                            {(Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).map(
+                              (k) => (
+                                <span key={k}>
+                                  {SIGNAL_LABELS[k]}:{" "}
+                                  {Math.max(0, Number(e.weights[k] ?? 0)).toFixed(0)}%
+                                </span>
+                              ),
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -363,14 +428,17 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-xs text-muted-foreground">
-            Comparing the first {behavior.priorDecisions} decisions to the most recent {behavior.recentDecisions}.
+            Comparing the first {behavior.priorDecisions} decisions to the most recent{" "}
+            {behavior.recentDecisions}.
           </div>
           <div className="space-y-2">
             {weightDrift.map((d) => {
               const changed = Math.abs(d.delta) >= 15;
               return (
                 <div key={d.signal} className="flex items-center gap-3 text-sm">
-                  <div className="w-32 shrink-0 text-muted-foreground">{SIGNAL_LABELS[d.signal] ?? d.signal}</div>
+                  <div className="w-32 shrink-0 text-muted-foreground">
+                    {SIGNAL_LABELS[d.signal] ?? d.signal}
+                  </div>
                   <div className="flex-1 flex items-center gap-2">
                     <div className="h-2 flex-1 overflow-hidden rounded bg-muted/40">
                       <div
@@ -391,7 +459,10 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     </div>
                     <span className="w-12 text-right text-xs">{d.recent.toFixed(0)}%</span>
                   </div>
-                  <Badge variant={changed ? "destructive" : "secondary"} className="w-16 justify-center">
+                  <Badge
+                    variant={changed ? "destructive" : "secondary"}
+                    className="w-16 justify-center"
+                  >
                     {d.delta >= 0 ? "+" : ""}
                     {d.delta.toFixed(0)}pp
                   </Badge>

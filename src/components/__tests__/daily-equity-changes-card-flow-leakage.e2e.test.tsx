@@ -64,9 +64,7 @@ vi.mock("@/lib/daily-equity-changes", async () => {
 });
 
 // Imported AFTER vi.mock so the card sees the mocked module.
-import {
-  computeDailyEquityChanges,
-} from "@/lib/daily-equity-changes";
+import { computeDailyEquityChanges } from "@/lib/daily-equity-changes";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 
 const mockedCompute = vi.mocked(computeDailyEquityChanges);
@@ -93,17 +91,13 @@ const equity: EquitySnapshotLite[] = [
   { snapshot_date: "2026-06-05", total_value: 1_550 },
 ];
 const deposits: DepositLite[] = [
-  { date: "2026-06-03", amount: 1_000 },   // deposit
-  { date: "2026-06-04", amount: -500 },    // withdrawal
+  { date: "2026-06-03", amount: 1_000 }, // deposit
+  { date: "2026-06-04", amount: -500 }, // withdrawal
 ];
 
 function render() {
   return renderToStaticMarkup(
-    <DailyEquityChangesCard
-      equity={equity}
-      deposits={deposits}
-      currency="GBP"
-    />,
+    <DailyEquityChangesCard equity={equity} deposits={deposits} currency="GBP" />,
   );
 }
 
@@ -178,9 +172,7 @@ describe("DailyEquityChangesCard: flow-leakage e2e", () => {
       },
     ]);
 
-    expect(() => render()).toThrow(
-      /DailyEquityChangesCard\.chartData.*pct drift on 2026-06-03/,
-    );
+    expect(() => render()).toThrow(/DailyEquityChangesCard\.chartData.*pct drift on 2026-06-03/);
   });
 
   it("failure path — withdrawal-day leak (negative flow bled into pct) throws", () => {
@@ -202,8 +194,6 @@ describe("DailyEquityChangesCard: flow-leakage e2e", () => {
       },
     ]);
 
-    expect(() => render()).toThrow(
-      /DailyEquityChangesCard\.chartData.*pct drift on 2026-06-04/,
-    );
+    expect(() => render()).toThrow(/DailyEquityChangesCard\.chartData.*pct drift on 2026-06-04/);
   });
 });

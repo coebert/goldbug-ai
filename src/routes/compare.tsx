@@ -11,13 +11,7 @@ import {
   getDivergenceNarratives,
 } from "@/lib/trading.functions";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,9 +30,22 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { GitCompareArrows, PlayCircle, RefreshCw, Sparkles, Loader2, SlidersHorizontal } from "lucide-react";
+import {
+  GitCompareArrows,
+  PlayCircle,
+  RefreshCw,
+  Sparkles,
+  Loader2,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Explain } from "@/components/explain";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/compare")({
   ssr: false,
@@ -61,7 +68,8 @@ type ComparisonResult = Awaited<ReturnType<typeof getComparison>>["results"][num
 
 function ComparePage() {
   const navigate = useNavigate();
-  const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>(null);
+  const [session, setSession] =
+    useState<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>(null);
   const [ready, setReady] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [days, setDays] = useState(10);
@@ -183,10 +191,14 @@ function ComparePage() {
         if (point) {
           const adjPct = adjustedByName.get(r.portfolio.name)?.get(d);
           if (adjPct != null) row[r.portfolio.name] = adjPct;
-          peaks[r.portfolio.name] = Math.max(peaks[r.portfolio.name] ?? -Infinity, point.total_value);
-          const drawdownPct = peaks[r.portfolio.name] > 0
-            ? ((point.total_value - peaks[r.portfolio.name]) / peaks[r.portfolio.name]) * 100
-            : 0;
+          peaks[r.portfolio.name] = Math.max(
+            peaks[r.portfolio.name] ?? -Infinity,
+            point.total_value,
+          );
+          const drawdownPct =
+            peaks[r.portfolio.name] > 0
+              ? ((point.total_value - peaks[r.portfolio.name]) / peaks[r.portfolio.name]) * 100
+              : 0;
           ddRow[r.portfolio.name] = drawdownPct;
         }
       }
@@ -197,9 +209,7 @@ function ComparePage() {
   }, [results]);
 
   if (!ready || !session) {
-    return (
-      <PageLoading />
-    );
+    return <PageLoading />;
   }
 
   const portfolios = portfoliosQ.data ?? [];
@@ -210,19 +220,25 @@ function ComparePage() {
         <p className="text-sm text-muted-foreground">No portfolios yet. Create some first.</p>
       )}
       {portfolios.map((p) => (
-        <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-md border border-border/60 p-2 text-sm hover:bg-muted/40">
+        <label
+          key={p.id}
+          className="flex cursor-pointer items-start gap-2 rounded-md border border-border/60 p-2 text-sm hover:bg-muted/40"
+        >
           <Checkbox checked={selected.includes(p.id)} onCheckedChange={() => toggle(p.id)} />
           <div className="flex-1 min-w-0">
             <div className="font-medium truncate">{p.name}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {p.currency} {Number(p.starting_cash).toFixed(0)} · {p.risk_level} · {(p.universe as string[]).join(", ")}
+              {p.currency} {Number(p.starting_cash).toFixed(0)} · {p.risk_level} ·{" "}
+              {(p.universe as string[]).join(", ")}
             </div>
           </div>
         </label>
       ))}
 
       <div className="border-t border-border pt-3">
-        <Label htmlFor="days" className="text-xs">Backtest window (trading days)</Label>
+        <Label htmlFor="days" className="text-xs">
+          Backtest window (trading days)
+        </Label>
         <Input
           id="days"
           type="number"
@@ -273,14 +289,18 @@ function ComparePage() {
         <div className="mb-6 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight sm:text-2xl">
-              <GitCompareArrows className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6" /> Compare portfolios
+              <GitCompareArrows className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6" /> Compare
+              portfolios
             </h1>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              Select up to 6 portfolios, run backtests on the same date range, and compare equity curves and risk-adjusted metrics.
+              Select up to 6 portfolios, run backtests on the same date range, and compare equity
+              curves and risk-adjusted metrics.
             </p>
           </div>
           <Link to="/" className="shrink-0">
-            <Button variant="outline" size="sm">Back</Button>
+            <Button variant="outline" size="sm">
+              Back
+            </Button>
           </Link>
         </div>
 
@@ -298,10 +318,10 @@ function ComparePage() {
             title="Reset and re-run backtests?"
             description={
               <p>
-                This will <span className="font-semibold text-destructive">reset</span> the
-                selected {selected.length} portfolio(s) and re-run the AI over the last{" "}
-                <span className="font-semibold">{days}</span> days. Existing trades and history
-                for those portfolios will be replaced.
+                This will <span className="font-semibold text-destructive">reset</span> the selected{" "}
+                {selected.length} portfolio(s) and re-run the AI over the last{" "}
+                <span className="font-semibold">{days}</span> days. Existing trades and history for
+                those portfolios will be replaced.
               </p>
             }
             confirmLabel="Reset and re-run"
@@ -323,7 +343,8 @@ function ComparePage() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Normalised to starting pot. Tap a legend chip to hide/show that line. Double-tap to isolate.
+                  Normalised to starting pot. Tap a legend chip to hide/show that line. Double-tap
+                  to isolate.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -350,13 +371,21 @@ function ComparePage() {
                             onClick={() => toggleHidden(r.portfolio.name)}
                             onDoubleClick={() => isolate(r.portfolio.name)}
                             aria-pressed={!off}
-                            title={off ? "Show this line (double-click to isolate)" : "Hide this line (double-click to isolate)"}
+                            title={
+                              off
+                                ? "Show this line (double-click to isolate)"
+                                : "Hide this line (double-click to isolate)"
+                            }
                             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
                               off
                                 ? "border-border/60 bg-muted/30 text-muted-foreground line-through"
                                 : "border-transparent text-foreground"
                             }`}
-                            style={off ? undefined : { background: `${color}22`, borderColor: `${color}66`, color }}
+                            style={
+                              off
+                                ? undefined
+                                : { background: `${color}22`, borderColor: `${color}66`, color }
+                            }
                           >
                             <span
                               className="inline-block h-2 w-2 rounded-full"
@@ -374,17 +403,37 @@ function ComparePage() {
                           dataKey="date"
                           stroke="var(--muted-foreground)"
                           fontSize={11}
-                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: "var(--muted-foreground)", fontSize: 12 }}
+                          label={{
+                            value: "Date",
+                            position: "insideBottom",
+                            offset: -2,
+                            fill: "var(--muted-foreground)",
+                            fontSize: 12,
+                          }}
                         />
                         <YAxis
                           stroke="var(--muted-foreground)"
                           fontSize={11}
                           width={70}
-                          tickFormatter={(v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(1)}%`}
-                          label={{ value: "Cumulative return vs start (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "var(--muted-foreground)", fontSize: 12 }}
+                          tickFormatter={(v) =>
+                            `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(1)}%`
+                          }
+                          label={{
+                            value: "Cumulative return vs start (%)",
+                            angle: -90,
+                            position: "insideLeft",
+                            offset: 8,
+                            style: { textAnchor: "middle" },
+                            fill: "var(--muted-foreground)",
+                            fontSize: 12,
+                          }}
                         />
 
-                        <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
+                        <ReferenceLine
+                          y={0}
+                          stroke="var(--muted-foreground)"
+                          strokeDasharray="3 3"
+                        />
                         <Tooltip
                           cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }}
                           content={({ active, payload, label }) => {
@@ -407,7 +456,9 @@ function ComparePage() {
                                         style={{ background: pt.color }}
                                       />
                                       <span className="flex-1">{pt.dataKey}</span>
-                                      <span className={val >= 0 ? "text-primary" : "text-destructive"}>
+                                      <span
+                                        className={val >= 0 ? "text-primary" : "text-destructive"}
+                                      >
                                         {val >= 0 ? "+" : ""}
                                         {val.toFixed(2)}%
                                       </span>
@@ -445,22 +496,44 @@ function ComparePage() {
                       </div>
                       <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={drawdownData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="var(--border)"
+                            opacity={0.4}
+                          />
                           <XAxis
                             dataKey="date"
                             stroke="var(--muted-foreground)"
                             fontSize={11}
-                            label={{ value: "Date", position: "insideBottom", offset: -2, fill: "var(--muted-foreground)", fontSize: 12 }}
+                            label={{
+                              value: "Date",
+                              position: "insideBottom",
+                              offset: -2,
+                              fill: "var(--muted-foreground)",
+                              fontSize: 12,
+                            }}
                           />
                           <YAxis
                             stroke="var(--muted-foreground)"
                             fontSize={11}
                             width={70}
                             tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                            label={{ value: "Drawdown (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "var(--muted-foreground)", fontSize: 12 }}
+                            label={{
+                              value: "Drawdown (%)",
+                              angle: -90,
+                              position: "insideLeft",
+                              offset: 8,
+                              style: { textAnchor: "middle" },
+                              fill: "var(--muted-foreground)",
+                              fontSize: 12,
+                            }}
                           />
 
-                          <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
+                          <ReferenceLine
+                            y={0}
+                            stroke="var(--muted-foreground)"
+                            strokeDasharray="3 3"
+                          />
                           <Tooltip
                             cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }}
                             contentStyle={{
@@ -468,6 +541,7 @@ function ComparePage() {
                               border: "1px solid var(--border)",
                               borderRadius: 6,
                               fontSize: 12,
+                              color: "var(--popover-foreground)",
                             }}
                             formatter={(v: number) => `${Number(v).toFixed(2)}%`}
                           />
@@ -502,7 +576,8 @@ function ComparePage() {
                 <CardHeader>
                   <CardTitle className="text-base">Metrics</CardTitle>
                   <CardDescription>
-                    Sharpe and volatility annualised (~252 trading days). Drawdown is worst peak-to-trough.
+                    Sharpe and volatility annualised (~252 trading days). Drawdown is worst
+                    peak-to-trough.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
@@ -512,10 +587,18 @@ function ComparePage() {
                         <th className="sticky left-0 z-10 bg-card py-2 pr-3">Portfolio</th>
                         <th className="py-2 pr-3">Risk</th>
                         <th className="py-2 pr-3 text-right">Days</th>
-                        <th className="py-2 pr-3 text-right"><Explain term="pnl">Return</Explain></th>
-                        <th className="py-2 pr-3 text-right"><Explain term="max_drawdown">Max DD</Explain></th>
-                        <th className="py-2 pr-3 text-right"><Explain term="sharpe">Sharpe</Explain></th>
-                        <th className="py-2 pr-3 text-right"><Explain term="volatility">Vol</Explain></th>
+                        <th className="py-2 pr-3 text-right">
+                          <Explain term="pnl">Return</Explain>
+                        </th>
+                        <th className="py-2 pr-3 text-right">
+                          <Explain term="max_drawdown">Max DD</Explain>
+                        </th>
+                        <th className="py-2 pr-3 text-right">
+                          <Explain term="sharpe">Sharpe</Explain>
+                        </th>
+                        <th className="py-2 pr-3 text-right">
+                          <Explain term="volatility">Vol</Explain>
+                        </th>
                         <th className="py-2 pr-3 text-right">Best day</th>
                         <th className="py-2 pr-3 text-right">Worst day</th>
                       </tr>
@@ -538,16 +621,25 @@ function ComparePage() {
                                 {r.portfolio.name}
                               </Link>
                             </td>
-                            <td className="py-2 pr-3 capitalize text-muted-foreground">{r.portfolio.risk_level}</td>
+                            <td className="py-2 pr-3 capitalize text-muted-foreground">
+                              {r.portfolio.risk_level}
+                            </td>
                             <td className="py-2 pr-3 text-right tabular-nums">{m.days}</td>
-                            <td className={`py-2 pr-3 text-right tabular-nums ${m.totalReturnPct >= 0 ? "text-primary" : "text-destructive"}`}>
-                              {m.totalReturnPct >= 0 ? "+" : ""}{m.totalReturnPct.toFixed(2)}%
+                            <td
+                              className={`py-2 pr-3 text-right tabular-nums ${m.totalReturnPct >= 0 ? "text-primary" : "text-destructive"}`}
+                            >
+                              {m.totalReturnPct >= 0 ? "+" : ""}
+                              {m.totalReturnPct.toFixed(2)}%
                             </td>
                             <td className="py-2 pr-3 text-right tabular-nums text-destructive">
                               {m.maxDrawdownPct.toFixed(2)}%
                             </td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{m.sharpe.toFixed(2)}</td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{m.volatilityPct.toFixed(1)}%</td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {m.sharpe.toFixed(2)}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {m.volatilityPct.toFixed(1)}%
+                            </td>
                             <td className="py-2 pr-3 text-right tabular-nums text-primary">
                               +{m.bestDayPct.toFixed(2)}%
                             </td>
@@ -602,7 +694,9 @@ function ComparePage() {
         <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl">
           <SheetHeader className="text-left">
             <SheetTitle>Select portfolios</SheetTitle>
-            <SheetDescription>{selected.length}/6 selected · Choose up to 6, then run or compare.</SheetDescription>
+            <SheetDescription>
+              {selected.length}/6 selected · Choose up to 6, then run or compare.
+            </SheetDescription>
           </SheetHeader>
           <div className="pt-4">{controls}</div>
         </SheetContent>
@@ -611,7 +705,9 @@ function ComparePage() {
   );
 }
 
-type DivergenceRow = Awaited<ReturnType<typeof getTradeComparison>>["results"][number]["rows"][number];
+type DivergenceRow = Awaited<
+  ReturnType<typeof getTradeComparison>
+>["results"][number]["rows"][number];
 
 function TradeDivergenceCard({
   portfolioIds,
@@ -633,7 +729,10 @@ function TradeDivergenceCard({
   const grid = useMemo(() => {
     const results = q.data?.results ?? [];
     // key = date|symbol -> per-portfolio cell
-    const map = new Map<string, { date: string; symbol: string; cells: (DivergenceRow | null)[] }>();
+    const map = new Map<
+      string,
+      { date: string; symbol: string; cells: (DivergenceRow | null)[] }
+    >();
     results.forEach((r, idx) => {
       for (const row of r.rows) {
         const key = `${row.date}|${row.symbol}`;
@@ -645,8 +744,8 @@ function TradeDivergenceCard({
         entry.cells[idx] = row;
       }
     });
-    const all = Array.from(map.values()).sort(
-      (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.symbol.localeCompare(b.symbol)),
+    const all = Array.from(map.values()).sort((a, b) =>
+      a.date < b.date ? 1 : a.date > b.date ? -1 : a.symbol.localeCompare(b.symbol),
     );
     const isDiverged = (cells: (DivergenceRow | null)[]) => {
       const sigs = cells.map((c) => {
@@ -657,7 +756,11 @@ function TradeDivergenceCard({
       return new Set(sigs).size > 1;
     };
     const filtered = onlyDiverged ? all.filter((r) => isDiverged(r.cells)) : all;
-    return { rows: filtered, total: all.length, divergedCount: all.filter((r) => isDiverged(r.cells)).length };
+    return {
+      rows: filtered,
+      total: all.length,
+      divergedCount: all.filter((r) => isDiverged(r.cells)).length,
+    };
   }, [q.data, onlyDiverged]);
 
   return (
@@ -665,8 +768,8 @@ function TradeDivergenceCard({
       <CardHeader>
         <CardTitle className="text-base">Trade-by-trade divergence</CardTitle>
         <CardDescription>
-          Where portfolios acted differently on the same symbol/day — buys, sells, guardrail blocks, or no-ops.
-          Hover any cell to see reason, signals and importance weights.
+          Where portfolios acted differently on the same symbol/day — buys, sells, guardrail blocks,
+          or no-ops. Hover any cell to see reason, signals and importance weights.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -677,10 +780,7 @@ function TradeDivergenceCard({
               : `${grid.divergedCount} diverged / ${grid.total} total (symbol × day) events`}
           </div>
           <label className="flex cursor-pointer items-center gap-2">
-            <Checkbox
-              checked={onlyDiverged}
-              onCheckedChange={(v) => setOnlyDiverged(Boolean(v))}
-            />
+            <Checkbox checked={onlyDiverged} onCheckedChange={(v) => setOnlyDiverged(Boolean(v))} />
             Show only diverged rows
           </label>
         </div>
@@ -710,8 +810,12 @@ function TradeDivergenceCard({
               <tbody>
                 {grid.rows.map((r) => (
                   <tr key={`${r.date}|${r.symbol}`} className="border-b border-border/50 align-top">
-                    <td className="sticky left-0 z-10 bg-card py-2 pr-3 tabular-nums text-muted-foreground">{r.date}</td>
-                    <td className="sticky left-[72px] z-10 bg-card py-2 pr-3 font-medium">{r.symbol}</td>
+                    <td className="sticky left-0 z-10 bg-card py-2 pr-3 tabular-nums text-muted-foreground">
+                      {r.date}
+                    </td>
+                    <td className="sticky left-[72px] z-10 bg-card py-2 pr-3 font-medium">
+                      {r.symbol}
+                    </td>
                     {r.cells.map((cell, i) => (
                       <td key={i} className="py-2 pr-3">
                         <TradeCell cell={cell} />
@@ -757,9 +861,7 @@ function TradeCell({ cell }: { cell: DivergenceRow | null }) {
           </span>
         )}
         {blocked && (
-          <span className="text-[10px] font-normal opacity-80">
-            {cell.rejected!.slice(0, 22)}
-          </span>
+          <span className="text-[10px] font-normal opacity-80">{cell.rejected!.slice(0, 22)}</span>
         )}
       </div>
       <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-72 rounded-md border border-border bg-card p-2 text-[11px] shadow-xl group-hover:block">
@@ -771,12 +873,8 @@ function TradeCell({ cell }: { cell: DivergenceRow | null }) {
             </span>
           )}
         </div>
-        {cell.reason && (
-          <div className="mb-1 text-muted-foreground">{cell.reason}</div>
-        )}
-        {blocked && (
-          <div className="mb-1 text-amber-400">Guardrail: {cell.rejected}</div>
-        )}
+        {cell.reason && <div className="mb-1 text-muted-foreground">{cell.reason}</div>}
+        {blocked && <div className="mb-1 text-amber-400">Guardrail: {cell.rejected}</div>}
         {cell.signals && (
           <div className="mb-1 grid grid-cols-3 gap-x-2 gap-y-0.5 tabular-nums text-muted-foreground">
             <div>RSI {fmt(cell.signals.rsi14, 1)}</div>
@@ -789,9 +887,7 @@ function TradeCell({ cell }: { cell: DivergenceRow | null }) {
         )}
         {topWeights.length > 0 && (
           <div className="mt-1 border-t border-border/60 pt-1">
-            <div className="mb-0.5 text-[10px] uppercase text-muted-foreground">
-              Signal weights
-            </div>
+            <div className="mb-0.5 text-[10px] uppercase text-muted-foreground">Signal weights</div>
             {topWeights.map(([k, v]) => (
               <div key={k} className="flex items-center gap-1">
                 <span className="w-24 capitalize">{k.replace(/_/g, " ")}</span>
@@ -851,14 +947,16 @@ function DivergenceNarrativesCard({
           Top 5 divergence narratives
         </CardTitle>
         <CardDescription>
-          Plain-English explanations of the biggest disagreements between the selected portfolios — what changed,
-          which priors and signals drove each side's decision, and which guardrails stepped in.
+          Plain-English explanations of the biggest disagreements between the selected portfolios —
+          what changed, which priors and signals drove each side's decision, and which guardrails
+          stepped in.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="mb-3 flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
-            Uses Aegis AI to summarise the highest-impact (date × symbol) events where portfolios acted differently.
+            Uses Aegis AI to summarise the highest-impact (date × symbol) events where portfolios
+            acted differently.
           </div>
           <Button size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
             {mut.isPending ? (
@@ -867,7 +965,8 @@ function DivergenceNarrativesCard({
               </>
             ) : (
               <>
-                <Sparkles className="mr-1 h-3.5 w-3.5" /> {events ? "Regenerate" : "Generate narratives"}
+                <Sparkles className="mr-1 h-3.5 w-3.5" />{" "}
+                {events ? "Regenerate" : "Generate narratives"}
               </>
             )}
           </Button>
@@ -885,7 +984,10 @@ function DivergenceNarrativesCard({
         {events && events.length > 0 && (
           <ol className="space-y-3">
             {events.map((ev) => (
-              <li key={`${ev.date}|${ev.symbol}`} className="rounded-md border border-border bg-card/50 p-3">
+              <li
+                key={`${ev.date}|${ev.symbol}`}
+                className="rounded-md border border-border bg-card/50 p-3"
+              >
                 <div className="mb-2 flex flex-wrap items-baseline gap-2">
                   <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
                     #{ev.rank}

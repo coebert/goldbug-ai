@@ -73,7 +73,11 @@ export function EquityPctChart({
         <div className="h-[160px] w-full landscape:h-[200px] md:h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
-              <CartesianGrid stroke="var(--foreground)" strokeOpacity={0.12} strokeDasharray="3 3" />
+              <CartesianGrid
+                stroke="var(--foreground)"
+                strokeOpacity={0.12}
+                strokeDasharray="3 3"
+              />
               <XAxis
                 dataKey="date"
                 tick={AXIS_TICK}
@@ -91,7 +95,12 @@ export function EquityPctChart({
                 strokeOpacity={0.4}
                 tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
               />
-              <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.6} strokeDasharray="4 3" />
+              <ReferenceLine
+                y={0}
+                stroke="currentColor"
+                strokeOpacity={0.6}
+                strokeDasharray="4 3"
+              />
               <Tooltip
                 contentStyle={{
                   fontSize: 12,

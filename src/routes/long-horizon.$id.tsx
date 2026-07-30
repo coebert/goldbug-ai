@@ -5,13 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPortfolio, runLongHorizonBacktest } from "@/lib/trading.functions";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppHeader } from "@/components/app-header";
@@ -59,7 +53,11 @@ export const Route = createFileRoute("/long-horizon/$id")({
 type LHResult = Awaited<ReturnType<typeof runLongHorizonBacktest>>;
 
 const PRESETS: Array<{ label: string; from: string; to: string }> = [
-  { label: "Since 2000 (dot-com to today)", from: "2000-01-01", to: new Date().toISOString().slice(0, 10) },
+  {
+    label: "Since 2000 (dot-com to today)",
+    from: "2000-01-01",
+    to: new Date().toISOString().slice(0, 10),
+  },
   { label: "Since 2005 (GFC era)", from: "2005-01-01", to: new Date().toISOString().slice(0, 10) },
   { label: "Since 2010 (post-GFC)", from: "2010-01-01", to: new Date().toISOString().slice(0, 10) },
   { label: "Since 2015 (10y)", from: "2015-01-01", to: new Date().toISOString().slice(0, 10) },
@@ -76,7 +74,8 @@ function fmtMoney(n: number, currency: string) {
 function LongHorizonPage() {
   const navigate = useNavigate();
   const { id } = useParams({ from: "/long-horizon/$id" });
-  const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>(null);
+  const [session, setSession] =
+    useState<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -130,7 +129,9 @@ function LongHorizonPage() {
       }),
     onSuccess: (r) => {
       setResult(r);
-      toast.success(`Simulated ${r.series[0]?.metrics.days ?? 0} trading days, ${r.tradeCount} trades`);
+      toast.success(
+        `Simulated ${r.series[0]?.metrics.days ?? 0} trading days, ${r.tradeCount} trades`,
+      );
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Backtest failed"),
   });
@@ -165,9 +166,7 @@ function LongHorizonPage() {
   }, [result, chartRes]);
 
   if (!ready || !session) {
-    return (
-      <PageLoading />
-    );
+    return <PageLoading />;
   }
 
   const portfolio = pQ.data?.portfolio;
@@ -193,7 +192,9 @@ function LongHorizonPage() {
             </p>
           </div>
           <Link to="/portfolio/$id" params={{ id }}>
-            <Button variant="outline" size="sm">Back to portfolio</Button>
+            <Button variant="outline" size="sm">
+              Back to portfolio
+            </Button>
           </Link>
         </div>
 
@@ -202,7 +203,8 @@ function LongHorizonPage() {
             <CardHeader>
               <CardTitle className="text-base">Configure run</CardTitle>
               <CardDescription>
-                Rule-based simulator using the same signals & risk config as the AI engine — no LLM calls, so long horizons run quickly.
+                Rule-based simulator using the same signals & risk config as the AI engine — no LLM
+                calls, so long horizons run quickly.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -213,7 +215,10 @@ function LongHorizonPage() {
                     <button
                       key={p.label}
                       className="rounded-md border border-border/60 px-2 py-1.5 text-left text-xs hover:bg-muted/40"
-                      onClick={() => { setFrom(p.from); setTo(p.to); }}
+                      onClick={() => {
+                        setFrom(p.from);
+                        setTo(p.to);
+                      }}
                     >
                       {p.label}
                     </button>
@@ -223,19 +228,34 @@ function LongHorizonPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label htmlFor="from" className="text-xs">From</Label>
-                  <Input id="from" type="date" value={from} min="1975-01-01" onChange={(e) => setFrom(e.target.value)} />
+                  <Label htmlFor="from" className="text-xs">
+                    From
+                  </Label>
+                  <Input
+                    id="from"
+                    type="date"
+                    value={from}
+                    min="1975-01-01"
+                    onChange={(e) => setFrom(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="to" className="text-xs">To</Label>
+                  <Label htmlFor="to" className="text-xs">
+                    To
+                  </Label>
                   <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
                 </div>
               </div>
 
               <div>
                 <Label className="text-xs">Rebalance frequency</Label>
-                <Select value={rebalance} onValueChange={(v) => setRebalance(v as "monthly" | "quarterly")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={rebalance}
+                  onValueChange={(v) => setRebalance(v as "monthly" | "quarterly")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Monthly</SelectItem>
                     <SelectItem value="quarterly">Quarterly</SelectItem>
@@ -244,7 +264,9 @@ function LongHorizonPage() {
               </div>
 
               <div>
-                <Label htmlFor="topK" className="text-xs">Top-K holdings ({topK})</Label>
+                <Label htmlFor="topK" className="text-xs">
+                  Top-K holdings ({topK})
+                </Label>
                 <Input
                   id="topK"
                   type="number"
@@ -258,11 +280,15 @@ function LongHorizonPage() {
               <div className="rounded-md border border-border/60 p-2 space-y-2">
                 <div className="text-xs font-medium text-foreground">Execution realism</div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Model realistic fills: commission and slippage per side (in basis points, 100 bps = 1%) and a minimum trade notional. Applied to every strategy trade and to the initial benchmark buy.
+                  Model realistic fills: commission and slippage per side (in basis points, 100 bps
+                  = 1%) and a minimum trade notional. Applied to every strategy trade and to the
+                  initial benchmark buy.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label htmlFor="comm" className="text-xs"><Explain term="transaction_cost">Commission (bps)</Explain></Label>
+                    <Label htmlFor="comm" className="text-xs">
+                      <Explain term="transaction_cost">Commission (bps)</Explain>
+                    </Label>
                     <Input
                       id="comm"
                       type="number"
@@ -270,11 +296,15 @@ function LongHorizonPage() {
                       max={500}
                       step={1}
                       value={commissionBps}
-                      onChange={(e) => setCommissionBps(Math.max(0, Math.min(500, Number(e.target.value) || 0)))}
+                      onChange={(e) =>
+                        setCommissionBps(Math.max(0, Math.min(500, Number(e.target.value) || 0)))
+                      }
                     />
                   </div>
                   <div>
-                    <Label htmlFor="slip" className="text-xs"><Explain term="slippage">Slippage (bps)</Explain></Label>
+                    <Label htmlFor="slip" className="text-xs">
+                      <Explain term="slippage">Slippage (bps)</Explain>
+                    </Label>
                     <Input
                       id="slip"
                       type="number"
@@ -282,7 +312,9 @@ function LongHorizonPage() {
                       max={500}
                       step={1}
                       value={slippageBps}
-                      onChange={(e) => setSlippageBps(Math.max(0, Math.min(500, Number(e.target.value) || 0)))}
+                      onChange={(e) =>
+                        setSlippageBps(Math.max(0, Math.min(500, Number(e.target.value) || 0)))
+                      }
                     />
                   </div>
                 </div>
@@ -297,7 +329,9 @@ function LongHorizonPage() {
                     max={100000}
                     step={5}
                     value={minTradeValue}
-                    onChange={(e) => setMinTradeValue(Math.max(0, Math.min(100000, Number(e.target.value) || 0)))}
+                    onChange={(e) =>
+                      setMinTradeValue(Math.max(0, Math.min(100000, Number(e.target.value) || 0)))
+                    }
                   />
                 </div>
                 <div className="flex flex-wrap gap-1 pt-1">
@@ -322,13 +356,18 @@ function LongHorizonPage() {
                 </div>
               </div>
 
-              <Button className="w-full" disabled={runMut.isPending} onClick={() => runMut.mutate()}>
+              <Button
+                className="w-full"
+                disabled={runMut.isPending}
+                onClick={() => runMut.mutate()}
+              >
                 <PlayCircle className="mr-2 h-4 w-4" />
                 {runMut.isPending ? "Running…" : "Run backtest"}
               </Button>
               {runMut.isPending && (
                 <p className="text-xs text-muted-foreground">
-                  First run for a wide window fetches decades of price data from Yahoo and caches it. Subsequent runs are much faster.
+                  First run for a wide window fetches decades of price data from Yahoo and caches
+                  it. Subsequent runs are much faster.
                 </p>
               )}
             </CardContent>
@@ -338,7 +377,9 @@ function LongHorizonPage() {
             {!result && (
               <Card>
                 <CardContent className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                  Pick a window and press <span className="mx-1 font-medium text-foreground">Run backtest</span> to compare the Aegis strategy against benchmarks.
+                  Pick a window and press{" "}
+                  <span className="mx-1 font-medium text-foreground">Run backtest</span> to compare
+                  the Aegis strategy against benchmarks.
                 </CardContent>
               </Card>
             )}
@@ -356,7 +397,17 @@ function LongHorizonPage() {
                       )}
                     </CardTitle>
                     <CardDescription>
-                      {result.from} → {result.to} · {result.rebalance} rebalance · {result.tradeCount} trades executed{result.skippedSmallTrades > 0 ? ` · ${result.skippedSmallTrades} skipped (< ${result.currency} ${result.execution.min_trade_value})` : ""} · costs paid ~{result.currency} {result.totalCostsPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({result.execution.commission_bps}bps comm / {result.execution.slippage_bps}bps slip) · click a legend item to isolate.
+                      {result.from} → {result.to} · {result.rebalance} rebalance ·{" "}
+                      {result.tradeCount} trades executed
+                      {result.skippedSmallTrades > 0
+                        ? ` · ${result.skippedSmallTrades} skipped (< ${result.currency} ${result.execution.min_trade_value})`
+                        : ""}{" "}
+                      · costs paid ~{result.currency}{" "}
+                      {result.totalCostsPaid.toLocaleString(undefined, {
+                        maximumFractionDigits: 0,
+                      })}{" "}
+                      ({result.execution.commission_bps}bps comm / {result.execution.slippage_bps}
+                      bps slip) · click a legend item to isolate.
                     </CardDescription>
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                       <EventOverlayControls
@@ -390,17 +441,37 @@ function LongHorizonPage() {
                           stroke="var(--muted-foreground)"
                           fontSize={11}
                           minTickGap={40}
-                          label={{ value: "Date", position: "insideBottom", offset: -2, fill: "var(--muted-foreground)", fontSize: 12 }}
+                          label={{
+                            value: "Date",
+                            position: "insideBottom",
+                            offset: -2,
+                            fill: "var(--muted-foreground)",
+                            fontSize: 12,
+                          }}
                         />
                         <YAxis
                           stroke="var(--muted-foreground)"
                           fontSize={11}
                           width={72}
-                          tickFormatter={(v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`}
-                          label={{ value: "Cumulative return (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: "var(--muted-foreground)", fontSize: 12 }}
+                          tickFormatter={(v) =>
+                            `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`
+                          }
+                          label={{
+                            value: "Cumulative return (%)",
+                            angle: -90,
+                            position: "insideLeft",
+                            offset: 8,
+                            style: { textAnchor: "middle" },
+                            fill: "var(--muted-foreground)",
+                            fontSize: 12,
+                          }}
                         />
 
-                        <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
+                        <ReferenceLine
+                          y={0}
+                          stroke="var(--muted-foreground)"
+                          strokeDasharray="3 3"
+                        />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={chartData.map((d) => String(d.date))}
@@ -416,7 +487,9 @@ function LongHorizonPage() {
                               (a, b) => Number(b.value ?? 0) - Number(a.value ?? 0),
                             );
                             const active_events = eventsOn
-                              ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
+                              ? eventsInRange(String(label), String(label)).filter(
+                                  (e) => e.severity >= eventSev,
+                                )
                               : [];
                             return (
                               <div className="rounded-md border border-border bg-card p-2 text-xs shadow-md">
@@ -424,17 +497,31 @@ function LongHorizonPage() {
                                 {sorted.map((pt) => {
                                   const val = Number(pt.value ?? 0);
                                   return (
-                                    <div key={String(pt.dataKey)} className="flex items-center gap-2 tabular-nums">
-                                      <span className="inline-block h-2 w-2 rounded-sm" style={{ background: pt.color }} />
+                                    <div
+                                      key={String(pt.dataKey)}
+                                      className="flex items-center gap-2 tabular-nums"
+                                    >
+                                      <span
+                                        className="inline-block h-2 w-2 rounded-sm"
+                                        style={{ background: pt.color }}
+                                      />
                                       <span className="flex-1">{pt.dataKey}</span>
-                                      <span className={val >= 0 ? "text-primary" : "text-destructive"}>{fmtPct(val)}</span>
+                                      <span
+                                        className={val >= 0 ? "text-primary" : "text-destructive"}
+                                      >
+                                        {fmtPct(val)}
+                                      </span>
                                     </div>
                                   );
                                 })}
                                 {active_events.length > 0 && (
                                   <div className="mt-1 border-t border-border/60 pt-1">
                                     {active_events.map((e) => (
-                                      <div key={e.id} style={{ color: eventColor(e.category) }} className="font-medium">
+                                      <div
+                                        key={e.id}
+                                        style={{ color: eventColor(e.category) }}
+                                        className="font-medium"
+                                      >
                                         ● {e.label}
                                       </div>
                                     ))}
@@ -445,14 +532,23 @@ function LongHorizonPage() {
                           }}
                         />
                         <Legend
-                          wrapperStyle={{ fontSize: 12, cursor: "pointer" }}
+                          wrapperStyle={{
+                            fontSize: 12,
+                            cursor: "pointer",
+                            color: "var(--foreground)",
+                          }}
                           onClick={(o) => {
                             const dk = (o as { dataKey?: unknown }).dataKey;
                             const key = typeof dk === "string" ? dk : String(dk ?? "");
                             setFocused((prev) => (prev === key ? null : key));
                           }}
                           formatter={(value) => (
-                            <span style={{ opacity: !focused || focused === value ? 1 : 0.35, textDecoration: focused === value ? "underline" : "none" }}>
+                            <span
+                              style={{
+                                opacity: !focused || focused === value ? 1 : 0.35,
+                                textDecoration: focused === value ? "underline" : "none",
+                              }}
+                            >
                               {value}
                             </span>
                           )}
@@ -481,7 +577,9 @@ function LongHorizonPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Overall performance vs benchmarks</CardTitle>
-                    <CardDescription>Full window: {result.from} → {result.to}</CardDescription>
+                    <CardDescription>
+                      Full window: {result.from} → {result.to}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -490,25 +588,49 @@ function LongHorizonPage() {
                           <th className="py-2 pr-4 text-left">Strategy</th>
                           <th className="py-2 pr-4 text-right">Final</th>
                           <th className="py-2 pr-4 text-right">Total return</th>
-                          <th className="py-2 pr-4 text-right"><Explain term="cagr">CAGR</Explain></th>
-                          <th className="py-2 pr-4 text-right"><Explain term="max_drawdown">Max drawdown</Explain></th>
-                          <th className="py-2 pr-4 text-right"><Explain term="sharpe">Sharpe</Explain></th>
-                          <th className="py-2 pr-4 text-right"><Explain term="volatility">Volatility</Explain></th>
+                          <th className="py-2 pr-4 text-right">
+                            <Explain term="cagr">CAGR</Explain>
+                          </th>
+                          <th className="py-2 pr-4 text-right">
+                            <Explain term="max_drawdown">Max drawdown</Explain>
+                          </th>
+                          <th className="py-2 pr-4 text-right">
+                            <Explain term="sharpe">Sharpe</Explain>
+                          </th>
+                          <th className="py-2 pr-4 text-right">
+                            <Explain term="volatility">Volatility</Explain>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="tabular-nums">
                         {result.series.map((s) => (
-                          <tr key={s.key} className={`border-b border-border/40 ${s.key === "aegis" ? "font-medium" : ""}`}>
+                          <tr
+                            key={s.key}
+                            className={`border-b border-border/40 ${s.key === "aegis" ? "font-medium" : ""}`}
+                          >
                             <td className="py-2 pr-4 text-left">
-                              <span className="inline-block h-2 w-2 rounded-sm align-middle mr-2" style={{ background: s.color }} />
+                              <span
+                                className="inline-block h-2 w-2 rounded-sm align-middle mr-2"
+                                style={{ background: s.color }}
+                              />
                               {s.name}
                             </td>
-                            <td className="py-2 pr-4 text-right">{fmtMoney(s.metrics.endValue, result.currency)}</td>
-                            <td className={`py-2 pr-4 text-right ${s.metrics.totalReturnPct >= 0 ? "text-primary" : "text-destructive"}`}>{fmtPct(s.metrics.totalReturnPct)}</td>
+                            <td className="py-2 pr-4 text-right">
+                              {fmtMoney(s.metrics.endValue, result.currency)}
+                            </td>
+                            <td
+                              className={`py-2 pr-4 text-right ${s.metrics.totalReturnPct >= 0 ? "text-primary" : "text-destructive"}`}
+                            >
+                              {fmtPct(s.metrics.totalReturnPct)}
+                            </td>
                             <td className="py-2 pr-4 text-right">{fmtPct(s.metrics.cagrPct)}</td>
-                            <td className="py-2 pr-4 text-right text-destructive">{s.metrics.maxDrawdownPct.toFixed(1)}%</td>
+                            <td className="py-2 pr-4 text-right text-destructive">
+                              {s.metrics.maxDrawdownPct.toFixed(1)}%
+                            </td>
                             <td className="py-2 pr-4 text-right">{s.metrics.sharpe.toFixed(2)}</td>
-                            <td className="py-2 pr-4 text-right">{s.metrics.volatilityPct.toFixed(1)}%</td>
+                            <td className="py-2 pr-4 text-right">
+                              {s.metrics.volatilityPct.toFixed(1)}%
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -518,19 +640,27 @@ function LongHorizonPage() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base"><Explain term="regime">Regime-specific results</Explain></CardTitle>
+                    <CardTitle className="text-base">
+                      <Explain term="regime">Regime-specific results</Explain>
+                    </CardTitle>
                     <CardDescription>
-                      Same strategy sliced into notable historical regimes from the playbook. "—" means insufficient data in that window.
+                      Same strategy sliced into notable historical regimes from the playbook. "—"
+                      means insufficient data in that window.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {result.regimes.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No regime windows fall inside {result.from} → {result.to}.</p>
+                      <p className="text-sm text-muted-foreground">
+                        No regime windows fall inside {result.from} → {result.to}.
+                      </p>
                     )}
                     {result.regimes.map((reg) => {
                       const aegis = reg.rows.find((r) => r.seriesKey === "aegis");
                       const spy = reg.rows.find((r) => r.seriesKey === "spy");
-                      const alpha = aegis && spy ? aegis.metrics.totalReturnPct - spy.metrics.totalReturnPct : null;
+                      const alpha =
+                        aegis && spy
+                          ? aegis.metrics.totalReturnPct - spy.metrics.totalReturnPct
+                          : null;
                       const kindColor: Record<string, string> = {
                         bull: "bg-primary/20 text-primary",
                         bear: "bg-destructive/20 text-destructive",
@@ -541,13 +671,19 @@ function LongHorizonPage() {
                       return (
                         <div key={reg.key} className="rounded-md border border-border/60 p-3">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span className={`rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${kindColor[reg.kind] ?? "bg-muted"}`}>
+                            <span
+                              className={`rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${kindColor[reg.kind] ?? "bg-muted"}`}
+                            >
                               {reg.kind}
                             </span>
                             <span className="font-medium">{reg.name}</span>
-                            <span className="text-xs text-muted-foreground">{reg.from} → {reg.to}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {reg.from} → {reg.to}
+                            </span>
                             {alpha != null && (
-                              <span className={`ml-auto text-xs ${alpha >= 0 ? "text-primary" : "text-destructive"}`}>
+                              <span
+                                className={`ml-auto text-xs ${alpha >= 0 ? "text-primary" : "text-destructive"}`}
+                              >
                                 Aegis vs SPY: {fmtPct(alpha)}
                               </span>
                             )}
@@ -565,12 +701,25 @@ function LongHorizonPage() {
                               </thead>
                               <tbody className="tabular-nums">
                                 {reg.rows.map((r) => (
-                                  <tr key={r.seriesKey} className={r.seriesKey === "aegis" ? "font-medium" : ""}>
+                                  <tr
+                                    key={r.seriesKey}
+                                    className={r.seriesKey === "aegis" ? "font-medium" : ""}
+                                  >
                                     <td className="py-1 pr-3">{r.name}</td>
-                                    <td className={`py-1 pr-3 text-right ${r.metrics.totalReturnPct >= 0 ? "text-primary" : "text-destructive"}`}>{fmtPct(r.metrics.totalReturnPct)}</td>
-                                    <td className="py-1 pr-3 text-right text-destructive">{r.metrics.maxDrawdownPct.toFixed(1)}%</td>
-                                    <td className="py-1 pr-3 text-right">{r.metrics.sharpe.toFixed(2)}</td>
-                                    <td className="py-1 pr-3 text-right">{r.metrics.volatilityPct.toFixed(1)}%</td>
+                                    <td
+                                      className={`py-1 pr-3 text-right ${r.metrics.totalReturnPct >= 0 ? "text-primary" : "text-destructive"}`}
+                                    >
+                                      {fmtPct(r.metrics.totalReturnPct)}
+                                    </td>
+                                    <td className="py-1 pr-3 text-right text-destructive">
+                                      {r.metrics.maxDrawdownPct.toFixed(1)}%
+                                    </td>
+                                    <td className="py-1 pr-3 text-right">
+                                      {r.metrics.sharpe.toFixed(2)}
+                                    </td>
+                                    <td className="py-1 pr-3 text-right">
+                                      {r.metrics.volatilityPct.toFixed(1)}%
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>

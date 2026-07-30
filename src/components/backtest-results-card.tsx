@@ -1,12 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Area,
   AreaChart,
@@ -22,7 +17,13 @@ import {
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
-import { AXIS_TICK, CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
+import {
+  AXIS_TICK,
+  CHART_ROLE,
+  CHART_SEQUENCE,
+  OKABE_ITO,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
 const PALETTE = CHART_SEQUENCE;
@@ -168,10 +169,20 @@ export function BacktestResultsCard({
             </div>
             <div className="flex items-center gap-3 text-[10px] text-foreground">
               <span className="inline-flex items-center gap-1">
-                <span aria-hidden className="inline-block h-0 w-0 border-b-[8px] border-l-[5px] border-r-[5px] border-l-transparent border-r-transparent" style={{ borderBottomColor: BUY_COLOR }} /> buy
+                <span
+                  aria-hidden
+                  className="inline-block h-0 w-0 border-b-[8px] border-l-[5px] border-r-[5px] border-l-transparent border-r-transparent"
+                  style={{ borderBottomColor: BUY_COLOR }}
+                />{" "}
+                buy
               </span>
               <span className="inline-flex items-center gap-1">
-                <span aria-hidden className="inline-block h-0 w-0 border-t-[8px] border-l-[5px] border-r-[5px] border-l-transparent border-r-transparent" style={{ borderTopColor: SELL_COLOR }} /> sell
+                <span
+                  aria-hidden
+                  className="inline-block h-0 w-0 border-t-[8px] border-l-[5px] border-r-[5px] border-l-transparent border-r-transparent"
+                  style={{ borderTopColor: SELL_COLOR }}
+                />{" "}
+                sell
               </span>
             </div>
           </div>
@@ -197,7 +208,7 @@ export function BacktestResultsCard({
                 <Tooltip
                   formatter={(v: number) => fmtCurrency(v)}
                   labelFormatter={(l) => `${l}`}
-                  contentStyle={{ fontSize: 12 }}
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
                 />
                 <Line
                   type="monotone"
@@ -251,7 +262,7 @@ export function BacktestResultsCard({
                 <Tooltip
                   formatter={(v: number) => `${v.toFixed(2)}%`}
                   labelFormatter={(l) => `${l}`}
-                  contentStyle={{ fontSize: 12 }}
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
                 />
                 <Area
                   type="monotone"
@@ -266,7 +277,6 @@ export function BacktestResultsCard({
             </ResponsiveContainer>
           </div>
         </section>
-
 
         <section>
           <div className="mb-2 flex items-center justify-between">
@@ -295,7 +305,7 @@ export function BacktestResultsCard({
                   <YAxis tick={AXIS_TICK} tickFormatter={fmtCompact} width={64} />
                   <Tooltip
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
-                    contentStyle={{ fontSize: 12 }}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
                   <Area

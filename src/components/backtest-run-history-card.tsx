@@ -22,7 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import type { BacktestMetrics } from "@/lib/backtest-metrics";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_TICK, LEGEND_STYLE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 
 export type BacktestEquityPoint = { snapshot_date: string; total_value: number };
 
@@ -52,18 +52,13 @@ const OVERLAY_PALETTE = [
   "hsl(262 83% 58%)",
 ];
 
-
-
-
 // React Query key for a portfolio's persisted run history.
-export const backtestRunsQueryKey = (portfolioId: string) =>
-  ["backtestRuns", portfolioId] as const;
+export const backtestRunsQueryKey = (portfolioId: string) => ["backtestRuns", portfolioId] as const;
 
 // `saveRun` was moved to `@/lib/backtest-run-save` so imperative callers
 // can persist a run without importing this heavy card module. Re-exported
 // here for backwards compatibility with any lingering callers.
 export { saveRun } from "@/lib/backtest-run-save";
-
 
 function fmt(n: number | null | undefined, digits = 2, suffix = "") {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -75,7 +70,6 @@ function toneClass(v: number | null | undefined, invert = false) {
   const good = invert ? v <= 0 : v >= 0;
   return good ? "text-emerald-500" : "text-red-500";
 }
-
 
 function ReasonRow({
   label,
@@ -102,11 +96,7 @@ function ReasonRow({
         <span className={`text-sm font-medium ${tone}`}>{raw}</span>
       </div>
       <div className="mt-1 h-1 w-full overflow-hidden rounded bg-border/50">
-        <div
-          className="h-full bg-primary/70"
-          style={{ width: `${pct.toFixed(1)}%` }}
-          aria-hidden
-        />
+        <div className="h-full bg-primary/70" style={{ width: `${pct.toFixed(1)}%` }} aria-hidden />
       </div>
       <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
         <span>
@@ -126,8 +116,8 @@ type RiskTolerance = "conservative" | "balanced" | "aggressive";
 // return most. Sharpe is always meaningful so it never drops below 0.2.
 const TOLERANCE_WEIGHTS: Record<RiskTolerance, { ret: number; mdd: number; sharpe: number }> = {
   conservative: { ret: 0.2, mdd: 0.55, sharpe: 0.25 },
-  balanced:     { ret: 0.35, mdd: 0.35, sharpe: 0.3 },
-  aggressive:   { ret: 0.6, mdd: 0.1, sharpe: 0.3 },
+  balanced: { ret: 0.35, mdd: 0.35, sharpe: 0.3 },
+  aggressive: { ret: 0.6, mdd: 0.1, sharpe: 0.3 },
 };
 
 function inferTolerance(riskLevel: string | undefined): RiskTolerance {
@@ -314,9 +304,7 @@ export function BacktestRunHistoryCard({
   const recommendation = useMemo(() => {
     if (runs.length === 0) return null;
     const targetBucket = tolerance; // conservative | balanced | aggressive
-    const bucketMatches = runs.filter(
-      (r) => inferTolerance(r.riskLevel) === targetBucket,
-    );
+    const bucketMatches = runs.filter((r) => inferTolerance(r.riskLevel) === targetBucket);
     const pool = bucketMatches.length > 0 ? bucketMatches : runs;
     const scopedToBucket = bucketMatches.length > 0;
 
@@ -352,10 +340,14 @@ export function BacktestRunHistoryCard({
       },
     }));
     scored.sort((a, b) => b.score - a.score);
-    return { best: scored[0], runnerUp: scored[1] ?? null, weights: w, poolSize: pool.length, scopedToBucket };
+    return {
+      best: scored[0],
+      runnerUp: scored[1] ?? null,
+      weights: w,
+      poolSize: pool.length,
+      scopedToBucket,
+    };
   }, [runs, tolerance]);
-
-
 
   return (
     <Card className="mb-4">
@@ -412,7 +404,9 @@ export function BacktestRunHistoryCard({
                 <div className="mt-3">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <div className="text-sm font-semibold">
-                      {new Date(recommendation.best.run.ranAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}
+                      {new Date(recommendation.best.run.ranAt).toLocaleString("en-GB", {
+                        timeZone: "Europe/London",
+                      })}
                     </div>
                     <Badge variant="secondary" className="capitalize">
                       {recommendation.best.run.riskLevel || "unknown"} risk
@@ -424,7 +418,8 @@ export function BacktestRunHistoryCard({
                       </span>
                       {recommendation.runnerUp && (
                         <>
-                          {" "}· next best{" "}
+                          {" "}
+                          · next best{" "}
                           <span className="font-mono text-foreground">
                             {recommendation.runnerUp.score.toFixed(3)}
                           </span>
@@ -482,12 +477,13 @@ export function BacktestRunHistoryCard({
               )}
             </div>
 
-
             {groupByRisk && aggregates.length > 0 && (
               <div className="mb-4 overflow-x-auto">
                 <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Side-by-side by risk level
-                  {selected.size > 0 ? ` (${selected.size} selected)` : ` (all ${runs.length} runs)`}
+                  {selected.size > 0
+                    ? ` (${selected.size} selected)`
+                    : ` (all ${runs.length} runs)`}
                 </div>
                 <table className="w-full min-w-[560px] text-sm">
                   <thead>
@@ -506,7 +502,9 @@ export function BacktestRunHistoryCard({
                       .map((g) => (
                         <tr key={g.key} className="border-b border-border/50">
                           <td className="py-2 pr-3">
-                            <Badge variant="secondary" className="uppercase">{g.key}</Badge>
+                            <Badge variant="secondary" className="uppercase">
+                              {g.key}
+                            </Badge>
                           </td>
                           <td className="py-2 pr-3 text-muted-foreground">{g.count}</td>
                           <td className={`py-2 pr-3 tabular-nums ${toneClass(g.avgReturn)}`}>
@@ -539,12 +537,21 @@ export function BacktestRunHistoryCard({
                 <div className="mb-1 text-xs text-muted-foreground">Equity curve</div>
                 <div className="h-56 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={mergedOverlay} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+                    <LineChart
+                      data={mergedOverlay}
+                      margin={{ top: 8, right: 16, bottom: 4, left: 4 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis
                         dataKey="t"
                         tick={AXIS_TICK}
-                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 12 }}
+                        label={{
+                          value: "Day",
+                          position: "insideBottom",
+                          offset: -2,
+                          fontSize: 12,
+                          fill: "var(--foreground)",
+                        }}
                       />
                       <YAxis
                         tick={AXIS_TICK}
@@ -554,9 +561,9 @@ export function BacktestRunHistoryCard({
                       <Tooltip
                         formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
                         labelFormatter={(t: number) => `Day ${t}`}
-                        contentStyle={{ fontSize: 12 }}
+                        contentStyle={TOOLTIP_CONTENT_STYLE}
                       />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Legend wrapperStyle={LEGEND_STYLE} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}
@@ -576,12 +583,21 @@ export function BacktestRunHistoryCard({
                 <div className="mb-1 mt-4 text-xs text-muted-foreground">Drawdown curve</div>
                 <div className="h-48 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={mergedOverlay} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+                    <LineChart
+                      data={mergedOverlay}
+                      margin={{ top: 8, right: 16, bottom: 4, left: 4 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis
                         dataKey="t"
                         tick={AXIS_TICK}
-                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 12 }}
+                        label={{
+                          value: "Day",
+                          position: "insideBottom",
+                          offset: -2,
+                          fontSize: 12,
+                          fill: "var(--foreground)",
+                        }}
                       />
                       <YAxis
                         tick={AXIS_TICK}
@@ -592,9 +608,9 @@ export function BacktestRunHistoryCard({
                       <Tooltip
                         formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
                         labelFormatter={(t: number) => `Day ${t}`}
-                        contentStyle={{ fontSize: 12 }}
+                        contentStyle={TOOLTIP_CONTENT_STYLE}
                       />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Legend wrapperStyle={LEGEND_STYLE} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}
@@ -616,13 +632,10 @@ export function BacktestRunHistoryCard({
 
             {compareRuns.length > 0 && overlaySeries.length === 0 && (
               <div className="mb-4 rounded-md border border-dashed border-border/60 p-3 text-xs text-muted-foreground">
-                No equity series stored for the selected runs. Newer runs record
-                their equity curve automatically; re-run a backtest to populate
-                the overlay charts.
+                No equity series stored for the selected runs. Newer runs record their equity curve
+                automatically; re-run a backtest to populate the overlay charts.
               </div>
             )}
-
-
 
             <div className="overflow-x-auto">
               <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -660,13 +673,17 @@ export function BacktestRunHistoryCard({
                           {new Date(r.ranAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}
                         </td>
                         <td className="py-2 pr-3">
-                          <Badge variant="secondary" className="uppercase">{r.riskLevel}</Badge>
+                          <Badge variant="secondary" className="uppercase">
+                            {r.riskLevel}
+                          </Badge>
                         </td>
                         <td className="py-2 pr-3 tabular-nums">{r.days}</td>
                         <td className={`py-2 pr-3 tabular-nums ${toneClass(m.totalReturnPct)}`}>
                           {fmt(m.totalReturnPct, 2, "%")}
                         </td>
-                        <td className={`py-2 pr-3 tabular-nums ${toneClass(m.maxDrawdownPct, true)}`}>
+                        <td
+                          className={`py-2 pr-3 tabular-nums ${toneClass(m.maxDrawdownPct, true)}`}
+                        >
                           {fmt(m.maxDrawdownPct, 2, "%")}
                         </td>
                         <td className={`py-2 pr-3 tabular-nums ${toneClass(m.sharpe)}`}>

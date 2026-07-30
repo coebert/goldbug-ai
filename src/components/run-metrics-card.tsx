@@ -6,15 +6,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Legend, CartesianGrid,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  CartesianGrid,
 } from "recharts";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -116,8 +129,16 @@ export function RunMetricsCard() {
 
         {summary && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <SummaryTile label="Runs" value={String(summary.count)} sub={`${summary.succ} ok · ${summary.fail} err`} />
-            <SummaryTile label="Avg duration" value={fmtDuration(summary.avgDurMs)} sub={`${(summary.avgDurMs / 1000).toFixed(1)}s`} />
+            <SummaryTile
+              label="Runs"
+              value={String(summary.count)}
+              sub={`${summary.succ} ok · ${summary.fail} err`}
+            />
+            <SummaryTile
+              label="Avg duration"
+              value={fmtDuration(summary.avgDurMs)}
+              sub={`${(summary.avgDurMs / 1000).toFixed(1)}s`}
+            />
             <SummaryTile
               label="Budget exceeded"
               value={String(summary.budget)}
@@ -136,7 +157,9 @@ export function RunMetricsCard() {
         {chartData.length > 0 && (
           <>
             <div>
-              <div className="mb-1 text-xs font-medium text-muted-foreground">Duration per run (seconds)</div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">
+                Duration per run (seconds)
+              </div>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -144,15 +167,23 @@ export function RunMetricsCard() {
                     <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
                     <YAxis width={64} tick={AXIS_TICK} />
                     <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="duration_s" name="duration (s)" stroke="var(--primary)" dot={false} />
+                    <Legend wrapperStyle={LEGEND_STYLE} />
+                    <Line
+                      type="monotone"
+                      dataKey="duration_s"
+                      name="duration (s)"
+                      stroke="var(--primary)"
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             <div>
-              <div className="mb-1 text-xs font-medium text-muted-foreground">Portfolios processed per run</div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">
+                Portfolios processed per run
+              </div>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -160,7 +191,7 @@ export function RunMetricsCard() {
                     <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
                     <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip />
-                    <Legend />
+                    <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="ok" name="success" stackId="p" fill="hsl(142 71% 45%)" />
                     <Bar dataKey="err" name="error" stackId="p" fill="hsl(0 84% 60%)" />
                     <Bar dataKey="budget_exceeded" name="budget exceeded" fill="hsl(38 92% 50%)" />
@@ -170,7 +201,9 @@ export function RunMetricsCard() {
             </div>
 
             <div>
-              <div className="mb-1 text-xs font-medium text-muted-foreground">Saxo API calls per run</div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">
+                Saxo API calls per run
+              </div>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -178,7 +211,7 @@ export function RunMetricsCard() {
                     <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
                     <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip />
-                    <Legend />
+                    <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />
                     <Bar dataKey="saxo_err" name="errors" fill="hsl(0 84% 60%)" />
                     <Bar dataKey="saxo_429" name="429 retries" fill="hsl(38 92% 50%)" />
@@ -210,23 +243,31 @@ export function RunMetricsCard() {
                       {formatUkTime(r.created_at)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">{r.triggered_by}</Badge>
+                      <Badge variant="outline" className="capitalize">
+                        {r.triggered_by}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {r.success ? (
                         <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">ok</Badge>
                       ) : (
-                        <Badge variant="destructive" title={r.error ?? undefined}>error</Badge>
+                        <Badge variant="destructive" title={r.error ?? undefined}>
+                          error
+                        </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtDuration(r.duration_ms)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtDuration(r.duration_ms)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {r.portfolios_ok}/{r.portfolios_total}
                       {r.portfolios_error > 0 && (
                         <span className="text-destructive"> ({r.portfolios_error} err)</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{r.budget_exceeded_count}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.budget_exceeded_count}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {r.saxo_calls_ok}/{r.saxo_calls_error}/{r.saxo_retries_429}
                     </TableCell>
@@ -242,8 +283,16 @@ export function RunMetricsCard() {
 }
 
 function SummaryTile({
-  label, value, sub, tone,
-}: { label: string; value: string; sub?: string; tone?: "ok" | "warn" }) {
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "ok" | "warn";
+}) {
   const toneCls =
     tone === "warn" ? "text-amber-500" : tone === "ok" ? "text-emerald-500" : "text-foreground";
   return (

@@ -35,7 +35,7 @@ import {
   Legend,
 } from "recharts";
 import { Languages, RefreshCw } from "lucide-react";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
 
 const COLORS = [
   "var(--primary)",
@@ -69,7 +69,7 @@ function buildChartData(result: TranslationQualityResult, langs: LanguageSeries[
     const row: ChartPoint = { day: day.slice(5) };
     for (const l of langs) {
       const p = l.points.find((x) => x.day === day);
-      row[l.language] = p && p.count > 0 ? Number((p.avgConfidence).toFixed(3)) : NaN;
+      row[l.language] = p && p.count > 0 ? Number(p.avgConfidence.toFixed(3)) : NaN;
     }
     return row;
   });
@@ -87,10 +87,7 @@ export function TranslationQualityCard() {
   });
 
   const result = query.data;
-  const topLangs = useMemo(
-    () => (result ? result.languages.slice(0, 6) : []),
-    [result],
-  );
+  const topLangs = useMemo(() => (result ? result.languages.slice(0, 6) : []), [result]);
   const chartData = useMemo(
     () => (result ? buildChartData(result, topLangs) : []),
     [result, topLangs],
@@ -106,7 +103,9 @@ export function TranslationQualityCard() {
           </span>
           <div className="flex items-center gap-2">
             <Select value={String(sinceDays)} onValueChange={(v) => setSinceDays(Number(v))}>
-              <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[110px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="7">Last 7 days</SelectItem>
                 <SelectItem value="14">Last 14 days</SelectItem>
@@ -116,7 +115,9 @@ export function TranslationQualityCard() {
               </SelectContent>
             </Select>
             <Select value={String(minCount)} onValueChange={(v) => setMinCount(Number(v))}>
-              <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="1">Min 1 headline</SelectItem>
                 <SelectItem value="3">Min 3 headlines</SelectItem>
@@ -139,7 +140,9 @@ export function TranslationQualityCard() {
         {query.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading translation stats…</p>
         ) : query.isError ? (
-          <p className="text-sm text-destructive">Failed to load: {(query.error as Error).message}</p>
+          <p className="text-sm text-destructive">
+            Failed to load: {(query.error as Error).message}
+          </p>
         ) : !result || result.totalTranslated === 0 ? (
           <p className="text-sm text-muted-foreground">
             No translated headlines in the selected window yet.
@@ -168,10 +171,17 @@ export function TranslationQualityCard() {
                   <XAxis dataKey="day" tick={AXIS_TICK} />
                   <YAxis width={64} domain={[0, 1]} tick={AXIS_TICK} />
                   <Tooltip
-                    contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)" }}
-                    formatter={(v: number | string) => (typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "—")}
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      fontSize: 12,
+                      color: "var(--popover-foreground)",
+                    }}
+                    formatter={(v: number | string) =>
+                      typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "—"
+                    }
                   />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={LEGEND_STYLE} />
                   {topLangs.map((l, i) => (
                     <Line
                       key={l.language}
@@ -205,10 +215,13 @@ export function TranslationQualityCard() {
                       <TableCell className="font-medium uppercase">{l.language}</TableCell>
                       <TableCell className="text-right">{l.totalCount}</TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={toneForConfidence(l.avgConfidence)}>{conf(l.avgConfidence)}</Badge>
+                        <Badge variant={toneForConfidence(l.avgConfidence)}>
+                          {conf(l.avgConfidence)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {l.lowCount} <span className="text-muted-foreground">({pct(l.lowShare)})</span>
+                        {l.lowCount}{" "}
+                        <span className="text-muted-foreground">({pct(l.lowShare)})</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -241,11 +254,15 @@ export function TranslationQualityCard() {
                   <TableBody>
                     {result.worstSources.map((s) => (
                       <TableRow key={`${s.source}::${s.language}`}>
-                        <TableCell className="max-w-[280px] truncate" title={s.source}>{s.source}</TableCell>
+                        <TableCell className="max-w-[280px] truncate" title={s.source}>
+                          {s.source}
+                        </TableCell>
                         <TableCell className="uppercase">{s.language}</TableCell>
                         <TableCell className="text-right">{s.count}</TableCell>
                         <TableCell className="text-right">
-                          <Badge variant={toneForConfidence(s.avgConfidence)}>{conf(s.avgConfidence)}</Badge>
+                          <Badge variant={toneForConfidence(s.avgConfidence)}>
+                            {conf(s.avgConfidence)}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">{pct(s.lowShare)}</TableCell>
                       </TableRow>

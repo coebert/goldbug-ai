@@ -8,7 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
 import {
   LineChart,
@@ -28,9 +34,16 @@ export const Route = createFileRoute("/portfolio/$id/report")({
   head: () => ({
     meta: [
       { title: "Performance Report — Aegis" },
-      { name: "description", content: "Daily and weekly returns, volatility, drawdown, Sharpe and benchmark comparison for your portfolio." },
+      {
+        name: "description",
+        content:
+          "Daily and weekly returns, volatility, drawdown, Sharpe and benchmark comparison for your portfolio.",
+      },
       { property: "og:title", content: "Performance Report — Aegis" },
-      { property: "og:description", content: "Track strategy returns, risk metrics, and alpha vs SPY." },
+      {
+        property: "og:description",
+        content: "Track strategy returns, risk metrics, and alpha vs SPY.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -39,7 +52,9 @@ export const Route = createFileRoute("/portfolio/$id/report")({
   errorComponent: ({ error, reset }) => (
     <div className="p-6 text-sm">
       <p className="text-destructive">{(error as Error).message}</p>
-      <Button className="mt-3" onClick={reset}>Retry</Button>
+      <Button className="mt-3" onClick={reset}>
+        Retry
+      </Button>
     </div>
   ),
   notFoundComponent: () => <div className="p-6">Not found</div>,
@@ -87,12 +102,16 @@ function ReportPage() {
             </Button>
             <h1 className="text-2xl font-semibold">Performance Report</h1>
             {data?.portfolio && (
-              <Badge variant="outline">{data.portfolio.name} · {data.portfolio.risk_level}</Badge>
+              <Badge variant="outline">
+                {data.portfolio.name} · {data.portfolio.risk_level}
+              </Badge>
             )}
           </div>
           <div className="flex items-center gap-2">
             <Select value={benchmark} onValueChange={setBenchmark}>
-              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Benchmark" /></SelectTrigger>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Benchmark" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="SPY">SPY (S&P 500)</SelectItem>
                 <SelectItem value="QQQ">QQQ (Nasdaq 100)</SelectItem>
@@ -101,7 +120,9 @@ function ReportPage() {
               </SelectContent>
             </Select>
             <Select value={String(windowDays)} onValueChange={(v) => setWindowDays(Number(v))}>
-              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Window" /></SelectTrigger>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Window" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="30">30 days</SelectItem>
                 <SelectItem value="90">90 days</SelectItem>
@@ -120,9 +141,12 @@ function ReportPage() {
         {isError && <p className="text-sm text-destructive">{(error as Error).message}</p>}
 
         {data && data.empty && (
-          <Card><CardContent className="pt-6 text-sm text-muted-foreground">
-            No equity snapshots yet — run at least one trading day or backtest to generate a performance report.
-          </CardContent></Card>
+          <Card>
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              No equity snapshots yet — run at least one trading day or backtest to generate a
+              performance report.
+            </CardContent>
+          </Card>
         )}
 
         {data && !data.empty && data.overall && (
@@ -143,19 +167,37 @@ function ReportPage() {
               />
               <KpiTile
                 label="Sharpe (annualised)"
-                sub={data.benchmarkOverall ? `Benchmark: ${fmtNum(data.benchmarkOverall.sharpe)}` : "risk-adjusted return"}
+                sub={
+                  data.benchmarkOverall
+                    ? `Benchmark: ${fmtNum(data.benchmarkOverall.sharpe)}`
+                    : "risk-adjusted return"
+                }
                 value={fmtNum(data.overall.sharpe)}
-                tone={data.overall.sharpe >= 1 ? "text-emerald-500" : data.overall.sharpe >= 0 ? "text-foreground" : "text-rose-500"}
+                tone={
+                  data.overall.sharpe >= 1
+                    ? "text-emerald-500"
+                    : data.overall.sharpe >= 0
+                      ? "text-foreground"
+                      : "text-rose-500"
+                }
               />
               <KpiTile
                 label="Max drawdown"
-                sub={data.benchmarkOverall ? `Benchmark: ${fmtPct(data.benchmarkOverall.max_drawdown_pct)}` : "peak-to-trough loss"}
+                sub={
+                  data.benchmarkOverall
+                    ? `Benchmark: ${fmtPct(data.benchmarkOverall.max_drawdown_pct)}`
+                    : "peak-to-trough loss"
+                }
                 value={fmtPct(data.overall.max_drawdown_pct)}
                 tone="text-rose-500"
               />
               <KpiTile
                 label="Volatility (annualised)"
-                sub={data.benchmarkOverall ? `Benchmark: ${fmtPct(data.benchmarkOverall.volatility_pct)}` : "daily returns σ × √252"}
+                sub={
+                  data.benchmarkOverall
+                    ? `Benchmark: ${fmtPct(data.benchmarkOverall.volatility_pct)}`
+                    : "daily returns σ × √252"
+                }
                 value={fmtPct(data.overall.volatility_pct)}
               />
               <KpiTile
@@ -178,7 +220,9 @@ function ReportPage() {
             {/* Equity vs benchmark chart */}
             <Card className="mb-6">
               <CardHeader>
-                <CardTitle className="text-base">Strategy vs {data.benchmark} (normalised to portfolio start)</CardTitle>
+                <CardTitle className="text-base">
+                  Strategy vs {data.benchmark} (normalised to portfolio start)
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div
@@ -192,7 +236,10 @@ function ReportPage() {
                       if (!s.length) return "No series data.";
                       const first = s[0];
                       const last = s[s.length - 1];
-                      const stratPct = first.strategy > 0 ? ((last.strategy - first.strategy) / first.strategy) * 100 : 0;
+                      const stratPct =
+                        first.strategy > 0
+                          ? ((last.strategy - first.strategy) / first.strategy) * 100
+                          : 0;
                       const fb = first.benchmark ?? 0;
                       const lb = last.benchmark ?? 0;
                       const benchPct = fb > 0 ? ((lb - fb) / fb) * 100 : 0;
@@ -200,30 +247,72 @@ function ReportPage() {
                     })()}
                   </span>
                   <ResponsiveContainer>
-                    <LineChart data={data.strategy_series} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                    <LineChart
+                      data={data.strategy_series}
+                      margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                       <XAxis
                         dataKey="date"
                         tick={AXIS_TICK}
-                        label={{ value: "Date", position: "insideBottom", offset: -4, style: { fontSize: 12, fill: "var(--foreground)" } }}
+                        label={{
+                          value: "Date",
+                          position: "insideBottom",
+                          offset: -4,
+                          style: { fontSize: 12, fill: "var(--foreground)" },
+                        }}
                         minTickGap={40}
                       />
-                      <YAxis width={64}
+                      <YAxis
+                        width={64}
                         tick={AXIS_TICK}
                         tickFormatter={(v) => `${(v as number).toLocaleString()}`}
-                        label={{ value: `Value (${currency})`, angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "var(--foreground)" } }}
+                        label={{
+                          value: `Value (${currency})`,
+                          angle: -90,
+                          position: "insideLeft",
+                          style: { fontSize: 12, fill: "var(--foreground)" },
+                        }}
                       />
                       <Tooltip
-                        contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }}
+                        contentStyle={{
+                          background: "var(--card)",
+                          border: "1px solid var(--border)",
+                          fontSize: 12,
+                          color: "var(--popover-foreground)",
+                        }}
                         formatter={(val: number | string, name) => [
-                          typeof val === "number" ? `${val.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}` : val,
+                          typeof val === "number"
+                            ? `${val.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`
+                            : val,
                           name,
                         ]}
                       />
                       <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
-                      <ReferenceLine y={data.portfolio.starting_cash} stroke="var(--foreground)" strokeOpacity={0.5} strokeDasharray="4 4" label={{ value: "Start", fill: "var(--foreground)", fontSize: 12 }} />
-                      <Line type="monotone" dataKey="strategy" name="Strategy" stroke={CHART_ROLE.positive} strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="benchmark" name={data.benchmark} stroke={CHART_ROLE.benchmark} strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                      <ReferenceLine
+                        y={data.portfolio.starting_cash}
+                        stroke="var(--foreground)"
+                        strokeOpacity={0.5}
+                        strokeDasharray="4 4"
+                        label={{ value: "Start", fill: "var(--foreground)", fontSize: 12 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="strategy"
+                        name="Strategy"
+                        stroke={CHART_ROLE.positive}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="benchmark"
+                        name={data.benchmark}
+                        stroke={CHART_ROLE.benchmark}
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        dot={false}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -262,8 +351,16 @@ function ReportPage() {
 }
 
 function KpiTile({
-  label, value, sub, tone,
-}: { label: string; value: string; sub?: string; tone?: string }) {
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: string;
+}) {
   return (
     <Card>
       <CardContent className="pt-4">
@@ -291,8 +388,16 @@ type Bucket = {
 };
 
 function PeriodTable({
-  rows, benchmark, showRiskCols, emptyLabel,
-}: { rows: Bucket[]; benchmark: string; showRiskCols: boolean; emptyLabel: string }) {
+  rows,
+  benchmark,
+  showRiskCols,
+  emptyLabel,
+}: {
+  rows: Bucket[];
+  benchmark: string;
+  showRiskCols: boolean;
+  emptyLabel: string;
+}) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground py-4">{emptyLabel}</p>;
   }
@@ -306,11 +411,13 @@ function PeriodTable({
               <th className="py-2 pr-3 text-right">Strategy</th>
               <th className="py-2 pr-3 text-right">{benchmark}</th>
               <th className="py-2 pr-3 text-right">Alpha</th>
-              {showRiskCols && <>
-                <th className="py-2 pr-3 text-right">Vol (ann.)</th>
-                <th className="py-2 pr-3 text-right">Max DD</th>
-                <th className="py-2 pr-3 text-right">Sharpe</th>
-              </>}
+              {showRiskCols && (
+                <>
+                  <th className="py-2 pr-3 text-right">Vol (ann.)</th>
+                  <th className="py-2 pr-3 text-right">Max DD</th>
+                  <th className="py-2 pr-3 text-right">Sharpe</th>
+                </>
+              )}
               <th className="py-2 pr-3 text-right">Best</th>
               <th className="py-2 pr-3 text-right">Worst</th>
             </tr>
@@ -320,18 +427,38 @@ function PeriodTable({
               <tr key={r.period_start + r.period_end} className="border-b last:border-b-0">
                 <td className="py-2 pr-3">
                   <div>{r.label}</div>
-                  <div className="text-xs text-muted-foreground">{r.days} day{r.days === 1 ? "" : "s"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {r.days} day{r.days === 1 ? "" : "s"}
+                  </div>
                 </td>
-                <td className={`py-2 pr-3 text-right font-mono ${toneClass(r.strategy_return_pct)}`}>{fmtPct(r.strategy_return_pct)}</td>
-                <td className={`py-2 pr-3 text-right font-mono ${toneClass(r.benchmark_return_pct)}`}>{fmtPct(r.benchmark_return_pct)}</td>
-                <td className={`py-2 pr-3 text-right font-mono ${toneClass(r.alpha_pct)}`}>{fmtPct(r.alpha_pct)}</td>
-                {showRiskCols && <>
-                  <td className="py-2 pr-3 text-right font-mono">{fmtPct(r.volatility_pct)}</td>
-                  <td className="py-2 pr-3 text-right font-mono text-rose-500">{fmtPct(r.max_drawdown_pct)}</td>
-                  <td className="py-2 pr-3 text-right font-mono">{fmtNum(r.sharpe)}</td>
-                </>}
-                <td className="py-2 pr-3 text-right font-mono text-emerald-500">{fmtPct(r.best_day_pct)}</td>
-                <td className="py-2 pr-3 text-right font-mono text-rose-500">{fmtPct(r.worst_day_pct)}</td>
+                <td
+                  className={`py-2 pr-3 text-right font-mono ${toneClass(r.strategy_return_pct)}`}
+                >
+                  {fmtPct(r.strategy_return_pct)}
+                </td>
+                <td
+                  className={`py-2 pr-3 text-right font-mono ${toneClass(r.benchmark_return_pct)}`}
+                >
+                  {fmtPct(r.benchmark_return_pct)}
+                </td>
+                <td className={`py-2 pr-3 text-right font-mono ${toneClass(r.alpha_pct)}`}>
+                  {fmtPct(r.alpha_pct)}
+                </td>
+                {showRiskCols && (
+                  <>
+                    <td className="py-2 pr-3 text-right font-mono">{fmtPct(r.volatility_pct)}</td>
+                    <td className="py-2 pr-3 text-right font-mono text-rose-500">
+                      {fmtPct(r.max_drawdown_pct)}
+                    </td>
+                    <td className="py-2 pr-3 text-right font-mono">{fmtNum(r.sharpe)}</td>
+                  </>
+                )}
+                <td className="py-2 pr-3 text-right font-mono text-emerald-500">
+                  {fmtPct(r.best_day_pct)}
+                </td>
+                <td className="py-2 pr-3 text-right font-mono text-rose-500">
+                  {fmtPct(r.worst_day_pct)}
+                </td>
               </tr>
             ))}
           </tbody>
