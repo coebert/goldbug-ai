@@ -7,6 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
+import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 import {
   detectSnapshotTimingMismatches,
   logSnapshotTimingMismatches,
