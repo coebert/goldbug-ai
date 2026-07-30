@@ -142,6 +142,10 @@ async function runHourlyCycleInner(
     if (runPreflightRefresh) {
       try {
         const { forceRefreshTokens, getOAuthStatus } = await import("@/lib/brokers/saxo-oauth.server");
+        const { recordTokenRefreshOutcome, checkRefreshWindow } = await import(
+          "@/lib/broker-token-health.server",
+        );
+        const { redactedError } = await import("@/lib/_server/redact");
         for (const env of ["sim", "live"] as const) {
           try {
             const status = await getOAuthStatus(env);
@@ -154,10 +158,21 @@ async function runHourlyCycleInner(
               continue;
             }
             const r = await forceRefreshTokens(env);
+            recordTokenRefreshOutcome({
+              env,
+              source: "hourly-run",
+              ok: true,
+              skipped: r.refreshed ? null : r.reason,
+            });
+            checkRefreshWindow({
+              env,
+              secondsUntilRefreshExpiry: status.secondsUntilRefreshExpiry,
+            });
             saxoRefresh[env] = r.refreshed ? { ok: true } : { ok: true, skipped: r.reason };
           } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
+            const msg = redactedError(e).message;
             console.error(`hourly-run: saxo refresh failed for ${env}`, msg);
+            recordTokenRefreshOutcome({ env, source: "hourly-run", ok: false, error: e });
             saxoRefresh[env] = { ok: false, error: msg };
           }
         }

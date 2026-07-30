@@ -28,3 +28,18 @@ module scope.
 4. Promote the new value to `CRON_SECRET` and delete `CRON_SECRET_NEXT`.
 
 Never leave `CRON_SECRET_NEXT` set long-term; it exists only for the overlap window.
+
+## Broker credential hygiene (phase 6)
+
+- Saxo tokens rotate on a schedule (`/api/public/hooks/saxo-refresh` every
+  ~30 min, plus the hourly tick preflight). Every attempt reports through
+  `recordTokenRefreshOutcome` in `src/lib/broker-token-health.server.ts`,
+  which appends to `broker_token_events` (admin-read, append-only) and, on
+  failure, audits a `broker_token` event and pushes an admin alert.
+- `checkRefreshWindow` escalates separately when the *refresh* token window is
+  closing (< 6h) or has lapsed — at that point only a reauthorisation helps.
+- Redaction is mandatory on any provider text that reaches a log or a table:
+  route it through `redactedError` (`_server/redact.ts`). It strips bearer
+  tokens, JWT-shaped values, long hex/base64 blobs and
+  `access_token=/refresh_token=`-style pairs. The Saxo REST error path and the
+  OAuth token-exchange path both redact before logging or throwing.

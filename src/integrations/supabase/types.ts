@@ -280,6 +280,33 @@ export type Database = {
         }
         Relationships: []
       }
+      broker_token_events: {
+        Row: {
+          created_at: string
+          detail: string | null
+          env: string
+          id: string
+          ok: boolean
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          env: string
+          id?: string
+          ok: boolean
+          source: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          env?: string
+          id?: string
+          ok?: boolean
+          source?: string
+        }
+        Relationships: []
+      }
       calibration_snapshots: {
         Row: {
           as_of: string

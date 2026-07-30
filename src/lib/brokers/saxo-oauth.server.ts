@@ -10,6 +10,7 @@
 
 import type { BrokerEnv } from "./adapter";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { redactedError } from "@/lib/_server/redact";
 
 const AUTH_HOST = {
   sim: "https://sim.logonvalidation.net",
@@ -126,7 +127,12 @@ async function tokenRequest(env: BrokerEnv, form: URLSearchParams): Promise<Saxo
     body: form.toString(),
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`Saxo token exchange failed (${res.status}): ${text.slice(0, 300)}`);
+  if (!res.ok) {
+    // Redact before the body ever reaches a log/table: Saxo's token endpoint
+    // echoes the request, which carries the refresh token.
+    const safe = redactedError(text.slice(0, 300)).message;
+    throw new Error(`Saxo token exchange failed (${res.status}): ${safe}`);
+  }
   return JSON.parse(text) as SaxoTokenResponse;
 }
 
