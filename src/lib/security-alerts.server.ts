@@ -124,3 +124,94 @@ export const SECURITY_ALERT_DEFAULTS = {
   last_notified_at: null as string | null,
   last_notified_count: null as number | null,
 };
+
+/**
+ * Admin fan-out for security events that have no owning user: repeated 401s on
+ * the scheduled-job webhooks (`cron_auth`) and rejected access to a portfolio
+ * we could not attribute to an actor.
+ *
+ * Counts matching `security_audit_log` rows inside the window, applies a
+ * notification-backed cool-down so an ongoing probe cannot spam, then writes an
+ * in-app notification AND a push alert to every administrator.
+ *
+ * Fire-and-forget: never let alerting break the access-control decision.
+ */
+export function notifyAdminsSecurityEvent(params: {
+  event: AuditEventKind;
+  reason: string | null;
+  windowMinutes?: number;
+  threshold?: number;
+  cooldownMinutes?: number;
+  details?: Record<string, unknown>;
+}): void {
+  const windowMinutes = params.windowMinutes ?? ADMIN_ALERT_DEFAULTS.windowMinutes;
+  const threshold = params.threshold ?? ADMIN_ALERT_DEFAULTS.threshold;
+  const cooldownMinutes =
+    params.cooldownMinutes ?? ADMIN_ALERT_DEFAULTS.cooldownMinutes;
+
+  void (async () => {
+    try {
+      const now = Date.now();
+      const since = new Date(now - windowMinutes * 60_000).toISOString();
+      const { count } = await supabaseAdmin
+        .from("security_audit_log")
+        .select("id", { count: "exact", head: true })
+        .eq("event", params.event)
+        .gte("created_at", since);
+      const total = count ?? 0;
+      if (total < threshold) return;
+
+      const cooldownSince = new Date(now - cooldownMinutes * 60_000).toISOString();
+      const { count: recentAlerts } = await supabaseAdmin
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("category", params.event)
+        .gte("created_at", cooldownSince);
+      if ((recentAlerts ?? 0) > 0) return;
+
+      const { data: admins } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+      if (!admins?.length) return;
+
+      const title =
+        params.event === "cron_auth"
+          ? "Unauthorised webhook attempts"
+          : `Security alert: ${params.event}`;
+      const body =
+        `${total} SECURITY:${params.event} events in the last ${windowMinutes}m` +
+        (params.reason ? ` (latest: ${params.reason})` : "");
+
+      for (const admin of admins) {
+        await supabaseAdmin.from("notifications").insert({
+          user_id: admin.user_id,
+          category: params.event,
+          severity: total >= threshold * 2 ? "critical" : "warning",
+          title,
+          body,
+          details: { ...(params.details ?? {}), count: total, window_minutes: windowMinutes },
+        });
+        await sendPushToUser(admin.user_id, {
+          title,
+          body,
+          url: "/admin",
+          tag: `security-alert-${params.event}`,
+          requireInteraction: true,
+        });
+      }
+    } catch (e) {
+      console.warn(
+        "SECURITY:admin alert notify failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  })();
+}
+
+/** Defaults for the admin fan-out path (probing is rarer, alert sooner). */
+export const ADMIN_ALERT_DEFAULTS = {
+  threshold: 5,
+  windowMinutes: 15,
+  cooldownMinutes: 60,
+};
