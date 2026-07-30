@@ -186,7 +186,14 @@ export function NewsReel() {
   const seenIdsRef = useRef<Set<string> | null>(null);
   const [highlightIds, setHighlightIds] = useState<Map<string, number>>(new Map());
 
-  const allItems = q.data?.items ?? [];
+  const rawItems = q.data?.items ?? [];
+  // Collapse repeats of the same story (same canonical URL or headline) that
+  // can arrive across refreshes/cron runs under different dates or sources.
+  // Sorting newest-first first means the surviving copy is the freshest.
+  const allItems = useMemo(
+    () => dedupeNewsItems(sortNewsLatestFirst(rawItems)),
+    [rawItems],
+  );
   const items = useMemo(() => {
     const filtered = allItems.filter((it) => {
       if (onlyCited && it.decisions_count === 0) return false;
