@@ -1661,25 +1661,26 @@ function PortfolioPage() {
                                   isPct
                                     ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
                                     : `${p.currency} ${v.toFixed(2)}`;
-                                // Net cumulative deposits out of the raw
-                                // tooltip pnl so it never shows a top-up
-                                // as profit (matches ModeSummaryTile).
-                                const dep = cumulativeDepositsByDate.get(String(label)) ?? 0;
-                                const pnlFromStart = isPct
-                                  ? row.value
-                                  : row.value - dep - startingCash;
+                                // Measure against invested capital on that
+                                // date (baseline pot + deposits so far) — the
+                                // same rule the equity-% chart and every
+                                // equity tile use, so a top-up never reads as
+                                // profit and the "start" line means the same
+                                // thing everywhere.
+                                const capital = baseAt(String(label));
+                                const pnlFromStart = isPct ? row.value : row.value - capital;
                                 const pnlPctFromStart = isPct
                                   ? row.value
-                                  : startingCash > 0
-                                    ? (pnlFromStart / startingCash) * 100
+                                  : capital > 0
+                                    ? (pnlFromStart / capital) * 100
                                     : 0;
                                 const benchPct =
                                   row.benchmark == null
                                     ? null
                                     : isPct
                                       ? row.benchmark
-                                      : startingCash > 0
-                                        ? ((row.benchmark - startingCash) / startingCash) * 100
+                                      : capital > 0
+                                        ? ((row.benchmark - capital) / capital) * 100
                                         : null;
                                 const active_events = eventsOn
                                   ? eventsInRange(String(label), String(label)).filter(
