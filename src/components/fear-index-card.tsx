@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartFrame } from "@/components/chart-frame";
 import { Gauge } from "lucide-react";
+import { formatMoney } from "@/lib/format-money";
 import {
   AXIS_LINE,
   AXIS_TICK,
