@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPerformanceAnalytics } from "@/lib/performance-analytics.functions";
 import type { AttributionSlice } from "@/lib/performance-analytics.server";
-import { AXIS_TICK, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 import {
   ResponsiveContainer,
   LineChart,
@@ -103,13 +103,9 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   data={data.equityCurve}
                   margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                  <YAxis
-                    tick={AXIS_TICK}
-                    tickFormatter={(v: number) => fmtCcy.format(v)}
-                    width={70}
-                  />
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => fmtCcy.format(v)} width={70} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                   <Tooltip
                     formatter={(v: number) => fmtCcyPrecise.format(v)}
                     labelClassName="text-xs"
@@ -138,13 +134,9 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                       <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                  <YAxis
-                    tick={AXIS_TICK}
-                    tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                    width={64}
-                  />
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => `${v.toFixed(0)}%`} width={64} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                   <Tooltip
                     formatter={(v: number) => `${v.toFixed(2)}%`}
                     labelClassName="text-xs"
@@ -256,9 +248,9 @@ function AttributionBlock({
               layout="vertical"
               margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
             >
-              <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
-              <XAxis type="number" tick={AXIS_TICK} tickFormatter={(v: number) => fmt.format(v)} />
-              <YAxis type="category" dataKey="label" tick={AXIS_TICK} width={110} />
+              <CartesianGrid {...GRID_PROPS} horizontal={false} />
+              <XAxis type="number" tick={AXIS_TICK} tickFormatter={(v: number) => fmt.format(v)} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+              <YAxis type="category" dataKey="label" tick={AXIS_TICK} width={110} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
               <Tooltip
                 formatter={(v: number) => fmt.format(v)}
                 labelClassName="text-xs"

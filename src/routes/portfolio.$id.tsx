@@ -196,7 +196,7 @@ import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 type PortfolioTab =
   | "overview"
@@ -1570,18 +1570,8 @@ function PortfolioPage() {
                                 />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid
-                              stroke={chartTheme.axis}
-                              strokeOpacity={chartTheme.gridOpacity}
-                              strokeDasharray="3 3"
-                            />
-                            <XAxis
-                              dataKey="date"
-                              tick={AXIS_TICK}
-                              stroke={chartTheme.axis}
-                              minTickGap={isMobile ? 56 : 30}
-                              tickFormatter={(v) => formatDateTick(v, isMobile)}
-                              label={
+                            <CartesianGrid {...GRID_PROPS} />
+                            <XAxis dataKey="date" tick={AXIS_TICK} stroke={chartTheme.axis} minTickGap={isMobile ? 56 : 30} tickFormatter={(v) => formatDateTick(v, isMobile)} label={
                                 isMobile
                                   ? undefined
                                   : {
@@ -1591,21 +1581,14 @@ function PortfolioPage() {
                                       fill: chartTheme.axisText,
                                       fontSize: 12,
                                     }
-                              }
-                            />
-                            <YAxis
-                              domain={["auto", "auto"]}
-                              width={isMobile ? 56 : 72}
-                              tick={AXIS_TICK}
-                              stroke={chartTheme.axis}
-                              tickFormatter={(v) =>
+                              } axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                            <YAxis domain={["auto", "auto"]} width={isMobile ? 56 : 72} tick={AXIS_TICK} stroke={chartTheme.axis} tickFormatter={(v) =>
                                 formatValueTick(v, {
                                   currency: p.currency,
                                   isPct: compareMode === "pct",
                                   isMobile,
                                 })
-                              }
-                              label={
+                              } label={
                                 isMobile
                                   ? undefined
                                   : {
@@ -1617,8 +1600,7 @@ function PortfolioPage() {
                                       fill: chartTheme.axisText,
                                       fontSize: 12,
                                     }
-                              }
-                            />
+                              } axisLine={AXIS_LINE} tickLine={TICK_LINE} />
 
                             <Tooltip
                               cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}

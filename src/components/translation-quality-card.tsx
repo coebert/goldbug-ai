@@ -35,7 +35,7 @@ import {
   Legend,
 } from "recharts";
 import { Languages, RefreshCw } from "lucide-react";
-import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
 
 const COLORS = [
   "var(--primary)",
@@ -167,9 +167,9 @@ export function TranslationQualityCard() {
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="day" tick={AXIS_TICK} />
-                  <YAxis width={64} domain={[0, 1]} tick={AXIS_TICK} />
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis dataKey="day" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <YAxis width={64} domain={[0, 1]} tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                   <Tooltip
                     contentStyle={{
                       background: "var(--popover)",

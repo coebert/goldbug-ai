@@ -34,6 +34,7 @@ import { Explain } from "@/components/explain";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { lttb } from "@/lib/downsample";
+import { AXIS_LINE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/long-horizon/$id")({
   ssr: false,
@@ -435,28 +436,17 @@ function LongHorizonPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={360}>
                       <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
-                        <XAxis
-                          dataKey="date"
-                          stroke="var(--muted-foreground)"
-                          fontSize={11}
-                          minTickGap={40}
-                          label={{
+                        <CartesianGrid {...GRID_PROPS} />
+                        <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} minTickGap={40} label={{
                             value: "Date",
                             position: "insideBottom",
                             offset: -2,
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }}
-                        />
-                        <YAxis
-                          stroke="var(--muted-foreground)"
-                          fontSize={11}
-                          width={72}
-                          tickFormatter={(v) =>
+                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                        <YAxis stroke="var(--muted-foreground)" fontSize={11} width={72} tickFormatter={(v) =>
                             `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(0)}%`
-                          }
-                          label={{
+                          } label={{
                             value: "Cumulative return (%)",
                             angle: -90,
                             position: "insideLeft",
@@ -464,8 +454,7 @@ function LongHorizonPage() {
                             style: { textAnchor: "middle" },
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }}
-                        />
+                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
 
                         <ReferenceLine
                           y={0}

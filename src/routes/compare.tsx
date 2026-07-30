@@ -39,6 +39,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Explain } from "@/components/explain";
+import { AXIS_LINE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 import {
   Sheet,
   SheetContent,
@@ -398,27 +399,17 @@ function ComparePage() {
                     </div>
                     <ResponsiveContainer width="100%" height={320}>
                       <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
-                        <XAxis
-                          dataKey="date"
-                          stroke="var(--muted-foreground)"
-                          fontSize={11}
-                          label={{
+                        <CartesianGrid {...GRID_PROPS} />
+                        <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} label={{
                             value: "Date",
                             position: "insideBottom",
                             offset: -2,
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }}
-                        />
-                        <YAxis
-                          stroke="var(--muted-foreground)"
-                          fontSize={11}
-                          width={70}
-                          tickFormatter={(v) =>
+                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                        <YAxis stroke="var(--muted-foreground)" fontSize={11} width={70} tickFormatter={(v) =>
                             `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(1)}%`
-                          }
-                          label={{
+                          } label={{
                             value: "Cumulative return vs start (%)",
                             angle: -90,
                             position: "insideLeft",
@@ -426,8 +417,7 @@ function ComparePage() {
                             style: { textAnchor: "middle" },
                             fill: "var(--muted-foreground)",
                             fontSize: 12,
-                          }}
-                        />
+                          }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
 
                         <ReferenceLine
                           y={0}
@@ -496,29 +486,15 @@ function ComparePage() {
                       </div>
                       <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={drawdownData}>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="var(--border)"
-                            opacity={0.4}
-                          />
-                          <XAxis
-                            dataKey="date"
-                            stroke="var(--muted-foreground)"
-                            fontSize={11}
-                            label={{
+                          <CartesianGrid {...GRID_PROPS} />
+                          <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} label={{
                               value: "Date",
                               position: "insideBottom",
                               offset: -2,
                               fill: "var(--muted-foreground)",
                               fontSize: 12,
-                            }}
-                          />
-                          <YAxis
-                            stroke="var(--muted-foreground)"
-                            fontSize={11}
-                            width={70}
-                            tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                            label={{
+                            }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                          <YAxis stroke="var(--muted-foreground)" fontSize={11} width={70} tickFormatter={(v) => `${Number(v).toFixed(1)}%`} label={{
                               value: "Drawdown (%)",
                               angle: -90,
                               position: "insideLeft",
@@ -526,8 +502,7 @@ function ComparePage() {
                               style: { textAnchor: "middle" },
                               fill: "var(--muted-foreground)",
                               fontSize: 12,
-                            }}
-                          />
+                            }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
 
                           <ReferenceLine
                             y={0}

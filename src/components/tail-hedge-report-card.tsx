@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getTailHedgeReport, type HedgeReport } from "@/lib/hedging/tail-hedge-report.functions";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 function money(n: number, currency: string) {
   try {
@@ -170,9 +170,9 @@ export function TailHedgeReportCard({
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ left: 4, right: 4, top: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={20} />
-                  <YAxis tick={AXIS_TICK} width={64} />
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={20} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <YAxis tick={AXIS_TICK} width={64} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                   <Tooltip
                     formatter={(v: number) => money(v, currency)}
                     labelStyle={{ color: "var(--foreground)" }}

@@ -27,7 +27,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { AXIS_TICK, CHART_ROLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 
 export const Route = createFileRoute("/portfolio/$id/report")({
@@ -251,29 +251,19 @@ function ReportPage() {
                       data={data.strategy_series}
                       margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis
-                        dataKey="date"
-                        tick={AXIS_TICK}
-                        label={{
+                      <CartesianGrid {...GRID_PROPS} />
+                      <XAxis dataKey="date" tick={AXIS_TICK} label={{
                           value: "Date",
                           position: "insideBottom",
                           offset: -4,
                           style: { fontSize: 12, fill: "var(--foreground)" },
-                        }}
-                        minTickGap={40}
-                      />
-                      <YAxis
-                        width={64}
-                        tick={AXIS_TICK}
-                        tickFormatter={(v) => `${(v as number).toLocaleString()}`}
-                        label={{
+                        }} minTickGap={40} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                      <YAxis width={64} tick={AXIS_TICK} tickFormatter={(v) => `${(v as number).toLocaleString()}`} label={{
                           value: `Value (${currency})`,
                           angle: -90,
                           position: "insideLeft",
                           style: { fontSize: 12, fill: "var(--foreground)" },
-                        }}
-                      />
+                        }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                       <Tooltip
                         contentStyle={{
                           background: "var(--card)",

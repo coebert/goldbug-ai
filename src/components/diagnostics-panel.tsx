@@ -18,7 +18,7 @@ import {
 import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge, Globe2 } from "lucide-react";
 import { eventColor, type EventCategory } from "@/lib/global-events";
 import { Explain } from "@/components/explain";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 type Props = { portfolioId: string };
 
@@ -130,24 +130,15 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
             <div className="h-48 w-full">
               <ResponsiveContainer>
                 <LineChart data={rolling}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                  <XAxis
-                    dataKey="index"
-                    tick={AXIS_TICK}
-                    label={{
+                  <CartesianGrid {...GRID_PROPS} />
+                  <XAxis dataKey="index" tick={AXIS_TICK} label={{
                       value: "Trade #",
                       position: "insideBottom",
                       offset: -2,
                       fontSize: 12,
                       fill: "var(--foreground)",
-                    }}
-                  />
-                  <YAxis
-                    tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
-                    domain={[0, 1]}
-                    tick={AXIS_TICK}
-                    width={64}
-                    label={{
+                    }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                  <YAxis tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} domain={[0, 1]} tick={AXIS_TICK} width={64} label={{
                       value: "Win rate (%)",
                       angle: -90,
                       position: "insideLeft",
@@ -155,8 +146,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                       style: { textAnchor: "middle" },
                       fontSize: 12,
                       fill: "var(--foreground)",
-                    }}
-                  />
+                    }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
 
                   <ReferenceLine y={0.5} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                   <Tooltip
@@ -196,25 +186,15 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
           <div className="h-56 w-full">
             <ResponsiveContainer>
               <BarChart data={calibration}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis
-                  dataKey="bucket"
-                  tick={AXIS_TICK}
-                  label={{
+                <CartesianGrid {...GRID_PROPS} />
+                <XAxis dataKey="bucket" tick={AXIS_TICK} label={{
                     value: "Order size bucket",
                     position: "insideBottom",
                     offset: -2,
                     fontSize: 12,
                     fill: "var(--foreground)",
-                  }}
-                />
-                <YAxis
-                  yAxisId="left"
-                  tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
-                  domain={[0, 1]}
-                  tick={AXIS_TICK}
-                  width={64}
-                  label={{
+                  }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                <YAxis yAxisId="left" tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} domain={[0, 1]} tick={AXIS_TICK} width={64} label={{
                     value: "Win rate (%)",
                     angle: -90,
                     position: "insideLeft",
@@ -222,15 +202,8 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     style: { textAnchor: "middle" },
                     fontSize: 12,
                     fill: "var(--foreground)",
-                  }}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={(v) => `${v.toFixed(1)}%`}
-                  tick={AXIS_TICK}
-                  width={68}
-                  label={{
+                  }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+                <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v.toFixed(1)}%`} tick={AXIS_TICK} width={68} label={{
                     value: "Avg fwd return (%)",
                     angle: 90,
                     position: "insideRight",
@@ -238,8 +211,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                     style: { textAnchor: "middle" },
                     fontSize: 12,
                     fill: "var(--foreground)",
-                  }}
-                />
+                  }} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
 
                 <Tooltip
                   contentStyle={{

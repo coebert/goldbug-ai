@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import { AXIS_TICK, LEGEND_STYLE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, LEGEND_STYLE, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface Props {
@@ -322,8 +322,8 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
       <div className="h-32 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-            <XAxis dataKey="label" tick={AXIS_TICK} interval="preserveStartEnd" />
-            <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
+            <XAxis dataKey="label" tick={AXIS_TICK} interval="preserveStartEnd" axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+            <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
             <Tooltip
               contentStyle={TOOLTIP_CONTENT_STYLE}
               labelFormatter={(_, payload) => {
@@ -369,8 +369,8 @@ function PairTimelineChart({ pair, buckets }: { pair: string; buckets: TimelineB
       <div className="h-20 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 2, right: 6, left: -24, bottom: 0 }}>
-            <XAxis dataKey="label" tick={AXIS_TICK} interval="preserveStartEnd" />
-            <YAxis tick={AXIS_TICK} allowDecimals={false} width={64} />
+            <XAxis dataKey="label" tick={AXIS_TICK} interval="preserveStartEnd" axisLine={AXIS_LINE} tickLine={TICK_LINE} />
+            <YAxis tick={AXIS_TICK} allowDecimals={false} width={64} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
             <Tooltip
               contentStyle={TOOLTIP_CONTENT_STYLE}
               labelFormatter={(_, payload) => {
