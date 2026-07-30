@@ -248,9 +248,29 @@ export async function advanceNewsBackfill(opts?: {
     return { job: finished, inserted: 0, domains_processed: 0, done: true, reason: "No newly added feeds to backfill." };
   }
 
+  // A job that swept feeds under the old (broken) domains added nothing, so
+  // rewind its pointer and re-sweep with the corrected publisher domains.
+  const staleDomains =
+    job.headlines_inserted === 0 &&
+    job.days_done > 0 &&
+    job.new_sources.some((s, i) => s.domain !== domains[i]);
+  if (staleDomains) {
+    await supabaseAdmin
+      .from("news_backfill_jobs")
+      .update({
+        days_done: 0,
+        cursor_date: job.end_date,
+        new_sources: job.new_sources.map((s, i) => ({ ...s, domain: domains[i] })),
+        last_error: null,
+      })
+      .eq("id", job.id);
+    job.days_done = 0;
+  }
+
   // The cursor doubles as a domain pointer: each slice takes the next batch of
   // publishers, and once every publisher has been swept the job completes.
   const startIdx = Math.min(job.days_done, domains.length);
+
   const seen = await windowSeenKeys(job.start_date, job.end_date);
   let inserted = 0;
   let processed = 0;
