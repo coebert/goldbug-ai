@@ -173,6 +173,7 @@ import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 
 type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "errors" | "confidence" | "risk" | "diagnostics" | "reports";
@@ -1286,7 +1287,7 @@ function PortfolioPage() {
                         <CartesianGrid stroke={chartTheme.axis} strokeOpacity={chartTheme.gridOpacity} strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
-                          tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
+                          tick={AXIS_TICK}
                           stroke={chartTheme.axis}
                           minTickGap={isMobile ? 56 : 30}
                           tickFormatter={(v) => formatDateTick(v, isMobile)}
@@ -1295,7 +1296,7 @@ function PortfolioPage() {
                         <YAxis
                           domain={["auto", "auto"]}
                           width={isMobile ? 44 : 72}
-                          tick={{ fontSize: isMobile ? 10 : 11, fill: chartTheme.axisText }}
+                          tick={AXIS_TICK}
                           stroke={chartTheme.axis}
                           tickFormatter={(v) => formatValueTick(v, { currency: p.currency, isPct: compareMode === "pct", isMobile })}
                           label={isMobile ? undefined : { value: yAxisLabel(compareMode, p.currency), angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}

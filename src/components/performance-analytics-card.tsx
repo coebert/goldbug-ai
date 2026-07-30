@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPerformanceAnalytics } from "@/lib/performance-analytics.functions";
 import type { AttributionSlice } from "@/lib/performance-analytics.server";
+import { AXIS_TICK } from "@/lib/chart-palette";
 import {
   ResponsiveContainer,
   LineChart,
@@ -91,8 +92,8 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={data.equityCurve} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => fmtCcy.format(v)} width={70} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
+                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => fmtCcy.format(v)} width={70} />
                   <Tooltip
                     formatter={(v: number) => fmtCcyPrecise.format(v)}
                     labelClassName="text-xs"
@@ -113,8 +114,8 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v.toFixed(0)}%`} width={50} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
+                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => `${v.toFixed(0)}%`} width={50} />
                   <Tooltip
                     formatter={(v: number) => `${v.toFixed(2)}%`}
                     labelClassName="text-xs"
@@ -196,8 +197,8 @@ function AttributionBlock({
           <ResponsiveContainer width="100%" height={Math.max(140, slices.length * 28 + 20)}>
             <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => fmt.format(v)} />
-              <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} width={110} />
+              <XAxis type="number" tick={AXIS_TICK} tickFormatter={(v: number) => fmt.format(v)} />
+              <YAxis type="category" dataKey="label" tick={AXIS_TICK} width={110} />
               <Tooltip
                 formatter={(v: number) => fmt.format(v)}
                 labelClassName="text-xs"

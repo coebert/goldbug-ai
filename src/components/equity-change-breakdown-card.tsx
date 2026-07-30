@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PieChart as PieChartIcon } from "lucide-react";
+import { AXIS_TICK } from "@/lib/chart-palette";
 import {
   computeEquityChangeBreakdown,
   type DepositLike,
@@ -227,14 +228,14 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
             >
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 12, fill: "var(--foreground)" }}
+                tick={AXIS_TICK}
                 interval={0}
                 tickMargin={6}
                 axisLine={{ stroke: "var(--border)" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "var(--foreground)" }}
+                tick={AXIS_TICK}
                 tickFormatter={(v: number) => formatMoney(v, currency).replace("+", "")}
                 width={70}
                 axisLine={false}

@@ -35,6 +35,7 @@ import {
   Legend,
 } from "recharts";
 import { Languages, RefreshCw } from "lucide-react";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 const COLORS = [
   "var(--primary)",
@@ -164,8 +165,8 @@ export function TranslationQualityCard() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="day" tick={AXIS_TICK} />
+                  <YAxis domain={[0, 1]} tick={AXIS_TICK} />
                   <Tooltip
                     contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)" }}
                     formatter={(v: number | string) => (typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "—")}

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import { AXIS_TICK } from "@/lib/chart-palette";
 import {
   BarChart,
   Bar,
@@ -359,10 +360,10 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
           <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10 }}
+              tick={AXIS_TICK}
               interval="preserveStartEnd"
             />
-            <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+            <YAxis tick={AXIS_TICK} allowDecimals={false} />
             <Tooltip
               contentStyle={{ fontSize: 11 }}
               labelFormatter={(_, payload) => {
@@ -416,10 +417,10 @@ function PairTimelineChart({
           <BarChart data={data} margin={{ top: 2, right: 6, left: -24, bottom: 0 }}>
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 9 }}
+              tick={AXIS_TICK}
               interval="preserveStartEnd"
             />
-            <YAxis tick={{ fontSize: 9 }} allowDecimals={false} width={20} />
+            <YAxis tick={AXIS_TICK} allowDecimals={false} width={20} />
             <Tooltip
               contentStyle={{ fontSize: 11 }}
               labelFormatter={(_, payload) => {

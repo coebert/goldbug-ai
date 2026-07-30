@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -140,8 +141,8 @@ export function RunMetricsCard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={24} />
-                    <YAxis tick={{ fontSize: 10 }} />
+                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
+                    <YAxis tick={AXIS_TICK} />
                     <Tooltip />
                     <Legend />
                     <Line type="monotone" dataKey="duration_s" name="duration (s)" stroke="var(--primary)" dot={false} />
@@ -156,8 +157,8 @@ export function RunMetricsCard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={24} />
-                    <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
+                    <YAxis tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="ok" name="success" stackId="p" fill="hsl(142 71% 45%)" />
@@ -174,8 +175,8 @@ export function RunMetricsCard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={24} />
-                    <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                    <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={24} />
+                    <YAxis tick={AXIS_TICK} allowDecimals={false} />
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />

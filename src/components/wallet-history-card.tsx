@@ -20,6 +20,7 @@ import {
 import { getWalletHistory } from "@/lib/wallet-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 interface Props {
   portfolioId: string;
@@ -134,10 +135,10 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
               <ResponsiveContainer>
                 <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
                   <YAxis
                     yAxisId="left"
-                    tick={{ fontSize: 11 }}
+                    tick={AXIS_TICK}
                     tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
                     }
@@ -145,7 +146,7 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 11 }}
+                    tick={AXIS_TICK}
                     tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
                     }

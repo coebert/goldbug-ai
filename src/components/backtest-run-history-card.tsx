@@ -22,6 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import type { BacktestMetrics } from "@/lib/backtest-metrics";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 export type BacktestEquityPoint = { snapshot_date: string; total_value: number };
 
@@ -542,11 +543,11 @@ export function BacktestRunHistoryCard({
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis
                         dataKey="t"
-                        tick={{ fontSize: 10 }}
+                        tick={AXIS_TICK}
                         label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
                       />
                       <YAxis
-                        tick={{ fontSize: 10 }}
+                        tick={AXIS_TICK}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                         width={44}
                       />
@@ -579,11 +580,11 @@ export function BacktestRunHistoryCard({
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis
                         dataKey="t"
-                        tick={{ fontSize: 10 }}
+                        tick={AXIS_TICK}
                         label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
                       />
                       <YAxis
-                        tick={{ fontSize: 10 }}
+                        tick={AXIS_TICK}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                         width={44}
                         domain={["auto", 0]}

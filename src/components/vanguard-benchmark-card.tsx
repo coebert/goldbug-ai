@@ -21,6 +21,7 @@ import {
   type EquityPoint,
 } from "@/lib/vanguard-benchmark";
 import { formatUk } from "@/lib/uk-time";
+import { AXIS_TICK } from "@/lib/chart-palette";
 
 /**
  * "vs Vanguard benchmark" performance tile.
@@ -175,13 +176,13 @@ export function VanguardBenchmarkCard({
                       dataKey="date"
                       tickFormatter={fmtShortDate}
                       minTickGap={32}
-                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tick={AXIS_TICK}
                       stroke="var(--border)"
                     />
                     <YAxis
                       domain={["auto", "auto"]}
                       tickFormatter={(v: number) => fmtCompact.format(v)}
-                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tick={AXIS_TICK}
                       stroke="var(--border)"
                       width={56}
                     />

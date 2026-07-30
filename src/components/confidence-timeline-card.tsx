@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { AXIS_TICK } from "@/lib/chart-palette";
 import {
   buildConfidenceTimeline,
   type ConfidencePoint,
@@ -144,8 +145,8 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={rows} margin={{ top: 10, right: 16, bottom: 8, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="dateLabel" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="dateLabel" tick={AXIS_TICK} />
+                  <YAxis domain={[0, 100]} tick={AXIS_TICK} />
                   <Tooltip content={<TimelineTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Line

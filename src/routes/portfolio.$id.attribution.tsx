@@ -243,7 +243,7 @@ function AttributionPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data.news_buckets}>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                          <XAxis dataKey="bucket" stroke="var(--muted-foreground)" tick={{ fontSize: 10 }} />
+                          <XAxis dataKey="bucket" stroke="var(--muted-foreground)" tick={AXIS_TICK} />
                           <YAxis stroke="var(--muted-foreground)" label={{ value: "Avg forward return (%)", angle: -90, position: "insideLeft", fill: "var(--muted-foreground)", style: { fontSize: 11 } }} />
                           <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
                           <ReferenceLine y={0} stroke="var(--muted-foreground)" />
