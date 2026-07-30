@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PieChart as PieChartIcon } from "lucide-react";
-import { AXIS_TICK, OKABE_ITO } from "@/lib/chart-palette";
+import { AXIS_TICK, OKABE_ITO, REFERENCE_LINE } from "@/lib/chart-palette";
 import {
   computeEquityChangeBreakdown,
   type DepositLike,
@@ -264,7 +264,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   Math.max(0, max) * 1.25 || 1,
                 ]}
               />
-              <ReferenceLine y={0} stroke="var(--border)" />
+              <ReferenceLine {...REFERENCE_LINE} y={0} />
               <Tooltip
                 cursor={{ fill: "color-mix(in oklab, var(--muted) 40%, transparent)" }}
                 content={({ active, payload }) => {

@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPerformanceAnalytics } from "@/lib/performance-analytics.functions";
 import type { AttributionSlice } from "@/lib/performance-analytics.server";
-import {
-  AXIS_LINE,
-  AXIS_TICK,
-  GRID_PROPS,
-  TICK_LINE,
-  TOOLTIP_CONTENT_STYLE,
-} from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 import {
   ResponsiveContainer,
   LineChart,
@@ -172,7 +166,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     labelClassName="text-xs"
                     contentStyle={TOOLTIP_CONTENT_STYLE}
                   />
-                  <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="2 2" />
+                  <ReferenceLine {...REFERENCE_LINE} y={0} />
                   <Area
                     type="monotone"
                     dataKey="drawdownPct"
@@ -299,7 +293,7 @@ function AttributionBlock({
                 labelClassName="text-xs"
                 contentStyle={TOOLTIP_CONTENT_STYLE}
               />
-              <ReferenceLine x={0} stroke="var(--muted-foreground)" />
+              <ReferenceLine {...REFERENCE_LINE} x={0} />
               <Bar dataKey="realizedPnl" radius={[0, 4, 4, 0]}>
                 {chartData.map((s) => (
                   <Cell

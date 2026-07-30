@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, RefreshCw } from "lucide-react";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, CHART_SEQUENCE, GRID_PROPS, OKABE_ITO, TICK_LINE } from "@/lib/chart-palette";
 import {
   Area,
   CartesianGrid,

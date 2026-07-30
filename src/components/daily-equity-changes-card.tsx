@@ -23,7 +23,7 @@ import {
   type EquitySnapshotLite,
 } from "@/lib/daily-equity-changes";
 import { formatMoney } from "@/lib/format-money";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 
 type Range = "7d" | "30d" | "90d" | "ytd" | "all";
 
@@ -218,7 +218,7 @@ export function DailyEquityChangesCard({
                     axisLine={AXIS_LINE}
                     tickLine={TICK_LINE}
                   />
-                  <ReferenceLine y={0} stroke="var(--foreground)" strokeOpacity={0.4} />
+                  <ReferenceLine {...REFERENCE_LINE} y={0} />
                   <Tooltip
                     cursor={{ fill: "color-mix(in oklab, var(--muted) 30%, transparent)" }}
                     content={({ active, payload }) => {

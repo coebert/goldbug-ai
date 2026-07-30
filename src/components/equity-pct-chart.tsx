@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 import {
   CartesianGrid,
   Line,
@@ -95,12 +95,7 @@ export function EquityPctChart({
                 axisLine={AXIS_LINE}
                 tickLine={TICK_LINE}
               />
-              <ReferenceLine
-                y={0}
-                stroke="currentColor"
-                strokeOpacity={0.6}
-                strokeDasharray="4 3"
-              />
+              <ReferenceLine {...REFERENCE_LINE} y={0} />
               <Tooltip
                 contentStyle={{
                   fontSize: 12,
