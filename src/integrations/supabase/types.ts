@@ -1353,6 +1353,57 @@ export type Database = {
         }
         Relationships: []
       }
+      news_relevance_runs: {
+        Row: {
+          batch_failures: number
+          batches: number
+          created_at: string
+          failure_reasons: Json
+          fallback_items: number
+          fallback_reason: string | null
+          id: string
+          items: number
+          latency_ms_max: number
+          latency_ms_p50: number
+          latency_ms_total: number
+          llm_scored: number
+          news_date: string
+          trigger: string
+        }
+        Insert: {
+          batch_failures?: number
+          batches?: number
+          created_at?: string
+          failure_reasons?: Json
+          fallback_items?: number
+          fallback_reason?: string | null
+          id?: string
+          items?: number
+          latency_ms_max?: number
+          latency_ms_p50?: number
+          latency_ms_total?: number
+          llm_scored?: number
+          news_date: string
+          trigger?: string
+        }
+        Update: {
+          batch_failures?: number
+          batches?: number
+          created_at?: string
+          failure_reasons?: Json
+          fallback_items?: number
+          fallback_reason?: string | null
+          id?: string
+          items?: number
+          latency_ms_max?: number
+          latency_ms_p50?: number
+          latency_ms_total?: number
+          llm_scored?: number
+          news_date?: string
+          trigger?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
