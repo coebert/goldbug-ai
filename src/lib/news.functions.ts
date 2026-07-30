@@ -12,6 +12,7 @@ import {
   type DecisionBreakdownItem,
 } from "./news-reel.server";
 import type { NewsRefreshResult } from "./news-refresh.server";
+import { sortNewsLatestFirst } from "./news-reel-sort";
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
