@@ -71,15 +71,21 @@ export const TOOLTIP_ITEM_STYLE = { color: "var(--popover-foreground)" } as cons
 // axis rules all but disappear while the grid glares. Derive every rule from
 // `--foreground` so the same alpha ladder holds on any surface tier:
 //
-//   grid  ~12%  — structure you read past, never through
-//   ticks ~30%  — short marks that need to register at 1px
-//   axis  ~45%  — the frame itself; the strongest non-text rule
+//   grid  ~14%  — structure you read past, never through
+//   ticks ~50%  — short marks that need to register at 1px
+//   axis  ~60%  — the frame itself; the strongest non-text rule
 //
-// All three clear the WCAG 1.4.11 3:1 non-text bar against `--surface-1`
-// through `--surface-3` (enforced in chart-axis-readability.test.ts).
-export const GRID_STROKE = "color-mix(in oklab, var(--foreground) 12%, transparent)";
-export const AXIS_LINE_STROKE = "color-mix(in oklab, var(--foreground) 45%, transparent)";
-export const TICK_LINE_STROKE = "color-mix(in oklab, var(--foreground) 30%, transparent)";
+// The alphas are theme-agnostic because `--foreground` flips with the theme,
+// but the *same* alpha yields lower contrast over a light surface than over a
+// dark one (a light page has less headroom below its foreground). The ladder
+// below is tuned against the weaker of the two: ticks/axis/reference all clear
+// WCAG 1.4.11's 3:1 non-text bar on light surfaces down to ~oklch(0.94) as
+// well as on `--surface-1`…`--surface-3` (enforced in
+// chart-axis-readability.test.ts, both themes).
+export const GRID_STROKE = "color-mix(in oklab, var(--foreground) 14%, transparent)";
+export const AXIS_LINE_STROKE = "color-mix(in oklab, var(--foreground) 60%, transparent)";
+export const TICK_LINE_STROKE = "color-mix(in oklab, var(--foreground) 50%, transparent)";
+
 
 // Spread onto <CartesianGrid />. Dashed so gridlines stay distinguishable
 // from plotted series at low alpha.
