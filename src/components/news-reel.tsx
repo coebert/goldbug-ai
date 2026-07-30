@@ -10,6 +10,7 @@ import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
 import { relevanceBand, relevanceBandLabel, sortByRelevance } from "@/lib/news-relevance";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
+import { NewsBackfillControls } from "@/components/news-backfill-controls";
 
 /** Badge colour per relevance band — semantic tokens only. */
 function relevanceCls(score: number): string {
@@ -509,6 +510,11 @@ export function NewsReel() {
           </button>
           <span className="text-[11px] text-muted-foreground">{items.length} of {allItems.length}</span>
         </div>
+
+        <div className="mt-3">
+          <NewsBackfillControls />
+        </div>
+
 
         <div className={`mt-3 flex-wrap items-center gap-2 text-[11px] ${filtersOpen ? "flex" : "hidden"} md:flex`}>
           <span className="text-muted-foreground uppercase tracking-wide">Asset:</span>
