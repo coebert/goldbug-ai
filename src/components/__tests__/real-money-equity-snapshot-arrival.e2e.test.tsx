@@ -91,7 +91,7 @@ describe("real-money equity tile — snapshot arrival e2e", () => {
     expect(nums2).toContain(330);
     expect(nums2).not.toContain(300); // headline value is 330, not stale 300
     expect(step.html).toContain("+10.00%");
-    expect(step.html).toContain("text-emerald-400");
+    expect(step.html).toContain("text-success");
 
     // --- Arrival 3: pullback snapshot at £315 (loss vs previous). -----
     snapshots = [
@@ -107,7 +107,7 @@ describe("real-money equity tile — snapshot arrival e2e", () => {
     // Sign prefix rendered without a spurious "+" and destructive tone applied.
     expect(step.html).toContain("-4.55%");
     expect(step.html).not.toContain("+-");
-    expect(step.html).toContain("text-red-400");
+    expect(step.html).toContain("text-destructive");
   });
 
   it("a same-day repeated snapshot (idempotent) does not fabricate a delta", () => {

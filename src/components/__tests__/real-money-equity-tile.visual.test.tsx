@@ -46,9 +46,9 @@ function extractParts(html: string) {
   const emptyState = html.match(
     /<div class="mt-1 text-sm text-muted-foreground">([^<]*)<\/div>/,
   )?.[1];
-  const tone = html.includes("text-emerald-400")
+  const tone = html.includes("text-success")
     ? "positive"
-    : html.includes("text-red-400")
+    : html.includes("text-destructive")
       ? "negative"
       : "none";
   return { headline, delta, sublabel, emptyState, tone };

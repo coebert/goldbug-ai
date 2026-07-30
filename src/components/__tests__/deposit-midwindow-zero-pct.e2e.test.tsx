@@ -126,7 +126,7 @@ describe("dashboard e2e — mid-window deposit shows 0% until trading moves", ()
     expect(step.summary.pnl).toBe(25);
     expect(step.summary.pct).toBeCloseTo(5, 5);
     expect(step.html).toContain("+5.00%");
-    expect(step.html).toContain("text-emerald-400");
+    expect(step.html).toContain("text-success");
 
     // --- Day 4: pullback of £40 (525 → 485). --------------------------
     snapshots = [
@@ -138,7 +138,7 @@ describe("dashboard e2e — mid-window deposit shows 0% until trading moves", ()
     expect(step.summary.pnl).toBe(-40);
     expect(step.summary.pct).toBeCloseTo((-40 / 525) * 100, 5);
     expect(step.html).toContain("-7.62%");
-    expect(step.html).toContain("text-red-400");
+    expect(step.html).toContain("text-destructive");
     expect(step.html).not.toContain("+-"); // no double sign
   });
 

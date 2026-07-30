@@ -76,7 +76,7 @@ function HeadlineBlock({
             <span className="ml-1 text-[10px]">cash</span>
           </div>
           <div
-            className={`text-xs tabular-nums ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+            className={`text-xs tabular-nums ${pnl >= 0 ? "text-success" : "text-destructive"}`}
           >
             {pnl >= 0 ? "+" : ""}
             {pnlPct.toFixed(2)}%
@@ -139,8 +139,8 @@ describe("portfolio card headline — rendered snapshots", () => {
     );
     expect(html).toContain("GBP 12,345.60");
     expect(html).toContain("text-2xl font-bold leading-tight tabular-nums");
-    expect(html).toContain("text-emerald-400");
-    expect(html).not.toContain("text-red-400");
+    expect(html).toContain("text-success");
+    expect(html).not.toContain("text-destructive");
     expect(html).toContain("+23.46%");
     expect(html).toContain("cash vs start");
     expect(html).toMatchSnapshot();
@@ -159,8 +159,8 @@ describe("portfolio card headline — rendered snapshots", () => {
       />,
     );
     expect(html).toContain("GBP 874.05");
-    expect(html).toContain("text-red-400");
-    expect(html).not.toContain("text-emerald-400");
+    expect(html).toContain("text-destructive");
+    expect(html).not.toContain("text-success");
     // Negative pnlPct renders with its own '-' via toFixed — never
     // prefixed with an extra '+'.
     expect(html).toContain("-12.59%");

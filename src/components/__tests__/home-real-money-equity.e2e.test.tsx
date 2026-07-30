@@ -183,7 +183,7 @@ describe("home dashboard real-money equity (e2e)", () => {
     const html = renderRealTile(summary);
     expect(html).toContain("+5.00%");
     // Positive tone class applied.
-    expect(html).toContain("text-emerald-400");
+    expect(html).toContain("text-success");
   });
 
   it("shows the empty state when no real-money portfolios exist", () => {

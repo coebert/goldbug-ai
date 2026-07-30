@@ -115,7 +115,7 @@ describe("real-money equity tile — full dashboard flow with extreme snapshot v
     assertSafeRender(html, "sub-penny");
     // Headline is rounded to whole £, so 0.002 → "£0". Percentage still gained.
     expect(html).toContain(GBP0.format(0));
-    expect(html).toContain("text-emerald-400");
+    expect(html).toContain("text-success");
   });
 
   it("handles a snapshot swing that crosses zero (£100 → £0 → £-50 phantom)", () => {
@@ -133,7 +133,7 @@ describe("real-money equity tile — full dashboard flow with extreme snapshot v
     expect(s.pnl).toBe(-50); // 0 → -50
     expect(s.pct).toBe(0);   // prev <= 0 → safe 0, not -Infinity
     assertSafeRender(html, "zero-crossing");
-    expect(html).toContain("text-red-400");
+    expect(html).toContain("text-destructive");
   });
 
   it("handles a billion-pound snapshot without scientific notation", () => {
@@ -206,7 +206,7 @@ describe("real-money equity tile — full dashboard flow with extreme snapshot v
       assertFiniteSummary(s, `burst day ${i}`);
       assertSafeRender(html, `burst day ${i}`);
       // Tone class MUST match pnl sign.
-      const tone = s.pnl >= 0 ? "text-emerald-400" : "text-red-400";
+      const tone = s.pnl >= 0 ? "text-success" : "text-destructive";
       expect(html, `burst day ${i} tone`).toContain(tone);
     }
   });

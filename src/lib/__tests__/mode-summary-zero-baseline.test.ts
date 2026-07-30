@@ -106,7 +106,7 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
     expect(html).not.toMatch(/NaN/);
     expect(html).not.toMatch(/Infinity/);
     // Positive pnl → emerald tone.
-    expect(html).toContain("text-emerald-400");
+    expect(html).toContain("text-success");
   });
 
   it("renders 0.00% with red tone when pnl is negative (loss from baseline 0)", () => {
@@ -114,7 +114,7 @@ describe("ModeSummaryTile — renders zero-baseline pct safely", () => {
       React.createElement(ModeSummaryTile, { ...baseProps, money: 0, pnl: -50, pct: 0 }),
     );
     expect(html).toMatch(/0\.00(<!-- -->)?%/);
-    expect(html).toContain("text-red-400");
+    expect(html).toContain("text-destructive");
     expect(html).not.toMatch(/NaN/);
   });
 

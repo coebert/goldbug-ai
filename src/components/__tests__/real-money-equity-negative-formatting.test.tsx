@@ -130,8 +130,8 @@ describe("real-money equity tile — negative equity & negative PnL formatting",
     );
     expect(summary.pnl).toBeCloseTo(-20, 10);
     expect(summary.pct).toBeCloseTo(-6.6666, 3);
-    expect(html).toContain("text-red-400");
-    expect(html).not.toContain("text-emerald-400");
+    expect(html).toContain("text-destructive");
+    expect(html).not.toContain("text-success");
     // Percent to exactly 2dp, no double-sign.
     expect(html).toContain("-6.67%");
     expect(html).not.toContain("+-6.67%");
@@ -169,7 +169,7 @@ describe("real-money equity tile — negative equity & negative PnL formatting",
     // pnl<0 → no "+" prefix; pct guarded to 0 → "0.00%" (no sign).
     expect(html).toContain("0.00%");
     expect(html).not.toContain("+0.00%");
-    expect(html).toContain("text-red-400");
+    expect(html).toContain("text-destructive");
     expect(html).toContain(numWhole.format(-30));
   });
 
@@ -195,7 +195,7 @@ describe("real-money equity tile — negative equity & negative PnL formatting",
     const html = renderReal({ now: 299.99, pnl: -0.01, pct: -0.003, count: 1 });
     expect(html).toContain("-0.00%");
     expect(html).not.toMatch(/\+-?0/);
-    expect(html).toContain("text-red-400");
+    expect(html).toContain("text-destructive");
   });
 
   it("headline & delta share the same locale for negative figures — no mixed grouping", () => {
