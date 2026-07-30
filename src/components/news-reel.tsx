@@ -531,15 +531,70 @@ export function NewsReel() {
           >
             Cited only
           </button>
-          {(assetFilter.size > 0 || riskFilter.size > 0 || onlyCited) && (
+          {topicOptions.length > 0 && (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <span className="text-muted-foreground uppercase tracking-wide">Topic:</span>
+              {topicOptions.map((t) => {
+                const active = topicFilter.has(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggle(topicFilter, t.id, setTopicFilter)}
+                    className={`rounded-full border px-2 py-0.5 transition-colors ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                    title={`${t.count} headline${t.count === 1 ? "" : "s"}`}
+                  >
+                    {t.label} <span className="opacity-70">{t.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {sourceOptions.length > 0 && (
+            <div className="flex w-full flex-wrap items-start gap-2">
+              <span className="mt-0.5 text-muted-foreground uppercase tracking-wide">Source:</span>
+              <div className="flex max-h-24 flex-1 flex-wrap gap-2 overflow-y-auto pr-1">
+                {sourceOptions.map((s) => {
+                  const active = sourceFilter.has(s.source);
+                  return (
+                    <button
+                      key={s.source}
+                      type="button"
+                      onClick={() => toggle(sourceFilter, s.source, setSourceFilter)}
+                      className={`max-w-[180px] truncate rounded-full border px-2 py-0.5 transition-colors ${
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                      }`}
+                      title={`${s.source} — ${s.count} headline${s.count === 1 ? "" : "s"}`}
+                    >
+                      {s.source} <span className="opacity-70">{s.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {(assetFilter.size > 0 || riskFilter.size > 0 || sourceFilter.size > 0 || topicFilter.size > 0 || onlyCited) && (
             <button
               type="button"
-              onClick={() => { setAssetFilter(new Set()); setRiskFilter(new Set()); setOnlyCited(false); }}
+              onClick={() => {
+                setAssetFilter(new Set());
+                setRiskFilter(new Set());
+                setSourceFilter(new Set());
+                setTopicFilter(new Set());
+                setOnlyCited(false);
+              }}
               className="ml-1 text-muted-foreground underline hover:text-foreground"
             >
               Clear
             </button>
           )}
+
           <span className="ml-auto flex items-center gap-2 text-muted-foreground">
             <label className="flex items-center gap-1 text-[11px]">
               <span className="uppercase tracking-wide">Sort:</span>
