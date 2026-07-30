@@ -9,6 +9,8 @@ import { TranslationBadge } from "@/components/translation-badge";
 import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
+import { NEWS_TOPICS, classifyNewsTopic } from "@/lib/news-topics";
+
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -166,11 +168,15 @@ export function NewsReel() {
   const [paused, setPaused] = useState(false);
   const [assetFilter, setAssetFilter] = useState<Set<string>>(new Set());
   const [riskFilter, setRiskFilter] = useState<Set<string>>(new Set());
+  const [sourceFilter, setSourceFilter] = useState<Set<string>>(new Set());
+  const [topicFilter, setTopicFilter] = useState<Set<string>>(new Set());
   const [onlyCited, setOnlyCited] = useState(false);
   const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount =
-    assetFilter.size + riskFilter.size + (onlyCited ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
+    assetFilter.size + riskFilter.size + sourceFilter.size + topicFilter.size +
+    (onlyCited ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const toggleExpanded = (id: string) => {
@@ -194,6 +200,39 @@ export function NewsReel() {
     () => dedupeNewsItems(sortNewsLatestFirst(rawItems)),
     [rawItems],
   );
+  // Topic per headline (derived — `news_cache` has no topic column).
+  const topicById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const it of allItems) m.set(it.id, classifyNewsTopic(it as any));
+    return m;
+  }, [allItems]);
+
+  // Source / topic options with counts, so the user sees what's available.
+  const sourceOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of allItems) {
+      const s = (it.source ?? "").trim();
+      if (!s) continue;
+      counts.set(s, (counts.get(s) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([source, count]) => ({ source, count }));
+  }, [allItems]);
+
+  const topicOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of allItems) {
+      const t = topicById.get(it.id) ?? "other";
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return NEWS_TOPICS.filter((t) => counts.has(t.id)).map((t) => ({
+      id: t.id as string,
+      label: t.label,
+      count: counts.get(t.id) ?? 0,
+    }));
+  }, [allItems, topicById]);
+
   const items = useMemo(() => {
     const filtered = allItems.filter((it) => {
       if (onlyCited && it.decisions_count === 0) return false;
@@ -202,6 +241,12 @@ export function NewsReel() {
       }
       if (riskFilter.size > 0) {
         if (!it.risk_levels.some((r) => riskFilter.has(r))) return false;
+      }
+      if (sourceFilter.size > 0) {
+        if (!sourceFilter.has((it.source ?? "").trim())) return false;
+      }
+      if (topicFilter.size > 0) {
+        if (!topicFilter.has(topicById.get(it.id) ?? "other")) return false;
       }
       return true;
     });
@@ -216,7 +261,8 @@ export function NewsReel() {
     }
     // Latest first: shared helper keeps this identical to the server ordering.
     return sortNewsLatestFirst(filtered);
-  }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
+  }, [allItems, assetFilter, riskFilter, sourceFilter, topicFilter, topicById, onlyCited, sortMode, now]);
+
 
   // Timestamp of the freshest headline currently in the reel — lets the user
   // confirm at a glance that newest-first ordering is in effect.
@@ -485,15 +531,70 @@ export function NewsReel() {
           >
             Cited only
           </button>
-          {(assetFilter.size > 0 || riskFilter.size > 0 || onlyCited) && (
+          {topicOptions.length > 0 && (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <span className="text-muted-foreground uppercase tracking-wide">Topic:</span>
+              {topicOptions.map((t) => {
+                const active = topicFilter.has(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggle(topicFilter, t.id, setTopicFilter)}
+                    className={`rounded-full border px-2 py-0.5 transition-colors ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                    title={`${t.count} headline${t.count === 1 ? "" : "s"}`}
+                  >
+                    {t.label} <span className="opacity-70">{t.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {sourceOptions.length > 0 && (
+            <div className="flex w-full flex-wrap items-start gap-2">
+              <span className="mt-0.5 text-muted-foreground uppercase tracking-wide">Source:</span>
+              <div className="flex max-h-24 flex-1 flex-wrap gap-2 overflow-y-auto pr-1">
+                {sourceOptions.map((s) => {
+                  const active = sourceFilter.has(s.source);
+                  return (
+                    <button
+                      key={s.source}
+                      type="button"
+                      onClick={() => toggle(sourceFilter, s.source, setSourceFilter)}
+                      className={`max-w-[180px] truncate rounded-full border px-2 py-0.5 transition-colors ${
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                      }`}
+                      title={`${s.source} — ${s.count} headline${s.count === 1 ? "" : "s"}`}
+                    >
+                      {s.source} <span className="opacity-70">{s.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {(assetFilter.size > 0 || riskFilter.size > 0 || sourceFilter.size > 0 || topicFilter.size > 0 || onlyCited) && (
             <button
               type="button"
-              onClick={() => { setAssetFilter(new Set()); setRiskFilter(new Set()); setOnlyCited(false); }}
+              onClick={() => {
+                setAssetFilter(new Set());
+                setRiskFilter(new Set());
+                setSourceFilter(new Set());
+                setTopicFilter(new Set());
+                setOnlyCited(false);
+              }}
               className="ml-1 text-muted-foreground underline hover:text-foreground"
             >
               Clear
             </button>
           )}
+
           <span className="ml-auto flex items-center gap-2 text-muted-foreground">
             <label className="flex items-center gap-1 text-[11px]">
               <span className="uppercase tracking-wide">Sort:</span>
