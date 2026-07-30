@@ -1566,14 +1566,18 @@ function PortfolioPage() {
                                 <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">
                                   {m.label}
                                 </div>
-                                <div className={`tabular-nums font-medium ${color(pv)}`}>
+                                <div
+                                  title={fmt(pv)}
+                                  className={`truncate tabular-nums font-medium ${color(pv)}`}
+                                >
                                   {fmt(pv)}
                                 </div>
                                 {perfMetrics.bench && (
-                                  <div className="tabular-nums text-[11px] text-muted-foreground">
+                                  <div className="truncate tabular-nums text-[11px] text-muted-foreground">
                                     {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
                                   </div>
                                 )}
+
                               </div>
                             );
                           })}
