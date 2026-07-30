@@ -88,7 +88,7 @@ async function runRisk(riskLevel: "high" | "balanced"): Promise<BacktestResult> 
       decisions.push({
         id: `${riskLevel}-${barIndex}-s-${sell.symbol}`,
         symbol: sell.symbol,
-        side: "sell",
+        side: "SELL",
         quantity: sell.quantity,
         price: px,
       });
@@ -106,7 +106,7 @@ async function runRisk(riskLevel: "high" | "balanced"): Promise<BacktestResult> 
       decisions.push({
         id: `${riskLevel}-${barIndex}-b-${buy.symbol}`,
         symbol: buy.symbol,
-        side: "buy",
+        side: "BUY",
         quantity: qty,
         price: px,
       });
@@ -161,7 +161,7 @@ describe("high-risk vs balanced-risk sim: multi-tick divergence", () => {
     expect(high.finalState.cash).toBeLessThan(balanced.finalState.cash);
     for (const r of [high, balanced]) {
       for (const p of r.equityCurve) expect(p.cash).toBeGreaterThanOrEqual(0);
-      for (const s of r.snapshots) expect(s.state.cash).toBeGreaterThanOrEqual(0);
+      for (const s of r.snapshots) expect(s.cash).toBeGreaterThanOrEqual(0);
     }
   });
 
