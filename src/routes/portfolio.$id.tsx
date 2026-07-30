@@ -1453,24 +1453,28 @@ function PortfolioPage() {
                           return (
                             <div
                               key={m.label}
-                              className="rounded-md border border-border/70 bg-muted/30 p-3"
+                              className="min-w-0 rounded-md border border-border/70 bg-muted/30 p-3"
                             >
-                              <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                <span>{m.label}</span>
-                                <ExplainIcon term={m.term} />
+                              <div className="flex min-w-0 items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                <span className="truncate">{m.label}</span>
+                                <span className="shrink-0">
+                                  <ExplainIcon term={m.term} />
+                                </span>
                               </div>
                               <div
-                                className={`tabular-nums text-base font-semibold leading-tight sm:text-xl ${color(m.value)}`}
+                                title={fmt(m.value)}
+                                className={`mt-0.5 truncate tabular-nums text-base font-semibold leading-tight sm:text-lg ${color(m.value)}`}
                               >
                                 {fmt(m.value)}
                               </div>
                               {perfMetrics.bench && (
-                                <div className="tabular-nums text-[11px] text-muted-foreground">
+                                <div className="truncate tabular-nums text-[11px] text-muted-foreground">
                                   {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
                                 </div>
                               )}
                             </div>
                           );
+
                         })}
                       </div>
                     )}
