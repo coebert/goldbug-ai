@@ -179,11 +179,11 @@ export function FearIndexCard({ portfolioId, active = true }: Props) {
                   ))}
                 </div>
               </div>
-              {d.history.length > 1 ? (
+              {history.length > 1 ? (
                 <ChartFrame className="h-56 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
-                      data={d.history}
+                      data={history}
                       margin={{ top: 8, right: 8, bottom: 4, left: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
