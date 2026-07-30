@@ -403,46 +403,63 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
 async function translateWithCache(
   headlines: string[],
 ): Promise<Map<string, TranslationCacheEntry>> {
-  const result = new Map<string, TranslationCacheEntry>();
-  if (headlines.length === 0) return result;
+  const byKey = new Map<string, TranslationCacheEntry>();
+  if (headlines.length === 0) return new Map();
 
-  // De-duplicate identical inputs so a batch of repeats sends one call.
-  const uniq = Array.from(new Set(headlines));
+  // De-duplicate on the NORMALISED key, so punctuation/casing variants of the
+  // same story share one cache lookup and one LLM slot.
+  const repByKey = new Map<string, string>();
+  for (const h of headlines) {
+    const k = translationCacheKey(h);
+    if (!k || repByKey.has(k)) continue;
+    repByKey.set(k, h);
+  }
+  const uniq = Array.from(repByKey.values());
 
   // 1. Memory cache.
   const stillMissing: string[] = [];
   for (const h of uniq) {
     const hit = cacheGet(h);
-    if (hit) result.set(h, hit);
+    if (hit) byKey.set(translationCacheKey(h), hit);
     else stillMissing.push(h);
   }
-  if (stillMissing.length === 0) return result;
 
-  // 2. Try to hydrate from persistent cache (translations of the same
-  //    original headline previously stored on another date/source).
-  await hydrateFromDbByOriginal(stillMissing);
+  // 2. Persistent cache — translations of the same story stored on another
+  //    date/source, or by an earlier cron run/worker.
+  if (stillMissing.length > 0) {
+    await hydrateFromDbByOriginal(stillMissing);
+  }
   const truly: string[] = [];
   for (const h of stillMissing) {
     const hit = cacheGet(h);
-    if (hit) result.set(h, hit);
+    if (hit) byKey.set(translationCacheKey(h), hit);
     else truly.push(h);
   }
-  if (truly.length === 0) return result;
 
   // 3. LLM call for what's left, then persist in memory + durable cache.
-  const numbered = truly.map((text, i) => ({ i, text }));
-  const byIndex = await callTranslateLLM(numbered);
-  const toPersist: { source: string; entry: TranslationCacheEntry }[] = [];
-  for (let i = 0; i < truly.length; i++) {
-    const entry = byIndex.get(i);
-    if (!entry) continue;
-    cacheSet(truly[i], entry);
-    result.set(truly[i], entry);
-    toPersist.push({ source: truly[i], entry });
+  if (truly.length > 0) {
+    const numbered = truly.map((text, i) => ({ i, text }));
+    const byIndex = await callTranslateLLM(numbered);
+    const toPersist: { source: string; entry: TranslationCacheEntry }[] = [];
+    for (let i = 0; i < truly.length; i++) {
+      const entry = byIndex.get(i);
+      if (!entry) continue;
+      cacheSet(truly[i], entry);
+      byKey.set(translationCacheKey(truly[i]), entry);
+      toPersist.push({ source: truly[i], entry });
+    }
+    await persistTranslations(toPersist);
   }
-  await persistTranslations(toPersist);
+
+  // Fan the per-key results back out to every input headline variant.
+  const result = new Map<string, TranslationCacheEntry>();
+  for (const h of headlines) {
+    const hit = byKey.get(translationCacheKey(h));
+    if (hit) result.set(h, hit);
+  }
   return result;
 }
+
 
 
 export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {
