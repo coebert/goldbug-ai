@@ -838,7 +838,7 @@ function PortfolioPage() {
               </div>
             )}
             <EquityPctChart
-              className="mb-4 md:hidden"
+              className="mb-4"
               equity={equity as { snapshot_date: string; total_value: number }[]}
               startingCash={startingCash}
             />
