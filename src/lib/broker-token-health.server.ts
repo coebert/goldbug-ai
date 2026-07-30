@@ -66,7 +66,7 @@ export function recordTokenRefreshOutcome(outcome: TokenRefreshOutcome): void {
         event: "broker_token",
         op: `${outcome.source}:${outcome.env}`,
         reason: "token_refresh_failed",
-        details: { env: outcome.env, source: outcome.source, error: safe },
+        details: { env: outcome.env, source: outcome.source, error: safe ? { ...safe } : null },
       });
 
       const { notifyAdminsSecurityEvent } = await import(

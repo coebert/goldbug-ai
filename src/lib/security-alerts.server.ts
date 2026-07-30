@@ -19,6 +19,7 @@ export type AuditEventKind =
   | "insights"
   | "backtest"
   | "cron_auth"
+  | "broker_token"
   | "generic";
 
 export function maybeNotifySecurityEvent(params: {
@@ -139,6 +140,7 @@ export const SECURITY_ALERT_DEFAULTS = {
 export function notifyAdminsSecurityEvent(params: {
   event: AuditEventKind;
   reason: string | null;
+  title?: string;
   windowMinutes?: number;
   threshold?: number;
   cooldownMinutes?: number;
@@ -176,9 +178,10 @@ export function notifyAdminsSecurityEvent(params: {
       if (!admins?.length) return;
 
       const title =
-        params.event === "cron_auth"
+        params.title ??
+        (params.event === "cron_auth"
           ? "Unauthorised webhook attempts"
-          : `Security alert: ${params.event}`;
+          : `Security alert: ${params.event}`);
       const body =
         `${total} SECURITY:${params.event} events in the last ${windowMinutes}m` +
         (params.reason ? ` (latest: ${params.reason})` : "");
