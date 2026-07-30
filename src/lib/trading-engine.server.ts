@@ -34,6 +34,7 @@ import {
 } from "./signals-extended.server";
 import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
+import { computeFearIndex, formatFearIndexBlock } from "./fear-index";
 import {
   computeCrossSectionalRanks,
   formatCrossSectionalBlock,
@@ -847,7 +848,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     },
     notes: "regime detection unavailable",
   };
+
+  // Composite FEAR INDEX — blends VIX level/term structure/VVIX/SKEW/put-call
+  // proxy with the index drawdown into a single 0..100 gauge. It is threaded
+  // into the AI prompt AND enforced deterministically in the buy-sizing chain.
+  const fearIndex = computeFearIndex({
+    vix: options?.vix ?? effectiveRegime.signals.vix_level ?? null,
+    vix9d: options?.vix9d ?? null,
+    vix3m: options?.vix3m ?? null,
+    vvix: options?.vvix ?? null,
+    skew: options?.skew ?? null,
+    putCallProxy: options?.put_call_proxy ?? null,
+    drawdownPct: effectiveRegime.signals.spy_drawdown_pct ?? null,
+  });
+  const fearBlock = formatFearIndexBlock(fearIndex);
+
   const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
+
   const cfg = tightened.cfg;
   const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
   const cashFloor = totalValue * cashFloorPctEff;
@@ -953,7 +970,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           sentiment: n.sentiment,
         })),
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
-        optionsBlock: options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable.",
+        optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
         crossSectional: formatCrossSectionalBlock(rankMap),
         events,
         cooling: coolingSymbols,
@@ -1656,6 +1673,22 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         spend *= 0.5;
         sizingNotes.push(`rank #${rankInfo.rank}/${rankInfo.universe_size} x0.5`);
       }
+
+      // FEAR INDEX overlay — panic blocks fresh buys outright, elevated fear
+      // shrinks them, complacency trims risk-taking slightly.
+      if (fearIndex.blockNewBuys) {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason,
+          rejected: `fear index ${fearIndex.score.toFixed(0)}/100 (panic) — new buys blocked`,
+        });
+        continue;
+      }
+      if (fearIndex.sizeMultiplier !== 1) {
+        spend *= fearIndex.sizeMultiplier;
+        sizingNotes.push(`fear${fearIndex.score.toFixed(0)}×${fearIndex.sizeMultiplier.toFixed(2)}`);
+      }
+
 
       // Portfolio-level 5-day drawdown → shrink new buys
       if (ddSizing.size_multiplier < 1) {
@@ -2552,6 +2585,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       },
       regime: regime ?? null,
       algo_regime: algoRegime ?? null,
+      fear_index: { score: fearIndex.score, label: fearIndex.label, size_multiplier: fearIndex.sizeMultiplier, reason: fearIndex.reason },
       tail_hedge: tailHedgeDecision,
       tail_hedge_execution: tailHedgeExecution,
       tail_hedge_reconciliation: tailHedgeReconciliation,
@@ -2591,7 +2625,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
               headline: n.headline, source: n.source, sentiment: n.sentiment,
             })),
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
-            optionsBlock: options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable.",
+            optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
             crossSectional: formatCrossSectionalBlock(rankMap),
             events,
             cooling: coolingSymbols,
