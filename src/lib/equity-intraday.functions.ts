@@ -17,7 +17,9 @@ export const getIntradayEquity = createServerFn({ method: "GET" })
     z
       .object({
         portfolio_id: z.string().uuid(),
-        days: z.number().int().min(1).max(120).default(30),
+        // Callers may ask for the portfolio's whole life so the Hourly view
+        // spans the same x-axis range as the all-time daily chart.
+        days: z.number().int().min(1).max(3650).default(30),
       })
       .parse(i),
   )
