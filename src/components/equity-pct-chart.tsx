@@ -72,6 +72,50 @@ export function pctDomain(values: number[]): [number, number] {
   return [Math.max(-100, lo - pad), hi + pad];
 }
 
+export type DeltaPoint = {
+  at: string;
+  value: number;
+  pct: number;
+  /** Percentage-point move versus the previous plotted point. */
+  deltaPct: number;
+  /** Money change versus the previous point, net of deposits made in between. */
+  deltaValue: number;
+};
+
+/**
+ * Period-over-period change for each plotted point. Deposits landing between
+ * two points are netted out so a top-up never shows up as a "gain".
+ */
+export function addDeltas(
+  rows: Array<{ at: string; value: number; pct: number }>,
+  deposits: Array<{ date: string; amount: number }> = [],
+): DeltaPoint[] {
+  return rows.map((r, i) => {
+    if (i === 0) return { ...r, deltaPct: 0, deltaValue: 0 };
+    const prev = rows[i - 1];
+    const prevDay = String(prev.at).slice(0, 10);
+    const day = String(r.at).slice(0, 10);
+    const flows = deposits.reduce((sum, d) => {
+      const amt = Number(d?.amount);
+      const dd = String(d?.date ?? "").slice(0, 10);
+      return Number.isFinite(amt) && dd > prevDay && dd <= day ? sum + amt : sum;
+    }, 0);
+    return {
+      ...r,
+      deltaPct: r.pct - prev.pct,
+      deltaValue: r.value - prev.value - flows,
+    };
+  });
+}
+
+/** Symmetric domain for the delta bars so zero sits on the mid-line. */
+export function deltaDomainFor(values: number[]): [number, number] {
+  const finite = values.filter((v) => Number.isFinite(v)).map(Math.abs);
+  const max = finite.length ? Math.max(...finite) : 0;
+  const span = Math.max(0.1, max * 1.15);
+  return [-span, span];
+}
+
 /**
  * Percentage change in equity versus the capital invested at the time.
  * Zero on the y-axis is the money put in, so the line only goes negative when
@@ -83,6 +127,7 @@ export function EquityPctChart({
   startingCash,
   deposits = [],
   inceptionDate = null,
+  currency = "GBP",
   className,
 }: {
   portfolioId?: string;
@@ -92,6 +137,7 @@ export function EquityPctChart({
   deposits?: Array<{ date: string; amount: number }>;
   /** `YYYY-MM-DD` the portfolio went live; earlier points are not plotted. */
   inceptionDate?: string | null;
+  currency?: string;
   className?: string;
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
