@@ -1605,7 +1605,7 @@ function PortfolioPage() {
                               top: 8,
                               right: isMobile ? 6 : 12,
                               left: isMobile ? -12 : 0,
-                              bottom: 8,
+                              bottom: 28,
                             }}
                           >
                             <defs>
@@ -1876,9 +1876,14 @@ function PortfolioPage() {
                             )}
                             <Legend
                               verticalAlign="bottom"
-                              height={24}
+                              height={28}
                               iconType="plainline"
-                              wrapperStyle={{ fontSize: 12, color: chartTheme.axisText }}
+                              wrapperStyle={{
+                                fontSize: 12,
+                                color: chartTheme.axisText,
+                                paddingTop: 8,
+                                lineHeight: "18px",
+                              }}
                             />
                           </ComposedChart>
                         </ResponsiveContainer>
