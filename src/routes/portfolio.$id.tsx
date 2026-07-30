@@ -1441,12 +1441,9 @@ function PortfolioPage() {
                                     ? (perfMetrics.bench.annReturn - riskFreeRate) /
                                       perfMetrics.bench.annVol
                                     : null;
-                          const fmt = (v: number | null | undefined) => {
-                            if (v == null || !Number.isFinite(v)) return "—";
-                            const s = m.signed && v > 0 ? "+" : "";
-                            const d = 2;
-                            return `${s}${v.toFixed(d)}${m.suffix}`;
-                          };
+                          const fmt = (v: number | null | undefined) =>
+                            formatMetricValue(v, m.signed, m.suffix);
+
                           const color = (v: number | null | undefined) => {
                             if (v == null) return "text-muted-foreground";
                             if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
