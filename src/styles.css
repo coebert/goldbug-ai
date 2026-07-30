@@ -88,8 +88,8 @@
    * numeric headlines (equity, PnL, next-run). --font-sans covers
    * everything else. Both families are loaded via <link> in
    * src/routes/__root.tsx per Tailwind v4 rules. */
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
   /* Elevation. Card = flat surface; card-hover = raised on interaction;
@@ -102,45 +102,45 @@
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.16 0.02 250);
+  --background: oklch(0.162 0.014 258);
   --foreground: oklch(0.96 0.01 90);
-  --card: oklch(0.20 0.02 250);
+  --card: oklch(0.216 0.022 257);
   --card-foreground: oklch(0.96 0.01 90);
-  --popover: oklch(0.20 0.02 250);
+  --popover: oklch(0.216 0.022 257);
   --popover-foreground: oklch(0.96 0.01 90);
-  --primary: oklch(0.78 0.17 145);
-  --primary-foreground: oklch(0.16 0.02 250);
-  --secondary: oklch(0.26 0.03 250);
+  --primary: oklch(0.797 0.164 160);
+  --primary-foreground: oklch(0.162 0.014 258);
+  --secondary: oklch(0.281 0.031 253);
   --secondary-foreground: oklch(0.96 0.01 90);
-  --muted: oklch(0.24 0.02 250);
-  --muted-foreground: oklch(0.72 0.03 250);
+  --muted: oklch(0.250 0.026 255);
+  --muted-foreground: oklch(0.735 0.024 255);
   --accent: oklch(0.72 0.15 75);
   --accent-foreground: oklch(0.16 0.02 250);
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0.01 90);
-  --border: oklch(0.28 0.02 250);
-  --input: oklch(0.28 0.02 250);
-  --ring: oklch(0.78 0.17 145);
-  --chart-1: oklch(0.78 0.17 145);
+  --border: oklch(0.300 0.032 253);
+  --input: oklch(0.300 0.032 253);
+  --ring: oklch(0.797 0.164 160);
+  --chart-1: oklch(0.797 0.164 160);
   --chart-2: oklch(0.72 0.15 75);
   --chart-3: oklch(0.62 0.22 25);
   --chart-4: oklch(0.70 0.14 260);
   --chart-5: oklch(0.80 0.12 200);
-  --sidebar: oklch(0.20 0.02 250);
+  --sidebar: oklch(0.216 0.022 257);
   --sidebar-foreground: oklch(0.96 0.01 90);
-  --sidebar-primary: oklch(0.78 0.17 145);
+  --sidebar-primary: oklch(0.797 0.164 160);
   --sidebar-primary-foreground: oklch(0.16 0.02 250);
-  --sidebar-accent: oklch(0.26 0.03 250);
+  --sidebar-accent: oklch(0.281 0.031 253);
   --sidebar-accent-foreground: oklch(0.96 0.01 90);
-  --sidebar-border: oklch(0.28 0.02 250);
-  --sidebar-ring: oklch(0.78 0.17 145);
+  --sidebar-border: oklch(0.300 0.032 253);
+  --sidebar-ring: oklch(0.797 0.164 160);
 
   /* Semantic status colours — Phase 1. Values are picked to sit
    * inside the existing oklch palette (chroma ~0.15–0.20) so they
    * feel like siblings of --primary rather than raw Tailwind hues. */
-  --success: oklch(0.78 0.17 145);
+  --success: oklch(0.797 0.164 160);
   --success-foreground: oklch(0.16 0.02 250);
-  --success-soft: oklch(0.30 0.08 145);
+  --success-soft: oklch(0.300 0.075 160);
   --warning: oklch(0.80 0.16 75);
   --warning-foreground: oklch(0.16 0.02 250);
   --warning-soft: oklch(0.30 0.06 75);
@@ -151,49 +151,49 @@
 
   /* Surface tiers. Kept close in lightness so cards read as a stack
    * of paper on the same desk rather than distinct materials. */
-  --surface-1: oklch(0.16 0.02 250);
-  --surface-2: oklch(0.20 0.02 250);
-  --surface-3: oklch(0.24 0.02 250);
-  --surface-sunken: oklch(0.14 0.02 250);
+  --surface-1: oklch(0.162 0.014 258);
+  --surface-2: oklch(0.216 0.022 257);
+  --surface-3: oklch(0.281 0.031 253);
+  --surface-sunken: oklch(0.144 0.012 258);
 }
 
 .dark {
-  --background: oklch(0.16 0.02 250);
+  --background: oklch(0.162 0.014 258);
   --foreground: oklch(0.96 0.01 90);
-  --card: oklch(0.20 0.02 250);
+  --card: oklch(0.216 0.022 257);
   --card-foreground: oklch(0.96 0.01 90);
-  --popover: oklch(0.20 0.02 250);
+  --popover: oklch(0.216 0.022 257);
   --popover-foreground: oklch(0.96 0.01 90);
-  --primary: oklch(0.78 0.17 145);
-  --primary-foreground: oklch(0.16 0.02 250);
-  --secondary: oklch(0.26 0.03 250);
+  --primary: oklch(0.797 0.164 160);
+  --primary-foreground: oklch(0.162 0.014 258);
+  --secondary: oklch(0.281 0.031 253);
   --secondary-foreground: oklch(0.96 0.01 90);
-  --muted: oklch(0.24 0.02 250);
-  --muted-foreground: oklch(0.72 0.03 250);
+  --muted: oklch(0.250 0.026 255);
+  --muted-foreground: oklch(0.735 0.024 255);
   --accent: oklch(0.72 0.15 75);
   --accent-foreground: oklch(0.16 0.02 250);
   --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.98 0.01 90);
-  --border: oklch(0.28 0.02 250);
-  --input: oklch(0.28 0.02 250);
-  --ring: oklch(0.78 0.17 145);
-  --chart-1: oklch(0.78 0.17 145);
+  --border: oklch(0.300 0.032 253);
+  --input: oklch(0.300 0.032 253);
+  --ring: oklch(0.797 0.164 160);
+  --chart-1: oklch(0.797 0.164 160);
   --chart-2: oklch(0.72 0.15 75);
   --chart-3: oklch(0.62 0.22 25);
   --chart-4: oklch(0.70 0.14 260);
   --chart-5: oklch(0.80 0.12 200);
-  --sidebar: oklch(0.20 0.02 250);
+  --sidebar: oklch(0.216 0.022 257);
   --sidebar-foreground: oklch(0.96 0.01 90);
-  --sidebar-primary: oklch(0.78 0.17 145);
+  --sidebar-primary: oklch(0.797 0.164 160);
   --sidebar-primary-foreground: oklch(0.16 0.02 250);
-  --sidebar-accent: oklch(0.26 0.03 250);
+  --sidebar-accent: oklch(0.281 0.031 253);
   --sidebar-accent-foreground: oklch(0.96 0.01 90);
-  --sidebar-border: oklch(0.28 0.02 250);
-  --sidebar-ring: oklch(0.78 0.17 145);
+  --sidebar-border: oklch(0.300 0.032 253);
+  --sidebar-ring: oklch(0.797 0.164 160);
 
-  --success: oklch(0.78 0.17 145);
+  --success: oklch(0.797 0.164 160);
   --success-foreground: oklch(0.16 0.02 250);
-  --success-soft: oklch(0.30 0.08 145);
+  --success-soft: oklch(0.300 0.075 160);
   --warning: oklch(0.80 0.16 75);
   --warning-foreground: oklch(0.16 0.02 250);
   --warning-soft: oklch(0.30 0.06 75);
@@ -202,10 +202,10 @@
   --info-soft: oklch(0.30 0.06 220);
   --destructive-soft: oklch(0.30 0.08 25);
 
-  --surface-1: oklch(0.16 0.02 250);
-  --surface-2: oklch(0.20 0.02 250);
-  --surface-3: oklch(0.24 0.02 250);
-  --surface-sunken: oklch(0.14 0.02 250);
+  --surface-1: oklch(0.162 0.014 258);
+  --surface-2: oklch(0.216 0.022 257);
+  --surface-3: oklch(0.281 0.031 253);
+  --surface-sunken: oklch(0.144 0.012 258);
 }
 
 
