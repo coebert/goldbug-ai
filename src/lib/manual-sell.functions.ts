@@ -10,6 +10,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 
 export type ManualSellResult = {
@@ -27,7 +28,7 @@ export type ManualSellResult = {
 };
 
 export const manualSellHolding = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((input: unknown) =>
     z
       .object({

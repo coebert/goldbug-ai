@@ -5,6 +5,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
@@ -374,7 +375,7 @@ export const getPortfolio = createServerFn({ method: "GET" })
   });
 
 export const deletePortfolio = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("portfolios").delete().eq("id", data.id);

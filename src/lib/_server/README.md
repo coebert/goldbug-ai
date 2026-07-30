@@ -55,3 +55,17 @@ Never leave `CRON_SECRET_NEXT` set long-term; it exists only for the overlap win
   comment saying so. `consume_rate_limit` and the other SECURITY DEFINER
   helpers are service_role-only except `has_role`, which RLS needs.
 - Dependency vulnerability scanning is run as part of each security pass.
+
+## Server-side two-factor (phase 8)
+
+- `requireAal2` (`src/lib/_server/require-aal2.ts`) wraps `requireSupabaseAuth`
+  and rejects any bearer token whose session is not `aal2` **once the account
+  has a verified factor**. Accounts with no factor pass through, so enrolment
+  is never a lockout.
+- Applied to the money-moving/irreversible server functions: `manualSellHolding`,
+  `triggerHourlyRunNow`, `updateTradingControls`, `activateLive`,
+  `resumeAllLive`, `startSaxoOAuth`, `deletePortfolio`. Risk-reducing actions
+  (pause, kill-all, deactivate) stay single-factor on purpose — never make
+  stopping trading harder than starting it.
+- New privileged server functions should use `requireAal2`, not
+  `requireSupabaseAuth`.

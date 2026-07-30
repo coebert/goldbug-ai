@@ -10,13 +10,14 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
 
 
 /** Activate live trading on a portfolio. Requires ping + optional balance read. */
 export const activateLive = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((data: unknown) =>
     z.object({
       portfolioId: z.string().uuid(),
@@ -182,7 +183,7 @@ export const killAllLive = createServerFn({ method: "POST" })
 
 /** Global resume — inverse of the kill-switch. Also idempotent and audited. */
 export const resumeAllLive = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((data: unknown) =>
     z.object({ reason: z.string().max(500).optional() }).default({}).parse(data ?? {}),
   )
@@ -385,7 +386,7 @@ export const reconcileOrders = createServerFn({ method: "POST" })
 
 /** Return the URL the user should visit to grant Saxo access. */
 export const startSaxoOAuth = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((d: unknown) => z.object({ env: z.enum(["sim", "live"]) }).parse(d))
   .handler(async ({ data }) => {
     const { getAuthorizeUrl, redirectUri } = await import("@/lib/brokers/saxo-oauth.server");
