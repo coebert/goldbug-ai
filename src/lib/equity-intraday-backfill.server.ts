@@ -21,7 +21,16 @@ export async function backfillPortfolioIntradayEquity(
 ): Promise<IntradayBackfillResult> {
   const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - Math.max(1, days));
-  const cutoffDate = cutoff.toISOString().slice(0, 10);
+  let cutoffDate = cutoff.toISOString().slice(0, 10);
+
+  // Never seed hours from before the portfolio existed / went live.
+  const { data: pf } = await supabase
+    .from("portfolios")
+    .select("created_at, live_activated_at")
+    .eq("id", portfolioId)
+    .maybeSingle();
+  const inception = portfolioInceptionDate(pf as never);
+  if (inception && inception > cutoffDate) cutoffDate = inception;
 
   const { data: snaps, error: snapErr } = await supabase
     .from("equity_snapshots")
