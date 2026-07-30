@@ -97,11 +97,76 @@ export async function routeOrdersToBroker(params: {
     return results;
   }
 
+  // Hard safety gate (independent of strategy logic): admin kill switch plus a
+  // per-day BUY notional ceiling. Fails closed — see trading-controls.server.
+  const { loadTradingGate } = await import("./trading-controls.server");
+  const gate = await loadTradingGate();
 
-
-  const routable = executed.filter(
+  let routable = executed.filter(
     (e) => !e.rejected && e.quantity > 0 && Number.isFinite(e.quantity) && Number.isFinite(e.price),
   );
+  if (routable.length === 0) return results;
+
+  const logGuard = async (method: string, detail: Record<string, unknown>, error: string) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method,
+        path: "/route/trading-controls",
+        status: 0,
+        request: asJson({ asOf, decisionId, ...detail }),
+        response: null,
+        error,
+      });
+    } catch {
+      /* best-effort log only */
+    }
+  };
+
+  if (!gate.enabled) {
+    await logGuard(
+      "ROUTE_SKIPPED_KILL_SWITCH",
+      { count: routable.length, haltReason: gate.haltReason },
+      gate.haltReason ?? "trading_controls.trading_enabled = false",
+    );
+    return results;
+  }
+
+  // Daily ceiling: SELLs always route (they reduce risk); BUYs are admitted in
+  // order until the remaining daily budget is exhausted.
+  let budget = gate.remaining;
+  const admitted: ExecutedOrderLike[] = [];
+  const capped: { symbol: string; notional: number }[] = [];
+  for (const e of routable) {
+    if (e.side !== "buy") {
+      admitted.push(e);
+      continue;
+    }
+    const notional = e.quantity * e.price;
+    if (notional > budget) {
+      capped.push({ symbol: e.symbol, notional });
+      continue;
+    }
+    budget -= notional;
+    admitted.push(e);
+  }
+  if (capped.length > 0) {
+    await logGuard(
+      "ROUTE_SKIPPED_DAILY_NOTIONAL_CAP",
+      {
+        capped,
+        dailyLimit: gate.dailyLimit,
+        spentToday: gate.spentToday,
+        remaining: gate.remaining,
+      },
+      `Daily BUY notional cap reached (limit ${gate.dailyLimit}, spent ${gate.spentToday.toFixed(2)})`,
+    );
+  }
+  routable = admitted;
   if (routable.length === 0) return results;
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

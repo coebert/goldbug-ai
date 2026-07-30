@@ -26,10 +26,23 @@ export const Route = createFileRoute("/api/public/news-preview")({
           100,
         );
 
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
+        // Publishable-key client, NOT the admin client: this endpoint is
+        // unauthenticated, so it must be limited to what the `anon` role may
+        // read (news_cache has a narrow public SELECT policy). Never widen this
+        // back to a service-role client.
+        const { createClient } = await import("@supabase/supabase-js");
+        const supabasePublic = createClient(
+          process.env.SUPABASE_URL!,
+          process.env.SUPABASE_PUBLISHABLE_KEY!,
+          {
+            auth: {
+              storage: undefined,
+              persistSession: false,
+              autoRefreshToken: false,
+            },
+          },
         );
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabasePublic
           .from("news_cache")
           .select(
             "news_date, source, headline, url, original_headline, original_language, translation_confidence",

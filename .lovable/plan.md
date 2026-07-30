@@ -1,63 +1,102 @@
-# Strategy: Defending Against AI-Driven Market Patterns
+# Security review — Aegis (real-money trading app)
 
-Modern markets show new footprints from algorithmic/AI participants: flash crashes, liquidity mirages, momentum ignition, quote stuffing, correlated de-risking (all algos exit together), and sudden volatility bursts around events. This plan hardens the app end-to-end.
+I audited the database access rules, every public endpoint, the server-side
+trading paths, secret handling and the sign-in surface. The good news first,
+then the issues in priority order.
 
-## Goals
+## What's already solid
 
-1. Detect abnormal microstructure conditions (liquidity vacuums, vol bursts, correlated de-risking) in real time.
-2. Adapt execution to avoid getting picked off by faster algos.
-3. Size and hedge for fatter tails and faster regime shifts.
-4. Give the AI decision layer explicit priors about algo-driven behavior.
+- Every user table has row-level access rules enabled, and the sensitive ones
+  (portfolios, holdings, trades, orders, fills, equity history) are scoped to the
+  owner. Audit/ledger tables are append-only.
+- Broker tokens and the service key are never reachable from browser code; the
+  project has a lint rule that blocks server-only modules from client bundles.
+- One shared ownership check guards every privileged trading path, with a
+  security audit log and push alerts on rejected access.
+- Scheduled endpoints share one verification helper with constant-time
+  comparison and per-IP rate limiting — no endpoint has a default-allow path.
+- Global budget settings were just locked to an administrator role.
 
-## Phases
+## Critical — fix first
 
-### Phase A — Detect: Algo-driven regime & microstructure signals
-New module `src/lib/microstructure/algo-regime.ts`:
-- **Volatility burst detector**: short-window realized vol vs 20d baseline; flag when ratio > 2.5.
-- **Liquidity vacuum detector**: recent volume / rolling median < 0.4 with widening spread proxy.
-- **Momentum-ignition / mean-reversion whiplash**: count sign flips of 5-bar returns in last 30 bars vs historical.
-- **Correlated de-risking**: cross-sectional correlation of top holdings' 5-day returns spiking above baseline (all-algos-exit signature).
-- **Gap-and-fade**: overnight gap > 1.5×ATR that reverses ≥50% within first 30 min.
+**1. The public app key is accepted as a credential on the trading endpoints.**
+The shared cron check accepts *either* the private `CRON_SECRET` *or* the
+Supabase publishable key. That publishable key is, by design, public — it ships
+inside the browser bundle of the published site. So anyone who opens the app can
+read it and then call the endpoints that run the trading cycle, reconcile the
+live account, or trigger reruns. Rate limiting slows that down; it does not stop
+it. The same weak check is hardcoded in the equity-backfill endpoint.
 
-Outputs an `AlgoRegimeSnapshot { volBurst, liquidityVacuum, whipsaw, correlationSpike, gapFade, score, tier: normal|elevated|extreme }`.
+Fix: require `CRON_SECRET` (or a new dedicated per-endpoint secret) on every
+`/api/public/hooks/*` route, delete the publishable-key branch entirely, and
+update the scheduled jobs to send the private header. Then verify each endpoint
+returns 401 with only the public key.
 
-### Phase B — Adapt execution
-Extend `src/lib/broker-simulator.ts` and live executor:
-- **Adaptive participation cap**: shrink `maxParticipationRate` (e.g. 15% → 5%) when tier=elevated, 2% when extreme.
-- **Wider TWAP slicing** in elevated regimes; skip new entries entirely in `extreme`.
-- **Anti-momentum-ignition guard**: reject market orders when short-window vol > 2× baseline; require marketable-limit with max slippage cap.
-- **Post-only / passive bias** when spread proxy is wide.
-- **Cool-down after whipsaw**: block re-entry into a symbol for N minutes after a stop-out during whipsaw regime.
+**2. Trading endpoints have no second factor beyond one shared secret.**
+Every job — hourly run, daily run, live reconcile, retrain — uses the same
+secret. One leak (a log, a copied cron definition) exposes all of them,
+including live order placement.
 
-### Phase C — Size & hedge for fatter tails
-- **Vol-targeted sizing**: scale position by `targetVol / max(realizedVol, 1e-6)`; new helper `src/lib/sizing/vol-target.ts`.
-- **Correlation-spike downscale**: when Phase A correlation signal fires, apply extra 0.5× multiplier via existing `sizeAgainstClusterCap`.
-- **Tail-hedge boost**: when `tier=extreme`, bump `TailHedgeConfig.baselinePctNav` (still capped) — integrate into `computeTailHedge` via a new `algoRegimeTier` input.
-- **Circuit breaker**: pause new buys when portfolio's realized 1-day move > 3σ vs 60d baseline; require next-tick confirmation.
+Fix: rotate `CRON_SECRET`, then give the order-placing routes their own secret,
+add a short-lived signature (timestamp + HMAC, reject anything older than a few
+minutes) so a captured request can't be replayed, and keep the existing per-IP
+limits.
 
-### Phase D — Inform the AI decision layer
-- Append an `ALGO-DRIVEN MARKET REGIME` block to `HISTORICAL_PLAYBOOK` in `src/lib/historical-playbook.server.ts` (flash-crash 2010, vol-mageddon Feb-2018, Mar-2020 gamma, meme-squeeze 2021, Aug-2024 yen-carry unwind) plus base rates and behavioral rules ("do not chase 1-min breakouts", "widen stops in whipsaw", "prefer VWAP over market").
-- Pipe the current `AlgoRegimeSnapshot` into the decision prompt and heuristic fallback (`src/lib/heuristic-decision.ts`) so both branches see the tier.
+## High
 
-### Phase E — Observability
-- New card `src/components/algo-regime-card.tsx` on the portfolio page showing current tier, active signals, and the sizing/execution multipliers currently applied.
-- Log every tier transition to `ai_decision_audit` context so post-hoc review can confirm the guardrails fired.
+**3. Sign-in hardening.** Turn on leaked-password checking so a password found
+in a known breach is rejected, keep public signups off, and add a second factor
+for the owner account. This account can move real money; a password alone is
+thin.
 
-### Phase F — Tests
-- Unit tests for each detector (`microstructure/__tests__/*.test.ts`) with synthetic bar fixtures.
-- Integration test: extreme-tier tick should produce zero new market buys and reduced participation.
-- Property test: vol-target sizer never exceeds risk-level cap and monotonically shrinks as realized vol rises.
-- Regression: existing scenario-report matrix still passes; add a new "algo-driven volatile" preset to `SCENARIO_MATRIX`.
+**4. A "kill switch" that isn't reachable by an attacker.** Today a caller who
+reached the run endpoints could place orders. Add a hard trading-enabled flag in
+the database that only an administrator can flip, checked immediately before any
+order is sent, plus a per-day notional ceiling enforced server-side and
+independent of the strategy logic.
 
-## Non-goals
+**5. Alert on the security audit log.** Rejected-access events are recorded but
+mostly noticed only if someone looks. Route them to a push alert with a
+threshold, and add the same for repeated 401s on the hook endpoints — that's the
+signature of someone probing the secret.
 
-- No new venue/broker integration; execution changes stay within existing Saxo pathway and the simulator.
-- No change to the equity/cash accounting layer.
-- No new user-visible risk-level presets (existing conservative/balanced/high still apply).
+## Medium
 
-## Rollout
+**6. Broker credential hygiene.** Move Saxo tokens onto a scheduled rotation and
+alert if a refresh fails, so a stale or leaked token has a short life. Confirm no
+broker response is written to a log table unredacted.
 
-1. Land Phases A, C, F behind pure functions (no live wiring) — verifiable via tests.
-2. Wire Phase D (playbook + heuristic) — decision-only impact.
-3. Wire Phase B into simulator, then live executor behind a per-portfolio flag `algo_regime_guard_enabled` defaulting on.
-4. Ship Phase E card once signals stabilize.
+**7. Tighten the remaining flagged tables.** `market_open_alerts_sent`,
+`run_locks` and `credit_budget_alerts` are currently closed by default, which is
+correct; add explicit comments/policies so a future change can't accidentally
+open them.
+
+**8. Public news endpoint.** It's read-only and field-limited, which is fine, but
+it queries with the privileged client. Switch it to the ordinary public client so
+a future column addition can't leak anything beyond the public policy.
+
+**9. Dependency and header hardening.** Add a regular dependency vulnerability
+check, and set standard browser security headers (content policy, frame
+blocking) on the published site.
+
+## Suggested order of work
+
+1. Remove the publishable-key auth branch on all hooks; rotate `CRON_SECRET`. (critical)
+2. Add timestamped signatures + a dedicated secret for order-placing routes.
+3. Enable leaked-password checks and a second factor for the owner account.
+4. Add the admin-only trading kill switch and daily notional ceiling.
+5. Wire alerts for rejected access and repeated 401s.
+6. Broker token rotation + redaction audit.
+7. Table comments/policies, public news client swap, headers, dependency scan.
+
+## Technical notes
+
+- Weak check lives in `src/lib/_server/cron.ts` (`expectedApiKey` branch) and is
+  duplicated inline in `src/routes/api/public/hooks/backfill-daily-equity-changes.ts`.
+- Order placement funnels through `src/lib/live-executor.server.ts`; that is the
+  right chokepoint for the kill switch and notional ceiling.
+- Ownership assertions are centralised in `src/lib/_server/ownership.ts` — keep
+  new privileged paths going through it rather than re-checking inline.
+- Sign-in settings are changed through the backend auth configuration, not code.
+
+Tell me which items to implement and I'll start with the critical ones.

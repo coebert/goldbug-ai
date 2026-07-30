@@ -4,6 +4,7 @@
 // without importing the .server module into the client bundle.
 
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type InvestabilityStatus = "candidate" | "blocked";
 
@@ -71,7 +72,9 @@ export function classifyInvestability(symbol: string, name: string): ClassifyRes
   };
 }
 
-export const listInvestableUniverse = createServerFn({ method: "GET" }).handler(
+export const listInvestableUniverse = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
   async (): Promise<InvestableUniverseEntry[]> => {
     const { UNIVERSE } = await import("./universe.server");
     return UNIVERSE.map((u) => {

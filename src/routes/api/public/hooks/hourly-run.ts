@@ -1,7 +1,7 @@
 // Cron-triggered endpoint that runs an hourly AI market + news check.
 // Refreshes news + macro regime + latest prices, then runs a tick for every
 // paper-mode portfolio (multiple ticks per day are safe — snapshots upsert).
-// Auth via Lovable Cloud apikey header (legacy x-cron-secret remains accepted).
+// Auth: private CRON_SECRET plus a timestamped HMAC signature (replay-resistant).
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -12,6 +12,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
         const { verifyCronRequest } = await import("@/lib/_server/cron");
         const verified = await verifyCronRequest(request, {
           bucket: "hooks:hourly-run",
+          requireSignature: true,
           capacity: 10,
           refillPerSec: 10/3600,
         });

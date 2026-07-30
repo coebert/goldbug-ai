@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Settings as SettingsIcon } from "lucide-react";
 import { PushNotificationsCard } from "@/components/push-notifications-card";
+import { TradingControlsCard } from "@/components/trading-controls-card";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -42,6 +43,13 @@ function SettingsPage() {
           Notifications
         </h2>
         <PushNotificationsCard />
+      </section>
+
+      <section aria-labelledby="safety-heading" className="space-y-3">
+        <h2 id="safety-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Trading safety
+        </h2>
+        <TradingControlsCard />
       </section>
     </div>
   );

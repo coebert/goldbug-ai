@@ -1,5 +1,5 @@
 // Cron-triggered endpoint that runs the AI daily tick for every paper-mode portfolio.
-// Called by pg_cron once per day. Auth via Supabase anon apikey header.
+// Called by pg_cron once per day. Auth: private CRON_SECRET + HMAC signature.
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -10,6 +10,7 @@ export const Route = createFileRoute("/api/public/hooks/daily-run")({
         const { verifyCronRequest } = await import("@/lib/_server/cron");
         const verified = await verifyCronRequest(request, {
           bucket: "hooks:daily-run",
+          requireSignature: true,
           capacity: 5,
           refillPerSec: 5/3600,
         });
