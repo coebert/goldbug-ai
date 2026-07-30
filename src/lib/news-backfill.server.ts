@@ -1,0 +1,321 @@
+// Historical backfill of the world-events reel.
+//
+// The live refresh hook only ever ingests *today*, so when the source
+// catalogue is expanded the new publishers have no history behind them. This
+// module re-ingests the last 30–90 days for those newly added feeds.
+//
+// Mechanics:
+//   • RSS feeds only carry ~48h of items, so history comes from GDELT's
+//     document API using a per-publisher `domainis:` query over the job's
+//     date window. That returns the same publishers the new feeds cover.
+//   • Work is chunked and resumable: a job row holds a cursor, and each
+//     invocation (button press or cron tick) advances as far as its wall-clock
+//     budget allows. Workers kill background promises, so everything is
+//     awaited inline.
+//   • Rows are stamped with `fetched_at` on the article's own day so the
+//     newest-first reel ordering is not disturbed by two months of history.
+
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { runWithBreaker } from "./_server/provider-circuit";
+import { RSS_SOURCES } from "./news-sources";
+import { buildSeenKeySet, filterUnseen } from "./news-dedupe";
+import {
+  backfillFetchedAt,
+  clampBackfillDays,
+  daysBetween,
+  addDaysISO,
+  isoDay,
+  newCatalogueSources,
+  planBackfillWindow,
+  seenDateToISODay,
+  type BackfillJobLike,
+} from "./news-backfill";
+
+export type NewsBackfillJob = BackfillJobLike & {
+  id: string;
+  requested_days: number;
+  new_sources: Array<{ id: string; label: string; domain: string }>;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+};
+
+const GDELT_TIMEOUT_MS = 6_000;
+/** GDELT asks for ≤1 request / 5s per client. */
+const GDELT_PACE_MS = 5_200;
+const DEFAULT_BUDGET_MS = 45_000;
+/** Publishers queried per invocation before the cursor moves on. */
+const DOMAINS_PER_SLICE = 6;
+const MAX_RECORDS = 120;
+
+type GdeltArticle = { title?: string; url?: string; domain?: string; seendate?: string; language?: string };
+
+function rowToJob(r: Record<string, unknown>): NewsBackfillJob {
+  return {
+    id: String(r.id),
+    status: String(r.status),
+    requested_days: Number(r.requested_days ?? 0),
+    start_date: String(r.start_date),
+    end_date: String(r.end_date),
+    cursor_date: (r.cursor_date as string | null) ?? null,
+    days_total: Number(r.days_total ?? 0),
+    days_done: Number(r.days_done ?? 0),
+    headlines_inserted: Number(r.headlines_inserted ?? 0),
+    new_sources: Array.isArray(r.new_sources) ? (r.new_sources as NewsBackfillJob["new_sources"]) : [],
+    last_error: (r.last_error as string | null) ?? null,
+    created_at: String(r.created_at),
+    updated_at: String(r.updated_at),
+    finished_at: (r.finished_at as string | null) ?? null,
+  };
+}
+
+/** Publisher domains already represented in the cache. */
+async function seenDomains(): Promise<string[]> {
+  const { data } = await supabaseAdmin
+    .from("news_cache")
+    .select("source")
+    .not("source", "is", null)
+    .limit(5000);
+  return Array.from(new Set((data ?? []).map((r) => String(r.source ?? "").toLowerCase()).filter(Boolean)));
+}
+
+/** Latest job for this user (or globally when called from cron). */
+export async function latestBackfillJob(userId?: string | null): Promise<NewsBackfillJob | null> {
+  let q = supabaseAdmin
+    .from("news_backfill_jobs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (userId) q = q.eq("created_by", userId);
+  const { data } = await q;
+  return data && data[0] ? rowToJob(data[0] as Record<string, unknown>) : null;
+}
+
+/**
+ * Create (or resume) a backfill job covering the last `days` days for every
+ * catalogue feed whose publisher has no history in the cache yet.
+ */
+export async function startNewsBackfill(
+  days: number,
+  userId: string | null,
+): Promise<{ job: NewsBackfillJob; resumed: boolean }> {
+  const existing = await latestBackfillJob(userId);
+  if (existing && existing.status === "running") return { job: existing, resumed: true };
+
+  const requested = clampBackfillDays(days);
+  const window = planBackfillWindow(isoDay(new Date()), requested);
+  const fresh = newCatalogueSources(RSS_SOURCES, await seenDomains());
+  const newSources = fresh.map((s) => ({
+    id: s.id,
+    label: s.label,
+    domain: new URL(s.url).hostname.replace(/^www\./, "").toLowerCase(),
+  }));
+
+  const { data, error } = await supabaseAdmin
+    .from("news_backfill_jobs")
+    .insert({
+      created_by: userId,
+      status: "running",
+      requested_days: requested,
+      start_date: window.start_date,
+      end_date: window.end_date,
+      cursor_date: window.end_date,
+      days_total: window.days_total,
+      new_sources: newSources,
+    })
+    .select("*")
+    .single();
+  if (error || !data) throw new Error(`Could not start backfill: ${error?.message ?? "unknown error"}`);
+  return { job: rowToJob(data as Record<string, unknown>), resumed: false };
+}
+
+/** One GDELT publisher-scoped query across the whole window, bucketed by day. */
+async function fetchDomainHistory(
+  domain: string,
+  startISO: string,
+  endISO: string,
+): Promise<Array<{ day: string; headline: string; url: string | null; source: string }>> {
+  const start = `${startISO.replace(/-/g, "")}000000`;
+  const end = `${endISO.replace(/-/g, "")}235959`;
+  const query = encodeURIComponent(`domainis:${domain}`);
+  const url =
+    `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json` +
+    `&maxrecords=${MAX_RECORDS}&sort=datedesc&startdatetime=${start}&enddatetime=${end}`;
+  try {
+    const res = await runWithBreaker(`gdelt:backfill:${domain}`, () =>
+      fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableTrader/1.0)" },
+        signal: AbortSignal.timeout(GDELT_TIMEOUT_MS),
+      }),
+    );
+    if (!res.ok) {
+      try { await res.body?.cancel(); } catch { /* noop */ }
+      return [];
+    }
+    const text = (await res.text()).trim();
+    if (!text.startsWith("{") && !text.startsWith("[")) return []; // rate-limit sentinel
+    const json = JSON.parse(text) as { articles?: GdeltArticle[] };
+    const out: Array<{ day: string; headline: string; url: string | null; source: string }> = [];
+    for (const a of json.articles ?? []) {
+      if (!a.title) continue;
+      const day = seenDateToISODay(a.seendate);
+      if (!day || daysBetween(startISO, day) < 0 || daysBetween(day, endISO) < 0) continue;
+      out.push({ day, headline: a.title, url: a.url ?? null, source: (a.domain ?? domain).toLowerCase() });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Existing headline/url keys across the whole window, for cross-day dedupe. */
+async function windowSeenKeys(startISO: string, endISO: string): Promise<Set<string>> {
+  const { data } = await supabaseAdmin
+    .from("news_cache")
+    .select("headline, url, original_headline")
+    .gte("news_date", startISO)
+    .lte("news_date", endISO)
+    .limit(5000);
+  return buildSeenKeySet(
+    (data ?? []).map((r) => ({
+      headline: String(r.headline ?? ""),
+      url: (r.url as string | null) ?? null,
+      original_headline: (r as { original_headline?: string | null }).original_headline ?? null,
+    })),
+  );
+}
+
+export type BackfillAdvanceResult = {
+  job: NewsBackfillJob | null;
+  inserted: number;
+  domains_processed: number;
+  done: boolean;
+  reason?: string;
+};
+
+/**
+ * Advance the running job as far as the wall-clock budget allows. Safe to call
+ * repeatedly and concurrently-ish: every insert is deduped against the cache,
+ * so a replayed slice adds nothing.
+ */
+export async function advanceNewsBackfill(opts?: {
+  userId?: string | null;
+  budgetMs?: number;
+}): Promise<BackfillAdvanceResult> {
+  const budgetMs = Math.max(5_000, Math.min(120_000, opts?.budgetMs ?? DEFAULT_BUDGET_MS));
+  const deadlineAt = Date.now() + budgetMs;
+
+  const job = await latestBackfillJob(opts?.userId ?? null);
+  if (!job) return { job: null, inserted: 0, domains_processed: 0, done: true, reason: "No backfill job." };
+  if (job.status !== "running") {
+    return { job, inserted: 0, domains_processed: 0, done: true, reason: `Job is ${job.status}.` };
+  }
+
+  const domains = job.new_sources.map((s) => s.domain).filter(Boolean);
+  if (domains.length === 0) {
+    const finished = await finishJob(job.id, "completed", null);
+    return { job: finished, inserted: 0, domains_processed: 0, done: true, reason: "No newly added feeds to backfill." };
+  }
+
+  // The cursor doubles as a domain pointer: each slice takes the next batch of
+  // publishers, and once every publisher has been swept the job completes.
+  const startIdx = Math.min(job.days_done, domains.length);
+  const seen = await windowSeenKeys(job.start_date, job.end_date);
+  let inserted = 0;
+  let processed = 0;
+
+  try {
+    for (let i = startIdx; i < domains.length; i++) {
+      if (Date.now() > deadlineAt - GDELT_PACE_MS) break;
+      if (processed > 0) await new Promise((r) => setTimeout(r, GDELT_PACE_MS));
+
+      const articles = await fetchDomainHistory(domains[i], job.start_date, job.end_date);
+      processed++;
+
+      const weight = RSS_SOURCES.find((s) => s.id === job.new_sources[i]?.id)?.weight ?? 0.6;
+      const candidates = articles.map((a) => ({
+        date: a.day,
+        source: a.source,
+        headline: a.headline,
+        url: a.url,
+        summary: null as string | null,
+        original_headline: null as string | null,
+        original_language: null as string | null,
+        translation_confidence: null as number | null,
+      }));
+      const unseen = filterUnseen(candidates, seen);
+      if (unseen.length > 0) {
+        const rows = unseen.map((n) => ({
+          news_date: n.date,
+          source: n.source,
+          headline: n.headline,
+          url: n.url,
+          summary: n.summary,
+          source_weight: weight,
+          fetched_at: backfillFetchedAt(n.date),
+        }));
+        const { error } = await supabaseAdmin.from("news_cache").insert(rows);
+        if (error) console.error("news-backfill: insert failed", error.message);
+        else inserted += rows.length;
+      }
+
+      await supabaseAdmin
+        .from("news_backfill_jobs")
+        .update({
+          days_done: i + 1,
+          headlines_inserted: job.headlines_inserted + inserted,
+          cursor_date: addDaysISO(job.end_date, -Math.floor(((i + 1) / domains.length) * (job.days_total - 1))),
+        })
+        .eq("id", job.id);
+
+      if (processed >= DOMAINS_PER_SLICE) break;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const failed = await finishJob(job.id, "failed", message);
+    return { job: failed, inserted, domains_processed: processed, done: true, reason: message };
+  }
+
+  const completed = startIdx + processed >= domains.length;
+  const final = completed
+    ? await finishJob(job.id, "completed", null)
+    : await latestBackfillJob(opts?.userId ?? null);
+
+  return {
+    job: final,
+    inserted,
+    domains_processed: processed,
+    done: completed,
+    reason: completed
+      ? `Backfill complete across ${domains.length} newly added feed${domains.length === 1 ? "" : "s"}.`
+      : `Swept ${processed} feed${processed === 1 ? "" : "s"} this pass — more queued.`,
+  };
+}
+
+async function finishJob(id: string, status: string, error: string | null): Promise<NewsBackfillJob | null> {
+  const { data } = await supabaseAdmin
+    .from("news_backfill_jobs")
+    .update({
+      status,
+      last_error: error,
+      finished_at: new Date().toISOString(),
+      cursor_date: status === "completed" ? null : undefined,
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  return data ? rowToJob(data as Record<string, unknown>) : null;
+}
+
+/** Stop a running job (user-initiated). */
+export async function cancelNewsBackfill(userId: string | null): Promise<NewsBackfillJob | null> {
+  const job = await latestBackfillJob(userId);
+  if (!job || job.status !== "running") return job;
+  return finishJob(job.id, "cancelled", null);
+}
+
+/** How many catalogue feeds currently have no history in the cache. */
+export async function countNewCatalogueFeeds(): Promise<number> {
+  return newCatalogueSources(RSS_SOURCES, await seenDomains()).length;
+}
