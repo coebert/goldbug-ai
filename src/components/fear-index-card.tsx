@@ -1,9 +1,32 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getFearIndexSnapshot } from "@/lib/fear-index.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ChartFrame } from "@/components/chart-frame";
 import { Gauge } from "lucide-react";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+const SESSION_OPTIONS = [14, 30, 90] as const;
+
 
 interface Props {
   portfolioId: string;
@@ -24,14 +47,16 @@ function toneFor(score: number) {
  */
 export function FearIndexCard({ portfolioId, active = true }: Props) {
   const fetchSnapshot = useServerFn(getFearIndexSnapshot);
+  const [sessions, setSessions] = useState<number>(30);
   const query = useQuery({
-    queryKey: ["fear-index", portfolioId],
-    queryFn: () => fetchSnapshot({ data: { portfolio_id: portfolioId } }),
+    queryKey: ["fear-index", portfolioId, sessions],
+    queryFn: () => fetchSnapshot({ data: { portfolio_id: portfolioId, sessions } }),
     enabled: active,
     staleTime: 60_000,
   });
 
   const d = query.data;
+  const history = d?.history ?? [];
   const score = d?.score ?? null;
   const tone = toneFor(score ?? 50);
 
@@ -137,21 +162,75 @@ export function FearIndexCard({ portfolioId, active = true }: Props) {
               )}
             </div>
 
-            {d && d.history.length > 1 && (
-              <div>
-                <p className="text-sm font-medium mb-2">Recent readings</p>
-                <div className="flex items-end gap-1 h-12">
-                  {d.history.map((h) => (
-                    <div
-                      key={h.run_date}
-                      title={`${h.run_date}: ${h.score.toFixed(0)}`}
-                      className={`flex-1 rounded-sm ${toneFor(h.score).bar}`}
-                      style={{ height: `${Math.max(6, Math.min(100, h.score))}%` }}
-                    />
+            <div>
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                <p className="text-sm font-medium">Fear index over time</p>
+                <div className="flex gap-1">
+                  {SESSION_OPTIONS.map((n) => (
+                    <Button
+                      key={n}
+                      size="sm"
+                      variant={sessions === n ? "secondary" : "ghost"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setSessions(n)}
+                    >
+                      {n}
+                    </Button>
                   ))}
                 </div>
               </div>
-            )}
+              {history.length > 1 ? (
+                <ChartFrame className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={history}
+                      margin={{ top: 8, right: 8, bottom: 4, left: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis
+                        dataKey="run_date"
+                        tick={AXIS_TICK}
+                        tickLine={TICK_LINE}
+                        axisLine={AXIS_LINE}
+                        minTickGap={24}
+                        tickFormatter={(v: string) => v.slice(5)}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        ticks={[0, 20, 40, 60, 80, 100]}
+                        width={36}
+                        tick={AXIS_TICK}
+                        tickLine={TICK_LINE}
+                        axisLine={AXIS_LINE}
+                      />
+                      <Tooltip
+                        contentStyle={TOOLTIP_CONTENT_STYLE}
+                        formatter={(v: number) => [v.toFixed(0), "Fear"]}
+                      />
+                      <ReferenceLine y={60} stroke={CHART_ROLE.warning} strokeDasharray="4 4" />
+                      <ReferenceLine y={80} stroke={CHART_ROLE.negative} strokeDasharray="4 4" />
+                      <Line
+                        type="monotone"
+                        dataKey="score"
+                        stroke={CHART_ROLE.highlight}
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
+                        name="Fear"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartFrame>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Not enough runs yet to chart a trend.
+                </p>
+              )}
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Above 60 = fear (buys shrink); above 80 = panic (buys can be blocked).
+              </p>
+            </div>
+
           </>
         )}
       </CardContent>
