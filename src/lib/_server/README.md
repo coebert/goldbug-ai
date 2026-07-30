@@ -69,3 +69,22 @@ Never leave `CRON_SECRET_NEXT` set long-term; it exists only for the overlap win
   stopping trading harder than starting it.
 - New privileged server functions should use `requireAal2`, not
   `requireSupabaseAuth`.
+
+## CI security gates
+
+`bun run verify:security` (also `.github/workflows/security.yml`, on every push/PR
+plus a daily cron) runs three blocking checks:
+
+1. **Security headers** — `check:security-headers` locks the SSR policy in
+   `security-headers.ts`: required headers present, HSTS >= 1 year with
+   subdomains, no wildcard/`http:` script or connect source, `object-src 'none'`,
+   scoped `frame-ancestors`. Loosening the policy fails CI until the contract
+   test is updated in the same commit.
+2. **Dependency scan** — `check:deps` fails on any high/critical advisory.
+   CI runs it with `--strict`, so an unreachable advisory registry is a failure
+   rather than a silent pass.
+3. **SECURITY DEFINER constraints** — `check:security-definer` statically audits
+   every definer function in `supabase/migrations`: `search_path` must be pinned,
+   EXECUTE must never reach `PUBLIC`/`anon`, and anything not on the reviewed
+   allowlist must carry an explicit `REVOKE ALL` and be `service_role` only.
+   New definer functions require an allowlist entry — that is the review gate.

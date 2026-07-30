@@ -1,0 +1,46 @@
+# Security gates that run on every build.
+#
+#   1. Security headers  — contract test locking the SSR CSP/HSTS policy.
+#   2. Dependency scan   — fails on any high/critical advisory.
+#   3. SECURITY DEFINER  — static audit of definer functions in migrations.
+#
+# Locally, the same three run with: bun run verify:security
+name: security
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Dependency advisories appear without any code change, so re-run daily.
+    - cron: "17 6 * * *"
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Security headers contract
+        run: bun run check:security-headers
+
+      - name: SECURITY DEFINER permission constraints
+        run: bun run check:security-definer
+
+      - name: Dependency vulnerability scan
+        run: bun run check:deps --strict
+
+      - name: Server function shape
+        run: bun run check:serverfn
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Unit tests
+        run: bun run test:unit
