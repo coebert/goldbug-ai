@@ -115,9 +115,24 @@ const BATCH = 25;
 async function scoreBatchWithLlm(
   items: Array<{ i: number; headline: string; source: string | null }>,
   ctx: RelevanceContext,
+  batchIndex: number,
+  telemetry: RelevanceBatchTelemetry[],
 ): Promise<Map<number, RelevanceScore>> {
+  const record = (
+    scored: number,
+    latencyMs: number,
+    failure: RelevanceFailureReason | null,
+    detail?: string,
+  ) => {
+    telemetry.push({ index: batchIndex, items: items.length, scored, latencyMs, failure, detail });
+  };
+
   const key = process.env.LOVABLE_API_KEY;
-  if (!key || items.length === 0) return new Map();
+  if (items.length === 0) return new Map();
+  if (!key) {
+    record(0, 0, "missing_api_key", "LOVABLE_API_KEY not configured");
+    return new Map();
+  }
 
   const gateway = createLovableAiGatewayProvider(key);
   const model = gateway("google/gemini-3.1-flash-lite");
@@ -143,14 +158,31 @@ Reply ONLY as JSON: {"scores":[{"i":0,"score":72,"reason":"one short sentence","
 Headlines:
 ${items.map((it) => `${it.i}. [${it.source ?? "unknown"}] ${it.headline}`).join("\n")}`;
 
+  const startedAt = Date.now();
   try {
     const { text } = await generateText({ model, prompt });
-    return parseLlmPayload(text);
+    const parsed = parseLlmPayload(text);
+    const latency = Date.now() - startedAt;
+    if (parsed.size === 0) {
+      const empty = text.trim().length === 0;
+      record(0, latency, empty ? "empty_reply" : "unparseable_reply", text.trim().slice(0, 160));
+      console.warn(
+        `news-relevance: batch ${batchIndex} returned no usable scores (${empty ? "empty" : "unparseable"} reply) in ${latency}ms`,
+      );
+    } else {
+      record(parsed.size, latency, null);
+    }
+    return parsed;
   } catch (err) {
-    console.warn("news-relevance: LLM scoring failed", err instanceof Error ? err.message : String(err));
+    const latency = Date.now() - startedAt;
+    const reason = classifyLlmFailure(err);
+    const detail = err instanceof Error ? err.message : String(err);
+    record(0, latency, reason, detail.slice(0, 200));
+    console.warn(`news-relevance: batch ${batchIndex} failed after ${latency}ms (${reason})`, detail);
     return new Map();
   }
 }
+
 
 export type RelevanceScoredRow = {
   id: string;
