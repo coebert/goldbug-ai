@@ -110,7 +110,12 @@ export function buildFearIndexSnapshot(rows: DecisionRow[]): FearIndexSnapshot {
         reason: typeof fear?.reason === "string" ? fear.reason : null,
         runDate,
         blockedBuys,
-        impacts: impacts.sort((a, b) => b.value - a.value).slice(0, 8),
+        impacts: impacts
+          .sort(
+            (a, b) =>
+              Math.abs(b.deltaPct ?? 0) - Math.abs(a.deltaPct ?? 0) || b.value - a.value,
+          )
+          .slice(0, 12),
         history: [],
       };
     }
