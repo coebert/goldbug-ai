@@ -1385,9 +1385,9 @@ function PortfolioPage() {
                             minSeverity={eventSev}
                             onSeverityChange={setEventSev}
                           />
-                        </div>
-                      </CardTitle>
+                      </div>
                     </CardHeader>
+
                     {perfMetrics && (
                       <div className="mx-6 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         {(
