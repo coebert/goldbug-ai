@@ -207,6 +207,67 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
     }
   }, [drift, driftHydrated, portfolioId]);
 
+  // Derived values are computed BEFORE any early return so the hook order
+  // stays identical across the loading -> loaded transition. Returning early
+  // above a useEffect changes the hook count between renders and throws
+  // "Rendered more hooks than during the previous render" on first load.
+  const d = q.data;
+
+  const walletEntries = d
+    ? Object.entries(d.wallet)
+        .map(([ccy, bal]) => ({ ccy, bal: Number(bal) }))
+        .sort((a, b) =>
+          a.ccy === d.baseCcy ? -1 : b.ccy === d.baseCcy ? 1 : a.ccy.localeCompare(b.ccy),
+        )
+    : [];
+
+  const baseSum = d
+    ? walletEntries.reduce((acc, w) => {
+        if (w.ccy === d.baseCcy) return acc + w.bal;
+        const inv = d.fxRates[w.ccy]?.rate;
+        return acc + (inv && inv > 0 ? w.bal / inv : 0);
+      }, 0)
+    : 0;
+  const scalarDelta = d ? baseSum - d.currentCash : 0;
+
+  const noWallet = !d?.rawCashByCcy || Object.keys(d.rawCashByCcy).length === 0;
+
+  const driftPctActual = d && d.currentCash > 0 ? Math.abs(scalarDelta) / d.currentCash : 0;
+  const breachAbs = Boolean(d) && drift.enabled && Math.abs(scalarDelta) > drift.absBase;
+  const breachPct = Boolean(d) && drift.enabled && drift.pct > 0 && driftPctActual > drift.pct;
+  const breached = Boolean(d) && !noWallet && (breachAbs || breachPct);
+  const breachSign = scalarDelta >= 0 ? "over" : "under";
+  const baseCcy = d?.baseCcy;
+
+  // Fire a toast once per (portfolio, signed bucket) breach transition.
+  useEffect(() => {
+    if (!breached || !baseCcy || !drift.notify || typeof window === "undefined") return;
+    const flagKey = `${driftKey(portfolioId)}:last-alert`;
+    const bucket = `${breachSign}:${breachAbs ? "abs" : ""}${breachPct ? "pct" : ""}`;
+    try {
+      const last = window.sessionStorage.getItem(flagKey);
+      if (last === bucket) return;
+      window.sessionStorage.setItem(flagKey, bucket);
+    } catch {
+      /* ignore */
+    }
+    toast.warning(
+      `Wallet drift: ${scalarDelta >= 0 ? "+" : "−"}${fmt(Math.abs(scalarDelta), baseCcy)}`,
+      {
+        description: `${(driftPctActual * 100).toFixed(2)}% vs current_cash — exceeds your alert threshold.`,
+      },
+    );
+  }, [
+    breached,
+    breachAbs,
+    breachPct,
+    breachSign,
+    drift.notify,
+    portfolioId,
+    scalarDelta,
+    driftPctActual,
+    baseCcy,
+  ]);
 
   if (q.isLoading) {
     return (
@@ -220,7 +281,7 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
       </Card>
     );
   }
-  if (q.isError || !q.data) {
+  if (q.isError || !d) {
     return (
       <Card>
         <CardHeader>
@@ -235,55 +296,7 @@ export function WalletAffordabilityCard({ portfolioId, active = true }: Props) {
     );
   }
 
-  const d = q.data;
-  const walletEntries = Object.entries(d.wallet)
-    .map(([ccy, bal]) => ({ ccy, bal: Number(bal) }))
-    .sort((a, b) => (a.ccy === d.baseCcy ? -1 : b.ccy === d.baseCcy ? 1 : a.ccy.localeCompare(b.ccy)));
 
-  const baseSum = walletEntries.reduce((acc, w) => {
-    if (w.ccy === d.baseCcy) return acc + w.bal;
-    const inv = d.fxRates[w.ccy]?.rate;
-    return acc + (inv && inv > 0 ? w.bal / inv : 0);
-  }, 0);
-  const scalarDelta = baseSum - d.currentCash;
-
-  const noWallet = !d.rawCashByCcy || Object.keys(d.rawCashByCcy).length === 0;
-
-  const driftPctActual = d.currentCash > 0 ? Math.abs(scalarDelta) / d.currentCash : 0;
-  const breachAbs = drift.enabled && Math.abs(scalarDelta) > drift.absBase;
-  const breachPct = drift.enabled && drift.pct > 0 && driftPctActual > drift.pct;
-  const breached = !noWallet && (breachAbs || breachPct);
-  const breachSign = scalarDelta >= 0 ? "over" : "under";
-
-  // Fire a toast once per (portfolio, signed bucket) breach transition.
-  useEffect(() => {
-    if (!breached || !drift.notify || typeof window === "undefined") return;
-    const flagKey = `${driftKey(portfolioId)}:last-alert`;
-    const bucket = `${breachSign}:${breachAbs ? "abs" : ""}${breachPct ? "pct" : ""}`;
-    try {
-      const last = window.sessionStorage.getItem(flagKey);
-      if (last === bucket) return;
-      window.sessionStorage.setItem(flagKey, bucket);
-    } catch {
-      /* ignore */
-    }
-    toast.warning(
-      `Wallet drift: ${scalarDelta >= 0 ? "+" : "−"}${fmt(Math.abs(scalarDelta), d.baseCcy)}`,
-      {
-        description: `${(driftPctActual * 100).toFixed(2)}% vs current_cash — exceeds your alert threshold.`,
-      },
-    );
-  }, [
-    breached,
-    breachAbs,
-    breachPct,
-    breachSign,
-    drift.notify,
-    portfolioId,
-    scalarDelta,
-    driftPctActual,
-    d.baseCcy,
-  ]);
 
   return (
     <TooltipProvider delayDuration={150}>
