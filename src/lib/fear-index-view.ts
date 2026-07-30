@@ -44,12 +44,19 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 const FEAR_NOTE = /fear(\d+(?:\.\d+)?)\s*×\s*(\d+(?:\.\d+)?)/i;
 
 /** Extract the "fearNN×M.MM" fragment a run stamped onto an order's reason. */
-export function parseFearNote(reason: unknown): { note: string; multiplier: number | null } | null {
+export function parseFearNote(
+  reason: unknown,
+): { note: string; multiplier: number | null; score: number | null } | null {
   if (typeof reason !== "string") return null;
   const m = reason.match(FEAR_NOTE);
   if (!m) return null;
   const mult = Number(m[2]);
-  return { note: m[0], multiplier: Number.isFinite(mult) ? mult : null };
+  const sc = Number(m[1]);
+  return {
+    note: m[0],
+    multiplier: Number.isFinite(mult) ? mult : null,
+    score: Number.isFinite(sc) ? sc : null,
+  };
 }
 
 export function buildFearIndexSnapshot(rows: DecisionRow[]): FearIndexSnapshot {
