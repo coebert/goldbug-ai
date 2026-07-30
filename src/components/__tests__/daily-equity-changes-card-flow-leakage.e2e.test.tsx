@@ -174,6 +174,7 @@ describe("DailyEquityChangesCard: flow-leakage e2e", () => {
         netFlow: 1_000,
         pnl: 10,
         pct: 100, // ← LEAK: derived from rawDelta, not pnl
+        basisReset: false,
       },
     ]);
 
@@ -197,6 +198,7 @@ describe("DailyEquityChangesCard: flow-leakage e2e", () => {
         netFlow: -500,
         pnl: 10,
         pct: (-490 / 2_020) * 100, // ← LEAK
+        basisReset: false,
       },
     ]);
 
