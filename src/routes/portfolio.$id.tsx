@@ -537,6 +537,13 @@ function PortfolioPage() {
 
   const [includeDeposits, setIncludeDeposits] = useIncludeDeposits();
 
+  // starting_cash minus any deposits already absorbed into it, so passive
+  // benchmarks don't double-count the same top-up.
+  const baselineStartingCash = useMemo(() => {
+    const v = Number(q.data?.baselineStartingCash);
+    return Number.isFinite(v) ? v : Number(q.data?.portfolio?.starting_cash ?? 0);
+  }, [q.data?.baselineStartingCash, q.data?.portfolio?.starting_cash]);
+
   const depositEvents = useMemo(
     () => (q.data?.deposits ?? []) as Array<{ date: string; amount: number }>,
     [q.data?.deposits],
@@ -953,7 +960,7 @@ function PortfolioPage() {
             {p && (
               <div className="mb-4">
                 <PerformanceDashboardCard
-                  startingCash={Number(p.starting_cash ?? 0)}
+                  startingCash={baselineStartingCash}
                   currency={String(p.currency ?? "GBP")}
                   equity={equity as { snapshot_date: string; total_value: number }[]}
                   trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
@@ -965,7 +972,7 @@ function PortfolioPage() {
             {p && (
               <div className="mb-4">
                 <VanguardBenchmarkCard
-                  startingCash={Number(p.starting_cash ?? 0)}
+                  startingCash={baselineStartingCash}
                   currency={String(p.currency ?? "GBP")}
                   equity={equity as { snapshot_date: string; total_value: number }[]}
                   deposits={depositEvents}
