@@ -139,7 +139,7 @@ describe("ingestion-time dedupe across cron runs", () => {
     expect(new Set(heads).size).toBe(heads.length);
     expect(reel.filter((r) => r.id.startsWith("dup-"))).toHaveLength(1);
     expect(reel.filter((r) => r.id.startsWith("new-"))).toHaveLength(5);
-    // Newest-first preserved after deduping.
-    expect(reel[0].id).toBe("new-5");
+    // Newest-first preserved after deduping: run-5's rows lead the reel.
+    expect(reel.slice(0, 2).map((r) => r.id).sort()).toEqual(["dup-5", "new-5"]);
   });
 });
