@@ -1293,10 +1293,11 @@ function PortfolioPage() {
 
                 <div className="grid gap-4 lg:grid-cols-3">
                   <Card className="lg:col-span-2">
-                    <CardHeader>
-                      <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
-                        <span>Equity curve</span>
+                    <CardHeader className="gap-3">
+                      <CardTitle className="text-base">Equity curve</CardTitle>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                         <div className="flex items-center gap-2">
+
                           <label className="text-xs font-normal text-muted-foreground">
                             Benchmark
                           </label>
@@ -1313,7 +1314,9 @@ function PortfolioPage() {
                             <option value="GLD">GLD (Gold)</option>
                             <option value="BTC-USD">BTC-USD</option>
                           </select>
-                          <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+                        </div>
+                        <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+
                             {(["standard", "high", "light", "cb"] as const).map((mode) => (
                               <button
                                 key={mode}
@@ -1382,9 +1385,9 @@ function PortfolioPage() {
                             minSeverity={eventSev}
                             onSeverityChange={setEventSev}
                           />
-                        </div>
-                      </CardTitle>
+                      </div>
                     </CardHeader>
+
                     {perfMetrics && (
                       <div className="mx-6 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         {(
@@ -1438,12 +1441,9 @@ function PortfolioPage() {
                                     ? (perfMetrics.bench.annReturn - riskFreeRate) /
                                       perfMetrics.bench.annVol
                                     : null;
-                          const fmt = (v: number | null | undefined) => {
-                            if (v == null || !Number.isFinite(v)) return "—";
-                            const s = m.signed && v > 0 ? "+" : "";
-                            const d = 2;
-                            return `${s}${v.toFixed(d)}${m.suffix}`;
-                          };
+                          const fmt = (v: number | null | undefined) =>
+                            formatMetricValue(v, m.signed, m.suffix);
+
                           const color = (v: number | null | undefined) => {
                             if (v == null) return "text-muted-foreground";
                             if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
@@ -1453,35 +1453,39 @@ function PortfolioPage() {
                           return (
                             <div
                               key={m.label}
-                              className="rounded-md border border-border/70 bg-muted/30 p-3"
+                              className="min-w-0 rounded-md border border-border/70 bg-muted/30 p-3"
                             >
-                              <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                <span>{m.label}</span>
-                                <ExplainIcon term={m.term} />
+                              <div className="flex min-w-0 items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                <span className="truncate">{m.label}</span>
+                                <span className="shrink-0">
+                                  <ExplainIcon term={m.term} />
+                                </span>
                               </div>
                               <div
-                                className={`tabular-nums text-base font-semibold leading-tight sm:text-xl ${color(m.value)}`}
+                                title={fmt(m.value)}
+                                className={`mt-0.5 truncate tabular-nums text-base font-semibold leading-tight sm:text-lg ${color(m.value)}`}
                               >
                                 {fmt(m.value)}
                               </div>
                               {perfMetrics.bench && (
-                                <div className="tabular-nums text-[11px] text-muted-foreground">
+                                <div className="truncate tabular-nums text-[11px] text-muted-foreground">
                                   {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
                                 </div>
                               )}
                             </div>
                           );
+
                         })}
                       </div>
                     )}
                     {perfMetrics && (
                       <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
-                        <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
-                          <span>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <span className="min-w-0 truncate">
                             Performance vs {benchmark === "none" ? "benchmark" : benchmark}
                           </span>
                           {perfMetrics.correlation != null && (
-                            <span className="tabular-nums">
+                            <span className="shrink-0 tabular-nums">
                               Correlation:{" "}
                               <span className="font-medium text-foreground">
                                 {perfMetrics.correlation.toFixed(2)}
@@ -1489,7 +1493,8 @@ function PortfolioPage() {
                             </span>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
+
                           {(
                             [
                               {
@@ -1534,11 +1539,9 @@ function PortfolioPage() {
                               },
                             ] as const
                           ).map((m) => {
-                            const fmt = (v: number | null | undefined) => {
-                              if (v == null || !Number.isFinite(v)) return "—";
-                              const s = m.signed && v > 0 ? "+" : "";
-                              return `${s}${v.toFixed(2)}${m.suffix}`;
-                            };
+                            const fmt = (v: number | null | undefined) =>
+                              formatMetricValue(v, m.signed, m.suffix);
+
                             const derived = (obj: { annReturn: number; annVol: number } | null) =>
                               obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
                             const pick = (obj: typeof perfMetrics.port | null) => {
@@ -1563,22 +1566,27 @@ function PortfolioPage() {
                                 <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">
                                   {m.label}
                                 </div>
-                                <div className={`tabular-nums font-medium ${color(pv)}`}>
+                                <div
+                                  title={fmt(pv)}
+                                  className={`truncate tabular-nums font-medium ${color(pv)}`}
+                                >
                                   {fmt(pv)}
                                 </div>
                                 {perfMetrics.bench && (
-                                  <div className="tabular-nums text-[11px] text-muted-foreground">
+                                  <div className="truncate tabular-nums text-[11px] text-muted-foreground">
                                     {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
                                   </div>
                                 )}
                               </div>
+
                             );
                           })}
                         </div>
                       </div>
                     )}
                     <CardContent
-                      className="h-56 sm:h-64"
+                      className="h-64 sm:h-80"
+
                       style={
                         chartTheme.surface !== "transparent"
                           ? { background: chartTheme.surface, borderRadius: 8 }
@@ -1597,7 +1605,7 @@ function PortfolioPage() {
                               top: 8,
                               right: isMobile ? 6 : 12,
                               left: isMobile ? -12 : 0,
-                              bottom: 8,
+                              bottom: 28,
                             }}
                           >
                             <defs>
@@ -1649,7 +1657,7 @@ function PortfolioPage() {
                             />
                             <YAxis
                               domain={["auto", "auto"]}
-                              width={isMobile ? 56 : 72}
+                              width={isMobile ? 56 : 92}
                               tick={AXIS_TICK}
                               stroke={chartTheme.axis}
                               tickFormatter={(v) =>
@@ -1666,12 +1674,13 @@ function PortfolioPage() {
                                       value: yAxisLabel(compareMode, p.currency),
                                       angle: -90,
                                       position: "insideLeft",
-                                      offset: 8,
+                                      offset: -2,
                                       style: { textAnchor: "middle" },
                                       fill: chartTheme.axisText,
                                       fontSize: 12,
                                     }
                               }
+
                               axisLine={AXIS_LINE}
                               tickLine={TICK_LINE}
                             />
@@ -1867,9 +1876,14 @@ function PortfolioPage() {
                             )}
                             <Legend
                               verticalAlign="bottom"
-                              height={24}
+                              height={28}
                               iconType="plainline"
-                              wrapperStyle={{ fontSize: 12, color: chartTheme.axisText }}
+                              wrapperStyle={{
+                                fontSize: 12,
+                                color: chartTheme.axisText,
+                                paddingTop: 8,
+                                lineHeight: "18px",
+                              }}
                             />
                           </ComposedChart>
                         </ResponsiveContainer>
@@ -2993,4 +3007,24 @@ function PlainEnglishExplanation({
       )}
     </div>
   );
+}
+
+/**
+ * Format a metric value for the equity-curve tiles.
+ *
+ * Degenerate backtests can produce astronomically large annualised figures
+ * (e.g. 3.12e+62%). Rendering those with `toFixed(2)` blows the tile width and
+ * overlaps neighbouring cards, so anything past 1e6 collapses to exponential
+ * notation.
+ */
+export function formatMetricValue(
+  v: number | null | undefined,
+  signed: boolean,
+  suffix: string,
+): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const sign = signed && v > 0 ? "+" : "";
+  const abs = Math.abs(v);
+  const body = abs >= 1e6 || (abs > 0 && abs < 1e-4) ? v.toExponential(2) : v.toFixed(2);
+  return `${sign}${body}${suffix}`;
 }
