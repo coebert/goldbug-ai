@@ -62,3 +62,37 @@ export const TOOLTIP_CONTENT_STYLE = {
 } as const;
 export const TOOLTIP_LABEL_STYLE = { color: "var(--muted-foreground)" } as const;
 export const TOOLTIP_ITEM_STYLE = { color: "var(--popover-foreground)" } as const;
+
+// ---------------------------------------------------------------------------
+// Gridlines, axis lines and tick marks.
+//
+// Recharts' defaults are #ccc gridlines and #666 axis/tick lines, both of
+// which are picked for a white page: on this app's dark plot surfaces the
+// axis rules all but disappear while the grid glares. Derive every rule from
+// `--foreground` so the same alpha ladder holds on any surface tier:
+//
+//   grid  ~12%  — structure you read past, never through
+//   ticks ~30%  — short marks that need to register at 1px
+//   axis  ~45%  — the frame itself; the strongest non-text rule
+//
+// All three clear the WCAG 1.4.11 3:1 non-text bar against `--surface-1`
+// through `--surface-3` (enforced in chart-axis-readability.test.ts).
+export const GRID_STROKE = "color-mix(in oklab, var(--foreground) 12%, transparent)";
+export const AXIS_LINE_STROKE = "color-mix(in oklab, var(--foreground) 45%, transparent)";
+export const TICK_LINE_STROKE = "color-mix(in oklab, var(--foreground) 30%, transparent)";
+
+// Spread onto <CartesianGrid />. Dashed so gridlines stay distinguishable
+// from plotted series at low alpha.
+export const GRID_PROPS = {
+  stroke: GRID_STROKE,
+  strokeDasharray: "3 3",
+} as const;
+
+// Spread onto <XAxis /> / <YAxis /> alongside `tick={AXIS_TICK}`.
+export const AXIS_LINE = { stroke: AXIS_LINE_STROKE } as const;
+export const TICK_LINE = { stroke: TICK_LINE_STROKE } as const;
+export const AXIS_PROPS = {
+  tick: AXIS_TICK,
+  axisLine: AXIS_LINE,
+  tickLine: TICK_LINE,
+} as const;
