@@ -87,7 +87,9 @@ export function buildDocumentCsp(prod: boolean = IS_PROD): string[] {
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
     connect,
-    "upgrade-insecure-requests",
+    // Dev serves over plain http on localhost and HMR uses ws:; upgrading
+    // those would break the dev server for no security gain.
+    ...(prod ? ["upgrade-insecure-requests"] : []),
   ];
 }
 

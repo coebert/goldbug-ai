@@ -52,7 +52,8 @@ describe("document security headers contract", () => {
     expect(get(CSP_DIRECTIVES, "form-action")).toBe("form-action 'self'");
     expect(get(CSP_DIRECTIVES, "frame-ancestors")).toBeTruthy();
     expect(get(CSP_DIRECTIVES, "frame-ancestors")).not.toMatch(/\s\*$/);
-    expect(CSP_DIRECTIVES).toContain("upgrade-insecure-requests");
+    expect(PROD).toContain("upgrade-insecure-requests");
+    expect(DEV).not.toContain("upgrade-insecure-requests");
   });
 
   it("never allows a wildcard or plaintext source", () => {
