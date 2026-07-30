@@ -1655,6 +1655,30 @@ export type Database = {
         }
         Relationships: []
       }
+      price_intraday: {
+        Row: {
+          bucket_hour: string
+          created_at: string
+          price: number
+          source: string
+          symbol: string
+        }
+        Insert: {
+          bucket_hour: string
+          created_at?: string
+          price: number
+          source?: string
+          symbol: string
+        }
+        Update: {
+          bucket_hour?: string
+          created_at?: string
+          price?: number
+          source?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
