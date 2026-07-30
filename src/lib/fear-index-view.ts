@@ -87,12 +87,18 @@ export function buildFearIndexSnapshot(rows: DecisionRow[]): FearIndexSnapshot {
         }
         const parsed = parseFearNote(rec.reason);
         if (!parsed) continue;
+        const value = num(rec.value) ?? 0;
+        const mult = parsed.multiplier;
+        const unadjusted = mult != null && mult > 0 ? value / mult : null;
         impacts.push({
           symbol,
           side: rec.side === "sell" ? "sell" : "buy",
-          value: num(rec.value) ?? 0,
+          value,
+          unadjustedValue: unadjusted,
+          deltaPct: mult != null ? (mult - 1) * 100 : null,
+          fearScore: parsed.score,
           note: parsed.note,
-          multiplier: parsed.multiplier,
+          multiplier: mult,
         });
       }
       const label = (typeof fear?.label === "string" ? (fear.label as FearLabel) : labelFor(score));
