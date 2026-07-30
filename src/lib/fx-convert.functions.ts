@@ -42,7 +42,7 @@ export const convertPortfolioCash = createServerFn({ method: "POST" })
     const { data: p, error: pErr } = await supabase
       .from("portfolios")
       .select(
-        "id, mode, currency, current_cash, cash_by_ccy, fx_enabled, fx_execution_mode",
+        "id, mode, currency, current_cash, cash_by_ccy, fx_enabled, fx_execution_mode, broker, broker_account_id",
       )
       .eq("id", data.portfolioId)
       .single();
@@ -95,6 +95,7 @@ export const convertPortfolioCash = createServerFn({ method: "POST" })
         userId,
         portfolioId: pRow.id,
         envOverride: pRow.mode === "live_prod" ? "live" : "sim",
+        accountKey: (pRow as { broker_account_id?: string | null }).broker_account_id ?? undefined,
       });
       if (typeof adapter.placeFxSpot !== "function") {
         return {

@@ -53,7 +53,7 @@ export const backfillOrderReconciliation = createServerFn({ method: "POST" })
 
     let q = supabase
       .from("portfolios")
-      .select("id, name, mode")
+      .select("id, name, mode, broker, broker_account_id")
       .eq("user_id", userId)
       .in("mode", ["live_sim", "live_prod"]);
     if (data.portfolioId) q = q.eq("id", data.portfolioId);
@@ -81,6 +81,7 @@ export const backfillOrderReconciliation = createServerFn({ method: "POST" })
           userId,
           portfolioId: p.id as string,
           envOverride: env,
+          accountKey: (p.broker_account_id as string | null) ?? undefined,
         });
         const s: OrderReconcileSummary = await reconcileOrderStatusesForPortfolio({
           portfolioId: p.id as string,

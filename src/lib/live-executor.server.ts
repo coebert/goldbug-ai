@@ -45,7 +45,13 @@ export interface RouteResult {
  * @param executed   executed[] array from trading-engine
  */
 export async function routeOrdersToBroker(params: {
-  portfolio: { id: string; mode: string; live_paused?: boolean | null };
+  portfolio: {
+    id: string;
+    mode: string;
+    live_paused?: boolean | null;
+    broker?: string | null;
+    broker_account_id?: string | null;
+  };
   userId: string;
   asOf: string;
   decisionId: string | null;
@@ -95,6 +101,50 @@ export async function routeOrdersToBroker(params: {
       // best-effort log only
     }
     return results;
+  }
+
+  // Which broker account does THIS portfolio trade? Orders must never be sent
+  // to a default/shared account — that is what made two sim portfolios mirror
+  // one another. Fields may be absent on the caller's row, so re-read them.
+  const { resolvePortfolioBrokerLink } = await import(
+    "@/lib/brokers/portfolio-broker-link.server"
+  );
+  let brokerRow: { broker?: string | null; broker_account_id?: string | null } = portfolio;
+  if (portfolio.broker === undefined || portfolio.broker_account_id === undefined) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("portfolios")
+      .select("broker, broker_account_id")
+      .eq("id", portfolio.id)
+      .maybeSingle();
+    brokerRow = data ?? {};
+  }
+  const brokerLink = resolvePortfolioBrokerLink(brokerRow);
+  if (!brokerLink.linked) {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "ROUTE_SKIPPED_NO_BROKER_ACCOUNT",
+        path: "/route/no-broker-account",
+        status: 0,
+        request: asJson({ asOf, decisionId, count: executed.length }),
+        response: null,
+        error: brokerLink.reason,
+      });
+    } catch {
+      /* best-effort log only */
+    }
+    return executed.map((e) => ({
+      symbol: e.symbol,
+      side: e.side,
+      quantity: e.quantity,
+      status: "skipped",
+      skipped: brokerLink.reason,
+    }));
   }
 
   // Hard safety gate (independent of strategy logic): admin kill switch plus a
@@ -178,6 +228,7 @@ export async function routeOrdersToBroker(params: {
       userId,
       portfolioId: portfolio.id,
       envOverride: portfolio.mode === "live_prod" ? "live" : "sim",
+      accountKey: brokerLink.accountKey,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

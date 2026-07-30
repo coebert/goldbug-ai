@@ -124,7 +124,7 @@ async function runHourlyCycleInner(
 
     const { data: allPortfolios, error } = await supabaseAdmin
       .from("portfolios")
-      .select("id, name, user_id, universe, mode, live_paused")
+      .select("id, name, user_id, universe, mode, live_paused, broker, broker_account_id")
       .in("mode", ["paper", "live_sim", "live_prod"]);
 
     if (error) throw new Error(error.message);
@@ -349,10 +349,16 @@ async function runHourlyCycleInner(
             const { reconcileOrderStatusesForPortfolio } = await import(
               "@/lib/order-reconciliation.server"
             );
+            const { resolvePortfolioBrokerLink } = await import(
+              "@/lib/brokers/portfolio-broker-link.server"
+            );
+            const link = resolvePortfolioBrokerLink(p);
+            if (!link.linked) throw new Error(link.reason);
             const adapter = await buildSaxoAdapter({
               userId: p.user_id as string,
               portfolioId: p.id,
               envOverride: env,
+              accountKey: link.accountKey,
             });
             await reconcileOrderStatusesForPortfolio({
               portfolioId: p.id,

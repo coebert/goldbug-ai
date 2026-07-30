@@ -19,6 +19,7 @@
 import { recordIntradayEquity } from "@/lib/equity-intraday.server";
 import { recordIntradayPrices } from "@/lib/price-intraday.server";
 
+import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
@@ -67,7 +68,7 @@ export async function reconcileLiveHoldingsFromBroker(
 
   const portfolioQuery = db
     .from("portfolios")
-    .select("id, user_id, mode, live_paused")
+    .select("id, user_id, mode, live_paused, broker, broker_account_id")
     .eq("id", portfolioId);
   const { data: p, error } = await (isAdmin
     ? portfolioQuery.eq("user_id", userId)
@@ -90,6 +91,11 @@ export async function reconcileLiveHoldingsFromBroker(
     }
   }
 
+  // Broker positions may only replace the holdings of a portfolio that is
+  // linked to its own broker account (see portfolio-broker-link.server.ts).
+  const link = resolvePortfolioBrokerLink(p);
+  if (!link.linked) return { skipped: true, reason: link.reason };
+
   const env = p.mode === "live_prod" ? "live" : "sim";
   let brokerCash: number;
   let brokerTotalValue: number | null = null;
@@ -102,6 +108,7 @@ export async function reconcileLiveHoldingsFromBroker(
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
     const adapter = await buildSaxoAdapter({
       userId: p.user_id, portfolioId, envOverride: env,
+      accountKey: link.accountKey,
     });
     const [bal, pos] = await Promise.all([
       adapter.getBalance(),

@@ -23,6 +23,7 @@
 // keep working without churn.
 export type { ScopedDbClient, OwnedDbClient } from "@/lib/_server/owned-client";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
+import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
 import { asJson } from "@/lib/_server/db-json";
 import { readWallet, walletBalance, writeWalletFieldsWithBaseCash } from "@/lib/portfolio-wallet";
 
@@ -57,7 +58,7 @@ export async function syncLiveCashFromBroker(
 
   const portfolioQuery = db
     .from("portfolios")
-    .select("id, user_id, mode, current_cash, starting_cash, live_paused, currency, cash_by_ccy")
+    .select("id, user_id, mode, current_cash, starting_cash, live_paused, currency, cash_by_ccy, broker, broker_account_id")
     .eq("id", portfolioId);
   const { data: p, error } = await (isAdmin
     ? portfolioQuery.eq("user_id", userId)
@@ -70,6 +71,11 @@ export async function syncLiveCashFromBroker(
   if (p.mode !== "live_sim" && p.mode !== "live_prod") {
     return { skipped: true, reason: "not a live portfolio" };
   }
+  // Only portfolios bound to their OWN broker account may be overwritten with
+  // broker state. Without this guard every sim portfolio mirrored the same
+  // default Saxo account and they all showed identical cash and holdings.
+  const link = resolvePortfolioBrokerLink(p);
+  if (!link.linked) return { skipped: true, reason: link.reason };
   const env = p.mode === "live_prod" ? "live" : "sim";
 
   let brokerCash: number;
@@ -80,6 +86,7 @@ export async function syncLiveCashFromBroker(
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
     const adapter = await buildSaxoAdapter({
       userId: p.user_id, portfolioId, envOverride: env,
+      accountKey: link.accountKey,
     });
     const bal = await adapter.getBalance();
     // IMPORTANT: equity snapshots and portfolio.current_cash must use Saxo's

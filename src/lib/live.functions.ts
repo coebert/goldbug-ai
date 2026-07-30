@@ -76,7 +76,7 @@ export const deactivateLive = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
-      .select("id, user_id, mode").eq("id", data.portfolioId).maybeSingle();
+      .select("id, user_id, mode, broker, broker_account_id").eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     const previousMode = own.data.mode;
     // Idempotent: already paper → log noop, don't rewrite.
@@ -232,11 +232,14 @@ export const pingBroker = createServerFn({ method: "POST" })
     z.object({ portfolioId: z.string().uuid(), env: z.enum(["sim", "live"]).optional() }).parse(data))
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
-      .select("id, user_id, mode").eq("id", data.portfolioId).maybeSingle();
+      .select("id, user_id, mode, broker, broker_account_id").eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     const env = data.env ?? (own.data.mode === "live_prod" ? "live" : "sim");
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-    const adapter = await buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
+    const adapter = await buildSaxoAdapter({
+      userId: context.userId, portfolioId: data.portfolioId, envOverride: env,
+      accountKey: own.data.broker_account_id ?? undefined,
+    });
     return adapter.ping();
   });
 
@@ -246,7 +249,7 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
     z.object({ portfolioId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const own = await context.supabase.from("portfolios")
-      .select("id, user_id, mode").eq("id", data.portfolioId).maybeSingle();
+      .select("id, user_id, mode, broker, broker_account_id").eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     // Pick up any external deposits/withdrawals into Saxo before returning the
     // broker snapshot so the UI immediately reflects the newly-available cash.
@@ -261,7 +264,10 @@ export const syncBrokerBalance = createServerFn({ method: "POST" })
     );
     const env = own.data.mode === "live_prod" ? "live" : "sim";
     const { buildSaxoAdapter } = await import("@/lib/brokers/saxo.server");
-    const adapter = await buildSaxoAdapter({ userId: context.userId, portfolioId: data.portfolioId, envOverride: env });
+    const adapter = await buildSaxoAdapter({
+      userId: context.userId, portfolioId: data.portfolioId, envOverride: env,
+      accountKey: own.data.broker_account_id ?? undefined,
+    });
     const bal = await adapter.getBalance();
     const pos = await adapter.getPositions();
     return { balance: bal, positions: pos, sync };
@@ -362,7 +368,8 @@ export const reconcileOrders = createServerFn({ method: "POST" })
     }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const p = await supabase.from("portfolios").select("id, user_id, mode")
+    const p = await supabase.from("portfolios")
+      .select("id, user_id, mode, broker, broker_account_id")
       .eq("id", data.portfolioId).maybeSingle();
     if (p.error || !p.data || p.data.user_id !== userId) throw new Error("Portfolio not found");
     if (p.data.mode !== "live_sim" && p.data.mode !== "live_prod") {
@@ -373,6 +380,7 @@ export const reconcileOrders = createServerFn({ method: "POST" })
     const { reconcileOrderStatusesForPortfolio } = await import("@/lib/order-reconciliation.server");
     const adapter = await buildSaxoAdapter({
       userId, portfolioId: data.portfolioId, envOverride: env,
+      accountKey: p.data.broker_account_id ?? undefined,
     });
     return reconcileOrderStatusesForPortfolio({
       portfolioId: data.portfolioId,
