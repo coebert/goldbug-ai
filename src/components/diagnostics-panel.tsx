@@ -129,14 +129,14 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   <XAxis
                     dataKey="index"
                     tick={AXIS_TICK}
-                    label={{ value: "Trade #", position: "insideBottom", offset: -2, fontSize: 11 }}
+                    label={{ value: "Trade #", position: "insideBottom", offset: -2, fontSize: 12 }}
                   />
                   <YAxis
                     tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
                     domain={[0, 1]}
                     tick={AXIS_TICK}
                     width={64}
-                    label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
+                    label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
                   />
 
                   <ReferenceLine y={0.5} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
@@ -170,7 +170,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                 <XAxis
                   dataKey="bucket"
                   tick={AXIS_TICK}
-                  label={{ value: "Order size bucket", position: "insideBottom", offset: -2, fontSize: 11 }}
+                  label={{ value: "Order size bucket", position: "insideBottom", offset: -2, fontSize: 12 }}
                 />
                 <YAxis
                   yAxisId="left"
@@ -178,7 +178,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   domain={[0, 1]}
                   tick={AXIS_TICK}
                   width={64}
-                  label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
+                  label={{ value: "Win rate (%)", angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
                 />
                 <YAxis
                   yAxisId="right"
@@ -186,7 +186,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                   tickFormatter={(v) => `${v.toFixed(1)}%`}
                   tick={AXIS_TICK}
                   width={68}
-                  label={{ value: "Avg fwd return (%)", angle: 90, position: "insideRight", offset: 8, style: { textAnchor: "middle" }, fontSize: 11 }}
+                  label={{ value: "Avg fwd return (%)", angle: 90, position: "insideRight", offset: 8, style: { textAnchor: "middle" }, fontSize: 12 }}
                 />
 
                 <Tooltip

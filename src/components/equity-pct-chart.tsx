@@ -94,7 +94,7 @@ export function EquityPctChart({
               <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.6} strokeDasharray="4 3" />
               <Tooltip
                 contentStyle={{
-                  fontSize: 11,
+                  fontSize: 12,
                   background: "var(--popover)",
                   border: "1px solid var(--border)",
                   borderRadius: 8,

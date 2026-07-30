@@ -306,7 +306,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   position="top"
                   formatter={(v: unknown) => formatPct(Number(v))}
                   style={{
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: 600,
                     fill: "var(--foreground)",
                   }}

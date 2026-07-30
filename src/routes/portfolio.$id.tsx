@@ -1384,7 +1384,7 @@ function PortfolioPage() {
                             );
                           }}
                         />
-                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axisText, fontSize: 10, position: "insideTopRight" }} />
+                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axisText, fontSize: 12, position: "insideTopRight" }} />
                         {eventsOn && (
                           <EventOverlay
                             domainDates={equityData.map((d) => d.date)}
@@ -1446,7 +1446,7 @@ function PortfolioPage() {
                           verticalAlign="bottom"
                           height={24}
                           iconType="plainline"
-                          wrapperStyle={{ fontSize: 11, color: chartTheme.axisText }}
+                          wrapperStyle={{ fontSize: 12, color: chartTheme.axisText }}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>

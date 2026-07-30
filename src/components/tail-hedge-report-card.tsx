@@ -163,7 +163,7 @@ export function TailHedgeReportCard({
                   <Tooltip
                     formatter={(v: number) => money(v, currency)}
                     labelStyle={{ color: "var(--foreground)" }}
-                    contentStyle={{ background: "var(--card)", borderRadius: 6, fontSize: 11 }}
+                    contentStyle={{ background: "var(--card)", borderRadius: 6, fontSize: 12 }}
                   />
                   <Area
                     type="monotone"

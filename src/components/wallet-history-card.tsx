@@ -162,7 +162,7 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
                     labelFormatter={(l) => String(l)}
                   />
                   <Legend
-                    wrapperStyle={{ fontSize: 11 }}
+                    wrapperStyle={{ fontSize: 12 }}
                     formatter={(v) => (v === "__baseTotal" ? `Total (${baseCcy})` : v)}
                   />
                   {currencies.map((c, i) => (

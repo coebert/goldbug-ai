@@ -544,7 +544,7 @@ export function BacktestRunHistoryCard({
                       <XAxis
                         dataKey="t"
                         tick={AXIS_TICK}
-                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
+                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 12 }}
                       />
                       <YAxis
                         tick={AXIS_TICK}
@@ -554,9 +554,9 @@ export function BacktestRunHistoryCard({
                       <Tooltip
                         formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
                         labelFormatter={(t: number) => `Day ${t}`}
-                        contentStyle={{ fontSize: 11 }}
+                        contentStyle={{ fontSize: 12 }}
                       />
-                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}
@@ -581,7 +581,7 @@ export function BacktestRunHistoryCard({
                       <XAxis
                         dataKey="t"
                         tick={AXIS_TICK}
-                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 10 }}
+                        label={{ value: "Day", position: "insideBottom", offset: -2, fontSize: 12 }}
                       />
                       <YAxis
                         tick={AXIS_TICK}
@@ -592,9 +592,9 @@ export function BacktestRunHistoryCard({
                       <Tooltip
                         formatter={(v: number, name: string) => [`${v.toFixed(2)}%`, name]}
                         labelFormatter={(t: number) => `Day ${t}`}
-                        contentStyle={{ fontSize: 11 }}
+                        contentStyle={{ fontSize: 12 }}
                       />
-                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}
