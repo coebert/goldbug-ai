@@ -931,8 +931,10 @@ function PortfolioPage() {
             )}
             <EquityPctChart
               className="mb-4"
+              portfolioId={id}
               equity={equity as { snapshot_date: string; total_value: number }[]}
-              startingCash={startingCash}
+              startingCash={baselineStartingCash}
+              deposits={depositEvents}
             />
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
