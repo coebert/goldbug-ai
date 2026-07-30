@@ -13,6 +13,8 @@ export type HoldingSeries = {
   avg_cost: number;
   quantity: number;
   closes: number[]; // ordered oldest -> newest
+  hourly: number[]; // hour-bucketed prices, oldest -> newest
+  hourlyAt: string[]; // ISO timestamps aligned with `hourly`
   currentPrice: number | null;
   pctChangeSincePurchase: number | null;
   valueChangeSincePurchase: number | null;
@@ -90,6 +92,24 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
       bySymbol.set(p.symbol, arr);
     }
 
+    // Hourly observations recorded by the broker sync. Keyed by the raw
+    // broker-native symbol (that's what the sync writes), so no MIC mapping
+    // here. 14 days keeps the payload small while covering any recent buy.
+    const intradaySince = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: intradayRows } = await context.supabase
+      .from("price_intraday")
+      .select("symbol, bucket_hour, price")
+      .in("symbol", Array.from(new Set(list.map((h) => h.symbol))))
+      .gte("bucket_hour", intradaySince)
+      .order("bucket_hour", { ascending: true });
+
+    const intradayBySymbol = new Map<string, Array<{ at: string; close: number }>>();
+    for (const r of intradayRows ?? []) {
+      const arr = intradayBySymbol.get(r.symbol) ?? [];
+      arr.push({ at: String(r.bucket_hour), close: Number(r.price) });
+      intradayBySymbol.set(r.symbol, arr);
+    }
+
     const result = list.map((h) =>
       buildHoldingSeries(
         {
@@ -100,6 +120,7 @@ export const getHoldingsHistory = createServerFn({ method: "GET" })
           asset_class: (h as { asset_class?: string | null }).asset_class ?? null,
         },
         bySymbol.get(resolve(h.symbol)) ?? [],
+        intradayBySymbol.get(h.symbol) ?? [],
       ),
     );
 
