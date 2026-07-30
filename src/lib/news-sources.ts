@@ -144,7 +144,21 @@ export const GDELT_SOURCES: Extract<NewsSource, { kind: "gdelt" }>[] = [
   { kind: "gdelt", id: "gdelt-crypto",    label: "GDELT · Crypto",       weight: 0.6, topic: "crypto",
     query: "(bitcoin OR ethereum OR \"crypto ETF\" OR stablecoin OR blockchain OR \"digital asset\")" },
   { kind: "gdelt", id: "gdelt-fx",        label: "GDELT · FX",           weight: 0.65, topic: "fx",
+  { kind: "gdelt", id: "gdelt-fx",        label: "GDELT · FX",           weight: 0.65, topic: "fx",
     query: "(\"foreign exchange\" OR \"currency market\" OR \"dollar index\" OR yuan OR yen OR sterling OR euro)" },
+  { kind: "gdelt", id: "gdelt-commods",   label: "GDELT · Commodities",  weight: 0.65, topic: "commodities",
+    query: "(gold OR copper OR \"iron ore\" OR wheat OR \"commodity prices\" OR lithium OR uranium)" },
+  { kind: "gdelt", id: "gdelt-banks",     label: "GDELT · Banking & credit", weight: 0.7, topic: "companies",
+    query: "(bank OR lender OR \"credit market\" OR default OR \"bond issuance\" OR \"private credit\" OR liquidity)" },
+  { kind: "gdelt", id: "gdelt-supply",    label: "GDELT · Supply chains", weight: 0.65, topic: "macro",
+    query: "(\"supply chain\" OR shipping OR freight OR \"port strike\" OR \"Red Sea\" OR logistics)" },
+  { kind: "gdelt", id: "gdelt-defence",   label: "GDELT · Defence",      weight: 0.6, topic: "geopolitics",
+    query: "(defence spending OR \"defense budget\" OR arms OR missile OR \"military exercise\")" },
+  { kind: "gdelt", id: "gdelt-climate",   label: "GDELT · Climate & disruption", weight: 0.55, topic: "macro",
+    query: "(hurricane OR drought OR flooding OR \"extreme weather\" OR \"climate policy\" OR \"carbon price\")" },
+  { kind: "gdelt", id: "gdelt-em",        label: "GDELT · Emerging markets", weight: 0.6, topic: "macro",
+    query: "(\"emerging markets\" OR India economy OR China economy OR Brazil economy OR \"currency crisis\" OR IMF bailout)" },
 ];
+
 
 export const ALL_SOURCES: NewsSource[] = [...RSS_SOURCES, ...GDELT_SOURCES];
