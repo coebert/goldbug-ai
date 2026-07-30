@@ -5,11 +5,19 @@ import { humanFearLabel, labelFor, type FearLabel } from "./fear-index";
 export type FearIndexSizingImpact = {
   symbol: string;
   side: "buy" | "sell";
+  /** Notional actually spent, after the fear multiplier was applied. */
   value: number;
+  /** Notional that would have been spent with no fear adjustment. */
+  unadjustedValue: number | null;
+  /** Signed % change vs the unadjusted size (e.g. -40 = trimmed 40%). */
+  deltaPct: number | null;
+  /** The fear score stamped on this order's sizing note. */
+  fearScore: number | null;
   /** e.g. "fear72×0.60" pulled out of the order's sizing notes. */
   note: string;
   multiplier: number | null;
 };
+
 
 export type FearIndexSnapshot = {
   score: number | null;
