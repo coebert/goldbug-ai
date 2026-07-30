@@ -34,6 +34,7 @@ import {
 } from "./signals-extended.server";
 import { getCrossAssetSnapshot, formatCrossAssetBlock } from "./cross-asset.server";
 import { getOptionsSnapshot, formatOptionsBlock } from "./options-signals.server";
+import { computeFearIndex, formatFearIndexBlock } from "./fear-index";
 import {
   computeCrossSectionalRanks,
   formatCrossSectionalBlock,
