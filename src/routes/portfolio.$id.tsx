@@ -1314,7 +1314,9 @@ function PortfolioPage() {
                             <option value="GLD">GLD (Gold)</option>
                             <option value="BTC-USD">BTC-USD</option>
                           </select>
-                          <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+                        </div>
+                        <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+
                             {(["standard", "high", "light", "cb"] as const).map((mode) => (
                               <button
                                 key={mode}
