@@ -11,6 +11,7 @@ import {
   type NewsReelItem,
   type DecisionBreakdownItem,
 } from "./news-reel.server";
+import type { NewsRefreshResult } from "./news-refresh.server";
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -251,4 +252,17 @@ export const getDecisionNewsBreakdown = createServerFn({ method: "GET" })
     });
 
     return { items, as_of: asOf.toISOString() };
+  });
+
+// On-demand cache refresh used by the reel's "Refresh now" button. The cron
+// hook only runs against the published deployment, so without this the reel
+// could only ever re-read a stale cache.
+export const refreshGlobalNews = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { max?: number } | undefined) => ({
+    max: Math.max(10, Math.min(80, Math.round(Number(input?.max ?? 30)))),
+  }))
+  .handler(async ({ data }): Promise<NewsRefreshResult> => {
+    const { refreshGlobalNewsNow } = await import("./news-refresh.server");
+    return refreshGlobalNewsNow(data.max);
   });
