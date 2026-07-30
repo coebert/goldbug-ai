@@ -2267,6 +2267,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       wallet_snapshots: {
         Row: {
           base_ccy: string
@@ -2340,6 +2361,13 @@ export type Database = {
           retry_after: number
         }[]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       algo_regime_tune_status:
@@ -2347,6 +2375,7 @@ export type Database = {
         | "accepted"
         | "rolled_back"
         | "superseded"
+      app_role: "admin" | "moderator" | "user"
       asset_class: "stock" | "etf" | "crypto" | "commodity" | "fx"
       portfolio_mode: "backtest" | "paper" | "live_sim" | "live_prod"
       portfolio_status: "active" | "paused" | "complete"
@@ -2485,6 +2514,7 @@ export const Constants = {
         "rolled_back",
         "superseded",
       ],
+      app_role: ["admin", "moderator", "user"],
       asset_class: ["stock", "etf", "crypto", "commodity", "fx"],
       portfolio_mode: ["backtest", "paper", "live_sim", "live_prod"],
       portfolio_status: ["active", "paused", "complete"],
