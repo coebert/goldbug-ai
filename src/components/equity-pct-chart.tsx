@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 import { getIntradayEquity } from "@/lib/equity-intraday.functions";
+import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
+
 import {
   CartesianGrid,
   Line,
@@ -100,6 +102,36 @@ export function EquityPctChart({
 
   const hourlyPoints = intradayQ.data?.points ?? [];
 
+  // Hourly recording only started when the feature shipped, so portfolios with
+  // months of daily history would open on an almost-empty Hourly view. The
+  // first time Hourly is opened with fewer points than daily snapshots, seed
+  // the missing hours from the daily series (one anchor per day). Runs at most
+  // once per mount and never overwrites genuinely recorded hours.
+  const backfillFn = useServerFn(backfillIntradayEquity);
+  const backfilled = useRef(false);
+  const [backfilling, setBackfilling] = useState(false);
+  useEffect(() => {
+    if (resolution !== "hourly" || !portfolioId) return;
+    if (backfilled.current || intradayQ.isLoading || !intradayQ.data) return;
+    if (hourlyPoints.length >= equity.length) return;
+    backfilled.current = true;
+    setBackfilling(true);
+    void backfillFn({ data: { portfolioId, days: 365 } })
+      .then(() => intradayQ.refetch())
+      .catch(() => undefined)
+      .finally(() => setBackfilling(false));
+  }, [
+    resolution,
+    portfolioId,
+    intradayQ.isLoading,
+    intradayQ.data,
+    hourlyPoints.length,
+    equity.length,
+    backfillFn,
+    intradayQ,
+  ]);
+
+
   const { data, domain, last } = useMemo(() => {
     const base = Number(startingCash);
     const source: Array<{ at: string; value: number }> =
@@ -175,10 +207,11 @@ export function EquityPctChart({
           {data.length < 2 ? (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
               {resolution === "hourly"
-                ? intradayQ.isLoading
+                ? intradayQ.isLoading || backfilling
                   ? "Loading hourly points…"
                   : "No hourly points recorded yet — they accumulate as runs complete."
                 : "Not enough history yet."}
+
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
