@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { TranslationBadge } from "@/components/translation-badge";
 import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
+import { relevanceBand, relevanceBandLabel, sortByRelevance } from "@/lib/news-relevance";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
 import { NEWS_TOPICS, classifyNewsTopic } from "@/lib/news-topics";
 
@@ -171,11 +172,13 @@ export function NewsReel() {
   const [sourceFilter, setSourceFilter] = useState<Set<string>>(new Set());
   const [topicFilter, setTopicFilter] = useState<Set<string>>(new Set());
   const [onlyCited, setOnlyCited] = useState(false);
-  const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
+  const [sortMode, setSortMode] = useState<"latest" | "reliability" | "relevance">("latest");
+  // Hide headlines the ranker judged unlikely to touch the user's book.
+  const [onlyRelevant, setOnlyRelevant] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount =
     assetFilter.size + riskFilter.size + sourceFilter.size + topicFilter.size +
-    (onlyCited ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
+    (onlyCited ? 1 : 0) + (onlyRelevant ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -236,6 +239,7 @@ export function NewsReel() {
   const items = useMemo(() => {
     const filtered = allItems.filter((it) => {
       if (onlyCited && it.decisions_count === 0) return false;
+      if (onlyRelevant && (it.relevance_score ?? 0) < 60) return false;
       if (assetFilter.size > 0) {
         if (!it.asset_classes.some((c) => assetFilter.has(c))) return false;
       }
@@ -250,6 +254,11 @@ export function NewsReel() {
       }
       return true;
     });
+    if (sortMode === "relevance") {
+      // Portfolio impact first (scored at ingestion against holdings, universe
+      // and risk level); newest wins inside an equal score.
+      return sortByRelevance(filtered);
+    }
     if (sortMode === "reliability") {
       // Composite trust score: credibility weighted 60%, recency 40%.
       const score = (it: (typeof filtered)[number]) => {
@@ -261,7 +270,7 @@ export function NewsReel() {
     }
     // Latest first: shared helper keeps this identical to the server ordering.
     return sortNewsLatestFirst(filtered);
-  }, [allItems, assetFilter, riskFilter, sourceFilter, topicFilter, topicById, onlyCited, sortMode, now]);
+  }, [allItems, assetFilter, riskFilter, sourceFilter, topicFilter, topicById, onlyCited, onlyRelevant, sortMode, now]);
 
 
   // Timestamp of the freshest headline currently in the reel — lets the user
@@ -292,6 +301,7 @@ export function NewsReel() {
     const strongNew = allItems.filter((it) => {
       if (prevSeen.has(it.id)) return false;
       if (onlyCited && it.decisions_count === 0) return false;
+      if (onlyRelevant && (it.relevance_score ?? 0) < 60) return false;
       if (assetFilter.size > 0 && !it.asset_classes.some((c) => assetFilter.has(c))) return false;
       if (riskFilter.size > 0 && !it.risk_levels.some((r) => riskFilter.has(r))) return false;
       const s = it.avg_sentiment;
@@ -457,7 +467,11 @@ export function NewsReel() {
                   ? `Newest headline ${formatUkTime(newestHeadlineAt)} ${ukZoneAbbr(newestHeadlineAt)}`
                   : "No headlines yet"}
                 {" · "}
-                {sortMode === "latest" ? "newest first" : "most reliable first"}
+                {sortMode === "latest"
+                  ? "newest first"
+                  : sortMode === "relevance"
+                    ? "most relevant to your book first"
+                    : "most reliable first"}
                 {refreshMs === 0 ? " · auto-refresh off" : ""}
               </div>
             </div>
@@ -600,11 +614,12 @@ export function NewsReel() {
               <span className="uppercase tracking-wide">Sort:</span>
               <select
                 value={sortMode}
-                onChange={(e) => setSortMode(e.target.value as "latest" | "reliability")}
+                onChange={(e) => setSortMode(e.target.value as "latest" | "reliability" | "relevance")}
                 className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                title="Sort headlines by newest first, or by a composite of source credibility (60%) and recency (40%)."
+                title="Sort by newest first, by portfolio relevance (AI-scored against your holdings, universe and risk level), or by a composite of source credibility (60%) and recency (40%)."
               >
                 <option value="latest">Latest</option>
+                <option value="relevance">Most relevant</option>
                 <option value="reliability">Most reliable</option>
               </select>
             </label>
