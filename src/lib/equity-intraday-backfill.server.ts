@@ -1,12 +1,20 @@
 // Server-side driver for hourly equity backfill.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveIntradayAnchors, type IntradayRow } from "./equity-intraday-backfill";
+import {
+  deriveIntradayFromPrices,
+  reconstructQuantitiesByDay,
+  type PriceObs,
+  type TradeLite,
+} from "./equity-intraday-price-shape";
 import { portfolioInceptionDate } from "./portfolio-inception";
 
 export type IntradayBackfillResult = {
   portfolioId: string;
   snapshots: number;
   rowsWritten: number;
+  /** Of `rowsWritten`, how many came from real intraday prices (vs one-a-day anchors). */
+  priceShapedRows?: number;
   fromBucket: string | null;
   toBucket: string | null;
   skipped?: string;
