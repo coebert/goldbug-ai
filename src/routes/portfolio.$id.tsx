@@ -139,6 +139,7 @@ import {
   TooltipTrigger as UITooltipTrigger,
 } from "@/components/ui/tooltip";
 import { RegimePanel } from "@/components/regime-panel";
+import { FearIndexCard } from "@/components/fear-index-card";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
 import { SignalDecayCard } from "@/components/signal-decay-card";
