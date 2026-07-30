@@ -9,6 +9,8 @@ import { runWithBreaker } from "@/lib/_server/provider-circuit";
 import { GDELT_SOURCES } from "./news-sources";
 import { fetchRssForDate } from "./news-rss.server";
 import { buildSeenKeySet, filterUnseen } from "./news-dedupe";
+import { detectLanguage, needsTranslation } from "./language-detect";
+
 
 
 
@@ -99,15 +101,28 @@ const TranslateSchema = z.object({
 });
 
 
-// Fast heuristic: skip translation when a headline is plainly ASCII/Latin
-// and does not obviously contain non-English words. We keep this permissive
-// (any non-ASCII char routes through the LLM) so accented Latin scripts and
-// mixed-script headlines still get language-detected.
+// Language gate for the translation pipeline. Previously this was a bare
+// non-ASCII test, which silently passed over every Latin-script non-English
+// headline ("Governo aprova novo imposto"). It now delegates to the shared
+// deterministic detector, which combines script detection, per-language
+// function-word markers and diacritic evidence, with English function-word
+// density as counter-evidence. The LLM still has the final say on the
+// language name and the translation — this only decides whether to ask.
 export function looksNonEnglish(s: string): boolean {
-  // Any char outside basic ASCII printable + common punctuation triggers
-  // translation. Cheap, safe over-approximation.
-  return /[^\x00-\x7F]/.test(s);
+  return needsTranslation(s);
 }
+
+/** Re-exported so read paths can label an item consistently without an LLM. */
+export { detectLanguage };
+
+
+/** Deterministic display name for a headline's language, or null if unknown. */
+function detectLanguageName(s: string): string | null {
+  const d = detectLanguage(s);
+  return d.isEnglish ? null : d.name;
+}
+
+
 
 // -------- Translation caching --------
 //
@@ -403,16 +418,21 @@ export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]>
     if (!t) return it;
     const isEnglish = !t.lang || /^en(glish)?$/i.test(t.lang);
     if (isEnglish || !t.translation) return it;
+    // Label consistency: if the model translated but did not name the
+    // language, fall back to the deterministic detector so the same headline
+    // is always presented with the same "Translated from X" label.
+    const detected = detectLanguageName(it.headline);
     return {
       ...it,
       headline: t.translation,
       original_headline: it.headline,
-      original_language: t.lang,
+      original_language: t.lang ?? detected,
       translation_confidence: t.confidence,
     };
 
   });
 }
+
 
 // Repair pass: translate rows already cached with a null original_language
 // but a non-ASCII headline. Prior ingests (before translation shipped, or
@@ -453,7 +473,7 @@ export function backfillTranslations(
           .update({
             headline: t.translation,
             original_headline: originalHeadline,
-            original_language: t.lang,
+            original_language: t.lang ?? detectLanguageName(originalHeadline),
             translation_confidence: t.confidence,
           })
           .eq("news_date", dateISO)

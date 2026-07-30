@@ -13,7 +13,7 @@ import {
 } from "./news-reel.server";
 import type { NewsRefreshResult } from "./news-refresh.server";
 import { sortNewsLatestFirst } from "./news-reel-sort";
-import { dedupeNewsItems } from "./news-dedupe";
+import { dedupeNewsItems, normalizeHeadlineKey } from "./news-dedupe";
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -117,9 +117,10 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
 
       for (let i = 0; i < usedNews.length; i++) {
         const n = usedNews[i];
-        const head = (n.headline ?? "").trim();
+        const head = normalizeHeadlineKey(n.headline);
         if (!head) continue;
         const bucket = infl.get(head) ?? {
+
           sum: 0, n: 0, rows: [],
           assetClasses: new Set<string>(), riskLevels: new Set<string>(), symbols: new Set<string>(),
         };
@@ -148,9 +149,18 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     }
 
     // 4. Assemble reel items with a plain-English note per headline.
+    //    Citations are matched on the NORMALISED key of both the (possibly
+    //    translated) headline and the original-language headline, so a story
+    //    the AI cited before a translation backfill — or cited in its source
+    //    language — still shows its decision links after the row flips to
+    //    English.
     const items: NewsReelItem[] = news.map((r) => {
-      const bucket = infl.get(r.headline.trim());
+      const original = (r as { original_headline?: string | null }).original_headline ?? null;
+      const bucket =
+        infl.get(normalizeHeadlineKey(r.headline)) ??
+        (original ? infl.get(normalizeHeadlineKey(original)) : undefined);
       const rows = bucket?.rows ?? [];
+
       const avg = bucket && bucket.n > 0 ? bucket.sum / bucket.n : null;
       let note: string;
       if (rows.length === 0) {

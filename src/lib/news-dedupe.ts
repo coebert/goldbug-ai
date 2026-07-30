@@ -21,6 +21,10 @@ export function canonicalUrlKey(url: string | null | undefined): string {
  * Normalised headline key: lowercase, accent-stripped, punctuation-collapsed.
  * Catches "Fed holds rates steady" vs "Fed holds rates steady." vs
  * "FED HOLDS RATES STEADY" — and common wire prefixes like "UPDATE 2-".
+ *
+ * Non-Latin scripts are preserved (letters/digits of ANY script survive), so
+ * Chinese/Arabic/Cyrillic originals still produce a usable key instead of
+ * collapsing to the empty string and slipping past headline-level dedupe.
  */
 export function normalizeHeadlineKey(headline: string | null | undefined): string {
   if (!headline) return "";
@@ -29,7 +33,7 @@ export function normalizeHeadlineKey(headline: string | null | undefined): strin
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/^\s*(update|exclusive|breaking|analysis|refile|corrected|wrapup|factbox)\s*\d*\s*[-:–—]\s*/i, "")
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
@@ -39,7 +43,13 @@ export type DedupableNewsItem = {
   original_headline?: string | null;
 };
 
-/** Every key a row should occupy, so later duplicates are recognised. */
+/**
+ * Every key a row should occupy, so later duplicates are recognised.
+ *
+ * Language-aware: a translated row occupies BOTH its English key and the key
+ * of its original-language headline, so the same story arriving later in its
+ * source language (or before/after a translation backfill) still collapses.
+ */
 export function dedupeKeysFor(item: DedupableNewsItem): string[] {
   const keys: string[] = [];
   const u = canonicalUrlKey(item.url);
@@ -50,6 +60,7 @@ export function dedupeKeysFor(item: DedupableNewsItem): string[] {
   if (o && o !== h) keys.push(`h:${o}`);
   return keys;
 }
+
 
 /**
  * Keep the FIRST occurrence of each story. Callers that want "newest wins"
