@@ -72,7 +72,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data: portfolios, error } = await context.supabase
       .from("portfolios")
-      .select("id,name,currency,starting_cash,current_cash,mode,created_at")
+      .select("id,name,currency,starting_cash,current_cash,mode,created_at,live_activated_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const list = portfolios ?? [];
