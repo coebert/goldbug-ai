@@ -28,7 +28,7 @@ export type FearAlertInput = {
   }>;
   /** Previous run's score, so we only alert on meaningful moves. */
   previousScore?: number | null;
-  thresholds?: Partial<typeof FEAR_ALERT_THRESHOLDS>;
+  thresholds?: Partial<Record<keyof typeof FEAR_ALERT_THRESHOLDS, number>>;
 };
 
 export type FearAlertResult = {
