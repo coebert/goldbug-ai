@@ -39,6 +39,7 @@ import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 import { Route as ApiPublicHooksCreditBudgetCheckRouteImport } from './routes/api/public/hooks/credit-budget-check'
 import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
+import { Route as ApiPublicHooksBackfillIntradayEquityRouteImport } from './routes/api/public/hooks/backfill-intraday-equity'
 import { Route as ApiPublicHooksBackfillDailyEquityChangesRouteImport } from './routes/api/public/hooks/backfill-daily-equity-changes'
 import { Route as ApiPublicHooksAiGatewayHealthRouteImport } from './routes/api/public/hooks/ai-gateway-health'
 
@@ -201,6 +202,12 @@ const ApiPublicHooksBatchRetrainRoute =
     path: '/api/public/hooks/batch-retrain',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBackfillIntradayEquityRoute =
+  ApiPublicHooksBackfillIntradayEquityRouteImport.update({
+    id: '/api/public/hooks/backfill-intraday-equity',
+    path: '/api/public/hooks/backfill-intraday-equity',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksBackfillDailyEquityChangesRoute =
   ApiPublicHooksBackfillDailyEquityChangesRouteImport.update({
     id: '/api/public/hooks/backfill-daily-equity-changes',
@@ -236,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
+  '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/credit-budget-check': typeof ApiPublicHooksCreditBudgetCheckRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -270,6 +278,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
+  '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/credit-budget-check': typeof ApiPublicHooksCreditBudgetCheckRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -305,6 +314,7 @@ export interface FileRoutesById {
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
+  '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
   '/api/public/hooks/credit-budget-check': typeof ApiPublicHooksCreditBudgetCheckRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -341,6 +351,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/report'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
+    | '/api/public/hooks/backfill-intraday-equity'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/credit-budget-check'
     | '/api/public/hooks/daily-run'
@@ -375,6 +386,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/report'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
+    | '/api/public/hooks/backfill-intraday-equity'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/credit-budget-check'
     | '/api/public/hooks/daily-run'
@@ -409,6 +421,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/report'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
+    | '/api/public/hooks/backfill-intraday-equity'
     | '/api/public/hooks/batch-retrain'
     | '/api/public/hooks/credit-budget-check'
     | '/api/public/hooks/daily-run'
@@ -440,6 +453,7 @@ export interface RootRouteChildren {
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
   ApiPublicHooksAiGatewayHealthRoute: typeof ApiPublicHooksAiGatewayHealthRoute
   ApiPublicHooksBackfillDailyEquityChangesRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRoute
+  ApiPublicHooksBackfillIntradayEquityRoute: typeof ApiPublicHooksBackfillIntradayEquityRoute
   ApiPublicHooksBatchRetrainRoute: typeof ApiPublicHooksBatchRetrainRoute
   ApiPublicHooksCreditBudgetCheckRoute: typeof ApiPublicHooksCreditBudgetCheckRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
@@ -665,6 +679,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksBatchRetrainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/backfill-intraday-equity': {
+      id: '/api/public/hooks/backfill-intraday-equity'
+      path: '/api/public/hooks/backfill-intraday-equity'
+      fullPath: '/api/public/hooks/backfill-intraday-equity'
+      preLoaderRoute: typeof ApiPublicHooksBackfillIntradayEquityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/backfill-daily-equity-changes': {
       id: '/api/public/hooks/backfill-daily-equity-changes'
       path: '/api/public/hooks/backfill-daily-equity-changes'
@@ -719,6 +740,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksAiGatewayHealthRoute: ApiPublicHooksAiGatewayHealthRoute,
   ApiPublicHooksBackfillDailyEquityChangesRoute:
     ApiPublicHooksBackfillDailyEquityChangesRoute,
+  ApiPublicHooksBackfillIntradayEquityRoute:
+    ApiPublicHooksBackfillIntradayEquityRoute,
   ApiPublicHooksBatchRetrainRoute: ApiPublicHooksBatchRetrainRoute,
   ApiPublicHooksCreditBudgetCheckRoute: ApiPublicHooksCreditBudgetCheckRoute,
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
