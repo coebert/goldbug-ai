@@ -102,8 +102,8 @@ export function TodayHero({
 
       <div className="grid gap-2 border-t border-border/60 px-4 py-3 sm:grid-cols-2 sm:gap-3 sm:px-6 sm:py-4">
         <ModeSummaryTile
-          label="Simulated equity"
-          sublabel="SIM · paper + live-sim"
+          label="Practice money"
+          sublabel="Pretend cash, real prices"
           tone="sim"
           money={summary.sim.now}
           pnl={summary.sim.pnl}
@@ -111,8 +111,8 @@ export function TodayHero({
           count={summary.sim.count}
         />
         <ModeSummaryTile
-          label="Real-money equity"
-          sublabel="REAL · live Saxo"
+          label="Real money"
+          sublabel="Held at your broker"
           tone="real"
           money={summary.real.now}
           pnl={summary.real.pnl}
