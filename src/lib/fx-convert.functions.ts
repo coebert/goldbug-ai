@@ -95,6 +95,7 @@ export const convertPortfolioCash = createServerFn({ method: "POST" })
         userId,
         portfolioId: pRow.id,
         envOverride: pRow.mode === "live_prod" ? "live" : "sim",
+        accountKey: (pRow as { broker_account_id?: string | null }).broker_account_id ?? undefined,
       });
       if (typeof adapter.placeFxSpot !== "function") {
         return {
