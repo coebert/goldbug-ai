@@ -545,6 +545,18 @@ export function NewsReel() {
           >
             Cited only
           </button>
+          <button
+            type="button"
+            onClick={() => setOnlyRelevant((v) => !v)}
+            className={`rounded-full border px-2 py-0.5 transition-colors ${
+              onlyRelevant
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            title="Only show headlines scored 60+ for likely impact on your holdings, universe and risk level"
+          >
+            High relevance only
+          </button>
           {topicOptions.length > 0 && (
             <div className="flex w-full flex-wrap items-center gap-2">
               <span className="text-muted-foreground uppercase tracking-wide">Topic:</span>
@@ -593,7 +605,7 @@ export function NewsReel() {
               </div>
             </div>
           )}
-          {(assetFilter.size > 0 || riskFilter.size > 0 || sourceFilter.size > 0 || topicFilter.size > 0 || onlyCited) && (
+          {(assetFilter.size > 0 || riskFilter.size > 0 || sourceFilter.size > 0 || topicFilter.size > 0 || onlyCited || onlyRelevant) && (
             <button
               type="button"
               onClick={() => {
@@ -602,6 +614,7 @@ export function NewsReel() {
                 setSourceFilter(new Set());
                 setTopicFilter(new Set());
                 setOnlyCited(false);
+                setOnlyRelevant(false);
               }}
               className="ml-1 text-muted-foreground underline hover:text-foreground"
             >
@@ -707,6 +720,20 @@ export function NewsReel() {
                             <Badge variant="outline" className={`border-transparent ${tone.cls}`}>
                               {tone.label}
                             </Badge>
+                            {item.relevance_score != null && (
+                              <Badge
+                                variant="outline"
+                                className={`border-transparent ${relevanceCls(item.relevance_score)}`}
+                                title={
+                                  item.relevance_reason
+                                    ? `${relevanceBandLabel(item.relevance_score)} (${Math.round(item.relevance_score)}/100) — ${item.relevance_reason}`
+                                    : `${relevanceBandLabel(item.relevance_score)} (${Math.round(item.relevance_score)}/100)`
+                                }
+                              >
+                                <Target className="mr-1 h-2.5 w-2.5" />
+                                {Math.round(item.relevance_score)}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <p className="text-sm font-medium leading-snug text-foreground">
