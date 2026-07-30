@@ -6,16 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import { AXIS_TICK } from "@/lib/chart-palette";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+import { AXIS_TICK, LEGEND_STYLE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface Props {
   portfolioId: string;
@@ -81,15 +73,13 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Yahoo / Frankfurter success rate over the last {data?.windowHours ?? 24}h.
-          Identity fallback (rate 1.0000) means both providers failed and
-          cross-currency buys are being blocked.
+          Yahoo / Frankfurter success rate over the last {data?.windowHours ?? 24}h. Identity
+          fallback (rate 1.0000) means both providers failed and cross-currency buys are being
+          blocked.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {query.isLoading && (
-          <div className="h-20 rounded-lg border bg-muted/30" aria-hidden />
-        )}
+        {query.isLoading && <div className="h-20 rounded-lg border bg-muted/30" aria-hidden />}
         {query.error && (
           <p className="text-sm text-destructive">
             Failed to load: {String((query.error as Error).message ?? query.error)}
@@ -105,17 +95,12 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
             role="alert"
             className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
           >
-            <div className="font-semibold">
-              Cross-currency buy circuit: OPEN
-            </div>
+            <div className="font-semibold">Cross-currency buy circuit: OPEN</div>
             <p className="mt-1 text-xs">
-              New cross-currency buys are paused. Auto-resume when a live FX
-              provider (Yahoo / Frankfurter) capture arrives.
+              New cross-currency buys are paused. Auto-resume when a live FX provider (Yahoo /
+              Frankfurter) capture arrives.
               {data.circuit.lastFallbackAt && (
-                <>
-                  {" "}
-                  Last fallback: {formatUkTime(data.circuit.lastFallbackAt)}.
-                </>
+                <> Last fallback: {formatUkTime(data.circuit.lastFallbackAt)}.</>
               )}
               {data.circuit.lastOkAt && (
                 <> Last live capture: {formatUkTime(data.circuit.lastOkAt)}.</>
@@ -125,8 +110,8 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
         )}
         {data && !data.circuit?.open && data.circuit?.lastOkAt && (
           <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-2 text-xs text-emerald-700 dark:text-emerald-400">
-            Cross-currency buy circuit: CLOSED (allowing buys). Last live
-            capture {formatUkTime(data.circuit.lastOkAt)}.
+            Cross-currency buy circuit: CLOSED (allowing buys). Last live capture{" "}
+            {formatUkTime(data.circuit.lastOkAt)}.
           </div>
         )}
         {data && <SkipCounters skips={data.skipCounters} />}
@@ -167,17 +152,13 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
                         <Badge variant="outline" className="ml-1 font-mono text-[10px]">
                           {p.lastSource}
                         </Badge>
-                        {p.lastAt && (
-                          <span className="ml-2">{formatUkTime(p.lastAt)}</span>
-                        )}
+                        {p.lastAt && <span className="ml-2">{formatUkTime(p.lastAt)}</span>}
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
                       <ProviderChip label="frankfurter" n={p.counts.frankfurter} good />
                       <ProviderChip label="er-api" n={p.counts["er-api"]} good />
-                      {p.counts.yahoo > 0 && (
-                        <ProviderChip label="yahoo" n={p.counts.yahoo} good />
-                      )}
+                      {p.counts.yahoo > 0 && <ProviderChip label="yahoo" n={p.counts.yahoo} good />}
                       <ProviderChip label="cache" n={p.counts.cache} />
                       {p.counts["cache-stale"] > 0 && (
                         <ProviderChip label="cache-stale" n={p.counts["cache-stale"]} warn />
@@ -186,9 +167,7 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
                         <ProviderChip label="identity fallback" n={p.counts.fallback} bad />
                       )}
                     </div>
-                    {pt && (
-                      <PairTimelineChart pair={p.pair} buckets={pt.buckets} />
-                    )}
+                    {pt && <PairTimelineChart pair={p.pair} buckets={pt.buckets} />}
                     {p.lastError && (
                       <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
                         {p.lastError}
@@ -206,8 +185,7 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
 }
 
 function StatusPill({ status }: { status: "ok" | "degraded" | "critical" }) {
-  if (status === "critical")
-    return <Badge variant="destructive">critical</Badge>;
+  if (status === "critical") return <Badge variant="destructive">critical</Badge>;
   if (status === "degraded")
     return (
       <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
@@ -215,7 +193,10 @@ function StatusPill({ status }: { status: "ok" | "degraded" | "critical" }) {
       </Badge>
     );
   return (
-    <Badge variant="outline" className="border-emerald-500/50 text-emerald-600 dark:text-emerald-400">
+    <Badge
+      variant="outline"
+      className="border-emerald-500/50 text-emerald-600 dark:text-emerald-400"
+    >
       healthy
     </Badge>
   );
@@ -290,10 +271,7 @@ function AvailabilityStrip({ availability }: { availability: Availability }) {
     <div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {items.map((it) => (
-          <div
-            key={it.label}
-            className="rounded-lg border bg-card p-2 text-center"
-          >
+          <div key={it.label} className="rounded-lg border bg-card p-2 text-center">
             <div className={`text-lg font-semibold tabular-nums ${it.cls}`}>
               {it.value.toFixed(1)}%
             </div>
@@ -307,22 +285,10 @@ function AvailabilityStrip({ availability }: { availability: Availability }) {
         className="mt-2 flex h-2 w-full overflow-hidden rounded-full border bg-muted"
         aria-label="FX source share"
       >
-        <div
-          className="bg-emerald-500"
-          style={{ width: `${availability.liveProviderPct}%` }}
-        />
-        <div
-          className="bg-muted-foreground/40"
-          style={{ width: `${availability.cachePct}%` }}
-        />
-        <div
-          className="bg-amber-500"
-          style={{ width: `${availability.stalePct}%` }}
-        />
-        <div
-          className="bg-destructive"
-          style={{ width: `${availability.fallbackPct}%` }}
-        />
+        <div className="bg-emerald-500" style={{ width: `${availability.liveProviderPct}%` }} />
+        <div className="bg-muted-foreground/40" style={{ width: `${availability.cachePct}%` }} />
+        <div className="bg-amber-500" style={{ width: `${availability.stalePct}%` }} />
+        <div className="bg-destructive" style={{ width: `${availability.fallbackPct}%` }} />
       </div>
       <div className="mt-1 text-[10px] text-muted-foreground">
         {availability.total} FX captures analysed
@@ -352,26 +318,20 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
   if (!hasAny) return null;
   return (
     <div className="rounded-lg border p-2">
-      <div className="mb-1 px-1 text-xs font-medium">
-        Provider availability by hour
-      </div>
+      <div className="mb-1 px-1 text-xs font-medium">Provider availability by hour</div>
       <div className="h-32 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-            <XAxis
-              dataKey="label"
-              tick={AXIS_TICK}
-              interval="preserveStartEnd"
-            />
+            <XAxis dataKey="label" tick={AXIS_TICK} interval="preserveStartEnd" />
             <YAxis width={64} tick={AXIS_TICK} allowDecimals={false} />
             <Tooltip
-              contentStyle={{ fontSize: 12 }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
               labelFormatter={(_, payload) => {
                 const iso = payload?.[0]?.payload?.hour as string | undefined;
                 return iso ? formatUkTime(iso) : "";
               }}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} iconSize={8} />
+            <Legend wrapperStyle={LEGEND_STYLE} iconSize={8} />
             <Bar dataKey="ok" name="Live" stackId="s" fill="var(--chart-2)" />
             <Bar dataKey="cache" name="Cache" stackId="s" fill="var(--muted-foreground)" />
             <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
@@ -383,13 +343,7 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
   );
 }
 
-function PairTimelineChart({
-  pair,
-  buckets,
-}: {
-  pair: string;
-  buckets: TimelineBucket[];
-}) {
+function PairTimelineChart({ pair, buckets }: { pair: string; buckets: TimelineBucket[] }) {
   const data = buckets.map((b) => ({
     ...b,
     label: new Date(b.hour).toLocaleTimeString("en-GB", {
@@ -415,14 +369,10 @@ function PairTimelineChart({
       <div className="h-20 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 2, right: 6, left: -24, bottom: 0 }}>
-            <XAxis
-              dataKey="label"
-              tick={AXIS_TICK}
-              interval="preserveStartEnd"
-            />
+            <XAxis dataKey="label" tick={AXIS_TICK} interval="preserveStartEnd" />
             <YAxis tick={AXIS_TICK} allowDecimals={false} width={64} />
             <Tooltip
-              contentStyle={{ fontSize: 12 }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
               labelFormatter={(_, payload) => {
                 const iso = payload?.[0]?.payload?.hour as string | undefined;
                 return iso ? formatUkTime(iso) : "";
@@ -464,9 +414,7 @@ function SkipCounters({ skips }: { skips: SkipCountersData }) {
     <div className="rounded-lg border p-3">
       <div className="mb-2 text-xs font-medium">
         Cross-currency buy skips
-        <span className="ml-1 text-muted-foreground">
-          (this window)
-        </span>
+        <span className="ml-1 text-muted-foreground">(this window)</span>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <SkipTile
@@ -501,15 +449,11 @@ function SkipCounters({ skips }: { skips: SkipCountersData }) {
               >
                 {e.method === "PRE_PLACE_FX_BLOCK" ? "fxBroken" : "circuit"}
               </Badge>
-              <span className="font-mono text-muted-foreground">
-                {e.pair ?? "—"}
-              </span>
+              <span className="font-mono text-muted-foreground">{e.pair ?? "—"}</span>
               <span className="text-muted-foreground">
                 {e.orderCount} order{e.orderCount === 1 ? "" : "s"}
               </span>
-              <span className="ml-auto text-muted-foreground">
-                {formatUkTime(e.at)}
-              </span>
+              <span className="ml-auto text-muted-foreground">{formatUkTime(e.at)}</span>
             </li>
           ))}
         </ul>
@@ -531,19 +475,11 @@ function SkipTile({
   lastAt: string | null;
   tone: "destructive" | "amber";
 }) {
-  const toneCls =
-    tone === "destructive"
-      ? "border-destructive/40"
-      : "border-amber-500/40";
-  const numCls =
-    tone === "destructive"
-      ? "text-destructive"
-      : "text-amber-600 dark:text-amber-400";
+  const toneCls = tone === "destructive" ? "border-destructive/40" : "border-amber-500/40";
+  const numCls = tone === "destructive" ? "text-destructive" : "text-amber-600 dark:text-amber-400";
   return (
     <div className={`rounded-md border p-2 ${toneCls}`}>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-lg font-semibold tabular-nums ${numCls}`}>
         {events}
         <span className="ml-1 text-xs font-normal text-muted-foreground">

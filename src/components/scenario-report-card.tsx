@@ -1,20 +1,31 @@
 import { useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card, CardContent, CardHeader, CardTitle,
-} from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
-  Tooltip, XAxis, YAxis,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 import {
-  buildScenarioReport, defaultScenarioSpecs,
-  type BuildScenarioReportInput, type ScenarioReport,
+  buildScenarioReport,
+  defaultScenarioSpecs,
+  type BuildScenarioReportInput,
+  type ScenarioReport,
 } from "@/lib/scenario-report";
 import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_TICK, LEGEND_STYLE } from "@/lib/chart-palette";
 
 const PALETTE = [
   "hsl(217 91% 60%)",
@@ -33,9 +44,13 @@ function fmtNum(n: number | null | undefined, digits = 2): string {
   return n.toFixed(digits);
 }
 function fmtMoney(n: number): string {
-  return Number.isFinite(n) ? n.toLocaleString(undefined, {
-    style: "currency", currency: "USD", maximumFractionDigits: 2,
-  }) : "—";
+  return Number.isFinite(n)
+    ? n.toLocaleString(undefined, {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2,
+      })
+    : "—";
 }
 
 /**
@@ -49,18 +64,12 @@ function fmtMoney(n: number): string {
  * describe a dated decision stream — the admin route wires it up to a
  * demo stream for now.
  */
-export function ScenarioReportCard(props: {
-  title?: string;
-  input: BuildScenarioReportInput;
-}) {
-  const [visible, setVisible] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(props.input.scenarios.map((s) => [s.id, true])),
+export function ScenarioReportCard(props: { title?: string; input: BuildScenarioReportInput }) {
+  const [visible, setVisible] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(props.input.scenarios.map((s) => [s.id, true])),
   );
 
-  const reports = useMemo(
-    () => buildScenarioReport(props.input),
-    [props.input],
-  );
+  const reports = useMemo(() => buildScenarioReport(props.input), [props.input]);
 
   const equityChartData = useMemo(
     () => alignByDate(reports, (r) => r.equityCurve.map((p) => [p.date, p.equity])),
@@ -84,15 +93,14 @@ export function ScenarioReportCard(props: {
         />
 
         <section>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            Equity curve
-          </h3>
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Equity curve</h3>
           <div className="h-72 w-full">
             <ResponsiveContainer>
               <LineChart data={equityChartData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                 <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
-                <YAxis width={64}
+                <YAxis
+                  width={64}
                   tick={AXIS_TICK}
                   tickFormatter={(v) => Number(v).toLocaleString()}
                 />
@@ -100,34 +108,36 @@ export function ScenarioReportCard(props: {
                   formatter={(v: number) => fmtMoney(v)}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
-                <Legend />
-                {reports.map((r, i) => visible[r.id] && (
-                  <Line
-                    key={r.id}
-                    type="monotone"
-                    dataKey={r.id}
-                    name={r.label}
-                    stroke={PALETTE[i % PALETTE.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    isAnimationActive={false}
-                  />
-                ))}
+                <Legend wrapperStyle={LEGEND_STYLE} />
+                {reports.map(
+                  (r, i) =>
+                    visible[r.id] && (
+                      <Line
+                        key={r.id}
+                        type="monotone"
+                        dataKey={r.id}
+                        name={r.label}
+                        stroke={PALETTE[i % PALETTE.length]}
+                        dot={false}
+                        strokeWidth={2}
+                        isAnimationActive={false}
+                      />
+                    ),
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
         </section>
 
         <section>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            Drawdown (%)
-          </h3>
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Drawdown (%)</h3>
           <div className="h-56 w-full">
             <ResponsiveContainer>
               <LineChart data={drawdownChartData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                 <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
-                <YAxis width={64}
+                <YAxis
+                  width={64}
                   tick={AXIS_TICK}
                   tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
                   domain={["auto", 0]}
@@ -136,19 +146,22 @@ export function ScenarioReportCard(props: {
                   formatter={(v: number) => `${v.toFixed(2)}%`}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
-                <Legend />
-                {reports.map((r, i) => visible[r.id] && (
-                  <Line
-                    key={r.id}
-                    type="monotone"
-                    dataKey={r.id}
-                    name={r.label}
-                    stroke={PALETTE[i % PALETTE.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    isAnimationActive={false}
-                  />
-                ))}
+                <Legend wrapperStyle={LEGEND_STYLE} />
+                {reports.map(
+                  (r, i) =>
+                    visible[r.id] && (
+                      <Line
+                        key={r.id}
+                        type="monotone"
+                        dataKey={r.id}
+                        name={r.label}
+                        stroke={PALETTE[i % PALETTE.length]}
+                        dot={false}
+                        strokeWidth={2}
+                        isAnimationActive={false}
+                      />
+                    ),
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -160,14 +173,8 @@ export function ScenarioReportCard(props: {
 
         <ExecutionCostHeatmaps reports={reports} visible={visible} />
 
-
-
-
-
         <section>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            Summary
-          </h3>
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Summary</h3>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -187,32 +194,23 @@ export function ScenarioReportCard(props: {
                 {reports.map((r) => (
                   <TableRow key={r.id} data-testid={`scenario-row-${r.id}`}>
                     <TableCell className="font-medium">{r.label}</TableCell>
-                    <TableCell className="text-right">
-                      {fmtMoney(r.summary.endEquity)}
-                    </TableCell>
-                    <TableCell className={`text-right ${
-                      r.summary.totalReturnPct >= 0
-                        ? "text-emerald-600" : "text-red-600"
-                    }`}>
+                    <TableCell className="text-right">{fmtMoney(r.summary.endEquity)}</TableCell>
+                    <TableCell
+                      className={`text-right ${
+                        r.summary.totalReturnPct >= 0 ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
                       {fmtPct(r.summary.totalReturnPct)}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {fmtPct(r.summary.cagrPct)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {fmtNum(r.summary.sharpe)}
-                    </TableCell>
+                    <TableCell className="text-right">{fmtPct(r.summary.cagrPct)}</TableCell>
+                    <TableCell className="text-right">{fmtNum(r.summary.sharpe)}</TableCell>
                     <TableCell className="text-right text-red-600">
                       {fmtPct(r.summary.maxDrawdownPct)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {r.summary.winRatePct == null
-                        ? "—"
-                        : `${r.summary.winRatePct.toFixed(1)}%`}
+                      {r.summary.winRatePct == null ? "—" : `${r.summary.winRatePct.toFixed(1)}%`}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {r.summary.trades}
-                    </TableCell>
+                    <TableCell className="text-right">{r.summary.trades}</TableCell>
                     <TableCell className="text-right">
                       {(r.summary.fillRatio * 100).toFixed(1)}%
                     </TableCell>
@@ -242,14 +240,9 @@ function ExecutionQualitySection(props: {
   visible: Record<string, boolean>;
 }) {
   const { reports, visible } = props;
-  const fillData = useMemo(
-    () => buildExecutionChartData(reports, (p) => p.fillRatio),
-    [reports],
-  );
+  const fillData = useMemo(() => buildExecutionChartData(reports, (p) => p.fillRatio), [reports]);
   const liqSlipData = useMemo(
-    () => buildExecutionChartData(
-      reports, (p) => p.liquidityAdjustedSlippageBps,
-    ),
+    () => buildExecutionChartData(reports, (p) => p.liquidityAdjustedSlippageBps),
     [reports],
   );
   const anyDecisions = fillData.length > 0;
@@ -258,19 +251,14 @@ function ExecutionQualitySection(props: {
   return (
     <>
       <section>
-        <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-          Fill ratio per decision
-        </h3>
+        <h3 className="mb-2 text-sm font-medium text-muted-foreground">Fill ratio per decision</h3>
         <div className="h-56 w-full">
           <ResponsiveContainer>
             <LineChart data={fillData}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis
-                dataKey="label"
-                tick={AXIS_TICK}
-                minTickGap={16}
-              />
-              <YAxis width={64}
+              <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={16} />
+              <YAxis
+                width={64}
                 tick={AXIS_TICK}
                 domain={[0, 1]}
                 tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
@@ -279,20 +267,23 @@ function ExecutionQualitySection(props: {
                 formatter={(v: number) => `${(v * 100).toFixed(1)}%`}
                 labelFormatter={(l) => `Decision: ${l}`}
               />
-              <Legend />
-              {reports.map((r, i) => visible[r.id] && (
-                <Line
-                  key={r.id}
-                  type="monotone"
-                  dataKey={r.id}
-                  name={r.label}
-                  stroke={PALETTE[i % PALETTE.length]}
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-              ))}
+              <Legend wrapperStyle={LEGEND_STYLE} />
+              {reports.map(
+                (r, i) =>
+                  visible[r.id] && (
+                    <Line
+                      key={r.id}
+                      type="monotone"
+                      dataKey={r.id}
+                      name={r.label}
+                      stroke={PALETTE[i % PALETTE.length]}
+                      strokeWidth={2}
+                      dot={{ r: 2 }}
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  ),
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -303,41 +294,37 @@ function ExecutionQualitySection(props: {
           Liquidity-adjusted slippage per decision (bps)
         </h3>
         <p className="mb-2 text-xs text-muted-foreground">
-          Adverse slippage in basis points, normalised by the fraction of
-          available liquidity consumed. Positive = costlier fills. Gaps
-          indicate an unconstrained book or unfilled order.
+          Adverse slippage in basis points, normalised by the fraction of available liquidity
+          consumed. Positive = costlier fills. Gaps indicate an unconstrained book or unfilled
+          order.
         </p>
         <div className="h-56 w-full">
           <ResponsiveContainer>
             <LineChart data={liqSlipData}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis
-                dataKey="label"
-                tick={AXIS_TICK}
-                minTickGap={16}
-              />
-              <YAxis width={64}
-                tick={AXIS_TICK}
-                tickFormatter={(v) => `${Number(v).toFixed(0)}`}
-              />
+              <XAxis dataKey="label" tick={AXIS_TICK} minTickGap={16} />
+              <YAxis width={64} tick={AXIS_TICK} tickFormatter={(v) => `${Number(v).toFixed(0)}`} />
               <Tooltip
                 formatter={(v: number) => `${v.toFixed(2)} bps`}
                 labelFormatter={(l) => `Decision: ${l}`}
               />
-              <Legend />
-              {reports.map((r, i) => visible[r.id] && (
-                <Line
-                  key={r.id}
-                  type="monotone"
-                  dataKey={r.id}
-                  name={r.label}
-                  stroke={PALETTE[i % PALETTE.length]}
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-              ))}
+              <Legend wrapperStyle={LEGEND_STYLE} />
+              {reports.map(
+                (r, i) =>
+                  visible[r.id] && (
+                    <Line
+                      key={r.id}
+                      type="monotone"
+                      dataKey={r.id}
+                      name={r.label}
+                      stroke={PALETTE[i % PALETTE.length]}
+                      strokeWidth={2}
+                      dot={{ r: 2 }}
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
+                  ),
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -362,7 +349,7 @@ function buildExecutionChartData(
   // Preserve decision order by walking the longest series; then union
   // in any decisionIds unique to shorter/differently-ordered series.
   const orderRef = reports.reduce(
-    (best, r) => r.executionSeries.length > best.length ? r.executionSeries : best,
+    (best, r) => (r.executionSeries.length > best.length ? r.executionSeries : best),
     reports[0].executionSeries,
   );
   const seen = new Set<string>();
@@ -401,7 +388,6 @@ function buildExecutionChartData(
   });
 }
 
-
 /**
  * Per-trade execution cost decomposition (spread, latency, market impact,
  * urgency) from the microstructure model. One expandable sub-section per
@@ -413,9 +399,7 @@ function CostBreakdownSection(props: {
   visible: Record<string, boolean>;
 }) {
   const shown = props.reports.filter((r) => props.visible[r.id]);
-  const anyBreakdown = shown.some((r) =>
-    r.executionSeries.some((p) => p.costBreakdownBps != null),
-  );
+  const anyBreakdown = shown.some((r) => r.executionSeries.some((p) => p.costBreakdownBps != null));
   if (!anyBreakdown) return null;
 
   return (
@@ -424,28 +408,20 @@ function CostBreakdownSection(props: {
         Per-trade cost breakdown (bps of mid, per side)
       </h3>
       <p className="mb-3 text-xs text-muted-foreground">
-        Attributes each filled decision's execution cost to half-spread,
-        fixed latency toll, size-driven market impact, and urgency. Bars
-        stack to the modelled total per-side cost. Weighted averages use
-        filled notional.
+        Attributes each filled decision's execution cost to half-spread, fixed latency toll,
+        size-driven market impact, and urgency. Bars stack to the modelled total per-side cost.
+        Weighted averages use filled notional.
       </p>
       <div className="space-y-6">
         {shown.map((r, i) => (
-          <CostBreakdownScenario
-            key={r.id}
-            report={r}
-            color={PALETTE[i % PALETTE.length]}
-          />
+          <CostBreakdownScenario key={r.id} report={r} color={PALETTE[i % PALETTE.length]} />
         ))}
       </div>
     </section>
   );
 }
 
-function CostBreakdownScenario(props: {
-  report: ScenarioReport;
-  color: string;
-}) {
+function CostBreakdownScenario(props: { report: ScenarioReport; color: string }) {
   const rows = props.report.executionSeries.filter(
     (p) => p.costBreakdownBps != null && p.filledNotional > 0,
   );
@@ -453,7 +429,7 @@ function CostBreakdownScenario(props: {
 
   // Notional-weighted average per component.
   const totalNotional = rows.reduce((a, p) => a + p.filledNotional, 0);
-  const wavg = (pick: (b: NonNullable<typeof rows[number]["costBreakdownBps"]>) => number) =>
+  const wavg = (pick: (b: NonNullable<(typeof rows)[number]["costBreakdownBps"]>) => number) =>
     totalNotional > 0
       ? rows.reduce((a, p) => a + pick(p.costBreakdownBps!) * p.filledNotional, 0) / totalNotional
       : 0;
@@ -483,15 +459,18 @@ function CostBreakdownScenario(props: {
           {props.report.label}
         </div>
         <div className="text-xs text-muted-foreground">
-          {rows.length} filled trade{rows.length === 1 ? "" : "s"} ·
-          weighted total {avg.totalBps.toFixed(1)} bps
+          {rows.length} filled trade{rows.length === 1 ? "" : "s"} · weighted total{" "}
+          {avg.totalBps.toFixed(1)} bps
         </div>
       </div>
       <div className="flex flex-wrap gap-3 border-b border-foreground/10 px-3 py-2 text-xs">
         <LegendSwatch color={SEG.spread} label={`Spread ${avg.halfSpreadBps.toFixed(1)}bps`} />
         <LegendSwatch color={SEG.latency} label={`Latency ${avg.latencyBps.toFixed(1)}bps`} />
         <LegendSwatch color={SEG.impact} label={`Impact ${avg.impactBps.toFixed(1)}bps`} />
-        <LegendSwatch color={SEG.urgency} label={`Urgency ${avg.urgencyBps >= 0 ? "+" : ""}${avg.urgencyBps.toFixed(1)}bps`} />
+        <LegendSwatch
+          color={SEG.urgency}
+          label={`Urgency ${avg.urgencyBps >= 0 ? "+" : ""}${avg.urgencyBps.toFixed(1)}bps`}
+        />
       </div>
       <div className="overflow-x-auto">
         <Table>
@@ -514,28 +493,40 @@ function CostBreakdownScenario(props: {
               return (
                 <TableRow key={p.decisionId}>
                   <TableCell className="font-medium">
-                    <div className="text-sm">{p.symbol} <span className="text-muted-foreground">{p.side}</span></div>
+                    <div className="text-sm">
+                      {p.symbol} <span className="text-muted-foreground">{p.side}</span>
+                    </div>
                     <div className="text-xs text-muted-foreground">{p.date}</div>
                   </TableCell>
                   <TableCell className="text-right">{b.halfSpreadBps.toFixed(1)}</TableCell>
                   <TableCell className="text-right">{b.latencyBps.toFixed(1)}</TableCell>
                   <TableCell className="text-right">{b.impactBps.toFixed(1)}</TableCell>
                   <TableCell className="text-right">
-                    {b.urgencyBps >= 0 ? "+" : ""}{b.urgencyBps.toFixed(1)}
+                    {b.urgencyBps >= 0 ? "+" : ""}
+                    {b.urgencyBps.toFixed(1)}
                   </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {b.totalBps.toFixed(1)}
-                  </TableCell>
+                  <TableCell className="text-right font-medium">{b.totalBps.toFixed(1)}</TableCell>
                   <TableCell>
                     <div
                       className="flex h-2 w-full overflow-hidden rounded-full bg-muted"
                       role="img"
                       aria-label={`Spread ${b.halfSpreadBps.toFixed(1)} bps, latency ${b.latencyBps.toFixed(1)} bps, impact ${b.impactBps.toFixed(1)} bps, urgency ${b.urgencyBps.toFixed(1)} bps, total ${b.totalBps.toFixed(1)} bps`}
                     >
-                      <span style={{ width: `${pctOf(b.halfSpreadBps)}%`, backgroundColor: SEG.spread }} />
-                      <span style={{ width: `${pctOf(b.latencyBps)}%`, backgroundColor: SEG.latency }} />
-                      <span style={{ width: `${pctOf(b.impactBps)}%`, backgroundColor: SEG.impact }} />
-                      <span style={{ width: `${pctOf(Math.max(0, b.urgencyBps))}%`, backgroundColor: SEG.urgency }} />
+                      <span
+                        style={{ width: `${pctOf(b.halfSpreadBps)}%`, backgroundColor: SEG.spread }}
+                      />
+                      <span
+                        style={{ width: `${pctOf(b.latencyBps)}%`, backgroundColor: SEG.latency }}
+                      />
+                      <span
+                        style={{ width: `${pctOf(b.impactBps)}%`, backgroundColor: SEG.impact }}
+                      />
+                      <span
+                        style={{
+                          width: `${pctOf(Math.max(0, b.urgencyBps))}%`,
+                          backgroundColor: SEG.urgency,
+                        }}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -551,15 +542,11 @@ function CostBreakdownScenario(props: {
 function LegendSwatch(props: { color: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-      <span
-        className="inline-block h-2 w-2 rounded-sm"
-        style={{ backgroundColor: props.color }}
-      />
+      <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: props.color }} />
       {props.label}
     </span>
   );
 }
-
 
 function ScenarioLegend(props: {
   reports: ScenarioReport[];
@@ -576,9 +563,7 @@ function ScenarioLegend(props: {
             type="button"
             onClick={() => props.onToggle(r.id)}
             className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition ${
-              active
-                ? "border-foreground/20 bg-muted"
-                : "border-foreground/10 opacity-40"
+              active ? "border-foreground/20 bg-muted" : "border-foreground/10 opacity-40"
             }`}
           >
             <span
@@ -605,8 +590,7 @@ function alignByDate(
   extract: (r: ScenarioReport) => Array<[string, number]>,
 ): Array<Record<string, string | number>> {
   const byScenario = reports.map((r) => ({ id: r.id, pts: extract(r) }));
-  const allDates = Array.from(new Set(byScenario.flatMap((s) => s.pts.map((p) => p[0]))))
-    .sort();
+  const allDates = Array.from(new Set(byScenario.flatMap((s) => s.pts.map((p) => p[0])))).sort();
   const cursors: Record<string, number> = {};
   const last: Record<string, number> = {};
   for (const s of byScenario) cursors[s.id] = 0;
@@ -678,20 +662,32 @@ export function buildDemoScenarioInput(opts?: {
       const qty = Math.floor(simCash / bar.price);
       if (qty > 0) {
         decisions.push({
-          id: `d-${i}-buy`, date: bar.date, symbol: "DEMO",
-          side: "BUY", quantity: qty, price: bar.price,
+          id: `d-${i}-buy`,
+          date: bar.date,
+          symbol: "DEMO",
+          side: "BUY",
+          quantity: qty,
+          price: bar.price,
           volumeHistory: bars.slice(Math.max(0, i - 20), i).map((b) => b.volume),
         });
-        holdingQty = qty; simCash -= qty * bar.price; inMarket = true;
+        holdingQty = qty;
+        simCash -= qty * bar.price;
+        inMarket = true;
       }
     } else if (inMarket && fast < slow) {
       if (holdingQty > 0) {
         decisions.push({
-          id: `d-${i}-sell`, date: bar.date, symbol: "DEMO",
-          side: "SELL", quantity: holdingQty, price: bar.price,
+          id: `d-${i}-sell`,
+          date: bar.date,
+          symbol: "DEMO",
+          side: "SELL",
+          quantity: holdingQty,
+          price: bar.price,
           volumeHistory: bars.slice(Math.max(0, i - 20), i).map((b) => b.volume),
         });
-        simCash += holdingQty * bar.price; holdingQty = 0; inMarket = false;
+        simCash += holdingQty * bar.price;
+        holdingQty = 0;
+        inMarket = false;
       }
     }
   }

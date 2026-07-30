@@ -132,7 +132,11 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
   };
 
   const totalIsNegative = breakdown.totalChange < 0;
-  const totalTone = totalIsNegative ? "text-destructive" : breakdown.totalChange > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground";
+  const totalTone = totalIsNegative
+    ? "text-destructive"
+    : breakdown.totalChange > 0
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-muted-foreground";
 
   return (
     <Card>
@@ -142,9 +146,9 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
             <PieChartIcon className="h-4 w-4" /> Equity change breakdown
           </CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            How the {formatPct(breakdown.totalPct)} total equity move splits between
-            external cash-flows and trading. Fees / dividends / interest are inferred
-            from small (&lt; {formatMoney(25, currency).replace("+", "")}) cash-flow events.
+            How the {formatPct(breakdown.totalPct)} total equity move splits between external
+            cash-flows and trading. Fees / dividends / interest are inferred from small (&lt;{" "}
+            {formatMoney(25, currency).replace("+", "")}) cash-flow events.
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -176,7 +180,11 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Toggle series">
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          role="group"
+          aria-label="Toggle series"
+        >
           {rows.map((b) => {
             const key = b.key as SeriesKey;
             const isHidden = hidden.has(key);
@@ -188,7 +196,13 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                 onClick={() => toggle(key)}
                 disabled={onlyOneLeft}
                 aria-pressed={!isHidden}
-                title={onlyOneLeft ? "At least one series must remain visible" : isHidden ? `Show ${b.label}` : `Hide ${b.label}`}
+                title={
+                  onlyOneLeft
+                    ? "At least one series must remain visible"
+                    : isHidden
+                      ? `Show ${b.label}`
+                      : `Hide ${b.label}`
+                }
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition ${
                   isHidden
                     ? "border-dashed border-border bg-transparent text-muted-foreground opacity-60 hover:opacity-100"
@@ -198,12 +212,15 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                 <span
                   aria-hidden
                   className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{ background: isHidden ? "transparent" : COLORS[key], borderWidth: isHidden ? 1 : 0, borderStyle: "solid", borderColor: COLORS[key] }}
+                  style={{
+                    background: isHidden ? "transparent" : COLORS[key],
+                    borderWidth: isHidden ? 1 : 0,
+                    borderStyle: "solid",
+                    borderColor: COLORS[key],
+                  }}
                 />
                 <span className="font-medium">{b.label}</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {formatPct(b.pctPoints)}
-                </span>
+                <span className="tabular-nums text-muted-foreground">{formatPct(b.pctPoints)}</span>
               </button>
             );
           })}
@@ -211,7 +228,10 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
         <p className="sr-only" aria-live="polite">
           Equity change over the selected {range.toUpperCase()} window: total{" "}
           {formatMoney(breakdown.totalChange, currency)} ({formatPct(breakdown.totalPct)}).{" "}
-          {rows.map((b) => `${b.label} ${formatMoney(b.amount, currency)} (${formatPct(b.pctPoints)})`).join("; ")}.
+          {rows
+            .map((b) => `${b.label} ${formatMoney(b.amount, currency)} (${formatPct(b.pctPoints)})`)
+            .join("; ")}
+          .
         </p>
 
         <div
@@ -219,7 +239,6 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
           role="img"
           aria-label={`Bar chart of equity change components for the ${range.toUpperCase()} window`}
         >
-
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
@@ -258,8 +277,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                     pct: number;
                   };
                   const totalPct = breakdown.totalPct;
-                  const shareOfMove =
-                    totalPct !== 0 ? (p.pct / totalPct) * 100 : 0;
+                  const shareOfMove = totalPct !== 0 ? (p.pct / totalPct) * 100 : 0;
                   const tone =
                     p.amount > 0
                       ? "text-emerald-600 dark:text-emerald-400"
@@ -284,9 +302,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                           {formatMoney(p.amount, currency)}
                         </span>
                         <span className="text-muted-foreground">Contribution</span>
-                        <span className={`text-right ${tone}`}>
-                          {formatPct(p.pct)} pts
-                        </span>
+                        <span className={`text-right ${tone}`}>{formatPct(p.pct)} pts</span>
                         <span className="text-muted-foreground">Share of move</span>
                         <span className="text-right">
                           {totalPct === 0 ? "—" : `${shareOfMove.toFixed(1)}%`}
@@ -341,9 +357,7 @@ export function EquityChangeBreakdownCard({ equity, deposits, currency }: Props)
                   <td className="px-3 py-2 text-right tabular-nums">
                     {formatMoney(b.amount, currency)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {formatPct(b.pctPoints)}
-                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{formatPct(b.pctPoints)}</td>
                 </tr>
               ))}
               <tr className="border-t bg-muted/20 font-medium">

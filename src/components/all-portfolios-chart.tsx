@@ -3,11 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAllPortfoliosEquity } from "@/lib/trading.functions";
 import { buildDepositAdjustedSeries } from "@/lib/deposit-adjusted-series";
-import {
-  SectionCard,
-  SectionCardBody,
-  SectionCardHeader,
-} from "@/components/ui/section-card";
+import { SectionCard, SectionCardBody, SectionCardHeader } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { ChartSkeleton } from "@/components/ui/card-skeleton";
@@ -41,7 +37,6 @@ function shortDate(s: string) {
   if (Number.isNaN(d.getTime())) return String(s);
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
 }
-
 
 const LINE_COLORS = ["#f472b6", "#a78bfa", "#facc15", "#4ade80", "#fb923c", "#60a5fa"];
 const SIM_COLOR = "#22d3ee";
@@ -85,9 +80,7 @@ export function AllPortfoliosChart() {
         <SectionCardBody>
           <ErrorState
             description={
-              q.error instanceof Error
-                ? q.error.message
-                : "The equity feed returned an error."
+              q.error instanceof Error ? q.error.message : "The equity feed returned an error."
             }
             onRetry={() => q.refetch()}
             retrying={q.isFetching}
@@ -179,21 +172,24 @@ function ModeChart({
   const [range, setRange] = useState<Range>("all");
   const isMobile = useIsMobile();
 
-
   const { series, totalNow, startingTotal, adjustedNow, netDeposits, yDomain } = useMemo(() => {
     const opt = RANGE_OPTS.find((r) => r.value === range)!;
     let s = allSeries.filter((row) => Number.isFinite(Number(row[totalKey])));
     if (opt.days && s.length > 0) {
       const cutoff = Date.now() - opt.days * 86_400_000;
       s = s.filter((r) => new Date(String(r.date)).getTime() >= cutoff);
-      if (s.length === 0) s = allSeries.filter((row) => Number.isFinite(Number(row[totalKey]))).slice(-1);
+      if (s.length === 0)
+        s = allSeries.filter((row) => Number.isFinite(Number(row[totalKey]))).slice(-1);
     }
     const start = s[0] ? Number(s[0][totalKey]) : 0;
     const last = s[s.length - 1] ? Number(s[s.length - 1][totalKey]) : 0;
     const totals = s.map((r) => Number(r[totalKey])).filter((n) => Number.isFinite(n));
     let lo = Math.min(...totals);
     let hi = Math.max(...totals);
-    if (!Number.isFinite(lo) || !Number.isFinite(hi)) { lo = 0; hi = 1; }
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+      lo = 0;
+      hi = 1;
+    }
     const pad = Math.max((hi - lo) * 0.1, hi * 0.005, 1);
 
     // Deposit-adjusted trailing % for this window. Only deposits dated
@@ -263,8 +259,12 @@ function ModeChart({
               <div className="text-lg font-semibold leading-tight tracking-tight tabular-nums sm:text-2xl">
                 {currency} {totalNow.toFixed(2)}
               </div>
-              <div className={`mt-0.5 text-[11px] leading-snug sm:text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}>
-                {pnl >= 0 ? "+" : ""}{currency} {pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%) over {RANGE_OPTS.find((r) => r.value === range)!.label}
+              <div
+                className={`mt-0.5 text-[11px] leading-snug sm:text-xs ${pnl >= 0 ? "text-primary" : "text-destructive"}`}
+              >
+                {pnl >= 0 ? "+" : ""}
+                {currency} {pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}
+                {pnlPct.toFixed(2)}%) over {RANGE_OPTS.find((r) => r.value === range)!.label}
                 {Math.abs(netDeposits) > 0.005 && (
                   <span
                     className="ml-1 text-muted-foreground"
@@ -277,7 +277,10 @@ function ModeChart({
             </div>
             <div className="h-[260px] w-full sm:h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={series} margin={{ top: 8, right: isMobile ? 6 : 12, bottom: 20, left: isMobile ? -8 : 8 }}>
+                <ComposedChart
+                  data={series}
+                  margin={{ top: 8, right: isMobile ? 6 : 12, bottom: 20, left: isMobile ? -8 : 8 }}
+                >
                   <defs>
                     <linearGradient id={`area-${totalKey}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={color} stopOpacity={0.35} />
@@ -298,7 +301,9 @@ function ModeChart({
                     tick={AXIS_TICK}
                     stroke={AXIS_COLOR}
                     strokeOpacity={0.6}
-                    tickFormatter={(v) => (isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v)))}
+                    tickFormatter={(v) =>
+                      isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v))
+                    }
                     domain={yDomain}
                     allowDataOverflow
                   />
@@ -313,13 +318,22 @@ function ModeChart({
                           <div className="mb-1 font-medium">{String(label)}</div>
                           <div className="mb-1 flex justify-between gap-3 tabular-nums">
                             <span className="text-muted-foreground">{badgeLabel} total</span>
-                            <span className="font-medium">{currency} {Number(row[totalKey]).toFixed(2)}</span>
+                            <span className="font-medium">
+                              {currency} {Number(row[totalKey]).toFixed(2)}
+                            </span>
                           </div>
                           {portfolios.map((p, i) => (
                             <div key={p.id} className="flex justify-between gap-3 tabular-nums">
-                              <span className="truncate" style={{ color: LINE_COLORS[i % LINE_COLORS.length] }}>{p.name}</span>
+                              <span
+                                className="truncate"
+                                style={{ color: LINE_COLORS[i % LINE_COLORS.length] }}
+                              >
+                                {p.name}
+                              </span>
                               <span className="shrink-0">
-                                {Number.isFinite(Number(row[p.id])) ? `${currency} ${Number(row[p.id]).toFixed(2)}` : "—"}
+                                {Number.isFinite(Number(row[p.id]))
+                                  ? `${currency} ${Number(row[p.id]).toFixed(2)}`
+                                  : "—"}
                               </span>
                             </div>
                           ))}
@@ -327,7 +341,11 @@ function ModeChart({
                       );
                     }}
                   />
-                  <Legend verticalAlign="top" height={24} wrapperStyle={{ fontSize: isMobile ? 10 : 12, color: AXIS_COLOR }} />
+                  <Legend
+                    verticalAlign="top"
+                    height={24}
+                    wrapperStyle={{ fontSize: isMobile ? 10 : 12, color: AXIS_COLOR }}
+                  />
 
                   <Area
                     type="monotone"

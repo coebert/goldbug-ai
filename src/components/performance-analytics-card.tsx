@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPerformanceAnalytics } from "@/lib/performance-analytics.functions";
 import type { AttributionSlice } from "@/lib/performance-analytics.server";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_TICK, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 import {
   ResponsiveContainer,
   LineChart,
@@ -59,7 +59,8 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
         <div>
           <CardTitle className="text-base">Performance analytics</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Equity, drawdown, and realised P&amp;L attribution across regime, sizing, exit and execution phases.
+            Equity, drawdown, and realised P&amp;L attribution across regime, sizing, exit and
+            execution phases.
           </p>
         </div>
         <div className="flex gap-1">
@@ -82,31 +83,55 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
         {data && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Stat label="Total return" value={data.totalReturnPct == null ? "—" : `${data.totalReturnPct.toFixed(2)}%`} tone={pctTone(data.totalReturnPct)} />
+              <Stat
+                label="Total return"
+                value={data.totalReturnPct == null ? "—" : `${data.totalReturnPct.toFixed(2)}%`}
+                tone={pctTone(data.totalReturnPct)}
+              />
               <Stat label="Max drawdown" value={`${data.maxDrawdownPct.toFixed(2)}%`} tone="neg" />
-              <Stat label="Realised P&L" value={fmtCcyPrecise.format(data.totalRealizedPnl)} tone={pctTone(data.totalRealizedPnl)} />
+              <Stat
+                label="Realised P&L"
+                value={fmtCcyPrecise.format(data.totalRealizedPnl)}
+                tone={pctTone(data.totalRealizedPnl)}
+              />
               <Stat label="Round-trips" value={String(data.roundTrips)} />
             </div>
 
             <ChartBlock title="Equity curve">
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={data.equityCurve} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <LineChart
+                  data={data.equityCurve}
+                  margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => fmtCcy.format(v)} width={70} />
+                  <YAxis
+                    tick={AXIS_TICK}
+                    tickFormatter={(v: number) => fmtCcy.format(v)}
+                    width={70}
+                  />
                   <Tooltip
                     formatter={(v: number) => fmtCcyPrecise.format(v)}
                     labelClassName="text-xs"
-                    contentStyle={{ fontSize: 12 }}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
                   />
-                  <Line type="monotone" dataKey="equity" stroke="var(--primary)" dot={false} strokeWidth={2} />
+                  <Line
+                    type="monotone"
+                    dataKey="equity"
+                    stroke="var(--primary)"
+                    dot={false}
+                    strokeWidth={2}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </ChartBlock>
 
             <ChartBlock title="Drawdown (peak-to-trough %)">
               <ResponsiveContainer width="100%" height={180}>
-                <AreaChart data={data.drawdownCurve} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <AreaChart
+                  data={data.drawdownCurve}
+                  margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--destructive)" stopOpacity={0.4} />
@@ -115,23 +140,52 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                  <YAxis tick={AXIS_TICK} tickFormatter={(v: number) => `${v.toFixed(0)}%`} width={64} />
+                  <YAxis
+                    tick={AXIS_TICK}
+                    tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                    width={64}
+                  />
                   <Tooltip
                     formatter={(v: number) => `${v.toFixed(2)}%`}
                     labelClassName="text-xs"
-                    contentStyle={{ fontSize: 12 }}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
                   />
                   <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="2 2" />
-                  <Area type="monotone" dataKey="drawdownPct" stroke="var(--destructive)" fill="url(#ddFill)" />
+                  <Area
+                    type="monotone"
+                    dataKey="drawdownPct"
+                    stroke="var(--destructive)"
+                    fill="url(#ddFill)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </ChartBlock>
 
             <div className="grid gap-6 lg:grid-cols-2">
-              <AttributionBlock title="Regime attribution" subtitle="Realised P&L grouped by market regime at entry." slices={data.regimeAttribution} fmt={fmtCcyPrecise} />
-              <AttributionBlock title="Sizing attribution" subtitle="Baseline vs conviction bonus vs risk-parity sizing." slices={data.sizingAttribution} fmt={fmtCcyPrecise} />
-              <AttributionBlock title="Exit attribution" subtitle="Which exit trigger closed each round-trip." slices={data.exitAttribution} fmt={fmtCcyPrecise} />
-              <AttributionBlock title="Execution attribution" subtitle="Impact of TOD gates, haircuts, and order slicing." slices={data.executionAttribution} fmt={fmtCcyPrecise} />
+              <AttributionBlock
+                title="Regime attribution"
+                subtitle="Realised P&L grouped by market regime at entry."
+                slices={data.regimeAttribution}
+                fmt={fmtCcyPrecise}
+              />
+              <AttributionBlock
+                title="Sizing attribution"
+                subtitle="Baseline vs conviction bonus vs risk-parity sizing."
+                slices={data.sizingAttribution}
+                fmt={fmtCcyPrecise}
+              />
+              <AttributionBlock
+                title="Exit attribution"
+                subtitle="Which exit trigger closed each round-trip."
+                slices={data.exitAttribution}
+                fmt={fmtCcyPrecise}
+              />
+              <AttributionBlock
+                title="Execution attribution"
+                subtitle="Impact of TOD gates, haircuts, and order slicing."
+                slices={data.executionAttribution}
+                fmt={fmtCcyPrecise}
+              />
             </div>
           </>
         )}
@@ -187,7 +241,9 @@ function AttributionBlock({
     <div className="rounded-md border p-3">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">{title}</div>
-        <Badge variant="outline" className="text-[10px]">{slices.reduce((n, s) => n + s.trips, 0)} trips</Badge>
+        <Badge variant="outline" className="text-[10px]">
+          {slices.reduce((n, s) => n + s.trips, 0)} trips
+        </Badge>
       </div>
       <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>
       {slices.length === 0 ? (
@@ -195,19 +251,26 @@ function AttributionBlock({
       ) : (
         <>
           <ResponsiveContainer width="100%" height={Math.max(140, slices.length * 28 + 20)}>
-            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 4 }}>
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
+            >
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
               <XAxis type="number" tick={AXIS_TICK} tickFormatter={(v: number) => fmt.format(v)} />
               <YAxis type="category" dataKey="label" tick={AXIS_TICK} width={110} />
               <Tooltip
                 formatter={(v: number) => fmt.format(v)}
                 labelClassName="text-xs"
-                contentStyle={{ fontSize: 12 }}
+                contentStyle={TOOLTIP_CONTENT_STYLE}
               />
               <ReferenceLine x={0} stroke="var(--muted-foreground)" />
               <Bar dataKey="realizedPnl" radius={[0, 4, 4, 0]}>
                 {chartData.map((s) => (
-                  <Cell key={s.key} fill={s.realizedPnl >= 0 ? "var(--primary)" : "var(--destructive)"} />
+                  <Cell
+                    key={s.key}
+                    fill={s.realizedPnl >= 0 ? "var(--primary)" : "var(--destructive)"}
+                  />
                 ))}
               </Bar>
             </BarChart>
@@ -222,7 +285,9 @@ function AttributionBlock({
               <div key={s.key} className="grid grid-cols-4 gap-1 py-1 text-xs">
                 <div className="col-span-2 truncate">{s.label}</div>
                 <div className="text-right">{s.trips}</div>
-                <div className="text-right">{s.winRatePct == null ? "—" : `${s.winRatePct.toFixed(0)}%`}</div>
+                <div className="text-right">
+                  {s.winRatePct == null ? "—" : `${s.winRatePct.toFixed(0)}%`}
+                </div>
               </div>
             ))}
           </div>

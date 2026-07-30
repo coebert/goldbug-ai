@@ -20,12 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppHeader } from "@/components/app-header";
 import { useIncludeDeposits } from "@/lib/use-include-deposits";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Line,
@@ -40,7 +35,30 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, PlayCircle, RotateCcw, Zap, ChevronDown, ShieldCheck, ShieldAlert, TrendingUp, TrendingDown, Newspaper, Activity, CalendarClock, ArrowUpDown, ArrowUp, ArrowDown, FileText, BarChart3, Settings2, Sparkles, Pencil, Banknote, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  PlayCircle,
+  RotateCcw,
+  Zap,
+  ChevronDown,
+  ShieldCheck,
+  ShieldAlert,
+  TrendingUp,
+  TrendingDown,
+  Newspaper,
+  Activity,
+  CalendarClock,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  FileText,
+  BarChart3,
+  Settings2,
+  Sparkles,
+  Pencil,
+  Banknote,
+  AlertTriangle,
+} from "lucide-react";
 import { RenamePortfolioDialog } from "@/components/rename-portfolio-dialog";
 import { AddSimFundsDialog } from "@/components/add-sim-funds-dialog";
 import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
@@ -50,16 +68,24 @@ const TradeAuditLogCard = lazy(() =>
   import("@/components/trade-audit-log-card").then((m) => ({ default: m.TradeAuditLogCard })),
 );
 const ConfidenceTimelineCard = lazy(() =>
-  import("@/components/confidence-timeline-card").then((m) => ({ default: m.ConfidenceTimelineCard })),
+  import("@/components/confidence-timeline-card").then((m) => ({
+    default: m.ConfidenceTimelineCard,
+  })),
 );
 const TradeErrorDashboardCard = lazy(() =>
-  import("@/components/trade-error-dashboard-card").then((m) => ({ default: m.TradeErrorDashboardCard })),
+  import("@/components/trade-error-dashboard-card").then((m) => ({
+    default: m.TradeErrorDashboardCard,
+  })),
 );
 const TradeOutcomePanelCard = lazy(() =>
-  import("@/components/trade-outcome-panel-card").then((m) => ({ default: m.TradeOutcomePanelCard })),
+  import("@/components/trade-outcome-panel-card").then((m) => ({
+    default: m.TradeOutcomePanelCard,
+  })),
 );
 const TodaysDecisionSummaryCard = lazy(() =>
-  import("@/components/todays-decision-summary-card").then((m) => ({ default: m.TodaysDecisionSummaryCard })),
+  import("@/components/todays-decision-summary-card").then((m) => ({
+    default: m.TodaysDecisionSummaryCard,
+  })),
 );
 
 const FxHealthCard = lazy(() =>
@@ -78,7 +104,9 @@ const ManualFxConvertCard = lazy(() =>
   import("@/components/manual-fx-convert-card").then((m) => ({ default: m.ManualFxConvertCard })),
 );
 const WalletAffordabilityCard = lazy(() =>
-  import("@/components/wallet-affordability-card").then((m) => ({ default: m.WalletAffordabilityCard })),
+  import("@/components/wallet-affordability-card").then((m) => ({
+    default: m.WalletAffordabilityCard,
+  })),
 );
 const WalletHistoryCard = lazy(() =>
   import("@/components/wallet-history-card").then((m) => ({ default: m.WalletHistoryCard })),
@@ -89,16 +117,7 @@ const MultiCurrencyExposureCard = lazy(() =>
   })),
 );
 
-
-
-
-
-
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
@@ -108,7 +127,12 @@ import { ExecutionCalibrationCard } from "@/components/execution-calibration-car
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { ModeBadge } from "@/components/mode-badge";
 import { LiveToggle } from "@/components/live-toggle";
-import { Tooltip as UITooltip, TooltipContent as UITooltipContent, TooltipProvider as UITooltipProvider, TooltipTrigger as UITooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip as UITooltip,
+  TooltipContent as UITooltipContent,
+  TooltipProvider as UITooltipProvider,
+  TooltipTrigger as UITooltipTrigger,
+} from "@/components/ui/tooltip";
 import { RegimePanel } from "@/components/regime-panel";
 import { LearningPanel } from "@/components/learning-panel";
 import { LiveTradingCard } from "@/components/live-trading-card";
@@ -133,8 +157,6 @@ import {
   tooltipModeChip,
 } from "@/lib/portfolio-performance-format";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
-
-
 
 import { CorrelationHeatmapCard } from "@/components/correlation-heatmap-card";
 import { LiveHoldingsCard, type HoldingSeriesInfo } from "@/components/live-holdings-card";
@@ -161,12 +183,13 @@ const BacktestResultsCard = lazy(() =>
   import("@/components/backtest-results-card").then((m) => ({ default: m.BacktestResultsCard })),
 );
 const BacktestRunHistoryCard = lazy(() =>
-  import("@/components/backtest-run-history-card").then((m) => ({ default: m.BacktestRunHistoryCard })),
+  import("@/components/backtest-run-history-card").then((m) => ({
+    default: m.BacktestRunHistoryCard,
+  })),
 );
 import { saveRun as saveBacktestRun } from "@/lib/backtest-run-save";
 
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
-
 
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
@@ -175,10 +198,27 @@ import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
 import { AXIS_TICK } from "@/lib/chart-palette";
 
-
-type PortfolioTab = "overview" | "trades" | "decisions" | "audit" | "errors" | "confidence" | "risk" | "diagnostics" | "reports";
-const PORTFOLIO_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "audit", "errors", "confidence", "risk", "diagnostics", "reports"];
-
+type PortfolioTab =
+  | "overview"
+  | "trades"
+  | "decisions"
+  | "audit"
+  | "errors"
+  | "confidence"
+  | "risk"
+  | "diagnostics"
+  | "reports";
+const PORTFOLIO_TABS: PortfolioTab[] = [
+  "overview",
+  "trades",
+  "decisions",
+  "audit",
+  "errors",
+  "confidence",
+  "risk",
+  "diagnostics",
+  "reports",
+];
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
@@ -203,14 +243,15 @@ function PortfolioPage() {
     navigate({ to: "/portfolio/$id", params: { id }, search: { tab: next }, replace: true });
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [tradeSort, setTradeSort] = useState<{ key: "date" | "symbol" | "side" | "qty" | "price" | "value"; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
+  const [tradeSort, setTradeSort] = useState<{
+    key: "date" | "symbol" | "side" | "qty" | "price" | "value";
+    dir: "asc" | "desc";
+  }>({ key: "date", dir: "desc" });
   const [showAdvancedDiag, setShowAdvancedDiag] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const isMobile = useIsMobile();
-
-
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -272,7 +313,10 @@ function PortfolioPage() {
       // Keep pulsing fast for 5 minutes after the last order/fill event so
       // partial fills, cancellations, and settlement side-effects all land.
       hotUntil = Date.now() + 5 * 60_000;
-      if (timer !== null) { window.clearTimeout(timer); timer = null; }
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
       runReconcile(reason).then(schedule);
     };
 
@@ -411,7 +455,6 @@ function PortfolioPage() {
     } as const;
   }, [chartContrast]);
 
-
   const runDay = useMutation({
     mutationFn: () => runDayFn({ data: { portfolio_id: id } }),
     onSuccess: (r) => {
@@ -424,7 +467,6 @@ function PortfolioPage() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
-
 
   const [lastBtMetrics, setLastBtMetrics] = useState<
     import("@/lib/backtest-metrics").BacktestMetrics | null
@@ -439,8 +481,7 @@ function PortfolioPage() {
       setLastBtDays(days);
       setBacktestRunToken((n) => n + 1);
       if (m) {
-        const winPart =
-          m.winRatePct != null ? ` · Win ${m.winRatePct.toFixed(0)}%` : "";
+        const winPart = m.winRatePct != null ? ` · Win ${m.winRatePct.toFixed(0)}%` : "";
         toast.success(
           `Backtest done. Return ${m.totalReturnPct.toFixed(2)}% · MDD ${m.maxDrawdownPct.toFixed(2)}% · Sharpe ${m.sharpe.toFixed(2)}${winPart}`,
         );
@@ -472,7 +513,6 @@ function PortfolioPage() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
-
 
   const reset = useMutation({
     mutationFn: () => resetFn({ data: { id } }),
@@ -529,9 +569,8 @@ function PortfolioPage() {
         if (d <= row.date) lastBench = bmap.get(d)!;
         else break;
       }
-      const benchmark_value = lastBench != null && base != null
-        ? startingCashForChart * (lastBench / base)
-        : null;
+      const benchmark_value =
+        lastBench != null && base != null ? startingCashForChart * (lastBench / base) : null;
       return { ...row, benchmark: benchmark_value };
     });
   }, [equityData, benchQ.data, benchmark, startingCashForChart]);
@@ -585,7 +624,8 @@ function PortfolioPage() {
         value: ((adjValue - base) / base) * 100,
         peak: ((adjPeak - base) / base) * 100,
         drawdown: row.drawdown,
-        benchmark: r.benchmark != null ? ((r.benchmark - base) / base) * 100 : r.benchmark ?? null,
+        benchmark:
+          r.benchmark != null ? ((r.benchmark - base) / base) * 100 : (r.benchmark ?? null),
       };
     });
   }, [chartData, compareMode, startingCashForChart, cumulativeDepositsByDate]);
@@ -595,7 +635,8 @@ function PortfolioPage() {
     if (rows.length < 2) return null;
     const portVals = rows.map((r) => r.value);
     const benchVals = rows.map((r) => (r as { benchmark?: number | null }).benchmark ?? null);
-    const hasBench = benchmark !== "none" && benchVals.every((v) => v != null && Number.isFinite(v));
+    const hasBench =
+      benchmark !== "none" && benchVals.every((v) => v != null && Number.isFinite(v));
 
     const dailyReturns = (vals: number[]) => {
       const out: number[] = [];
@@ -656,8 +697,6 @@ function PortfolioPage() {
     return { port, bench, correlation };
   }, [chartData, benchmark]);
 
-
-
   const p = q.data?.portfolio;
   const holdings = q.data?.holdings ?? [];
   const trades = q.data?.trades ?? [];
@@ -677,15 +716,17 @@ function PortfolioPage() {
     return map;
   }, [holdingsHistoryQ.data]);
 
-
-
   // Single authoritative source of the three headline numbers. When an
   // equity snapshot exists it wins (both `total_value` and `cash` come from
   // the FX/GBX-normalised snapshot, so `invested = total_value − cash` cannot
   // disagree with the equity tile). The fallback path is only used when the
   // portfolio has no snapshots yet (first tick, brand-new account).
   const latestSnapshot = equity.length ? equity[equity.length - 1] : null;
-  const { totalValue, cash: cashAuthoritative, invested: holdingsValue } = useMemo(
+  const {
+    totalValue,
+    cash: cashAuthoritative,
+    invested: holdingsValue,
+  } = useMemo(
     () =>
       derivePortfolioMetrics({
         latestSnapshot,
@@ -703,16 +744,23 @@ function PortfolioPage() {
     const dir = tradeSort.dir === "asc" ? 1 : -1;
     const val = (t: (typeof trades)[number]) => {
       switch (tradeSort.key) {
-        case "date": return `${t.trade_date} ${t.executed_at ?? ""}`;
-        case "symbol": return t.symbol;
-        case "side": return t.side;
-        case "qty": return Number(t.quantity);
-        case "price": return Number(t.price);
-        case "value": return Number(t.value);
+        case "date":
+          return `${t.trade_date} ${t.executed_at ?? ""}`;
+        case "symbol":
+          return t.symbol;
+        case "side":
+          return t.side;
+        case "qty":
+          return Number(t.quantity);
+        case "price":
+          return Number(t.price);
+        case "value":
+          return Number(t.value);
       }
     };
     arr.sort((a, b) => {
-      const av = val(a); const bv = val(b);
+      const av = val(a);
+      const bv = val(b);
       if (av < bv) return -dir;
       if (av > bv) return dir;
       return 0;
@@ -764,7 +812,9 @@ function PortfolioPage() {
             <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:flex-wrap sm:justify-between sm:gap-4">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-lg font-semibold tracking-tight sm:text-2xl">{p.name}</h1>
+                  <h1 className="truncate text-lg font-semibold tracking-tight sm:text-2xl">
+                    {p.name}
+                  </h1>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -785,19 +835,37 @@ function PortfolioPage() {
                     </Button>
                   )}
                   <ModeBadge mode={p.mode} />
-                  <LiveToggle portfolioId={p.id} mode={p.mode} livePaused={(p as { live_paused?: boolean | null }).live_paused} />
+                  <LiveToggle
+                    portfolioId={p.id}
+                    mode={p.mode}
+                    livePaused={(p as { live_paused?: boolean | null }).live_paused}
+                  />
                 </div>
 
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {p.currency} {startingCash.toFixed(0)} <Explain term="starting_pot">starting pot</Explain> · <Explain term="risk_level">{p.risk_level} risk</Explain>
+                  {p.currency} {startingCash.toFixed(0)}{" "}
+                  <Explain term="starting_pot">starting pot</Explain> ·{" "}
+                  <Explain term="risk_level">{p.risk_level} risk</Explain>
                 </p>
                 {p.mode === "live_prod" ? (
                   <p className="mt-1 text-[11px] font-medium leading-snug text-destructive sm:text-xs">
-                    ⚠ <Explain term="live_prod">Real money</Explain> — approved orders route to your live broker account.
+                    ⚠ <Explain term="live_prod">Real money</Explain> — approved orders route to your
+                    live broker account.
                   </p>
                 ) : (
                   <p className="mt-1 text-[11px] leading-snug text-muted-foreground sm:text-xs">
-                    This portfolio uses <span className="font-medium text-foreground">pretend money</span> — nothing you do here touches your bank or Saxo account. {p.mode === "live_sim" ? <>(<Explain term="live_sim">paper-traded against live prices</Explain>)</> : <>(<Explain term="backtest">historical backtest only</Explain>)</>}
+                    This portfolio uses{" "}
+                    <span className="font-medium text-foreground">pretend money</span> — nothing you
+                    do here touches your bank or Saxo account.{" "}
+                    {p.mode === "live_sim" ? (
+                      <>
+                        (<Explain term="live_sim">paper-traded against live prices</Explain>)
+                      </>
+                    ) : (
+                      <>
+                        (<Explain term="backtest">historical backtest only</Explain>)
+                      </>
+                    )}
                   </p>
                 )}
               </div>
@@ -813,17 +881,17 @@ function PortfolioPage() {
                   {pnl >= 0 ? "+" : ""}
                   {formatMoneyAmount(pnl)} ({pnlPct.toFixed(2)}%)
                 </span>
-
               </div>
             </div>
-
 
             {underfunded && (
               <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                   <div className="space-y-1">
-                    <p className="font-medium text-foreground">Portfolio underfunded — no affordable instruments</p>
+                    <p className="font-medium text-foreground">
+                      Portfolio underfunded — no affordable instruments
+                    </p>
                     <p className="text-muted-foreground">
                       The latest AI run found no tradeable symbols. Per-symbol budget is{" "}
                       <span className="font-medium text-foreground">
@@ -833,13 +901,20 @@ function PortfolioPage() {
                       <span className="font-medium text-foreground">
                         {p.currency} {underfunded.minTradeValue.toFixed(2)}
                       </span>
-                      . Try adding funds{p.mode !== "live_prod" ? " to this portfolio" : " to your broker account"}, raising the max position size, or lowering the minimum trade value in Risk controls.
+                      . Try adding funds
+                      {p.mode !== "live_prod" ? " to this portfolio" : " to your broker account"},
+                      raising the max position size, or lowering the minimum trade value in Risk
+                      controls.
                     </p>
                     {underfunded.notes.length > 0 && (
-                      <p className="text-xs text-muted-foreground"><JargonText>{underfunded.notes.slice(0, 2).join(" · ")}</JargonText></p>
+                      <p className="text-xs text-muted-foreground">
+                        <JargonText>{underfunded.notes.slice(0, 2).join(" · ")}</JargonText>
+                      </p>
                     )}
                     <div className="pt-1">
-                      <Button size="sm" variant="outline" onClick={() => setTab("risk")}>Open Risk controls</Button>
+                      <Button size="sm" variant="outline" onClick={() => setTab("risk")}>
+                        Open Risk controls
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -852,659 +927,965 @@ function PortfolioPage() {
             />
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
-
               {/* Mobile: single-row horizontally scrollable strip with snap so
                   the tab set doesn't consume 3–4 vertical rows on 375px.
                   Desktop keeps the wrap-free flex layout. */}
               <TabsList className="-mx-4 flex w-auto max-w-none justify-start gap-1 h-auto overflow-x-auto scroll-smooth snap-x snap-mandatory px-4 p-1 md:mx-0 md:w-full md:max-w-full md:flex-nowrap md:overflow-x-auto md:px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <TabsTrigger value="overview" className="min-h-10 shrink-0 snap-start">Overview</TabsTrigger>
-                <TabsTrigger value="trades" className="min-h-10 shrink-0 snap-start">Trades ({trades.length})</TabsTrigger>
-                <TabsTrigger value="decisions" className="min-h-10 shrink-0 snap-start">Decisions ({decisions.length})</TabsTrigger>
-                <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">Audit</TabsTrigger>
-                <TabsTrigger value="errors" className="min-h-10 shrink-0 snap-start">Errors</TabsTrigger>
+                <TabsTrigger value="overview" className="min-h-10 shrink-0 snap-start">
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="trades" className="min-h-10 shrink-0 snap-start">
+                  Trades ({trades.length})
+                </TabsTrigger>
+                <TabsTrigger value="decisions" className="min-h-10 shrink-0 snap-start">
+                  Decisions ({decisions.length})
+                </TabsTrigger>
+                <TabsTrigger value="audit" className="min-h-10 shrink-0 snap-start">
+                  Audit
+                </TabsTrigger>
+                <TabsTrigger value="errors" className="min-h-10 shrink-0 snap-start">
+                  Errors
+                </TabsTrigger>
 
-                <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">Confidence</TabsTrigger>
-                <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">Risk</TabsTrigger>
-                <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">Diagnostics</TabsTrigger>
-                <TabsTrigger value="reports" className="min-h-10 shrink-0 snap-start">Reports</TabsTrigger>
+                <TabsTrigger value="confidence" className="min-h-10 shrink-0 snap-start">
+                  Confidence
+                </TabsTrigger>
+                <TabsTrigger value="risk" className="min-h-10 shrink-0 snap-start">
+                  Risk
+                </TabsTrigger>
+                <TabsTrigger value="diagnostics" className="min-h-10 shrink-0 snap-start">
+                  Diagnostics
+                </TabsTrigger>
+                <TabsTrigger value="reports" className="min-h-10 shrink-0 snap-start">
+                  Reports
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="mt-4">
-            <CurrencyDiagnosticsBanner
-              portfolioId={id}
-              portfolioCurrency={p.currency}
-              mode={p.mode}
-            />
-            <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
-            <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
-            <div className="mb-6">
-              <LiveHoldingsCard
-                holdings={holdings}
-                currency={p.currency}
-                cash={cashAuthoritative}
-                cashByCcy={
-                  (p as { cash_by_ccy?: Record<string, number> | null }).cash_by_ccy ?? null
-                }
-                totalValue={totalValue}
-                invested={holdingsValue}
-                mode={p.mode}
-                series={holdingsSeries}
-                portfolioId={id}
-               />
-
-            </div>
-            <div className="mb-6">
-              <TailHedgeCard portfolioId={id} currency={p.currency} />
-            </div>
-            <div className="mb-6">
-              <TailHedgeReportCard portfolioId={id} currency={p.currency} />
-            </div>
-            <Card className="mb-6">
-              <CardContent className="flex flex-wrap items-center gap-3 py-4">
-                <UITooltipProvider delayDuration={100}>
-                  <UITooltip>
-                    <UITooltipTrigger asChild>
-                      <Button
-                        onClick={() => runDay.mutate()}
-                        disabled={runDay.isPending || runBt.isPending}
-                      >
-                        <Zap className="mr-1 h-4 w-4" />
-                        {runDay.isPending ? "Running…" : "Run one day now"}
+                <CurrencyDiagnosticsBanner
+                  portfolioId={id}
+                  portfolioCurrency={p.currency}
+                  mode={p.mode}
+                />
+                <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
+                <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
+                <div className="mb-6">
+                  <LiveHoldingsCard
+                    holdings={holdings}
+                    currency={p.currency}
+                    cash={cashAuthoritative}
+                    cashByCcy={
+                      (p as { cash_by_ccy?: Record<string, number> | null }).cash_by_ccy ?? null
+                    }
+                    totalValue={totalValue}
+                    invested={holdingsValue}
+                    mode={p.mode}
+                    series={holdingsSeries}
+                    portfolioId={id}
+                  />
+                </div>
+                <div className="mb-6">
+                  <TailHedgeCard portfolioId={id} currency={p.currency} />
+                </div>
+                <div className="mb-6">
+                  <TailHedgeReportCard portfolioId={id} currency={p.currency} />
+                </div>
+                <Card className="mb-6">
+                  <CardContent className="flex flex-wrap items-center gap-3 py-4">
+                    <UITooltipProvider delayDuration={100}>
+                      <UITooltip>
+                        <UITooltipTrigger asChild>
+                          <Button
+                            onClick={() => runDay.mutate()}
+                            disabled={runDay.isPending || runBt.isPending}
+                          >
+                            <Zap className="mr-1 h-4 w-4" />
+                            {runDay.isPending ? "Running…" : "Run one day now"}
+                          </Button>
+                        </UITooltipTrigger>
+                        <UITooltipContent className="max-w-xs">
+                          Manually triggers ONE AI decision cycle right now (fetches latest prices +
+                          news, asks the AI, applies guardrails, records any resulting trades). Same
+                          thing the hourly cron does when the portfolio is Active — use this to test
+                          or force a run without waiting for the next hour. Doesn't touch real money
+                          unless the portfolio is in Real money mode.
+                        </UITooltipContent>
+                      </UITooltip>
+                    </UITooltipProvider>
+                    <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5">
+                      <span className="text-xs text-muted-foreground">Backtest days:</span>
+                      <div className="w-32">
+                        <Slider
+                          value={[days]}
+                          onValueChange={([v]) => setDays(v)}
+                          min={3}
+                          max={20}
+                          step={1}
+                        />
+                      </div>
+                      <span className="w-6 text-right text-sm tabular-nums">{days}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => runBt.mutate()}
+                      disabled={runBt.isPending || runDay.isPending}
+                    >
+                      <PlayCircle className="mr-1 h-4 w-4" />
+                      {runBt.isPending ? "Backtesting…" : `Run ${days}-day backtest`}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setConfirmReset(true)}
+                      disabled={reset.isPending}
+                    >
+                      <RotateCcw className="mr-1 h-4 w-4" /> Reset
+                    </Button>
+                    <Link to="/long-horizon/$id" params={{ id }}>
+                      <Button variant="outline">
+                        <CalendarClock className="mr-1 h-4 w-4" /> Long-horizon backtest
                       </Button>
-                    </UITooltipTrigger>
-                    <UITooltipContent className="max-w-xs">
-                      Manually triggers ONE AI decision cycle right now (fetches latest prices + news, asks the AI, applies guardrails, records any resulting trades). Same thing the hourly cron does when the portfolio is Active — use this to test or force a run without waiting for the next hour. Doesn't touch real money unless the portfolio is in Real money mode.
-                    </UITooltipContent>
-                  </UITooltip>
-                </UITooltipProvider>
-                <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5">
-                  <span className="text-xs text-muted-foreground">Backtest days:</span>
-                  <div className="w-32">
-                    <Slider
-                      value={[days]}
-                      onValueChange={([v]) => setDays(v)}
-                      min={3}
-                      max={20}
-                      step={1}
+                    </Link>
+                    {(runDay.isPending || runBt.isPending) && (
+                      <span className="text-xs text-muted-foreground">
+                        Fetching prices, reading news, asking the AI…
+                      </span>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {p && (
+                  <div className="mb-4">
+                    <PerformanceDashboardCard
+                      startingCash={baselineStartingCash}
+                      currency={String(p.currency ?? "GBP")}
+                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
+                      deposits={depositEvents}
                     />
                   </div>
-                  <span className="w-6 text-right text-sm tabular-nums">{days}</span>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => runBt.mutate()}
-                  disabled={runBt.isPending || runDay.isPending}
-                >
-                  <PlayCircle className="mr-1 h-4 w-4" />
-                  {runBt.isPending ? "Backtesting…" : `Run ${days}-day backtest`}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => setConfirmReset(true)}
-                  disabled={reset.isPending}
-                >
-                  <RotateCcw className="mr-1 h-4 w-4" /> Reset
-                </Button>
-                <Link to="/long-horizon/$id" params={{ id }}>
-                  <Button variant="outline">
-                    <CalendarClock className="mr-1 h-4 w-4" /> Long-horizon backtest
-                  </Button>
-                </Link>
-                {(runDay.isPending || runBt.isPending) && (
-                  <span className="text-xs text-muted-foreground">
-                    Fetching prices, reading news, asking the AI…
-                  </span>
                 )}
-              </CardContent>
-            </Card>
 
-            {p && (
-              <div className="mb-4">
-                <PerformanceDashboardCard
-                  startingCash={baselineStartingCash}
-                  currency={String(p.currency ?? "GBP")}
-                  equity={equity as { snapshot_date: string; total_value: number }[]}
-                  trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
-                  deposits={depositEvents}
-                />
-              </div>
-            )}
-
-            {p && (
-              <div className="mb-4">
-                <VanguardBenchmarkCard
-                  startingCash={baselineStartingCash}
-                  currency={String(p.currency ?? "GBP")}
-                  equity={equity as { snapshot_date: string; total_value: number }[]}
-                  deposits={depositEvents}
-                  riskLevel={p.risk_level}
-                />
-              </div>
-            )}
-
-            {p && (
-              <div className="mb-4">
-                <EquityChangeBreakdownCard
-                  equity={equity as { snapshot_date: string; total_value: number }[]}
-                  deposits={depositEvents}
-                  currency={String(p.currency ?? "GBP")}
-                />
-              </div>
-            )}
-
-            {p && (
-              <div className="mb-4">
-                <DailyEquityChangesCard
-                  equity={equity as { snapshot_date: string; total_value: number }[]}
-                  deposits={depositEvents}
-                  currency={String(p.currency ?? "GBP")}
-                />
-              </div>
-            )}
-
-            {p && (
-              <div className="mb-4">
-                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                  <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
-                </Suspense>
-              </div>
-            )}
-
-            {p && (
-              <div className="mb-4">
-                <Suspense fallback={<div className="h-48 rounded-xl border bg-card" aria-hidden />}>
-                  <MultiCurrencyExposureCard portfolioId={id} active={tab === "overview"} />
-                </Suspense>
-              </div>
-            )}
-
-            {p && (
-              <div className="mb-4">
-                <Suspense fallback={<div className="h-64 rounded-xl border bg-card" aria-hidden />}>
-                  <WalletHistoryCard portfolioId={id} active={tab === "overview"} />
-                </Suspense>
-              </div>
-            )}
-
-
-
-
-            {lastBtMetrics && (
-              <Card className="mb-4">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Backtest metrics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Metric label="Total return" value={`${lastBtMetrics.totalReturnPct.toFixed(2)}%`} tone={lastBtMetrics.totalReturnPct >= 0 ? "up" : "down"} />
-                    <Metric label="Max drawdown" value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`} tone="down" hint={lastBtMetrics.maxDrawdownCI ? `95% CI ${lastBtMetrics.maxDrawdownCI.low.toFixed(2)}% … ${lastBtMetrics.maxDrawdownCI.high.toFixed(2)}%` : lastBtMetrics.maxDrawdownPeakDate && lastBtMetrics.maxDrawdownTroughDate ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}` : undefined} />
-                    <Metric label="Sharpe (ann.)" value={lastBtMetrics.sharpe.toFixed(2)} tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"} hint={lastBtMetrics.sharpeCI ? `95% CI ${lastBtMetrics.sharpeCI.low.toFixed(2)} … ${lastBtMetrics.sharpeCI.high.toFixed(2)}` : undefined} />
-                    <Metric label="Win rate" value={lastBtMetrics.winRatePct != null ? `${lastBtMetrics.winRatePct.toFixed(0)}%` : "—"} hint={`${lastBtMetrics.wins}W / ${lastBtMetrics.losses}L / ${lastBtMetrics.trades} trades`} />
-                    <Metric label="Volatility (ann.)" value={`${lastBtMetrics.volatilityPct.toFixed(2)}%`} />
-                    <Metric label="Best day" value={`${lastBtMetrics.bestDayPct.toFixed(2)}%`} tone="up" />
-                    <Metric label="Worst day" value={`${lastBtMetrics.worstDayPct.toFixed(2)}%`} tone="down" />
-                    <Metric label="Realized PnL" value={lastBtMetrics.grossRealizedPnl.toFixed(2)} tone={lastBtMetrics.grossRealizedPnl >= 0 ? "up" : "down"} />
+                {p && (
+                  <div className="mb-4">
+                    <VanguardBenchmarkCard
+                      startingCash={baselineStartingCash}
+                      currency={String(p.currency ?? "GBP")}
+                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      deposits={depositEvents}
+                      riskLevel={p.risk_level}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                )}
 
-            {backtestRunToken > 0 && lastBtDays != null && (
-              <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                <BacktestResultsCard
-                  portfolioId={id}
-                  days={lastBtDays}
-                  runToken={backtestRunToken}
-                  currency={p?.currency ?? "USD"}
-                />
-              </Suspense>
-            )}
-
-            <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-              <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
-            </Suspense>
-
-
-
-
-
-            {(() => {
-              const cb = p.circuit_breaker as { paused?: boolean; reason?: string; tripped_at?: string } | null;
-              if (!cb?.paused) return null;
-              return (
-                <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-                  <div className="font-medium text-destructive">Circuit breaker active — AI paused</div>
-                  <div className="mt-1 text-muted-foreground">
-                    <JargonText>{`${cb.reason ?? "Auto-paused"}${cb.tripped_at ? ` (since ${cb.tripped_at.slice(0, 10)})` : ""}. Stop-loss/take-profit still enforced. Adjust risk controls or clear the breaker to resume new trades.`}</JargonText>
+                {p && (
+                  <div className="mb-4">
+                    <EquityChangeBreakdownCard
+                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      deposits={depositEvents}
+                      currency={String(p.currency ?? "GBP")}
+                    />
                   </div>
-                </div>
-              );
-            })()}
+                )}
 
+                {p && (
+                  <div className="mb-4">
+                    <DailyEquityChangesCard
+                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      deposits={depositEvents}
+                      currency={String(p.currency ?? "GBP")}
+                    />
+                  </div>
+                )}
 
+                {p && (
+                  <div className="mb-4">
+                    <Suspense
+                      fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
+                    >
+                      <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
+                    </Suspense>
+                  </div>
+                )}
 
+                {p && (
+                  <div className="mb-4">
+                    <Suspense
+                      fallback={<div className="h-48 rounded-xl border bg-card" aria-hidden />}
+                    >
+                      <MultiCurrencyExposureCard portfolioId={id} active={tab === "overview"} />
+                    </Suspense>
+                  </div>
+                )}
 
+                {p && (
+                  <div className="mb-4">
+                    <Suspense
+                      fallback={<div className="h-64 rounded-xl border bg-card" aria-hidden />}
+                    >
+                      <WalletHistoryCard portfolioId={id} active={tab === "overview"} />
+                    </Suspense>
+                  </div>
+                )}
 
-            <div className="mb-6">
-              <LiveTradingCard portfolioId={id} />
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-3">
-
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
-                    <span>Equity curve</span>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-normal text-muted-foreground">Benchmark</label>
-                      <select
-                        value={benchmark}
-                        onChange={(e) => setBenchmark(e.target.value)}
-                        className="rounded-md border border-border bg-background px-2 py-1 text-xs font-normal"
-                      >
-                        <option value="none">None</option>
-                        <option value="SPY">SPY (S&amp;P 500)</option>
-                        <option value="QQQ">QQQ (Nasdaq 100)</option>
-                        <option value="ACWI">ACWI (Global)</option>
-                        <option value="AGG">AGG (US Bonds)</option>
-                        <option value="GLD">GLD (Gold)</option>
-                        <option value="BTC-USD">BTC-USD</option>
-                      </select>
-                      <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
-                        {(["standard", "high", "light", "cb"] as const).map((mode) => (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={() => setChartContrast(mode)}
-                            className={`px-2 py-1 font-normal capitalize transition-colors ${
-                              chartContrast === mode
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-background text-muted-foreground hover:text-foreground"
-                            }`}
-                            title={mode === "cb" ? "Colorblind-safe palette (Okabe–Ito)" : `${mode} contrast`}
-                            aria-label={mode === "cb" ? "Colorblind-safe palette" : `${mode} contrast`}
-                          >
-                            {mode === "cb" ? "Colorblind" : mode}
-                          </button>
-                        ))}
-                      </div>
-                      <label className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground" title="Annual risk-free rate used in Sharpe ratio">
-                        <span>Rf</span>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={riskFreeRate}
-                          onChange={(e) => setRiskFreeRate(Number(e.target.value) || 0)}
-                          className="w-14 bg-transparent text-foreground tabular-nums outline-none"
-                          aria-label="Risk-free rate (annual %)"
+                {lastBtMetrics && (
+                  <Card className="mb-4">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Backtest metrics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <Metric
+                          label="Total return"
+                          value={`${lastBtMetrics.totalReturnPct.toFixed(2)}%`}
+                          tone={lastBtMetrics.totalReturnPct >= 0 ? "up" : "down"}
                         />
-                        <span>%</span>
-                      </label>
-                      <div className="inline-flex overflow-hidden rounded-md border border-border text-xs" role="group" aria-label="Benchmark compare mode">
-                        {(["raw", "pct"] as const).map((mode) => (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={() => setCompareMode(mode)}
-                            className={`px-2 py-1 font-normal transition-colors ${
-                              compareMode === mode
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-background text-muted-foreground hover:text-foreground"
-                            }`}
-                            title={mode === "pct" ? "Normalized: % indexed to start" : "Raw value"}
-                          >
-                            {mode === "pct" ? "% vs start" : "Raw"}
-                          </button>
-                        ))}
+                        <Metric
+                          label="Max drawdown"
+                          value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`}
+                          tone="down"
+                          hint={
+                            lastBtMetrics.maxDrawdownCI
+                              ? `95% CI ${lastBtMetrics.maxDrawdownCI.low.toFixed(2)}% … ${lastBtMetrics.maxDrawdownCI.high.toFixed(2)}%`
+                              : lastBtMetrics.maxDrawdownPeakDate &&
+                                  lastBtMetrics.maxDrawdownTroughDate
+                                ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}`
+                                : undefined
+                          }
+                        />
+                        <Metric
+                          label="Sharpe (ann.)"
+                          value={lastBtMetrics.sharpe.toFixed(2)}
+                          tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"}
+                          hint={
+                            lastBtMetrics.sharpeCI
+                              ? `95% CI ${lastBtMetrics.sharpeCI.low.toFixed(2)} … ${lastBtMetrics.sharpeCI.high.toFixed(2)}`
+                              : undefined
+                          }
+                        />
+                        <Metric
+                          label="Win rate"
+                          value={
+                            lastBtMetrics.winRatePct != null
+                              ? `${lastBtMetrics.winRatePct.toFixed(0)}%`
+                              : "—"
+                          }
+                          hint={`${lastBtMetrics.wins}W / ${lastBtMetrics.losses}L / ${lastBtMetrics.trades} trades`}
+                        />
+                        <Metric
+                          label="Volatility (ann.)"
+                          value={`${lastBtMetrics.volatilityPct.toFixed(2)}%`}
+                        />
+                        <Metric
+                          label="Best day"
+                          value={`${lastBtMetrics.bestDayPct.toFixed(2)}%`}
+                          tone="up"
+                        />
+                        <Metric
+                          label="Worst day"
+                          value={`${lastBtMetrics.worstDayPct.toFixed(2)}%`}
+                          tone="down"
+                        />
+                        <Metric
+                          label="Realized PnL"
+                          value={lastBtMetrics.grossRealizedPnl.toFixed(2)}
+                          tone={lastBtMetrics.grossRealizedPnl >= 0 ? "up" : "down"}
+                        />
                       </div>
-                      <EventOverlayControls
-                        domainDates={equityData.map((d) => d.date)}
-                        enabled={eventsOn}
-                        onToggle={setEventsOn}
-                        minSeverity={eventSev}
-                        onSeverityChange={setEventSev}
-                      />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {backtestRunToken > 0 && lastBtDays != null && (
+                  <Suspense
+                    fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
+                  >
+                    <BacktestResultsCard
+                      portfolioId={id}
+                      days={lastBtDays}
+                      runToken={backtestRunToken}
+                      currency={p?.currency ?? "USD"}
+                    />
+                  </Suspense>
+                )}
+
+                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
+                  <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
+                </Suspense>
+
+                {(() => {
+                  const cb = p.circuit_breaker as {
+                    paused?: boolean;
+                    reason?: string;
+                    tripped_at?: string;
+                  } | null;
+                  if (!cb?.paused) return null;
+                  return (
+                    <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+                      <div className="font-medium text-destructive">
+                        Circuit breaker active — AI paused
+                      </div>
+                      <div className="mt-1 text-muted-foreground">
+                        <JargonText>{`${cb.reason ?? "Auto-paused"}${cb.tripped_at ? ` (since ${cb.tripped_at.slice(0, 10)})` : ""}. Stop-loss/take-profit still enforced. Adjust risk controls or clear the breaker to resume new trades.`}</JargonText>
+                      </div>
                     </div>
-                  </CardTitle>
-                </CardHeader>
-                {perfMetrics && (
-                  <div className="mx-6 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {([
-                      { label: "CAGR", term: "cagr" as TermId, value: perfMetrics.port.annReturn, suffix: "%", signed: true, negative: false },
-                      { label: "Volatility (ann.)", term: "volatility" as TermId, value: perfMetrics.port.annVol, suffix: "%", signed: false, negative: false },
-                      { label: `Sharpe (rf=${riskFreeRate}%)`, term: "sharpe" as TermId, value: perfMetrics.port.annVol > 0 ? (perfMetrics.port.annReturn - riskFreeRate) / perfMetrics.port.annVol : null, suffix: "", signed: true, negative: false },
-                      { label: "Max drawdown", term: "max_drawdown" as TermId, value: perfMetrics.port.maxDrawdown, suffix: "%", signed: false, negative: true },
-                    ] as const).map((m) => {
-                      const bv = m.label === "CAGR" ? perfMetrics.bench?.annReturn
-                        : m.label === "Volatility (ann.)" ? perfMetrics.bench?.annVol
-                        : m.label === "Max drawdown" ? perfMetrics.bench?.maxDrawdown
-                        : (perfMetrics.bench && perfMetrics.bench.annVol > 0 ? (perfMetrics.bench.annReturn - riskFreeRate) / perfMetrics.bench.annVol : null);
-                      const fmt = (v: number | null | undefined) => {
-                        if (v == null || !Number.isFinite(v)) return "—";
-                        const s = m.signed && v > 0 ? "+" : "";
-                        const d = 2;
-                        return `${s}${v.toFixed(d)}${m.suffix}`;
-                      };
-                      const color = (v: number | null | undefined) => {
-                        if (v == null) return "text-muted-foreground";
-                        if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
-                        if (!m.signed) return "text-foreground";
-                        return v >= 0 ? "text-primary" : "text-destructive";
-                      };
-                      return (
-                        <div key={m.label} className="rounded-md border border-border/70 bg-muted/30 p-3">
-                          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                            <span>{m.label}</span>
-                            <ExplainIcon term={m.term} />
+                  );
+                })()}
+
+                <div className="mb-6">
+                  <LiveTradingCard portfolioId={id} />
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <Card className="lg:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
+                        <span>Equity curve</span>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-normal text-muted-foreground">
+                            Benchmark
+                          </label>
+                          <select
+                            value={benchmark}
+                            onChange={(e) => setBenchmark(e.target.value)}
+                            className="rounded-md border border-border bg-background px-2 py-1 text-xs font-normal"
+                          >
+                            <option value="none">None</option>
+                            <option value="SPY">SPY (S&amp;P 500)</option>
+                            <option value="QQQ">QQQ (Nasdaq 100)</option>
+                            <option value="ACWI">ACWI (Global)</option>
+                            <option value="AGG">AGG (US Bonds)</option>
+                            <option value="GLD">GLD (Gold)</option>
+                            <option value="BTC-USD">BTC-USD</option>
+                          </select>
+                          <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+                            {(["standard", "high", "light", "cb"] as const).map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setChartContrast(mode)}
+                                className={`px-2 py-1 font-normal capitalize transition-colors ${
+                                  chartContrast === mode
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background text-muted-foreground hover:text-foreground"
+                                }`}
+                                title={
+                                  mode === "cb"
+                                    ? "Colorblind-safe palette (Okabe–Ito)"
+                                    : `${mode} contrast`
+                                }
+                                aria-label={
+                                  mode === "cb" ? "Colorblind-safe palette" : `${mode} contrast`
+                                }
+                              >
+                                {mode === "cb" ? "Colorblind" : mode}
+                              </button>
+                            ))}
                           </div>
-                          <div className={`tabular-nums text-base font-semibold leading-tight sm:text-xl ${color(m.value)}`}>{fmt(m.value)}</div>
-                          {perfMetrics.bench && (
-                            <div className="tabular-nums text-[11px] text-muted-foreground">
-                              {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
+                          <label
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground"
+                            title="Annual risk-free rate used in Sharpe ratio"
+                          >
+                            <span>Rf</span>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={riskFreeRate}
+                              onChange={(e) => setRiskFreeRate(Number(e.target.value) || 0)}
+                              className="w-14 bg-transparent text-foreground tabular-nums outline-none"
+                              aria-label="Risk-free rate (annual %)"
+                            />
+                            <span>%</span>
+                          </label>
+                          <div
+                            className="inline-flex overflow-hidden rounded-md border border-border text-xs"
+                            role="group"
+                            aria-label="Benchmark compare mode"
+                          >
+                            {(["raw", "pct"] as const).map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setCompareMode(mode)}
+                                className={`px-2 py-1 font-normal transition-colors ${
+                                  compareMode === mode
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background text-muted-foreground hover:text-foreground"
+                                }`}
+                                title={
+                                  mode === "pct" ? "Normalized: % indexed to start" : "Raw value"
+                                }
+                              >
+                                {mode === "pct" ? "% vs start" : "Raw"}
+                              </button>
+                            ))}
+                          </div>
+                          <EventOverlayControls
+                            domainDates={equityData.map((d) => d.date)}
+                            enabled={eventsOn}
+                            onToggle={setEventsOn}
+                            minSeverity={eventSev}
+                            onSeverityChange={setEventSev}
+                          />
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    {perfMetrics && (
+                      <div className="mx-6 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {(
+                          [
+                            {
+                              label: "CAGR",
+                              term: "cagr" as TermId,
+                              value: perfMetrics.port.annReturn,
+                              suffix: "%",
+                              signed: true,
+                              negative: false,
+                            },
+                            {
+                              label: "Volatility (ann.)",
+                              term: "volatility" as TermId,
+                              value: perfMetrics.port.annVol,
+                              suffix: "%",
+                              signed: false,
+                              negative: false,
+                            },
+                            {
+                              label: `Sharpe (rf=${riskFreeRate}%)`,
+                              term: "sharpe" as TermId,
+                              value:
+                                perfMetrics.port.annVol > 0
+                                  ? (perfMetrics.port.annReturn - riskFreeRate) /
+                                    perfMetrics.port.annVol
+                                  : null,
+                              suffix: "",
+                              signed: true,
+                              negative: false,
+                            },
+                            {
+                              label: "Max drawdown",
+                              term: "max_drawdown" as TermId,
+                              value: perfMetrics.port.maxDrawdown,
+                              suffix: "%",
+                              signed: false,
+                              negative: true,
+                            },
+                          ] as const
+                        ).map((m) => {
+                          const bv =
+                            m.label === "CAGR"
+                              ? perfMetrics.bench?.annReturn
+                              : m.label === "Volatility (ann.)"
+                                ? perfMetrics.bench?.annVol
+                                : m.label === "Max drawdown"
+                                  ? perfMetrics.bench?.maxDrawdown
+                                  : perfMetrics.bench && perfMetrics.bench.annVol > 0
+                                    ? (perfMetrics.bench.annReturn - riskFreeRate) /
+                                      perfMetrics.bench.annVol
+                                    : null;
+                          const fmt = (v: number | null | undefined) => {
+                            if (v == null || !Number.isFinite(v)) return "—";
+                            const s = m.signed && v > 0 ? "+" : "";
+                            const d = 2;
+                            return `${s}${v.toFixed(d)}${m.suffix}`;
+                          };
+                          const color = (v: number | null | undefined) => {
+                            if (v == null) return "text-muted-foreground";
+                            if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
+                            if (!m.signed) return "text-foreground";
+                            return v >= 0 ? "text-primary" : "text-destructive";
+                          };
+                          return (
+                            <div
+                              key={m.label}
+                              className="rounded-md border border-border/70 bg-muted/30 p-3"
+                            >
+                              <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                <span>{m.label}</span>
+                                <ExplainIcon term={m.term} />
+                              </div>
+                              <div
+                                className={`tabular-nums text-base font-semibold leading-tight sm:text-xl ${color(m.value)}`}
+                              >
+                                {fmt(m.value)}
+                              </div>
+                              {perfMetrics.bench && (
+                                <div className="tabular-nums text-[11px] text-muted-foreground">
+                                  {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
+                                </div>
+                              )}
                             </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {perfMetrics && (
+                      <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
+                        <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <span>
+                            Performance vs {benchmark === "none" ? "benchmark" : benchmark}
+                          </span>
+                          {perfMetrics.correlation != null && (
+                            <span className="tabular-nums">
+                              Correlation:{" "}
+                              <span className="font-medium text-foreground">
+                                {perfMetrics.correlation.toFixed(2)}
+                              </span>
+                            </span>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {perfMetrics && (
-                  <div className="mx-6 mb-3 rounded-md border border-border/70 bg-muted/30 p-3">
-                    <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <span>Performance vs {benchmark === "none" ? "benchmark" : benchmark}</span>
-                      {perfMetrics.correlation != null && (
-                        <span className="tabular-nums">
-                          Correlation: <span className="font-medium text-foreground">{perfMetrics.correlation.toFixed(2)}</span>
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
-                      {([
-                        { label: "Total return", key: "totalReturn", suffix: "%", signed: true, negative: false, derived: false },
-                        { label: "Annualized return", key: "annReturn", suffix: "%", signed: true, negative: false, derived: false },
-                        { label: "Volatility (ann.)", key: "annVol", suffix: "%", signed: false, negative: false, derived: false },
-                        { label: "Max drawdown", key: "maxDrawdown", suffix: "%", signed: false, negative: true, derived: false },
-                        { label: "Return / Vol", key: "rvr", suffix: "", signed: true, negative: false, derived: true },
-                      ] as const).map((m) => {
-                        const fmt = (v: number | null | undefined) => {
-                          if (v == null || !Number.isFinite(v)) return "—";
-                          const s = m.signed && v > 0 ? "+" : "";
-                          return `${s}${v.toFixed(2)}${m.suffix}`;
-                        };
-                        const derived = (obj: { annReturn: number; annVol: number } | null) =>
-                          obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
-                        const pick = (obj: typeof perfMetrics.port | null) => {
-                          if (!obj) return null;
-                          const v = (obj as unknown as Record<string, unknown>)[m.key];
-                          return typeof v === "number" ? v : null;
-                        };
-                        const pv = m.derived ? derived(perfMetrics.port) : pick(perfMetrics.port);
-                        const bv = m.derived ? derived(perfMetrics.bench) : pick(perfMetrics.bench);
-                        const color = (v: number | null) => {
-                          if (v == null) return "text-muted-foreground";
-                          if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
-                          if (!m.signed) return "text-foreground";
-                          return v >= 0 ? "text-primary" : "text-destructive";
-                        };
-                        return (
-                          <div key={m.label} className="min-w-0">
-                            <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
-                            <div className={`tabular-nums font-medium ${color(pv)}`}>
-                              {fmt(pv)}
-                            </div>
-                            {perfMetrics.bench && (
-                              <div className="tabular-nums text-[11px] text-muted-foreground">
-                                {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <CardContent
-                  className="h-56 sm:h-64"
-                  style={chartTheme.surface !== "transparent" ? { background: chartTheme.surface, borderRadius: 8 } : undefined}
-                >
-                  {equityData.length < 2 ? (
-                    <p className="pt-8 text-center text-sm text-muted-foreground">
-                      Run a backtest or the daily AI to see the curve.
-                    </p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={displayChartData} margin={{ top: 8, right: isMobile ? 6 : 12, left: isMobile ? -12 : 0, bottom: 8 }}>
-                        <defs>
-                          <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={chartTheme.drawdown} stopOpacity={0.28} />
-                            <stop offset="100%" stopColor={chartTheme.drawdown} stopOpacity={0.02} />
-                          </linearGradient>
-                          <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={chartTheme.equity} stopOpacity={chartTheme.equityFillTop} />
-                            <stop offset="100%" stopColor={chartTheme.equity} stopOpacity={chartTheme.equityFillBottom} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid stroke={chartTheme.axis} strokeOpacity={chartTheme.gridOpacity} strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          tick={AXIS_TICK}
-                          stroke={chartTheme.axis}
-                          minTickGap={isMobile ? 56 : 30}
-                          tickFormatter={(v) => formatDateTick(v, isMobile)}
-                          label={isMobile ? undefined : { value: "Date", position: "insideBottom", offset: -2, fill: chartTheme.axisText, fontSize: 12 }}
-                        />
-                        <YAxis
-                          domain={["auto", "auto"]}
-                          width={isMobile ? 56 : 72}
-                          tick={AXIS_TICK}
-                          stroke={chartTheme.axis}
-                          tickFormatter={(v) => formatValueTick(v, { currency: p.currency, isPct: compareMode === "pct", isMobile })}
-                          label={isMobile ? undefined : { value: yAxisLabel(compareMode, p.currency), angle: -90, position: "insideLeft", offset: 8, style: { textAnchor: "middle" }, fill: chartTheme.axisText, fontSize: 12 }}
-                        />
-
-
-
-                        <Tooltip
-                          cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
-                          wrapperStyle={{ zIndex: 40, maxWidth: "min(85vw, 320px)" }}
-
-                          content={({ active, payload, label }) => {
-                            if (!active || !payload?.length) return null;
-                            const row = payload[0].payload as {
-                              value: number;
-                              peak: number;
-                              drawdown: number;
-                              benchmark?: number | null;
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
+                          {(
+                            [
+                              {
+                                label: "Total return",
+                                key: "totalReturn",
+                                suffix: "%",
+                                signed: true,
+                                negative: false,
+                                derived: false,
+                              },
+                              {
+                                label: "Annualized return",
+                                key: "annReturn",
+                                suffix: "%",
+                                signed: true,
+                                negative: false,
+                                derived: false,
+                              },
+                              {
+                                label: "Volatility (ann.)",
+                                key: "annVol",
+                                suffix: "%",
+                                signed: false,
+                                negative: false,
+                                derived: false,
+                              },
+                              {
+                                label: "Max drawdown",
+                                key: "maxDrawdown",
+                                suffix: "%",
+                                signed: false,
+                                negative: true,
+                                derived: false,
+                              },
+                              {
+                                label: "Return / Vol",
+                                key: "rvr",
+                                suffix: "",
+                                signed: true,
+                                negative: false,
+                                derived: true,
+                              },
+                            ] as const
+                          ).map((m) => {
+                            const fmt = (v: number | null | undefined) => {
+                              if (v == null || !Number.isFinite(v)) return "—";
+                              const s = m.signed && v > 0 ? "+" : "";
+                              return `${s}${v.toFixed(2)}${m.suffix}`;
                             };
-                            const isPct = compareMode === "pct";
-                            const fmtVal = (v: number) => isPct
-                              ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
-                              : `${p.currency} ${v.toFixed(2)}`;
-                            // Net cumulative deposits out of the raw
-                            // tooltip pnl so it never shows a top-up
-                            // as profit (matches ModeSummaryTile).
-                            const dep = cumulativeDepositsByDate.get(String(label)) ?? 0;
-                            const pnlFromStart = isPct ? row.value : row.value - dep - startingCash;
-                            const pnlPctFromStart = isPct
-                              ? row.value
-                              : startingCash > 0 ? (pnlFromStart / startingCash) * 100 : 0;
-                            const benchPct = row.benchmark == null
-                              ? null
-                              : isPct
-                                ? row.benchmark
-                                : startingCash > 0 ? ((row.benchmark - startingCash) / startingCash) * 100 : null;
-                            const active_events = eventsOn
-                              ? eventsInRange(String(label), String(label)).filter((e) => e.severity >= eventSev)
-                              : [];
+                            const derived = (obj: { annReturn: number; annVol: number } | null) =>
+                              obj && obj.annVol > 0 ? obj.annReturn / obj.annVol : null;
+                            const pick = (obj: typeof perfMetrics.port | null) => {
+                              if (!obj) return null;
+                              const v = (obj as unknown as Record<string, unknown>)[m.key];
+                              return typeof v === "number" ? v : null;
+                            };
+                            const pv = m.derived
+                              ? derived(perfMetrics.port)
+                              : pick(perfMetrics.port);
+                            const bv = m.derived
+                              ? derived(perfMetrics.bench)
+                              : pick(perfMetrics.bench);
+                            const color = (v: number | null) => {
+                              if (v == null) return "text-muted-foreground";
+                              if (m.negative) return v < 0 ? "text-destructive" : "text-foreground";
+                              if (!m.signed) return "text-foreground";
+                              return v >= 0 ? "text-primary" : "text-destructive";
+                            };
                             return (
-                              <div className="max-w-[85vw] rounded-md border border-border bg-card p-2 text-[11px] shadow-md sm:text-xs">
-                                <div className="mb-1 font-medium">
-                                  {label} <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">{isPct ? "% vs start" : "value"}</span>
+                              <div key={m.label} className="min-w-0">
+                                <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  {m.label}
                                 </div>
-                                <div className="tabular-nums">
-                                  <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.equity }} />
-                                  Portfolio: {fmtVal(row.value)}
+                                <div className={`tabular-nums font-medium ${color(pv)}`}>
+                                  {fmt(pv)}
                                 </div>
-                                {!isPct && (
-                                  <div className="tabular-nums text-muted-foreground pl-3.5">
-                                    vs start: {pnlFromStart >= 0 ? "+" : ""}
-                                    {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
-                                    {dep !== 0 && (
-                                      <span className="ml-1" title={`Excludes ${p.currency} ${dep.toFixed(2)} of ${dep >= 0 ? "deposits" : "withdrawals"}`}>
-                                        · trading only
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                {row.benchmark != null && (
-                                  <div className="tabular-nums mt-1">
-                                    <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ background: chartTheme.benchmark }} />
-                                    {benchmark}: {fmtVal(row.benchmark)}
-                                    {!isPct && benchPct != null && (
-                                      <span className="text-muted-foreground"> ({benchPct >= 0 ? "+" : ""}{benchPct.toFixed(2)}%)</span>
-                                    )}
-                                  </div>
-                                )}
-                                <div className="tabular-nums text-muted-foreground mt-1">
-                                  Peak: {fmtVal(row.peak)}
-                                </div>
-                                <div className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}>
-                                  Drawdown: {row.drawdown.toFixed(2)}%
-                                </div>
-                                {active_events.length > 0 && (
-                                  <div className="mt-1 border-t border-border/60 pt-1">
-                                    {active_events.map((e) => (
-                                      <div key={e.id} style={{ color: eventColor(e.category) }} className="font-medium">
-                                        ● {e.label}
-                                      </div>
-                                    ))}
+                                {perfMetrics.bench && (
+                                  <div className="tabular-nums text-[11px] text-muted-foreground">
+                                    {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
                                   </div>
                                 )}
                               </div>
                             );
-                          }}
-                        />
-                        <ReferenceLine y={compareMode === "pct" ? 0 : startingCash} stroke={chartTheme.axis} strokeDasharray="3 3" label={{ value: "start", fill: chartTheme.axisText, fontSize: 12, position: "insideTopRight" }} />
-                        {eventsOn && (
-                          <EventOverlay
-                            domainDates={equityData.map((d) => d.date)}
-                            minSeverity={eventSev}
-                            labelPosition="insideTop"
-                          />
-                        )}
-                        <Area
-                          type="monotone"
-                          dataKey="peak"
-                          stroke="none"
-                          fill="url(#ddFill)"
-                          fillOpacity={1}
-                          isAnimationActive={false}
-                          activeDot={false}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="value"
-                          stroke="none"
-                          fill="url(#equityFill)"
-                          fillOpacity={1}
-                          isAnimationActive={false}
-                          activeDot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="peak"
-                          stroke={chartTheme.peak}
-                          strokeWidth={1}
-                          strokeDasharray="2 3"
-                          dot={false}
-                          isAnimationActive={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          name="Portfolio"
-                          stroke={chartTheme.equity}
-                          strokeWidth={chartTheme.strokeWidth}
-                          dot={false}
-                          activeDot={{ r: 5, fill: chartTheme.equity, stroke: "var(--background)", strokeWidth: 2 }}
-                        />
-                        {benchmark !== "none" && (
-                          <Line
-                            type="monotone"
-                            dataKey="benchmark"
-                            name={`${benchmark} (normalised)`}
-                            stroke={chartTheme.benchmark}
-                            strokeWidth={Math.max(2, chartTheme.strokeWidth - 0.5)}
-                            strokeDasharray="4 3"
-                            dot={false}
-                            connectNulls
-                            isAnimationActive={false}
-                            activeDot={{ r: 4, fill: chartTheme.benchmark, stroke: "var(--background)", strokeWidth: 2 }}
-                          />
-                        )}
-                        <Legend
-                          verticalAlign="bottom"
-                          height={24}
-                          iconType="plainline"
-                          wrapperStyle={{ fontSize: 12, color: chartTheme.axisText }}
-                        />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <CardContent
+                      className="h-56 sm:h-64"
+                      style={
+                        chartTheme.surface !== "transparent"
+                          ? { background: chartTheme.surface, borderRadius: 8 }
+                          : undefined
+                      }
+                    >
+                      {equityData.length < 2 ? (
+                        <p className="pt-8 text-center text-sm text-muted-foreground">
+                          Run a backtest or the daily AI to see the curve.
+                        </p>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart
+                            data={displayChartData}
+                            margin={{
+                              top: 8,
+                              right: isMobile ? 6 : 12,
+                              left: isMobile ? -12 : 0,
+                              bottom: 8,
+                            }}
+                          >
+                            <defs>
+                              <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop
+                                  offset="0%"
+                                  stopColor={chartTheme.drawdown}
+                                  stopOpacity={0.28}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor={chartTheme.drawdown}
+                                  stopOpacity={0.02}
+                                />
+                              </linearGradient>
+                              <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop
+                                  offset="0%"
+                                  stopColor={chartTheme.equity}
+                                  stopOpacity={chartTheme.equityFillTop}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor={chartTheme.equity}
+                                  stopOpacity={chartTheme.equityFillBottom}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid
+                              stroke={chartTheme.axis}
+                              strokeOpacity={chartTheme.gridOpacity}
+                              strokeDasharray="3 3"
+                            />
+                            <XAxis
+                              dataKey="date"
+                              tick={AXIS_TICK}
+                              stroke={chartTheme.axis}
+                              minTickGap={isMobile ? 56 : 30}
+                              tickFormatter={(v) => formatDateTick(v, isMobile)}
+                              label={
+                                isMobile
+                                  ? undefined
+                                  : {
+                                      value: "Date",
+                                      position: "insideBottom",
+                                      offset: -2,
+                                      fill: chartTheme.axisText,
+                                      fontSize: 12,
+                                    }
+                              }
+                            />
+                            <YAxis
+                              domain={["auto", "auto"]}
+                              width={isMobile ? 56 : 72}
+                              tick={AXIS_TICK}
+                              stroke={chartTheme.axis}
+                              tickFormatter={(v) =>
+                                formatValueTick(v, {
+                                  currency: p.currency,
+                                  isPct: compareMode === "pct",
+                                  isMobile,
+                                })
+                              }
+                              label={
+                                isMobile
+                                  ? undefined
+                                  : {
+                                      value: yAxisLabel(compareMode, p.currency),
+                                      angle: -90,
+                                      position: "insideLeft",
+                                      offset: 8,
+                                      style: { textAnchor: "middle" },
+                                      fill: chartTheme.axisText,
+                                      fontSize: 12,
+                                    }
+                              }
+                            />
 
+                            <Tooltip
+                              cursor={{ stroke: chartTheme.axis, strokeDasharray: "3 3" }}
+                              wrapperStyle={{ zIndex: 40, maxWidth: "min(85vw, 320px)" }}
+                              content={({ active, payload, label }) => {
+                                if (!active || !payload?.length) return null;
+                                const row = payload[0].payload as {
+                                  value: number;
+                                  peak: number;
+                                  drawdown: number;
+                                  benchmark?: number | null;
+                                };
+                                const isPct = compareMode === "pct";
+                                const fmtVal = (v: number) =>
+                                  isPct
+                                    ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
+                                    : `${p.currency} ${v.toFixed(2)}`;
+                                // Net cumulative deposits out of the raw
+                                // tooltip pnl so it never shows a top-up
+                                // as profit (matches ModeSummaryTile).
+                                const dep = cumulativeDepositsByDate.get(String(label)) ?? 0;
+                                const pnlFromStart = isPct
+                                  ? row.value
+                                  : row.value - dep - startingCash;
+                                const pnlPctFromStart = isPct
+                                  ? row.value
+                                  : startingCash > 0
+                                    ? (pnlFromStart / startingCash) * 100
+                                    : 0;
+                                const benchPct =
+                                  row.benchmark == null
+                                    ? null
+                                    : isPct
+                                      ? row.benchmark
+                                      : startingCash > 0
+                                        ? ((row.benchmark - startingCash) / startingCash) * 100
+                                        : null;
+                                const active_events = eventsOn
+                                  ? eventsInRange(String(label), String(label)).filter(
+                                      (e) => e.severity >= eventSev,
+                                    )
+                                  : [];
+                                return (
+                                  <div className="max-w-[85vw] rounded-md border border-border bg-card p-2 text-[11px] shadow-md sm:text-xs">
+                                    <div className="mb-1 font-medium">
+                                      {label}{" "}
+                                      <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                        {isPct ? "% vs start" : "value"}
+                                      </span>
+                                    </div>
+                                    <div className="tabular-nums">
+                                      <span
+                                        className="inline-block h-2 w-2 rounded-full mr-1.5"
+                                        style={{ background: chartTheme.equity }}
+                                      />
+                                      Portfolio: {fmtVal(row.value)}
+                                    </div>
+                                    {!isPct && (
+                                      <div className="tabular-nums text-muted-foreground pl-3.5">
+                                        vs start: {pnlFromStart >= 0 ? "+" : ""}
+                                        {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
+                                        {dep !== 0 && (
+                                          <span
+                                            className="ml-1"
+                                            title={`Excludes ${p.currency} ${dep.toFixed(2)} of ${dep >= 0 ? "deposits" : "withdrawals"}`}
+                                          >
+                                            · trading only
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {row.benchmark != null && (
+                                      <div className="tabular-nums mt-1">
+                                        <span
+                                          className="inline-block h-2 w-2 rounded-full mr-1.5"
+                                          style={{ background: chartTheme.benchmark }}
+                                        />
+                                        {benchmark}: {fmtVal(row.benchmark)}
+                                        {!isPct && benchPct != null && (
+                                          <span className="text-muted-foreground">
+                                            {" "}
+                                            ({benchPct >= 0 ? "+" : ""}
+                                            {benchPct.toFixed(2)}%)
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    <div className="tabular-nums text-muted-foreground mt-1">
+                                      Peak: {fmtVal(row.peak)}
+                                    </div>
+                                    <div
+                                      className={`tabular-nums ${row.drawdown < 0 ? "text-destructive" : "text-primary"}`}
+                                    >
+                                      Drawdown: {row.drawdown.toFixed(2)}%
+                                    </div>
+                                    {active_events.length > 0 && (
+                                      <div className="mt-1 border-t border-border/60 pt-1">
+                                        {active_events.map((e) => (
+                                          <div
+                                            key={e.id}
+                                            style={{ color: eventColor(e.category) }}
+                                            className="font-medium"
+                                          >
+                                            ● {e.label}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }}
+                            />
+                            <ReferenceLine
+                              y={compareMode === "pct" ? 0 : startingCash}
+                              stroke={chartTheme.axis}
+                              strokeDasharray="3 3"
+                              label={{
+                                value: "start",
+                                fill: chartTheme.axisText,
+                                fontSize: 12,
+                                position: "insideTopRight",
+                              }}
+                            />
+                            {eventsOn && (
+                              <EventOverlay
+                                domainDates={equityData.map((d) => d.date)}
+                                minSeverity={eventSev}
+                                labelPosition="insideTop"
+                              />
+                            )}
+                            <Area
+                              type="monotone"
+                              dataKey="peak"
+                              stroke="none"
+                              fill="url(#ddFill)"
+                              fillOpacity={1}
+                              isAnimationActive={false}
+                              activeDot={false}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="value"
+                              stroke="none"
+                              fill="url(#equityFill)"
+                              fillOpacity={1}
+                              isAnimationActive={false}
+                              activeDot={false}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="peak"
+                              stroke={chartTheme.peak}
+                              strokeWidth={1}
+                              strokeDasharray="2 3"
+                              dot={false}
+                              isAnimationActive={false}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="value"
+                              name="Portfolio"
+                              stroke={chartTheme.equity}
+                              strokeWidth={chartTheme.strokeWidth}
+                              dot={false}
+                              activeDot={{
+                                r: 5,
+                                fill: chartTheme.equity,
+                                stroke: "var(--background)",
+                                strokeWidth: 2,
+                              }}
+                            />
+                            {benchmark !== "none" && (
+                              <Line
+                                type="monotone"
+                                dataKey="benchmark"
+                                name={`${benchmark} (normalised)`}
+                                stroke={chartTheme.benchmark}
+                                strokeWidth={Math.max(2, chartTheme.strokeWidth - 0.5)}
+                                strokeDasharray="4 3"
+                                dot={false}
+                                connectNulls
+                                isAnimationActive={false}
+                                activeDot={{
+                                  r: 4,
+                                  fill: chartTheme.benchmark,
+                                  stroke: "var(--background)",
+                                  strokeWidth: 2,
+                                }}
+                              />
+                            )}
+                            <Legend
+                              verticalAlign="bottom"
+                              height={24}
+                              iconType="plainline"
+                              wrapperStyle={{ fontSize: 12, color: chartTheme.axisText }}
+                            />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
 
-              <CommodityExposureCard
-                holdings={holdings}
-                decisions={decisions}
-                currency={p.currency}
-                totalValue={totalValue}
-                series={holdingsSeries}
-              />
-            </div>
+                  <CommodityExposureCard
+                    holdings={holdings}
+                    decisions={decisions}
+                    currency={p.currency}
+                    totalValue={totalValue}
+                    series={holdingsSeries}
+                  />
+                </div>
 
-            <div className="mt-6">
-              <CommodityLiquiditySimulatorCard />
-            </div>
+                <div className="mt-6">
+                  <CommodityLiquiditySimulatorCard />
+                </div>
 
-            <div className="mt-6">
-              <InvestableUniverseCard />
-            </div>
+                <div className="mt-6">
+                  <InvestableUniverseCard />
+                </div>
 
-            <div className="mt-6">
-              <CommodityBacktestCard portfolioId={id} />
-            </div>
+                <div className="mt-6">
+                  <CommodityBacktestCard portfolioId={id} />
+                </div>
 
-            <div className="mt-6">
-              <CryptoBacktestCard portfolioId={id} />
-            </div>
+                <div className="mt-6">
+                  <CryptoBacktestCard portfolioId={id} />
+                </div>
 
-            {(p.mode === "live_sim" || p.mode === "live_prod") && (
-              <div className="mt-6 space-y-4">
-                <FxAuditCard portfolioId={id} active={tab === "overview"} />
-                <FxTradeDrilldownCard portfolioId={id} active={tab === "overview"} />
-                <CashReconciliationLogCard portfolioId={id} />
-              </div>
-            )}
+                {(p.mode === "live_sim" || p.mode === "live_prod") && (
+                  <div className="mt-6 space-y-4">
+                    <FxAuditCard portfolioId={id} active={tab === "overview"} />
+                    <FxTradeDrilldownCard portfolioId={id} active={tab === "overview"} />
+                    <CashReconciliationLogCard portfolioId={id} />
+                  </div>
+                )}
 
-
-
-
-
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              <RegimePanel />
-              <LearningPanel portfolioId={p.id} />
-            </div>
-
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <RegimePanel />
+                  <LearningPanel portfolioId={p.id} />
+                </div>
               </TabsContent>
 
               <TabsContent value="risk" className="mt-4 space-y-4">
-                <RiskControlsCard portfolioId={id} riskConfig={p.risk_config} baseCurrency={p.currency} />
+                <RiskControlsCard
+                  portfolioId={id}
+                  riskConfig={p.risk_config}
+                  baseCurrency={p.currency}
+                />
                 <ExecutionCalibrationCard
                   portfolioId={id}
-                  execParams={(p.risk_config as { execution_params?: Parameters<typeof ExecutionCalibrationCard>[0]["execParams"] } | null)?.execution_params ?? null}
-                  calibration={(p.risk_config as { execution_calibration?: Parameters<typeof ExecutionCalibrationCard>[0]["calibration"] } | null)?.execution_calibration ?? null}
+                  execParams={
+                    (
+                      p.risk_config as {
+                        execution_params?: Parameters<
+                          typeof ExecutionCalibrationCard
+                        >[0]["execParams"];
+                      } | null
+                    )?.execution_params ?? null
+                  }
+                  calibration={
+                    (
+                      p.risk_config as {
+                        execution_calibration?: Parameters<
+                          typeof ExecutionCalibrationCard
+                        >[0]["calibration"];
+                      } | null
+                    )?.execution_calibration ?? null
+                  }
                 />
               </TabsContent>
 
@@ -1521,7 +1902,6 @@ function PortfolioPage() {
                   <DecisionCard key={d.id} decision={d} currency={p.currency} />
                 ))}
               </TabsContent>
-
 
               <TabsContent value="audit" className="mt-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
@@ -1546,24 +1926,18 @@ function PortfolioPage() {
                     {p.fx_enabled === true && (
                       <RiskSimulatorCard portfolioId={p.id} active={tab === "errors"} />
                     )}
-                    {p.fx_enabled === true && (
-                      <ManualFxConvertCard portfolio={p} />
-                    )}
+                    {p.fx_enabled === true && <ManualFxConvertCard portfolio={p} />}
                     <TradeOutcomePanelCard portfolioId={p.id} active={tab === "errors"} />
                     <TradeErrorDashboardCard portfolioId={p.id} active={tab === "errors"} />
                   </div>
                 </Suspense>
-
               </TabsContent>
-
 
               <TabsContent value="confidence" className="mt-4">
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <ConfidenceTimelineCard decisions={decisions} />
                 </Suspense>
               </TabsContent>
-
-
 
               <TabsContent value="trades" className="mt-4">
                 {trades.length === 0 && (
@@ -1576,16 +1950,26 @@ function PortfolioPage() {
                       <table className="w-full min-w-[640px] text-sm">
                         <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur text-xs uppercase text-muted-foreground">
                           <tr>
-                            {([
-                              { key: "date", label: `Date & time (${ukZoneAbbr()})`, align: "left" },
-                              { key: "symbol", label: "Symbol", align: "left" },
-                              { key: "side", label: "Side", align: "left" },
-                              { key: "qty", label: "Qty", align: "right" },
-                              { key: "price", label: "Price", align: "right" },
-                              { key: "value", label: "Value", align: "right" },
-                            ] as const).map((col) => {
+                            {(
+                              [
+                                {
+                                  key: "date",
+                                  label: `Date & time (${ukZoneAbbr()})`,
+                                  align: "left",
+                                },
+                                { key: "symbol", label: "Symbol", align: "left" },
+                                { key: "side", label: "Side", align: "left" },
+                                { key: "qty", label: "Qty", align: "right" },
+                                { key: "price", label: "Price", align: "right" },
+                                { key: "value", label: "Value", align: "right" },
+                              ] as const
+                            ).map((col) => {
                               const active = tradeSort.key === col.key;
-                              const Icon = active ? (tradeSort.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                              const Icon = active
+                                ? tradeSort.dir === "asc"
+                                  ? ArrowUp
+                                  : ArrowDown
+                                : ArrowUpDown;
                               return (
                                 <th
                                   key={col.key}
@@ -1598,7 +1982,16 @@ function PortfolioPage() {
                                       setTradeSort((s) =>
                                         s.key === col.key
                                           ? { key: col.key, dir: s.dir === "asc" ? "desc" : "asc" }
-                                          : { key: col.key, dir: col.key === "date" || col.key === "value" || col.key === "qty" || col.key === "price" ? "desc" : "asc" },
+                                          : {
+                                              key: col.key,
+                                              dir:
+                                                col.key === "date" ||
+                                                col.key === "value" ||
+                                                col.key === "qty" ||
+                                                col.key === "price"
+                                                  ? "desc"
+                                                  : "asc",
+                                            },
                                       )
                                     }
                                   >
@@ -1614,26 +2007,47 @@ function PortfolioPage() {
                         <tbody>
                           {sortedTrades.map((t) => {
                             const executedAt = t.executed_at ? new Date(t.executed_at) : null;
-                            const timeUk = executedAt && !isNaN(executedAt.getTime())
-                              ? formatUk(executedAt, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
-                              : null;
-                            const zoneUk = executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
+                            const timeUk =
+                              executedAt && !isNaN(executedAt.getTime())
+                                ? formatUk(executedAt, {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                    hour12: false,
+                                  })
+                                : null;
+                            const zoneUk =
+                              executedAt && !isNaN(executedAt.getTime())
+                                ? ukZoneAbbr(executedAt)
+                                : "";
                             return (
                               <tr key={t.id} className="border-t border-border">
                                 <td className="px-3 py-2 tabular-nums whitespace-nowrap">
                                   <span>{t.trade_date}</span>
                                   {timeUk && (
-                                    <span className="ml-2 text-xs text-muted-foreground">{timeUk} {zoneUk}</span>
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {timeUk} {zoneUk}
+                                    </span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2 font-medium">{t.symbol}</td>
-                                <td className={`px-3 py-2 ${t.side === "buy" ? "text-primary" : "text-accent"}`}>
+                                <td
+                                  className={`px-3 py-2 ${t.side === "buy" ? "text-primary" : "text-accent"}`}
+                                >
                                   {t.side.toUpperCase()}
                                 </td>
-                                <td className="px-3 py-2 text-right tabular-nums">{Number(t.quantity).toFixed(4)}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{Number(t.price).toFixed(2)}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{Number(t.value).toFixed(2)}</td>
-                                <td className="px-3 py-2 text-xs text-muted-foreground"><JargonText>{t.reason}</JargonText></td>
+                                <td className="px-3 py-2 text-right tabular-nums">
+                                  {Number(t.quantity).toFixed(4)}
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums">
+                                  {Number(t.price).toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums">
+                                  {Number(t.value).toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-xs text-muted-foreground">
+                                  <JargonText>{t.reason}</JargonText>
+                                </td>
                               </tr>
                             );
                           })}
@@ -1645,31 +2059,49 @@ function PortfolioPage() {
                     <div className="md:hidden space-y-2">
                       {sortedTrades.map((t) => {
                         const executedAt = t.executed_at ? new Date(t.executed_at) : null;
-                        const timeUk = executedAt && !isNaN(executedAt.getTime())
-                          ? formatUk(executedAt, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
-                          : null;
-                        const zoneUk = executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
+                        const timeUk =
+                          executedAt && !isNaN(executedAt.getTime())
+                            ? formatUk(executedAt, {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                                hour12: false,
+                              })
+                            : null;
+                        const zoneUk =
+                          executedAt && !isNaN(executedAt.getTime()) ? ukZoneAbbr(executedAt) : "";
                         return (
                           <details
                             key={t.id}
                             className="group rounded-lg border border-border bg-card text-sm [&_summary::-webkit-details-marker]:hidden"
                           >
                             <summary className="flex cursor-pointer list-none items-center gap-2 p-3">
-                              <Badge className={`shrink-0 ${t.side === "buy" ? "bg-primary/15 text-primary hover:bg-primary/15" : "bg-accent/15 text-accent hover:bg-accent/15"}`}>
+                              <Badge
+                                className={`shrink-0 ${t.side === "buy" ? "bg-primary/15 text-primary hover:bg-primary/15" : "bg-accent/15 text-accent hover:bg-accent/15"}`}
+                              >
                                 {t.side.toUpperCase()}
                               </Badge>
-                              <span className="min-w-0 flex-1 truncate font-medium">{t.symbol}</span>
-                              <span className="shrink-0 tabular-nums font-semibold">{Number(t.value).toFixed(2)}</span>
+                              <span className="min-w-0 flex-1 truncate font-medium">
+                                {t.symbol}
+                              </span>
+                              <span className="shrink-0 tabular-nums font-semibold">
+                                {Number(t.value).toFixed(2)}
+                              </span>
                               <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                             </summary>
                             <div className="border-t border-border px-3 py-2 space-y-1.5">
                               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
-                                <span>{t.trade_date}{timeUk ? ` · ${timeUk} ${zoneUk}` : ""}</span>
+                                <span>
+                                  {t.trade_date}
+                                  {timeUk ? ` · ${timeUk} ${zoneUk}` : ""}
+                                </span>
                                 <span>Qty {Number(t.quantity).toFixed(4)}</span>
                                 <span>@ {Number(t.price).toFixed(2)}</span>
                               </div>
                               {t.reason && (
-                                <p className="text-xs text-muted-foreground break-words"><JargonText>{t.reason}</JargonText></p>
+                                <p className="text-xs text-muted-foreground break-words">
+                                  <JargonText>{t.reason}</JargonText>
+                                </p>
                               )}
                             </div>
                           </details>
@@ -1684,8 +2116,11 @@ function PortfolioPage() {
                 <DiagnosticsPanel portfolioId={p.id} />
                 <Collapsible open={showAdvancedDiag} onOpenChange={setShowAdvancedDiag}>
                   <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
-                    <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedDiag ? "rotate-180" : ""}`} />
-                    {showAdvancedDiag ? "Hide" : "Show"} advanced diagnostics (signal decay, correlations, stress, learning delta, shadow variants)
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${showAdvancedDiag ? "rotate-180" : ""}`}
+                    />
+                    {showAdvancedDiag ? "Hide" : "Show"} advanced diagnostics (signal decay,
+                    correlations, stress, learning delta, shadow variants)
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-4">
                     <div className="grid gap-4 lg:grid-cols-2">
@@ -1701,17 +2136,46 @@ function PortfolioPage() {
 
               <TabsContent value="reports" className="mt-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {([
-                    { to: "/portfolio/$id/analytics", label: "Performance analytics", desc: "Equity, drawdown and PnL attribution across regime, sizing, exit and execution phases.", Icon: BarChart3 },
-                    { to: "/portfolio/$id/attribution", label: "Attribution", desc: "Per-asset P&L contribution and factor breakdown.", Icon: BarChart3 },
-                    { to: "/portfolio/$id/report", label: "Report", desc: "Downloadable performance report for this portfolio.", Icon: FileText },
-                    { to: "/portfolio/$id/optimizer", label: "Optimizer", desc: "Re-run the AI with alternate risk profiles for comparison.", Icon: Settings2 },
-                    { to: "/long-horizon/$id", label: "Long-horizon backtest", desc: "Multi-decade rule-based simulation vs benchmarks.", Icon: CalendarClock },
-                  ] as const).map((r) => (
+                  {(
+                    [
+                      {
+                        to: "/portfolio/$id/analytics",
+                        label: "Performance analytics",
+                        desc: "Equity, drawdown and PnL attribution across regime, sizing, exit and execution phases.",
+                        Icon: BarChart3,
+                      },
+                      {
+                        to: "/portfolio/$id/attribution",
+                        label: "Attribution",
+                        desc: "Per-asset P&L contribution and factor breakdown.",
+                        Icon: BarChart3,
+                      },
+                      {
+                        to: "/portfolio/$id/report",
+                        label: "Report",
+                        desc: "Downloadable performance report for this portfolio.",
+                        Icon: FileText,
+                      },
+                      {
+                        to: "/portfolio/$id/optimizer",
+                        label: "Optimizer",
+                        desc: "Re-run the AI with alternate risk profiles for comparison.",
+                        Icon: Settings2,
+                      },
+                      {
+                        to: "/long-horizon/$id",
+                        label: "Long-horizon backtest",
+                        desc: "Multi-decade rule-based simulation vs benchmarks.",
+                        Icon: CalendarClock,
+                      },
+                    ] as const
+                  ).map((r) => (
                     <Link key={r.to} to={r.to} params={{ id: p.id }} className="block">
                       <Card className="h-full transition-colors hover:border-primary/40">
                         <CardContent className="flex items-start gap-3 py-4">
-                          <div className="mt-0.5 rounded-md bg-muted p-2"><r.Icon className="h-4 w-4" /></div>
+                          <div className="mt-0.5 rounded-md bg-muted p-2">
+                            <r.Icon className="h-4 w-4" />
+                          </div>
                           <div className="min-w-0">
                             <div className="font-medium">{r.label}</div>
                             <p className="text-xs text-muted-foreground">{r.desc}</p>
@@ -1724,7 +2188,6 @@ function PortfolioPage() {
               </TabsContent>
             </Tabs>
           </>
-
         )}
       </main>
       <ConfirmDialog
@@ -1806,7 +2269,12 @@ type ExecutedRow = {
   liquidity?: ExecutedLiquidity;
 };
 
-type NewsRow = { headline: string; source: string | null; sentiment?: number | null; source_weight?: number | null };
+type NewsRow = {
+  headline: string;
+  source: string | null;
+  sentiment?: number | null;
+  source_weight?: number | null;
+};
 
 type Guardrails = {
   risk_level: string;
@@ -1847,7 +2315,6 @@ type DecisionRaw = {
   } | null;
 };
 
-
 function fmtNum(v: number | null | undefined, digits = 2) {
   if (v == null || Number.isNaN(v)) return "—";
   return Number(v).toFixed(digits);
@@ -1872,30 +2339,36 @@ function SignalBadges({ s }: { s: SignalRow }) {
   const rsi = s.rsi14;
   return (
     <div className="flex flex-wrap gap-1.5 text-xs">
-      <Badge variant="outline" className="tabular-nums">Px {fmtNum(s.price)}</Badge>
       <Badge variant="outline" className="tabular-nums">
-        {trendUp ? <TrendingUp className="mr-1 h-3 w-3 text-primary" /> : <TrendingDown className="mr-1 h-3 w-3 text-destructive" />}
+        Px {fmtNum(s.price)}
+      </Badge>
+      <Badge variant="outline" className="tabular-nums">
+        {trendUp ? (
+          <TrendingUp className="mr-1 h-3 w-3 text-primary" />
+        ) : (
+          <TrendingDown className="mr-1 h-3 w-3 text-destructive" />
+        )}
         SMA20 {fmtNum(s.sma20)} / 50 {fmtNum(s.sma50)}
       </Badge>
       {rsi != null && (
         <Badge
           variant="outline"
-          className={
-            rsi >= 70
-              ? "text-destructive"
-              : rsi <= 30
-              ? "text-primary"
-              : ""
-          }
+          className={rsi >= 70 ? "text-destructive" : rsi <= 30 ? "text-primary" : ""}
         >
           RSI {fmtNum(rsi, 0)}
           {rsi >= 70 ? " · overbought" : rsi <= 30 ? " · oversold" : ""}
         </Badge>
       )}
-      <Badge variant="outline" className={s.change5d != null && s.change5d >= 0 ? "text-primary" : "text-destructive"}>
+      <Badge
+        variant="outline"
+        className={s.change5d != null && s.change5d >= 0 ? "text-primary" : "text-destructive"}
+      >
         5d {fmtPct(s.change5d)}
       </Badge>
-      <Badge variant="outline" className={s.change30d != null && s.change30d >= 0 ? "text-primary" : "text-destructive"}>
+      <Badge
+        variant="outline"
+        className={s.change30d != null && s.change30d >= 0 ? "text-primary" : "text-destructive"}
+      >
         30d {fmtPct(s.change30d)}
       </Badge>
     </div>
@@ -1970,11 +2443,10 @@ function LiquidityStrip({ lq }: { lq: ExecutedLiquidity }) {
         <Badge variant="outline" className={bucketClass}>
           Rejection risk {lq.rejection_score} · {lq.rejection_bucket}
         </Badge>
+        <Badge variant="outline">Slippage ~{lq.est_slippage_bps.toFixed(0)}bps</Badge>
         <Badge variant="outline">
-          Slippage ~{lq.est_slippage_bps.toFixed(0)}bps
-        </Badge>
-        <Badge variant="outline">
-          Turnover {lq.est_turnover_pct_adv == null ? "—" : `${lq.est_turnover_pct_adv.toFixed(2)}% ADV`}
+          Turnover{" "}
+          {lq.est_turnover_pct_adv == null ? "—" : `${lq.est_turnover_pct_adv.toFixed(2)}% ADV`}
         </Badge>
         <Badge variant="outline">
           20d ADV {lq.adv_20d_usd == null ? "—" : `$${Math.round(lq.adv_20d_usd).toLocaleString()}`}
@@ -2024,9 +2496,6 @@ function OrderPanel({
     ? news.filter((n) => keywordMatch(n.headline, signal.symbol, signal.name)).slice(0, 3)
     : [];
 
-
-
-
   return (
     <div className="rounded-lg border border-border bg-muted/10 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -2068,7 +2537,6 @@ function OrderPanel({
             </Badge>
           )}
         </div>
-
       </div>
 
       <p className="mb-2 text-sm">
@@ -2077,7 +2545,6 @@ function OrderPanel({
       </p>
 
       {order.liquidity && <LiquidityStrip lq={order.liquidity} />}
-
 
       <PlainEnglishExplanation
         decisionId={decisionId}
@@ -2107,7 +2574,6 @@ function OrderPanel({
         </div>
       )}
 
-
       {relatedNews.length > 0 && (
         <div className="mb-2">
           <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
@@ -2130,12 +2596,12 @@ function OrderPanel({
           {approved && side === "buy" && (
             <ul className="space-y-0.5">
               <li>
-                ✓ Cash floor respected — kept ≥ {currency} {fmtNum(guardrails.cash_floor_value)}
-                {" "}({(guardrails.cash_floor_pct * 100).toFixed(0)}% of portfolio)
+                ✓ Cash floor respected — kept ≥ {currency} {fmtNum(guardrails.cash_floor_value)} (
+                {(guardrails.cash_floor_pct * 100).toFixed(0)}% of portfolio)
               </li>
               <li>
-                ✓ Position ≤ {currency} {fmtNum(guardrails.max_position_value)} cap
-                {" "}({(guardrails.max_position_pct * 100).toFixed(0)}% max)
+                ✓ Position ≤ {currency} {fmtNum(guardrails.max_position_value)} cap (
+                {(guardrails.max_position_pct * 100).toFixed(0)}% max)
               </li>
               <li>✓ Within {guardrails.max_new_positions_per_day} new-position daily cap</li>
               <li>✓ No leverage, no borrow, cash-funded</li>
@@ -2203,8 +2669,6 @@ function DecisionCard({
   });
   const regime = (regimeQ.data ?? null) as ConfidenceRegime;
 
-
-
   return (
     <Card>
       <CardContent className="space-y-4 py-4">
@@ -2229,9 +2693,7 @@ function DecisionCard({
             <Badge variant="outline">
               Cash floor {(guardrails.cash_floor_pct * 100).toFixed(0)}%
             </Badge>
-            <Badge variant="outline">
-              ≤ {guardrails.max_new_positions_per_day} new/day
-            </Badge>
+            <Badge variant="outline">≤ {guardrails.max_new_positions_per_day} new/day</Badge>
             <Badge variant="outline">No leverage</Badge>
           </div>
         )}
@@ -2258,7 +2720,9 @@ function DecisionCard({
             <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
               Market briefing
             </div>
-            <p className="text-sm text-muted-foreground"><JargonText>{decision.briefing}</JargonText></p>
+            <p className="text-sm text-muted-foreground">
+              <JargonText>{decision.briefing}</JargonText>
+            </p>
           </div>
         )}
         {decision.rationale && (
@@ -2266,7 +2730,9 @@ function DecisionCard({
             <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
               Rationale
             </div>
-            <p className="text-sm"><JargonText>{decision.rationale}</JargonText></p>
+            <p className="text-sm">
+              <JargonText>{decision.rationale}</JargonText>
+            </p>
           </div>
         )}
 
@@ -2290,7 +2756,6 @@ function DecisionCard({
                 regime={regime}
               />
             ))}
-
           </div>
         )}
         {executed.length === 0 && (
@@ -2344,7 +2809,6 @@ function DecisionCard({
   );
 }
 
-
 function Metric({
   label,
   value,
@@ -2356,13 +2820,14 @@ function Metric({
   hint?: string;
   tone?: "up" | "down";
 }) {
-  const toneClass =
-    tone === "up" ? "text-emerald-400" : tone === "down" ? "text-red-400" : "";
+  const toneClass = tone === "up" ? "text-emerald-400" : tone === "down" ? "text-red-400" : "";
   return (
     <div className="min-w-0 rounded-md border border-border/60 bg-card px-3 py-2">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`truncate text-base font-semibold tabular-nums ${toneClass}`}>{value}</div>
-      {hint ? <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{hint}</div> : null}
+      {hint ? (
+        <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{hint}</div>
+      ) : null}
     </div>
   );
 }
@@ -2473,4 +2938,3 @@ function PlainEnglishExplanation({
     </div>
   );
 }
-

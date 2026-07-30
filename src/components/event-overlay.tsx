@@ -14,7 +14,12 @@ type Props = {
 };
 
 /** Render <ReferenceArea>/<ReferenceLine> children INSIDE a recharts chart. */
-export function EventOverlay({ domainDates, yAxisId, minSeverity = 2, labelPosition = "insideTopRight" }: Props) {
+export function EventOverlay({
+  domainDates,
+  yAxisId,
+  minSeverity = 2,
+  labelPosition = "insideTopRight",
+}: Props) {
   if (!domainDates?.length) return null;
   const first = domainDates[0];
   const last = domainDates[domainDates.length - 1];
@@ -35,7 +40,13 @@ export function EventOverlay({ domainDates, yAxisId, minSeverity = 2, labelPosit
               strokeDasharray="3 3"
               yAxisId={yAxisId as never}
               ifOverflow="extendDomain"
-              label={{ value: e.short, position: labelPosition, fill: color, fontSize: 10, fontWeight: 600 }}
+              label={{
+                value: e.short,
+                position: labelPosition,
+                fill: color,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
             />
           );
         }
@@ -51,7 +62,13 @@ export function EventOverlay({ domainDates, yAxisId, minSeverity = 2, labelPosit
             strokeOpacity={0.35}
             strokeDasharray="2 3"
             ifOverflow="extendDomain"
-            label={{ value: e.short, position: labelPosition, fill: color, fontSize: 10, fontWeight: 600 }}
+            label={{
+              value: e.short,
+              position: labelPosition,
+              fill: color,
+              fontSize: 12,
+              fontWeight: 600,
+            }}
           />
         );
       })}

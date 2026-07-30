@@ -45,3 +45,20 @@ export const CHART_SEQUENCE: readonly string[] = [
 // legibility for numeric axes.
 export const AXIS_TICK = { fontSize: 12, fill: "var(--foreground)" } as const;
 export const AXIS_LABEL = { fontSize: 12, fill: "var(--foreground)" } as const;
+
+// Legend text. Recharts renders legend labels with the browser's inherited
+// colour, which resolves to black inside an SVG-adjacent wrapper — always
+// pin it to the theme foreground.
+export const LEGEND_STYLE = { fontSize: 12, color: "var(--foreground)" } as const;
+
+// Tooltip surface. Recharts' built-in default is an opaque white panel with
+// black text, which is unreadable against this app's dark theme.
+export const TOOLTIP_CONTENT_STYLE = {
+  fontSize: 12,
+  background: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: 6,
+  color: "var(--popover-foreground)",
+} as const;
+export const TOOLTIP_LABEL_STYLE = { color: "var(--muted-foreground)" } as const;
+export const TOOLTIP_ITEM_STYLE = { color: "var(--popover-foreground)" } as const;

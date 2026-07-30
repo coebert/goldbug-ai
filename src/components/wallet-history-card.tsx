@@ -20,7 +20,7 @@ import {
 import { getWalletHistory } from "@/lib/wallet-history.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AXIS_TICK } from "@/lib/chart-palette";
+import { AXIS_TICK, LEGEND_STYLE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 
 interface Props {
   portfolioId: string;
@@ -136,14 +136,16 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
                 <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={24} />
-                  <YAxis width={64}
+                  <YAxis
+                    width={64}
                     yAxisId="left"
                     tick={AXIS_TICK}
                     tickFormatter={(v) =>
                       typeof v === "number" ? v.toLocaleString("en-GB") : String(v)
                     }
                   />
-                  <YAxis width={64}
+                  <YAxis
+                    width={64}
                     yAxisId="right"
                     orientation="right"
                     tick={AXIS_TICK}
@@ -152,17 +154,16 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
                     }
                   />
                   <Tooltip
-                    contentStyle={{ fontSize: 12 }}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
                     formatter={(value: number | string, name: string) => {
                       const n = typeof value === "number" ? value : Number(value);
-                      if (name === "__baseTotal")
-                        return [fmt(n, baseCcy), `Total (${baseCcy})`];
+                      if (name === "__baseTotal") return [fmt(n, baseCcy), `Total (${baseCcy})`];
                       return [fmt(n, name), name];
                     }}
                     labelFormatter={(l) => String(l)}
                   />
                   <Legend
-                    wrapperStyle={{ fontSize: 12 }}
+                    wrapperStyle={LEGEND_STYLE}
                     formatter={(v) => (v === "__baseTotal" ? `Total (${baseCcy})` : v)}
                   />
                   {currencies.map((c, i) => (
@@ -193,8 +194,8 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
               </ResponsiveContainer>
             </div>
             <div className="mt-2 text-xs text-muted-foreground">
-              Stacked areas: wallet balance per currency (native units). Line: total
-              wallet valued in {baseCcy}. Snapshots are captured once per tick.
+              Stacked areas: wallet balance per currency (native units). Line: total wallet valued
+              in {baseCcy}. Snapshots are captured once per tick.
             </div>
           </>
         )}

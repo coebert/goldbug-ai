@@ -67,8 +67,7 @@ export function TailHedgeReportCard({
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["tail-hedge-report", portfolioId, sinceDays ?? "all"],
-    queryFn: () =>
-      fetchReport({ data: sinceDays ? { portfolioId, sinceDays } : { portfolioId } }),
+    queryFn: () => fetchReport({ data: sinceDays ? { portfolioId, sinceDays } : { portfolioId } }),
     staleTime: 60 * 1000,
   });
 
@@ -85,17 +84,32 @@ export function TailHedgeReportCard({
       .channel(`tail-hedge-live:${portfolioId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "decisions", filter: `portfolio_id=eq.${portfolioId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "decisions",
+          filter: `portfolio_id=eq.${portfolioId}`,
+        },
         invalidate,
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "decisions", filter: `portfolio_id=eq.${portfolioId}` },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "decisions",
+          filter: `portfolio_id=eq.${portfolioId}`,
+        },
         invalidate,
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "live_fills", filter: `portfolio_id=eq.${portfolioId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "live_fills",
+          filter: `portfolio_id=eq.${portfolioId}`,
+        },
         invalidate,
       )
       .subscribe();
@@ -103,7 +117,6 @@ export function TailHedgeReportCard({
       supabase.removeChannel(channel);
     };
   }, [portfolioId, queryClient]);
-
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -163,7 +176,12 @@ export function TailHedgeReportCard({
                   <Tooltip
                     formatter={(v: number) => money(v, currency)}
                     labelStyle={{ color: "var(--foreground)" }}
-                    contentStyle={{ background: "var(--card)", borderRadius: 6, fontSize: 12 }}
+                    contentStyle={{
+                      background: "var(--card)",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      color: "var(--popover-foreground)",
+                    }}
                   />
                   <Area
                     type="monotone"
@@ -199,9 +217,21 @@ function TotalsGrid({ report, currency }: { report: HedgeReport; currency: strin
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <Stat label="Advisories" value={String(t.decisions)} sub={`${t.applied} applied`} />
-      <Stat label="Gross notional" value={money(t.grossNotional, currency)} sub={`net ${money(t.netNotional, currency)}`} />
-      <Stat label="Est. fees + slippage" value={money(netCost, currency)} sub={`${t.buyCount}B / ${t.sellCount}S`} />
-      <Stat label="Unfilled advised" value={money(t.unfilledAdvisedNotional, currency)} sub={`${t.deferred} deferred`} />
+      <Stat
+        label="Gross notional"
+        value={money(t.grossNotional, currency)}
+        sub={`net ${money(t.netNotional, currency)}`}
+      />
+      <Stat
+        label="Est. fees + slippage"
+        value={money(netCost, currency)}
+        sub={`${t.buyCount}B / ${t.sellCount}S`}
+      />
+      <Stat
+        label="Unfilled advised"
+        value={money(t.unfilledAdvisedNotional, currency)}
+        sub={`${t.deferred} deferred`}
+      />
     </div>
   );
 }
@@ -241,7 +271,10 @@ function TradesTable({ report, currency }: { report: HedgeReport; currency: stri
             <tr key={i} className="border-b border-border/40 last:border-0">
               <td className="py-1">{fmtDate(t.date)}</td>
               <td>
-                <Badge variant={t.action === "buy" ? "default" : "secondary"} className="h-4 px-1 text-[10px]">
+                <Badge
+                  variant={t.action === "buy" ? "default" : "secondary"}
+                  className="h-4 px-1 text-[10px]"
+                >
                   {t.action.toUpperCase()}
                 </Badge>
               </td>
@@ -302,9 +335,13 @@ function PhaseAttributionTable({ report }: { report: HedgeReport }) {
           </thead>
           <tbody className="tabular-nums">
             {report.phaseAttribution.map((r) => {
-              const isHedge = r.phase.toLowerCase().includes("hedge") || r.phase.toLowerCase().includes("phase6");
+              const isHedge =
+                r.phase.toLowerCase().includes("hedge") || r.phase.toLowerCase().includes("phase6");
               return (
-                <tr key={r.phase} className={`border-b border-border/40 last:border-0 ${isHedge ? "bg-primary/5" : ""}`}>
+                <tr
+                  key={r.phase}
+                  className={`border-b border-border/40 last:border-0 ${isHedge ? "bg-primary/5" : ""}`}
+                >
                   <td className="py-1">{r.phase}</td>
                   <td className="text-right">{pct(r.cagrDelta)}</td>
                   <td className="text-right">{pct(r.ddDelta)}</td>

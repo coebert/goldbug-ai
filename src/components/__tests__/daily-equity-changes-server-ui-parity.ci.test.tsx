@@ -84,16 +84,13 @@ type ChartRow = {
   netFlow: number;
 };
 
-function uiRenderedRows(fixture: {
-  equity: EquitySnapshotLite[];
-  deposits: DepositLite[];
-}): { chart: ChartRow[]; best?: string; worst?: string } {
+function uiRenderedRows(fixture: { equity: EquitySnapshotLite[]; deposits: DepositLite[] }): {
+  chart: ChartRow[];
+  best?: string;
+  worst?: string;
+} {
   const html = renderToStaticMarkup(
-    <DailyEquityChangesCard
-      equity={fixture.equity}
-      deposits={fixture.deposits}
-      currency="GBP"
-    />,
+    <DailyEquityChangesCard equity={fixture.equity} deposits={fixture.deposits} currency="GBP" />,
   );
   // Parse without a DOM: the test runs under the node env. The mocked
   // BarChart wraps its data in a JSON-encoded `data-payload` attribute

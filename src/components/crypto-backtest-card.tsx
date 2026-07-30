@@ -22,7 +22,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { toast } from "sonner";
 import { AXIS_TICK } from "@/lib/chart-palette";
 
@@ -32,7 +39,11 @@ const fmtPct = (v: number, digits = 2) =>
   Number.isFinite(v) ? `${(v * 100).toFixed(digits)}%` : "—";
 const fmtGbp = (v: number) =>
   Number.isFinite(v)
-    ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(v)
+    ? new Intl.NumberFormat("en-GB", {
+        style: "currency",
+        currency: "GBP",
+        maximumFractionDigits: 0,
+      }).format(v)
     : "—";
 
 export function CryptoBacktestCard({ portfolioId }: Props) {
@@ -72,16 +83,14 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
     return Array.from(byDate.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   })();
 
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Crypto playbook replay backtest</CardTitle>
         <CardDescription>
-          Replays daily bars for the six Saxo-tradable crypto ETPs against your
-          risk-level sleeve cap and the live playbook resolver. Reports total
-          return, CAGR, max drawdown and Sharpe so you can judge expected
-          reward vs risk before letting the AI trade the sleeve.
+          Replays daily bars for the six Saxo-tradable crypto ETPs against your risk-level sleeve
+          cap and the live playbook resolver. Reports total return, CAGR, max drawdown and Sharpe so
+          you can judge expected reward vs risk before letting the AI trade the sleeve.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -112,33 +121,73 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat label="Final equity" value={fmtGbp(report.finalEquity)} />
-              <Stat label="Total return" value={fmtPct(report.totalReturnPct)} tone={report.totalReturnPct >= 0 ? "pos" : "neg"} />
-              <Stat label="CAGR" value={fmtPct(report.cagrPct)} tone={report.cagrPct >= 0 ? "pos" : "neg"} />
+              <Stat
+                label="Total return"
+                value={fmtPct(report.totalReturnPct)}
+                tone={report.totalReturnPct >= 0 ? "pos" : "neg"}
+              />
+              <Stat
+                label="CAGR"
+                value={fmtPct(report.cagrPct)}
+                tone={report.cagrPct >= 0 ? "pos" : "neg"}
+              />
               <Stat label="Max drawdown" value={fmtPct(report.maxDrawdownPct)} tone="neg" />
               <Stat label="Ann. volatility" value={fmtPct(report.volatilityPctAnnual)} />
-              <Stat label="Sharpe" value={report.sharpe.toFixed(2)} tone={report.sharpe >= 0 ? "pos" : "neg"} />
+              <Stat
+                label="Sharpe"
+                value={report.sharpe.toFixed(2)}
+                tone={report.sharpe >= 0 ? "pos" : "neg"}
+              />
               <Stat label="Win rate" value={fmtPct(report.winRate, 1)} />
               <Stat label="Closed trades" value={String(report.trades)} />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <RegimeBadge label="Risk-on days" value={report.bucketDayCount.risk_on} total={report.daysReplayed} tone="pos" />
-              <RegimeBadge label="Caution days" value={report.bucketDayCount.caution} total={report.daysReplayed} tone="warn" />
-              <RegimeBadge label="Risk-off days" value={report.bucketDayCount.risk_off} total={report.daysReplayed} tone="neg" />
+              <RegimeBadge
+                label="Risk-on days"
+                value={report.bucketDayCount.risk_on}
+                total={report.daysReplayed}
+                tone="pos"
+              />
+              <RegimeBadge
+                label="Caution days"
+                value={report.bucketDayCount.caution}
+                total={report.daysReplayed}
+                tone="warn"
+              />
+              <RegimeBadge
+                label="Risk-off days"
+                value={report.bucketDayCount.risk_off}
+                total={report.daysReplayed}
+                tone="neg"
+              />
             </div>
 
             {chartData.length > 0 ? (
               <div className="space-y-3">
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <ComposedChart
+                      data={chartData}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
                       <YAxis tick={AXIS_TICK} tickFormatter={(v) => fmtGbp(Number(v))} width={72} />
                       <Tooltip
-                        formatter={(v: number | string, name) => [fmtGbp(Number(v)), benchLabelFromKey(String(name))]}
+                        formatter={(v: number | string, name) => [
+                          fmtGbp(Number(v)),
+                          benchLabelFromKey(String(name)),
+                        ]}
                       />
-                      <Line type="monotone" dataKey="equity" name="Sleeve" stroke="var(--primary)" dot={false} strokeWidth={2} />
+                      <Line
+                        type="monotone"
+                        dataKey="equity"
+                        name="Sleeve"
+                        stroke="var(--primary)"
+                        dot={false}
+                        strokeWidth={2}
+                      />
                       {benchmarks
                         .filter((b) => !b.label.startsWith("Sleeve"))
                         .map((b) => (
@@ -154,7 +203,6 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                           />
                         ))}
                     </ComposedChart>
-
                   </ResponsiveContainer>
                 </div>
                 <div className="h-40">
@@ -162,9 +210,19 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                     <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis dataKey="date" tick={AXIS_TICK} minTickGap={40} />
-                      <YAxis tick={AXIS_TICK} tickFormatter={(v) => `${v}%`} width={64} domain={["dataMin", 0]} />
+                      <YAxis
+                        tick={AXIS_TICK}
+                        tickFormatter={(v) => `${v}%`}
+                        width={64}
+                        domain={["dataMin", 0]}
+                      />
                       <Tooltip formatter={(v: number | string) => [`${v}%`, "Drawdown"]} />
-                      <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="color-mix(in oklab, var(--destructive) 25%, transparent)" />
+                      <Area
+                        type="monotone"
+                        dataKey="drawdown"
+                        stroke="var(--destructive)"
+                        fill="color-mix(in oklab, var(--destructive) 25%, transparent)"
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -175,7 +233,8 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
               <div>
                 <div className="mb-2 text-sm font-medium">Benchmark comparison</div>
                 <p className="mb-2 text-xs text-muted-foreground">
-                  Same window, same starting cash. Passive holds pay one entry cost; cash compounds at the risk-free rate (0% if unset).
+                  Same window, same starting cash. Passive holds pay one entry cost; cash compounds
+                  at the risk-free rate (0% if unset).
                 </p>
                 <Table>
                   <TableHeader>
@@ -201,18 +260,33 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                           <TableRow key={b.label} className={isSleeve ? "font-medium" : ""}>
                             <TableCell>
                               <span className="inline-flex items-center gap-2">
-                                <span className="inline-block h-2 w-2 rounded-full" style={{ background: benchColor(b.label) }} />
+                                <span
+                                  className="inline-block h-2 w-2 rounded-full"
+                                  style={{ background: benchColor(b.label) }}
+                                />
                                 {b.label}
                               </span>
                             </TableCell>
                             <TableCell className="text-right">{fmtGbp(b.finalEquity)}</TableCell>
-                            <TableCell className={`text-right ${b.totalReturnPct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{fmtPct(b.totalReturnPct)}</TableCell>
+                            <TableCell
+                              className={`text-right ${b.totalReturnPct >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+                            >
+                              {fmtPct(b.totalReturnPct)}
+                            </TableCell>
                             <TableCell className="text-right">{fmtPct(b.cagrPct)}</TableCell>
-                            <TableCell className="text-right text-rose-600">{fmtPct(b.maxDrawdownPct)}</TableCell>
-                            <TableCell className="text-right">{fmtPct(b.volatilityPctAnnual)}</TableCell>
+                            <TableCell className="text-right text-rose-600">
+                              {fmtPct(b.maxDrawdownPct)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {fmtPct(b.volatilityPctAnnual)}
+                            </TableCell>
                             <TableCell className="text-right">{b.sharpe.toFixed(2)}</TableCell>
-                            <TableCell className={`text-right ${isSleeve ? "text-muted-foreground" : delta <= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                              {isSleeve ? "—" : `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(2)}pp`}
+                            <TableCell
+                              className={`text-right ${isSleeve ? "text-muted-foreground" : delta <= 0 ? "text-emerald-600" : "text-rose-600"}`}
+                            >
+                              {isSleeve
+                                ? "—"
+                                : `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(2)}pp`}
                             </TableCell>
                           </TableRow>
                         );
@@ -222,8 +296,6 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                 </Table>
               </div>
             ) : null}
-
-
 
             <div>
               <div className="mb-2 text-sm font-medium">Per-ETP contribution</div>
@@ -243,7 +315,9 @@ export function CryptoBacktestCard({ portfolioId }: Props) {
                   {report.bySymbol.map((s) => (
                     <TableRow key={s.symbol}>
                       <TableCell className="font-medium">{s.symbol}</TableCell>
-                      <TableCell><Badge variant="outline">{s.group}</Badge></TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{s.group}</Badge>
+                      </TableCell>
                       <TableCell className="text-right">{s.trades}</TableCell>
                       <TableCell className="text-right">{fmtPct(s.winRate, 1)}</TableCell>
                       <TableCell className="text-right">{fmtGbp(s.realisedPnl)}</TableCell>
@@ -275,13 +349,30 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "po
   );
 }
 
-function RegimeBadge({ label, value, total, tone }: { label: string; value: number; total: number; tone: "pos" | "warn" | "neg" }) {
+function RegimeBadge({
+  label,
+  value,
+  total,
+  tone,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  tone: "pos" | "warn" | "neg";
+}) {
   const pct = total > 0 ? (value / total) * 100 : 0;
-  const cls = tone === "pos" ? "bg-emerald-50 text-emerald-700" : tone === "warn" ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700";
+  const cls =
+    tone === "pos"
+      ? "bg-emerald-50 text-emerald-700"
+      : tone === "warn"
+        ? "bg-amber-50 text-amber-700"
+        : "bg-rose-50 text-rose-700";
   return (
     <div className={`rounded-md border p-3 ${cls}`}>
       <div className="text-xs opacity-80">{label}</div>
-      <div className="text-lg font-semibold">{value} <span className="text-xs opacity-80">({pct.toFixed(0)}%)</span></div>
+      <div className="text-lg font-semibold">
+        {value} <span className="text-xs opacity-80">({pct.toFixed(0)}%)</span>
+      </div>
     </div>
   );
 }
@@ -295,17 +386,22 @@ function benchKey(label: string): string {
 }
 function benchLabelFromKey(key: string): string {
   switch (key) {
-    case "equity": return "Sleeve";
-    case "bench_btc": return "BTC buy & hold";
-    case "bench_eth": return "ETH buy & hold";
-    case "bench_cash": return "Cash";
-    default: return key;
+    case "equity":
+      return "Sleeve";
+    case "bench_btc":
+      return "BTC buy & hold";
+    case "bench_eth":
+      return "ETH buy & hold";
+    case "bench_cash":
+      return "Cash";
+    default:
+      return key;
   }
 }
 function benchColor(label: string): string {
   if (label.startsWith("Sleeve")) return "var(--primary)";
-  if (label.startsWith("BTC")) return "#f7931a";       // bitcoin orange
-  if (label.startsWith("ETH")) return "#627eea";       // ethereum blue
+  if (label.startsWith("BTC")) return "#f7931a"; // bitcoin orange
+  if (label.startsWith("ETH")) return "#627eea"; // ethereum blue
   if (label.startsWith("Cash")) return "var(--muted-foreground)";
   return "var(--muted-foreground)";
 }
