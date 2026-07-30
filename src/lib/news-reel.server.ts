@@ -27,6 +27,13 @@ export type NewsReelItem = {
   original_language: string | null;
   translation_confidence: number | null;
 
+  /** 0..100 portfolio-relevance rank assigned at ingestion. */
+  relevance_score: number | null;
+  /** Plain-English reason the score was assigned. */
+  relevance_reason: string | null;
+  /** Machine tags (holding:VOD, theme:inflation, ccy:GBP…). */
+  relevance_tags: string[];
+
   avg_sentiment: number | null;
   decisions_count: number;
   influences: NewsReelInfluence[];

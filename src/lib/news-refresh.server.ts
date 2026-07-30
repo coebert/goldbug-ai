@@ -16,6 +16,8 @@ export type NewsRefreshResult = {
   date: string;
   headlines: number;
   scored: number;
+  /** Headlines ranked for portfolio relevance during this refresh. */
+  relevance_scored?: number;
   skipped: boolean;
   reason?: string;
 };
@@ -54,10 +56,23 @@ export async function refreshGlobalNewsNow(max = 60): Promise<NewsRefreshResult>
   const { ensureSentimentScored } = await import("./sentiment.server");
   const items = await getNewsForDate(today, max, { forceRefresh: true });
   const scored = items.length > 0 ? await ensureSentimentScored(today, items) : [];
+
+  // Rank fresh headlines against the user's book before the reel reads them.
+  let relevanceScored = 0;
+  if (items.length > 0) {
+    try {
+      const { ensureRelevanceScored } = await import("./news-relevance.server");
+      relevanceScored = (await ensureRelevanceScored(today)).scored;
+    } catch (err) {
+      console.warn("news-refresh: relevance pass failed", err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return {
     date: today,
     headlines: items.length,
     scored: scored.filter((s) => s.sentiment != null).length,
+    relevance_scored: relevanceScored,
     skipped: false,
   };
 }

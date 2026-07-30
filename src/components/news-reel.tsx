@@ -8,13 +8,28 @@ import { Badge } from "@/components/ui/badge";
 import { TranslationBadge } from "@/components/translation-badge";
 import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
+import { relevanceBand, relevanceBandLabel, sortByRelevance } from "@/lib/news-relevance";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
+
+/** Badge colour per relevance band — semantic tokens only. */
+function relevanceCls(score: number): string {
+  switch (relevanceBand(score)) {
+    case "critical":
+      return "bg-primary/15 text-primary";
+    case "high":
+      return "bg-primary/10 text-primary";
+    case "moderate":
+      return "bg-muted text-foreground";
+    default:
+      return "bg-muted/60 text-muted-foreground";
+  }
+}
 import { NEWS_TOPICS, classifyNewsTopic } from "@/lib/news-topics";
 
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles, Target } from "lucide-react";
 
 // Absolute sentiment threshold treated as a "strong" market-moving signal.
 const STRONG_SENTIMENT_THRESHOLD = 0.4;
@@ -171,11 +186,13 @@ export function NewsReel() {
   const [sourceFilter, setSourceFilter] = useState<Set<string>>(new Set());
   const [topicFilter, setTopicFilter] = useState<Set<string>>(new Set());
   const [onlyCited, setOnlyCited] = useState(false);
-  const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
+  const [sortMode, setSortMode] = useState<"latest" | "reliability" | "relevance">("latest");
+  // Hide headlines the ranker judged unlikely to touch the user's book.
+  const [onlyRelevant, setOnlyRelevant] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount =
     assetFilter.size + riskFilter.size + sourceFilter.size + topicFilter.size +
-    (onlyCited ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
+    (onlyCited ? 1 : 0) + (onlyRelevant ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -236,6 +253,7 @@ export function NewsReel() {
   const items = useMemo(() => {
     const filtered = allItems.filter((it) => {
       if (onlyCited && it.decisions_count === 0) return false;
+      if (onlyRelevant && (it.relevance_score ?? 0) < 60) return false;
       if (assetFilter.size > 0) {
         if (!it.asset_classes.some((c) => assetFilter.has(c))) return false;
       }
@@ -250,6 +268,11 @@ export function NewsReel() {
       }
       return true;
     });
+    if (sortMode === "relevance") {
+      // Portfolio impact first (scored at ingestion against holdings, universe
+      // and risk level); newest wins inside an equal score.
+      return sortByRelevance(filtered);
+    }
     if (sortMode === "reliability") {
       // Composite trust score: credibility weighted 60%, recency 40%.
       const score = (it: (typeof filtered)[number]) => {
@@ -261,7 +284,7 @@ export function NewsReel() {
     }
     // Latest first: shared helper keeps this identical to the server ordering.
     return sortNewsLatestFirst(filtered);
-  }, [allItems, assetFilter, riskFilter, sourceFilter, topicFilter, topicById, onlyCited, sortMode, now]);
+  }, [allItems, assetFilter, riskFilter, sourceFilter, topicFilter, topicById, onlyCited, onlyRelevant, sortMode, now]);
 
 
   // Timestamp of the freshest headline currently in the reel — lets the user
@@ -292,6 +315,7 @@ export function NewsReel() {
     const strongNew = allItems.filter((it) => {
       if (prevSeen.has(it.id)) return false;
       if (onlyCited && it.decisions_count === 0) return false;
+      if (onlyRelevant && (it.relevance_score ?? 0) < 60) return false;
       if (assetFilter.size > 0 && !it.asset_classes.some((c) => assetFilter.has(c))) return false;
       if (riskFilter.size > 0 && !it.risk_levels.some((r) => riskFilter.has(r))) return false;
       const s = it.avg_sentiment;
@@ -457,7 +481,11 @@ export function NewsReel() {
                   ? `Newest headline ${formatUkTime(newestHeadlineAt)} ${ukZoneAbbr(newestHeadlineAt)}`
                   : "No headlines yet"}
                 {" · "}
-                {sortMode === "latest" ? "newest first" : "most reliable first"}
+                {sortMode === "latest"
+                  ? "newest first"
+                  : sortMode === "relevance"
+                    ? "most relevant to your book first"
+                    : "most reliable first"}
                 {refreshMs === 0 ? " · auto-refresh off" : ""}
               </div>
             </div>
@@ -531,6 +559,18 @@ export function NewsReel() {
           >
             Cited only
           </button>
+          <button
+            type="button"
+            onClick={() => setOnlyRelevant((v) => !v)}
+            className={`rounded-full border px-2 py-0.5 transition-colors ${
+              onlyRelevant
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+            }`}
+            title="Only show headlines scored 60+ for likely impact on your holdings, universe and risk level"
+          >
+            High relevance only
+          </button>
           {topicOptions.length > 0 && (
             <div className="flex w-full flex-wrap items-center gap-2">
               <span className="text-muted-foreground uppercase tracking-wide">Topic:</span>
@@ -579,7 +619,7 @@ export function NewsReel() {
               </div>
             </div>
           )}
-          {(assetFilter.size > 0 || riskFilter.size > 0 || sourceFilter.size > 0 || topicFilter.size > 0 || onlyCited) && (
+          {(assetFilter.size > 0 || riskFilter.size > 0 || sourceFilter.size > 0 || topicFilter.size > 0 || onlyCited || onlyRelevant) && (
             <button
               type="button"
               onClick={() => {
@@ -588,6 +628,7 @@ export function NewsReel() {
                 setSourceFilter(new Set());
                 setTopicFilter(new Set());
                 setOnlyCited(false);
+                setOnlyRelevant(false);
               }}
               className="ml-1 text-muted-foreground underline hover:text-foreground"
             >
@@ -600,11 +641,12 @@ export function NewsReel() {
               <span className="uppercase tracking-wide">Sort:</span>
               <select
                 value={sortMode}
-                onChange={(e) => setSortMode(e.target.value as "latest" | "reliability")}
+                onChange={(e) => setSortMode(e.target.value as "latest" | "reliability" | "relevance")}
                 className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                title="Sort headlines by newest first, or by a composite of source credibility (60%) and recency (40%)."
+                title="Sort by newest first, by portfolio relevance (AI-scored against your holdings, universe and risk level), or by a composite of source credibility (60%) and recency (40%)."
               >
                 <option value="latest">Latest</option>
+                <option value="relevance">Most relevant</option>
                 <option value="reliability">Most reliable</option>
               </select>
             </label>
@@ -692,6 +734,20 @@ export function NewsReel() {
                             <Badge variant="outline" className={`border-transparent ${tone.cls}`}>
                               {tone.label}
                             </Badge>
+                            {item.relevance_score != null && (
+                              <Badge
+                                variant="outline"
+                                className={`border-transparent ${relevanceCls(item.relevance_score)}`}
+                                title={
+                                  item.relevance_reason
+                                    ? `${relevanceBandLabel(item.relevance_score)} (${Math.round(item.relevance_score)}/100) — ${item.relevance_reason}`
+                                    : `${relevanceBandLabel(item.relevance_score)} (${Math.round(item.relevance_score)}/100)`
+                                }
+                              >
+                                <Target className="mr-1 h-2.5 w-2.5" />
+                                {Math.round(item.relevance_score)}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <p className="text-sm font-medium leading-snug text-foreground">

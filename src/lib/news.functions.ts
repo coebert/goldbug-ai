@@ -33,7 +33,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       (
         await context.supabase
           .from("news_cache")
-          .select("id, news_date, fetched_at, source, headline, url, summary, original_headline, original_language, translation_confidence")
+          .select("id, news_date, fetched_at, source, headline, url, summary, original_headline, original_language, translation_confidence, relevance_score, relevance_reason, relevance_tags")
           .gte("news_date", since)
           .order("news_date", { ascending: false })
           .order("fetched_at", { ascending: false })
@@ -56,6 +56,22 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       const dates = Array.from(new Set(needsTranslation.map((r) => r.news_date as string))).slice(0, 5);
       await Promise.all(dates.map((d) => backfillTranslations(d).catch(() => null)));
       news = await readNews();
+    }
+
+    // Opportunistic relevance repair: rows cached before the ranker existed
+    // (or written by a path that skipped it) get scored now, so the reel never
+    // shows an unranked headline. Bounded to the dates on screen.
+    const unranked = news.filter((r) => (r as { relevance_score?: number | null }).relevance_score == null);
+    if (unranked.length > 0) {
+      const { ensureRelevanceScored, loadRelevanceContext } = await import("@/lib/news-relevance.server");
+      const dates = Array.from(new Set(unranked.map((r) => r.news_date as string))).slice(0, 3);
+      try {
+        const ctx = await loadRelevanceContext();
+        for (const d of dates) await ensureRelevanceScored(d, { ctx, max: 60 });
+        news = await readNews();
+      } catch (err) {
+        console.warn("news reel: relevance repair failed", err instanceof Error ? err.message : String(err));
+      }
     }
 
     // 2. Recent decisions across the user's own portfolios.
@@ -186,6 +202,16 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
         translation_confidence: (() => {
           const c = (r as { translation_confidence?: number | string | null }).translation_confidence;
           return c == null ? null : Number(c);
+        })(),
+
+        relevance_score: (() => {
+          const v = (r as { relevance_score?: number | string | null }).relevance_score;
+          return v == null ? null : Number(v);
+        })(),
+        relevance_reason: ((r as { relevance_reason?: string | null }).relevance_reason ?? null),
+        relevance_tags: (() => {
+          const t = (r as { relevance_tags?: unknown }).relevance_tags;
+          return Array.isArray(t) ? (t as unknown[]).map((x) => String(x)) : [];
         })(),
 
         avg_sentiment: avg,

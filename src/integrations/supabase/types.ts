@@ -1248,6 +1248,9 @@ export type Database = {
           news_date: string
           original_headline: string | null
           original_language: string | null
+          relevance_reason: string | null
+          relevance_score: number | null
+          relevance_tags: Json | null
           sentiment: string | null
           source: string | null
           source_weight: number | null
@@ -1263,6 +1266,9 @@ export type Database = {
           news_date: string
           original_headline?: string | null
           original_language?: string | null
+          relevance_reason?: string | null
+          relevance_score?: number | null
+          relevance_tags?: Json | null
           sentiment?: string | null
           source?: string | null
           source_weight?: number | null
@@ -1278,6 +1284,9 @@ export type Database = {
           news_date?: string
           original_headline?: string | null
           original_language?: string | null
+          relevance_reason?: string | null
+          relevance_score?: number | null
+          relevance_tags?: Json | null
           sentiment?: string | null
           source?: string | null
           source_weight?: number | null

@@ -152,7 +152,7 @@ describe("looksNonEnglish", () => {
     expect(looksNonEnglish("Apple beats earnings, stock jumps 4%")).toBe(false);
   });
 
-  it("returns true when any non-ASCII character is present", async () => {
+  it("routes genuinely non-English headlines for translation", async () => {
     const { looksNonEnglish } = await import("../news.server");
     // Cyrillic
     expect(looksNonEnglish("Центробанк повысил ставку")).toBe(true);
@@ -160,8 +160,9 @@ describe("looksNonEnglish", () => {
     expect(looksNonEnglish("央行加息")).toBe(true);
     // Accented Latin — still routed for detection
     expect(looksNonEnglish("Élysée annonce de nouvelles mesures")).toBe(true);
-    // Emoji / symbol also triggers
-    expect(looksNonEnglish("Markets rally 🚀")).toBe(true);
+    // Emoji and other non-ASCII decoration are NOT evidence of a foreign
+    // language — an English headline with an emoji must not be translated.
+    expect(looksNonEnglish("Markets rally 🚀")).toBe(false);
   });
 
   it("handles empty strings safely", async () => {
