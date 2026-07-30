@@ -9,6 +9,8 @@ import { TranslationBadge } from "@/components/translation-badge";
 import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 import { sortNewsLatestFirst } from "@/lib/news-reel-sort";
 import { dedupeNewsItems } from "@/lib/news-dedupe";
+import { NEWS_TOPICS, classifyNewsTopic } from "@/lib/news-topics";
+
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
