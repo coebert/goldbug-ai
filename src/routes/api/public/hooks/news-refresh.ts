@@ -42,8 +42,18 @@ export const Route = createFileRoute("/api/public/hooks/news-refresh")({
           const items = await getNewsForDate(today, max, { forceRefresh });
           const scored = items.length > 0 ? await ensureSentimentScored(today, items) : [];
           const scoredCount = scored.filter((item) => item.sentiment != null).length;
+          // Portfolio-relevance pass: every fresh headline is ranked against
+          // the user's holdings, universe and risk level before it can reach
+          // the reel, so priority ordering is available on first read.
+          let relevanceScored = 0;
+          try {
+            const { ensureRelevanceScored } = await import("@/lib/news-relevance.server");
+            relevanceScored = (await ensureRelevanceScored(today)).scored;
+          } catch (err) {
+            console.warn("news-refresh: relevance pass failed", err instanceof Error ? err.message : String(err));
+          }
           console.log(
-            `news-refresh: completed for ${today} (${items.length} headlines, ${scoredCount} scored)`,
+            `news-refresh: completed for ${today} (${items.length} headlines, ${scoredCount} scored, ${relevanceScored} ranked)`,
           );
           return new Response(
             JSON.stringify({
@@ -51,6 +61,7 @@ export const Route = createFileRoute("/api/public/hooks/news-refresh")({
               date: today,
               headlines: items.length,
               scored: scoredCount,
+              relevance_scored: relevanceScored,
               at: new Date().toISOString(),
               max,
             }),
