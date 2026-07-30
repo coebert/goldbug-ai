@@ -198,6 +198,39 @@ export function NewsReel() {
     () => dedupeNewsItems(sortNewsLatestFirst(rawItems)),
     [rawItems],
   );
+  // Topic per headline (derived — `news_cache` has no topic column).
+  const topicById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const it of allItems) m.set(it.id, classifyNewsTopic(it as any));
+    return m;
+  }, [allItems]);
+
+  // Source / topic options with counts, so the user sees what's available.
+  const sourceOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of allItems) {
+      const s = (it.source ?? "").trim();
+      if (!s) continue;
+      counts.set(s, (counts.get(s) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([source, count]) => ({ source, count }));
+  }, [allItems]);
+
+  const topicOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of allItems) {
+      const t = topicById.get(it.id) ?? "other";
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return NEWS_TOPICS.filter((t) => counts.has(t.id)).map((t) => ({
+      id: t.id as string,
+      label: t.label,
+      count: counts.get(t.id) ?? 0,
+    }));
+  }, [allItems, topicById]);
+
   const items = useMemo(() => {
     const filtered = allItems.filter((it) => {
       if (onlyCited && it.decisions_count === 0) return false;
@@ -206,6 +239,12 @@ export function NewsReel() {
       }
       if (riskFilter.size > 0) {
         if (!it.risk_levels.some((r) => riskFilter.has(r))) return false;
+      }
+      if (sourceFilter.size > 0) {
+        if (!sourceFilter.has((it.source ?? "").trim())) return false;
+      }
+      if (topicFilter.size > 0) {
+        if (!topicFilter.has(topicById.get(it.id) ?? "other")) return false;
       }
       return true;
     });
@@ -220,7 +259,8 @@ export function NewsReel() {
     }
     // Latest first: shared helper keeps this identical to the server ordering.
     return sortNewsLatestFirst(filtered);
-  }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
+  }, [allItems, assetFilter, riskFilter, sourceFilter, topicFilter, topicById, onlyCited, sortMode, now]);
+
 
   // Timestamp of the freshest headline currently in the reel — lets the user
   // confirm at a glance that newest-first ordering is in effect.
