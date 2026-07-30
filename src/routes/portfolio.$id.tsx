@@ -1577,8 +1577,8 @@ function PortfolioPage() {
                                     {benchmark}: <span className={color(bv)}>{fmt(bv)}</span>
                                   </div>
                                 )}
-
                               </div>
+
                             );
                           })}
                         </div>
