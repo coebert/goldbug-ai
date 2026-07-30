@@ -20,6 +20,10 @@ export const Route = createFileRoute("/api/public/hooks/saxo-refresh")({
         const { forceRefreshTokens, getOAuthStatus } = await import(
           "@/lib/brokers/saxo-oauth.server"
         );
+        const { recordTokenRefreshOutcome, checkRefreshWindow } = await import(
+          "@/lib/broker-token-health.server"
+        );
+        const { redactedError } = await import("@/lib/_server/redact");
         const result: Record<string, unknown> = {};
         for (const env of ["sim", "live"] as const) {
           try {
@@ -33,12 +37,26 @@ export const Route = createFileRoute("/api/public/hooks/saxo-refresh")({
               continue;
             }
             const r = await forceRefreshTokens(env);
+            recordTokenRefreshOutcome({
+              env,
+              source: "saxo-refresh",
+              ok: true,
+              skipped: r.refreshed ? null : r.reason,
+            });
+            checkRefreshWindow({
+              env,
+              secondsUntilRefreshExpiry: (await getOAuthStatus(env))
+                .secondsUntilRefreshExpiry,
+            });
             result[env] = r.refreshed
               ? { ok: true, refreshed: true }
               : { ok: true, skipped: r.reason };
           } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
+            // Redacted: token endpoints echo the request (and sometimes
+            // credentials) back inside the error body.
+            const msg = redactedError(e).message;
             console.error(`saxo-refresh: ${env} failed`, msg);
+            recordTokenRefreshOutcome({ env, source: "saxo-refresh", ok: false, error: e });
             result[env] = { ok: false, error: msg };
           }
         }
