@@ -18,6 +18,8 @@ export type NewsReelInfluence = {
 export type NewsReelItem = {
   id: string;
   date: string;
+  /** Precise ingestion timestamp (ISO) — used for true "latest first" ordering. */
+  fetched_at: string | null;
   source: string | null;
   headline: string;
   url: string | null;

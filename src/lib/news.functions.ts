@@ -31,7 +31,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       (
         await context.supabase
           .from("news_cache")
-          .select("id, news_date, source, headline, url, summary, original_headline, original_language, translation_confidence")
+          .select("id, news_date, fetched_at, source, headline, url, summary, original_headline, original_language, translation_confidence")
           .gte("news_date", since)
           .order("news_date", { ascending: false })
           .order("fetched_at", { ascending: false })
@@ -165,6 +165,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       return {
         id: r.id,
         date: r.news_date,
+        fetched_at: ((r as { fetched_at?: string | null }).fetched_at ?? null),
         source: r.source,
         headline: r.headline,
         url: r.url,
@@ -186,13 +187,15 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       };
     });
 
-    // Sort: cited items first, then newest.
-    items.sort((a, b) => {
-      if ((b.decisions_count > 0 ? 1 : 0) !== (a.decisions_count > 0 ? 1 : 0)) {
-        return (b.decisions_count > 0 ? 1 : 0) - (a.decisions_count > 0 ? 1 : 0);
-      }
-      return a.date < b.date ? 1 : -1;
-    });
+    // Sort: strictly newest first (ingestion timestamp, falling back to news date),
+    // with citation count only as a tie-breaker within the same instant.
+    const ts = (i: NewsReelItem) => {
+      const t = i.fetched_at ? Date.parse(i.fetched_at) : NaN;
+      if (Number.isFinite(t)) return t;
+      const d = Date.parse(`${i.date}T00:00:00Z`);
+      return Number.isFinite(d) ? d : 0;
+    };
+    items.sort((a, b) => ts(b) - ts(a) || b.decisions_count - a.decisions_count);
 
     const sliced = items.slice(0, limit);
     return { items: sliced, as_of: asOf.toISOString(), has_more: items.length > limit, since_days: sinceDays, limit };
