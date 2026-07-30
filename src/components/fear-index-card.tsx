@@ -12,9 +12,12 @@ import {
   AXIS_LINE,
   AXIS_TICK,
   CHART_ROLE,
+  GRID_PROPS,
+  REFERENCE_LINE,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
 } from "@/lib/chart-palette";
+
 import {
   CartesianGrid,
   Line,
