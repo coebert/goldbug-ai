@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runWithBreaker } from "@/lib/_server/provider-circuit";
 import { GDELT_SOURCES } from "./news-sources";
 import { fetchRssForDate } from "./news-rss.server";
-import { buildSeenKeySet, filterUnseen } from "./news-dedupe";
+import { buildSeenKeySet, filterUnseen, normalizeHeadlineKey } from "./news-dedupe";
 import { detectLanguage, needsTranslation } from "./language-detect";
 
 
@@ -133,11 +133,14 @@ function detectLanguageName(s: string): string | null {
 //      translated, `headline` holds English and `original_headline` /
 //      `original_language` are set. Every read path already prefers cached
 //      rows before hitting GDELT, so a translated row is never re-sent.
-//   2. In-memory per-worker LRU keyed by the source headline text — repeat
-//      appearances (same story, different day or source) skip the LLM
-//      entirely. Also used to hydrate freshly-fetched GDELT items from any
-//      prior translation of the same headline stored in news_cache.
-//   3. In-flight de-duplication on `backfillTranslations(dateISO)` so many
+//   2. In-memory per-worker LRU keyed by the NORMALISED headline key — the
+//      same story arriving with different casing, punctuation or a wire
+//      prefix ("UPDATE 2-…") reuses one translation instead of paying for a
+//      second LLM call.
+//   3. Durable `headline_translation_cache`, also keyed on that normalised
+//      key (`norm_key`, uniquely indexed), so cron runs and refreshes across
+//      workers/restarts never retranslate a story already translated.
+//   4. In-flight de-duplication on `backfillTranslations(dateISO)` so many
 //      concurrent renders sharing a request don't stampede the LLM.
 
 type TranslationCacheEntry = {
@@ -146,22 +149,32 @@ type TranslationCacheEntry = {
   confidence: number | null; // 0..1, null when unknown or no translation
 };
 
+/**
+ * Cache key for a headline: the shared normalised dedupe key, so cache hits
+ * survive punctuation/casing/wire-prefix drift. Falls back to the trimmed raw
+ * text when normalisation yields nothing (e.g. emoji-only headlines).
+ */
+export function translationCacheKey(headline: string): string {
+  return normalizeHeadlineKey(headline) || headline.trim().toLowerCase();
+}
 
 const TRANSLATION_CACHE_MAX = 2000;
 const translationCache = new Map<string, TranslationCacheEntry>();
 
 function cacheGet(headline: string): TranslationCacheEntry | undefined {
-  const hit = translationCache.get(headline);
+  const key = translationCacheKey(headline);
+  const hit = translationCache.get(key);
   if (!hit) return undefined;
   // LRU touch — reinserting moves it to newest position.
-  translationCache.delete(headline);
-  translationCache.set(headline, hit);
+  translationCache.delete(key);
+  translationCache.set(key, hit);
   return hit;
 }
 
 function cacheSet(headline: string, entry: TranslationCacheEntry): void {
-  if (translationCache.has(headline)) translationCache.delete(headline);
-  translationCache.set(headline, entry);
+  const key = translationCacheKey(headline);
+  if (translationCache.has(key)) translationCache.delete(key);
+  translationCache.set(key, entry);
   if (translationCache.size > TRANSLATION_CACHE_MAX) {
     // Evict oldest.
     const oldest = translationCache.keys().next().value;
@@ -169,31 +182,48 @@ function cacheSet(headline: string, entry: TranslationCacheEntry): void {
   }
 }
 
+function cacheDelete(headline: string): void {
+  translationCache.delete(translationCacheKey(headline));
+}
+
 // Warm the in-memory cache from the dedicated persistent translation cache
 // so translations survive server restarts. Only rows whose `expires_at` is
 // still in the future are honored — stale rows fall through to the LLM.
+// Lookups go through `norm_key`, so a story whose punctuation/casing changed
+// between runs still resolves to the stored translation.
 async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
-  const missing = originals.filter((h) => !translationCache.has(h));
+  const missing = originals.filter((h) => !translationCache.has(translationCacheKey(h)));
   if (missing.length === 0) return;
+  const keys = Array.from(new Set(missing.map(translationCacheKey))).filter(Boolean);
+  if (keys.length === 0) return;
   try {
     const nowIso = new Date().toISOString();
     const { data } = await supabaseAdmin
       .from("headline_translation_cache")
-      .select("source_headline, language, translation, confidence, expires_at")
-      .in("source_headline", missing)
+      .select("source_headline, norm_key, language, translation, confidence, expires_at")
+      .in("norm_key", keys)
       .gt("expires_at", nowIso)
       .limit(500);
+    const byKey = new Map<string, TranslationCacheEntry>();
     for (const r of data ?? []) {
-      const orig = (r as { source_headline: string }).source_headline;
-      const lang = (r as { language: string | null }).language;
-      const translation = (r as { translation: string | null }).translation;
-      const conf = (r as { confidence: number | string | null }).confidence;
-      if (!orig) continue;
-      cacheSet(orig, {
-        lang: lang ?? null,
-        translation: translation ?? null,
-        confidence: conf == null ? null : Number(conf),
+      const row = r as {
+        source_headline: string | null;
+        norm_key: string | null;
+        language: string | null;
+        translation: string | null;
+        confidence: number | string | null;
+      };
+      const key = row.norm_key || (row.source_headline ? translationCacheKey(row.source_headline) : "");
+      if (!key) continue;
+      byKey.set(key, {
+        lang: row.language ?? null,
+        translation: row.translation ?? null,
+        confidence: row.confidence == null ? null : Number(row.confidence),
       });
+    }
+    for (const h of missing) {
+      const hit = byKey.get(translationCacheKey(h));
+      if (hit) cacheSet(h, hit);
     }
   } catch (err) {
     // Non-fatal — the cache just stays cold for these keys.
@@ -201,9 +231,9 @@ async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
   }
 }
 
-// Persist fresh LLM results to the dedicated cache with a 30-day TTL
-// (via the column default). Upsert so repeated appearances refresh
-// `updated_at`/`expires_at` and keep hot entries alive.
+// Persist fresh LLM results to the dedicated cache with a 30-day TTL.
+// Upsert on `norm_key` so repeated appearances of the same story (any
+// punctuation/casing variant) refresh one row rather than adding duplicates.
 async function persistTranslations(
   entries: { source: string; entry: TranslationCacheEntry }[],
 ): Promise<void> {
@@ -211,17 +241,27 @@ async function persistTranslations(
   try {
     const nowIso = new Date().toISOString();
     const expiresIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const rows = entries.map(({ source, entry }) => ({
+    // Collapse variants inside this batch — the unique index rejects a batch
+    // containing two rows with the same norm_key.
+    const byKey = new Map<string, { source: string; entry: TranslationCacheEntry }>();
+    for (const e of entries) {
+      const key = translationCacheKey(e.source);
+      if (!key) continue;
+      byKey.set(key, e);
+    }
+    const rows = Array.from(byKey.entries()).map(([norm_key, { source, entry }]) => ({
       source_headline: source,
+      norm_key,
       language: entry.lang,
       translation: entry.translation,
       confidence: entry.confidence,
       updated_at: nowIso,
       expires_at: expiresIso,
     }));
+    if (rows.length === 0) return;
     const { error } = await supabaseAdmin
       .from("headline_translation_cache")
-      .upsert(rows, { onConflict: "source_headline" });
+      .upsert(rows, { onConflict: "norm_key" });
     if (error) {
       console.warn("news: translation cache upsert failed", error.message);
     }
@@ -229,6 +269,7 @@ async function persistTranslations(
     console.warn("news: translation cache upsert threw", err instanceof Error ? err.message : String(err));
   }
 }
+
 
 // Background refresh: find translation cache rows that have expired (or are
 // within `soonMs` of expiring) and re-run the LLM so the persistent cache
@@ -263,7 +304,7 @@ export function refreshStaleTranslations(
 
       // Evict from memory so translateWithCache is forced to re-hit the LLM
       // instead of returning the about-to-expire entry.
-      for (const h of originals) translationCache.delete(h);
+      for (const h of originals) cacheDelete(h);
 
       // Re-translate (in-memory + persistent cache both get rewritten with a
       // fresh 30-day TTL via persistTranslations).
@@ -362,46 +403,63 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
 async function translateWithCache(
   headlines: string[],
 ): Promise<Map<string, TranslationCacheEntry>> {
-  const result = new Map<string, TranslationCacheEntry>();
-  if (headlines.length === 0) return result;
+  const byKey = new Map<string, TranslationCacheEntry>();
+  if (headlines.length === 0) return new Map();
 
-  // De-duplicate identical inputs so a batch of repeats sends one call.
-  const uniq = Array.from(new Set(headlines));
+  // De-duplicate on the NORMALISED key, so punctuation/casing variants of the
+  // same story share one cache lookup and one LLM slot.
+  const repByKey = new Map<string, string>();
+  for (const h of headlines) {
+    const k = translationCacheKey(h);
+    if (!k || repByKey.has(k)) continue;
+    repByKey.set(k, h);
+  }
+  const uniq = Array.from(repByKey.values());
 
   // 1. Memory cache.
   const stillMissing: string[] = [];
   for (const h of uniq) {
     const hit = cacheGet(h);
-    if (hit) result.set(h, hit);
+    if (hit) byKey.set(translationCacheKey(h), hit);
     else stillMissing.push(h);
   }
-  if (stillMissing.length === 0) return result;
 
-  // 2. Try to hydrate from persistent cache (translations of the same
-  //    original headline previously stored on another date/source).
-  await hydrateFromDbByOriginal(stillMissing);
+  // 2. Persistent cache — translations of the same story stored on another
+  //    date/source, or by an earlier cron run/worker.
+  if (stillMissing.length > 0) {
+    await hydrateFromDbByOriginal(stillMissing);
+  }
   const truly: string[] = [];
   for (const h of stillMissing) {
     const hit = cacheGet(h);
-    if (hit) result.set(h, hit);
+    if (hit) byKey.set(translationCacheKey(h), hit);
     else truly.push(h);
   }
-  if (truly.length === 0) return result;
 
   // 3. LLM call for what's left, then persist in memory + durable cache.
-  const numbered = truly.map((text, i) => ({ i, text }));
-  const byIndex = await callTranslateLLM(numbered);
-  const toPersist: { source: string; entry: TranslationCacheEntry }[] = [];
-  for (let i = 0; i < truly.length; i++) {
-    const entry = byIndex.get(i);
-    if (!entry) continue;
-    cacheSet(truly[i], entry);
-    result.set(truly[i], entry);
-    toPersist.push({ source: truly[i], entry });
+  if (truly.length > 0) {
+    const numbered = truly.map((text, i) => ({ i, text }));
+    const byIndex = await callTranslateLLM(numbered);
+    const toPersist: { source: string; entry: TranslationCacheEntry }[] = [];
+    for (let i = 0; i < truly.length; i++) {
+      const entry = byIndex.get(i);
+      if (!entry) continue;
+      cacheSet(truly[i], entry);
+      byKey.set(translationCacheKey(truly[i]), entry);
+      toPersist.push({ source: truly[i], entry });
+    }
+    await persistTranslations(toPersist);
   }
-  await persistTranslations(toPersist);
+
+  // Fan the per-key results back out to every input headline variant.
+  const result = new Map<string, TranslationCacheEntry>();
+  for (const h of headlines) {
+    const hit = byKey.get(translationCacheKey(h));
+    if (hit) result.set(h, hit);
+  }
   return result;
 }
+
 
 
 export async function translateHeadlines(items: NewsItem[]): Promise<NewsItem[]> {

@@ -739,6 +739,7 @@ export type Database = {
           created_at: string
           expires_at: string
           language: string | null
+          norm_key: string | null
           source_headline: string
           translation: string | null
           updated_at: string
@@ -748,6 +749,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           language?: string | null
+          norm_key?: string | null
           source_headline: string
           translation?: string | null
           updated_at?: string
@@ -757,6 +759,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           language?: string | null
+          norm_key?: string | null
           source_headline?: string
           translation?: string | null
           updated_at?: string
