@@ -100,6 +100,36 @@ export function EquityPctChart({
 
   const hourlyPoints = intradayQ.data?.points ?? [];
 
+  // Hourly recording only started when the feature shipped, so portfolios with
+  // months of daily history would open on an almost-empty Hourly view. The
+  // first time Hourly is opened with fewer points than daily snapshots, seed
+  // the missing hours from the daily series (one anchor per day). Runs at most
+  // once per mount and never overwrites genuinely recorded hours.
+  const backfillFn = useServerFn(backfillIntradayEquity);
+  const backfilled = useRef(false);
+  const [backfilling, setBackfilling] = useState(false);
+  useEffect(() => {
+    if (resolution !== "hourly" || !portfolioId) return;
+    if (backfilled.current || intradayQ.isLoading || !intradayQ.data) return;
+    if (hourlyPoints.length >= equity.length) return;
+    backfilled.current = true;
+    setBackfilling(true);
+    void backfillFn({ data: { portfolioId, days: 365 } })
+      .then(() => intradayQ.refetch())
+      .catch(() => undefined)
+      .finally(() => setBackfilling(false));
+  }, [
+    resolution,
+    portfolioId,
+    intradayQ.isLoading,
+    intradayQ.data,
+    hourlyPoints.length,
+    equity.length,
+    backfillFn,
+    intradayQ,
+  ]);
+
+
   const { data, domain, last } = useMemo(() => {
     const base = Number(startingCash);
     const source: Array<{ at: string; value: number }> =
