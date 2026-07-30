@@ -3,9 +3,18 @@
 // Every public webhook MUST call `verifyCronRequest(request, { bucket, ... })`
 // before touching any admin client. It bundles:
 //   1. Per-IP token-bucket rate limit (see rate-limit.server).
-//   2. Constant-time auth check using either the existing `x-cron-secret`
-//      header or the canonical Lovable Cloud `apikey` header.
-//   3. Uniform 401 / 429 responses so no route diverges.
+//   2. Constant-time auth check against the PRIVATE `CRON_SECRET`.
+//   3. Optional timestamped HMAC signature for the money-moving routes.
+//   4. Uniform 401 / 429 responses so no route diverges.
+//   5. A persisted `cron_auth` security event on every rejection, so repeated
+//      probing raises a push alert instead of sitting silently in the logs.
+//
+// SECURITY — do NOT reintroduce an `apikey` / publishable-key branch here.
+// The Supabase publishable key is shipped inside the browser bundle of the
+// published site, so accepting it as a credential makes these endpoints (which
+// place real broker orders) callable by anyone who opens the app. The private
+// `CRON_SECRET` is the only accepted bearer, and pg_cron reads it from the
+// vault.
 //
 // Returning `{ ok: false, response }` means the handler must return
 // `response` unchanged. `{ ok: true }` means the caller is verified.
@@ -22,8 +31,15 @@ import {
 export interface VerifyCronOptions extends RateLimitOptions {
   /** Optional override; defaults to process.env.CRON_SECRET. */
   expectedSecret?: string;
-  /** Optional override; defaults to process.env.SUPABASE_PUBLISHABLE_KEY. */
-  expectedApiKey?: string;
+  /**
+   * Require `x-cron-timestamp` + `x-cron-signature` in addition to the shared
+   * secret. Use on every endpoint that can place or reconcile real orders: it
+   * binds the request to a single path and a short time window, so a captured
+   * request cannot be replayed or pointed at a different endpoint.
+   */
+  requireSignature?: boolean;
+  /** Accepted clock skew for signed requests, in seconds (default 300). */
+  maxSkewSeconds?: number;
 }
 
 export type VerifyCronResult =
@@ -45,6 +61,92 @@ function timingSafeEqual(a: string, b: string): boolean {
   return out === 0;
 }
 
+/** Hex HMAC-SHA256 over `${timestamp}.${pathname}`, keyed with CRON_SECRET. */
+async function signPayload(secret: string, payload: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Probes within this window are counted towards the alert threshold. */
+const AUTH_ALERT_WINDOW_MIN = 15;
+const AUTH_ALERT_THRESHOLD = 5;
+const AUTH_ALERT_COOLDOWN_MIN = 60;
+
+/**
+ * Record a rejected webhook call and, when someone is clearly probing, notify
+ * every admin. Fire-and-forget: an audit failure must never turn a clean 401
+ * into a 500.
+ */
+function auditAuthFailure(context: {
+  bucket: string;
+  ip: string;
+  path: string;
+  reason: string;
+}): void {
+  console.warn("SECURITY:cron_auth rejected webhook call", context);
+  void (async () => {
+    try {
+      const { supabaseAdmin } = await import(
+        "@/integrations/supabase/client.server"
+      );
+      await supabaseAdmin.from("security_audit_log").insert({
+        event: "cron_auth",
+        op: context.bucket,
+        reason: context.reason,
+        details: { ip: context.ip, path: context.path },
+      });
+
+      const since = new Date(
+        Date.now() - AUTH_ALERT_WINDOW_MIN * 60_000,
+      ).toISOString();
+      const { count } = await supabaseAdmin
+        .from("security_audit_log")
+        .select("id", { count: "exact", head: true })
+        .eq("event", "cron_auth")
+        .gte("created_at", since);
+      if ((count ?? 0) < AUTH_ALERT_THRESHOLD) return;
+
+      // Cooldown: don't spam while an attack is ongoing.
+      const cooldownSince = new Date(
+        Date.now() - AUTH_ALERT_COOLDOWN_MIN * 60_000,
+      ).toISOString();
+      const { count: recentAlerts } = await supabaseAdmin
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("category", "cron_auth")
+        .gte("created_at", cooldownSince);
+      if ((recentAlerts ?? 0) > 0) return;
+
+      const { data: admins } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+      for (const admin of admins ?? []) {
+        await supabaseAdmin.from("notifications").insert({
+          user_id: admin.user_id,
+          category: "cron_auth",
+          severity: "critical",
+          title: "Unauthorised webhook attempts",
+          body: `${count} rejected calls to ${context.path} in the last ${AUTH_ALERT_WINDOW_MIN} minutes (last reason: ${context.reason}).`,
+          details: { ip: context.ip, path: context.path, count },
+        });
+      }
+    } catch {
+      /* best-effort */
+    }
+  })();
+}
+
 export async function verifyCronRequest(
   request: Request,
   opts: VerifyCronOptions,
@@ -52,27 +154,47 @@ export async function verifyCronRequest(
   const rl = await checkRateLimit(request, opts);
   if (!rl.allowed) return { ok: false, response: tooManyRequests(rl) };
 
+  const path = new URL(request.url).pathname;
+  const reject = (reason: string): VerifyCronResult => {
+    auditAuthFailure({ bucket: opts.bucket, ip: rl.ip, path, reason });
+    return { ok: false, response: jsonResponse(401, { error: "unauthorized" }) };
+  };
+
   const provided =
     request.headers.get("x-cron-secret") ??
     request.headers.get("X-Cron-Secret") ??
     "";
   const expected = opts.expectedSecret ?? process.env.CRON_SECRET ?? "";
-  const providedApiKey =
-    request.headers.get("apikey") ??
-    request.headers.get("ApiKey") ??
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    "";
-  const expectedApiKey =
-    opts.expectedApiKey ??
-    process.env.SUPABASE_PUBLISHABLE_KEY ??
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-    "";
 
-  const secretOk = Boolean(expected && provided && timingSafeEqual(provided, expected));
-  const apiKeyOk = Boolean(expectedApiKey && providedApiKey && timingSafeEqual(providedApiKey, expectedApiKey));
-
-  if (!secretOk && !apiKeyOk) {
-    return { ok: false, response: jsonResponse(401, { error: "unauthorized" }) };
+  if (!expected) return reject("cron_secret_not_configured");
+  if (!provided || !timingSafeEqual(provided, expected)) {
+    return reject("bad_or_missing_secret");
   }
+
+  const timestamp =
+    request.headers.get("x-cron-timestamp") ??
+    request.headers.get("X-Cron-Timestamp") ??
+    "";
+  const signature =
+    request.headers.get("x-cron-signature") ??
+    request.headers.get("X-Cron-Signature") ??
+    "";
+
+  // A signature is mandatory on high-risk routes, and always verified when
+  // present — an attacker cannot downgrade by omitting a valid one.
+  if (opts.requireSignature || timestamp || signature) {
+    if (!timestamp || !signature) return reject("missing_signature");
+
+    const ts = Number(timestamp);
+    if (!Number.isFinite(ts)) return reject("bad_timestamp");
+    const skew = Math.abs(Date.now() / 1000 - ts);
+    if (skew > (opts.maxSkewSeconds ?? 300)) return reject("stale_signature");
+
+    const want = await signPayload(expected, `${timestamp}.${path}`);
+    if (!timingSafeEqual(signature.toLowerCase(), want)) {
+      return reject("bad_signature");
+    }
+  }
+
   return { ok: true, ip: rl.ip };
 }

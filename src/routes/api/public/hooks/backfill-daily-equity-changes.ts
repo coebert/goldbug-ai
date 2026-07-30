@@ -7,11 +7,13 @@ export const Route = createFileRoute(
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apiKey = request.headers.get("apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
-        if (!apiKey || !expected || apiKey !== expected) {
-          return new Response("Unauthorized", { status: 401 });
-        }
+        const { verifyCronRequest } = await import("@/lib/_server/cron");
+        const verified = await verifyCronRequest(request, {
+          bucket: "hooks:backfill-daily-equity-changes",
+          capacity: 10,
+          refillPerSec: 10 / 3600,
+        });
+        if (!verified.ok) return verified.response;
 
         let days = 30;
         try {

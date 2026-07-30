@@ -2267,6 +2267,36 @@ export type Database = {
           },
         ]
       }
+      trading_controls: {
+        Row: {
+          base_currency: string
+          daily_notional_limit: number
+          halt_reason: string | null
+          id: boolean
+          trading_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          base_currency?: string
+          daily_notional_limit?: number
+          halt_reason?: string | null
+          id?: boolean
+          trading_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          base_currency?: string
+          daily_notional_limit?: number
+          halt_reason?: string | null
+          id?: boolean
+          trading_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

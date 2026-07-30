@@ -10,6 +10,7 @@ export const Route = createFileRoute("/api/public/hooks/live-reconcile")({
         const { verifyCronRequest } = await import("@/lib/_server/cron");
         const verified = await verifyCronRequest(request, {
           bucket: "hooks:live-reconcile",
+          requireSignature: true,
           capacity: 5,
           refillPerSec: 5/3600,
         });
