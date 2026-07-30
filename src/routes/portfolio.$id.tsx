@@ -1706,10 +1706,10 @@ function PortfolioPage() {
                                       <div className="tabular-nums text-muted-foreground pl-3.5">
                                         vs start: {pnlFromStart >= 0 ? "+" : ""}
                                         {pnlFromStart.toFixed(2)} ({pnlPctFromStart.toFixed(2)}%)
-                                        {dep !== 0 && (
+                                        {capital - baselineStartingCash !== 0 && (
                                           <span
                                             className="ml-1"
-                                            title={`Excludes ${p.currency} ${dep.toFixed(2)} of ${dep >= 0 ? "deposits" : "withdrawals"}`}
+                                            title={`Measured against ${p.currency} ${capital.toFixed(2)} of invested capital, including ${p.currency} ${Math.abs(capital - baselineStartingCash).toFixed(2)} of ${capital >= baselineStartingCash ? "deposits" : "withdrawals"}`}
                                           >
                                             · trading only
                                           </span>
