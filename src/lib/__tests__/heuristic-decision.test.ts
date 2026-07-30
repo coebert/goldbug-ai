@@ -57,6 +57,6 @@ describe("heuristic-decision", () => {
       reason: "gateway 429",
     });
     expect(d.orders).toEqual([]);
-    expect(d.briefing).toMatch(/no exit signals/);
+    expect(d.briefing).toMatch(/heuristic found no signals/);
   });
 });
