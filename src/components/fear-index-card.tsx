@@ -254,7 +254,7 @@ export function FearIndexCard({ portfolioId, active = true, currency = "GBP" }: 
                       data={history}
                       margin={{ top: 8, right: 8, bottom: 4, left: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <CartesianGrid {...GRID_PROPS} />
                       <XAxis
                         dataKey="run_date"
                         tick={AXIS_TICK}
@@ -266,7 +266,7 @@ export function FearIndexCard({ portfolioId, active = true, currency = "GBP" }: 
                       <YAxis
                         domain={[0, 100]}
                         ticks={[0, 20, 40, 60, 80, 100]}
-                        width={36}
+                        width={56}
                         tick={AXIS_TICK}
                         tickLine={TICK_LINE}
                         axisLine={AXIS_LINE}
@@ -275,8 +275,9 @@ export function FearIndexCard({ portfolioId, active = true, currency = "GBP" }: 
                         contentStyle={TOOLTIP_CONTENT_STYLE}
                         formatter={(v: number) => [v.toFixed(0), "Fear"]}
                       />
-                      <ReferenceLine y={60} stroke={CHART_ROLE.warning} strokeDasharray="4 4" />
-                      <ReferenceLine y={80} stroke={CHART_ROLE.negative} strokeDasharray="4 4" />
+                      <ReferenceLine {...REFERENCE_LINE} y={60} />
+                      <ReferenceLine {...REFERENCE_LINE} y={80} />
+
                       <Line
                         type="monotone"
                         dataKey="score"
