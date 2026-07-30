@@ -166,11 +166,15 @@ export function NewsReel() {
   const [paused, setPaused] = useState(false);
   const [assetFilter, setAssetFilter] = useState<Set<string>>(new Set());
   const [riskFilter, setRiskFilter] = useState<Set<string>>(new Set());
+  const [sourceFilter, setSourceFilter] = useState<Set<string>>(new Set());
+  const [topicFilter, setTopicFilter] = useState<Set<string>>(new Set());
   const [onlyCited, setOnlyCited] = useState(false);
   const [sortMode, setSortMode] = useState<"latest" | "reliability">("latest");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount =
-    assetFilter.size + riskFilter.size + (onlyCited ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
+    assetFilter.size + riskFilter.size + sourceFilter.size + topicFilter.size +
+    (onlyCited ? 1 : 0) + (sortMode !== "latest" ? 1 : 0);
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const toggleExpanded = (id: string) => {
