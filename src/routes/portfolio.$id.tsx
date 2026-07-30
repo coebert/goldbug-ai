@@ -836,10 +836,14 @@ function PortfolioPage() {
                 </div>
               </div>
             )}
-
-
+            <EquityPctChart
+              className="mb-4 md:hidden"
+              equity={equity as { snapshot_date: string; total_value: number }[]}
+              startingCash={startingCash}
+            />
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as PortfolioTab)} className="mt-2">
+
               {/* Mobile: single-row horizontally scrollable strip with snap so
                   the tab set doesn't consume 3–4 vertical rows on 375px.
                   Desktop keeps the wrap-free flex layout. */}
