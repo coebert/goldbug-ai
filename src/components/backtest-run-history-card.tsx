@@ -22,7 +22,16 @@ import {
   YAxis,
 } from "recharts";
 import type { BacktestMetrics } from "@/lib/backtest-metrics";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, OKABE_ITO, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  OKABE_ITO,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 
 export type BacktestEquityPoint = { snapshot_date: string; total_value: number };
 

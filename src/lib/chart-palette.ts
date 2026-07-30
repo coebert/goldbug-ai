@@ -117,9 +117,5 @@ export const CHART_NEUTRAL_SERIES = "#9AA4B2";
 // The contrast suite iterates this list, so anything rendered in a chart
 // must come from here rather than an inline literal.
 export const CHART_SERIES_COLORS: readonly string[] = [
-  ...new Set<string>([
-    ...Object.values(CHART_ROLE),
-    ...CHART_SEQUENCE,
-    CHART_NEUTRAL_SERIES,
-  ]),
+  ...new Set<string>([...Object.values(CHART_ROLE), ...CHART_SEQUENCE, CHART_NEUTRAL_SERIES]),
 ];

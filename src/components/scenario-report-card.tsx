@@ -25,7 +25,15 @@ import {
   type ScenarioReport,
 } from "@/lib/scenario-report";
 import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, OKABE_ITO, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  OKABE_ITO,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 const PALETTE = [
   OKABE_ITO.skyBlue,

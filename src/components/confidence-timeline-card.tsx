@@ -20,7 +20,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, OKABE_ITO, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  OKABE_ITO,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 import { buildConfidenceTimeline, type ConfidencePoint } from "@/lib/confidence-timeline";
 
 type Decision = { id: string; run_date: string; raw: unknown };

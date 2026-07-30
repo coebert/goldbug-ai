@@ -17,7 +17,17 @@ import {
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
-import { AXIS_LINE, AXIS_TICK, CHART_NEUTRAL_SERIES, CHART_ROLE, CHART_SEQUENCE, GRID_PROPS, OKABE_ITO, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_NEUTRAL_SERIES,
+  CHART_ROLE,
+  CHART_SEQUENCE,
+  GRID_PROPS,
+  OKABE_ITO,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
 const PALETTE = CHART_SEQUENCE;

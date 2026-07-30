@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPerformanceAnalytics } from "@/lib/performance-analytics.functions";
 import type { AttributionSlice } from "@/lib/performance-analytics.server";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 import {
   ResponsiveContainer,
   LineChart,

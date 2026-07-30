@@ -18,7 +18,14 @@ import {
 import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge, Globe2 } from "lucide-react";
 import { eventColor, type EventCategory } from "@/lib/global-events";
 import { Explain } from "@/components/explain";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 type Props = { portfolioId: string };
 

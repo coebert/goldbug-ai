@@ -196,7 +196,14 @@ import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, OKABE_ITO, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  GRID_PROPS,
+  OKABE_ITO,
+  REFERENCE_LINE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 type PortfolioTab =
   | "overview"
@@ -1731,12 +1738,16 @@ function PortfolioPage() {
                                 );
                               }}
                             />
-                            <ReferenceLine {...REFERENCE_LINE} y={compareMode === "pct" ? 0 : startingCash} label={{
+                            <ReferenceLine
+                              {...REFERENCE_LINE}
+                              y={compareMode === "pct" ? 0 : startingCash}
+                              label={{
                                 value: "start",
                                 fill: chartTheme.axisText,
                                 fontSize: 12,
                                 position: "insideTopRight",
-                              }} />
+                              }}
+                            />
                             {eventsOn && (
                               <EventOverlay
                                 domainDates={equityData.map((d) => d.date)}

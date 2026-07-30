@@ -39,7 +39,13 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Explain } from "@/components/explain";
-import { AXIS_LINE, CHART_SEQUENCE, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  CHART_SEQUENCE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 import {
   Sheet,
   SheetContent,

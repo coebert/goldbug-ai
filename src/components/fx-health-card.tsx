@@ -6,7 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, LEGEND_STYLE, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  LEGEND_STYLE,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface Props {

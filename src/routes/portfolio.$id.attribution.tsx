@@ -25,7 +25,17 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
-import { AXIS_LINE, AXIS_TICK, CHART_NEUTRAL_SERIES, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, OKABE_ITO, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_NEUTRAL_SERIES,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  OKABE_ITO,
+  REFERENCE_LINE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/portfolio/$id/attribution")({
   head: () => ({
@@ -491,7 +501,11 @@ function AttributionPage() {
                             }}
                           />
                           <ReferenceLine {...REFERENCE_LINE} y={0} />
-                          <Bar dataKey="avg_return_pct" name="Avg return (%)" fill={CHART_ROLE.positive} />
+                          <Bar
+                            dataKey="avg_return_pct"
+                            name="Avg return (%)"
+                            fill={CHART_ROLE.positive}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>

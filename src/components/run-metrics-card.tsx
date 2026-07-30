@@ -27,7 +27,14 @@ import {
 } from "recharts";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  LEGEND_STYLE,
+  TICK_LINE,
+} from "@/lib/chart-palette";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -212,7 +219,11 @@ export function RunMetricsCard() {
                     <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="ok" name="success" stackId="p" fill={CHART_ROLE.positive} />
                     <Bar dataKey="err" name="error" stackId="p" fill={CHART_ROLE.negative} />
-                    <Bar dataKey="budget_exceeded" name="budget exceeded" fill={CHART_ROLE.benchmark} />
+                    <Bar
+                      dataKey="budget_exceeded"
+                      name="budget exceeded"
+                      fill={CHART_ROLE.benchmark}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
