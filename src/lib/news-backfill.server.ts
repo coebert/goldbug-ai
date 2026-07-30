@@ -294,7 +294,12 @@ export async function advanceNewsBackfill(opts?: {
 }
 
 async function finishJob(id: string, status: string, error: string | null): Promise<NewsBackfillJob | null> {
-  const patch: Record<string, unknown> = {
+  const patch: {
+    status: string;
+    last_error: string | null;
+    finished_at: string;
+    cursor_date?: string | null;
+  } = {
     status,
     last_error: error,
     finished_at: new Date().toISOString(),
