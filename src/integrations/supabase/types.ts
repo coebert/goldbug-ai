@@ -1239,6 +1239,60 @@ export type Database = {
         }
         Relationships: []
       }
+      news_backfill_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          cursor_date: string | null
+          days_done: number
+          days_total: number
+          end_date: string
+          finished_at: string | null
+          headlines_inserted: number
+          id: string
+          last_error: string | null
+          new_sources: Json
+          requested_days: number
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          cursor_date?: string | null
+          days_done?: number
+          days_total: number
+          end_date: string
+          finished_at?: string | null
+          headlines_inserted?: number
+          id?: string
+          last_error?: string | null
+          new_sources?: Json
+          requested_days: number
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          cursor_date?: string | null
+          days_done?: number
+          days_total?: number
+          end_date?: string
+          finished_at?: string | null
+          headlines_inserted?: number
+          id?: string
+          last_error?: string | null
+          new_sources?: Json
+          requested_days?: number
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       news_cache: {
         Row: {
           entities: Json | null
