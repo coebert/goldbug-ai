@@ -289,6 +289,12 @@ export const getPortfolio = createServerFn({ method: "GET" })
 
     const deposits: Array<{ date: string; amount: number }> = [];
     let brokerCurrency: string | null = null;
+    // Deposits that were folded into `portfolios.starting_cash` when they were
+    // detected (live cash syncs bump the starting pot). Those must be removed
+    // from the baseline before re-adding them on their own date, otherwise the
+    // contributed capital — and any passive benchmark built from it — is
+    // double-counted.
+    let startingCashAbsorbed = 0;
     const mode = (portfolio as { mode?: string }).mode;
     if (mode !== "live_prod" && mode !== "live_sim") {
       const { data: simEvents } = await context.supabase
@@ -323,8 +329,16 @@ export const getPortfolio = createServerFn({ method: "GET" })
         const amt = Number(resp.delta);
         if (!Number.isFinite(amt) || amt === 0) continue;
         deposits.push({ date: String(row.created_at).slice(0, 10), amount: amt });
+        startingCashAbsorbed += amt;
       }
     }
+
+    const startingCash = Number(
+      (portfolio as { starting_cash?: number | string }).starting_cash ?? 0,
+    );
+    const baselineStartingCash = Number.isFinite(startingCash)
+      ? startingCash - startingCashAbsorbed
+      : startingCash;
 
     return {
       portfolio,
@@ -333,8 +347,12 @@ export const getPortfolio = createServerFn({ method: "GET" })
       decisions: decisions ?? [],
       equity: equity ?? [],
       deposits,
+      // starting_cash with any already-absorbed deposits stripped out, so
+      // `baselineStartingCash + deposits === starting_cash`.
+      baselineStartingCash,
       brokerCurrency,
     };
+
   });
 
 export const deletePortfolio = createServerFn({ method: "POST" })
