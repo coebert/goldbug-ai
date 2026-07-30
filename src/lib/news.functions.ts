@@ -13,6 +13,7 @@ import {
 } from "./news-reel.server";
 import type { NewsRefreshResult } from "./news-refresh.server";
 import { sortNewsLatestFirst } from "./news-reel-sort";
+import { dedupeNewsItems } from "./news-dedupe";
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -188,11 +189,15 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       };
     });
 
-    // Sort: strictly newest first (shared helper, also used by the reel UI).
+    // Sort: strictly newest first (shared helper, also used by the reel UI),
+    // then drop repeats of the same story (same canonical URL or headline)
+    // that earlier cron runs cached under a different date/source. Sorting
+    // first means the surviving copy is always the freshest one.
     const sorted = sortNewsLatestFirst(items);
+    const deduped = dedupeNewsItems(sorted);
 
-    const sliced = sorted.slice(0, limit);
-    return { items: sliced, as_of: asOf.toISOString(), has_more: items.length > limit, since_days: sinceDays, limit };
+    const sliced = deduped.slice(0, limit);
+    return { items: sliced, as_of: asOf.toISOString(), has_more: deduped.length > limit, since_days: sinceDays, limit };
   });
 
 export const getDecisionNewsBreakdown = createServerFn({ method: "GET" })
