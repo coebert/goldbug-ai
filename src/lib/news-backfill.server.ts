@@ -115,8 +115,9 @@ export async function startNewsBackfill(
   const newSources = fresh.map((s) => ({
     id: s.id,
     label: s.label,
-    domain: new URL(s.url).hostname.replace(/^www\./, "").toLowerCase(),
-  }));
+    domain: publisherDomain(s.url) ?? "",
+  })).filter((s) => s.domain);
+
 
   const { data, error } = await supabaseAdmin
     .from("news_backfill_jobs")
