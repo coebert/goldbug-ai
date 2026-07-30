@@ -18,6 +18,14 @@ import {
   type RelevanceScore,
   type RiskLevel,
 } from "./news-relevance";
+import {
+  classifyLlmFailure,
+  formatRunTelemetry,
+  summarizeRelevanceRun,
+  type RelevanceBatchTelemetry,
+  type RelevanceFailureReason,
+  type RelevanceRunTelemetry,
+} from "./news-relevance-telemetry";
 
 const RISK_ORDER: RiskLevel[] = ["conservative", "balanced", "aggressive"];
 
