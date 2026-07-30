@@ -31,6 +31,8 @@ const SESSION_OPTIONS = [14, 30, 90] as const;
 interface Props {
   portfolioId: string;
   active?: boolean;
+  /** Base currency for the sizing comparison amounts. */
+  currency?: string;
 }
 
 function toneFor(score: number) {
@@ -45,9 +47,10 @@ function toneFor(score: number) {
  * Fear-index gauge: the market-fear score the last run used, plus exactly how
  * that score changed buy sizing (or blocked buys entirely).
  */
-export function FearIndexCard({ portfolioId, active = true }: Props) {
+export function FearIndexCard({ portfolioId, active = true, currency = "GBP" }: Props) {
   const fetchSnapshot = useServerFn(getFearIndexSnapshot);
   const [sessions, setSessions] = useState<number>(30);
+  const [onlyResized, setOnlyResized] = useState(false);
   const query = useQuery({
     queryKey: ["fear-index", portfolioId, sessions],
     queryFn: () => fetchSnapshot({ data: { portfolio_id: portfolioId, sessions } }),
@@ -57,6 +60,13 @@ export function FearIndexCard({ portfolioId, active = true }: Props) {
 
   const d = query.data;
   const history = d?.history ?? [];
+  const impacts = d?.impacts ?? [];
+  const resized = impacts.filter((i) => i.deltaPct != null && Math.abs(i.deltaPct) >= 0.5);
+  const visibleImpacts = onlyResized ? resized : impacts;
+  const netDelta = resized.reduce(
+    (sum, i) => sum + (i.unadjustedValue != null ? i.value - i.unadjustedValue : 0),
+    0,
+  );
   const score = d?.score ?? null;
   const tone = toneFor(score ?? 50);
 
