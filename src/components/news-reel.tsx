@@ -6,6 +6,7 @@ import { getGlobalNewsReel, refreshGlobalNews } from "@/lib/trading.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TranslationBadge } from "@/components/translation-badge";
+import { formatUkDateTime, formatUkTime, ukZoneAbbr } from "@/lib/uk-time";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
