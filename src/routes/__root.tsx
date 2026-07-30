@@ -17,6 +17,8 @@ import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { GlobalShortcutsHost } from "@/lib/keyboard-shortcuts";
 import { DensityHost } from "@/lib/use-density";
 import { installChunkReloadHandler } from "@/lib/chunk-reload";
+import { MfaGate } from "@/components/mfa-gate";
+
 
 function NotFoundComponent() {
   return (
