@@ -199,10 +199,11 @@ export type RelevanceScoredRow = {
  */
 export async function ensureRelevanceScored(
   dateISO: string,
-  opts?: { rescore?: boolean; max?: number; ctx?: RelevanceContext },
-): Promise<{ scored: number; skipped: number; date: string }> {
+  opts?: { rescore?: boolean; max?: number; ctx?: RelevanceContext; trigger?: string },
+): Promise<{ scored: number; skipped: number; date: string; telemetry: RelevanceRunTelemetry | null }> {
   const ctx = opts?.ctx ?? (await loadRelevanceContext());
   const max = Math.max(1, Math.min(200, opts?.max ?? 120));
+  const trigger = opts?.trigger ?? "unknown";
 
   let query = supabaseAdmin
     .from("news_cache")
@@ -215,10 +216,10 @@ export async function ensureRelevanceScored(
   const { data: rows, error } = await query;
   if (error) {
     console.warn("news-relevance: read failed", error.message);
-    return { scored: 0, skipped: 0, date: dateISO };
+    return { scored: 0, skipped: 0, date: dateISO, telemetry: null };
   }
   const pending = rows ?? [];
-  if (pending.length === 0) return { scored: 0, skipped: 0, date: dateISO };
+  if (pending.length === 0) return { scored: 0, skipped: 0, date: dateISO, telemetry: null };
 
   // Heuristic first — it is the guaranteed floor even if the LLM call fails.
   const heuristics = pending.map((r) =>
@@ -233,14 +234,17 @@ export async function ensureRelevanceScored(
     ),
   );
 
+  const batchTelemetry: RelevanceBatchTelemetry[] = [];
   const llm = new Map<number, RelevanceScore>();
+  let batchIndex = 0;
   for (let start = 0; start < pending.length; start += BATCH) {
     const slice = pending.slice(start, start + BATCH).map((r, k) => ({
       i: start + k,
       headline: (r.headline as string) ?? "",
       source: (r.source as string | null) ?? null,
     }));
-    const batch = await scoreBatchWithLlm(slice, ctx);
+    const batch = await scoreBatchWithLlm(slice, ctx, batchIndex, batchTelemetry);
+    batchIndex += 1;
     for (const [i, v] of batch) llm.set(i, v);
   }
 
@@ -261,5 +265,38 @@ export async function ensureRelevanceScored(
     }),
   );
 
-  return { scored, skipped: pending.length - scored, date: dateISO };
+  const telemetry = summarizeRelevanceRun({
+    date: dateISO,
+    trigger,
+    items: pending.length,
+    batches: batchTelemetry,
+  });
+  console.info(`news-relevance[${trigger}] ${formatRunTelemetry(telemetry)}`);
+  await persistRunTelemetry(telemetry);
+
+  return { scored, skipped: pending.length - scored, date: dateISO, telemetry };
 }
+
+/** Best-effort persistence so the UI can show recent scoring health. */
+async function persistRunTelemetry(t: RelevanceRunTelemetry): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin.from("news_relevance_runs").insert({
+      news_date: t.date,
+      trigger: t.trigger,
+      items: t.items,
+      batches: t.batches,
+      batch_failures: t.batchFailures,
+      llm_scored: t.llmScored,
+      fallback_items: t.fallbackItems,
+      latency_ms_total: t.latencyMsTotal,
+      latency_ms_p50: t.latencyMsP50,
+      latency_ms_max: t.latencyMsMax,
+      failure_reasons: t.failureReasons,
+      fallback_reason: t.fallbackReason,
+    });
+    if (error) console.warn("news-relevance: telemetry insert failed", error.message);
+  } catch (err) {
+    console.warn("news-relevance: telemetry insert threw", err instanceof Error ? err.message : String(err));
+  }
+}
+
