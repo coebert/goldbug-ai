@@ -207,10 +207,11 @@ export function EquityPctChart({
           {data.length < 2 ? (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
               {resolution === "hourly"
-                ? intradayQ.isLoading
+                ? intradayQ.isLoading || backfilling
                   ? "Loading hourly points…"
                   : "No hourly points recorded yet — they accumulate as runs complete."
                 : "Not enough history yet."}
+
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
