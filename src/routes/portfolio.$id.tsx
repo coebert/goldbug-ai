@@ -154,6 +154,7 @@ import { PerformanceDashboardCard } from "@/components/performance-dashboard-car
 import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
+import { EquityPctChart } from "@/components/equity-pct-chart";
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 const BacktestResultsCard = lazy(() =>
