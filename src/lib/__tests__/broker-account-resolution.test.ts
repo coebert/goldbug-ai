@@ -147,18 +147,30 @@ describe("broker account resolution — call-site contracts", () => {
     expect(read(file)).toContain("broker_account_id");
   });
 
-  it("no buildSaxoAdapter call for a portfolio omits accountKey", () => {
+  it("no buildSaxoAdapter call for an already-linked portfolio omits accountKey", () => {
     for (const { file } of KEY_PASSING_SURFACES) {
       const src = read(file);
-      const calls = src.match(/buildSaxoAdapter\(\{[\s\S]*?\}\)/g) ?? [];
+      const calls = [...src.matchAll(/buildSaxoAdapter\(\{[\s\S]*?\}\)/g)];
       expect(calls.length, file).toBeGreaterThan(0);
-      for (const call of calls) {
-        // Account-agnostic probes explicitly pass portfolioId: null.
-        const accountAgnostic = /portfolioId:\s*null/.test(call);
-        expect(accountAgnostic || call.includes("accountKey"), `${file}: ${call}`).toBe(true);
+      for (const m of calls) {
+        const call = m[0];
+        // Two legitimate exemptions:
+        //  - account-agnostic probes (`portfolioId: null`), and
+        //  - activation-time discovery, which pings to LEARN the account id
+        //    and then writes it to broker_account_id.
+        const agnostic = /portfolioId:\s*null/.test(call);
+        const discovery = /ping\.accountId/.test(src.slice(m.index ?? 0, (m.index ?? 0) + 600));
+        expect(agnostic || discovery || call.includes("accountKey"), `${file}: ${call}`).toBe(true);
       }
     }
   });
+
+  it("activation persists the discovered account id instead of relying on the env default", () => {
+    const src = read("src/lib/live.functions.ts");
+    expect(src).toContain("ping.accountId");
+    expect(src).toContain("broker_account_id: brokerAccountId ?? null");
+  });
+
 
   it("order routing logs a skip instead of silently routing to a default account", () => {
     const src = read("src/lib/live-executor.server.ts");
