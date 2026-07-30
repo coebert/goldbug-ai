@@ -6,9 +6,11 @@ import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
 
 import {
+  Bar,
   CartesianGrid,
+  Cell,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -72,6 +74,50 @@ export function pctDomain(values: number[]): [number, number] {
   return [Math.max(-100, lo - pad), hi + pad];
 }
 
+export type DeltaPoint = {
+  at: string;
+  value: number;
+  pct: number;
+  /** Percentage-point move versus the previous plotted point. */
+  deltaPct: number;
+  /** Money change versus the previous point, net of deposits made in between. */
+  deltaValue: number;
+};
+
+/**
+ * Period-over-period change for each plotted point. Deposits landing between
+ * two points are netted out so a top-up never shows up as a "gain".
+ */
+export function addDeltas(
+  rows: Array<{ at: string; value: number; pct: number }>,
+  deposits: Array<{ date: string; amount: number }> = [],
+): DeltaPoint[] {
+  return rows.map((r, i) => {
+    if (i === 0) return { ...r, deltaPct: 0, deltaValue: 0 };
+    const prev = rows[i - 1];
+    const prevDay = String(prev.at).slice(0, 10);
+    const day = String(r.at).slice(0, 10);
+    const flows = deposits.reduce((sum, d) => {
+      const amt = Number(d?.amount);
+      const dd = String(d?.date ?? "").slice(0, 10);
+      return Number.isFinite(amt) && dd > prevDay && dd <= day ? sum + amt : sum;
+    }, 0);
+    return {
+      ...r,
+      deltaPct: r.pct - prev.pct,
+      deltaValue: r.value - prev.value - flows,
+    };
+  });
+}
+
+/** Symmetric domain for the delta bars so zero sits on the mid-line. */
+export function deltaDomainFor(values: number[]): [number, number] {
+  const finite = values.filter((v) => Number.isFinite(v)).map(Math.abs);
+  const max = finite.length ? Math.max(...finite) : 0;
+  const span = Math.max(0.1, max * 1.15);
+  return [-span, span];
+}
+
 /**
  * Percentage change in equity versus the capital invested at the time.
  * Zero on the y-axis is the money put in, so the line only goes negative when
@@ -83,6 +129,7 @@ export function EquityPctChart({
   startingCash,
   deposits = [],
   inceptionDate = null,
+  currency = "GBP",
   className,
 }: {
   portfolioId?: string;
@@ -92,6 +139,7 @@ export function EquityPctChart({
   deposits?: Array<{ date: string; amount: number }>;
   /** `YYYY-MM-DD` the portfolio went live; earlier points are not plotted. */
   inceptionDate?: string | null;
+  currency?: string;
   className?: string;
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
@@ -135,7 +183,7 @@ export function EquityPctChart({
   ]);
 
 
-  const { data, domain, last } = useMemo(() => {
+  const { data, domain, deltaDomain, last } = useMemo(() => {
     const base = Number(startingCash);
     const raw: Array<{ at: string; value: number }> =
       resolution === "hourly"
@@ -153,6 +201,7 @@ export function EquityPctChart({
               const capital = capitalAt(base, deposits, r.at);
               return {
                 at: r.at,
+                value: r.value,
                 pct: capital > 0 ? ((r.value - capital) / capital) * 100 : NaN,
               };
             })
@@ -161,10 +210,12 @@ export function EquityPctChart({
             .filter((r) => Number.isFinite(r.pct) && r.pct > -100)
         : [];
 
-    const vals = rows.map((r) => r.pct);
+    const withDelta = addDeltas(rows, deposits);
+    const vals = withDelta.map((r) => r.pct);
     return {
-      data: rows,
+      data: withDelta,
       domain: pctDomain(vals),
+      deltaDomain: deltaDomainFor(withDelta.map((r) => r.deltaPct)),
       last: vals.length ? vals[vals.length - 1] : 0,
     };
   }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate]);
@@ -175,6 +226,12 @@ export function EquityPctChart({
   const up = last >= 0;
   const color = up ? "var(--success)" : "var(--destructive)";
   const fmtX = resolution === "hourly" ? fmtHour : fmtDay;
+  const money = (v: number) =>
+    `${v < 0 ? "−" : "+"}${new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: currency || "GBP",
+      maximumFractionDigits: 2,
+    }).format(Math.abs(v))}`;
 
   return (
     <div className={className}>
@@ -222,7 +279,7 @@ export function EquityPctChart({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
+              <ComposedChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
                 <CartesianGrid {...GRID_PROPS} />
                 <XAxis
                   dataKey="at"
@@ -233,6 +290,7 @@ export function EquityPctChart({
                   tickLine={TICK_LINE}
                 />
                 <YAxis
+                  yAxisId="pct"
                   width={64}
                   tickMargin={4}
                   domain={domain}
@@ -241,7 +299,8 @@ export function EquityPctChart({
                   axisLine={AXIS_LINE}
                   tickLine={TICK_LINE}
                 />
-                <ReferenceLine {...REFERENCE_LINE} y={0} />
+                <YAxis yAxisId="delta" orientation="right" domain={deltaDomain} hide />
+                <ReferenceLine yAxisId="pct" {...REFERENCE_LINE} y={0} />
                 <Tooltip
                   contentStyle={{
                     fontSize: 12,
@@ -252,9 +311,39 @@ export function EquityPctChart({
                   }}
                   labelStyle={{ color: "var(--muted-foreground)" }}
                   labelFormatter={(l) => fmtX(String(l))}
-                  formatter={(v) => [`${Number(v).toFixed(2)}%`, "vs capital"]}
+                  formatter={(v, name, item) => {
+                    if (name === "delta") {
+                      const d = Number(v);
+                      const money_ = money(Number(item?.payload?.deltaValue ?? 0));
+                      return [
+                        `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(2)} pp · ${money_}`,
+                        resolution === "hourly" ? "vs prev hour" : "vs prev day",
+                      ];
+                    }
+                    return [`${Number(v).toFixed(2)}%`, "vs capital"];
+                  }}
                 />
+                <Bar
+                  yAxisId="delta"
+                  dataKey="deltaPct"
+                  name="delta"
+                  barSize={resolution === "hourly" ? 3 : 6}
+                  isAnimationActive={false}
+                  radius={[1, 1, 1, 1]}
+                >
+                  {data.map((d, i) => (
+                    <Cell
+                      key={i}
+                      fill={
+                        d.deltaPct >= 0
+                          ? "color-mix(in oklab, var(--success) 45%, transparent)"
+                          : "color-mix(in oklab, var(--destructive) 45%, transparent)"
+                      }
+                    />
+                  ))}
+                </Bar>
                 <Line
+                  yAxisId="pct"
                   type="monotone"
                   dataKey="pct"
                   stroke={color}
@@ -262,7 +351,7 @@ export function EquityPctChart({
                   dot={false}
                   isAnimationActive={false}
                 />
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
