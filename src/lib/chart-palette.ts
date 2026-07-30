@@ -96,3 +96,30 @@ export const AXIS_PROPS = {
   axisLine: AXIS_LINE,
   tickLine: TICK_LINE,
 } as const;
+
+// Reference/baseline rules (zero lines, targets, thresholds). They sit above
+// the grid but must never compete with a data series, so they land between
+// the axis frame and the plotted colours. `--border` and `--muted-foreground`
+// are NOT substitutes: both drop under 3:1 on `--surface-1`.
+export const REFERENCE_LINE_STROKE = "color-mix(in oklab, var(--foreground) 55%, transparent)";
+export const REFERENCE_LINE = {
+  stroke: REFERENCE_LINE_STROKE,
+  strokeDasharray: "3 3",
+} as const;
+
+// Neutral (non-semantic) series colour for supporting bands such as a cash
+// sleeve or a win-rate backdrop. Deliberately low-chroma so Okabe–Ito hues
+// stay dominant, but light enough to clear 3:1 on every dark surface —
+// mid-slate greys such as #64748b do not.
+export const CHART_NEUTRAL_SERIES = "#9AA4B2";
+
+// Every colour a chart may paint a line, bar, area or reference rule with.
+// The contrast suite iterates this list, so anything rendered in a chart
+// must come from here rather than an inline literal.
+export const CHART_SERIES_COLORS: readonly string[] = [
+  ...new Set<string>([
+    ...Object.values(CHART_ROLE),
+    ...CHART_SEQUENCE,
+    CHART_NEUTRAL_SERIES,
+  ]),
+];
