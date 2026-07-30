@@ -115,6 +115,13 @@ export function looksNonEnglish(s: string): boolean {
 /** Re-exported so read paths can label an item consistently without an LLM. */
 export { detectLanguage } from "./language-detect";
 
+/** Deterministic display name for a headline's language, or null if unknown. */
+function detectLanguageName(s: string): string | null {
+  const d = detectLanguage(s);
+  return d.isEnglish ? null : d.name;
+}
+
+
 
 // -------- Translation caching --------
 //
