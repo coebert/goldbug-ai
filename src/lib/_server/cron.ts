@@ -106,46 +106,24 @@ function auditAuthFailure(context: {
         details: { ip: context.ip, path: context.path },
       });
 
-      const since = new Date(
-        Date.now() - AUTH_ALERT_WINDOW_MIN * 60_000,
-      ).toISOString();
-      const { count } = await supabaseAdmin
-        .from("security_audit_log")
-        .select("id", { count: "exact", head: true })
-        .eq("event", "cron_auth")
-        .gte("created_at", since);
-      if ((count ?? 0) < AUTH_ALERT_THRESHOLD) return;
-
-      // Cooldown: don't spam while an attack is ongoing.
-      const cooldownSince = new Date(
-        Date.now() - AUTH_ALERT_COOLDOWN_MIN * 60_000,
-      ).toISOString();
-      const { count: recentAlerts } = await supabaseAdmin
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("category", "cron_auth")
-        .gte("created_at", cooldownSince);
-      if ((recentAlerts ?? 0) > 0) return;
-
-      const { data: admins } = await supabaseAdmin
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin");
-      for (const admin of admins ?? []) {
-        await supabaseAdmin.from("notifications").insert({
-          user_id: admin.user_id,
-          category: "cron_auth",
-          severity: "critical",
-          title: "Unauthorised webhook attempts",
-          body: `${count} rejected calls to ${context.path} in the last ${AUTH_ALERT_WINDOW_MIN} minutes (last reason: ${context.reason}).`,
-          details: { ip: context.ip, path: context.path, count },
-        });
-      }
+      // Shared admin fan-out: in-app notification + push, threshold + cooldown.
+      const { notifyAdminsSecurityEvent } = await import(
+        "@/lib/security-alerts.server"
+      );
+      notifyAdminsSecurityEvent({
+        event: "cron_auth",
+        reason: context.reason,
+        threshold: AUTH_ALERT_THRESHOLD,
+        windowMinutes: AUTH_ALERT_WINDOW_MIN,
+        cooldownMinutes: AUTH_ALERT_COOLDOWN_MIN,
+        details: { ip: context.ip, path: context.path },
+      });
     } catch {
       /* best-effort */
     }
   })();
 }
+
 
 /**
  * Secrets accepted right now, most-current first.
