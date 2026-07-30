@@ -1,0 +1,44 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for emoji+mixed 1`] = `"https://www.google.com/search?q=%F0%9F%9A%A8%20Ruble%20%D1%80%D1%83%D0%B1%D0%BB%D1%8C%20slides%204%25%20vs%20%E2%82%AC&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for latin+arabic-rtl 1`] = `"https://www.google.com/search?q=%D8%A3%D8%B1%D8%A7%D9%85%D9%83%D9%88%20raises%20OSP%20for%20Asia%20buyers&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for latin+cjk-chinese 1`] = `"https://www.google.com/search?q=%E4%B8%AD%E5%9B%BD%E5%A4%AE%E8%A1%8C%20injects%20500bn%20yuan%20into%20money%20markets&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for latin+cjk-japanese 1`] = `"https://www.google.com/search?q=%E6%97%A5%E9%8A%80%20holds%20rates%3B%20yen%20slips%20vs%20USD&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for latin+cyrillic 1`] = `"https://www.google.com/search?q=%D0%93%D0%B0%D0%B7%D0%BF%D1%80%D0%BE%D0%BC%20cuts%20flows%20as%20Brent%20tops%20%2495&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for latin+greek 1`] = `"https://www.google.com/search?q=%CE%A4%CF%81%CE%AC%CF%80%CE%B5%CE%B6%CE%B1%20%CE%95%CE%BB%CE%BB%CE%AC%CE%B4%CE%BF%CF%82%20warns%20on%20inflation%20(Q4)&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for latin+korean 1`] = `"https://www.google.com/search?q=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90%20Q3%20profit%20beats%20%E2%80%94%20chips%20rebound&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for plus-and-slash 1`] = `"https://www.google.com/search?q=USD%2FJPY%20150%2B%20%E2%80%94%20%E6%97%A5%E6%9C%AC%20intervention%20risk&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for reserved-chars 1`] = `"https://www.google.com/search?q=S%26P%20500%20%2B2.1%25%20%3D%20record%3F%20yes%2Fno%20%23markets&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > fallback search URL is stable for whitespace-heavy 1`] = `"https://www.google.com/search?q=%D0%95%D0%A6%D0%91%20%20%20holds%09fire%20%20on%20%20cuts&tbm=nws"`;
+
+exports[`citation link snapshots — code-switched headlines > locks the full fallback URL table 1`] = `
+{
+  "emoji+mixed": "https://www.google.com/search?q=%F0%9F%9A%A8%20Ruble%20%D1%80%D1%83%D0%B1%D0%BB%D1%8C%20slides%204%25%20vs%20%E2%82%AC&tbm=nws",
+  "latin+arabic-rtl": "https://www.google.com/search?q=%D8%A3%D8%B1%D8%A7%D9%85%D9%83%D9%88%20raises%20OSP%20for%20Asia%20buyers&tbm=nws",
+  "latin+cjk-chinese": "https://www.google.com/search?q=%E4%B8%AD%E5%9B%BD%E5%A4%AE%E8%A1%8C%20injects%20500bn%20yuan%20into%20money%20markets&tbm=nws",
+  "latin+cjk-japanese": "https://www.google.com/search?q=%E6%97%A5%E9%8A%80%20holds%20rates%3B%20yen%20slips%20vs%20USD&tbm=nws",
+  "latin+cyrillic": "https://www.google.com/search?q=%D0%93%D0%B0%D0%B7%D0%BF%D1%80%D0%BE%D0%BC%20cuts%20flows%20as%20Brent%20tops%20%2495&tbm=nws",
+  "latin+greek": "https://www.google.com/search?q=%CE%A4%CF%81%CE%AC%CF%80%CE%B5%CE%B6%CE%B1%20%CE%95%CE%BB%CE%BB%CE%AC%CE%B4%CE%BF%CF%82%20warns%20on%20inflation%20(Q4)&tbm=nws",
+  "latin+korean": "https://www.google.com/search?q=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90%20Q3%20profit%20beats%20%E2%80%94%20chips%20rebound&tbm=nws",
+  "plus-and-slash": "https://www.google.com/search?q=USD%2FJPY%20150%2B%20%E2%80%94%20%E6%97%A5%E6%9C%AC%20intervention%20risk&tbm=nws",
+  "reserved-chars": "https://www.google.com/search?q=S%26P%20500%20%2B2.1%25%20%3D%20record%3F%20yes%2Fno%20%23markets&tbm=nws",
+  "whitespace-heavy": "https://www.google.com/search?q=%D0%95%D0%A6%D0%91%20%20%20holds%09fire%20%20on%20%20cuts&tbm=nws",
+}
+`;
+
+exports[`citationHref fallback selection > snapshots the mixed real/fallback citation map 1`] = `
+[
+  "https://reuters.com/a",
+  "https://www.google.com/search?q=%E4%B8%AD%E5%9B%BD%E5%A4%AE%E8%A1%8C%20injects%20liquidity&tbm=nws",
+  "https://www.google.com/search?q=Ruble%20%D1%80%D1%83%D0%B1%D0%BB%D1%8C%20slides&tbm=nws",
+]
+`;
