@@ -364,7 +364,7 @@ export const getPortfolio = createServerFn({ method: "GET" })
       decisions: decisions ?? [],
       equity: clippedEquity,
       inceptionDate,
-      deposits: clipToInception(deposits, inceptionDate, (d) => d.date),
+      deposits,
       // starting_cash with any already-absorbed deposits stripped out, so
       // `baselineStartingCash + deposits === starting_cash`.
       baselineStartingCash,
