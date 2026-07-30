@@ -82,6 +82,7 @@ export function EquityPctChart({
   equity,
   startingCash,
   deposits = [],
+  inceptionDate = null,
   className,
 }: {
   portfolioId?: string;
@@ -89,6 +90,8 @@ export function EquityPctChart({
   /** Baseline pot with later deposits stripped out (`baselineStartingCash`). */
   startingCash: number;
   deposits?: Array<{ date: string; amount: number }>;
+  /** `YYYY-MM-DD` the portfolio went live; earlier points are not plotted. */
+  inceptionDate?: string | null;
   className?: string;
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
@@ -134,10 +137,14 @@ export function EquityPctChart({
 
   const { data, domain, last } = useMemo(() => {
     const base = Number(startingCash);
-    const source: Array<{ at: string; value: number }> =
+    const raw: Array<{ at: string; value: number }> =
       resolution === "hourly"
         ? hourlyPoints.map((p) => ({ at: p.at, value: Number(p.total_value) }))
         : equity.map((e) => ({ at: String(e.snapshot_date), value: Number(e.total_value) }));
+    // Never plot points from before the portfolio went live.
+    const source = inceptionDate
+      ? raw.filter((r) => String(r.at).slice(0, 10) >= inceptionDate)
+      : raw;
 
     const rows =
       base > 0
@@ -160,7 +167,7 @@ export function EquityPctChart({
       domain: pctDomain(vals),
       last: vals.length ? vals[vals.length - 1] : 0,
     };
-  }, [equity, hourlyPoints, deposits, startingCash, resolution]);
+  }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate]);
 
   const hasDaily = equity.length >= 2;
   if (!hasDaily) return null;

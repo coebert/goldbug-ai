@@ -7,6 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
+import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 import {
   detectSnapshotTimingMismatches,
   logSnapshotTimingMismatches,
@@ -71,7 +72,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data: portfolios, error } = await context.supabase
       .from("portfolios")
-      .select("id,name,currency,starting_cash,current_cash,mode,created_at")
+      .select("id,name,currency,starting_cash,current_cash,mode,created_at,live_activated_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const list = portfolios ?? [];
@@ -100,10 +101,19 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       .in("portfolio_id", ids)
       .order("snapshot_date", { ascending: true });
 
+    // Snapshots dated before a portfolio existed (seeded/backtest rows, or a
+    // broker account's pre-existing history pulled in on first sync) are not
+    // that portfolio's performance — clip them off every series.
+    const inceptionById = new Map(list.map((p) => [p.id, portfolioInceptionDate(p)]));
+    const clippedEq = (allEq ?? []).filter((s) => {
+      const inception = inceptionById.get(String(s.portfolio_id)) ?? null;
+      return !inception || String(s.snapshot_date).slice(0, 10) >= inception;
+    });
+
     const today = new Date().toISOString().slice(0, 10);
     const built = buildAllPortfoliosEquity({
       portfolios: list,
-      snapshots: allEq ?? [],
+      snapshots: clippedEq,
       today,
     });
 
@@ -340,12 +350,20 @@ export const getPortfolio = createServerFn({ method: "GET" })
       ? startingCash - startingCashAbsorbed
       : startingCash;
 
+    // Clip pre-inception snapshots: history that predates the portfolio (or,
+    // for live portfolios, the day it went live) is not its performance.
+    const inceptionDate = portfolioInceptionDate(portfolio as never);
+    const clippedEquity = clipToInception(equity ?? [], inceptionDate, (r) =>
+      String((r as { snapshot_date?: unknown }).snapshot_date ?? ""),
+    );
+
     return {
       portfolio,
       holdings: holdings ?? [],
       trades: trades ?? [],
       decisions: decisions ?? [],
-      equity: equity ?? [],
+      equity: clippedEquity,
+      inceptionDate,
       deposits,
       // starting_cash with any already-absorbed deposits stripped out, so
       // `baselineStartingCash + deposits === starting_cash`.

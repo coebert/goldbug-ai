@@ -1,0 +1,43 @@
+// Portfolio inception: the first date a portfolio genuinely existed.
+//
+// Equity snapshots can predate a portfolio for two reasons: seeded/backtest
+// rows written against an earlier experiment, and broker syncs that pull a
+// Saxo account's older history into a freshly created live portfolio. Both
+// render as "performance" on charts for a period when the portfolio — and in
+// the live case, the funded account — did not exist yet.
+//
+// Inception is the later of the row's creation and its live activation, so a
+// live portfolio's charts start the day it actually went live.
+
+export type InceptionSource = {
+  created_at?: string | null;
+  live_activated_at?: string | null;
+};
+
+function toDay(v: unknown): string | null {
+  if (!v) return null;
+  const s = String(v).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+/** ISO `YYYY-MM-DD` inception day, or null when unknown (never clip then). */
+export function portfolioInceptionDate(p: InceptionSource | null | undefined): string | null {
+  if (!p) return null;
+  const created = toDay(p.created_at);
+  const live = toDay(p.live_activated_at);
+  if (created && live) return created > live ? created : live;
+  return created ?? live ?? null;
+}
+
+/** Drop rows dated before inception. A null inception keeps everything. */
+export function clipToInception<T>(
+  rows: readonly T[],
+  inception: string | null,
+  getDate: (row: T) => string | null | undefined,
+): T[] {
+  if (!inception) return [...rows];
+  return rows.filter((row) => {
+    const d = toDay(getDate(row));
+    return d === null ? true : d >= inception;
+  });
+}
