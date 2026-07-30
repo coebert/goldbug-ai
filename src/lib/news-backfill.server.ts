@@ -41,13 +41,17 @@ export type NewsBackfillJob = BackfillJobLike & {
   finished_at: string | null;
 };
 
-const GDELT_TIMEOUT_MS = 6_000;
+const GDELT_TIMEOUT_MS = 10_000;
 /** GDELT asks for ≤1 request / 5s per client. */
-const GDELT_PACE_MS = 5_200;
+const GDELT_PACE_MS = 5_600;
+/** GDELT answers throttled callers with a plain-text notice — retry those. */
+const GDELT_MAX_ATTEMPTS = 3;
+const GDELT_RETRY_MS = 6_000;
 const DEFAULT_BUDGET_MS = 45_000;
 /** Publishers queried per invocation before the cursor moves on. */
 const DOMAINS_PER_SLICE = 6;
 const MAX_RECORDS = 120;
+
 
 type GdeltArticle = { title?: string; url?: string; domain?: string; seendate?: string; language?: string };
 
