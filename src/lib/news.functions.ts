@@ -13,7 +13,7 @@ import {
 } from "./news-reel.server";
 import type { NewsRefreshResult } from "./news-refresh.server";
 import { sortNewsLatestFirst } from "./news-reel-sort";
-import { dedupeNewsItems } from "./news-dedupe";
+import { dedupeNewsItems, normalizeHeadlineKey } from "./news-dedupe";
 
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
