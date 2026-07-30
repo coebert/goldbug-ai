@@ -93,7 +93,7 @@ const headlineWithVariantsArb = headlineArb.chain(({ script, headline }) =>
 
 const urlArb = fc
   .record({
-    host: fc.constantFrom("example.com", "www.example.com", "News.Example.COM"),
+    host: fc.constantFrom("example.com", "www.example.com", "Example.COM", "WWW.Example.com"),
     path: fc.constantFrom("/markets/story", "/markets/story/", "/Markets/Story"),
     query: fc.constantFrom("", "?utm_source=rss", "?utm_source=rss&utm_medium=feed", "?ref=twitter"),
     hash: fc.constantFrom("", "#top", "#comments"),
