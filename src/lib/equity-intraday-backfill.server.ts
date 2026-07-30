@@ -1,6 +1,7 @@
 // Server-side driver for hourly equity backfill.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveIntradayAnchors, type IntradayRow } from "./equity-intraday-backfill";
+import { portfolioInceptionDate } from "./portfolio-inception";
 
 export type IntradayBackfillResult = {
   portfolioId: string;
