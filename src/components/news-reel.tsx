@@ -204,7 +204,14 @@ export function NewsReel() {
       };
       return [...filtered].sort((a, b) => score(b) - score(a));
     }
-    return filtered;
+    // Latest first: use the precise ingestion timestamp when available.
+    const ts = (it: (typeof filtered)[number]) => {
+      const t = it.fetched_at ? Date.parse(it.fetched_at) : NaN;
+      if (Number.isFinite(t)) return t;
+      const d = Date.parse(`${it.date}T00:00:00Z`);
+      return Number.isFinite(d) ? d : 0;
+    };
+    return [...filtered].sort((a, b) => ts(b) - ts(a));
   }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
 
 
