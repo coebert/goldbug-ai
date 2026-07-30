@@ -215,6 +215,19 @@ export function NewsReel() {
     return [...filtered].sort((a, b) => ts(b) - ts(a));
   }, [allItems, assetFilter, riskFilter, onlyCited, sortMode, now]);
 
+  // Timestamp of the freshest headline currently in the reel — lets the user
+  // confirm at a glance that newest-first ordering is in effect.
+  const newestHeadlineAt = useMemo(() => {
+    let max = 0;
+    for (const it of allItems) {
+      const t = it.fetched_at ? Date.parse(it.fetched_at) : Date.parse(`${it.date}T00:00:00Z`);
+      if (Number.isFinite(t) && t > max) max = t;
+    }
+    return max > 0 ? max : null;
+  }, [allItems]);
+
+
+
 
   // Detect newly-arrived headlines that match current filters and carry a strong sentiment signal,
   // then flash-highlight them in the list and surface a toast notification.
