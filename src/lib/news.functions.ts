@@ -165,6 +165,7 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
       return {
         id: r.id,
         date: r.news_date,
+        fetched_at: ((r as { fetched_at?: string | null }).fetched_at ?? null),
         source: r.source,
         headline: r.headline,
         url: r.url,
