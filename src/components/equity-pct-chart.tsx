@@ -137,10 +137,14 @@ export function EquityPctChart({
 
   const { data, domain, last } = useMemo(() => {
     const base = Number(startingCash);
-    const source: Array<{ at: string; value: number }> =
+    const raw: Array<{ at: string; value: number }> =
       resolution === "hourly"
         ? hourlyPoints.map((p) => ({ at: p.at, value: Number(p.total_value) }))
         : equity.map((e) => ({ at: String(e.snapshot_date), value: Number(e.total_value) }));
+    // Never plot points from before the portfolio went live.
+    const source = inceptionDate
+      ? raw.filter((r) => String(r.at).slice(0, 10) >= inceptionDate)
+      : raw;
 
     const rows =
       base > 0
