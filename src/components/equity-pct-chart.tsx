@@ -82,6 +82,7 @@ export function EquityPctChart({
   equity,
   startingCash,
   deposits = [],
+  inceptionDate = null,
   className,
 }: {
   portfolioId?: string;
