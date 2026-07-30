@@ -18,7 +18,7 @@ import {
 import { AlertTriangle, Info, Activity, TrendingDown, Target, Gauge, Globe2 } from "lucide-react";
 import { eventColor, type EventCategory } from "@/lib/global-events";
 import { Explain } from "@/components/explain";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 type Props = { portfolioId: string };
 
@@ -395,7 +395,7 @@ export function DiagnosticsPanel({ portfolioId }: Props) {
                                   "var(--chart-2)",
                                   "hsl(43 90% 55%)",
                                   "hsl(280 70% 62%)",
-                                  "hsl(0 84% 60%)",
+                                  CHART_ROLE.negative,
                                 ];
                                 return (
                                   <div

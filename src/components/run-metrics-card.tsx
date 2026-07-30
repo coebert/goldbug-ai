@@ -27,7 +27,7 @@ import {
 } from "recharts";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -210,9 +210,9 @@ export function RunMetricsCard() {
                     />
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
-                    <Bar dataKey="ok" name="success" stackId="p" fill="hsl(142 71% 45%)" />
-                    <Bar dataKey="err" name="error" stackId="p" fill="hsl(0 84% 60%)" />
-                    <Bar dataKey="budget_exceeded" name="budget exceeded" fill="hsl(38 92% 50%)" />
+                    <Bar dataKey="ok" name="success" stackId="p" fill={CHART_ROLE.positive} />
+                    <Bar dataKey="err" name="error" stackId="p" fill={CHART_ROLE.negative} />
+                    <Bar dataKey="budget_exceeded" name="budget exceeded" fill={CHART_ROLE.benchmark} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -243,8 +243,8 @@ export function RunMetricsCard() {
                     <Tooltip />
                     <Legend wrapperStyle={LEGEND_STYLE} />
                     <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />
-                    <Bar dataKey="saxo_err" name="errors" fill="hsl(0 84% 60%)" />
-                    <Bar dataKey="saxo_429" name="429 retries" fill="hsl(38 92% 50%)" />
+                    <Bar dataKey="saxo_err" name="errors" fill={CHART_ROLE.negative} />
+                    <Bar dataKey="saxo_429" name="429 retries" fill={CHART_ROLE.benchmark} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

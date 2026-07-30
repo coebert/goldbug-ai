@@ -6,13 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, RefreshCw } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
-import {
-  AXIS_LINE,
-  AXIS_TICK,
-  LEGEND_STYLE,
-  TICK_LINE,
-  TOOLTIP_CONTENT_STYLE,
-} from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, LEGEND_STYLE, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface Props {
@@ -352,7 +346,7 @@ function TimelineChart({ timeline }: { timeline: TimelineBucket[] }) {
             <Legend wrapperStyle={LEGEND_STYLE} iconSize={8} />
             <Bar dataKey="ok" name="Live" stackId="s" fill="var(--chart-2)" />
             <Bar dataKey="cache" name="Cache" stackId="s" fill="var(--muted-foreground)" />
-            <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
+            <Bar dataKey="stale" name="Stale" stackId="s" fill={CHART_ROLE.benchmark} />
             <Bar dataKey="fallback" name="Fallback" stackId="s" fill="var(--destructive)" />
           </BarChart>
         </ResponsiveContainer>
@@ -410,7 +404,7 @@ function PairTimelineChart({ pair, buckets }: { pair: string; buckets: TimelineB
             />
             <Bar dataKey="ok" name="Live" stackId="s" fill="var(--chart-2)" />
             <Bar dataKey="cache" name="Cache" stackId="s" fill="var(--muted-foreground)" />
-            <Bar dataKey="stale" name="Stale" stackId="s" fill="hsl(38 92% 50%)" />
+            <Bar dataKey="stale" name="Stale" stackId="s" fill={CHART_ROLE.benchmark} />
             <Bar dataKey="fallback" name="Fallback" stackId="s" fill="var(--destructive)" />
           </BarChart>
         </ResponsiveContainer>

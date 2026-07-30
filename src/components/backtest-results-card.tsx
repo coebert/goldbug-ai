@@ -17,16 +17,7 @@ import {
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
-import {
-  AXIS_LINE,
-  AXIS_TICK,
-  CHART_ROLE,
-  CHART_SEQUENCE,
-  GRID_PROPS,
-  OKABE_ITO,
-  TICK_LINE,
-  TOOLTIP_CONTENT_STYLE,
-} from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_NEUTRAL_SERIES, CHART_ROLE, CHART_SEQUENCE, GRID_PROPS, OKABE_ITO, TICK_LINE, TOOLTIP_CONTENT_STYLE } from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
 const PALETTE = CHART_SEQUENCE;
@@ -36,7 +27,7 @@ function colorFor(_symbol: string, index: number): string {
 }
 
 // Neutral cash band — kept low-chroma so per-symbol hues stand out.
-const CASH_COLOR = "hsl(220 9% 46%)";
+const CASH_COLOR = CHART_NEUTRAL_SERIES;
 const EQUITY_COLOR = CHART_ROLE.deposits; // blue reads as the primary series
 const BUY_COLOR = CHART_ROLE.positive;
 const SELL_COLOR = CHART_ROLE.negative;

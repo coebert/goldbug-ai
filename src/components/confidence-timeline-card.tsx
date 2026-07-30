@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, OKABE_ITO, TICK_LINE } from "@/lib/chart-palette";
 import { buildConfidenceTimeline, type ConfidencePoint } from "@/lib/confidence-timeline";
 
 type Decision = { id: string; run_date: string; raw: unknown };
@@ -170,7 +170,7 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
                     type="monotone"
                     dataKey="score"
                     name="Confidence"
-                    stroke="hsl(217 91% 60%)"
+                    stroke={OKABE_ITO.skyBlue}
                     strokeWidth={2}
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
@@ -180,14 +180,14 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
                     name="Executed"
                     data={executedRows}
                     dataKey="score"
-                    fill="hsl(142 71% 45%)"
+                    fill={CHART_ROLE.positive}
                     shape="circle"
                   />
                   <Scatter
                     name="Rejected"
                     data={rejectedRows}
                     dataKey="score"
-                    fill="hsl(0 84% 60%)"
+                    fill={CHART_ROLE.negative}
                     shape="triangle"
                   />
                   {transitions.map((t) => (
@@ -196,7 +196,7 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
                       x={t.dateLabel}
                       y={t.score}
                       r={7}
-                      stroke="hsl(38 92% 50%)"
+                      stroke={CHART_ROLE.benchmark}
                       strokeWidth={2}
                       fill="none"
                       isFront

@@ -25,14 +25,7 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
-import {
-  AXIS_LINE,
-  AXIS_TICK,
-  CHART_ROLE,
-  GRID_PROPS,
-  LEGEND_STYLE,
-  TICK_LINE,
-} from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_NEUTRAL_SERIES, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, OKABE_ITO, TICK_LINE } from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/portfolio/$id/attribution")({
   head: () => ({
@@ -57,10 +50,10 @@ export const Route = createFileRoute("/portfolio/$id/attribution")({
 });
 
 const SIGNAL_COLORS: Record<string, string> = {
-  sma_trend: "#06b6d4",
+  sma_trend: OKABE_ITO.skyBlue,
   rsi: "#a855f7",
   price_change: "#f59e0b",
-  news_sentiment: "#22c55e",
+  news_sentiment: CHART_ROLE.positive,
   volatility: "#ef4444",
 };
 const SIGNALS = ["sma_trend", "rsi", "price_change", "news_sentiment", "volatility"] as const;
@@ -246,7 +239,7 @@ function AttributionPage() {
                         yAxisId="right"
                         dataKey="win"
                         name="Win rate (%)"
-                        fill="#64748b"
+                        fill={CHART_NEUTRAL_SERIES}
                         opacity={0.6}
                       />
                     </BarChart>
@@ -503,7 +496,7 @@ function AttributionPage() {
                             }}
                           />
                           <ReferenceLine y={0} stroke="var(--muted-foreground)" />
-                          <Bar dataKey="avg_return_pct" name="Avg return (%)" fill="#22c55e" />
+                          <Bar dataKey="avg_return_pct" name="Avg return (%)" fill={CHART_ROLE.positive} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -566,7 +559,7 @@ function AttributionPage() {
                                 news_score: t.news_score,
                                 forward_return_pct: t.forward_return_pct,
                               }))}
-                            fill="#06b6d4"
+                            fill={OKABE_ITO.skyBlue}
                           />
                         </ScatterChart>
                       </ResponsiveContainer>

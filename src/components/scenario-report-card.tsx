@@ -25,14 +25,14 @@ import {
   type ScenarioReport,
 } from "@/lib/scenario-report";
 import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, CHART_ROLE, GRID_PROPS, LEGEND_STYLE, OKABE_ITO, TICK_LINE } from "@/lib/chart-palette";
 
 const PALETTE = [
-  "hsl(217 91% 60%)",
-  "hsl(142 71% 45%)",
-  "hsl(38 92% 50%)",
-  "hsl(291 64% 55%)",
-  "hsl(0 84% 60%)",
+  OKABE_ITO.skyBlue,
+  CHART_ROLE.positive,
+  CHART_ROLE.benchmark,
+  OKABE_ITO.reddishPurple,
+  CHART_ROLE.negative,
 ];
 
 function fmtPct(n: number | null | undefined, digits = 2): string {
@@ -478,10 +478,10 @@ function CostBreakdownScenario(props: { report: ScenarioReport; color: string })
   };
 
   const SEG = {
-    spread: "hsl(217 91% 60%)",
-    latency: "hsl(38 92% 50%)",
-    impact: "hsl(291 64% 55%)",
-    urgency: "hsl(142 71% 45%)",
+    spread: OKABE_ITO.skyBlue,
+    latency: CHART_ROLE.benchmark,
+    impact: OKABE_ITO.reddishPurple,
+    urgency: CHART_ROLE.positive,
   };
 
   return (

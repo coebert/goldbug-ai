@@ -196,7 +196,7 @@ import { eventsInRange, eventColor } from "@/lib/global-events";
 import { Explain, ExplainIcon } from "@/components/explain";
 import type { TermId } from "@/lib/glossary";
 import { formatUk, ukZoneAbbr } from "@/lib/uk-time";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, OKABE_ITO, TICK_LINE } from "@/lib/chart-palette";
 
 type PortfolioTab =
   | "overview"
@@ -430,7 +430,7 @@ function PortfolioPage() {
         equity: "#56B4E9",
         equityFillTop: 0.5,
         equityFillBottom: 0.05,
-        benchmark: "#E69F00",
+        benchmark: OKABE_ITO.orange,
         drawdown: "#D55E00",
         peak: "#E8E8E8",
         gridOpacity: 0.55,
