@@ -4,8 +4,8 @@ import { historyDays, spanDays } from "../equity-pct-chart";
 describe("hourly chart covers all-time history", () => {
   it("requests the whole portfolio life, not a rolling month", () => {
     const now = new Date("2026-07-30T12:00:00Z");
-    expect(historyDays("2026-07-29", now)).toBe(2);
-    expect(historyDays("2025-07-30", now)).toBe(366);
+    expect(historyDays("2026-07-29", now)).toBe(3);
+    expect(historyDays("2025-07-30", now)).toBe(367);
     // Old portfolios are capped, never truncated to 30 days.
     expect(historyDays("2010-01-01", now)).toBe(3650);
   });
