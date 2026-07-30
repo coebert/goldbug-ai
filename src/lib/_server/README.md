@@ -43,3 +43,15 @@ Never leave `CRON_SECRET_NEXT` set long-term; it exists only for the overlap win
   tokens, JWT-shaped values, long hex/base64 blobs and
   `access_token=/refresh_token=`-style pairs. The Saxo REST error path and the
   OAuth token-exchange path both redact before logging or throwing.
+
+## Surface hardening (phase 7)
+
+- Browser security headers (CSP, nosniff, referrer policy, permissions policy,
+  COOP, HSTS) are applied to every SSR response by `securityHeadersMiddleware`
+  in `src/start.ts`. Add new third-party origins to the CSP there rather than
+  loosening `default-src`.
+- Internal tables (`run_locks`, `market_open_alerts_sent`,
+  `rate_limit_buckets`) keep RLS on with **no** policies; each carries a table
+  comment saying so. `consume_rate_limit` and the other SECURITY DEFINER
+  helpers are service_role-only except `has_role`, which RLS needs.
+- Dependency vulnerability scanning is run as part of each security pass.
