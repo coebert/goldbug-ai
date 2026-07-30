@@ -101,10 +101,19 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
       .in("portfolio_id", ids)
       .order("snapshot_date", { ascending: true });
 
+    // Snapshots dated before a portfolio existed (seeded/backtest rows, or a
+    // broker account's pre-existing history pulled in on first sync) are not
+    // that portfolio's performance — clip them off every series.
+    const inceptionById = new Map(list.map((p) => [p.id, portfolioInceptionDate(p)]));
+    const clippedEq = (allEq ?? []).filter((s) => {
+      const inception = inceptionById.get(String(s.portfolio_id)) ?? null;
+      return !inception || String(s.snapshot_date).slice(0, 10) >= inception;
+    });
+
     const today = new Date().toISOString().slice(0, 10);
     const built = buildAllPortfoliosEquity({
       portfolios: list,
-      snapshots: allEq ?? [],
+      snapshots: clippedEq,
       today,
     });
 
