@@ -363,12 +363,12 @@ export function NewsReel() {
                   }
                 }}
                 disabled={q.isFetching || refreshing}
-                aria-label="Refresh news now"
-                title="Fetch the latest headlines immediately"
+                aria-label="Refresh global news"
+                title="Fetch the latest global headlines from source now"
                 className="h-8 gap-1.5 px-2 text-xs"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching || refreshing ? "animate-spin" : ""}`} />
-                {q.isFetching || refreshing ? "Refreshing…" : "Refresh now"}
+                {q.isFetching || refreshing ? "Refreshing…" : "Refresh global news"}
               </Button>
             </div>
             <div className="text-[10px] text-muted-foreground" title={lastUpdated ? new Date(lastUpdated).toLocaleString("en-GB", { timeZone: "Europe/London" }) : "Not yet loaded"}>
