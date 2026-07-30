@@ -154,7 +154,9 @@ export class SaxoAdapter implements BrokerAdapter {
         await new Promise((r) => setTimeout(r, waitMs));
       }
       if (!res!.ok) {
-        const msg = `Saxo ${method} ${path} failed [${res!.status}]: ${text.slice(0, 400)}`;
+        // Redact the provider body before it reaches the broker log table:
+        // Saxo echoes request payloads (and occasionally credentials) back.
+        const msg = `Saxo ${method} ${path} failed [${res!.status}]: ${redactedError(text.slice(0, 400)).message}`;
         if (!silentStatuses.has(res!.status)) {
           await log({
             portfolioId: this.portfolioId, userId: this.userId, env: this.env,
