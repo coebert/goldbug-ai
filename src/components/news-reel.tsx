@@ -510,6 +510,11 @@ export function NewsReel() {
           <span className="text-[11px] text-muted-foreground">{items.length} of {allItems.length}</span>
         </div>
 
+        <div className="mt-3">
+          <NewsBackfillControls />
+        </div>
+
+
         <div className={`mt-3 flex-wrap items-center gap-2 text-[11px] ${filtersOpen ? "flex" : "hidden"} md:flex`}>
           <span className="text-muted-foreground uppercase tracking-wide">Asset:</span>
           {ASSET_CLASSES.map((c) => {
