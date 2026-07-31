@@ -11,7 +11,7 @@ import {
 } from "@/lib/corporate-actions.functions";
 import { daysUntil, deadlineUrgency } from "@/lib/corporate-actions";
 import { bestValueOption } from "@/lib/corporate-action-impact";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoney } from "@/lib/format-money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ function ImpactPreviewTable({ event }: { event: CorporateActionView }) {
           <span className="font-normal text-muted-foreground">
             on {impact.position.quantity} shares
             {impact.position.price != null
-              ? ` @ ${formatMoneyAmount(impact.position.price, ccy)}`
+              ? ` @ ${formatMoney(impact.position.price, ccy)}`
               : ""}
           </span>
         )}
@@ -81,13 +81,13 @@ function ImpactPreviewTable({ event }: { event: CorporateActionView }) {
                       </div>
                     </td>
                     <td className="py-1 pr-2 text-right align-top">
-                      {i.cashDelta ? `+${formatMoneyAmount(i.cashDelta, ccy)}` : "—"}
+                      {i.cashDelta ? `+${formatMoney(i.cashDelta, ccy)}` : "—"}
                     </td>
                     <td className="py-1 pr-2 text-right align-top">
                       {i.sharesDelta ? `+${i.sharesDelta} → ${i.sharesAfter}` : impact.position.quantity}
                     </td>
                     <td className="py-1 text-right align-top">
-                      {i.totalValue ? formatMoneyAmount(i.totalValue, ccy) : "—"}
+                      {i.totalValue ? formatMoney(i.totalValue, ccy) : "—"}
                     </td>
                   </tr>
                 ))}
