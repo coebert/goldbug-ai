@@ -3,6 +3,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { PushNotificationsCard } from "@/components/push-notifications-card";
 import { TradingControlsCard } from "@/components/trading-controls-card";
 import { MfaCard } from "@/components/mfa-card";
+import { CorporateActionAlertSettingsCard } from "@/components/corporate-action-alert-settings-card";
 
 
 export const Route = createFileRoute("/settings")({
