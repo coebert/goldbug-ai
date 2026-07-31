@@ -183,10 +183,17 @@ export async function reconcileLiveHoldingsFromBroker(
   // matches the account summary shown in the Saxo app (which folds in bits our
   // per-position math can miss — currency conversion at Saxo's rate, cash sub-
   // accounts, un-booked corporate actions, etc.).
-  const holdingsValueLocal = positions.reduce(
-    (sum, p) => sum + (p.marketPrice || p.avgPrice || 0) * p.quantity,
-    0,
-  );
+  // Saxo quotes LSE instruments in pence (GBX) while the account currency is
+  // GBP. Fold those quotes to the base unit before summing, otherwise this
+  // fallback values every :xlon position 100x too high — which surfaced as a
+  // ~GBP 817k headline for a ~GBP 10.2k account whenever Saxo's authoritative
+  // TotalValue was missing from the response.
+  const holdingsValueLocal = positions.reduce((sum, p) => {
+    const raw = p.marketPrice || p.avgPrice || 0;
+    const px = normalizeLseDisplayPriceToBase(p.symbol, raw, saxoAssetToClass(p.assetType));
+    return sum + px * p.quantity;
+  }, 0);
+
   const newTotal =
     brokerTotalValue != null && brokerTotalValue > 0
       ? brokerTotalValue
