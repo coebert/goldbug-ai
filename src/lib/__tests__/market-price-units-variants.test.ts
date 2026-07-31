@@ -121,12 +121,13 @@ describe("normalizeLseDisplayPriceToBase — numeric conversion", () => {
 });
 
 describe("normalizeMarketPriceForTrading — order sizing path", () => {
-  it("divides every LSE quote by 100 (both stocks and ETFs use pence in Yahoo trading API)", () => {
+  it("divides GBX LSE quotes by 100 and leaves GBP-quoted LSE tickers alone", () => {
     // For the *trading* path, both LSE stocks and LSE ETFs are quoted in
     // pence by Yahoo — order-sizing must not depend on asset_class.
     expect(normalizeMarketPriceForTrading("HSBA.L", 1555.19)).toBeCloseTo(15.5519, 6);
-    expect(normalizeMarketPriceForTrading("VUKE.L", 4634)).toBeCloseTo(46.34, 6);
-    expect(normalizeMarketPriceForTrading("VMID:xlon", 3644.25)).toBeCloseTo(36.4425, 6);
+    expect(normalizeMarketPriceForTrading("VUKE.L", 46.34)).toBeCloseTo(46.34, 6);
+    expect(normalizeMarketPriceForTrading("VMID:xlon", 36.4425)).toBeCloseTo(36.4425, 6);
+    expect(normalizeMarketPriceForTrading("ISF.L", 1062.33)).toBeCloseTo(10.6233, 6);
   });
 
   it("leaves non-LSE quotes unchanged", () => {
