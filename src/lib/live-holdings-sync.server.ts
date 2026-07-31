@@ -17,6 +17,8 @@
 // broker read failures leave local state alone.
 
 import { recordIntradayEquity } from "@/lib/equity-intraday.server";
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+
 import { recordIntradayPrices } from "@/lib/price-intraday.server";
 
 import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
