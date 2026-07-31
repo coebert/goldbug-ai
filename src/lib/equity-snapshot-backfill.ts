@@ -8,8 +8,8 @@
 //
 // Rules:
 //  1. Every portfolio must have a row for `today` reflecting current cash +
-//     marked-to-market holdings. If today's row already exists, nothing is
-//     written (idempotent).
+//     marked-to-market holdings. A stale same-day row is replaced; an already
+//     correct row is left alone (idempotent).
 //  2. Gaps between the last known snapshot and today are carried forward with
 //     the last known total (flat line), never invented values, and capped at
 //     `maxCarryForwardDays` so one dormant portfolio can't write hundreds of
@@ -159,8 +159,10 @@ export function planMissingEquitySnapshots({
       }
     }
 
-    // Today's mark-to-market row.
-    if (dates.has(today)) continue;
+    // Today's mark-to-market row. Do not treat the date alone as proof that the
+    // value is current: an early read can create a cash-only row before fills
+    // or prices arrive, and the date-keyed upsert would otherwise freeze that
+    // incorrect value for the rest of the day.
     if (portfolio.inception && today < portfolio.inception) continue;
     const cash = round2(num(portfolio.current_cash));
     const holdingsValue = markHoldingsToMarket(
@@ -168,6 +170,31 @@ export function planMissingEquitySnapshots({
       prices,
     );
     const total = round2(cash + holdingsValue);
+    const todayRow = rows.find((row) => String(row.snapshot_date).slice(0, 10) === today);
+    const storedTotal = todayRow ? num(todayRow.total_value, Number.NaN) : Number.NaN;
+    const rawStoredCash = todayRow ? num(todayRow.cash, Number.NaN) : Number.NaN;
+    const rawStoredHoldings = todayRow ? num(todayRow.holdings_value, Number.NaN) : Number.NaN;
+    // Older rows sometimes contain only total_value, or total_value + cash.
+    // Reconstruct the omitted component before comparing so those rows do not
+    // trigger a needless upsert when their effective values are already right.
+    const storedCash = Number.isFinite(rawStoredCash)
+      ? rawStoredCash
+      : Number.isFinite(rawStoredHoldings)
+        ? storedTotal - rawStoredHoldings
+        : storedTotal;
+    const storedHoldings = Number.isFinite(rawStoredHoldings)
+      ? rawStoredHoldings
+      : Number.isFinite(rawStoredCash)
+        ? storedTotal - rawStoredCash
+        : 0;
+    if (
+      todayRow &&
+      round2(storedCash) === cash &&
+      round2(storedHoldings) === holdingsValue &&
+      round2(storedTotal) === total
+    ) {
+      continue;
+    }
     // Never write a meaningless all-zero row for a portfolio with no data at
     // all — that would render a flat zero line instead of an honest empty state.
     if (rows.length === 0 && total <= 0) continue;

@@ -166,8 +166,11 @@ describe("equity visibility after inception clipping (balanced + high risk sims)
         inception: portfolioInceptionDate(p),
       })),
       snapshots: snaps,
-      holdings: [],
-      prices: new Map(),
+      holdings: [
+        { portfolio_id: balanced.id, symbol: "BAL", quantity: 10, avg_cost: 705 },
+        { portfolio_id: high.id, symbol: "HIGH", quantity: 20, avg_cost: 450 },
+      ],
+      prices: new Map([["BAL", 705], ["HIGH", 450]]),
       today: TODAY,
     });
     expect(planned.filter((p) => p.reason === "today")).toEqual([]);
