@@ -171,11 +171,27 @@ export function planMissingEquitySnapshots({
     );
     const total = round2(cash + holdingsValue);
     const todayRow = rows.find((row) => String(row.snapshot_date).slice(0, 10) === today);
+    const storedTotal = todayRow ? num(todayRow.total_value, Number.NaN) : Number.NaN;
+    const rawStoredCash = todayRow ? num(todayRow.cash, Number.NaN) : Number.NaN;
+    const rawStoredHoldings = todayRow ? num(todayRow.holdings_value, Number.NaN) : Number.NaN;
+    // Older rows sometimes contain only total_value, or total_value + cash.
+    // Reconstruct the omitted component before comparing so those rows do not
+    // trigger a needless upsert when their effective values are already right.
+    const storedCash = Number.isFinite(rawStoredCash)
+      ? rawStoredCash
+      : Number.isFinite(rawStoredHoldings)
+        ? storedTotal - rawStoredHoldings
+        : storedTotal;
+    const storedHoldings = Number.isFinite(rawStoredHoldings)
+      ? rawStoredHoldings
+      : Number.isFinite(rawStoredCash)
+        ? storedTotal - rawStoredCash
+        : 0;
     if (
       todayRow &&
-      round2(num(todayRow.cash, Number.NaN)) === cash &&
-      round2(num(todayRow.holdings_value, Number.NaN)) === holdingsValue &&
-      round2(num(todayRow.total_value, Number.NaN)) === total
+      round2(storedCash) === cash &&
+      round2(storedHoldings) === holdingsValue &&
+      round2(storedTotal) === total
     ) {
       continue;
     }
