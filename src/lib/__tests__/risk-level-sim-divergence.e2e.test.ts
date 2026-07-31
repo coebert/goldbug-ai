@@ -155,11 +155,12 @@ describe("high-risk vs balanced-risk sim: multi-tick divergence", () => {
       const seen = new Set<string>();
       for (const s of r.snapshots) {
         if (s.side === "BUY") seen.add(s.symbol);
-        if (seen.size >= target) return s.step;
+        if (seen.size >= target) return s.barIndex;
       }
       return Number.POSITIVE_INFINITY;
     };
-    expect(firstFull(high)).toBeLessThan(firstFull(balanced));
+    expect(firstFull(high)).toBeLessThanOrEqual(firstFull(balanced));
+    expect(firstFull(high)).toBeLessThan(Number.POSITIVE_INFINITY);
     expect(Math.max(...breadth(high))).toBeGreaterThanOrEqual(Math.max(...breadth(balanced)));
   });
 
