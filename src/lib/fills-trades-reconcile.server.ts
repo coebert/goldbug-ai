@@ -17,6 +17,13 @@
 import type { Database } from "@/integrations/supabase/types";
 import { withOwnedClient } from "@/lib/_server/owned-client";
 import { findSymbol } from "@/lib/universe.server";
+import {
+  rebuildLedgerFromFills,
+  resolveFillPrice,
+  type CloseLookup,
+  type FillLite,
+} from "@/lib/fills-ledger-rebuild";
+
 
 type AssetClass = Database["public"]["Enums"]["asset_class"];
 const ALLOWED: ReadonlySet<AssetClass> = new Set(["stock", "etf", "fx", "crypto", "commodity"]);
