@@ -290,6 +290,12 @@ export async function runRiskLevelSim(
 
   return {
     equity,
+    series: result.equityCurve.map((p) => ({
+      date: p.date,
+      cash: p.cash,
+      holdingsValue: p.holdingsValue,
+      totalValue: p.totalValue,
+    })),
     buys,
     sells,
     wins,
