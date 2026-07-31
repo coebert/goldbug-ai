@@ -2418,6 +2418,95 @@ export type Database = {
           },
         ]
       }
+      ticker_watch_alerts: {
+        Row: {
+          alert_date: string
+          created_at: string
+          details: Json
+          id: string
+          price: number | null
+          symbol: string
+          trigger_code: string
+          user_id: string
+          watch_id: string
+        }
+        Insert: {
+          alert_date?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          price?: number | null
+          symbol: string
+          trigger_code: string
+          user_id: string
+          watch_id: string
+        }
+        Update: {
+          alert_date?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          price?: number | null
+          symbol?: string
+          trigger_code?: string
+          user_id?: string
+          watch_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticker_watch_alerts_watch_id_fkey"
+            columns: ["watch_id"]
+            isOneToOne: false
+            referencedRelation: "ticker_watches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticker_watches: {
+        Row: {
+          active: boolean
+          buy_above: number | null
+          created_at: string
+          drop_below: number | null
+          id: string
+          label: string | null
+          max_vol_pct: number
+          oversold_rsi: number
+          symbol: string
+          thesis: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          buy_above?: number | null
+          created_at?: string
+          drop_below?: number | null
+          id?: string
+          label?: string | null
+          max_vol_pct?: number
+          oversold_rsi?: number
+          symbol: string
+          thesis?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          buy_above?: number | null
+          created_at?: string
+          drop_below?: number | null
+          id?: string
+          label?: string | null
+          max_vol_pct?: number
+          oversold_rsi?: number
+          symbol?: string
+          thesis?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           asset_class: Database["public"]["Enums"]["asset_class"]

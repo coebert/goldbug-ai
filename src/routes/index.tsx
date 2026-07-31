@@ -42,6 +42,9 @@ const AllPortfoliosChart = lazy(() =>
 const NewsReel = lazy(() =>
   import("@/components/news-reel").then((m) => ({ default: m.NewsReel })),
 );
+const TickerWatchCard = lazy(() =>
+  import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
+);
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
 );
@@ -299,6 +302,17 @@ function Home() {
                 <AllPortfoliosChart />
               </Suspense>
             </AdvancedSection>
+
+            <AdvancedSection
+              title="Symbols the AI is watching"
+              summary="Individual shares under close watch, with the price levels that trigger an alert."
+              defaultOpen
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <TickerWatchCard />
+              </Suspense>
+            </AdvancedSection>
+
 
             <AdvancedSection
               title="News the AI is reading"
