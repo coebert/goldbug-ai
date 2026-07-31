@@ -91,30 +91,62 @@ export async function reconcileFillsToTradesForPortfolio(
   //    authoritative executed trades. Wipe first to keep the ledger canonical.
   await admin.from("trades").delete().eq("portfolio_id", portfolioId);
 
-  const rows = fills
+  // Broker fills often arrive without an average price, and LSE fills arrive
+  // in GBX. Resolve missing prices from cached closes and fold everything to
+  // base units so the ledger notionals are sane.
+  const symbols = [...new Set(fills.map((f) => String(f.symbol)))];
+  const closes: CloseLookup = new Map();
+  if (symbols.length > 0) {
+    const firstDay = (fills[0]?.filled_at as string | null)?.slice(0, 10) ?? "1970-01-01";
+    const since = new Date(`${firstDay}T00:00:00Z`);
+    since.setUTCDate(since.getUTCDate() - 10);
+    const pc = await admin
+      .from("price_cache")
+      .select("symbol, price_date, close")
+      .in("symbol", symbols)
+      .gte("price_date", since.toISOString().slice(0, 10))
+      .order("price_date", { ascending: true });
+    for (const row of pc.data ?? []) {
+      const sym = String(row.symbol);
+      const list = closes.get(sym) ?? [];
+      list.push({ date: String(row.price_date), close: Number(row.close) });
+      closes.set(sym, list);
+    }
+  }
+
+  const priced = fills
     .filter((f) => Number(f.quantity ?? 0) > 0)
-    .map((f) => {
-      const qty = Number(f.quantity);
-      const px = Number(f.fill_price ?? 0);
-      const value = qty * px;
-      const filledAtIso = (f.filled_at as string | null) ?? new Date().toISOString();
-      const brokerFillId = f.broker_fill_id ? String(f.broker_fill_id) : String(f.id);
-      const rawSide = String(f.side ?? "buy").toLowerCase();
-      const side: "buy" | "sell" = rawSide === "sell" ? "sell" : "buy";
-      return {
-        portfolio_id: portfolioId,
-        symbol: f.symbol as string,
-        asset_class: classFor(f.symbol as string),
-        side,
-        quantity: qty,
-        price: px,
-        value,
-        executed_at: filledAtIso,
-        trade_date: filledAtIso.slice(0, 10),
-        reason: `[broker-fill] fill_id=${brokerFillId}`,
-        ...(f.currency ? { instrument_ccy: String(f.currency) } : {}),
-      };
-    });
+    .map((f) => ({
+      ...(f as unknown as FillLite),
+      symbol: String(f.symbol),
+      price: resolveFillPrice(f as unknown as FillLite, closes),
+    }))
+    .filter((f) => f.price > 0);
+
+  const rows = priced.map((f) => {
+    const qty = Number(f.quantity);
+    const px = f.price;
+    const value = qty * px;
+    const filledAtIso = f.filled_at ?? new Date().toISOString();
+    const src = fills.find((x) => x.id === f.id);
+    const brokerFillId = src?.broker_fill_id ? String(src.broker_fill_id) : String(f.id);
+    const rawSide = String(f.side ?? "buy").toLowerCase();
+    const side: "buy" | "sell" = rawSide === "sell" ? "sell" : "buy";
+    return {
+      portfolio_id: portfolioId,
+      symbol: f.symbol,
+      asset_class: classFor(f.symbol),
+      side,
+      quantity: qty,
+      price: px,
+      value,
+      executed_at: filledAtIso,
+      trade_date: filledAtIso.slice(0, 10),
+      reason: `[broker-fill] fill_id=${brokerFillId}`,
+      ...(src?.currency ? { instrument_ccy: String(src.currency) } : {}),
+    };
+  });
+
 
   if (rows.length > 0) {
     const ins = await admin.from("trades").insert(rows);
