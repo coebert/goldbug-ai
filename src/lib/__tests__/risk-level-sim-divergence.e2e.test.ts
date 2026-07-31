@@ -123,15 +123,12 @@ let high: BacktestResult;
 let balanced: BacktestResult;
 
 describe("high-risk vs balanced-risk sim: multi-tick divergence", () => {
-  beforeAllRuns();
-
-  function beforeAllRuns() {
-    // vitest hoists describe bodies; run both replays lazily once.
-  }
-
-  it("both replays complete over the full tape", async () => {
+  beforeAll(async () => {
     high = await runRisk("high");
     balanced = await runRisk("balanced");
+  });
+
+  it("both replays complete over the full tape", () => {
     expect(high.equityCurve).toHaveLength(BARS);
     expect(balanced.equityCurve).toHaveLength(BARS);
   });
