@@ -12,25 +12,6 @@ export function isLsePenceQuoted(symbol: string): boolean {
   return s.endsWith(".L") || s.endsWith(":XLON");
 }
 
-/**
- * True when this symbol's raw quote is in GBX (pence) for **display /
- * allocation** purposes — i.e. an LSE listing that is NOT an ETF. LSE ETFs
- * quote in GBP already, so their raw price must be left alone.
- *
- * `assetClass` comes from the `holdings.asset_class` column and, when
- * missing, we fall back to treating the symbol as pence-quoted (the
- * conservative assumption for LSE common stocks).
- */
-export function isLseGbxDisplayQuoted(
-  symbol: string,
-  assetClass?: string | null,
-): boolean {
-  if (!isLsePenceQuoted(symbol)) return false;
-  const ac = String(assetClass ?? "").toLowerCase();
-  // LSE ETFs quote in GBP, not GBX.
-  if (ac === "etf") return false;
-  return true;
-}
 
 /**
  * LSE tickers whose feed quotes arrive in **GBP (pounds)** rather than GBX.
