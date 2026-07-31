@@ -279,6 +279,17 @@ function Home() {
             </AdvancedSection>
 
             <AdvancedSection
+              title="Risk levels at a glance"
+              summary="Risk, drawdown and diversification for each risk level, side by side."
+              defaultOpen={advanced}
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <RiskLevelMetricsCard />
+              </Suspense>
+            </AdvancedSection>
+
+
+            <AdvancedSection
               title="All portfolios on one chart"
               summary="Your combined value over time, every portfolio added together."
               defaultOpen={advanced}
