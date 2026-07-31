@@ -27,6 +27,8 @@ export type RevalueHolding = {
   quantity: number | string | null;
   avg_cost?: number | string | null;
   asset_class?: string | null;
+  /** Settlement currency of the quote, e.g. GBP / USD. */
+  instrument_ccy?: string | null;
   /** When the position was first opened; it contributes to no earlier day. */
   opened_at?: string | null;
 };
@@ -112,6 +114,27 @@ export function symbolKeys(symbol: string): string[] {
   return [...keys];
 }
 
+const MIC_TO_CCY: Record<string, string> = {
+  xlon: "GBP", xetr: "EUR", xpar: "EUR", xams: "EUR", xmil: "EUR",
+  xmad: "EUR", xswx: "CHF", xtse: "CAD", xhkg: "HKD", xtks: "JPY",
+  xasx: "AUD", xsto: "SEK", xcse: "DKK", xhel: "EUR", xose: "NOK",
+  xnas: "USD", xnys: "USD", arcx: "USD", bats: "USD",
+};
+
+/**
+ * Settlement currency of a position, after the GBX→GBP fold. Explicit
+ * `instrument_ccy` wins unless it is a pence tag (already folded) — those rows
+ * default to GBP for LSE listings.
+ */
+export function instrumentCurrency(holding: RevalueHolding): string {
+  const raw = String(holding.instrument_ccy ?? "").trim();
+  const symbol = String(holding.symbol ?? "").trim().toUpperCase();
+  const mic = symbol.includes(":") ? symbol.slice(symbol.lastIndexOf(":") + 1).toLowerCase() : "";
+  const suffixCcy = symbol.endsWith(".L") ? "GBP" : MIC_TO_CCY[mic];
+  if (raw && raw.toUpperCase() !== "GBX" && raw !== "GBp") return raw.toUpperCase();
+  return suffixCcy ?? "USD";
+}
+
 /** Canonical identity used to line fills up with holdings. */
 export function positionKey(symbol: string): string {
   const keys = symbolKeys(symbol);
@@ -186,6 +209,8 @@ export function valuePositionsOn(
   book: Map<string, { quantity: number; holding: RevalueHolding }>,
   prices: Map<string, Map<string, number>>,
   date: string,
+  /** Instrument currency → portfolio base currency multipliers. */
+  fx: Map<string, number> = new Map(),
 ): number {
   let total = 0;
   for (const { quantity, holding } of book.values()) {
@@ -198,7 +223,8 @@ export function valuePositionsOn(
           holding.asset_class,
         );
     if (!(px > 0)) continue;
-    total += quantity * px;
+    const rate = fx.get(instrumentCurrency(holding).toUpperCase()) ?? 1;
+    total += quantity * px * (Number.isFinite(rate) && rate > 0 ? rate : 1);
   }
   return round2(total);
 }
@@ -211,6 +237,7 @@ export function planHistoricalRevaluation({
   prices,
   inception,
   today,
+  fx = new Map<string, number>(),
 }: {
   portfolioId: string;
   snapshots: RevalueSnapshot[];
@@ -220,6 +247,8 @@ export function planHistoricalRevaluation({
   inception?: string | null;
   /** Rows on/after this date are left to the live mark-to-market path. */
   today?: string | null;
+  /** Instrument currency → portfolio base currency multipliers. */
+  fx?: Map<string, number>;
 }): RevalueReport {
   const rows: RevaluedSnapshot[] = [];
   const skipped: SkippedSnapshot[] = [];
@@ -237,7 +266,7 @@ export function planHistoricalRevaluation({
       continue;
     }
     const book = positionsOn(holdings, fills, date);
-    const holdingsValue = valuePositionsOn(book, prices, date);
+    const holdingsValue = valuePositionsOn(book, prices, date, fx);
 
     const storedTotal = num(snap.total_value, Number.NaN);
     const rawCash = num(snap.cash, Number.NaN);
