@@ -123,7 +123,18 @@ export const RSS_SOURCES: Extract<NewsSource, { kind: "rss" }>[] = [
   { kind: "rss", id: "theblock",        label: "The Block",              url: "https://www.theblock.co/rss.xml",                        weight: 0.6,  region: "Global",  topic: "crypto" },
   { kind: "rss", id: "decrypt",         label: "Decrypt",                url: "https://decrypt.co/feed",                                weight: 0.55, region: "Global",  topic: "crypto" },
   { kind: "rss", id: "bitcoinmag",      label: "Bitcoin Magazine",       url: "https://bitcoinmagazine.com/feed",                       weight: 0.5,  region: "Global",  topic: "crypto" },
+  // --- Executive social posts (reported by wires; see src/lib/exec-posts.ts) ---
+  ...TRACKED_EXECUTIVES.map((exec) => ({
+    kind: "rss" as const,
+    id: `execpost-${exec.id}`,
+    label: `${exec.name} posts (via Google News)`,
+    url: execPostFeedQuery(exec),
+    weight: Number((0.55 + 0.25 * exec.weight).toFixed(2)),
+    region: "Global",
+    topic: "exec-posts",
+  })),
 ];
+
 
 
 // GDELT topical slices — issuing several narrow queries yields far broader
