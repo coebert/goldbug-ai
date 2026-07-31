@@ -20,6 +20,7 @@ import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
 import { PortfolioMirrorAlert } from "@/components/portfolio-mirror-alert";
 import { checkPortfolioMirrors } from "@/lib/portfolio-mirror-detect.functions";
+import { RiskLevelMetricsCard } from "@/components/risk-level-metrics-card";
 import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { Sparkles, PlusCircle } from "lucide-react";
@@ -277,6 +278,17 @@ function Home() {
                 <MarketHoursCard />
               </Suspense>
             </AdvancedSection>
+
+            <AdvancedSection
+              title="Risk levels at a glance"
+              summary="Risk, drawdown and diversification for each risk level, side by side."
+              defaultOpen={advanced}
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <RiskLevelMetricsCard />
+              </Suspense>
+            </AdvancedSection>
+
 
             <AdvancedSection
               title="All portfolios on one chart"
