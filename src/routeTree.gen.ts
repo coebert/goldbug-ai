@@ -30,6 +30,7 @@ import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/ne
 import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/api/public/algo-regime-autotune-cron'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
+import { Route as ApiPublicHooksTickerWatchRouteImport } from './routes/api/public/hooks/ticker-watch'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
 import { Route as ApiPublicHooksNewsRefreshRouteImport } from './routes/api/public/hooks/news-refresh'
 import { Route as ApiPublicHooksNewsBackfillRouteImport } from './routes/api/public/hooks/news-backfill'
@@ -152,6 +153,12 @@ const ApiPublicHooksTranslationRefreshRoute =
     path: '/api/public/hooks/translation-refresh',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksTickerWatchRoute =
+  ApiPublicHooksTickerWatchRouteImport.update({
+    id: '/api/public/hooks/ticker-watch',
+    path: '/api/public/hooks/ticker-watch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksSaxoRefreshRoute =
   ApiPublicHooksSaxoRefreshRouteImport.update({
     id: '/api/public/hooks/saxo-refresh',
@@ -269,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
+  '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
@@ -306,6 +314,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
+  '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
@@ -344,6 +353,7 @@ export interface FileRoutesById {
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
+  '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
     | '/api/public/hooks/saxo-refresh'
+    | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
   fileRoutesByTo: FileRoutesByTo
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
     | '/api/public/hooks/saxo-refresh'
+    | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
   id:
@@ -457,6 +469,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
     | '/api/public/hooks/saxo-refresh'
+    | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
     | '/api/public/saxo/callback'
   fileRoutesById: FileRoutesById
@@ -491,6 +504,7 @@ export interface RootRouteChildren {
   ApiPublicHooksNewsBackfillRoute: typeof ApiPublicHooksNewsBackfillRoute
   ApiPublicHooksNewsRefreshRoute: typeof ApiPublicHooksNewsRefreshRoute
   ApiPublicHooksSaxoRefreshRoute: typeof ApiPublicHooksSaxoRefreshRoute
+  ApiPublicHooksTickerWatchRoute: typeof ApiPublicHooksTickerWatchRoute
   ApiPublicHooksTranslationRefreshRoute: typeof ApiPublicHooksTranslationRefreshRoute
   ApiPublicSaxoCallbackRoute: typeof ApiPublicSaxoCallbackRoute
 }
@@ -642,6 +656,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/translation-refresh'
       fullPath: '/api/public/hooks/translation-refresh'
       preLoaderRoute: typeof ApiPublicHooksTranslationRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/ticker-watch': {
+      id: '/api/public/hooks/ticker-watch'
+      path: '/api/public/hooks/ticker-watch'
+      fullPath: '/api/public/hooks/ticker-watch'
+      preLoaderRoute: typeof ApiPublicHooksTickerWatchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/saxo-refresh': {
@@ -796,6 +817,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksNewsBackfillRoute: ApiPublicHooksNewsBackfillRoute,
   ApiPublicHooksNewsRefreshRoute: ApiPublicHooksNewsRefreshRoute,
   ApiPublicHooksSaxoRefreshRoute: ApiPublicHooksSaxoRefreshRoute,
+  ApiPublicHooksTickerWatchRoute: ApiPublicHooksTickerWatchRoute,
   ApiPublicHooksTranslationRefreshRoute: ApiPublicHooksTranslationRefreshRoute,
   ApiPublicSaxoCallbackRoute: ApiPublicSaxoCallbackRoute,
 }
