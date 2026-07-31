@@ -48,17 +48,20 @@ describe("isLseGbxDisplayQuoted — asset-class routing", () => {
     }
   });
 
-  it("all common LSE ETF tickers are GBP-quoted, not GBX", () => {
-    // A regression here means the ETF price gets divided by 100 and shows
-    // as pennies of a pound in the holdings tile.
-    const etfs = [
-      "VUKE.L", "VMID.L", "ISF.L", "IUKD.L", "VWRL.L", "VUSA.L", "VHYL.L",
-      "VEUR.L", "VJPN.L", "EMIM.L", "IWDA.L", "SGLN.L", "IGLN.L", "CSPX.L",
-      "VUKE:xlon", "VMID:xlon", "ISF:xlon", "iwda:xlon",
-    ];
-    for (const s of etfs) {
+  it("only the allowlisted Vanguard LSE tickers are GBP-quoted", () => {
+    for (const s of ["VUKE.L", "VMID.L", "VWRL.L", "VUSA.L", "VHYL.L",
+                     "VEUR.L", "VJPN.L", "VUKE:xlon", "VMID:xlon"]) {
       expect(isLseGbxDisplayQuoted(s, "etf")).toBe(false);
       expect(isLseGbxDisplayQuoted(s, "ETF")).toBe(false);
+    }
+  });
+
+  it("iShares-style LSE ETFs stay GBX (regression: 100x inflated equity)", () => {
+    // ISF.L quotes ~1062p and SGLN.L ~7690p. Treating them as pounds made a
+    // simulated portfolio read ~9.2M instead of ~92k.
+    for (const s of ["ISF.L", "SGLN.L", "IUKD.L", "IGLN.L", "CSPX.L",
+                     "EMIM.L", "IWDA.L", "ISF:xlon", "sgln:xlon"]) {
+      expect(isLseGbxDisplayQuoted(s, "etf")).toBe(true);
     }
   });
 
@@ -85,10 +88,11 @@ describe("normalizeLseDisplayPriceToBase — numeric conversion", () => {
     expect(normalizeLseDisplayPriceToBase("SHEL:xlon", 2700, "stock")).toBeCloseTo(27, 6);
   });
 
-  it("leaves LSE ETFs unchanged (already GBP)", () => {
+  it("leaves GBP-quoted LSE ETFs unchanged but folds GBX ETFs", () => {
     expect(normalizeLseDisplayPriceToBase("VUKE.L", 46.34, "etf")).toBe(46.34);
     expect(normalizeLseDisplayPriceToBase("VMID:xlon", 36.4425, "etf")).toBe(36.4425);
-    expect(normalizeLseDisplayPriceToBase("ISF.L", 812.5, "etf")).toBe(812.5);
+    expect(normalizeLseDisplayPriceToBase("ISF.L", 812.5, "etf")).toBeCloseTo(8.125, 6);
+    expect(normalizeLseDisplayPriceToBase("SGLN:xlon", 7690, "etf")).toBeCloseTo(76.9, 6);
   });
 
   it("leaves non-LSE symbols unchanged regardless of numeric magnitude", () => {
@@ -147,9 +151,9 @@ describe("multi-currency mixing safety in largest-remainder allocation", () => {
     const rows = [
       { symbol: "BP.L", qty: 500, avg: 452.30, ac: "stock" }, // GBX
       { symbol: "VUKE.L", qty: 50, avg: 46.34, ac: "etf" },   // GBP
-      { symbol: "ISF.L", qty: 40, avg: 812.5, ac: "etf" },    // GBP
+      { symbol: "ISF.L", qty: 40, avg: 812.5, ac: "etf" },    // GBX
     ];
-    const invested = 226150 / 100 + 2317 + 32500; // ≈ £37,078 in GBP
+    const invested = 226150 / 100 + 2317 + 325; // ≈ £4,904 in GBP
     const raw = rows.map((r) => r.qty * r.avg);
     const rawAlloc = allocateRoundedShares(raw, invested);
     // BP.L raw = 226,150 (pence!), ETFs = 2,317 & 32,500 → BP dominates.
@@ -160,8 +164,8 @@ describe("multi-currency mixing safety in largest-remainder allocation", () => {
       (r) => r.qty * normalizeLseDisplayPriceToBase(r.symbol, r.avg, r.ac),
     );
     const fixedAlloc = allocateRoundedShares(fixed, invested);
-    // BP.L GBP = 2,261.5; VUKE = 2,317; ISF = 32,500 → ISF dominates, but
-    // the two ~£2.3k rows now show as materially non-zero.
+    // BP.L GBP = 2,261.5; VUKE = 2,317; ISF = 325 → the two ~£2.3k rows now
+    // show as materially non-zero.
     expect(fixedAlloc[0]).toBeGreaterThan(1500);
     expect(fixedAlloc[1]).toBeGreaterThan(1500);
     expect(fixedAlloc.reduce((a, b) => a + b, 0)).toBeCloseTo(invested, 2);

@@ -22,9 +22,14 @@ describe("LSE display normalisation", () => {
     expect(isLseGbxDisplayQuoted("HSBA:xlon", "stock")).toBe(true);
   });
 
-  it("treats LSE ETFs (VUKE / VMID) as GBP-quoted, not GBX", () => {
+  it("treats allowlisted Vanguard LSE ETFs (VUKE / VMID) as GBP-quoted", () => {
     expect(isLseGbxDisplayQuoted("VUKE.L", "etf")).toBe(false);
     expect(isLseGbxDisplayQuoted("VMID:xlon", "etf")).toBe(false);
+  });
+
+  it("treats other LSE ETFs (ISF / SGLN) as GBX-quoted", () => {
+    expect(isLseGbxDisplayQuoted("ISF.L", "etf")).toBe(true);
+    expect(isLseGbxDisplayQuoted("SGLN:xlon", "etf")).toBe(true);
   });
 
   it("leaves non-LSE symbols untouched", () => {
