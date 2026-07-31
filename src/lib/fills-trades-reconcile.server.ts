@@ -182,6 +182,46 @@ export async function reconcileFillsToTradesForPortfolio(
     holdings = { skipped: true, reason: e instanceof Error ? e.message : String(e) };
   }
 
+  // 5. No broker to sync against (unlinked sim portfolio)? Replay the priced
+  //    fills locally so holdings and cash still reflect what was executed,
+  //    instead of leaving the portfolio looking like it never traded.
+  if (holdings.skipped) {
+    const ledger = rebuildLedgerFromFills(priced);
+    await admin.from("holdings").delete().eq("portfolio_id", portfolioId);
+    if (ledger.positions.length > 0) {
+      const ins = await admin.from("holdings").insert(
+        ledger.positions.map((p) => ({
+          portfolio_id: portfolioId,
+          symbol: p.symbol,
+          asset_class: classFor(p.symbol),
+          quantity: p.quantity,
+          avg_cost: p.avgCost,
+        })),
+      );
+      if (ins.error) throw new Error(`insert holdings failed: ${ins.error.message}`);
+    }
+    const pf = await admin
+      .from("portfolios")
+      .select("starting_cash")
+      .eq("id", portfolioId)
+      .maybeSingle();
+    const start = Number(pf.data?.starting_cash ?? 0);
+    if (Number.isFinite(start) && start > 0) {
+      await admin
+        .from("portfolios")
+        .update({ current_cash: Math.max(0, start + ledger.cashDelta) })
+        .eq("id", portfolioId);
+    }
+    holdings = {
+      skipped: false,
+      reason: `local-rebuild (${holdings.reason ?? "broker sync unavailable"})`,
+      brokerPositions: ledger.positions.length,
+      keptSymbols: ledger.positions.map((p) => p.symbol),
+      removedSymbols: [],
+    };
+  }
+
+
   return {
     portfolioId,
     mode: mode as "live_sim" | "live_prod",
