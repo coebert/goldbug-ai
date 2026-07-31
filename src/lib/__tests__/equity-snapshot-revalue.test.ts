@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   closeOnOrBefore,
+  instrumentCurrency,
   planHistoricalRevaluation,
   positionKey,
   positionsOn,
@@ -188,5 +189,44 @@ describe("planHistoricalRevaluation", () => {
     });
     expect(report.daysScanned).toBe(1);
     expect(report.rows.every((r) => r.snapshot_date >= "2026-07-27")).toBe(true);
+  });
+});
+
+describe("currency handling", () => {
+  it("derives the settlement currency from the listing", () => {
+    expect(instrumentCurrency({ symbol: "ISF:xlon", quantity: 1 })).toBe("GBP");
+    expect(instrumentCurrency({ symbol: "ISF.L", quantity: 1 })).toBe("GBP");
+    expect(instrumentCurrency({ symbol: "JNJ:xnys", quantity: 1 })).toBe("USD");
+    expect(
+      instrumentCurrency({ symbol: "ISF:xlon", quantity: 1, instrument_ccy: "GBp" }),
+    ).toBe("GBP");
+    expect(
+      instrumentCurrency({ symbol: "ASML:xams", quantity: 1, instrument_ccy: "EUR" }),
+    ).toBe("EUR");
+  });
+
+  it("converts each leg into the portfolio base currency after the pence fold", () => {
+    const report = planHistoricalRevaluation({
+      portfolioId: "p1",
+      snapshots: [
+        { snapshot_date: "2026-07-28", cash: 0, holdings_value: 1, total_value: 1 },
+      ],
+      holdings: [
+        { symbol: "ISF:xlon", quantity: 100, avg_cost: 1050, opened_at: "2026-07-27" },
+        { symbol: "JNJ:xnys", quantity: 10, avg_cost: 260, opened_at: "2026-07-27" },
+      ],
+      fills: [],
+      prices: priceMap({
+        "ISF.L": { "2026-07-28": 1060 },
+        JNJ: { "2026-07-28": 266 },
+      }),
+      fx: new Map([
+        ["GBP", 1.15],
+        ["USD", 0.89],
+      ]),
+      today: "2026-07-31",
+    });
+    // (100 * 10.60 * 1.15) + (10 * 266 * 0.89)
+    expect(report.rows[0]!.holdings_value).toBeCloseTo(1219 + 2367.4, 1);
   });
 });
