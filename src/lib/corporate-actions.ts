@@ -6,6 +6,9 @@
 // fields degrade to null rather than throwing, and the raw row is preserved
 // so the UI can always fall back to "check Saxo".
 
+/** What the option pays out in: cash, new shares, or a mix. */
+export type OptionKind = "cash" | "securities" | "mixed" | "unknown";
+
 export type CorporateActionOption = {
   /** Saxo's option number / id, when present. */
   id: string | null;
@@ -15,6 +18,14 @@ export type CorporateActionOption = {
   isDefault: boolean;
   /** Free-text detail (rate, ratio, currency) when Saxo supplies it. */
   detail: string | null;
+  /** Cash/scrip classification, inferred from the option label and type. */
+  kind: OptionKind;
+  /** Per-share cash rate, when Saxo publishes one. */
+  rate: number | null;
+  /** Currency of `rate`. */
+  currency: string | null;
+  /** New shares per held share (0.02 = 1 new share per 50 held), when known. */
+  ratio: number | null;
 };
 
 export type CorporateAction = {
@@ -103,6 +114,37 @@ export function normalizeDate(value: unknown): string | null {
   return d.toISOString();
 }
 
+const SECURITY_WORDS =
+  /(scrip|reinvest|stock|share|securit|drip|new ordinar|subscri|rights)/i;
+const CASH_WORDS = /(cash|proceeds|payment|dividend in cash|sell)/i;
+
+/** Classify an option's payout from its label/type text. */
+export function classifyOptionKind(text: string): OptionKind {
+  const sec = SECURITY_WORDS.test(text);
+  const cash = CASH_WORDS.test(text);
+  if (sec && cash) return "mixed";
+  if (sec) return "securities";
+  if (cash) return "cash";
+  return "unknown";
+}
+
+/**
+ * Parse a ratio expressed as "1:20", "1 for 20", "0.05" or "1/20" into
+ * new-shares-per-held-share. Returns null when unparseable.
+ */
+export function parseRatio(value: string | null): number | null {
+  if (!value) return null;
+  const pair = value.match(/(\d+(?:\.\d+)?)\s*(?::|\/|for|per)\s*(\d+(?:\.\d+)?)/i);
+  if (pair) {
+    const a = Number(pair[1]);
+    const b = Number(pair[2]);
+    if (Number.isFinite(a) && Number.isFinite(b) && b > 0) return a / b;
+    return null;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function normalizeOption(input: unknown, index: number): CorporateActionOption {
   const o = rec(input);
   const label =
@@ -114,11 +156,16 @@ function normalizeOption(input: unknown, index: number): CorporateActionOption {
   if (rate != null) detailBits.push(ccy ? `${rate} ${ccy}` : String(rate));
   const ratio = str(o, "Ratio", "RatioNew", "TermsRatio");
   if (ratio) detailBits.push(`ratio ${ratio}`);
+  const kindText = [label, str(o, "OptionType", "Type", "InstructionType") ?? ""].join(" ");
   return {
     id: str(o, "OptionNumber", "OptionId", "Id", "Number"),
     label,
     isDefault: bool(o, "IsDefault", "Default", "IsDefaultOption"),
     detail: detailBits.length ? detailBits.join(" · ") : null,
+    kind: classifyOptionKind(kindText),
+    rate,
+    currency: ccy,
+    ratio: parseRatio(ratio) ?? num(o, "RatioFactor", "SharesPerShare"),
   };
 }
 

@@ -9,9 +9,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { CorporateAction } from "./corporate-actions";
+import type { ImpactPreview } from "./corporate-action-impact";
 
 /** Wire shape: the raw Saxo row is dropped (not serializable / not needed). */
-export type CorporateActionView = Omit<CorporateAction, "raw">;
+export type CorporateActionView = Omit<CorporateAction, "raw"> & {
+  /** Cash-vs-scrip estimate for the position we actually hold. */
+  impact: ImpactPreview;
+};
 
 export type CorporateActionsResult = {
   portfolioId: string;
@@ -26,6 +30,11 @@ export type CorporateActionsResult = {
   /** Human-readable reason when nothing could be fetched. */
   reason: string | null;
 };
+
+/** "ULVR:xlon" / "ULVR.L" → "ULVR" for cross-source symbol matching. */
+function baseTicker(symbol: string): string {
+  return symbol.split(/[:.]/)[0]!.trim().toUpperCase();
+}
 
 export const listCorporateActions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -83,9 +92,57 @@ export const listCorporateActions = createServerFn({ method: "GET" })
     const { normalizeCorporateActions, sortByDeadline } = await import(
       "./corporate-actions"
     );
-    const all = sortByDeadline(normalizeCorporateActions(res.events)).map(
-      ({ raw: _raw, ...view }): CorporateActionView => view,
+    const normalized = sortByDeadline(normalizeCorporateActions(res.events));
+
+    // Pull the positions and last closes needed to price each election.
+    const { data: holdings } = await context.supabase
+      .from("holdings")
+      .select("symbol, quantity, avg_cost, instrument_ccy")
+      .eq("portfolio_id", data.portfolioId);
+    const bySymbol = new Map(
+      (holdings ?? []).map((h) => [baseTicker(h.symbol), h]),
     );
+
+    const symbols = [...new Set((holdings ?? []).map((h) => h.symbol))];
+    const prices = new Map<string, number>();
+    if (symbols.length) {
+      const { data: rows } = await context.supabase
+        .from("price_cache")
+        .select("symbol, close, price_date")
+        .in("symbol", symbols)
+        .order("price_date", { ascending: false })
+        .limit(500);
+      for (const r of rows ?? []) {
+        const key = baseTicker(r.symbol);
+        if (!prices.has(key) && Number.isFinite(r.close)) prices.set(key, r.close);
+      }
+    }
+
+    const { buildImpactPreview } = await import("./corporate-action-impact");
+    const { normalizeMarketPriceForTrading } = await import("./market-price-units");
+
+    const all = normalized.map(({ raw: _raw, ...view }): CorporateActionView => {
+      const key = baseTicker(view.symbol ?? view.instrument ?? "");
+      const h = key ? bySymbol.get(key) : undefined;
+      let position = null as null | {
+        quantity: number;
+        price: number | null;
+        currency: string;
+      };
+      if (h) {
+        const cached = prices.get(key);
+        const price =
+          cached != null
+            ? normalizeMarketPriceForTrading(h.symbol, cached)
+            : Number(h.avg_cost) || null;
+        position = {
+          quantity: Number(h.quantity) || 0,
+          price,
+          currency: h.instrument_ccy || "GBP",
+        };
+      }
+      return { ...view, impact: buildImpactPreview(view.options, position) };
+    });
     // Only surface events for this portfolio's account when Saxo tags them.
     const scoped = all.filter(
       (e) => e.accountKey == null || e.accountKey === link.accountKey,

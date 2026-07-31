@@ -10,10 +10,12 @@ import {
   type CorporateActionView,
 } from "@/lib/corporate-actions.functions";
 import { daysUntil, deadlineUrgency } from "@/lib/corporate-actions";
+import { bestValueOption } from "@/lib/corporate-action-impact";
+import { formatMoney } from "@/lib/format-money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CalendarClock, Landmark, RefreshCw } from "lucide-react";
+import { Landmark, RefreshCw, Scale } from "lucide-react";
 import { formatUkDateTime } from "@/lib/uk-time";
 
 function deadlineBadge(deadline: string | null) {
@@ -29,6 +31,77 @@ function deadlineBadge(deadline: string | null) {
   if (urgency === "urgent") return { cls: "bg-destructive text-destructive-foreground", label };
   if (urgency === "soon") return { cls: "bg-amber-500 text-white hover:bg-amber-500", label };
   return { cls: "bg-muted text-muted-foreground", label };
+}
+
+function ImpactPreviewTable({ event }: { event: CorporateActionView }) {
+  const { impact } = event;
+  const best = bestValueOption(impact);
+  const ccy = impact.position.currency;
+
+  return (
+    <div className="mt-3 rounded-lg border border-dashed bg-muted/20 p-2.5">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium">
+        <Scale className="h-3.5 w-3.5 text-primary" /> Impact preview
+        {impact.position.quantity > 0 && (
+          <span className="font-normal text-muted-foreground">
+            on {impact.position.quantity} shares
+            {impact.position.price != null
+              ? ` @ ${formatMoney(impact.position.price, ccy)}`
+              : ""}
+          </span>
+        )}
+      </div>
+
+      {impact.unavailableReason ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">{impact.unavailableReason}</p>
+      ) : (
+        <>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead className="text-muted-foreground">
+                <tr className="text-left">
+                  <th className="pb-1 pr-2 font-normal">If you elect</th>
+                  <th className="pb-1 pr-2 text-right font-normal">Cash</th>
+                  <th className="pb-1 pr-2 text-right font-normal">Shares</th>
+                  <th className="pb-1 text-right font-normal">Est. value</th>
+                </tr>
+              </thead>
+              <tbody className="tabular-nums">
+                {impact.impacts.map((i, idx) => (
+                  <tr key={i.optionId ?? `${event.id}-imp-${idx}`} className="border-t">
+                    <td className="py-1 pr-2 align-top">
+                      <span className="font-medium">{i.label}</span>
+                      {best && best.optionId === i.optionId && (
+                        <Badge className="ml-1.5 bg-primary/15 text-[10px] text-primary hover:bg-primary/15">
+                          higher est. value
+                        </Badge>
+                      )}
+                      <div className="text-[10px] font-normal text-muted-foreground">
+                        {i.basis}
+                      </div>
+                    </td>
+                    <td className="py-1 pr-2 text-right align-top">
+                      {i.cashDelta ? `+${formatMoney(i.cashDelta, ccy)}` : "—"}
+                    </td>
+                    <td className="py-1 pr-2 text-right align-top">
+                      {i.sharesDelta ? `+${i.sharesDelta} → ${i.sharesAfter}` : impact.position.quantity}
+                    </td>
+                    <td className="py-1 text-right align-top">
+                      {i.totalValue ? formatMoney(i.totalValue, ccy) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            Estimates only: fractional entitlements, withholding tax and the registrar's
+            scrip reference price can change the outcome.
+          </p>
+        </>
+      )}
+    </div>
+  );
 }
 
 function EventRow({ event }: { event: CorporateActionView }) {
@@ -89,7 +162,10 @@ function EventRow({ event }: { event: CorporateActionView }) {
           No election options published — this event is mandatory or informational.
         </p>
       )}
+
+      <ImpactPreviewTable event={event} />
     </li>
+
   );
 }
 
