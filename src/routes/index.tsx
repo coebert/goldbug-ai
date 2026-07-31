@@ -20,6 +20,7 @@ import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
 import { PortfolioMirrorAlert } from "@/components/portfolio-mirror-alert";
 import { checkPortfolioMirrors } from "@/lib/portfolio-mirror-detect.functions";
+import { RiskLevelMetricsCard } from "@/components/risk-level-metrics-card";
 import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { Sparkles, PlusCircle } from "lucide-react";
