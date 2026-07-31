@@ -42,6 +42,9 @@ const AllPortfoliosChart = lazy(() =>
 const NewsReel = lazy(() =>
   import("@/components/news-reel").then((m) => ({ default: m.NewsReel })),
 );
+const ExecPostsCard = lazy(() =>
+  import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
+);
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
 );
@@ -313,6 +316,16 @@ function Home() {
               </Suspense>
             </AdvancedSection>
 
+
+            <AdvancedSection
+              title="CEO posts the AI is tracking"
+              summary="Market-moving social posts by figures such as Elon Musk, and the symbols they affect."
+              defaultOpen={advanced}
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <ExecPostsCard />
+              </Suspense>
+            </AdvancedSection>
 
             <AdvancedSection
               title="News the AI is reading"

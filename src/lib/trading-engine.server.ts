@@ -42,6 +42,7 @@ import {
   type RankInfo,
 } from "./cross-sectional-ranking.server";
 import { getNewsForDate } from "./news.server";
+import { computeExecPostSignals, execPostSentimentNudge } from "./exec-posts";
 import {
   ensureSentimentScored,
   aggregatedSentimentForSymbol,
@@ -274,6 +275,7 @@ export async function callAiForDecision(args: {
   totalValue: number;
   features: Awaited<ReturnType<typeof buildCandidateFeatures>>;
   news: Array<{ headline: string; source: string | null; sentiment: number | null }>;
+  execPosts?: Array<{ symbol: string; score: number; posts: number; executives: string[]; latest_date: string | null }>;
   crossAsset: string; // preformatted block
   optionsBlock: string; // preformatted options-implied block
   crossSectional: string; // preformatted cross-sectional ranking block
@@ -432,6 +434,14 @@ ${args.news
       `${i + 1}. [${n.source ?? "news"}] (sent ${n.sentiment == null ? "?" : n.sentiment.toFixed(2)}) ${n.headline}`,
   )
   .join("\n")}
+
+Tracked CEO / founder social posts affecting these symbols (recency-weighted, -1..+1):
+${args.execPosts && args.execPosts.length > 0
+  ? args.execPosts
+      .map((e) => `- ${e.symbol}: ${e.score.toFixed(2)} from ${e.posts} post(s) by ${e.executives.join(", ")} (latest ${e.latest_date ?? "n/a"})`)
+      .join("\n")
+  : "- none in the last 7 days"}
+Posts by figures such as Elon Musk can move a ticker within minutes; treat a strongly negative post score as a reason to shrink or skip a BUY, and a strongly positive one as confirmation only when the technicals already agree.
 
 Return:
 - briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}, and cross-asset posture).
@@ -834,9 +844,34 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     loadScoredNewsWindow(asOf, 8),
   ).catch(() => [] as Awaited<ReturnType<typeof loadScoredNewsWindow>>);
 
+  // Tracked CEO/founder social posts (Musk & co.) reported by the wires.
+  // These move tickers faster than ordinary coverage, so they get a small,
+  // bounded nudge on top of the standard news sentiment.
+  const execPostSignals = computeExecPostSignals(
+    [
+      ...scoredNews.map((n) => ({
+        headline: n.headline,
+        source: n.source,
+        sentiment: n.sentiment,
+        date: asOf,
+      })),
+      ...scoredWindow.map((n) => ({
+        headline: n.headline,
+        source: n.source,
+        sentiment: n.sentiment,
+        date: n.news_date,
+      })),
+    ],
+    asOf,
+  );
+
   for (const f of features) {
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
-    f.news_score = agg.contributors > 0 ? Number(agg.score.toFixed(3)) : null;
+    const execNudge = execPostSentimentNudge(f.symbol, execPostSignals);
+    const base = agg.contributors > 0 ? agg.score : 0;
+    const blended = Math.max(-1, Math.min(1, base + execNudge));
+    f.news_score =
+      agg.contributors > 0 || execNudge !== 0 ? Number(blended.toFixed(3)) : null;
     f.news_contributors = agg.contributors;
     f.news_momentum = computeSentimentMomentum(f.symbol, f.name, scoredWindow, asOf);
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
@@ -985,6 +1020,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           source: n.source,
           sentiment: n.sentiment,
         })),
+        execPosts: execPostSignals.slice(0, 8),
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
         crossSectional: formatCrossSectionalBlock(rankMap),

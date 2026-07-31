@@ -7,6 +7,8 @@
 // by the AI briefing prompt and by trade-signal blending — tier-one wires
 // like Reuters/AP/BBC anchor above regional or single-topic feeds.
 
+import { TRACKED_EXECUTIVES, execPostFeedQuery } from "@/lib/exec-posts";
+
 export type NewsSource =
   | {
       kind: "rss";
@@ -123,7 +125,18 @@ export const RSS_SOURCES: Extract<NewsSource, { kind: "rss" }>[] = [
   { kind: "rss", id: "theblock",        label: "The Block",              url: "https://www.theblock.co/rss.xml",                        weight: 0.6,  region: "Global",  topic: "crypto" },
   { kind: "rss", id: "decrypt",         label: "Decrypt",                url: "https://decrypt.co/feed",                                weight: 0.55, region: "Global",  topic: "crypto" },
   { kind: "rss", id: "bitcoinmag",      label: "Bitcoin Magazine",       url: "https://bitcoinmagazine.com/feed",                       weight: 0.5,  region: "Global",  topic: "crypto" },
+  // --- Executive social posts (reported by wires; see src/lib/exec-posts.ts) ---
+  ...TRACKED_EXECUTIVES.map((exec) => ({
+    kind: "rss" as const,
+    id: `execpost-${exec.id}`,
+    label: `${exec.name} posts (via Google News)`,
+    url: execPostFeedQuery(exec),
+    weight: Number((0.55 + 0.25 * exec.weight).toFixed(2)),
+    region: "Global",
+    topic: "exec-posts",
+  })),
 ];
+
 
 
 // GDELT topical slices — issuing several narrow queries yields far broader
@@ -158,7 +171,10 @@ export const GDELT_SOURCES: Extract<NewsSource, { kind: "gdelt" }>[] = [
     query: "(hurricane OR drought OR flooding OR \"extreme weather\" OR \"climate policy\" OR \"carbon price\")" },
   { kind: "gdelt", id: "gdelt-em",        label: "GDELT · Emerging markets", weight: 0.6, topic: "macro",
     query: "(\"emerging markets\" OR India economy OR China economy OR Brazil economy OR \"currency crisis\" OR IMF bailout)" },
+  { kind: "gdelt", id: "gdelt-execposts", label: "GDELT · CEO posts",    weight: 0.7, topic: "exec-posts",
+    query: "((\"Elon Musk\" OR \"Jensen Huang\" OR \"Tim Cook\" OR \"Sam Altman\" OR \"Michael Saylor\" OR \"Jamie Dimon\") AND (post OR posted OR tweet OR \"on X\" OR \"Truth Social\"))" },
 ];
+
 
 
 export const ALL_SOURCES: NewsSource[] = [...RSS_SOURCES, ...GDELT_SOURCES];
