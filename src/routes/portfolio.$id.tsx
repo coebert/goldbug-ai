@@ -177,6 +177,7 @@ import { TailHedgeReportCard } from "@/components/tail-hedge-report-card";
 import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-card";
 import { ReconcileFillsCard } from "@/components/reconcile-fills-card";
 import { PriceUnitAuditCard } from "@/components/price-unit-audit-card";
+import { ValuationConsistencyAlert } from "@/components/valuation-consistency-alert";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
 import { FxAuditCard } from "@/components/fx-audit-card";
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
@@ -1006,6 +1007,7 @@ function PortfolioPage() {
                 />
                 <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
+                <ValuationConsistencyAlert portfolioId={id} className="mb-4" />
                 <ReconcileFillsCard portfolioId={id} className="mb-4" />
                 <PriceUnitAuditCard portfolioId={id} className="mb-4" />
                 <div className="mb-6">

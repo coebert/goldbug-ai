@@ -1,0 +1,242 @@
+// Valuation consistency check.
+//
+// A portfolio tile can only move so far in one day. A 3x jump between
+// consecutive daily snapshots is not a market move — it is almost always a
+// price-unit fault: a GBX quote that skipped the ÷100 fold (~100x), a pound
+// quote folded anyway (~0.01x), or a foreign leg that lost its FX rate
+// (typically 1.1x–1.6x, which shows up as a jump only on concentrated books).
+//
+// This module is pure. It takes the stored snapshot series plus (optionally)
+// the price-unit audit for the suspect day, and reports which day broke, how
+// badly, and which quote is the likely culprit.
+
+import type { PriceUnitAudit, PriceUnitAuditRow } from "./price-unit-audit";
+
+/** Default implausibility threshold: more than a 3x move in one step. */
+export const DEFAULT_JUMP_FACTOR = 3;
+
+export type ConsistencySnapshot = {
+  snapshot_date: string;
+  total_value: number | string | null;
+  holdings_value?: number | string | null;
+  cash?: number | string | null;
+};
+
+export type SuspectedUnitSource =
+  /** Ratio near 100x/0.01x — a pence quote that was (or wasn't) folded. */
+  | "gbx_pence_fold"
+  /** A leg is missing its instrument→base rate. */
+  | "missing_fx_rate"
+  /** The day's value leans on average cost or a stale carried quote. */
+  | "stale_or_missing_quote"
+  /** Cash, not marks, moved — a deposit/withdrawal, not a unit bug. */
+  | "cash_movement"
+  | "unknown";
+
+export type ValuationJump = {
+  date: string;
+  previous_date: string;
+  previous_value: number;
+  value: number;
+  /** value ÷ previous_value. >3 or <1/3 by default. */
+  ratio: number;
+  direction: "up" | "down";
+  /** How much of the change came from cash rather than marks. */
+  cash_delta: number;
+  holdings_ratio: number | null;
+  suspected_source: SuspectedUnitSource;
+  /** Symbols whose own arithmetic explains the jump, worst first. */
+  suspect_symbols: {
+    symbol: string;
+    reason: string;
+    quote_currency: string;
+    raw_quote: number;
+    price_in_instrument_ccy: number;
+    fx_pair: string;
+    fx_rate: number;
+    value_base: number;
+    weight: number;
+  }[];
+  explanation: string;
+};
+
+export type ValuationConsistencyReport = {
+  portfolio_id: string;
+  base_ccy: string;
+  daysChecked: number;
+  threshold: number;
+  jumps: ValuationJump[];
+  /** Largest-ratio jump, or null when the series looks sane. */
+  worst: ValuationJump | null;
+};
+
+function num(value: number | string | null | undefined, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function round(value: number, dp = 4): number {
+  const scale = 10 ** dp;
+  return Math.round(value * scale) / scale;
+}
+
+function nearlyHundredFold(ratio: number): boolean {
+  return (ratio >= 50 && ratio <= 200) || (ratio >= 1 / 200 && ratio <= 1 / 50);
+}
+
+/** Rank audit rows by how likely each is to be the cause of a jump. */
+export function suspectRowsFor(
+  audit: PriceUnitAudit | null | undefined,
+  ratio: number,
+): { rows: PriceUnitAuditRow[]; source: SuspectedUnitSource } {
+  if (!audit || audit.rows.length === 0) {
+    return { rows: [], source: nearlyHundredFold(ratio) ? "gbx_pence_fold" : "unknown" };
+  }
+
+  const pence = audit.rows.filter((r) => r.pence_folded || r.quote_currency === "GBX");
+  const missingFx = audit.rows.filter((r) => r.fx_source === "assumed_identity");
+  const stale = audit.rows.filter(
+    (r) => r.price_source === "avg_cost" || r.price_source === "missing",
+  );
+
+  const byWeight = (a: PriceUnitAuditRow, b: PriceUnitAuditRow) => b.weight - a.weight;
+
+  if (nearlyHundredFold(ratio) && pence.length > 0) {
+    return { rows: [...pence].sort(byWeight), source: "gbx_pence_fold" };
+  }
+  if (missingFx.length > 0) {
+    return { rows: [...missingFx].sort(byWeight), source: "missing_fx_rate" };
+  }
+  if (pence.length > 0 && nearlyHundredFold(ratio)) {
+    return { rows: [...pence].sort(byWeight), source: "gbx_pence_fold" };
+  }
+  if (stale.length > 0) {
+    return { rows: [...stale].sort(byWeight), source: "stale_or_missing_quote" };
+  }
+  if (pence.length > 0) {
+    return { rows: [...pence].sort(byWeight), source: "gbx_pence_fold" };
+  }
+  return { rows: [], source: "unknown" };
+}
+
+function reasonFor(row: PriceUnitAuditRow): string {
+  if (row.fx_source === "assumed_identity") {
+    return `No ${row.fx_pair} rate — converted at 1.0`;
+  }
+  if (row.price_source === "missing") return "No quote at all — valued at zero";
+  if (row.price_source === "avg_cost") return "Valued at average cost, not a market close";
+  if (row.pence_folded) {
+    return `Pence quote ${row.raw_quote} GBX folded ÷100 → ${row.price_in_instrument_ccy} ${row.instrument_ccy}`;
+  }
+  return `${row.instrument_ccy} quote used without a unit fold`;
+}
+
+const SOURCE_TEXT: Record<SuspectedUnitSource, string> = {
+  gbx_pence_fold: "a pence (GBX) quote being folded to pounds inconsistently",
+  missing_fx_rate: "a missing instrument→base FX rate",
+  stale_or_missing_quote: "a stale or missing market quote",
+  cash_movement: "a cash deposit or withdrawal, not a pricing fault",
+  unknown: "an unidentified pricing step",
+};
+
+export function checkValuationConsistency({
+  portfolioId,
+  snapshots,
+  audits = {},
+  baseCcy = "GBP",
+  jumpFactor = DEFAULT_JUMP_FACTOR,
+}: {
+  portfolioId: string;
+  snapshots: ConsistencySnapshot[];
+  /** Price-unit audit keyed by snapshot date, where one was built. */
+  audits?: Record<string, PriceUnitAudit | null | undefined>;
+  baseCcy?: string;
+  jumpFactor?: number;
+}): ValuationConsistencyReport {
+  const threshold = Math.max(1.0001, jumpFactor);
+  const ordered = [...snapshots]
+    .map((s) => ({
+      date: String(s.snapshot_date).slice(0, 10),
+      total: num(s.total_value),
+      holdings: s.holdings_value == null ? null : num(s.holdings_value),
+      cash: num(s.cash),
+    }))
+    .filter((s) => s.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const jumps: ValuationJump[] = [];
+
+  for (let i = 1; i < ordered.length; i += 1) {
+    const prev = ordered[i - 1]!;
+    const curr = ordered[i]!;
+    // A zero/negative prior value has no meaningful ratio; funding a fresh
+    // portfolio is not a jump.
+    if (prev.total <= 0 || curr.total <= 0) continue;
+
+    const ratio = curr.total / prev.total;
+    if (ratio < threshold && ratio > 1 / threshold) continue;
+
+    const cashDelta = round(curr.cash - prev.cash, 2);
+    const holdingsRatio =
+      prev.holdings != null && curr.holdings != null && prev.holdings > 0
+        ? round(curr.holdings / prev.holdings, 4)
+        : null;
+
+    // External cash explains the move: not a unit fault.
+    const explainedByCash =
+      Math.abs(cashDelta) > 0 &&
+      Math.abs(curr.total - prev.total - cashDelta) <= Math.abs(curr.total - prev.total) * 0.05;
+
+    const audit = audits[curr.date] ?? null;
+    const { rows, source } = explainedByCash
+      ? { rows: [] as PriceUnitAuditRow[], source: "cash_movement" as SuspectedUnitSource }
+      : suspectRowsFor(audit, holdingsRatio ?? ratio);
+
+    const suspects = rows.slice(0, 5).map((r) => ({
+      symbol: r.symbol,
+      reason: reasonFor(r),
+      quote_currency: r.quote_currency,
+      raw_quote: r.raw_quote,
+      price_in_instrument_ccy: r.price_in_instrument_ccy,
+      fx_pair: r.fx_pair,
+      fx_rate: r.fx_rate,
+      value_base: r.value_base,
+      weight: r.weight,
+    }));
+
+    const direction: "up" | "down" = ratio >= 1 ? "up" : "down";
+    const shown = round(ratio, 2);
+    const explanation =
+      `Total value moved ${direction === "up" ? "up" : "down"} ${shown}x between ${prev.date} and ${curr.date} ` +
+      `(${round(prev.total, 2)} → ${round(curr.total, 2)} ${baseCcy.toUpperCase()}). ` +
+      `Most likely cause: ${SOURCE_TEXT[source]}` +
+      (suspects.length > 0 ? ` — check ${suspects.map((s) => s.symbol).join(", ")}.` : ".");
+
+    jumps.push({
+      date: curr.date,
+      previous_date: prev.date,
+      previous_value: round(prev.total, 2),
+      value: round(curr.total, 2),
+      ratio: round(ratio, 4),
+      direction,
+      cash_delta: cashDelta,
+      holdings_ratio: holdingsRatio,
+      suspected_source: source,
+      suspect_symbols: suspects,
+      explanation,
+    });
+  }
+
+  const scored = [...jumps].sort(
+    (a, b) => Math.max(b.ratio, 1 / b.ratio) - Math.max(a.ratio, 1 / a.ratio),
+  );
+
+  return {
+    portfolio_id: portfolioId,
+    base_ccy: baseCcy.toUpperCase(),
+    daysChecked: Math.max(0, ordered.length - 1),
+    threshold,
+    jumps,
+    worst: scored[0] ?? null,
+  };
+}
