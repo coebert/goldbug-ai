@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // The Saxo adapter is loaded via a dynamic import inside the function under
 // test, so we mock the module before importing anything.
+const ACCOUNT_KEY = "ACC-TEST-1";
 const balanceStub = vi.fn();
 vi.mock("@/lib/brokers/saxo.server", () => ({
   buildSaxoAdapter: vi.fn(async () => ({
@@ -45,6 +46,9 @@ type Portfolio = {
   live_paused: boolean;
   currency: string;
   cash_by_ccy?: Record<string, number> | null;
+  /** Broker binding — required for broker sync (see portfolio-broker-link). */
+  broker?: string | null;
+  broker_account_id?: string | null;
 };
 type Holding = { id: string; portfolio_id: string };
 type Fill = {
@@ -206,7 +210,7 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
     // executor must treat it as a deposit and grow starting_cash to £300.
     const store = makeStore(
       [{
-        id: PID, user_id: UID, mode: "live_prod",
+        id: PID, user_id: UID, mode: "live_prod", broker: "saxo", broker_account_id: ACCOUNT_KEY,
         current_cash: 14.98, starting_cash: 100,
         live_paused: false, currency: "GBP",
       }],
@@ -237,7 +241,7 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
     // it).
     const store = makeStore(
       [{
-        id: PID, user_id: UID, mode: "live_prod",
+        id: PID, user_id: UID, mode: "live_prod", broker: "saxo", broker_account_id: ACCOUNT_KEY,
         current_cash: 300, starting_cash: 300,
         live_paused: false, currency: "GBP",
       }],
@@ -266,7 +270,7 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
     // the stale 176.97.
     const store = makeStore(
       [{
-        id: PID, user_id: UID, mode: "live_prod",
+        id: PID, user_id: UID, mode: "live_prod", broker: "saxo", broker_account_id: ACCOUNT_KEY,
         current_cash: 152.78, starting_cash: 300,
         live_paused: false, currency: "GBP",
       }],
@@ -308,7 +312,7 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
     // silently writing 0.
     const store = makeStore(
       [{
-        id: PID, user_id: UID, mode: "live_prod",
+        id: PID, user_id: UID, mode: "live_prod", broker: "saxo", broker_account_id: ACCOUNT_KEY,
         current_cash: 150, starting_cash: 300,
         live_paused: false, currency: "GBP",
       }],
@@ -347,7 +351,7 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
     const today = new Date().toISOString().slice(0, 10);
     const store = makeStore(
       [{
-        id: PID, user_id: UID, mode: "live_prod",
+        id: PID, user_id: UID, mode: "live_prod", broker: "saxo", broker_account_id: ACCOUNT_KEY,
         current_cash: 124.6, starting_cash: 300,
         live_paused: false, currency: "GBP",
       }],
@@ -389,7 +393,7 @@ describe("syncLiveCashFromBroker — starting pot & snapshot regression", () => 
     const today = new Date().toISOString().slice(0, 10);
     const store = makeStore(
       [{
-        id: PID, user_id: UID, mode: "live_prod",
+        id: PID, user_id: UID, mode: "live_prod", broker: "saxo", broker_account_id: ACCOUNT_KEY,
         current_cash: 10014.98, starting_cash: 10190.38,
         live_paused: false, currency: "GBP",
         cash_by_ccy: { GBP: 124.6 },
