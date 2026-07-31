@@ -133,15 +133,36 @@ describe("high-risk vs balanced-risk sim: multi-tick divergence", () => {
     expect(balanced.equityCurve).toHaveLength(BARS);
   });
 
-  it("holdings diverge — high risk opens more names", () => {
+  it("holdings diverge — high risk builds breadth faster and sizes differently", () => {
     const h = finalHoldingsMap(high);
     const b = finalHoldingsMap(balanced);
-    expect(Object.keys(h).length).toBeGreaterThan(Object.keys(b).length);
-    expect(h).not.toEqual(b);
-    // The balanced book is a subset of the high-risk book's symbols
-    // (same ranking, fewer slots per tick).
+    // Same tape and ranking, so the balanced book is always a subset of the
+    // high-risk universe — but the per-name quantities must differ.
     for (const sym of Object.keys(b)) expect(Object.keys(h)).toContain(sym);
+    expect(h).not.toEqual(b);
+
+    // Breadth over time: high risk opens up to 3 names per tick vs 2, so it
+    // reaches full breadth strictly earlier and is never behind.
+    const breadth = (r: typeof high) => {
+      const seen = new Set<string>();
+      return r.snapshots.map((s) => {
+        if (s.side === "BUY") seen.add(s.symbol);
+        return seen.size;
+      });
+    };
+    const target = Object.keys(h).length;
+    const firstFull = (r: typeof high) => {
+      const seen = new Set<string>();
+      for (const s of r.snapshots) {
+        if (s.side === "BUY") seen.add(s.symbol);
+        if (seen.size >= target) return s.step;
+      }
+      return Number.POSITIVE_INFINITY;
+    };
+    expect(firstFull(high)).toBeLessThan(firstFull(balanced));
+    expect(Math.max(...breadth(high))).toBeGreaterThanOrEqual(Math.max(...breadth(balanced)));
   });
+
 
   it("per-name size diverges — high risk buys a bigger slice of cash", () => {
     const h = finalHoldingsMap(high);
