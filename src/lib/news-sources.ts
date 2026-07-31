@@ -7,6 +7,8 @@
 // by the AI briefing prompt and by trade-signal blending — tier-one wires
 // like Reuters/AP/BBC anchor above regional or single-topic feeds.
 
+import { TRACKED_EXECUTIVES, execPostFeedQuery } from "@/lib/exec-posts";
+
 export type NewsSource =
   | {
       kind: "rss";
