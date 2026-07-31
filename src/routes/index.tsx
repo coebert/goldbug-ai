@@ -18,6 +18,8 @@ import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
 import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
+import { PortfolioMirrorAlert } from "@/components/portfolio-mirror-alert";
+import { checkPortfolioMirrors } from "@/lib/portfolio-mirror-detect.functions";
 import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { Sparkles, PlusCircle } from "lucide-react";
@@ -91,6 +93,13 @@ function Home() {
     enabled: !!session,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  });
+  const checkMirrors = useServerFn(checkPortfolioMirrors);
+  const mirrorQ = useQuery({
+    queryKey: ["portfolio-mirror-check"],
+    queryFn: () => checkMirrors(),
+    enabled: !!session,
+    staleTime: 60_000,
   });
   const isRefreshingEquity = equityQ.isFetching && !equityQ.isLoading;
   const equityErrored = equityQ.isError && !equityQ.data;
@@ -173,6 +182,8 @@ function Home() {
         </div>
 
         <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
+
+        <PortfolioMirrorAlert findings={mirrorQ.data?.findings ?? []} />
 
         {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
