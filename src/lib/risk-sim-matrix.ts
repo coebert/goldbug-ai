@@ -283,6 +283,10 @@ export async function runRiskLevelSim(
   }));
   const sellSnaps = result.snapshots.filter((s) => s.side === "SELL");
   const wins = sellSnaps.filter((s) => s.realizedPnl > 0).length;
+  const peakOpenPositions = result.snapshots.reduce(
+    (max, s) => Math.max(max, s.holdings.filter((h) => h.quantity > 0).length),
+    0,
+  );
 
   return {
     equity,
@@ -291,6 +295,8 @@ export async function runRiskLevelSim(
     wins,
     closed: sellSnaps.length,
     finalCash: result.finalState.cash,
+    finalHoldings: result.finalState.holdings.filter((h) => h.quantity > 0).map((h) => ({ ...h })),
+    peakOpenPositions,
     symbols,
   };
 }
