@@ -104,8 +104,21 @@ function ImpactPreviewTable({ event }: { event: CorporateActionView }) {
   );
 }
 
-function EventRow({ event }: { event: CorporateActionView }) {
+function EventRow({
+  event,
+  env,
+}: {
+  event: CorporateActionView;
+  env: SaxoEnv;
+}) {
   const badge = deadlineBadge(event.deadline);
+  const electUrl = buildSaxoCorporateActionLink({
+    env,
+    accountKey: event.accountKey,
+    eventId: event.id,
+    uic: event.uic,
+    symbol: event.symbol,
+  });
   return (
     <li className="rounded-lg border bg-card/50 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
