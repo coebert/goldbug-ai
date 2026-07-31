@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
+import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
 import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 import {
   detectSnapshotTimingMismatches,
@@ -96,6 +97,13 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     }
 
     const ids = list.map((p) => p.id);
+
+    // Self-healing step: write any missing snapshot rows (today's
+    // mark-to-market plus carry-forward gap fill) before reading, so cards
+    // never render an empty state or fall back to raw cash. Idempotent upsert;
+    // failures are swallowed and simply leave the existing data untouched.
+    await backfillMissingEquitySnapshots(context.supabase as never, list);
+
     const { data: allEq } = await context.supabase
       .from("equity_snapshots")
       .select("portfolio_id,snapshot_date,total_value,cash")
@@ -279,6 +287,14 @@ export const getPortfolio = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    // Heal missing snapshots for this portfolio before reading it.
+    const { data: pfRow } = await context.supabase
+      .from("portfolios")
+      .select("id,current_cash,created_at,live_activated_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (pfRow) await backfillMissingEquitySnapshots(context.supabase as never, [pfRow as never]);
+
     const [
       { data: portfolio },
       { data: holdings },
