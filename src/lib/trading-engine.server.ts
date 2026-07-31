@@ -594,9 +594,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // cash assumptions. The abort surfaces as a decision row so the user can
   // see why nothing traded.
   const ownerLookup = await supabaseAdmin
-    .from("portfolios").select("user_id, mode").eq("id", portfolioId).maybeSingle();
+    .from("portfolios")
+    .select("user_id, mode, broker, broker_account_id")
+    .eq("id", portfolioId)
+    .maybeSingle();
   const ownerMode = ownerLookup.data?.mode;
+  // Only a portfolio actually bound to a broker account can (or must) have its
+  // cash confirmed against the broker. An unlinked live_sim portfolio runs on a
+  // purely local ledger — treating its unavoidable "no broker_account_id" skip
+  // as a fatal reconciliation failure froze it out of trading entirely.
+  const { resolvePortfolioBrokerLink } = await import(
+    "@/lib/brokers/portfolio-broker-link.server"
+  );
+  const brokerLinked = ownerLookup.data
+    ? resolvePortfolioBrokerLink(ownerLookup.data).linked
+    : false;
   const isLiveMode = ownerMode === "live_sim" || ownerMode === "live_prod";
+  const requiresBrokerCash = isLiveMode && brokerLinked;
   let cashSyncFailure: string | null = null;
   if (ownerLookup.data?.user_id) {
     try {
@@ -606,18 +620,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         portfolioId,
         withOwnedClient(ownerLookup.data.user_id),
       );
-      // A "skipped" result on a live portfolio for any reason other than
-      // "no material drift" means we couldn't confirm broker cash. Treat as
-      // failure so we don't size against stale local cash.
-      if (isLiveMode && res.skipped && res.reason !== "no material drift") {
+      // A "skipped" result on a broker-linked portfolio for any reason other
+      // than "no material drift" means we couldn't confirm broker cash. Treat
+      // as failure so we don't size against stale local cash.
+      if (requiresBrokerCash && res.skipped && res.reason !== "no material drift") {
         cashSyncFailure = res.reason;
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("cash sync failed", portfolioId, msg);
-      if (isLiveMode) cashSyncFailure = msg;
+      if (requiresBrokerCash) cashSyncFailure = msg;
     }
   }
+
 
   if (cashSyncFailure) {
     const briefing = "Skipped: could not reconcile broker cash before sizing trades.";

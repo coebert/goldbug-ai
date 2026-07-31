@@ -17,6 +17,13 @@
 import type { Database } from "@/integrations/supabase/types";
 import { withOwnedClient } from "@/lib/_server/owned-client";
 import { findSymbol } from "@/lib/universe.server";
+import {
+  rebuildLedgerFromFills,
+  resolveFillPrice,
+  type CloseLookup,
+  type FillLite,
+} from "@/lib/fills-ledger-rebuild";
+
 
 type AssetClass = Database["public"]["Enums"]["asset_class"];
 const ALLOWED: ReadonlySet<AssetClass> = new Set(["stock", "etf", "fx", "crypto", "commodity"]);
@@ -91,30 +98,62 @@ export async function reconcileFillsToTradesForPortfolio(
   //    authoritative executed trades. Wipe first to keep the ledger canonical.
   await admin.from("trades").delete().eq("portfolio_id", portfolioId);
 
-  const rows = fills
+  // Broker fills often arrive without an average price, and LSE fills arrive
+  // in GBX. Resolve missing prices from cached closes and fold everything to
+  // base units so the ledger notionals are sane.
+  const symbols = [...new Set(fills.map((f) => String(f.symbol)))];
+  const closes: CloseLookup = new Map();
+  if (symbols.length > 0) {
+    const firstDay = (fills[0]?.filled_at as string | null)?.slice(0, 10) ?? "1970-01-01";
+    const since = new Date(`${firstDay}T00:00:00Z`);
+    since.setUTCDate(since.getUTCDate() - 10);
+    const pc = await admin
+      .from("price_cache")
+      .select("symbol, price_date, close")
+      .in("symbol", symbols)
+      .gte("price_date", since.toISOString().slice(0, 10))
+      .order("price_date", { ascending: true });
+    for (const row of pc.data ?? []) {
+      const sym = String(row.symbol);
+      const list = closes.get(sym) ?? [];
+      list.push({ date: String(row.price_date), close: Number(row.close) });
+      closes.set(sym, list);
+    }
+  }
+
+  const priced = fills
     .filter((f) => Number(f.quantity ?? 0) > 0)
-    .map((f) => {
-      const qty = Number(f.quantity);
-      const px = Number(f.fill_price ?? 0);
-      const value = qty * px;
-      const filledAtIso = (f.filled_at as string | null) ?? new Date().toISOString();
-      const brokerFillId = f.broker_fill_id ? String(f.broker_fill_id) : String(f.id);
-      const rawSide = String(f.side ?? "buy").toLowerCase();
-      const side: "buy" | "sell" = rawSide === "sell" ? "sell" : "buy";
-      return {
-        portfolio_id: portfolioId,
-        symbol: f.symbol as string,
-        asset_class: classFor(f.symbol as string),
-        side,
-        quantity: qty,
-        price: px,
-        value,
-        executed_at: filledAtIso,
-        trade_date: filledAtIso.slice(0, 10),
-        reason: `[broker-fill] fill_id=${brokerFillId}`,
-        ...(f.currency ? { instrument_ccy: String(f.currency) } : {}),
-      };
-    });
+    .map((f) => ({
+      ...(f as unknown as FillLite),
+      symbol: String(f.symbol),
+      price: resolveFillPrice(f as unknown as FillLite, closes),
+    }))
+    .filter((f) => f.price > 0);
+
+  const rows = priced.map((f) => {
+    const qty = Number(f.quantity);
+    const px = f.price;
+    const value = qty * px;
+    const filledAtIso = f.filled_at ?? new Date().toISOString();
+    const src = fills.find((x) => x.id === f.id);
+    const brokerFillId = src?.broker_fill_id ? String(src.broker_fill_id) : String(f.id);
+    const rawSide = String(f.side ?? "buy").toLowerCase();
+    const side: "buy" | "sell" = rawSide === "sell" ? "sell" : "buy";
+    return {
+      portfolio_id: portfolioId,
+      symbol: f.symbol,
+      asset_class: classFor(f.symbol),
+      side,
+      quantity: qty,
+      price: px,
+      value,
+      executed_at: filledAtIso,
+      trade_date: filledAtIso.slice(0, 10),
+      reason: `[broker-fill] fill_id=${brokerFillId}`,
+      ...(src?.currency ? { instrument_ccy: String(src.currency) } : {}),
+    };
+  });
+
 
   if (rows.length > 0) {
     const ins = await admin.from("trades").insert(rows);
@@ -142,6 +181,46 @@ export async function reconcileFillsToTradesForPortfolio(
   } catch (e) {
     holdings = { skipped: true, reason: e instanceof Error ? e.message : String(e) };
   }
+
+  // 5. No broker to sync against (unlinked sim portfolio)? Replay the priced
+  //    fills locally so holdings and cash still reflect what was executed,
+  //    instead of leaving the portfolio looking like it never traded.
+  if (holdings.skipped) {
+    const ledger = rebuildLedgerFromFills(priced);
+    await admin.from("holdings").delete().eq("portfolio_id", portfolioId);
+    if (ledger.positions.length > 0) {
+      const ins = await admin.from("holdings").insert(
+        ledger.positions.map((p) => ({
+          portfolio_id: portfolioId,
+          symbol: p.symbol,
+          asset_class: classFor(p.symbol),
+          quantity: p.quantity,
+          avg_cost: p.avgCost,
+        })),
+      );
+      if (ins.error) throw new Error(`insert holdings failed: ${ins.error.message}`);
+    }
+    const pf = await admin
+      .from("portfolios")
+      .select("starting_cash")
+      .eq("id", portfolioId)
+      .maybeSingle();
+    const start = Number(pf.data?.starting_cash ?? 0);
+    if (Number.isFinite(start) && start > 0) {
+      await admin
+        .from("portfolios")
+        .update({ current_cash: Math.max(0, start + ledger.cashDelta) })
+        .eq("id", portfolioId);
+    }
+    holdings = {
+      skipped: false,
+      reason: `local-rebuild (${holdings.reason ?? "broker sync unavailable"})`,
+      brokerPositions: ledger.positions.length,
+      keptSymbols: ledger.positions.map((p) => p.symbol),
+      removedSymbols: [],
+    };
+  }
+
 
   return {
     portfolioId,
