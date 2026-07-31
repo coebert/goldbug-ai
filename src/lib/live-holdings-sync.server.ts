@@ -190,11 +190,16 @@ export async function reconcileLiveHoldingsFromBroker(
   // fallback values every :xlon position 100x too high — which surfaced as a
   // ~GBP 817k headline for a ~GBP 10.2k account whenever Saxo's authoritative
   // TotalValue was missing from the response.
-  const holdingsValueLocal = positions.reduce((sum, p) => {
-    const raw = p.marketPrice || p.avgPrice || 0;
-    const px = normalizeLseDisplayPriceToBase(p.symbol, raw, saxoAssetToClass(p.assetType));
-    return sum + px * p.quantity;
-  }, 0);
+  const holdingsValueLocal = valueBrokerPositions(
+    positions.map((p) => ({
+      symbol: p.symbol,
+      quantity: p.quantity,
+      marketPrice: p.marketPrice,
+      avgPrice: p.avgPrice,
+      assetClass: saxoAssetToClass(p.assetType),
+    })),
+  );
+
 
   const newTotal =
     brokerTotalValue != null && brokerTotalValue > 0
