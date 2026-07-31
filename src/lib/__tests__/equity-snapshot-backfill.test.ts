@@ -52,15 +52,49 @@ describe("planMissingEquitySnapshots", () => {
     ]);
   });
 
-  it("is idempotent when today's row already exists", () => {
+  it("is idempotent when today's row is already correctly marked", () => {
     const planned = planMissingEquitySnapshots({
       portfolios: [pf("p1", 5000)],
-      snapshots: [{ portfolio_id: "p1", snapshot_date: TODAY, cash: 5000, total_value: 5000 }],
+      snapshots: [{
+        portfolio_id: "p1",
+        snapshot_date: TODAY,
+        cash: 5000,
+        holdings_value: 0,
+        total_value: 5000,
+      }],
       holdings: [],
       prices: new Map(),
       today: TODAY,
     });
     expect(planned).toEqual([]);
+  });
+
+  it("replaces a stale same-day cash-only row after holdings arrive", () => {
+    const planned = planMissingEquitySnapshots({
+      portfolios: [pf("balanced", 547_499.46)],
+      snapshots: [{
+        portfolio_id: "balanced",
+        snapshot_date: TODAY,
+        cash: 1_000_000,
+        holdings_value: 0,
+        total_value: 1_000_000,
+      }],
+      holdings: [
+        { portfolio_id: "balanced", symbol: "JNJ", quantity: 636, avg_cost: 265.95 },
+        { portfolio_id: "balanced", symbol: "V", quantity: 704, avg_cost: 362.53 },
+      ],
+      prices: new Map([["JNJ", 270], ["V", 365]]),
+      today: TODAY,
+    });
+
+    expect(planned).toEqual([{
+      portfolio_id: "balanced",
+      snapshot_date: TODAY,
+      cash: 547_499.46,
+      holdings_value: 428_680,
+      total_value: 976_179.46,
+      reason: "today",
+    }]);
   });
 
   it("carries the last known total forward across gap days", () => {
