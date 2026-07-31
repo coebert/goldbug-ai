@@ -132,7 +132,17 @@ export function buildAllPortfoliosEquity({
   });
 
   const perPortfolioSeries: Record<string, PortfolioEquityPoint[]> = {};
-  for (const portfolio of perPortfolio) perPortfolioSeries[portfolio.id] = portfolio.series;
+  for (const portfolio of perPortfolio) {
+    // A portfolio with no snapshots yet is still worth its cash today. Mirror
+    // the combined-series rule (current_cash on `today` only, never history)
+    // so the card shows the real balance instead of an empty "—".
+    perPortfolioSeries[portfolio.id] =
+      portfolio.series.length > 0
+        ? portfolio.series
+        : Number.isFinite(portfolio.current_cash)
+          ? [{ date: today, value: portfolio.current_cash }]
+          : [];
+  }
 
   return {
     portfolios: perPortfolio.map((portfolio) => ({
