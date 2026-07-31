@@ -32,20 +32,57 @@ export function isLseGbxDisplayQuoted(
   return true;
 }
 
-export function marketQuoteCurrency(symbol: string): "GBX" | null {
-  return isLsePenceQuoted(symbol) ? "GBX" : null;
+/**
+ * LSE tickers whose feed quotes arrive in **GBP (pounds)** rather than GBX.
+ * This is a small, verified allowlist — the Vanguard UK range is quoted in
+ * pounds by our price provider (VUKE ≈ 47.6, VMID ≈ 36.6), while the rest of
+ * the LSE — including iShares ETFs such as ISF (≈ 1062) and SGLN (≈ 7690) —
+ * arrives in pence.
+ *
+ * Do NOT widen this to "all ETFs": that rule inflated iShares positions by
+ * 100x and made a simulated portfolio read ~9.2M instead of ~92k.
+ */
+const GBP_QUOTED_LSE_TICKERS = new Set([
+  "VUKE", "VMID", "VUSA", "VWRL", "VHYL", "VEUR", "VJPN", "VFEM", "VEVE",
+  "VAGP", "VGOV", "VERX", "VDPX", "VWRP", "VUAG",
+]);
+
+function lseRoot(symbol: string): string {
+  const s = symbol.trim().toUpperCase();
+  if (s.endsWith(":XLON")) return s.slice(0, -5);
+  if (s.endsWith(".L")) return s.slice(0, -2);
+  return s;
 }
 
+/**
+ * True when this symbol's raw quote is in GBX (pence). Applies to every LSE
+ * listing except the explicitly GBP-quoted tickers above. `assetClass` is
+ * accepted for backwards compatibility but no longer routes the decision —
+ * ETF status alone does not imply a pound-denominated quote.
+ */
+export function isLseGbxDisplayQuoted(
+  symbol: string,
+  _assetClass?: string | null,
+): boolean {
+  if (!isLsePenceQuoted(symbol)) return false;
+  return !GBP_QUOTED_LSE_TICKERS.has(lseRoot(symbol));
+}
+
+export function marketQuoteCurrency(symbol: string): "GBX" | null {
+  return isLseGbxDisplayQuoted(symbol) ? "GBX" : null;
+}
+
+/** Order-sizing normalisation. Uses the same unit rule as display so the
+ *  ledger and the tiles can never disagree about a symbol's scale. */
 export function normalizeMarketPriceForTrading(symbol: string, price: number): number {
   if (!Number.isFinite(price)) return 0;
-  return isLsePenceQuoted(symbol) ? price / 100 : price;
+  return isLseGbxDisplayQuoted(symbol) ? price / 100 : price;
 }
 
 /**
  * Convert a native quote into the LSE base currency (GBP) for display and
- * for cross-position value aggregation. LSE ETFs are already in GBP and are
- * returned unchanged; LSE common stocks are divided by 100 to fold GBX
- * pence into pounds.
+ * for cross-position value aggregation. GBX quotes are divided by 100;
+ * GBP-quoted LSE tickers and non-LSE symbols pass through unchanged.
  */
 export function normalizeLseDisplayPriceToBase(
   symbol: string,
@@ -55,3 +92,4 @@ export function normalizeLseDisplayPriceToBase(
   if (!Number.isFinite(price)) return 0;
   return isLseGbxDisplayQuoted(symbol, assetClass) ? price / 100 : price;
 }
+
