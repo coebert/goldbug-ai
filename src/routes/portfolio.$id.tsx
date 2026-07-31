@@ -68,6 +68,12 @@ import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
 const TradeAuditLogCard = lazy(() =>
   import("@/components/trade-audit-log-card").then((m) => ({ default: m.TradeAuditLogCard })),
 );
+const CorporateActionsCard = lazy(() =>
+  import("@/components/corporate-actions-card").then((m) => ({
+    default: m.CorporateActionsCard,
+  })),
+);
+
 const ConfidenceTimelineCard = lazy(() =>
   import("@/components/confidence-timeline-card").then((m) => ({
     default: m.ConfidenceTimelineCard,
@@ -1013,6 +1019,16 @@ function PortfolioPage() {
                     portfolioId={id}
                   />
                 </div>
+                {p.broker && (
+                  <div className="mb-6">
+                    <Suspense
+                      fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
+                    >
+                      <CorporateActionsCard portfolioId={id} active={tab === "overview"} />
+                    </Suspense>
+                  </div>
+                )}
+
                 <Card className="mb-6">
                   <CardContent className="flex flex-wrap items-center gap-3 py-4">
                     <UITooltipProvider delayDuration={100}>
