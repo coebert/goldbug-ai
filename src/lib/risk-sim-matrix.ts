@@ -219,6 +219,10 @@ export async function runRiskLevelSim(
   wins: number;
   closed: number;
   finalCash: number;
+  /** Open positions at the end of the tape (symbol → quantity, avgCost). */
+  finalHoldings: SimHolding[];
+  /** Peak simultaneous open positions seen during the run. */
+  peakOpenPositions: number;
   symbols: Set<string>;
 }> {
   let buys = 0;
