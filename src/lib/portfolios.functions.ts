@@ -97,6 +97,13 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
     }
 
     const ids = list.map((p) => p.id);
+
+    // Self-healing step: write any missing snapshot rows (today's
+    // mark-to-market plus carry-forward gap fill) before reading, so cards
+    // never render an empty state or fall back to raw cash. Idempotent upsert;
+    // failures are swallowed and simply leave the existing data untouched.
+    await backfillMissingEquitySnapshots(context.supabase as never, list);
+
     const { data: allEq } = await context.supabase
       .from("equity_snapshots")
       .select("portfolio_id,snapshot_date,total_value,cash")
