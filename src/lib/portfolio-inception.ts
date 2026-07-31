@@ -29,15 +29,25 @@ export function portfolioInceptionDate(p: InceptionSource | null | undefined): s
   return created ?? live ?? null;
 }
 
-/** Drop rows dated before inception. A null inception keeps everything. */
+/**
+ * Drop rows dated before inception. A null inception keeps everything.
+ *
+ * Safety valve: when EVERY row predates inception the clip is not a phantom
+ * pre-history — it is a portfolio whose entire recorded history is dated
+ * earlier than its row (backtest replays over historical dates, imported
+ * ledgers). Wiping the series there leaves the card with "no equity snapshots
+ * yet" despite real data, so we keep the rows untouched in that case.
+ */
 export function clipToInception<T>(
   rows: readonly T[],
   inception: string | null,
   getDate: (row: T) => string | null | undefined,
 ): T[] {
   if (!inception) return [...rows];
-  return rows.filter((row) => {
+  const kept = rows.filter((row) => {
     const d = toDay(getDate(row));
     return d === null ? true : d >= inception;
   });
+  if (kept.length === 0 && rows.length > 0) return [...rows];
+  return kept;
 }
