@@ -1,12 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ClipboardCheck, Loader2 } from "lucide-react";
+import { ClipboardCheck, History as HistoryIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   reconcileFillsToTrades,
   type FillsTradesReconcileResult,
 } from "@/lib/fills-trades-reconcile.functions";
+import {
+  revalueSnapshotHistory,
+  type RevalueRunResult,
+} from "@/lib/equity-snapshot-revalue.functions";
+
 import { toast } from "sonner";
 
 /**
@@ -46,7 +51,25 @@ export function ReconcileFillsCard({
       toast.error(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`),
   });
 
+  const runRevalue = useServerFn(revalueSnapshotHistory);
+  const revalue = useMutation({
+    mutationFn: () => runRevalue({ data: { portfolioId } }),
+    onSuccess: (res: RevalueRunResult) => {
+      toast.success(
+        res.written === 0
+          ? `Snapshot history already correct (${res.daysScanned} day${res.daysScanned === 1 ? "" : "s"} checked)`
+          : `Revalued ${res.written} of ${res.daysScanned} historical day${res.daysScanned === 1 ? "" : "s"} with the corrected LSE pence rules`,
+        { duration: 10000 },
+      );
+      queryClient.invalidateQueries({ queryKey: ["equity"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+    },
+    onError: (e: unknown) =>
+      toast.error(`Revalue failed: ${e instanceof Error ? e.message : String(e)}`),
+  });
+
   return (
+
     <Card className={`border-primary/40 bg-primary/5 ${className ?? ""}`}>
       <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -62,19 +85,36 @@ export function ReconcileFillsCard({
             </p>
           </div>
         </div>
-        <Button
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-          className="w-full shrink-0 sm:w-auto"
-          data-testid="reconcile-fills-button"
-        >
-          {mutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <ClipboardCheck className="mr-2 h-4 w-4" />
-          )}
-          {mutation.isPending ? "Rebuilding…" : "Reconcile fills → trades"}
-        </Button>
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className="w-full sm:w-auto"
+            data-testid="reconcile-fills-button"
+          >
+            {mutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ClipboardCheck className="mr-2 h-4 w-4" />
+            )}
+            {mutation.isPending ? "Rebuilding…" : "Reconcile fills → trades"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => revalue.mutate()}
+            disabled={revalue.isPending}
+            className="w-full sm:w-auto"
+            data-testid="revalue-history-button"
+          >
+            {revalue.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <HistoryIcon className="mr-2 h-4 w-4" />
+            )}
+            {revalue.isPending ? "Revaluing…" : "Revalue history"}
+          </Button>
+        </div>
+
       </CardContent>
     </Card>
   );
