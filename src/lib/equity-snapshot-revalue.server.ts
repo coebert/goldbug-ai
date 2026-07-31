@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  instrumentCurrency,
   planHistoricalRevaluation,
   symbolKeys,
   type RevalueFill,
@@ -69,7 +70,7 @@ export async function revalueHistoricalSnapshots(
     await Promise.all([
       supabase
         .from("portfolios")
-        .select("id, created_at, live_activated_at")
+        .select("id, created_at, live_activated_at, currency")
         .eq("id", portfolioId)
         .maybeSingle(),
       supabase
@@ -79,7 +80,7 @@ export async function revalueHistoricalSnapshots(
         .order("snapshot_date", { ascending: true }),
       supabase
         .from("holdings")
-        .select("symbol, quantity, avg_cost, asset_class, opened_at")
+        .select("symbol, quantity, avg_cost, asset_class, opened_at, instrument_ccy")
         .eq("portfolio_id", portfolioId)
         .gt("quantity", 0),
       supabase
@@ -107,6 +108,24 @@ export async function revalueHistoricalSnapshots(
     since,
   );
 
+  // Positions settle in their listing currency; the snapshot is denominated in
+  // the portfolio's base currency, so convert once per distinct currency.
+  const base = String((portfolio as { currency?: string | null }).currency ?? "GBP").toUpperCase();
+  const fx = new Map<string, number>();
+  const { getFxRate } = await import("./fx.server");
+  for (const ccy of new Set(holdings.map((h) => instrumentCurrency(h).toUpperCase()))) {
+    if (ccy === base) {
+      fx.set(ccy, 1);
+      continue;
+    }
+    try {
+      const res = await getFxRate(ccy, base);
+      if (res && Number.isFinite(res.rate) && res.rate > 0) fx.set(ccy, res.rate);
+    } catch {
+      // Leave unset — valuation falls back to 1x rather than zeroing a leg.
+    }
+  }
+
   const report = planHistoricalRevaluation({
     portfolioId,
     snapshots,
@@ -114,6 +133,7 @@ export async function revalueHistoricalSnapshots(
     fills,
     prices,
     inception,
+    fx,
     today: options.today ?? new Date().toISOString().slice(0, 10),
   });
 
