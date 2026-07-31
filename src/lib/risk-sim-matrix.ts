@@ -18,7 +18,7 @@ import {
   dailyReturns,
   type EquityPoint,
 } from "@/lib/backtest-metrics";
-import type { SimDecision } from "@/lib/broker-simulator";
+import type { SimDecision, SimHolding } from "@/lib/broker-simulator";
 
 export type RiskLevel = "low" | "balanced" | "high";
 export const RISK_LEVELS: RiskLevel[] = ["low", "balanced", "high"];
