@@ -354,6 +354,66 @@ export type Database = {
           },
         ]
       }
+      corporate_action_alert_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          threshold_hours: number[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          threshold_hours?: number[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          threshold_hours?: number[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      corporate_action_alerts_sent: {
+        Row: {
+          deadline: string | null
+          event_id: string
+          hours_remaining: number | null
+          id: string
+          portfolio_id: string | null
+          sent_at: string
+          suppressed: boolean
+          threshold_hours: number
+          user_id: string
+        }
+        Insert: {
+          deadline?: string | null
+          event_id: string
+          hours_remaining?: number | null
+          id?: string
+          portfolio_id?: string | null
+          sent_at?: string
+          suppressed?: boolean
+          threshold_hours: number
+          user_id: string
+        }
+        Update: {
+          deadline?: string | null
+          event_id?: string
+          hours_remaining?: number | null
+          id?: string
+          portfolio_id?: string | null
+          sent_at?: string
+          suppressed?: boolean
+          threshold_hours?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       counterfactuals: {
         Row: {
           as_of: string
