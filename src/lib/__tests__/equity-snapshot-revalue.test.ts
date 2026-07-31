@@ -110,7 +110,7 @@ describe("planHistoricalRevaluation", () => {
     expect(row.previous_total_value).toBe(108650);
   });
 
-  it("zeroes days before the positions were opened but keeps cash", () => {
+  it("never erases history it cannot attribute to the ledger", () => {
     const report = planHistoricalRevaluation({
       portfolioId: "p1",
       snapshots: [
@@ -120,8 +120,25 @@ describe("planHistoricalRevaluation", () => {
       fills,
       prices,
     });
-    expect(report.rows[0]!.holdings_value).toBe(0);
-    expect(report.rows[0]!.total_value).toBe(5000);
+    expect(report.rows).toHaveLength(0);
+    expect(report.skipped).toEqual([
+      { snapshot_date: "2026-07-26", reason: "unattributable_history" },
+    ]);
+  });
+
+  it("leaves today's row to the live mark-to-market path", () => {
+    const report = planHistoricalRevaluation({
+      portfolioId: "p1",
+      snapshots: [
+        { snapshot_date: "2026-07-31", cash: 1000, holdings_value: 1, total_value: 1001 },
+      ],
+      holdings,
+      fills,
+      prices,
+      today: "2026-07-31",
+    });
+    expect(report.rows).toHaveLength(0);
+    expect(report.skipped[0]).toEqual({ snapshot_date: "2026-07-31", reason: "today" });
   });
 
   it("is idempotent — a corrected row is not rewritten", () => {
