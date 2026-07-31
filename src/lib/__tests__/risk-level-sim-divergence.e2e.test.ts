@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { runBacktest, type BacktestBar, type BacktestResult } from "@/lib/backtest-runner";
 import {
   buildHeuristicBuys,
   buildHeuristicSells,
