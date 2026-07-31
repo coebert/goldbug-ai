@@ -122,17 +122,19 @@ const MIC_TO_CCY: Record<string, string> = {
 };
 
 /**
- * Settlement currency of a position, after the GBX→GBP fold. Explicit
- * `instrument_ccy` wins unless it is a pence tag (already folded) — those rows
- * default to GBP for LSE listings.
+ * Settlement currency of a position, after the GBX→GBP fold. The listing
+ * venue wins over `instrument_ccy`: stored rows frequently carry the
+ * portfolio's base currency rather than the venue's (e.g. `JNJ:xnys` tagged
+ * GBP), which would silently skip the FX conversion.
  */
 export function instrumentCurrency(holding: RevalueHolding): string {
   const raw = String(holding.instrument_ccy ?? "").trim();
   const symbol = String(holding.symbol ?? "").trim().toUpperCase();
   const mic = symbol.includes(":") ? symbol.slice(symbol.lastIndexOf(":") + 1).toLowerCase() : "";
   const suffixCcy = symbol.endsWith(".L") ? "GBP" : MIC_TO_CCY[mic];
+  if (suffixCcy) return suffixCcy;
   if (raw && raw.toUpperCase() !== "GBX" && raw !== "GBp") return raw.toUpperCase();
-  return suffixCcy ?? "USD";
+  return "USD";
 }
 
 /** Canonical identity used to line fills up with holdings. */

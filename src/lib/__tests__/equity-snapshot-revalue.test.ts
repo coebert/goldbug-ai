@@ -220,6 +220,11 @@ describe("currency handling", () => {
     expect(
       instrumentCurrency({ symbol: "ASML:xams", quantity: 1, instrument_ccy: "EUR" }),
     ).toBe("EUR");
+    // Venue wins over a mis-tagged instrument_ccy (US listings stored as GBP).
+    expect(
+      instrumentCurrency({ symbol: "JNJ:xnys", quantity: 1, instrument_ccy: "GBP" }),
+    ).toBe("USD");
+    expect(instrumentCurrency({ symbol: "BRK-B", quantity: 1, instrument_ccy: "USD" })).toBe("USD");
   });
 
   it("converts each leg into the portfolio base currency after the pence fold", () => {
