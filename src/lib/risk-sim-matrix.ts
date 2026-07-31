@@ -18,7 +18,7 @@ import {
   dailyReturns,
   type EquityPoint,
 } from "@/lib/backtest-metrics";
-import type { SimDecision } from "@/lib/broker-simulator";
+import type { SimDecision, SimHolding } from "@/lib/broker-simulator";
 
 export type RiskLevel = "low" | "balanced" | "high";
 export const RISK_LEVELS: RiskLevel[] = ["low", "balanced", "high"];
@@ -214,11 +214,17 @@ export async function runRiskLevelSim(
   feePerTrade: number,
 ): Promise<{
   equity: EquityPoint[];
+  /** Per-bar cash / holdings-value / total-value path. */
+  series: Array<{ date: string; cash: number; holdingsValue: number; totalValue: number }>;
   buys: number;
   sells: number;
   wins: number;
   closed: number;
   finalCash: number;
+  /** Open positions at the end of the tape (symbol → quantity, avgCost). */
+  finalHoldings: SimHolding[];
+  /** Peak simultaneous open positions seen during the run. */
+  peakOpenPositions: number;
   symbols: Set<string>;
 }> {
   let buys = 0;
@@ -279,14 +285,26 @@ export async function runRiskLevelSim(
   }));
   const sellSnaps = result.snapshots.filter((s) => s.side === "SELL");
   const wins = sellSnaps.filter((s) => s.realizedPnl > 0).length;
+  const peakOpenPositions = result.snapshots.reduce(
+    (max, s) => Math.max(max, s.holdings.filter((h) => h.quantity > 0).length),
+    0,
+  );
 
   return {
     equity,
+    series: result.equityCurve.map((p) => ({
+      date: p.date,
+      cash: p.cash,
+      holdingsValue: p.holdingsValue,
+      totalValue: p.totalValue,
+    })),
     buys,
     sells,
     wins,
     closed: sellSnaps.length,
     finalCash: result.finalState.cash,
+    finalHoldings: result.finalState.holdings.filter((h) => h.quantity > 0).map((h) => ({ ...h })),
+    peakOpenPositions,
     symbols,
   };
 }
