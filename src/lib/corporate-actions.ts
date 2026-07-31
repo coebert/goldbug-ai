@@ -160,9 +160,7 @@ export function normalizeCorporateAction(input: unknown, index = 0): CorporateAc
     payDate: normalizeDate(e.PayDate) ?? normalizeDate(e.PaymentDate),
     deadline,
     status: str(e, "Status", "EventStatus", "InstructionStatus"),
-    requiresElection: options.length > 1 || bool(e, "IsMandatory") === false
-      ? options.length > 1
-      : options.length > 1,
+    requiresElection: options.length > 1,
     options,
     raw: e,
   };
