@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
+import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
 import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 import {
   detectSnapshotTimingMismatches,
