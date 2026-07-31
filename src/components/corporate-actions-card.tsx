@@ -89,7 +89,10 @@ function EventRow({ event }: { event: CorporateActionView }) {
           No election options published — this event is mandatory or informational.
         </p>
       )}
+
+      <ImpactPreviewTable event={event} />
     </li>
+
   );
 }
 
