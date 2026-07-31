@@ -287,6 +287,14 @@ export const getPortfolio = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    // Heal missing snapshots for this portfolio before reading it.
+    const { data: pfRow } = await context.supabase
+      .from("portfolios")
+      .select("id,current_cash,created_at,live_activated_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (pfRow) await backfillMissingEquitySnapshots(context.supabase as never, [pfRow as never]);
+
     const [
       { data: portfolio },
       { data: holdings },
