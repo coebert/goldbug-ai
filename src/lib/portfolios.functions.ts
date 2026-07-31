@@ -104,12 +104,22 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
 
     // Snapshots dated before a portfolio existed (seeded/backtest rows, or a
     // broker account's pre-existing history pulled in on first sync) are not
-    // that portfolio's performance — clip them off every series.
+    // that portfolio's performance — clip them off every series. Clipping is
+    // per portfolio and non-destructive: a portfolio whose whole history
+    // predates its row keeps its rows (see clipToInception).
     const inceptionById = new Map(list.map((p) => [p.id, portfolioInceptionDate(p)]));
-    const clippedEq = (allEq ?? []).filter((s) => {
-      const inception = inceptionById.get(String(s.portfolio_id)) ?? null;
-      return !inception || String(s.snapshot_date).slice(0, 10) >= inception;
-    });
+    const byPid = new Map<string, typeof allEq>();
+    for (const s of allEq ?? []) {
+      const pid = String(s.portfolio_id);
+      const arr = byPid.get(pid) ?? [];
+      arr!.push(s);
+      byPid.set(pid, arr);
+    }
+    const clippedEq = [...byPid.entries()].flatMap(([pid, rows]) =>
+      clipToInception(rows ?? [], inceptionById.get(pid) ?? null, (r) =>
+        String(r.snapshot_date).slice(0, 10),
+      ),
+    );
 
     const today = new Date().toISOString().slice(0, 10);
     const built = buildAllPortfoliosEquity({
