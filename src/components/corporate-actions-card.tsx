@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CalendarClock, Landmark, RefreshCw } from "lucide-react";
-import { formatUkTime } from "@/lib/uk-time";
+import { formatUkDateTime } from "@/lib/uk-time";
 
 function deadlineBadge(deadline: string | null) {
   const urgency = deadlineUrgency(deadline);
@@ -53,16 +53,16 @@ function EventRow({ event }: { event: CorporateActionView }) {
         <div>
           <dt className="text-muted-foreground">Respond by</dt>
           <dd className="tabular-nums">
-            {event.deadline ? formatUkTime(event.deadline) : "—"}
+            {event.deadline ? formatUkDateTime(event.deadline) : "—"}
           </dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Ex-date</dt>
-          <dd className="tabular-nums">{event.exDate ? formatUkTime(event.exDate) : "—"}</dd>
+          <dd className="tabular-nums">{event.exDate ? formatUkDateTime(event.exDate) : "—"}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Pay date</dt>
-          <dd className="tabular-nums">{event.payDate ? formatUkTime(event.payDate) : "—"}</dd>
+          <dd className="tabular-nums">{event.payDate ? formatUkDateTime(event.payDate) : "—"}</dd>
         </div>
       </dl>
 
@@ -159,7 +159,7 @@ export function CorporateActionsCard({
         )}
         {res?.fetchedAt && (
           <p className="text-[10px] text-muted-foreground">
-            Checked {formatUkTime(res.fetchedAt)}
+            Checked {formatUkDateTime(res.fetchedAt)}
             {res.env ? ` · ${res.env.toUpperCase()}` : ""}
           </p>
         )}
