@@ -127,12 +127,13 @@ export async function getDailyCandles(
     }))
     .reverse();
 
-  // If we have enough recent data (last row within a few days of asOf), use cache
+  // A valuation for a specific day must not silently reuse a close from several
+  // sessions earlier. That made held portfolios appear flat even while their
+  // assets moved. Use the cache only when it reaches the requested date; on
+  // weekends/holidays the fetch below safely falls back to the latest close.
   if (cachedCandles.length >= Math.min(days, 20)) {
     const lastDate = cachedCandles[cachedCandles.length - 1].date;
-    const gapDays =
-      (new Date(asOfDate).getTime() - new Date(lastDate).getTime()) / 86400000;
-    if (gapDays < 5) return cachedCandles;
+    if (lastDate === asOfDate) return cachedCandles;
   }
 
   // Fetch fresh from Yahoo and upsert
