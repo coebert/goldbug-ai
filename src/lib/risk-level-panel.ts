@@ -204,10 +204,13 @@ export type RiskLadderWarning = {
 export function checkRiskLadder(rows: RiskLevelMetrics[]): RiskLadderWarning[] {
   const warnings: RiskLadderWarning[] = [];
   const by = new Map(rows.map((r) => [r.riskLevel, r] as const));
-  const pairs: Array<[RiskLevelKey, RiskLevelKey]> = [
-    ["low", "balanced"],
-    ["balanced", "high"],
-  ];
+  // Compare each adjacent rung; if a rung is missing, compare across the gap
+  // so a low/high-only setup is still verified.
+  const ladder: RiskLevelKey[] = (["low", "balanced", "high"] as RiskLevelKey[]).filter((k) =>
+    by.has(k),
+  );
+  const pairs: Array<[RiskLevelKey, RiskLevelKey]> = [];
+  for (let i = 0; i < ladder.length - 1; i++) pairs.push([ladder[i], ladder[i + 1]]);
 
   for (const [lower, upper] of pairs) {
     const a = by.get(lower);
