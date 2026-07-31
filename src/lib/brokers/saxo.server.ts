@@ -972,6 +972,47 @@ export class SaxoAdapter implements BrokerAdapter {
   }
 
   /**
+   * List pending corporate action events for this account (dividends,
+   * reinvestment elections, rights issues, mergers…).
+   *
+   * READ-ONLY: this adapter never submits an election. Saxo exposes the
+   * corporate-actions service group under slightly different paths across
+   * environments and API versions, and it is not enabled at all on some
+   * SIM accounts — so we probe the known paths in order and report which
+   * one answered. 403/404 are expected outcomes, not errors, and are kept
+   * out of live_broker_log.
+   */
+  async listCorporateActions(): Promise<{
+    endpoint: string | null;
+    supported: boolean;
+    events: unknown[];
+    attempts: Array<{ path: string; error: string }>;
+  }> {
+    const candidates = [
+      "/ca/v2/events",
+      "/ca/v1/events",
+      "/port/v1/corporateactions",
+    ];
+    const attempts: Array<{ path: string; error: string }> = [];
+    for (const path of candidates) {
+      try {
+        const res = await this.req<{ Data?: unknown[] } | unknown[]>("GET", path, {
+          query: { $top: 200 },
+          silentStatuses: [400, 403, 404],
+          maxAttempts: 2,
+        });
+        const events = Array.isArray(res) ? res : (res?.Data ?? []);
+        return { endpoint: path, supported: true, events, attempts };
+      } catch (e) {
+        attempts.push({ path, error: redactedError(e).message });
+      }
+    }
+    return { endpoint: null, supported: false, events: [], attempts };
+  }
+
+
+
+  /**
    * Look up a single historical (closed) order by id. Returns null if Saxo
    * cannot find it in the given lookback window — some environments don't
    * expose the hist endpoint, so the caller must treat null as "unknown".
