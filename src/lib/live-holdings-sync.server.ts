@@ -17,6 +17,8 @@
 // broker read failures leave local state alone.
 
 import { recordIntradayEquity } from "@/lib/equity-intraday.server";
+import { valueBrokerPositions } from "@/lib/broker-positions-value";
+
 import { recordIntradayPrices } from "@/lib/price-intraday.server";
 
 import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
@@ -183,10 +185,22 @@ export async function reconcileLiveHoldingsFromBroker(
   // matches the account summary shown in the Saxo app (which folds in bits our
   // per-position math can miss — currency conversion at Saxo's rate, cash sub-
   // accounts, un-booked corporate actions, etc.).
-  const holdingsValueLocal = positions.reduce(
-    (sum, p) => sum + (p.marketPrice || p.avgPrice || 0) * p.quantity,
-    0,
+  // Saxo quotes LSE instruments in pence (GBX) while the account currency is
+  // GBP. Fold those quotes to the base unit before summing, otherwise this
+  // fallback values every :xlon position 100x too high — which surfaced as a
+  // ~GBP 817k headline for a ~GBP 10.2k account whenever Saxo's authoritative
+  // TotalValue was missing from the response.
+  const holdingsValueLocal = valueBrokerPositions(
+    positions.map((p) => ({
+      symbol: p.symbol,
+      quantity: p.quantity,
+      marketPrice: p.marketPrice,
+      avgPrice: p.avgPrice,
+      assetClass: saxoAssetToClass(p.assetType),
+    })),
   );
+
+
   const newTotal =
     brokerTotalValue != null && brokerTotalValue > 0
       ? brokerTotalValue
