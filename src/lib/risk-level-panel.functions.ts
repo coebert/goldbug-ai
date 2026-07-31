@@ -49,7 +49,7 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
     const [{ data: holdings }, { data: snapshots }] = await Promise.all([
       context.supabase
         .from("holdings")
-        .select("portfolio_id, symbol, quantity, avg_cost, current_price")
+        .select("portfolio_id, symbol, quantity, avg_cost")
         .in("portfolio_id", ids),
       context.supabase
         .from("equity_snapshots")
@@ -59,12 +59,16 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
         .order("snapshot_date", { ascending: true }),
     ]);
 
+    // No live price column on holdings — average cost is the weighting proxy,
+    // which is fine for relative diversification/concentration figures.
     const holdingsBy = new Map<string, RiskPanelPortfolio["holdings"]>();
     for (const h of holdings ?? []) {
-      const row = h as typeof h & { current_price?: number | null };
-      const price = Number(row.current_price) || Number(row.avg_cost) || 0;
       const list = holdingsBy.get(h.portfolio_id) ?? [];
-      list.push({ symbol: h.symbol, quantity: Number(h.quantity) || 0, price });
+      list.push({
+        symbol: h.symbol,
+        quantity: Number(h.quantity) || 0,
+        price: Number(h.avg_cost) || 0,
+      });
       holdingsBy.set(h.portfolio_id, list);
     }
 
