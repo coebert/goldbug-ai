@@ -16,6 +16,7 @@ export type NewsTopicId =
   | "crypto"
   | "tech"
   | "companies"
+  | "exec-posts"
   | "geopolitics"
   | "other";
 
@@ -28,6 +29,7 @@ export const NEWS_TOPICS: Array<{ id: NewsTopicId; label: string }> = [
   { id: "crypto", label: "Crypto" },
   { id: "tech", label: "Tech" },
   { id: "companies", label: "Companies" },
+  { id: "exec-posts", label: "CEO posts" },
   { id: "geopolitics", label: "Geopolitics" },
   { id: "other", label: "Other" },
 ];
@@ -39,6 +41,7 @@ export function newsTopicLabel(id: string): string {
 // Keyword rules are evaluated in order; the first match wins. Ordering puts
 // the most specific/actionable buckets ahead of broad ones.
 const RULES: Array<{ id: NewsTopicId; re: RegExp }> = [
+  { id: "exec-posts", re: /\b(elon musk|jensen huang|tim cook|sam altman|mark zuckerberg|jamie dimon|warren buffett|jeff bezos|michael saylor|donald trump)\b[^.]{0,80}\b(post(ed|s)?|tweet(ed|s)?|on x\b|truth social|linkedin post)\b/i },
   { id: "central-bank", re: /\b(fed|federal reserve|fomc|ecb|bank of england|boe|boj|bank of japan|pboc|rate (cut|hike|decision)|monetary policy|quantitative (easing|tightening)|central bank)\b/i },
   { id: "crypto", re: /\b(bitcoin|btc|ethereum|eth\b|crypto|stablecoin|blockchain|defi|altcoin|coinbase|binance)\b/i },
   { id: "energy", re: /\b(oil|brent|wti|crude|opec|natural gas|lng|refinery|petrol|diesel|electricity price|power grid|renewable|solar|wind farm)\b/i },
@@ -64,6 +67,7 @@ const SOURCE_TOPIC_HINTS: Map<string, NewsTopicId> = (() => {
       case "tech": return "tech";
       case "companies":
       case "business": return "companies";
+      case "exec-posts": return "exec-posts";
       default: return null;
     }
   };
