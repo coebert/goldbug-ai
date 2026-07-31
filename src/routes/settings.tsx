@@ -53,6 +53,7 @@ function SettingsPage() {
           Notifications
         </h2>
         <PushNotificationsCard />
+        <CorporateActionAlertSettingsCard />
       </section>
 
       <section aria-labelledby="safety-heading" className="space-y-3">
