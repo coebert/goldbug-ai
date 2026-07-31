@@ -29,7 +29,7 @@ export const checkPortfolioMirrors = createServerFn({ method: "POST" })
       .select(
         "id, name, mode, risk_level, broker, broker_account_id, current_cash, currency, status",
       )
-      .neq("status", "archived");
+      .in("status", ["active", "paused"]);
     if (pErr) throw new Error(pErr.message);
 
     const active = (portfolios ?? []).filter(Boolean);
