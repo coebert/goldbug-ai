@@ -214,7 +214,8 @@ export async function runRiskLevelSim(
   feePerTrade: number,
 ): Promise<{
   equity: EquityPoint[];
-  buys: number;
+  /** Per-bar cash / holdings-value / total-value path. */
+  series: Array<{ date: string; cash: number; holdingsValue: number; totalValue: number }>;
   sells: number;
   wins: number;
   closed: number;
