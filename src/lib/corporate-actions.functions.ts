@@ -10,6 +10,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { CorporateAction } from "./corporate-actions";
 
+/** Wire shape: the raw Saxo row is dropped (not serializable / not needed). */
+export type CorporateActionView = Omit<CorporateAction, "raw">;
+
 export type CorporateActionsResult = {
   portfolioId: string;
   /** false when the portfolio is not linked to a broker account. */
@@ -19,7 +22,7 @@ export type CorporateActionsResult = {
   env: string | null;
   endpoint: string | null;
   fetchedAt: string;
-  events: CorporateAction[];
+  events: CorporateActionView[];
   /** Human-readable reason when nothing could be fetched. */
   reason: string | null;
 };
@@ -54,7 +57,7 @@ export const listCorporateActions = createServerFn({ method: "GET" })
       "@/lib/brokers/portfolio-broker-link.server"
     );
     const link = resolvePortfolioBrokerLink(p);
-    if (!link.ok) {
+    if (!link.linked) {
       return empty({ reason: link.reason });
     }
 
@@ -80,7 +83,9 @@ export const listCorporateActions = createServerFn({ method: "GET" })
     const { normalizeCorporateActions, sortByDeadline } = await import(
       "./corporate-actions"
     );
-    const all = sortByDeadline(normalizeCorporateActions(res.events));
+    const all = sortByDeadline(normalizeCorporateActions(res.events)).map(
+      ({ raw: _raw, ...view }): CorporateActionView => view,
+    );
     // Only surface events for this portfolio's account when Saxo tags them.
     const scoped = all.filter(
       (e) => e.accountKey == null || e.accountKey === link.accountKey,
