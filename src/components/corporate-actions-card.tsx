@@ -15,8 +15,13 @@ import { formatMoney } from "@/lib/format-money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Landmark, RefreshCw, Scale } from "lucide-react";
+import { ExternalLink, Landmark, RefreshCw, Scale } from "lucide-react";
 import { formatUkDateTime } from "@/lib/uk-time";
+import {
+  buildSaxoCorporateActionLink,
+  saxoDeepLinkLabel,
+  type SaxoEnv,
+} from "@/lib/saxo-deep-link";
 
 function deadlineBadge(deadline: string | null) {
   const urgency = deadlineUrgency(deadline);
@@ -177,6 +182,13 @@ function EventRow({
       )}
 
       <ImpactPreviewTable event={event} />
+
+      <Button asChild size="sm" className="mt-2.5 h-8 w-full sm:w-auto">
+        <a href={electUrl} target="_blank" rel="noopener noreferrer" title={saxoDeepLinkLabel(env)}>
+          <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+          Make election in Saxo
+        </a>
+      </Button>
     </li>
 
   );
@@ -242,7 +254,7 @@ export function CorporateActionsCard({
         {events.length > 0 && (
           <ul className="space-y-2">
             {events.map((e) => (
-              <EventRow key={e.id} event={e} />
+              <EventRow key={e.id} event={e} env={(res?.env as SaxoEnv) ?? null} />
             ))}
           </ul>
         )}
