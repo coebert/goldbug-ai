@@ -171,7 +171,10 @@ export const GDELT_SOURCES: Extract<NewsSource, { kind: "gdelt" }>[] = [
     query: "(hurricane OR drought OR flooding OR \"extreme weather\" OR \"climate policy\" OR \"carbon price\")" },
   { kind: "gdelt", id: "gdelt-em",        label: "GDELT · Emerging markets", weight: 0.6, topic: "macro",
     query: "(\"emerging markets\" OR India economy OR China economy OR Brazil economy OR \"currency crisis\" OR IMF bailout)" },
+  { kind: "gdelt", id: "gdelt-execposts", label: "GDELT · CEO posts",    weight: 0.7, topic: "exec-posts",
+    query: "((\"Elon Musk\" OR \"Jensen Huang\" OR \"Tim Cook\" OR \"Sam Altman\" OR \"Michael Saylor\" OR \"Jamie Dimon\") AND (post OR posted OR tweet OR \"on X\" OR \"Truth Social\"))" },
 ];
+
 
 
 export const ALL_SOURCES: NewsSource[] = [...RSS_SOURCES, ...GDELT_SOURCES];
