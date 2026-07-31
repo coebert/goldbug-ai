@@ -68,6 +68,12 @@ import { SimFundHistoryCard } from "@/components/sim-fund-history-card";
 const TradeAuditLogCard = lazy(() =>
   import("@/components/trade-audit-log-card").then((m) => ({ default: m.TradeAuditLogCard })),
 );
+const CorporateActionsCard = lazy(() =>
+  import("@/components/corporate-actions-card").then((m) => ({
+    default: m.CorporateActionsCard,
+  })),
+);
+
 const ConfidenceTimelineCard = lazy(() =>
   import("@/components/confidence-timeline-card").then((m) => ({
     default: m.ConfidenceTimelineCard,
