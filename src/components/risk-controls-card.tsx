@@ -25,26 +25,23 @@ import { Explain } from "@/components/explain";
 
 import { COMMODITY_GROUPS, type CommodityGroup } from "@/lib/commodity-groups";
 
-type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
+import {
+  RISK_PRESETS,
+  RISK_DIAL_DEFAULTS,
+  type RiskDialConfig,
+  type DialAssetClass,
+} from "@/lib/risk-presets";
+import {
+  AGGRESSIVENESS_BOUNDS,
+  SIZE_MULT_BOUNDS,
+  clampRange,
+  resolveAggressiveness,
+} from "@/lib/risk-aggressiveness";
 
-type RiskConfig = {
-  asset_class_limits: Partial<Record<AssetClass, number>>;
-  per_symbol_limit_pct: number | null;
-  stop_loss_pct: number;
-  take_profit_pct: number;
-  atr_trailing_mult: number;
-  max_hold_days: number;
-  volatility_sizing: boolean;
-  vol_target_pct: number;
-  max_daily_loss_pct: number;
-  max_drawdown_halt_pct: number;
-  commodity_group_limits: Partial<Record<CommodityGroup, number>>;
-  commodity_min_adv_usd: number;
-  commodity_max_atr_pct: number;
-  fx_currency_limits?: Partial<Record<string, number>>;
-  diversification_tilt?: "off" | "balanced" | "strong";
-  risk_level?: number;
-};
+// The dial config lives in `@/lib/risk-presets` so the server-side sweep and
+// the live engine read exactly the same table this card writes.
+type AssetClass = DialAssetClass;
+type RiskConfig = RiskDialConfig;
 
 // Currencies the app can settle in today. Base currency is filtered out in the
 // UI since caps only apply to non-base holdings.
