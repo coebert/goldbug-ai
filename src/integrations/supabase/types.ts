@@ -701,7 +701,9 @@ export type Database = {
           holdings_value: number
           id: string
           portfolio_id: string
+          provenance: Json | null
           snapshot_date: string
+          source: string | null
           total_value: number
         }
         Insert: {
@@ -709,7 +711,9 @@ export type Database = {
           holdings_value: number
           id?: string
           portfolio_id: string
+          provenance?: Json | null
           snapshot_date: string
+          source?: string | null
           total_value: number
         }
         Update: {
@@ -717,7 +721,9 @@ export type Database = {
           holdings_value?: number
           id?: string
           portfolio_id?: string
+          provenance?: Json | null
           snapshot_date?: string
+          source?: string | null
           total_value?: number
         }
         Relationships: [
@@ -1506,6 +1512,33 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      observed_quote_currency: {
+        Row: {
+          id: string
+          observed_at: string
+          quote_currency: string
+          sample_price: number | null
+          source: string | null
+          symbol: string
+        }
+        Insert: {
+          id?: string
+          observed_at?: string
+          quote_currency: string
+          sample_price?: number | null
+          source?: string | null
+          symbol: string
+        }
+        Update: {
+          id?: string
+          observed_at?: string
+          quote_currency?: string
+          sample_price?: number | null
+          source?: string | null
+          symbol?: string
         }
         Relationships: []
       }
@@ -2610,6 +2643,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      valuation_write_rejections: {
+        Row: {
+          attempted: Json | null
+          created_at: string
+          id: string
+          portfolio_id: string
+          reason: string
+          snapshot_date: string
+          source: string | null
+          violations: Json | null
+        }
+        Insert: {
+          attempted?: Json | null
+          created_at?: string
+          id?: string
+          portfolio_id: string
+          reason: string
+          snapshot_date: string
+          source?: string | null
+          violations?: Json | null
+        }
+        Update: {
+          attempted?: Json | null
+          created_at?: string
+          id?: string
+          portfolio_id?: string
+          reason?: string
+          snapshot_date?: string
+          source?: string | null
+          violations?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "valuation_write_rejections_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wallet_snapshots: {
         Row: {

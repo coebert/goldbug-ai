@@ -74,6 +74,8 @@ import { applyBuyExecution, applySellExecution } from "./execution-realism.serve
 import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { instrumentCcyFor } from "./instrument-ccy-rules";
 import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
+import { valuePortfolioHoldings } from "./valuation/value-holdings.server";
+import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
 
 // Resolve a live GBP-normalized price for a held symbol, tolerant of the
 // symbol casing mismatch between `holdings.symbol` (often lowercase, e.g.
@@ -2470,12 +2472,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   }
 
 
-  // Recompute portfolio value with latest holdings
-  const newHoldingsValue = Array.from(holdingsByS.values()).reduce((sum, h) => {
-    const p = holdingLivePrice(priceMap, h);
-    return sum + p * Number(h.quantity);
-  }, 0);
-  const newTotal = workingCash + newHoldingsValue;
+  // Recompute portfolio value with latest holdings through the single
+  // valuation kernel: unit-normalised prices in, FX applied, provenance out.
+  const tickValuation = await valuePortfolioHoldings({
+    holdings: Array.from(holdingsByS.values()).map((h) => ({
+      symbol: h.symbol,
+      quantity: Number(h.quantity),
+      avg_cost: Number(h.avg_cost),
+      asset_class: h.asset_class ?? null,
+      instrument_ccy:
+        (h as unknown as { instrument_ccy?: string | null }).instrument_ccy ?? null,
+    })),
+    normalizedPrices: priceMap,
+    wallet: { [(portfolio.currency || "GBP").toUpperCase()]: workingCash },
+    baseCcy: portfolio.currency || "GBP",
+  });
+  const newHoldingsValue = tickValuation.holdingsValue;
+  const newTotal = tickValuation.totalValue;
 
   // Phase 6 decision + execution telemetry now happens earlier (before the
   // paper-portfolio trades/holdings writer) so hedge fills land in the same
@@ -2494,16 +2507,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
 
 
-  await admin.from("equity_snapshots").upsert(
-    {
-      portfolio_id: portfolioId,
-      snapshot_date: asOf,
-      cash: workingCash,
-      holdings_value: newHoldingsValue,
-      total_value: newTotal,
-    },
-    { onConflict: "portfolio_id,snapshot_date" },
-  );
+  await writeEquitySnapshot(admin as never, {
+    portfolioId,
+    snapshotDate: asOf,
+    cash: tickValuation.cash,
+    holdingsValue: newHoldingsValue,
+    totalValue: newTotal,
+    currency: portfolio.currency || "GBP",
+    source: "trading_engine",
+    provenance: tickValuation.provenance,
+  });
 
   await recordIntradayEquity(admin as never, portfolioId, {
     cash: workingCash,
@@ -2850,7 +2863,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 export async function snapshotPortfolio(portfolioId: string, asOf: string) {
   const { data: portfolio } = await supabaseAdmin
     .from("portfolios")
-    .select("current_cash")
+    .select("current_cash, currency")
     .eq("id", portfolioId)
     .single();
   if (!portfolio) return;
@@ -2863,25 +2876,34 @@ export async function snapshotPortfolio(portfolioId: string, asOf: string) {
     (holdings ?? []).map((h) => h.symbol),
     asOf,
   );
-  const hv = (holdings ?? []).reduce((s, h) => {
-    const p = holdingLivePrice(priceMap, h);
-    return s + p * Number(h.quantity);
-  }, 0);
   const cash = Number(portfolio.current_cash);
-  await supabaseAdmin.from("equity_snapshots").upsert(
-    {
-      portfolio_id: portfolioId,
-      snapshot_date: asOf,
-      cash,
-      holdings_value: hv,
-      total_value: cash + hv,
-    },
-    { onConflict: "portfolio_id,snapshot_date" },
-  );
+  const baseCcy = ((portfolio as { currency?: string | null }).currency || "GBP").toUpperCase();
+  const valuation = await valuePortfolioHoldings({
+    holdings: (holdings ?? []).map((h) => ({
+      symbol: h.symbol,
+      quantity: Number(h.quantity),
+      avg_cost: Number(h.avg_cost),
+    })),
+    normalizedPrices: priceMap,
+    wallet: { [baseCcy]: cash },
+    baseCcy,
+    asOf,
+  });
+  const hv = valuation.holdingsValue;
+  await writeEquitySnapshot(supabaseAdmin as never, {
+    portfolioId,
+    snapshotDate: asOf,
+    cash: valuation.cash,
+    holdingsValue: hv,
+    totalValue: valuation.totalValue,
+    currency: baseCcy,
+    source: "trading_engine",
+    provenance: valuation.provenance,
+  });
 
   await recordIntradayEquity(supabaseAdmin as never, portfolioId, {
-    cash,
+    cash: valuation.cash,
     holdingsValue: hv,
-    totalValue: cash + hv,
+    totalValue: valuation.totalValue,
   });
 }

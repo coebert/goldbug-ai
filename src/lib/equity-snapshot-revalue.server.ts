@@ -14,6 +14,7 @@ import {
   type RevalueSnapshot,
 } from "./equity-snapshot-revalue";
 import { portfolioInceptionDate } from "./portfolio-inception";
+import { writeEquitySnapshots } from "./valuation/write-snapshot.server";
 
 export type RevalueRunResult = RevalueReport & {
   written: number;
@@ -141,21 +142,31 @@ export async function revalueHistoricalSnapshots(
     return { ...report, written: 0, dryRun };
   }
 
-  const { error } = await supabase.from("equity_snapshots").upsert(
-    report.rows.map((r) => ({
-      portfolio_id: portfolioId,
-      snapshot_date: r.snapshot_date,
+  // Revaluation rewrites a whole historical series, so the prior total for
+  // each row comes from the series itself rather than a per-row query.
+  const ordered = [...report.rows].sort((a, b) =>
+    a.snapshot_date < b.snapshot_date ? -1 : a.snapshot_date > b.snapshot_date ? 1 : 0,
+  );
+  const { written, rejected } = await writeEquitySnapshots(
+    supabase as never,
+    ordered.map((r, i) => ({
+      portfolioId,
+      snapshotDate: r.snapshot_date,
       cash: r.cash,
-      holdings_value: r.holdings_value,
-      total_value: r.total_value,
+      holdingsValue: r.holdings_value,
+      totalValue: r.total_value,
+      currency: base,
+      source: "revalue" as const,
+      priorTotal: i === 0 ? null : ordered[i - 1]!.total_value,
     })),
-    { onConflict: "portfolio_id,snapshot_date" },
   );
 
   return {
     ...report,
-    written: error ? 0 : report.rows.length,
+    written,
     dryRun,
-    ...(error ? { error: error.message } : {}),
+    ...(rejected.length
+      ? { error: `${rejected.length} row(s) rejected by the valuation gate: ${rejected[0]!.message ?? ""}` }
+      : {}),
   };
 }

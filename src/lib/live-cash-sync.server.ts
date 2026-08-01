@@ -494,7 +494,12 @@ export type CashSyncSnapshotClient = {
         };
       };
     };
-    update: (patch: { cash: number; holdings_value: number; total_value: number }) => {
+    update: (patch: {
+      cash: number;
+      holdings_value: number;
+      total_value: number;
+      source?: string;
+    }) => {
       eq: (col: "id", val: string) => Promise<{ error: { message: string } | null }>;
     };
     insert: (row: {
@@ -503,6 +508,7 @@ export type CashSyncSnapshotClient = {
       cash: number;
       holdings_value: number;
       total_value: number;
+      source?: string;
     }) => Promise<{ error: { message: string } | null }>;
   };
 };
@@ -585,10 +591,17 @@ export async function writeCashSyncSnapshot(
     return { action: "error", message: existing.error.message };
   }
 
+  // NOTE: this is the one writer that does NOT delegate to
+  // `valuation/write-snapshot.server.ts`. It deliberately does read-then-update
+  // rather than an upsert, because it must stay correct in environments where
+  // UNIQUE(portfolio_id, snapshot_date) was never applied (see the test suite).
+  // It is broker-authoritative and already runs the same invariant check the
+  // gate runs, and it stamps the same `source`, so the guard test allows it by
+  // name. Do not add other exceptions.
   if (existing.data) {
     const upd = await client
       .from("equity_snapshots")
-      .update({ cash, holdings_value: holdingsValue, total_value: totalValue })
+      .update({ cash, holdings_value: holdingsValue, total_value: totalValue, source: "broker_sync" })
       .eq("id", existing.data.id);
     if (upd.error) return { action: "error", message: upd.error.message };
     return {
@@ -605,6 +618,7 @@ export async function writeCashSyncSnapshot(
     cash,
     holdings_value: holdingsValue,
     total_value: totalValue,
+    source: "broker_sync",
   });
   if (ins.error) return { action: "error", message: ins.error.message };
   return {

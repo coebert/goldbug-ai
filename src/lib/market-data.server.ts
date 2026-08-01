@@ -60,6 +60,7 @@ async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> 
   const json = (await res.json()) as {
     chart?: {
       result?: Array<{
+        meta?: { currency?: string };
         timestamp?: number[];
         indicators?: {
           quote?: Array<{
@@ -80,6 +81,30 @@ async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> 
   }
   const q = result.indicators?.quote?.[0];
   if (!q) throw new Error(`Yahoo returned no quotes for ${symbol}`);
+
+  // Record the currency the feed ACTUALLY quoted this symbol in (LSE lines come
+  // back as GBp, i.e. pence). The valuation kernel prefers this observed fact
+  // over the ticker-suffix heuristic, so a new LSE listing can no longer land a
+  // 100x tile just because nobody added it to an allowlist.
+  const quoteCcy = result.meta?.currency;
+  if (quoteCcy) {
+    const lastClose = [...(q.close ?? [])].reverse().find((c) => c != null) ?? null;
+    void (async () => {
+      try {
+        const { recordObservedQuoteCurrency } = await import(
+          "@/lib/valuation/observed-quote-currency"
+        );
+        await recordObservedQuoteCurrency(supabaseAdmin, {
+          symbol,
+          quoteCurrency: quoteCcy,
+          samplePrice: lastClose,
+          source: "yahoo",
+        });
+      } catch {
+        /* observation is best-effort */
+      }
+    })();
+  }
   const out: Candle[] = [];
   for (let i = 0; i < result.timestamp.length; i++) {
     const close = q.close?.[i];

@@ -24,6 +24,7 @@ import { recordIntradayPrices } from "@/lib/price-intraday.server";
 import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import { instrumentCcyFor } from "@/lib/instrument-ccy-rules";
+import { writeEquitySnapshot } from "@/lib/valuation/write-snapshot.server";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
 
@@ -218,16 +219,16 @@ export async function reconcileLiveHoldingsFromBroker(
     .eq("id", portfolioId);
 
   const asOf = new Date().toISOString().slice(0, 10);
-  await db.from("equity_snapshots").upsert(
-    {
-      portfolio_id: portfolioId,
-      snapshot_date: asOf,
-      cash: brokerCash,
-      holdings_value: holdingsValue,
-      total_value: newTotal,
-    },
-    { onConflict: "portfolio_id,snapshot_date" },
-  );
+  await writeEquitySnapshot(db as never, {
+    portfolioId,
+    snapshotDate: asOf,
+    cash: brokerCash,
+    holdingsValue,
+    totalValue: newTotal,
+    // Broker figures are authoritative: the gate still enforces the
+    // arithmetic invariants but does not second-guess the size of the move.
+    source: "broker_sync",
+  });
 
   await recordIntradayEquity(db as never, portfolioId, {
     cash: brokerCash,

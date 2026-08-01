@@ -2,6 +2,8 @@
 // (not a createServerFn) so unit tests can invoke it with a hand-rolled
 // Supabase mock. See src/lib/__tests__/add-sim-funds.test.ts.
 
+import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
+
 export async function addSimFundsHandler(
   data: { id: string; amount: number },
   // Supabase client typing is intentionally loose here so tests can pass a
@@ -77,18 +79,15 @@ export async function addSimFundsHandler(
       ? Number(latest.cash) + data.amount
       : newCurrent;
   const snapshotTotal = snapshotCash + holdingsValue;
-  await supabase
-    .from("equity_snapshots")
-    .upsert(
-      {
-        portfolio_id: data.id,
-        snapshot_date: today,
-        cash: snapshotCash,
-        holdings_value: holdingsValue,
-        total_value: snapshotTotal,
-      },
-      { onConflict: "portfolio_id,snapshot_date" },
-    );
+  await writeEquitySnapshot(supabase as never, {
+    portfolioId: data.id,
+    snapshotDate: today,
+    cash: snapshotCash,
+    holdingsValue,
+    totalValue: snapshotTotal,
+    currency: String(p.currency ?? "GBP"),
+    source: "fund_event",
+  });
 
   return { ok: true, portfolio: updated };
 }
