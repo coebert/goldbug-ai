@@ -174,7 +174,7 @@ export async function reconcileLiveHoldingsFromBroker(
         high_water_mark: p.avgPrice || p.marketPrice || 0,
         // Tagging rules own the settlement currency: broker payloads often
         // echo the account currency, which would skip the FX leg.
-        instrument_ccy: instrumentCcyFor(p.symbol, p.currency ?? null),
+        instrument_ccy: instrumentCcyFor(p.symbol),
       };
     });
   if (rowsToUpsert.length > 0) {
