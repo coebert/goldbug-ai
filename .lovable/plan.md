@@ -1,102 +1,71 @@
-# Security review — Aegis (real-money trading app)
+# Making portfolio valuation correct by construction
 
-I audited the database access rules, every public endpoint, the server-side
-trading paths, secret handling and the sign-in surface. The good news first,
-then the issues in priority order.
+## What I found
 
-## What's already solid
+The app already has good valuation building blocks — they just aren't the only path to a number. There are **7 independent places that write `equity_snapshots`**, and each one does its own arithmetic:
 
-- Every user table has row-level access rules enabled, and the sensitive ones
-  (portfolios, holdings, trades, orders, fills, equity history) are scoped to the
-  owner. Audit/ledger tables are append-only.
-- Broker tokens and the service key are never reachable from browser code; the
-  project has a lint rule that blocks server-only modules from client bundles.
-- One shared ownership check guards every privileged trading path, with a
-  security audit log and push alerts on rejected access.
-- Scheduled endpoints share one verification helper with constant-time
-  comparison and per-IP rate limiting — no endpoint has a default-allow path.
-- Global budget settings were just locked to an administrator role.
+| Writer | GBX -> GBP applied? | FX applied? | Invariants checked? |
+|---|---|---|---|
+| `equity-snapshot-backfill.server.ts` | yes | yes | no |
+| `equity-snapshot-revalue.server.ts` | yes | yes | no |
+| `live-cash-sync.server.ts` | broker-authoritative | n/a | yes |
+| `live-holdings-sync.server.ts` | broker-authoritative | n/a | no |
+| `trading-engine.server.ts` (2 sites) | **no** | **no** | no |
+| `sim-funds.server.ts` | n/a | n/a | no |
 
-## Critical — fix first
+The two trading-engine sites do a bare `price x quantity` sum. That single pattern is the origin of the pence-inflation and USD-counted-as-GBP incidents. Meanwhile the canonical multi-currency valuer (`valueHoldings` in `multi-ccy-holdings.ts`) has exactly **two** callers, neither of which is a snapshot writer, and the invariant checker (`equity-invariants.ts`) is wired into one writer out of seven.
 
-**1. The public app key is accepted as a credential on the trading endpoints.**
-The shared cron check accepts *either* the private `CRON_SECRET` *or* the
-Supabase publishable key. That publishable key is, by design, public — it ships
-inside the browser bundle of the published site. So anyone who opens the app can
-read it and then call the endpoints that run the trading cycle, reconcile the
-live account, or trigger reruns. Rate limiting slows that down; it does not stop
-it. The same weak check is hardcoded in the equity-backfill endpoint.
+So each fix so far has been correct but local: it repaired one path while the other six kept their own copy of the rules. That is why the problem keeps returning in a new tile.
 
-Fix: require `CRON_SECRET` (or a new dedicated per-endpoint secret) on every
-`/api/public/hooks/*` route, delete the publishable-key branch entirely, and
-update the scheduled jobs to send the private header. Then verify each endpoint
-returns 401 with only the public key.
+## The fix: one kernel, one gate, one shape
 
-**2. Trading endpoints have no second factor beyond one shared secret.**
-Every job — hourly run, daily run, live reconcile, retrain — uses the same
-secret. One leak (a log, a copied cron definition) exposes all of them,
-including live order placement.
+### 1. A single valuation kernel
 
-Fix: rotate `CRON_SECRET`, then give the order-placing routes their own secret,
-add a short-lived signature (timestamp + HMAC, reject anything older than a few
-minutes) so a captured request can't be replayed, and keep the existing per-IP
-limits.
+Create `src/lib/valuation/kernel.ts` as the only function in the app allowed to turn holdings + prices + cash into an equity figure. It takes explicit inputs (holdings, price map, wallet, base currency, FX resolver, as-of timestamp) and returns a `ValuationResult` containing the totals **plus the full provenance**: per-symbol quote currency, unit divisor applied, FX rate and its source/age, and any fallback that was used.
 
-## High
+It composes the existing, already-tested pieces rather than reinventing them — `instrument-ccy-rules.ts` for currency tagging, `market-price-units.ts` for the GBX divisor, `price-symbol.ts` for symbol normalisation, `valueHoldings` for the multi-currency sum. Nothing new is invented; the logic is simply given one front door.
 
-**3. Sign-in hardening.** Turn on leaked-password checking so a password found
-in a known breach is rejected, keep public signups off, and add a second factor
-for the owner account. This account can move real money; a password alone is
-thin.
+### 2. A write gate no writer can bypass
 
-**4. A "kill switch" that isn't reachable by an attacker.** Today a caller who
-reached the run endpoints could place orders. Add a hard trading-enabled flag in
-the database that only an administrator can flip, checked immediately before any
-order is sent, plus a per-day notional ceiling enforced server-side and
-independent of the strategy logic.
+Create `src/lib/valuation/write-snapshot.server.ts`. Every snapshot write goes through it, and it:
 
-**5. Alert on the security audit log.** Rejected-access events are recorded but
-mostly noticed only if someone looks. Route them to a push alert with a
-threshold, and add the same for repeated 401s on the hook endpoints — that's the
-signature of someone probing the secret.
+- refuses non-finite values, negative cash/holdings, and `total != cash + holdings` beyond tolerance (reusing `checkEquityInvariants`);
+- refuses a total that moves more than a configurable multiple versus the prior snapshot unless the delta is explained by a recorded fund event (reusing `valuation-consistency.ts` logic, which currently only *reports* after the fact);
+- records the provenance blob alongside the row so any suspect number can be explained without re-deriving it.
 
-## Medium
+Rejections are logged and surfaced, never silently swallowed. Broker-authoritative values stay authoritative: they pass through the gate as a distinct source that skips the recompute check but still must satisfy the arithmetic invariants.
 
-**6. Broker credential hygiene.** Move Saxo tokens onto a scheduled rotation and
-alert if a refresh fails, so a stale or leaked token has a short life. Confirm no
-broker response is written to a log table unredacted.
+### 3. Migrate the seven writers
 
-**7. Tighten the remaining flagged tables.** `market_open_alerts_sent`,
-`run_locks` and `credit_budget_alerts` are currently closed by default, which is
-correct; add explicit comments/policies so a future change can't accidentally
-open them.
+Convert each writer to `computeValuation()` + `writeEquitySnapshot()`. The trading engine's two sites and `live-holdings-sync` are the substantive changes; the rest are mechanical. Then add a lint-style guard test that fails if `.from("equity_snapshots")` with `insert`/`upsert` appears anywhere outside the gate module — this is what stops writer number eight from reintroducing the bug.
 
-**8. Public news endpoint.** It's read-only and field-limited, which is fine, but
-it queries with the privileged client. Switch it to the ordinary public client so
-a future column addition can't leak anything beyond the public policy.
+### 4. Close the units gap at the source
 
-**9. Dependency and header hardening.** Add a regular dependency vulnerability
-check, and set standard browser security headers (content policy, frame
-blocking) on the published site.
+The GBX rule currently lives behind a hand-maintained allowlist of Vanguard tickers. Rather than widen the allowlist further, store the observed quote currency per symbol when a price is fetched, and have the kernel prefer that stored fact over the heuristic, falling back to the allowlist only for unseen symbols. A sanity band (a quote 50-200x off the trailing median for that symbol) flags a unit flip before it is ever multiplied by a quantity.
 
-## Suggested order of work
+### 5. Golden-file regression suite
 
-1. Remove the publishable-key auth branch on all hooks; rotate `CRON_SECRET`. (critical)
-2. Add timestamped signatures + a dedicated secret for order-placing routes.
-3. Enable leaked-password checks and a second factor for the owner account.
-4. Add the admin-only trading kill switch and daily notional ceiling.
-5. Wire alerts for rejected access and repeated 401s.
-6. Broker token rotation + redaction audit.
-7. Table comments/policies, public news client swap, headers, dependency scan.
+One fixture portfolio containing an LSE pence stock, an LSE pound-quoted ETF, a USD stock, a EUR stock, a JPY stock and a crypto pair, with pinned prices and FX rates, asserted end-to-end through kernel -> gate -> tile-facing derivation. Any change to units or FX that moves a number has to update the golden file deliberately. Plus a property test: valuation is invariant to holdings order, and scaling every quantity by k scales holdings value by exactly k.
+
+### 6. Reconciliation as a standing check
+
+A daily job re-derives every portfolio's latest snapshot from source data and compares against what is stored. A mismatch beyond tolerance raises an alert with the provenance diff attached, so drift is caught by the app rather than by you noticing a wrong tile.
+
+## Sequencing
+
+1. Kernel + provenance type, unit-tested standalone (no behaviour change yet)
+2. Write gate + guard test
+3. Migrate trading engine and live-holdings-sync (the two real offenders)
+4. Migrate remaining writers
+5. Observed-quote-currency store + sanity band
+6. Golden-file and property suites
+7. Daily reconciliation job and alerting
+
+Steps 1-3 remove the recurring failure mode. Steps 4-7 make it hard to reintroduce.
 
 ## Technical notes
 
-- Weak check lives in `src/lib/_server/cron.ts` (`expectedApiKey` branch) and is
-  duplicated inline in `src/routes/api/public/hooks/backfill-daily-equity-changes.ts`.
-- Order placement funnels through `src/lib/live-executor.server.ts`; that is the
-  right chokepoint for the kill switch and notional ceiling.
-- Ownership assertions are centralised in `src/lib/_server/ownership.ts` — keep
-  new privileged paths going through it rather than re-checking inline.
-- Sign-in settings are changed through the backend auth configuration, not code.
-
-Tell me which items to implement and I'll start with the critical ones.
+- No schema changes beyond a provenance column on `equity_snapshots` and a small observed-quote-currency table.
+- Existing modules are reused, not replaced: `instrument-ccy-rules`, `market-price-units`, `multi-ccy-holdings`, `equity-invariants`, `valuation-consistency`, `price-symbol`.
+- The gate is server-only; client tiles keep reading stored snapshots and never recompute.
+- Backfill/revalue paths already do the right thing, so migrating them is low risk and mostly deletes duplicated code.
