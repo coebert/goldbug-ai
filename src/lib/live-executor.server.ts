@@ -1154,7 +1154,13 @@ export async function routeOrdersToBroker(params: {
         type SpotOutcome = import("./fx-spot-plan").FxSpotOutcome;
         const outcomes: SpotOutcome[] = [];
         for (const leg of trim.fxLegs) {
-          const clientOrderId = `fx-${decisionId}-${leg.triggeredBySymbol}-${leg.fromCcy}${leg.toCcy}`;
+          // Saxo caps ExternalReference at 50 chars; a raw uuid + symbol + pair
+          // overflows it and the whole order is rejected with InvalidModelState.
+          // Hash instead so the key stays deterministic (idempotent retries) and short.
+          const clientOrderId = `fx:${createHash("sha256")
+            .update(`${decisionId}:${leg.triggeredBySymbol}:${leg.fromCcy}${leg.toCcy}`)
+            .digest("hex")
+            .slice(0, 24)}`;
           const spot = await adapter.placeFxSpot!({
             fromCcy: leg.fromCcy,
             toCcy: leg.toCcy,
