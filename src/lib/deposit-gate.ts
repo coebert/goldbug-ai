@@ -48,11 +48,30 @@ export function evaluateDepositGate(input: DepositGateInput): DepositGateDecisio
   }
 
   if (!hasLocalHoldings) {
+    // "No local holdings" does NOT prove the account is empty — the holdings
+    // sync may simply not have landed yet. If the broker's TotalValue sits
+    // materially above its cash balance, the missing money is invested in
+    // positions we haven't mirrored locally, so a negative drift is an
+    // internal reallocation (cash → stock), not a withdrawal. Booking it
+    // would drop starting_cash and manufacture a huge phantom gain on the
+    // real-money tile (the 2026-08-01 −£8,999.68 / +781% incident).
+    const brokerCash = Number(input.brokerCash);
+    const brokerPositionsValue =
+      brokerTotalValue != null && Number.isFinite(brokerTotalValue) && Number.isFinite(brokerCash)
+        ? brokerTotalValue - brokerCash
+        : 0;
+    if (delta < 0 && brokerPositionsValue > Math.max(1, Math.abs(delta) * 0.1)) {
+      return {
+        canTreatDriftAsDeposit: false,
+        depositGateReason: `blocked: broker holds ${brokerPositionsValue.toFixed(2)} in un-synced positions — cash moved into holdings, not a withdrawal`,
+      };
+    }
     return {
       canTreatDriftAsDeposit: true,
       depositGateReason: "no local holdings — first funding",
     };
   }
+
 
   const unexplained = delta - explainedCashDelta;
   if (Math.abs(unexplained) < DRIFT_EPSILON) {
