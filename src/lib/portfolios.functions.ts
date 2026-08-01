@@ -375,12 +375,17 @@ export const getPortfolio = createServerFn({ method: "GET" })
         .eq("method", "CASH_SYNC")
         .eq("status", 200)
         .order("created_at", { ascending: false });
+      const ownSeries = (equity ?? []).map((r) => ({
+        date: String((r as { snapshot_date?: unknown }).snapshot_date ?? ""),
+        value: Number((r as { total_value?: unknown }).total_value ?? Number.NaN),
+      }));
       for (const row of cashSyncs ?? []) {
         if (!row.created_at) continue;
         const resp = (row.response ?? {}) as {
           delta?: number | string;
           startingCashAdjusted?: boolean;
           currency?: string;
+          previousStarting?: number | string;
         };
         if (!brokerCurrency && typeof resp.currency === "string" && resp.currency) {
           brokerCurrency = resp.currency.toUpperCase();
@@ -388,10 +393,19 @@ export const getPortfolio = createServerFn({ method: "GET" })
         if (!resp.startingCashAdjusted) continue;
         const amt = Number(resp.delta);
         if (!Number.isFinite(amt) || amt === 0) continue;
-        deposits.push({ date: String(row.created_at).slice(0, 10), amount: amt });
-        startingCashAbsorbed += amt;
+        const raw = { date: String(row.created_at).slice(0, 10), amount: amt };
+        // Same rule as the home-page list: a sync with no known prior
+        // baseline is a starting_cash repair, so re-anchor it onto the
+        // equity step the portfolio actually shows.
+        const flow = Number.isFinite(Number(resp.previousStarting))
+          ? raw
+          : reanchorInferredInflow(raw, ownSeries);
+        if (!flow) continue;
+        deposits.push(flow);
+        startingCashAbsorbed += flow.amount;
       }
     }
+
 
     const startingCash = Number(
       (portfolio as { starting_cash?: number | string }).starting_cash ?? 0,
