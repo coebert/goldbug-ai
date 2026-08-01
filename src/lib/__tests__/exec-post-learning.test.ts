@@ -87,10 +87,10 @@ describe("buildExecPostEvents", () => {
 
 describe("summariseExecPostEvents", () => {
   const rising = new Map<string, PriceBar[]>([
-    ["TSLA", bars(8, [100, 100, 100, 103, 105, 107, 110])],
+    ["TSLA", bars(8, [100, 100, 100, 103, 105, 107, 110, 112])],
   ]);
   const falling = new Map<string, PriceBar[]>([
-    ["TSLA", bars(8, [100, 100, 100, 97, 95, 93, 90])],
+    ["TSLA", bars(8, [100, 100, 100, 97, 95, 93, 90, 88])],
   ]);
 
   it("scores a post that led the move as a hit", () => {
@@ -108,7 +108,7 @@ describe("summariseExecPostEvents", () => {
 
   it("counts a same-week round-trip as a reversal", () => {
     const roundTrip = new Map<string, PriceBar[]>([
-      ["TSLA", bars(8, [100, 100, 100, 105, 104, 101, 96])],
+      ["TSLA", bars(8, [100, 100, 100, 105, 104, 101, 99, 96])],
     ]);
     const [stat] = summariseExecPostEvents(buildExecPostEvents([post()], roundTrip));
     expect(stat!.hit_rate_1d).toBe(1);
