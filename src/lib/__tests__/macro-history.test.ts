@@ -264,9 +264,10 @@ describe("drawdown sizing rules", () => {
   it("is neutral with no rules or a nonsense depth", () => {
     expect(drawdownSizeScale(-30, null).scale).toBe(1);
     expect(drawdownSizeScale(-30, []).scale).toBe(1);
+    // A NaN depth falls back to neutral rather than silently picking a rule.
     expect(drawdownSizeScale(Number.NaN, [
       { from_pct: 0, size_scale: 0.4, require_trend: false, note: "x" },
-    ]).scale).toBe(0.4);
+    ]).scale).toBe(1);
   });
 });
 
