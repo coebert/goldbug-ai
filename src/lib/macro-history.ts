@@ -19,6 +19,9 @@
 
 import type { MarketEventKind } from "./market-events";
 
+/** Event kinds the catalogue uses, including two not produced by the classifier. */
+export type MacroEpisodeKind = MarketEventKind | "liquidity_stress" | "retail_mania";
+
 export type MacroEpisode = {
   id: string;
   label: string;
@@ -27,7 +30,7 @@ export type MacroEpisode = {
   /** ISO date of the trough. */
   trough: string;
   /** Headline market-event kind that characterised the episode. */
-  kind: MarketEventKind;
+  kind: MacroEpisodeKind;
   /** Peak-to-trough drawdown of the US large-cap index, positive %. */
   drawdown_pct: number;
   /** Calendar days from trough back to the prior peak; null = not recovered in-sample. */
@@ -47,7 +50,7 @@ export const MACRO_EPISODES: MacroEpisode[] = [
   {
     id: "quant_quake_2007",
     label: "Quant quake",
-    start: "2007-07-19", trough: "2007-08-15", kind: "liquidity_stress" as MarketEventKind,
+    start: "2007-07-19", trough: "2007-08-15", kind: "liquidity_stress",
     drawdown_pct: 9.4, recovery_days: 62, origin: "liquidity",
     lesson: "A crowded-factor unwind hits leveraged lookalike books first; unlevered positions that survive the week are usually made whole.",
   },
@@ -61,7 +64,7 @@ export const MACRO_EPISODES: MacroEpisode[] = [
   {
     id: "flash_crash_2010",
     label: "Flash crash",
-    start: "2010-04-23", trough: "2010-07-02", kind: "liquidity_stress" as MarketEventKind,
+    start: "2010-04-23", trough: "2010-07-02", kind: "liquidity_stress",
     drawdown_pct: 16.0, recovery_days: 145, origin: "liquidity",
     lesson: "A microstructure air-pocket with no cash-flow news round-trips in weeks; market orders into the vacuum are the only permanent loss.",
   },
@@ -96,7 +99,7 @@ export const MACRO_EPISODES: MacroEpisode[] = [
   {
     id: "volmageddon_2018",
     label: "Volmageddon",
-    start: "2018-01-26", trough: "2018-02-08", kind: "liquidity_stress" as MarketEventKind,
+    start: "2018-01-26", trough: "2018-02-08", kind: "liquidity_stress",
     drawdown_pct: 10.2, recovery_days: 194, origin: "liquidity",
     lesson: "A volatility-product unwind is a mechanical, not fundamental, event — but it resets the whole year's volatility regime.",
   },
@@ -117,7 +120,7 @@ export const MACRO_EPISODES: MacroEpisode[] = [
   {
     id: "meme_2021",
     label: "Meme-stock mania",
-    start: "2021-01-27", trough: "2021-01-29", kind: "retail_mania" as MarketEventKind,
+    start: "2021-01-27", trough: "2021-01-29", kind: "retail_mania",
     drawdown_pct: 3.7, recovery_days: 8, origin: "liquidity",
     lesson: "Index impact was trivial while individual names moved 10x; crowding, not the index, was the risk to size for.",
   },
@@ -145,7 +148,7 @@ export const MACRO_EPISODES: MacroEpisode[] = [
   {
     id: "yen_carry_2024",
     label: "Yen carry unwind",
-    start: "2024-07-16", trough: "2024-08-05", kind: "liquidity_stress" as MarketEventKind,
+    start: "2024-07-16", trough: "2024-08-05", kind: "liquidity_stress",
     drawdown_pct: 8.5, recovery_days: 41, origin: "liquidity",
     lesson: "A funding-currency unwind produced a one-day VIX spike above 60 that had fully mean-reverted within a month; selling into the panic print was the error.",
   },
