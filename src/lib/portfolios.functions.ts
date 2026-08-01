@@ -192,7 +192,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         // Defensive: older log rows set startingCashAdjusted=true even when
         // the monotonic clamp left starting_cash unchanged (negative drift).
         // Trust the row only if the baseline actually moved.
-        const prevStart = Number(resp.previousStarting);
+        const prevStart = trustedPreviousStarting(resp.previousStarting) ?? Number.NaN;
         const newStart = Number(resp.newStarting);
         if (
           Number.isFinite(prevStart) &&
