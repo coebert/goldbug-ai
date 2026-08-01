@@ -1043,6 +1043,42 @@ export type Database = {
           },
         ]
       }
+      idempotency_keys: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          endpoint: string
+          id: string
+          idempotency_key: string
+          request_hash: string
+          response: Json | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          endpoint: string
+          id?: string
+          idempotency_key: string
+          request_hash: string
+          response?: Json | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          endpoint?: string
+          id?: string
+          idempotency_key?: string
+          request_hash?: string
+          response?: Json | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       lesson_overrides: {
         Row: {
           action: string
