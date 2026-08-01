@@ -19,6 +19,8 @@ vi.mock("@tanstack/react-start", () => {
     self.middleware = () => self;
     self.inputValidator = () => self;
     self.handler = () => self;
+    self.server = () => self;
+    self.client = () => self;
     return self;
   };
   return {
