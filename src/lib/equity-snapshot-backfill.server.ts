@@ -16,6 +16,7 @@ import { portfolioInceptionDate } from "./portfolio-inception";
 import { priceSymbolVariants } from "./price-symbol";
 import { instrumentCcyFor } from "./instrument-ccy-rules";
 import { getFxRate } from "./fx.server";
+import { writeEquitySnapshots } from "./valuation/write-snapshot.server";
 
 export type BackfillPortfolioRow = {
   id: string;
@@ -138,12 +139,47 @@ export async function backfillMissingEquitySnapshots(
 
     if (planned.length === 0) return { planned, written: 0 };
 
-    const { error } = await supabase.from("equity_snapshots").upsert(
-      planned.map(({ reason: _reason, ...row }) => row),
-      { onConflict: "portfolio_id,snapshot_date" },
-    );
-    if (error) return { planned, written: 0, error: error.message };
-    return { planned, written: planned.length };
+    // Backfill fills gaps in a historical series, so the "previous total" for
+    // the plausibility band is taken from the planned series itself (falling
+    // back to whatever already exists on disk for the first row).
+    const byPortfolio = new Map<string, typeof planned>();
+    for (const row of planned) {
+      const list = byPortfolio.get(row.portfolio_id) ?? [];
+      list.push(row);
+      byPortfolio.set(row.portfolio_id, list);
+    }
+
+    const currencyById = new Map(portfolios.map((p) => [p.id, p.currency ?? null]));
+    let written = 0;
+    const rejections: string[] = [];
+
+    for (const [portfolioId, rows] of byPortfolio) {
+      const ordered = [...rows].sort((a, b) =>
+        a.snapshot_date < b.snapshot_date ? -1 : a.snapshot_date > b.snapshot_date ? 1 : 0,
+      );
+      const res = await writeEquitySnapshots(
+        supabase as never,
+        ordered.map((r, i) => ({
+          portfolioId,
+          snapshotDate: r.snapshot_date,
+          cash: Number(r.cash),
+          holdingsValue: Number(r.holdings_value),
+          totalValue: Number(r.total_value),
+          currency: currencyById.get(portfolioId) ?? null,
+          source: "backfill" as const,
+          ...(i > 0 ? { priorTotal: Number(ordered[i - 1]!.total_value) } : {}),
+        })),
+      );
+      written += res.written;
+      for (const r of res.rejected) {
+        rejections.push(`${r.portfolioId}@${r.snapshotDate}: ${r.message ?? r.reason}`);
+      }
+    }
+
+    if (rejections.length) {
+      return { planned, written, error: `valuation gate rejected ${rejections.length} row(s): ${rejections[0]}` };
+    }
+    return { planned, written };
   } catch (err) {
     // Backfill must never break the read path — degrade to whatever exists.
     return { planned: [], written: 0, error: err instanceof Error ? err.message : String(err) };
