@@ -2863,8 +2863,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
             crossSectional: formatCrossSectionalBlock(rankMap),
             marketEvents: macroPlaybookBlock
-          ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
-          : marketEventsBlock,
+              ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
+              : marketEventsBlock,
             events,
             cooling: coolingSymbols,
             asOf,
