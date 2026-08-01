@@ -9,7 +9,11 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreloadStaleTime: 0,
+    // Preload on hover/touch intent, and treat a freshly preloaded route as
+    // usable for 30s so the subsequent tap renders without refetching.
+    defaultPreload: "intent",
+    defaultPreloadDelay: 50,
+    defaultPreloadStaleTime: 30_000,
   });
 
   return router;
