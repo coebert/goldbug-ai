@@ -265,6 +265,8 @@ export async function runLongHorizonBacktest(opts: {
   const topK = opts.topK ?? 6;
   const rp = riskProfile(opts.riskLevel);
   const rc: RiskConfig = parseRiskConfig(opts.riskConfig);
+  // Same dial the live engine reads, so a sweep previews real behaviour.
+  const aggression = resolveAggressiveness(opts.riskConfig);
   const execution: ExecutionCosts = {
     commission_bps: Math.max(0, opts.execution?.commission_bps ?? 5),
     slippage_bps: Math.max(0, opts.execution?.slippage_bps ?? 10),
