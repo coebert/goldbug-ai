@@ -304,6 +304,39 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
     );
 
     const found = lookupPrice(input.price, symbol);
+
+    // Fail safe: with no way to tell GBX from GBP (or from USD), any number we
+    // produce is a coin flip between right and 100x wrong. Contribute nothing,
+    // flag the result degraded, and record the raw quote for diagnostics so a
+    // human (or the tagging job) can resolve the units.
+    if (!units.resolved) {
+      degraded = true;
+      warnings.push({
+        code: "unresolved_quote_units",
+        symbol,
+        message:
+          units.unresolvedReason ??
+          `Quote units for ${symbol} could not be resolved; row withheld from the total.`,
+      });
+      lines.push({
+        symbol,
+        priceKey: found.key,
+        quantity,
+        nativeQuote: found.value ?? 0,
+        quoteCurrency: units.quoteCurrency,
+        quoteCurrencySource: units.quoteCurrencySource,
+        unitsResolved: false,
+        unitDivisor: units.unitDivisor,
+        instrumentCurrency: units.instrumentCurrency,
+        nativeValue: 0,
+        fxRate: 1,
+        fxSource: "identity",
+        baseValue: 0,
+        priceSource: "unresolved_units",
+      });
+      continue;
+    }
+
     let nativeQuote = found.value;
     let priceSource: PriceSource = "market";
 
@@ -337,6 +370,7 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
     const { rate, source } = rateFor(units.instrumentCurrency);
     const baseValue = nativeValue * rate;
     holdingsValue += baseValue;
+
 
     lines.push({
       symbol,
