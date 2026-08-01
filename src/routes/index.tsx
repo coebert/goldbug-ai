@@ -27,6 +27,8 @@ import { Sparkles, PlusCircle } from "lucide-react";
 
 import { TodayHero } from "@/components/home/today-hero";
 import { TodayHeroSkeleton } from "@/components/home/today-hero-skeleton";
+import { PortfolioListSkeleton } from "@/components/home/portfolio-row-skeleton";
+import { MirrorAlertSkeleton } from "@/components/home/mirror-alert-skeleton";
 import { DashboardSettings } from "@/components/home/dashboard-settings";
 import { NewHereBanner } from "@/components/home/new-here-banner";
 import { NextActionCard } from "@/components/home/next-action-card";
@@ -254,7 +256,11 @@ function Home() {
 
         <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
 
-        <PortfolioMirrorAlert findings={mirrorQ.data?.findings ?? []} />
+        {mirrorQ.isLoading && portfolioCount > 1 ? (
+          <MirrorAlertSkeleton />
+        ) : (
+          <PortfolioMirrorAlert findings={mirrorQ.data?.findings ?? []} />
+        )}
 
         {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
@@ -283,7 +289,7 @@ function Home() {
                 {portfolioCount === 0 ? "" : `${portfolioCount} portfolio${portfolioCount === 1 ? "" : "s"} in total`}
               </span>
             </div>
-            {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
+            {q.isLoading && <PortfolioListSkeleton count={1} />}
             {q.data && q.data.length === 0 && (
               <Card className="border-primary/40 bg-primary/5">
                 <CardContent className="flex flex-col items-start gap-3 py-8 sm:flex-row sm:items-center sm:justify-between">
