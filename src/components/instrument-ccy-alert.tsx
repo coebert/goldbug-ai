@@ -1,11 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, Coins } from "lucide-react";
+import { AlertTriangle, Coins, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   getInstrumentCcyCheck,
   type InstrumentCcyCheckResult,
 } from "@/lib/instrument-ccy-check.functions";
+import {
+  applyInstrumentCcyFixes,
+  type InstrumentCcyFixResult,
+} from "@/lib/instrument-ccy-fix.functions";
+import { planInstrumentCcyFixes } from "@/lib/instrument-ccy-fix";
 import type { Severity } from "@/lib/instrument-ccy-check";
 
 const SEVERITY_VARIANT: Record<Severity, "destructive" | "default" | "secondary"> = {
