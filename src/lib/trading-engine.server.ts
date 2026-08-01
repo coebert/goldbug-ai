@@ -54,6 +54,12 @@ import {
   type SymbolEventFeatures,
 } from "./market-events";
 import {
+  playbookAdjustedTilt,
+  formatMacroPlaybookBlock,
+  drawdownSizeScale,
+} from "./macro-playbook";
+import { loadActiveMacroLessons } from "./macro-history-analysis.server";
+import {
   ensureSentimentScored,
   aggregatedSentimentForSymbol,
   loadScoredNewsWindow,
@@ -884,6 +890,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     : null;
   const execCoefficients = execLessons?.coefficients ?? null;
 
+  // Learned macro playbook: `runMacroHistoryAnalysis` studies ~20 years of
+  // index history plus the documented episode catalogue and stores, per
+  // event kind, whether the first move historically extended (follow),
+  // round-tripped (fade), needed confirmation (wait) or preceded a slow bear
+  // (de_risk) — plus buy-size scaling by how deep the index already is.
+  // With no study on file every multiplier is 1 and the engine is unchanged.
+  const macroLessons = portfolio.user_id
+    ? await loadActiveMacroLessons(supabaseAdmin as never, portfolio.user_id).catch(() => null)
+    : null;
+  const macroPlaybook = macroLessons?.playbook ?? null;
+
   const execPostSignals = computeExecPostSignals(
     [
       ...scoredNews.map((n) => ({
@@ -935,7 +952,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
     const execNudge = learnedExecPostNudge(f.symbol, execPostSignals, execCoefficients).nudge;
     const evf = symbolEventFeatures(f.symbol, f.name, marketEvents);
-    const evTilt = eventTilt(evf, macroEvents);
+    const rawTilt = eventTilt(evf, macroEvents);
+    // The playbook re-weights the tilt by what this event kind historically
+    // did — including flipping the sign for "fade" kinds. Still hard-capped
+    // at MAX_EVENT_TILT inside `playbookAdjustedTilt`.
+    const evTilt = playbookAdjustedTilt(
+      rawTilt,
+      [...evf.top_kinds, ...macroEvents.drivers.map((d) => d.kind)],
+      macroPlaybook,
+    );
     const base = agg.contributors > 0 ? agg.score : 0;
     const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt));
     f.news_score =
@@ -947,6 +972,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     f.event_features = evf.event_count > 0 ? evf : null;
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
   }
+
+  const macroPlaybookBlock = formatMacroPlaybookBlock(
+    macroLessons,
+    // Drawdown context is resolved below once the regime is known; the block
+    // only needs the raw depth, which the regime snapshot already carries.
+    regime?.signals.spy_drawdown_pct ?? null,
+    [
+      ...new Set([
+        ...features.flatMap((f) => f.event_features?.top_kinds ?? []),
+        ...macroEvents.drivers.map((d) => String(d.kind)),
+      ]),
+    ],
+  );
 
   const marketEventsBlock = formatMarketEventsBlock(
     macroEvents,
@@ -999,7 +1037,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
   const cashFloor = totalValue * cashFloorPctEff;
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
-  const maxPosVal = totalValue * basePerSymbolPct;
+
+  // Learned drawdown sizing: the 20-year study measured the forward return
+  // from each depth below the index high. Deep holes historically needed a
+  // confirmed turn, so the playbook is allowed to SHRINK the per-symbol cap
+  // there — never to widen it beyond the configured risk limit.
+  const macroDdSizing = drawdownSizeScale(
+    effectiveRegime.signals.spy_drawdown_pct,
+    macroLessons?.drawdown_rules ?? null,
+  );
+  const ddSizeScale = Math.min(1, macroDdSizing.scale);
+  const maxPosVal = totalValue * basePerSymbolPct * ddSizeScale;
 
   // Build FX context (wallet, exposure by currency, live rates, circuit state).
   // Safe to call even when fx_enabled is false — returns an inactive context
@@ -1104,7 +1152,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
         crossSectional: formatCrossSectionalBlock(rankMap),
-        marketEvents: marketEventsBlock,
+        marketEvents: macroPlaybookBlock
+          ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
+          : marketEventsBlock,
         events,
         cooling: coolingSymbols,
         asOf,
@@ -2812,7 +2862,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
             crossSectional: formatCrossSectionalBlock(rankMap),
-            marketEvents: marketEventsBlock,
+            marketEvents: macroPlaybookBlock
+              ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
+              : marketEventsBlock,
             events,
             cooling: coolingSymbols,
             asOf,
