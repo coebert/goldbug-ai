@@ -254,7 +254,11 @@ function Home() {
 
         <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
 
-        <PortfolioMirrorAlert findings={mirrorQ.data?.findings ?? []} />
+        {mirrorQ.isLoading && portfolioCount > 1 ? (
+          <MirrorAlertSkeleton />
+        ) : (
+          <PortfolioMirrorAlert findings={mirrorQ.data?.findings ?? []} />
+        )}
 
         {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
