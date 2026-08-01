@@ -59,7 +59,7 @@ describe("instrument_ccy validation across the holdings book", () => {
   });
 
   it("a book tagged by the rules raises no currency findings", () => {
-    const { rows } = tagRowsCurrency(SYMBOLS.map(({ symbol }) => ({ symbol, instrument_ccy: null })));
+    const { rows } = tagRowsCurrency(SYMBOLS.map(({ symbol }) => ({ symbol, instrument_ccy: null as string | null })));
     const report = checkInstrumentCurrencies({
       portfolioId: "p1",
       baseCcy: "GBP",
@@ -118,7 +118,7 @@ describe("instrument_ccy validation across the holdings book", () => {
   });
 
   it("holds under a non-GBP base currency too", () => {
-    const { rows } = tagRowsCurrency(SYMBOLS.map(({ symbol }) => ({ symbol, instrument_ccy: null })));
+    const { rows } = tagRowsCurrency(SYMBOLS.map(({ symbol }) => ({ symbol, instrument_ccy: null as string | null })));
     const report = checkInstrumentCurrencies({
       portfolioId: "p1",
       baseCcy: "USD",
