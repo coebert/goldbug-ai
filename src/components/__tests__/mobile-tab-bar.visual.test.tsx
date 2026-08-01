@@ -59,13 +59,52 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 
+// ---------------------------------------------------------------------------
+// Determinism guards.
+//
+// A visual snapshot must be identical whether this file runs alone or inside
+// the full parallel suite. Two classes of input could break that:
+//   * wall-clock time (a "Xs ago"-style label, a date, an animation delay);
+//   * viewport-dependent branching (matchMedia / window.innerWidth), which
+//     differs between the jsdom-less `ci` project and a DOM environment.
+// The component uses neither today — Tailwind's `md:hidden` handles the
+// breakpoint in CSS, not JS — so we freeze the clock and install a matchMedia
+// spy that FAILS the run if anything in the tree starts querying it.
+// ---------------------------------------------------------------------------
+const FROZEN_NOW = new Date("2026-07-30T14:00:00Z");
+const matchMediaCalls: string[] = [];
+
+beforeAll(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: false });
+  vi.setSystemTime(FROZEN_NOW);
+  (globalThis as { window?: unknown }).window ??= globalThis;
+  (globalThis as unknown as { matchMedia: (q: string) => unknown }).matchMedia = (q: string) => {
+    matchMediaCalls.push(q);
+    return {
+      matches: false,
+      media: q,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    };
+  };
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
+
 function renderAt(pathname: string): string {
   (globalThis as { __PATH__?: string }).__PATH__ = pathname;
+  vi.setSystemTime(FROZEN_NOW);
   return renderToStaticMarkup(<MobileTabBar />);
 }
 
 // Representative routes: root, a leaf, and a hidden-prefix route.
 const ROUTES = ["/", "/trades", "/learn", "/compare", "/auth/sign-in"] as const;
+
 
 describe("mobile tab bar — visual regression", () => {
   for (const path of ROUTES) {
