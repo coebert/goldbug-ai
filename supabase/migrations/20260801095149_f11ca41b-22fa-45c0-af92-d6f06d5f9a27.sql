@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.purge_expired_idempotency_keys() FROM anon, authenticated, PUBLIC;
