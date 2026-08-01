@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`e2e: LSE quotes -> valuation -> holdings cards & equity charts > rendered holdings + equity output snapshot 1`] = `
+{
+  "chartPct": 2.28,
+  "rowPercents": {
+    "AAPL:xnas": 5,
+    "HSBA.L": -5,
+    "MKS:xlon": 5,
+    "VUKE.L": 5,
+  },
+  "snapshots": [
+    {
+      "snapshot_date": "2026-07-29",
+      "total_value": 9000.27,
+    },
+    {
+      "snapshot_date": "2026-07-30",
+      "total_value": 9070.27,
+    },
+    {
+      "snapshot_date": "2026-07-31",
+      "total_value": 9122.77,
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "total_value": 9205.27,
+    },
+  ],
+}
+`;
