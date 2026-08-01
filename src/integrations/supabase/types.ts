@@ -736,6 +736,114 @@ export type Database = {
           },
         ]
       }
+      exec_post_events: {
+        Row: {
+          base_price: number | null
+          created_at: string
+          executive_id: string
+          executive_name: string
+          headline: string
+          id: string
+          max_adverse_pct: number | null
+          post_date: string
+          ret_1d: number | null
+          ret_3d: number | null
+          ret_5d: number | null
+          sentiment: number | null
+          source: string | null
+          symbol: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          base_price?: number | null
+          created_at?: string
+          executive_id: string
+          executive_name: string
+          headline: string
+          id?: string
+          max_adverse_pct?: number | null
+          post_date: string
+          ret_1d?: number | null
+          ret_3d?: number | null
+          ret_5d?: number | null
+          sentiment?: number | null
+          source?: string | null
+          symbol: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          base_price?: number | null
+          created_at?: string
+          executive_id?: string
+          executive_name?: string
+          headline?: string
+          id?: string
+          max_adverse_pct?: number | null
+          post_date?: string
+          ret_1d?: number | null
+          ret_3d?: number | null
+          ret_5d?: number | null
+          sentiment?: number | null
+          source?: string | null
+          symbol?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exec_post_lessons: {
+        Row: {
+          active: boolean
+          coefficients: Json
+          created_at: string
+          generated_at: string
+          id: string
+          lessons: Json
+          model: string | null
+          narrative: string | null
+          sample_size: number
+          stats: Json
+          updated_at: string
+          user_id: string
+          window_days: number
+        }
+        Insert: {
+          active?: boolean
+          coefficients?: Json
+          created_at?: string
+          generated_at?: string
+          id?: string
+          lessons?: Json
+          model?: string | null
+          narrative?: string | null
+          sample_size?: number
+          stats?: Json
+          updated_at?: string
+          user_id: string
+          window_days?: number
+        }
+        Update: {
+          active?: boolean
+          coefficients?: Json
+          created_at?: string
+          generated_at?: string
+          id?: string
+          lessons?: Json
+          model?: string | null
+          narrative?: string | null
+          sample_size?: number
+          stats?: Json
+          updated_at?: string
+          user_id?: string
+          window_days?: number
+        }
+        Relationships: []
+      }
       execution_calibrations: {
         Row: {
           adv_notional_20d: number | null
