@@ -52,11 +52,7 @@ import {
   type ScheduleBucket,
   type SliceStrategy,
 } from "./execution-vwap";
-import {
-  createTickBudget,
-  withSlicerDeadline,
-  SlicerTimeoutError,
-} from "./execution-slicer-deadline";
+import { createTickBudget, withSlicerDeadline } from "./execution-slicer-deadline";
 
 /** Never fan out more child orders than this from one tick. */
 export const MAX_SLICES_PER_TICK = 50;
