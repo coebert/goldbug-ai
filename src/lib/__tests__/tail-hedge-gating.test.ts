@@ -99,9 +99,11 @@ describe("tail-hedge SELL is not suppressed when the position can support it", (
   });
 
   it("sizes the unwind off cost basis when no live quote exists", () => {
-    const holdings = new Map<string, Holding>([["SGLN.L", holding("SGLN.L", 100, 40)]]);
+    const holdings = new Map<string, Holding>([["GLD", holding("GLD", 100, 40)]]);
     const res = applyTailHedgeToPaperPortfolio({
       ...BASE,
+      portfolioCurrency: "USD",
+      hedgeSymbol: "GLD",
       decision: sellDecision(400),
       holdingsByS: holdings,
       workingCash: 0,
@@ -112,6 +114,23 @@ describe("tail-hedge SELL is not suppressed when the position can support it", (
     expect(res.priceSource).toBe("avg_cost");
     expect(res.qty).toBeCloseTo(10, 6);
     expect(res.reason).toContain("cost basis");
+  });
+
+  it("applies the GBX→GBP rule to an LSE cost-basis fallback, like the engine does", () => {
+    // avg_cost on an LSE line is pence-quoted; 4000p = £40, so a £400 clip is
+    // 10 units — not 1000. Same normalisation the engine's holdingLivePrice
+    // fallback uses, so hedge sizing can't disagree with exposure maths.
+    const holdings = new Map<string, Holding>([["SGLN.L", holding("SGLN.L", 100, 4000)]]);
+    const res = applyTailHedgeToPaperPortfolio({
+      ...BASE,
+      decision: sellDecision(400),
+      holdingsByS: holdings,
+      workingCash: 0,
+      priceMap: new Map(),
+      isLivePortfolio: false,
+    });
+    expect(res.priceSource).toBe("avg_cost");
+    expect(res.qty).toBeCloseTo(10, 6);
   });
 
   it("sells what the position can support instead of dropping the leg", () => {
