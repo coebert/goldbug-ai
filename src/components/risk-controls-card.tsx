@@ -25,26 +25,23 @@ import { Explain } from "@/components/explain";
 
 import { COMMODITY_GROUPS, type CommodityGroup } from "@/lib/commodity-groups";
 
-type AssetClass = "stock" | "etf" | "crypto" | "commodity" | "fx";
+import {
+  RISK_PRESETS,
+  RISK_DIAL_DEFAULTS,
+  type RiskDialConfig,
+  type DialAssetClass,
+} from "@/lib/risk-presets";
+import {
+  AGGRESSIVENESS_BOUNDS,
+  SIZE_MULT_BOUNDS,
+  clampRange,
+  resolveAggressiveness,
+} from "@/lib/risk-aggressiveness";
 
-type RiskConfig = {
-  asset_class_limits: Partial<Record<AssetClass, number>>;
-  per_symbol_limit_pct: number | null;
-  stop_loss_pct: number;
-  take_profit_pct: number;
-  atr_trailing_mult: number;
-  max_hold_days: number;
-  volatility_sizing: boolean;
-  vol_target_pct: number;
-  max_daily_loss_pct: number;
-  max_drawdown_halt_pct: number;
-  commodity_group_limits: Partial<Record<CommodityGroup, number>>;
-  commodity_min_adv_usd: number;
-  commodity_max_atr_pct: number;
-  fx_currency_limits?: Partial<Record<string, number>>;
-  diversification_tilt?: "off" | "balanced" | "strong";
-  risk_level?: number;
-};
+// The dial config lives in `@/lib/risk-presets` so the server-side sweep and
+// the live engine read exactly the same table this card writes.
+type AssetClass = DialAssetClass;
+type RiskConfig = RiskDialConfig;
 
 // Currencies the app can settle in today. Base currency is filtered out in the
 // UI since caps only apply to non-base holdings.
@@ -58,22 +55,7 @@ const FX_CCY_OPTIONS: { code: string; label: string }[] = [
   { code: "CHF", label: "Swiss franc" },
 ];
 
-const DEFAULTS: RiskConfig = {
-  asset_class_limits: { stock: 0.6, etf: 0.8, crypto: 0.2, commodity: 0.3, fx: 0.3 },
-  per_symbol_limit_pct: null,
-  stop_loss_pct: 0.1,
-  take_profit_pct: 0.25,
-  atr_trailing_mult: 3,
-  max_hold_days: 0,
-  volatility_sizing: true,
-  vol_target_pct: 0.015,
-  max_daily_loss_pct: 0.05,
-  max_drawdown_halt_pct: 0.20,
-  commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
-  commodity_min_adv_usd: 250_000,
-  commodity_max_atr_pct: 0.06,
-  fx_currency_limits: {},
-};
+const DEFAULTS: RiskConfig = RISK_DIAL_DEFAULTS;
 
 
 function parseCfg(raw: unknown): RiskConfig {
@@ -126,6 +108,26 @@ function parseCfg(raw: unknown): RiskConfig {
       return out;
     })(),
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
+    // Sizing / aggressiveness knobs — clamped on read so a bad stored value
+    // can never widen risk beyond the hard bounds.
+    size_multiplier: clampRange(
+      r.size_multiplier,
+      SIZE_MULT_BOUNDS.min,
+      SIZE_MULT_BOUNDS.max,
+      resolveAggressiveness(r).sizeMult,
+    ),
+    buy_aggressiveness: clampRange(
+      r.buy_aggressiveness,
+      AGGRESSIVENESS_BOUNDS.min,
+      AGGRESSIVENESS_BOUNDS.max,
+      resolveAggressiveness(r).buy,
+    ),
+    sell_aggressiveness: clampRange(
+      r.sell_aggressiveness,
+      AGGRESSIVENESS_BOUNDS.min,
+      AGGRESSIVENESS_BOUNDS.max,
+      resolveAggressiveness(r).sell,
+    ),
     diversification_tilt:
       r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
         ? r.diversification_tilt
@@ -142,92 +144,6 @@ const CLASSES: { key: AssetClass; label: string }[] = [
   { key: "commodity", label: "Commodities" },
   { key: "fx", label: "FX" },
 ];
-
-// Simple 1..5 risk-level presets. Moving the slider rewrites every detailed
-// field below so the two views stay in sync.
-const RISK_PRESETS: Record<number, { name: string; blurb: string; cfg: RiskConfig }> = {
-  1: {
-    name: "Low risk",
-    blurb: "Capital preservation. Tight stops, small positions, mostly ETFs.",
-    cfg: {
-      asset_class_limits: { stock: 0.3, etf: 0.9, crypto: 0.02, commodity: 0.15, fx: 0.15 },
-      per_symbol_limit_pct: 0.05,
-      stop_loss_pct: 0.05,
-      take_profit_pct: 0.15,
-      atr_trailing_mult: 2,
-      max_hold_days: 60,
-      volatility_sizing: true,
-      vol_target_pct: 0.007,
-      max_daily_loss_pct: 0.02,
-      max_drawdown_halt_pct: 0.08,
-      commodity_group_limits: { Gold: 0.1, Basket: 0.08 },
-      commodity_min_adv_usd: 1_000_000,
-      commodity_max_atr_pct: 0.04,
-    },
-  },
-  2: {
-    name: "Cautious",
-    blurb: "Slow and steady growth with limited crypto/commodity exposure.",
-    cfg: {
-      asset_class_limits: { stock: 0.5, etf: 0.85, crypto: 0.05, commodity: 0.2, fx: 0.2 },
-      per_symbol_limit_pct: 0.08,
-      stop_loss_pct: 0.07,
-      take_profit_pct: 0.2,
-      atr_trailing_mult: 2.5,
-      max_hold_days: 90,
-      volatility_sizing: true,
-      vol_target_pct: 0.01,
-      max_daily_loss_pct: 0.03,
-      max_drawdown_halt_pct: 0.12,
-      commodity_group_limits: { Gold: 0.15, Basket: 0.12 },
-      commodity_min_adv_usd: 500_000,
-      commodity_max_atr_pct: 0.05,
-    },
-  },
-  3: {
-    name: "Balanced",
-    blurb: "Default mix — moderate stops, diversified caps.",
-    cfg: { ...DEFAULTS },
-  },
-  4: {
-    name: "Growth",
-    blurb: "Larger positions, wider stops, more crypto/commodity room.",
-    cfg: {
-      asset_class_limits: { stock: 0.75, etf: 0.75, crypto: 0.3, commodity: 0.4, fx: 0.4 },
-      per_symbol_limit_pct: 0.2,
-      stop_loss_pct: 0.15,
-      take_profit_pct: 0.4,
-      atr_trailing_mult: 4,
-      max_hold_days: 0,
-      volatility_sizing: true,
-      vol_target_pct: 0.02,
-      max_daily_loss_pct: 0.06,
-      max_drawdown_halt_pct: 0.25,
-      commodity_group_limits: { Gold: 0.3, Basket: 0.2 },
-      commodity_min_adv_usd: 150_000,
-      commodity_max_atr_pct: 0.08,
-    },
-  },
-  5: {
-    name: "High risk",
-    blurb: "Aggressive concentration, wide stops, run winners hard.",
-    cfg: {
-      asset_class_limits: { stock: 0.9, etf: 0.6, crypto: 0.5, commodity: 0.5, fx: 0.5 },
-      per_symbol_limit_pct: 0.35,
-      stop_loss_pct: 0.25,
-      take_profit_pct: 0.75,
-      atr_trailing_mult: 5,
-      max_hold_days: 0,
-      volatility_sizing: false,
-      vol_target_pct: 0.03,
-      max_daily_loss_pct: 0.10,
-      max_drawdown_halt_pct: 0.35,
-      commodity_group_limits: { Gold: 0.4, Basket: 0.3 },
-      commodity_min_adv_usd: 50_000,
-      commodity_max_atr_pct: 0.12,
-    },
-  },
-};
 
 function inferRiskLevel(cfg: RiskConfig): number {
   // Match by nearest stop_loss + per_symbol_limit — good enough for slider sync.
@@ -454,6 +370,63 @@ export function RiskControlsCard({
                 <span>Growth</span>
                 <span>High risk</span>
               </div>
+
+              {/* Sizing and per-side aggressiveness. The preset sets these,
+                  but they can be fine-tuned without moving the whole dial. */}
+              <div className="mt-4 space-y-4 border-t border-border/60 pt-4">
+                <p className="flex items-center gap-2 text-xs font-semibold">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> Sizing &
+                  aggressiveness
+                </p>
+                {(
+                  [
+                    {
+                      key: "size_multiplier" as const,
+                      label: "Position size",
+                      hint: "Scales every buy budget and the per-symbol cap.",
+                      bounds: SIZE_MULT_BOUNDS,
+                    },
+                    {
+                      key: "buy_aggressiveness" as const,
+                      label: "Buy aggressiveness",
+                      hint: "How much of a wanted buy is taken in one go.",
+                      bounds: AGGRESSIVENESS_BOUNDS,
+                    },
+                    {
+                      key: "sell_aggressiveness" as const,
+                      label: "Sell aggressiveness",
+                      hint: "How fast trims and exits are completed.",
+                      bounds: AGGRESSIVENESS_BOUNDS,
+                    },
+                  ]
+                ).map((row) => {
+                  const value = clampRange(
+                    cfg[row.key],
+                    row.bounds.min,
+                    row.bounds.max,
+                    1,
+                  );
+                  return (
+                    <div key={row.key} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <Label className="text-xs">{row.label}</Label>
+                        <span className="font-medium text-primary">{value.toFixed(2)}×</span>
+                      </div>
+                      <Slider
+                        min={row.bounds.min}
+                        max={row.bounds.max}
+                        step={0.05}
+                        value={[value]}
+                        onValueChange={(v) =>
+                          setCfg((c) => ({ ...c, [row.key]: v[0] ?? value }))
+                        }
+                      />
+                      <p className="text-[11px] text-muted-foreground">{row.hint}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
               {lastChange && (
                 <div className="mt-4 rounded-md border border-primary/30 bg-background/60 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">

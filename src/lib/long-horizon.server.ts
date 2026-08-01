@@ -10,6 +10,11 @@
 
 import { getDailyCandlesRange, sma, rsi, pctChange, dailyVolatility } from "./market-data.server";
 import { riskProfile, parseRiskConfig, effectiveCashFloorPct, type RiskConfig } from "./universe.server";
+import {
+  resolveAggressiveness,
+  aggressiveBuySpend,
+  aggressiveSellQty,
+} from "./risk-aggressiveness";
 import type { Database } from "@/integrations/supabase/types";
 
 type AssetClass = Database["public"]["Enums"]["asset_class"];
@@ -260,6 +265,8 @@ export async function runLongHorizonBacktest(opts: {
   const topK = opts.topK ?? 6;
   const rp = riskProfile(opts.riskLevel);
   const rc: RiskConfig = parseRiskConfig(opts.riskConfig);
+  // Same dial the live engine reads, so a sweep previews real behaviour.
+  const aggression = resolveAggressiveness(opts.riskConfig);
   const execution: ExecutionCosts = {
     commission_bps: Math.max(0, opts.execution?.commission_bps ?? 5),
     slippage_bps: Math.max(0, opts.execution?.slippage_bps ?? 10),
@@ -395,10 +402,14 @@ export async function runLongHorizonBacktest(opts: {
       const investable = Math.max(0, totalValue - cashFloor);
 
       // Base target weight = equal-weight across picks, capped by per-symbol,
-      // per-class limits, and optional vol targeting.
-      const perSymCap = rc.per_symbol_limit_pct ?? rp.maxPositionPct;
+      // per-class limits, the dial's size multiplier, and optional vol
+      // targeting.
+      const perSymCap = Math.min(
+        1,
+        (rc.per_symbol_limit_pct ?? rp.maxPositionPct) * aggression.sizeMult,
+      );
       const rawWeights = new Map<string, number>();
-      const baseW = picks.length > 0 ? Math.min(perSymCap, 1 / picks.length) : 0;
+      const baseW = picks.length > 0 ? Math.min(perSymCap, aggression.sizeMult / picks.length) : 0;
       for (const p of picks) {
         let w = baseW;
         if (rc.volatility_sizing && p.vol && p.vol > 0) {
@@ -448,10 +459,13 @@ export async function runLongHorizonBacktest(opts: {
         const cur = holdings.get(p.sym.symbol);
         const curValue = (cur?.qty ?? 0) * p.price;
         const diff = targetValue - curValue;
-        // ignore drift smaller than either 0.5% of portfolio or the min trade size
-        if (Math.abs(diff) < Math.max(totalValue2 * 0.005, execution.min_trade_value)) continue;
+        // Ignore drift smaller than the dial's band or the min trade size.
+        // A patient dial tolerates more drift; an aggressive one chases the
+        // target on thinner gaps.
+        if (Math.abs(diff) < Math.max(totalValue2 * aggression.driftBand, execution.min_trade_value))
+          continue;
         if (diff > 0) {
-          const spend = Math.min(diff, cash - cashFloor);
+          const spend = Math.min(aggressiveBuySpend(diff, aggression), cash - cashFloor);
           if (spend <= 0) continue;
           const res = buyShares(p.sym.symbol, spend, p.price);
           if (!res) continue;
@@ -459,7 +473,8 @@ export async function runLongHorizonBacktest(opts: {
           const newCost = ((cur?.qty ?? 0) * (cur?.avgCost ?? 0) + res.qty * res.effCost) / newQty;
           holdings.set(p.sym.symbol, { qty: newQty, avgCost: newCost });
         } else if (cur) {
-          const sellQty = Math.min(cur.qty, (-diff) / p.price);
+          const sellQty = aggressiveSellQty((-diff) / p.price, cur.qty, aggression);
+
           const ok = sellShares(p.sym.symbol, sellQty, p.price);
           if (ok == null) continue;
           const remaining = cur.qty - sellQty;

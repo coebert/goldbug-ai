@@ -127,6 +127,8 @@ const MultiCurrencyExposureCard = lazy(() =>
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card";
+import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -1971,6 +1973,12 @@ function PortfolioPage() {
                   portfolioId={id}
                   riskConfig={p.risk_config}
                   baseCurrency={p.currency}
+                />
+                <RiskCurveComparisonCard
+                  portfolioId={id}
+                  currentLevel={clampDialLevel(
+                    (p.risk_config as { risk_level?: number } | null)?.risk_level,
+                  )}
                 />
                 <ExecutionCalibrationCard
                   portfolioId={id}

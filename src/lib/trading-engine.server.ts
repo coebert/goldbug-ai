@@ -11,6 +11,11 @@ import { HEDGE_FUND_PLAYBOOK } from "./hedge-fund-playbook.server";
 import { COMMODITY_PLAYBOOK } from "./commodity-playbook.server";
 import { CRYPTO_PLAYBOOK } from "./crypto-playbook.server";
 import {
+  resolveAggressiveness,
+  aggressiveBuySpend,
+  aggressiveSellQty,
+} from "./risk-aggressiveness";
+import {
   buildLearningContext,
   formatLearningBlock,
   reflectAndUpdateLessons,
@@ -1069,6 +1074,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
 
   const cfg = tightened.cfg;
+  // Risk dial (1..5) → position sizing + per-side trade aggressiveness.
+  const aggression = resolveAggressiveness(portfolio.risk_config);
   const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
   const cashFloor = totalValue * cashFloorPctEff;
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
@@ -1683,7 +1690,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      let qty = Number(cur.quantity) * pct;
+      // Risk dial, sell side: a defensive profile exits faster than it
+      // enters. Clamped to the held quantity, so this can only accelerate an
+      // exit — never short.
+      let qty = aggressiveSellQty(Number(cur.quantity) * pct, Number(cur.quantity), aggression);
       // Phase 6 — discretionary AI sell: apply TOD gate/haircut and slice plan.
       const eaPreview = applyExecAlphaSell(meta.symbol, qty * price, price);
       if (!eaPreview.allow) {
@@ -1843,8 +1853,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
 
       const spendableCash = Math.max(0, workingCash - cashFloor);
-      let spend = spendableCash * pct;
-      const sizingNotes: string[] = [];
+      // Risk dial, buy side: position-size multiplier × buy aggressiveness.
+      // Every downstream cap (per-symbol, class, vol, cash) still applies.
+      let spend = aggressiveBuySpend(spendableCash * pct, aggression);
+      const sizingNotes: string[] = [
+        `dial ${aggression.level} (${aggression.name}) size×${aggression.sizeMult.toFixed(2)} buy×${aggression.buy.toFixed(2)}`,
+      ];
 
       // Conviction-weighted Kelly cap (only shrinks; never grows above requested %)
       if (typeof order.conviction === "number") {
