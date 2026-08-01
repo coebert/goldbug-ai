@@ -39,7 +39,9 @@ export function ValuationConsistencyAlert({
     retry: false,
   });
 
-  const jumps = data?.jumps ?? [];
+  // Deposits/withdrawals move the tile legitimately — those days are recorded
+  // in the report for the audit trail but are not pricing faults.
+  const jumps = (data?.jumps ?? []).filter((j) => !j.benign);
   if (jumps.length === 0) return null;
 
   return (
