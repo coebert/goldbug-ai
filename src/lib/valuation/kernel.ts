@@ -16,7 +16,7 @@
 // price map and an FX resolver. That keeps it testable in any environment and
 // makes the golden-file suite meaningful.
 
-import { instrumentCcyFor } from "../instrument-ccy-rules";
+import { instrumentCcyFor, venueCurrency } from "../instrument-ccy-rules";
 import { isLseGbxDisplayQuoted } from "../market-price-units";
 import { priceSymbolVariants } from "../price-symbol";
 
@@ -45,7 +45,19 @@ export type FxResolve = (from: string, to: string) => number | null | undefined;
  */
 export type ObservedQuoteCcy = (symbol: string) => string | null | undefined;
 
-export type PriceSource = "market" | "cost_basis" | "missing";
+export type PriceSource = "market" | "cost_basis" | "missing" | "unresolved_units";
+
+/** Outcome of deciding what units a raw quote arrives in. */
+export type QuoteUnits = {
+  quoteCurrency: string;
+  quoteCurrencySource: "observed" | "rules" | "unresolved";
+  /** 100 for GBX, otherwise 1. Meaningless when `resolved` is false. */
+  unitDivisor: number;
+  instrumentCurrency: string;
+  /** False when GBX vs GBP (or any currency) could not be determined. */
+  resolved: boolean;
+  unresolvedReason?: string;
+};
 export type FxSource = "identity" | "resolved" | "fallback_identity";
 
 /** Per-holding provenance: everything needed to explain one line of a total. */
@@ -59,7 +71,9 @@ export type ValuationLine = {
   /** Currency the raw quote is expressed in ("GBX" for pence-quoted LSE). */
   quoteCurrency: string;
   /** How the quote currency was decided. */
-  quoteCurrencySource: "observed" | "rules";
+  quoteCurrencySource: "observed" | "rules" | "unresolved";
+  /** False when the quote units could not be decided; value withheld. */
+  unitsResolved: boolean;
   /** 100 for GBX, otherwise 1. */
   unitDivisor: number;
   /** Currency after the divisor is applied (GBX -> GBP). */
@@ -85,6 +99,7 @@ export type ValuationWarningCode =
   | "missing_price"
   | "cost_basis_fallback"
   | "missing_fx_rate"
+  | "unresolved_quote_units"
   | "non_finite_input";
 
 export type ValuationWarning = {
@@ -152,12 +167,7 @@ export function resolveQuoteUnits(
   declaredCcy: string | null | undefined,
   observed: string | null | undefined,
   defaultCcy: string,
-): {
-  quoteCurrency: string;
-  quoteCurrencySource: "observed" | "rules";
-  unitDivisor: number;
-  instrumentCurrency: string;
-} {
+): QuoteUnits {
   const obs = (observed ?? "").trim().toUpperCase();
   if (obs) {
     const divisor = obs === "GBX" ? 100 : 1;
@@ -166,6 +176,7 @@ export function resolveQuoteUnits(
       quoteCurrencySource: "observed",
       unitDivisor: divisor,
       instrumentCurrency: obs === "GBX" ? "GBP" : obs,
+      resolved: true,
     };
   }
 
@@ -177,6 +188,7 @@ export function resolveQuoteUnits(
       quoteCurrencySource: "rules",
       unitDivisor: 100,
       instrumentCurrency: "GBP",
+      resolved: true,
     };
   }
 
@@ -186,6 +198,23 @@ export function resolveQuoteUnits(
       quoteCurrencySource: "rules",
       unitDivisor: 100,
       instrumentCurrency: "GBP",
+      resolved: true,
+    };
+  }
+
+  // Nothing to go on: no observed quote currency, no stored tag, and the
+  // symbol carries no venue marker the rules layer recognises. Guessing here
+  // is exactly how a pence quote gets treated as pounds (or a USD quote as
+  // GBP) and a tile reports a 100x or 25% wrong percentage. Report it as
+  // unresolved and let callers withhold the number instead.
+  if (!declared && !venueCurrency(symbol)) {
+    return {
+      quoteCurrency: "UNKNOWN",
+      quoteCurrencySource: "unresolved",
+      unitDivisor: 1,
+      instrumentCurrency: (defaultCcy || "GBP").trim().toUpperCase(),
+      resolved: false,
+      unresolvedReason: `No observed quote currency, no stored instrument_ccy, and no recognised venue for "${String(symbol ?? "").trim() || "(blank symbol)"}" — GBX vs GBP cannot be decided.`,
     };
   }
 
@@ -195,8 +224,24 @@ export function resolveQuoteUnits(
     quoteCurrencySource: "rules",
     unitDivisor: 1,
     instrumentCurrency: ccy,
+    resolved: true,
   };
 }
+
+/**
+ * UI-facing predicate: can this row's quote units be decided at all?
+ * Components use it to render "—" instead of a percentage that would be
+ * silently off by 100x (or by an FX leg).
+ */
+export function quoteUnitsResolved(
+  symbol: string,
+  declaredCcy?: string | null,
+  observed?: string | null,
+  defaultCcy = "GBP",
+): boolean {
+  return resolveQuoteUnits(symbol, declaredCcy, observed, defaultCcy).resolved;
+}
+
 
 /** Look a price up under every key this holding might be cached under. */
 function lookupPrice(price: PriceLookup, symbol: string): { value: number | null; key: string } {
@@ -259,6 +304,39 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
     );
 
     const found = lookupPrice(input.price, symbol);
+
+    // Fail safe: with no way to tell GBX from GBP (or from USD), any number we
+    // produce is a coin flip between right and 100x wrong. Contribute nothing,
+    // flag the result degraded, and record the raw quote for diagnostics so a
+    // human (or the tagging job) can resolve the units.
+    if (!units.resolved) {
+      degraded = true;
+      warnings.push({
+        code: "unresolved_quote_units",
+        symbol,
+        message:
+          units.unresolvedReason ??
+          `Quote units for ${symbol} could not be resolved; row withheld from the total.`,
+      });
+      lines.push({
+        symbol,
+        priceKey: found.key,
+        quantity,
+        nativeQuote: found.value ?? 0,
+        quoteCurrency: units.quoteCurrency,
+        quoteCurrencySource: units.quoteCurrencySource,
+        unitsResolved: false,
+        unitDivisor: units.unitDivisor,
+        instrumentCurrency: units.instrumentCurrency,
+        nativeValue: 0,
+        fxRate: 1,
+        fxSource: "identity",
+        baseValue: 0,
+        priceSource: "unresolved_units",
+      });
+      continue;
+    }
+
     let nativeQuote = found.value;
     let priceSource: PriceSource = "market";
 
@@ -293,6 +371,7 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
     const baseValue = nativeValue * rate;
     holdingsValue += baseValue;
 
+
     lines.push({
       symbol,
       priceKey: found.key,
@@ -300,6 +379,7 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
       nativeQuote,
       quoteCurrency: units.quoteCurrency,
       quoteCurrencySource: units.quoteCurrencySource,
+      unitsResolved: true,
       unitDivisor: units.unitDivisor,
       instrumentCurrency: units.instrumentCurrency,
       nativeValue,

@@ -17,6 +17,7 @@ import {
   roundMoney,
 } from "@/lib/format-money";
 import { holdingAvgCostBase } from "@/lib/market-price-units";
+import { quoteUnitsResolved } from "@/lib/valuation/kernel";
 import { useEffect, useState } from "react";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
 import { HoldingSellDialog } from "@/components/holding-sell-dialog";
@@ -151,6 +152,7 @@ export function LiveHoldingsCard({
     for (const i of issues) console.warn(formatIssue(i));
   }, [series]);
 
+  const baseCcyForUnits = String(currency ?? "GBP").toUpperCase();
   const rawRows = holdings
     .map((h) => {
       const qty = Number(h.quantity);
@@ -166,9 +168,15 @@ export function LiveHoldingsCard({
       // so users don't mistake a flat P/L row for genuine breakeven.
       const hasLive = s?.currentPrice != null && Number.isFinite(Number(s.currentPrice));
       const mark = hasLive ? Number(s!.currentPrice) : avg;
-      const rawValue = qty * mark;
-      const costBasis = qty * avg;
-      return { ...h, qty, avg, mark, rawValue, costBasis, series: s, pricedAtCost: !hasLive };
+      // Fail-safe: if we cannot tell whether this ticker is quoted in pence
+      // or pounds (no observed quote currency, no stored instrument_ccy, no
+      // recognised venue), any money figure or percentage would be a guess
+      // that is either right or 100x wrong. Weight the row at zero and render
+      // it as unknown rather than publishing a fabricated number.
+      const unitsUnknown = !quoteUnitsResolved(h.symbol, h.instrument_ccy ?? null, null, baseCcyForUnits);
+      const rawValue = unitsUnknown ? 0 : qty * mark;
+      const costBasis = unitsUnknown ? 0 : qty * avg;
+      return { ...h, qty, avg, mark, rawValue, costBasis, series: s, unitsUnknown, pricedAtCost: !hasLive && !unitsUnknown };
     });
 
   const rawSum = rawRows.reduce((s, r) => s + r.rawValue, 0);
@@ -444,8 +452,9 @@ export function LiveHoldingsCard({
             {rows.map((r) => {
               const pct = denom > 0 ? (r.value / denom) * 100 : 0;
               const s = r.series;
-              const changePct = s?.pctChangeSincePurchase ?? null;
-              const changeVal = s?.valueChangeSincePurchase ?? null;
+              // Percentages are withheld entirely when units are unknown.
+              const changePct = r.unitsUnknown ? null : (s?.pctChangeSincePurchase ?? null);
+              const changeVal = r.unitsUnknown ? null : (s?.valueChangeSincePurchase ?? null);
               const up = (changePct ?? 0) >= 0;
               const openedLabel = fmtOpened(r.opened_at ?? s?.opened_at ?? null);
               const hourlyPts = s?.hourly ?? [];
@@ -531,6 +540,15 @@ export function LiveHoldingsCard({
                             {r.asset_class}
                           </Badge>
                         )}
+                        {r.unitsUnknown && (
+                          <Badge
+                            variant="outline"
+                            className="border-rose-500/50 bg-rose-500/10 text-rose-400 text-[9px] px-1.5 py-0"
+                            title="Price units for this ticker could not be resolved to pence (GBX) or pounds (GBP), so its value and percentage change are withheld rather than shown as a possibly 100x-wrong number."
+                          >
+                            units unknown
+                          </Badge>
+                        )}
                         {r.pricedAtCost && (
                           <Badge
                             variant="outline"
@@ -562,9 +580,11 @@ export function LiveHoldingsCard({
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-base font-semibold tabular-nums">{fmt(r.value)}</div>
+                      <div className="text-base font-semibold tabular-nums">
+                        {r.unitsUnknown ? "—" : fmt(r.value)}
+                      </div>
                       <div className="text-[11px] text-muted-foreground tabular-nums">
-                        {pct.toFixed(1)}% of portfolio
+                        {r.unitsUnknown ? "units unresolved" : `${pct.toFixed(1)}% of portfolio`}
                       </div>
                     </div>
                   </div>
