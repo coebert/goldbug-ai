@@ -31,7 +31,7 @@ export function ExperienceLevelToggle({ className = "" }: { className?: string }
             aria-checked={active}
             title={hint}
             onClick={() => setLevel(value)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2.5 text-xs sm:px-2.5 sm:py-1 font-medium transition-colors ${
               active
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"

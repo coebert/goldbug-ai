@@ -46,7 +46,7 @@ export function DashboardSettings({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5" aria-label="Dashboard display settings">
+        <Button variant="outline" size="sm" className="min-h-11 gap-1.5 px-3 sm:min-h-0 sm:h-8" aria-label="Dashboard display settings">
           <Settings2 className="h-3.5 w-3.5" /> Display
           {(includeDeposits || focusMode || density === "compact") && (
             <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />

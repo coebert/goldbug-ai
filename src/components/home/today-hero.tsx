@@ -59,7 +59,7 @@ export function TodayHero({
               {summary.real.count} portfolio{summary.real.count === 1 ? "" : "s"} at your broker
             </span>
           </div>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
             <span className="font-display text-[1.75rem] font-bold leading-none tracking-tight tabular-nums break-all sm:text-4xl">
               {formatGBP(realNow)}
             </span>
@@ -103,7 +103,7 @@ export function TodayHero({
           )}
 
         </div>
-        <div className="flex w-full items-center gap-2 rounded-lg border border-border/60 bg-surface-sunken px-3 py-2 sm:w-auto sm:shrink-0">
+        <div className="flex w-full items-center gap-2 rounded-lg border border-border/60 bg-surface-sunken px-3 py-2.5 sm:w-auto sm:shrink-0 sm:py-2">
           <Clock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Next AI run</div>

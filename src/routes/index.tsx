@@ -196,7 +196,7 @@ function Home() {
                 : "Everything below updates by itself. The AI reviews the market every hour."}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:flex-nowrap">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 sm:shrink-0 sm:flex-nowrap sm:gap-2">
             <ExperienceLevelToggle />
             <DashboardSettings
               includeDeposits={includeDeposits}
@@ -212,7 +212,7 @@ function Home() {
               </Button>
             </a>
             <a href="#create-portfolio" className="ml-auto sm:hidden">
-              <Button size="sm" className="h-8">
+              <Button size="sm" className="min-h-11 px-4">
                 <PlusCircle className="mr-1 h-4 w-4" /> New
               </Button>
             </a>
