@@ -52,6 +52,9 @@ const ExecPostsCard = lazy(() =>
 const ExecPostLessonsCard = lazy(() =>
   import("@/components/exec-post-lessons-card").then((m) => ({ default: m.ExecPostLessonsCard })),
 );
+const MacroLessonsCard = lazy(() =>
+  import("@/components/macro-lessons-card").then((m) => ({ default: m.MacroLessonsCard })),
+);
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
 );
@@ -404,6 +407,16 @@ function Home() {
             >
               <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <ExecPostLessonsCard />
+              </Suspense>
+            </AdvancedSection>
+
+            <AdvancedSection
+              title="What the AI learned from 20 years of news"
+              summary="Two decades of drawdowns and the headlines behind them, turned into rules for reacting to today's news."
+              defaultOpen={false}
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <MacroLessonsCard />
               </Suspense>
             </AdvancedSection>
 
