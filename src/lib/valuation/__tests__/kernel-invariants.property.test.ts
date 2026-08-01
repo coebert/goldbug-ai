@@ -38,10 +38,6 @@ const inputArb = fc.record({
   ),
 });
 
-function value(i: fc.Arbitrary<never> extends never ? any : never) {
-  return i;
-}
-
 describe("valuation kernel — properties", () => {
   it("total always equals cash + holdings, and is always finite", () => {
     fc.assert(
