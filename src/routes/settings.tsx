@@ -72,6 +72,5 @@ function SettingsPage() {
         <ValuationHistoryBackfillCard />
       </section>
     </div>
-    </div>
   );
 }
