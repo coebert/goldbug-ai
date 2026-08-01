@@ -76,7 +76,15 @@ export const activateLive = createServerFn({ method: "POST" })
     // RLS on portfolios (`user_id = auth.uid()`) enforces ownership on this
     // update via the caller's JWT — no service_role needed.
     const upd = await supabase.from("portfolios").update(patch).eq("id", data.portfolioId);
-    if (upd.error) throw new Error(upd.error.message);
+    if (upd.error) {
+      // Lost the race against a concurrent activation: the partial unique index
+      // rejected the second claim. Report it like the pre-check does.
+      if (isBrokerAccountUniqueViolation(upd.error) && brokerAccountId) {
+        throw new Error(brokerAccountClaimedMessage(brokerAccountId, "another portfolio"));
+      }
+      throw new Error(upd.error.message);
+    }
+
     await logAudit({
       userId, portfolioId: data.portfolioId, action: "ACTIVATE",
       env: data.targetEnv,
