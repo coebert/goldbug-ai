@@ -156,11 +156,17 @@ export async function withIdempotency<T>(
   const reservation = await store.reserve({ ...scope, requestHash });
   if (!reservation.reserved) {
     const existing = reservation.existing;
+    // Expired keys are answered before the payload check: the stored request
+    // hash may itself be gone, and "your key expired" is the useful answer.
+    if (existing.status === "expired") {
+      throw new IdempotencyKeyExpiredError(args.key, existing.expired_at ?? null);
+    }
     // Different payload under the same key: never replay someone else's answer.
     if (existing.request_hash !== requestHash) throw new IdempotencyKeyReuseError(args.key);
     if (existing.status !== "completed") throw new IdempotencyInProgressError(args.key);
     return { replayed: true, response: existing.response as T };
   }
+
 
   let response: T;
   try {
