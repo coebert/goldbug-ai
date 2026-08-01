@@ -244,14 +244,21 @@ export class SaxoAdapter implements BrokerAdapter {
     try {
       const ak = await this.getDefaultAccountKey();
       if (ak) {
+        // Saxo rejects an AccountKey-scoped balance read unless ClientKey is
+        // sent alongside it ("The ClientKey field is required"), which used to
+        // 400 on every tick and silently fall back to the client aggregate.
+        const ckForAccount = await this.getClientKey().catch(() => null);
         bal = await this.req<SaxoBalance>("GET", "/port/v1/balances", {
-          query: { AccountKey: ak },
+          query: ckForAccount
+            ? { AccountKey: ak, ClientKey: ckForAccount }
+            : { AccountKey: ak },
         });
         source = "account";
       }
     } catch (e) {
       clientLookupError = `account-scope: ${e instanceof Error ? e.message : String(e)}`;
     }
+
     if (bal == null) {
       try {
         const ck = await this.getClientKey();

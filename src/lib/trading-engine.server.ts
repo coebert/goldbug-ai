@@ -91,7 +91,7 @@ import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { instrumentCcyFor } from "./instrument-ccy-rules";
 import { normalizeMarketPriceForTrading, holdingAvgCostBase } from "./market-price-units";
 import { valuePortfolioHoldings } from "./valuation/value-holdings.server";
-import { engineSymbolKey, priceSymbolVariants } from "./price-symbol";
+import { engineSymbolKey, priceSymbolVariants, resolvePriceSymbol } from "./price-symbol";
 import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
 
 // Resolve a live GBP-normalized price for a held symbol, tolerant of the
@@ -630,17 +630,26 @@ async function currentPrices(symbols: string[], asOf: string): Promise<Map<strin
   const out = new Map<string, number>();
   await Promise.all(
     symbols.map(async (s) => {
-      const p = await getPriceOn(s, asOf);
+      // Broker-native spellings ("MKS:xlon") are not Yahoo symbols: fetching
+      // them 404s every tick and leaves the holding unpriced, which silently
+      // falls back to cost basis. Resolve to the canonical price key first,
+      // then publish the quote under every variant so lookups by either
+      // spelling hit.
+      const canonical = resolvePriceSymbol(s);
+      const p = (await getPriceOn(canonical, asOf)) ?? (canonical === s ? null : await getPriceOn(s, asOf));
       if (p != null) {
-        const norm = normalizeMarketPriceForTrading(s, p);
-        out.set(s, norm);
-        out.set(s.toUpperCase(), norm);
-        out.set(s.toLowerCase(), norm);
+        const norm = normalizeMarketPriceForTrading(canonical, p);
+        for (const key of new Set([s, canonical, ...priceSymbolVariants(s)])) {
+          out.set(key, norm);
+          out.set(key.toUpperCase(), norm);
+          out.set(key.toLowerCase(), norm);
+        }
       }
     }),
   );
   return out;
 }
+
 
 export async function runDailyTick(portfolioId: string, asOf: string, opts?: { skipNews?: boolean }) {
   // For live portfolios, pick up external Saxo deposits/withdrawals before we
@@ -791,11 +800,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const priceMap = await currentPrices(universePriceSyms, asOf);
 
   const cash = Number(portfolio.current_cash);
+  // Track how much of the book had no live quote and was valued off cost
+  // basis. A large unpriced share means the NAV is a guess — risk halts must
+  // not treat that shortfall as a real drawdown.
+  let unpricedHoldingsValue = 0;
   const holdingsValue = (holdings ?? []).reduce((sum, h) => {
+    const quoted = holdingPriceBySymbol(priceMap, h.symbol);
     const p = holdingLivePrice(priceMap, h);
-    return sum + p * Number(h.quantity);
+    const value = p * Number(h.quantity);
+    if (quoted == null) unpricedHoldingsValue += value;
+    return sum + value;
   }, 0);
   const totalValue = cash + holdingsValue;
+
 
   // Cash-aware universe filter. Uses raw risk_config (pre-regime tightening) so
   // the pre-filter is at least as generous as the final guardrails. Shared
@@ -1306,6 +1323,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const halts = evaluateRiskHalts({
     startingEquity: Number(portfolio.starting_cash) || totalValue,
     currentEquity: totalValue,
+    unpricedHoldingsValue,
     priorCloseEquity: equityStats.priorCloseEquity,
     peakEquity: equityStats.peakEquity,
     thresholds: {
@@ -1314,6 +1332,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       max_drawdown_halt_pct: cfg.max_drawdown_halt_pct,
     },
   });
+  if (halts.valuation_suspect) {
+    console.warn(
+      `[trading-engine] risk halts suppressed for ${portfolioId}: valuation unreliable (unpriced ${unpricedHoldingsValue.toFixed(2)} of ${totalValue.toFixed(2)})`,
+    );
+  }
+
 
   // ---- Auto-liquidation: multi-layer exits BEFORE the AI runs ----
   // Layers, in evaluation order:
