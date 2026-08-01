@@ -216,7 +216,7 @@ describe("UI: unresolvable units render as unknown, never as a percentage", () =
         totalValue={3_100}
         invested={2_100}
         currency="GBP"
-        isLive={false}
+        mode="paper"
       />,
     );
 
