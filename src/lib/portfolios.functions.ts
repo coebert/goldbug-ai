@@ -11,7 +11,7 @@ import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
 import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 import { deletePortfolioWithCleanup } from "./portfolio-delete-cleanup";
-import { reanchorInferredInflow } from "./infer-cash-flow";
+import { reanchorInferredInflow, trustedPreviousStarting } from "./infer-cash-flow";
 
 import {
   detectSnapshotTimingMismatches,
@@ -397,7 +397,7 @@ export const getPortfolio = createServerFn({ method: "GET" })
         // Same rule as the home-page list: a sync with no known prior
         // baseline is a starting_cash repair, so re-anchor it onto the
         // equity step the portfolio actually shows.
-        const flow = Number.isFinite(Number(resp.previousStarting))
+        const flow = trustedPreviousStarting(resp.previousStarting) !== null
           ? raw
           : reanchorInferredInflow(raw, ownSeries);
         if (!flow) continue;
