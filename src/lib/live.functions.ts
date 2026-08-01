@@ -104,43 +104,40 @@ export const activateLive = createServerFn({ method: "POST" })
     return { ok: true, ping, startingCash: starting };
   });
 
+/**
+ * Deactivate live trading. Idempotent: repeated calls are a no-op that still
+ * return the portfolio's current live/paper status, so a client that lost the
+ * first response can just call again instead of guessing.
+ */
 export const deactivateLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
     z.object({ portfolioId: z.string().uuid(), reason: z.string().max(500).optional() }).parse(data),
   )
   .handler(async ({ data, context }) => {
-    const own = await context.supabase.from("portfolios")
-      .select("id, user_id, mode, broker, broker_account_id").eq("id", data.portfolioId).maybeSingle();
-    if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
-    const previousMode = own.data.mode;
-    const previousAccount = own.data.broker_account_id ?? null;
-
-    // Single atomic UPDATE: flips mode → paper and nulls broker_account_id
-    // together, guarded on owner + live mode. Nothing can observe (or race
-    // into) a paper row that still holds its broker account. A repeat call
-    // matches zero rows and is reported as a no-op rather than an error.
-    const released = await releaseBrokerAccountAtomically(context.supabase as never, {
+    // Ownership, the live-mode precondition and the atomic release all live in
+    // the shared helper so this and any other caller cannot drift apart.
+    const result = await deactivateLivePortfolio(context.supabase as never, {
       portfolioId: data.portfolioId,
       userId: context.userId,
     });
 
-    if (!released.changed) {
-      await logAudit({
-        userId: context.userId, portfolioId: data.portfolioId, action: "DEACTIVATE",
-        request: { reason: data.reason ?? null },
-        response: { noop: true, previousMode },
-      });
-      return { ok: true, changed: false };
-    }
-
     await logAudit({
-      userId: context.userId, portfolioId: data.portfolioId, action: "DEACTIVATE",
+      userId: context.userId,
+      portfolioId: data.portfolioId,
+      action: "DEACTIVATE",
       request: { reason: data.reason ?? null },
-      response: { previousMode, newMode: "paper", releasedBrokerAccountId: previousAccount },
+      response: {
+        noop: !result.changed,
+        previousMode: result.previous_mode,
+        newMode: result.status.mode,
+        releasedBrokerAccountId: result.released_broker_account_id,
+      },
     });
-    return { ok: true, changed: true };
+
+    return result;
   });
+
 
 
 export const pauseLive = createServerFn({ method: "POST" })
