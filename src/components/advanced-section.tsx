@@ -30,7 +30,7 @@ export function AdvancedSection({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-surface-3/50"
+        className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left sm:px-4 transition-colors hover:bg-surface-3/50"
       >
         <span className="min-w-0">
           <span className="block font-display text-sm font-semibold tracking-tight">{title}</span>
@@ -41,7 +41,7 @@ export function AdvancedSection({
           aria-hidden
         />
       </button>
-      {open && <div className="space-y-4 border-t border-border/60 p-4">{children}</div>}
+      {open && <div className="space-y-4 border-t border-border/60 p-3 sm:p-4">{children}</div>}
     </section>
   );
 }

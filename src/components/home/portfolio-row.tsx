@@ -269,7 +269,7 @@ export function PortfolioRow({
 
 
         <div
-          className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-border/60 pt-3 transition-opacity ${isRefreshingEquity ? "opacity-90" : ""}`}
+          className={`mt-3 grid grid-cols-1 gap-3 border-t border-border/60 pt-3 transition-opacity sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end ${isRefreshingEquity ? "opacity-90" : ""}`}
           aria-busy={isRefreshingEquity || undefined}
           data-refreshing={isRefreshingEquity ? "true" : undefined}
           data-testid="portfolio-row-equity"
@@ -374,9 +374,9 @@ export function PortfolioRow({
               ))}
             </div>
           </div>
-          <div className="shrink-0 text-right">
+          <div className="min-w-0 text-left sm:shrink-0 sm:text-right">
             <TooltipProvider delayDuration={150}>
-              <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <div className="flex items-center justify-start gap-1.5 sm:justify-end text-[10px] uppercase tracking-wide text-muted-foreground">
                 Total equity
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -420,7 +420,7 @@ export function PortfolioRow({
                 aria-live="polite"
                 aria-label={`Total equity unavailable: ${equityError}`}
                 data-testid="total-equity-error"
-                className="flex flex-col items-end gap-1"
+                className="flex flex-col items-start gap-1 sm:items-end"
               >
                 <div className="flex items-center gap-1 text-2xl font-bold leading-tight tabular-nums text-destructive">
                   <AlertCircle className="h-5 w-5" aria-hidden />
@@ -450,7 +450,7 @@ export function PortfolioRow({
                 aria-busy="true"
                 aria-label="Loading total equity"
                 data-testid="total-equity-loading"
-                className="flex flex-col items-end gap-1"
+                className="flex flex-col items-start gap-1 sm:items-end"
               >
                 <Skeleton
                   variant="shimmer"
@@ -486,7 +486,7 @@ export function PortfolioRow({
                   const holdPct = (holdingsAmt / denom) * 100;
                   return (
                     <div
-                      className="mt-1 flex flex-col items-end gap-0.5 text-[11px] tabular-nums text-muted-foreground"
+                      className="mt-1 flex flex-col items-start gap-0.5 sm:items-end text-[11px] tabular-nums text-muted-foreground"
                       title="Cash vs holdings split of total equity"
                       data-testid="equity-split-breakdown"
                     >
@@ -523,7 +523,7 @@ export function PortfolioRow({
                   const cashPnl = Number(portfolio.current_cash) - startCash;
                   const cashPnlPct = startCash > 0 ? (cashPnl / startCash) * 100 : 0;
                   return (
-                    <div className="mt-1 flex flex-col items-end gap-0.5">
+                    <div className="mt-1 flex flex-col items-start gap-0.5 sm:items-end">
                       <div className={`text-xs tabular-nums ${equityPnl >= 0 ? "text-success" : "text-destructive"}`}>
                         {equityPnl >= 0 ? "+" : ""}
                         {equityPnlPct.toFixed(2)}%
