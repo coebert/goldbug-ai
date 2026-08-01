@@ -24,6 +24,7 @@ import { recordIntradayPrices } from "@/lib/price-intraday.server";
 import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
 import { asJson, type Insert } from "@/lib/_server/db-json";
 import { instrumentCcyFor } from "@/lib/instrument-ccy-rules";
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
 import { writeEquitySnapshot } from "@/lib/valuation/write-snapshot.server";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
