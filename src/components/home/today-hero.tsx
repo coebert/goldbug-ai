@@ -36,13 +36,18 @@ export function TodayHero({
     );
   }
 
-  const combinedNow = safe(summary.real.now) + safe(summary.sim.now);
-  const combinedPnl = safe(summary.real.pnl) + safe(summary.sim.pnl);
-  const prevBase = combinedNow - combinedPnl;
-  const combinedPct = prevBase > 0 ? (combinedPnl / prevBase) * 100 : 0;
-  const positive = combinedPnl >= 0;
+  // Real money leads: the headline figure is the broker-held equity.
+  const realNow = safe(summary.real.now);
+  const realPnl = safe(summary.real.pnl);
+  const realBase = realNow - realPnl;
+  const realPct = realBase > 0 ? (realPnl / realBase) * 100 : 0;
+  const positive = realPnl >= 0;
   const TrendIcon = positive ? TrendingUp : TrendingDown;
-  const totalPortfolios = summary.real.count + summary.sim.count;
+  const simNow = safe(summary.sim.now);
+  const simPnl = safe(summary.sim.pnl);
+  const simPositive = simPnl >= 0;
+  const combinedNow = realNow + simNow;
+
 
   return (
     <section className="mb-6 rounded-2xl border border-border/70 bg-surface-2 shadow-[var(--shadow-card)]">
