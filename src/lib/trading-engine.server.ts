@@ -973,6 +973,19 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
   }
 
+  const macroPlaybookBlock = formatMacroPlaybookBlock(
+    macroLessons,
+    // Drawdown context is resolved below once the regime is known; the block
+    // only needs the raw depth, which the regime snapshot already carries.
+    regime?.signals.spy_drawdown_pct ?? null,
+    [
+      ...new Set([
+        ...features.flatMap((f) => f.event_features?.top_kinds ?? []),
+        ...macroEvents.drivers.map((d) => String(d.kind)),
+      ]),
+    ],
+  );
+
   const marketEventsBlock = formatMarketEventsBlock(
     macroEvents,
     features.map((f) => ({
@@ -1024,7 +1037,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
   const cashFloor = totalValue * cashFloorPctEff;
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
-  const maxPosVal = totalValue * basePerSymbolPct;
+
+  // Learned drawdown sizing: the 20-year study measured the forward return
+  // from each depth below the index high. Deep holes historically needed a
+  // confirmed turn, so the playbook is allowed to SHRINK the per-symbol cap
+  // there — never to widen it beyond the configured risk limit.
+  const ddSizing = drawdownSizeScale(
+    effectiveRegime.signals.spy_drawdown_pct,
+    macroLessons?.drawdown_rules ?? null,
+  );
+  const ddSizeScale = Math.min(1, ddSizing.scale);
+  const maxPosVal = totalValue * basePerSymbolPct * ddSizeScale;
 
   // Build FX context (wallet, exposure by currency, live rates, circuit state).
   // Safe to call even when fx_enabled is false — returns an inactive context
@@ -1129,7 +1152,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
         crossSectional: formatCrossSectionalBlock(rankMap),
-        marketEvents: marketEventsBlock,
+        marketEvents: macroPlaybookBlock
+          ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
+          : marketEventsBlock,
         events,
         cooling: coolingSymbols,
         asOf,
@@ -2837,7 +2862,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
             crossSectional: formatCrossSectionalBlock(rankMap),
-            marketEvents: marketEventsBlock,
+            marketEvents: macroPlaybookBlock
+          ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
+          : marketEventsBlock,
             events,
             cooling: coolingSymbols,
             asOf,
