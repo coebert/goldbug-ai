@@ -11,7 +11,7 @@ import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
 import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 import { deletePortfolioWithCleanup } from "./portfolio-delete-cleanup";
-import { reanchorInferredInflow } from "./infer-cash-flow";
+import { reanchorInferredInflow, trustedPreviousStarting } from "./infer-cash-flow";
 
 import {
   detectSnapshotTimingMismatches,
@@ -192,7 +192,7 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         // Defensive: older log rows set startingCashAdjusted=true even when
         // the monotonic clamp left starting_cash unchanged (negative drift).
         // Trust the row only if the baseline actually moved.
-        const prevStart = Number(resp.previousStarting);
+        const prevStart = trustedPreviousStarting(resp.previousStarting) ?? Number.NaN;
         const newStart = Number(resp.newStarting);
         if (
           Number.isFinite(prevStart) &&
@@ -397,7 +397,7 @@ export const getPortfolio = createServerFn({ method: "GET" })
         // Same rule as the home-page list: a sync with no known prior
         // baseline is a starting_cash repair, so re-anchor it onto the
         // equity step the portfolio actually shows.
-        const flow = Number.isFinite(Number(resp.previousStarting))
+        const flow = trustedPreviousStarting(resp.previousStarting) !== null
           ? raw
           : reanchorInferredInflow(raw, ownSeries);
         if (!flow) continue;

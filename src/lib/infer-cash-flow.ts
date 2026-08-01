@@ -52,3 +52,19 @@ export function reanchorInferredInflow(
   // more than the broker reported.
   return { date: bestDate, amount: Math.min(bestStep, delta) };
 }
+
+/**
+ * A CASH_SYNC row is only trustworthy when it reports a real numeric
+ * prior baseline. `null`, `undefined`, empty strings and non-numeric junk
+ * all mean "baseline unknown" — and `Number(null) === 0` is finite, so a
+ * bare Number.isFinite check would wrongly trust a null row and net a
+ * phantom deposit out of the sparkline.
+ */
+export function trustedPreviousStarting(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
