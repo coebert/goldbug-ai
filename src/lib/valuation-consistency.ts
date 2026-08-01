@@ -239,7 +239,11 @@ export function checkValuationConsistency({
       fx_rate: r.fx_rate,
       value_base: r.value_base,
       weight: r.weight,
+      fx: fxConversionFor(r, baseCcy.toUpperCase()),
     }));
+
+    const fxBreakdown = explainedByCash ? [] : fxBreakdownFor(audit, baseCcy.toUpperCase());
+
 
     const direction: "up" | "down" = ratio >= 1 ? "up" : "down";
     const shown = round(ratio, 2);
