@@ -106,12 +106,59 @@ export function TradeExplanationPanel({
         ) : (
           <p className="text-sm text-muted-foreground">Not recorded for this order.</p>
         )}
-        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground list-disc pl-4">
+
+        {calibrationLoading ? (
+          <p className="mt-1 text-xs text-muted-foreground">Checking historical hit-rate…</p>
+        ) : reading ? (
+          <div data-testid="confidence-calibration" className="mt-2 space-y-2">
+            <p className="text-xs text-muted-foreground">{reading.sentence}</p>
+            {!reading.insufficient && reading.band?.hitRate != null && (
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                  <span>Historical hit-rate in this band</span>
+                  <span className="tabular-nums">
+                    {Math.round(reading.band.hitRate * 100)}% of {reading.band.n}
+                  </span>
+                </div>
+                <Progress
+                  value={Math.round(reading.band.hitRate * 100)}
+                  aria-label="Historical hit-rate for this confidence band"
+                />
+              </div>
+            )}
+            {report && report.totalSamples > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {report.bands
+                  .filter((b) => b.n > 0)
+                  .map((b) => (
+                    <Badge
+                      key={b.label}
+                      variant={b === reading.band ? "secondary" : "outline"}
+                      className="text-[10px] tabular-nums"
+                    >
+                      {b.label}: {b.hitRate != null ? `${Math.round(b.hitRate * 100)}%` : "—"} (n=
+                      {b.n})
+                    </Badge>
+                  ))}
+              </div>
+            )}
+            {reading.percentile != null && (
+              <p className="text-[10px] text-muted-foreground">
+                Percentile band: this order ranks at the {reading.percentile}th percentile of
+                confidence across the last {report?.totalSamples ?? 0} scored orders, measured over
+                a {report?.horizonDays ?? 5}-session horizon.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground list-disc pl-4">
           {x.confidence.drivers.map((d, i) => (
             <li key={i}>{d}</li>
           ))}
         </ul>
       </div>
+
 
       {x.withheldValue.withheld && (
         <div
