@@ -51,6 +51,22 @@ export function buildDepositAdjustedSeries(
     .map((d) => ({ date: d.date, amount: Number(d.amount) }))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
+  // Guard against over-stated inflows. Some flow records are inferred
+  // (e.g. a broker cash-sync that repairs an unknown `starting_cash`
+  // baseline) and can claim MORE capital than the equity series ever
+  // shows arriving. Subtracting that phantom excess turns a flat
+  // portfolio into a large fake loss (the "-49%" card bug). A deposit
+  // can never inject more than the highest equity the window reaches
+  // above its baseline, so cap the netted inflow there.
+  const maxEquity = points.reduce((m, p) => {
+    const v = Number(p.equity);
+    return Number.isFinite(v) && v > m ? v : m;
+  }, Number.NEGATIVE_INFINITY);
+  const maxInflow =
+    Number.isFinite(maxEquity) && Number.isFinite(baseline)
+      ? Math.max(0, maxEquity - baseline)
+      : Number.POSITIVE_INFINITY;
+
   let cumulative = 0;
   let depIdx = 0;
   const out: AdjustedPoint[] = [];
@@ -65,7 +81,10 @@ export function buildDepositAdjustedSeries(
       depIdx += 1;
     }
     cumulative += dep;
-    const adjusted = equity - cumulative;
+    // Only positive (inflow) cumulatives are capped; withdrawals are
+    // evidenced by cash leaving and need no ceiling.
+    const netted = cumulative > maxInflow ? maxInflow : cumulative;
+    const adjusted = equity - netted;
     // Delegate the capital-adjusted denominator + guards to the shared
     // helper so this surface never drifts from mode-summary / card /
     // breakdown maths. Equivalent to a single-flow TWRR:
@@ -73,7 +92,7 @@ export function buildDepositAdjustedSeries(
     const pct = capitalAdjustedPct({
       pnl: adjusted - baseline,
       baseline,
-      netFlow: cumulative,
+      netFlow: netted,
     });
 
 
