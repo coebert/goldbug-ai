@@ -15,7 +15,7 @@ import { z } from "zod";
 import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
 import {
   assertBrokerAccountUnclaimed,
-  brokerAccountClaimedMessage,
+  brokerAccountConflictMessage,
   isBrokerAccountUniqueViolation,
 } from "@/lib/broker-account-claim";
 
@@ -80,7 +80,14 @@ export const activateLive = createServerFn({ method: "POST" })
       // Lost the race against a concurrent activation: the partial unique index
       // rejected the second claim. Report it like the pre-check does.
       if (isBrokerAccountUniqueViolation(upd.error) && brokerAccountId) {
-        throw new Error(brokerAccountClaimedMessage(brokerAccountId, "another portfolio"));
+        // Same wording as the pre-check, resolved through the same helper.
+        throw new Error(
+          await brokerAccountConflictMessage(supabase as never, {
+            portfolioId: data.portfolioId,
+            broker: "saxo",
+            brokerAccountId,
+          }),
+        );
       }
       throw new Error(upd.error.message);
     }
