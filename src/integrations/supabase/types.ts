@@ -1048,6 +1048,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           endpoint: string
+          expires_at: string
           id: string
           idempotency_key: string
           request_hash: string
@@ -1059,6 +1060,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           endpoint: string
+          expires_at?: string
           id?: string
           idempotency_key: string
           request_hash: string
@@ -1070,6 +1072,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           endpoint?: string
+          expires_at?: string
           id?: string
           idempotency_key?: string
           request_hash?: string
@@ -2960,6 +2963,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      purge_expired_idempotency_keys: { Args: never; Returns: number }
     }
     Enums: {
       algo_regime_tune_status:
