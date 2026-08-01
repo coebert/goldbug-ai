@@ -13,6 +13,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
+import { deactivateLivePortfolio } from "@/lib/live-deactivate";
 import {
   assertBrokerAccountUnclaimed,
   brokerAccountConflictMessage,
