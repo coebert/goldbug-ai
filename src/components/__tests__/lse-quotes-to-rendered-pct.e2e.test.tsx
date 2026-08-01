@@ -25,7 +25,8 @@ import { computeValuation } from "@/lib/valuation/kernel";
 const OPENED = "2026-07-29";
 const DAYS = ["2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01"] as const;
 
-const STARTING_CASH = 10_300;
+// Baseline pot = day-one equity, so the chart plots pure market performance.
+const STARTING_CASH = 9_000.27;
 const CASH_GBP = 1_300.27;
 const USDGBP = 0.8;
 

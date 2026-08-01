@@ -2,7 +2,7 @@
 
 exports[`e2e: LSE quotes -> valuation -> holdings cards & equity charts > rendered holdings + equity output snapshot 1`] = `
 {
-  "chartPct": -10.63,
+  "chartPct": 2.28,
   "rowPercents": {
     "AAPL:xnas": 5,
     "HSBA.L": -5,
