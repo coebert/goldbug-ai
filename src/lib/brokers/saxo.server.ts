@@ -53,6 +53,14 @@ async function log(args: {
   }
 }
 
+// Saxo rejects the whole order when ExternalReference exceeds 50 characters.
+// Clamp defensively here so a long caller-supplied idempotency key degrades
+// to a truncated reference instead of an InvalidModelState rejection.
+function externalReference(clientOrderId: string): string {
+  const s = String(clientOrderId ?? "");
+  return s.length <= 50 ? s : s.slice(0, 50);
+}
+
 export class SaxoAdapter implements BrokerAdapter {
   readonly name = "saxo";
   readonly env: BrokerEnv;
@@ -657,7 +665,7 @@ export class SaxoAdapter implements BrokerAdapter {
       AmountType: "Quantity",
       OrderType: req.orderType === "limit" ? "Limit" : "Market",
       OrderDuration: { DurationType: "DayOrder" },
-      ExternalReference: req.clientOrderId,
+      ExternalReference: externalReference(req.clientOrderId),
       // Saxo requires this on every order since 2024: "true" marks the order
       // as manually initiated by a human. We surface manual + cron runs the
       // same way — the AI decides, but a real person configured the guardrails,
@@ -871,7 +879,7 @@ export class SaxoAdapter implements BrokerAdapter {
       AmountType: "Quantity",
       OrderType: "Market",
       OrderDuration: { DurationType: "DayOrder" },
-      ExternalReference: req.clientOrderId,
+      ExternalReference: externalReference(req.clientOrderId),
       ManualOrder: true,
     };
     if (accountKey) body.AccountKey = accountKey;

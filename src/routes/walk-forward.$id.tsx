@@ -31,7 +31,17 @@ import {
   ReferenceLine,
 } from "recharts";
 import { PlayCircle, SplitSquareHorizontal } from "lucide-react";
-import { AXIS_LINE, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
+} from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/walk-forward/$id")({
   ssr: false,
@@ -331,21 +341,26 @@ function WalkForwardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid {...GRID_PROPS} />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} axisLine={AXIS_LINE} tickLine={TICK_LINE} minTickGap={40} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} minTickGap={40} />
                   <YAxis
-                    tick={{ fontSize: 11 }}
+                    tick={AXIS_TICK}
                     axisLine={AXIS_LINE}
                     tickLine={TICK_LINE}
                     tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                    width={48}
+                    width={64}
                   />
-                  <Tooltip formatter={(v: number) => fmtPct(Number(v))} />
+                  <Tooltip
+                    formatter={(v: number) => fmtPct(Number(v))}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                  />
                   <ReferenceLine y={0} {...REFERENCE_LINE} />
                   <Line
                     type="monotone"
                     dataKey="pct"
                     name="Out-of-sample"
-                    stroke="hsl(var(--primary))"
+                    stroke={CHART_ROLE.positive}
                     dot={false}
                     strokeWidth={2}
                   />

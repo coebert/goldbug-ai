@@ -91,6 +91,7 @@ import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { instrumentCcyFor } from "./instrument-ccy-rules";
 import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
 import { valuePortfolioHoldings } from "./valuation/value-holdings.server";
+import { engineSymbolKey, priceSymbolVariants } from "./price-symbol";
 import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
 
 // Resolve a live GBP-normalized price for a held symbol, tolerant of the
@@ -102,10 +103,15 @@ function holdingLivePrice(
   priceMap: Map<string, number>,
   h: { symbol: string; avg_cost: number | string; asset_class?: string | null },
 ): number {
-  const live = priceMap.get(h.symbol) ?? priceMap.get(h.symbol.toUpperCase()) ?? priceMap.get(h.symbol.toLowerCase());
+  for (const key of priceSymbolVariants(h.symbol)) {
+    const live = priceMap.get(key) ?? priceMap.get(key.toLowerCase());
+    if (live != null && Number.isFinite(live)) return live;
+  }
+  const live = priceMap.get(h.symbol);
   if (live != null && Number.isFinite(live)) return live;
   return normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), h.asset_class ?? null);
 }
+
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
@@ -1269,7 +1275,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
 
   let workingCash = cash;
-  const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
+  // Keyed by canonical universe symbol (see engineSymbolKey); the record
+  // keeps its broker-native `symbol` so persistence targets the same row.
+  const holdingsByS = new Map(
+    (holdings ?? []).map((h) => [engineSymbolKey(h.symbol), { ...h }] as const),
+  );
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
@@ -1323,15 +1333,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         })());
       for (const t of recentSells ?? []) {
         // Only count fills after this position's opened_at.
-        const h = holdingsByS.get(String((t as { symbol: string }).symbol));
+        const h = holdingsByS.get(engineSymbolKey(String((t as { symbol: string }).symbol)));
         if (!h) continue;
         const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
         if (!openedAt) continue;
         if (String((t as { trade_date: string }).trade_date) >= openedAt.slice(0, 10)) {
-          scaleOutTakenBySym.set(
-            String((t as { symbol: string }).symbol),
-            (scaleOutTakenBySym.get(String((t as { symbol: string }).symbol)) ?? 0) + 1,
-          );
+          const key = engineSymbolKey(String((t as { symbol: string }).symbol));
+          scaleOutTakenBySym.set(key, (scaleOutTakenBySym.get(key) ?? 0) + 1);
+
         }
       }
     } catch {
@@ -2023,7 +2032,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const existingExposureBySymbol = new Map<string, number>();
       for (const h of holdingsByS.values()) {
         const p = holdingLivePrice(priceMap, h);
-        existingExposureBySymbol.set(h.symbol, p * Number(h.quantity));
+        existingExposureBySymbol.set(engineSymbolKey(h.symbol), p * Number(h.quantity));
       }
       const corrRes = correlatedClusterAllowance({
         symbol: meta.symbol,
@@ -2307,7 +2316,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // ---- Rebalance-band trims: harvest overweight winners after buy pass ----
   const trims = computeRebalanceTrims({
     totalValue,
-    holdings: Array.from(holdingsByS.values()).map((h) => ({ symbol: h.symbol, quantity: Number(h.quantity) })),
+    holdings: Array.from(holdingsByS.entries()).map(([key, h]) => ({ symbol: key, quantity: Number(h.quantity) })),
     priceMap,
     targetPerSymbolPct: basePerSymbolPct,
     bandPct: 0.25,

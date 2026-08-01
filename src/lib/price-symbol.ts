@@ -37,3 +37,13 @@ export function priceSymbolVariants(symbol: string): string[] {
   out.add(resolvePriceSymbol(sym).toUpperCase());
   return [...out].filter(Boolean);
 }
+
+/**
+ * Canonical key used to match a stored holding against the trading universe,
+ * priceMap and AI order symbols. Broker-native holdings arrive as
+ * "AAPL:xnas" / "MKS:xlon" while orders and prices use "AAPL" / "MKS.L";
+ * keying on the raw broker symbol made every sell path miss the position.
+ */
+export function engineSymbolKey(symbol: string): string {
+  return resolvePriceSymbol(String(symbol ?? "")).toUpperCase();
+}
