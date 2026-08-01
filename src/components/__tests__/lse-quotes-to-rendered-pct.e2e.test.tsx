@@ -34,8 +34,13 @@ type Holding = {
   /** Broker-native / cache spelling, deliberately mixed across venues. */
   symbol: string;
   quantity: number;
-  /** Persisted cost basis — ALWAYS base currency (GBP). */
+  /**
+   * Persisted cost basis as the sync stores it: base GBP for LSE listings
+   * (never pence), native USD for US listings.
+   */
   avg_cost: number;
+  /** Unit-correct "since purchase" percentage the UI must render. */
+  expectedPct: number;
   instrument_ccy: string;
   /** True GBP unit price on each day, used to derive the sample feed. */
   gbp: Record<string, number>;
@@ -49,6 +54,7 @@ const HOLDINGS: Holding[] = [
     symbol: "MKS:xlon",
     quantity: 500,
     avg_cost: 4,
+    expectedPct: 5,
     instrument_ccy: "GBX",
     quotedIn: "GBX",
     gbp: { "2026-07-29": 4, "2026-07-30": 4.04, "2026-07-31": 4.1, "2026-08-01": 4.2 },
@@ -58,6 +64,7 @@ const HOLDINGS: Holding[] = [
     symbol: "HSBA.L",
     quantity: 120,
     avg_cost: 15,
+    expectedPct: -5,
     instrument_ccy: "GBX",
     quotedIn: "GBX",
     gbp: { "2026-07-29": 15, "2026-07-30": 14.7, "2026-07-31": 14.4, "2026-08-01": 14.25 },
@@ -67,6 +74,7 @@ const HOLDINGS: Holding[] = [
     symbol: "VUKE.L", // GBP-allowlisted LSE ETF: quoted in pounds, never /100
     quantity: 50,
     avg_cost: 46,
+    expectedPct: 5,
     instrument_ccy: "GBP",
     quotedIn: "GBP",
     gbp: { "2026-07-29": 46, "2026-07-30": 46.92, "2026-07-31": 47.61, "2026-08-01": 48.3 },
@@ -75,7 +83,8 @@ const HOLDINGS: Holding[] = [
     id: "4",
     symbol: "AAPL:xnas", // USD, exercises the FX leg alongside the LSE rows
     quantity: 10,
-    avg_cost: 160, // 200 USD @ 0.80
+    avg_cost: 200, // native USD basis: 200 -> 210 is +5%
+    expectedPct: 5,
     instrument_ccy: "USD",
     quotedIn: "USD",
     gbp: { "2026-07-29": 160, "2026-07-30": 164, "2026-07-31": 166.4, "2026-08-01": 168 },
@@ -239,8 +248,7 @@ describe("e2e: LSE quotes -> valuation -> holdings cards & equity charts", () =>
   it("holdings card renders the unit-correct percentage for each ticker", () => {
     const shown = rowPercents(renderHoldingsCard());
     for (const h of HOLDINGS) {
-      const expected = ((h.gbp["2026-08-01"] - h.avg_cost) / h.avg_cost) * 100;
-      expect(shown[h.symbol]).toBeCloseTo(expected, 1);
+      expect(shown[h.symbol]).toBeCloseTo(h.expectedPct, 1);
     }
     // Spot values, so a wholesale sign/format change cannot pass silently.
     expect(shown["MKS:xlon"]).toBeCloseTo(5, 1);
@@ -255,14 +263,14 @@ describe("e2e: LSE quotes -> valuation -> holdings cards & equity charts", () =>
     expect(chartHeadlinePct(renderEquityChart())).toBeCloseTo(expected, 2);
   });
 
-  it("card total and chart baseline agree on the same equity figure", () => {
+  it("card invested + cash reconcile to the equity the chart plots", () => {
     const html = renderHoldingsCard();
     const total = SNAPSHOTS[SNAPSHOTS.length - 1].total_value;
     expect(total).toBeCloseTo(expectedEquity("2026-08-01"), 2);
-    // The value the card was given is the value the chart plots.
-    expect(html).toContain(
-      new Intl.NumberFormat("en-GB", { maximumFractionDigits: 0 }).format(Math.round(total)),
-    );
+    // Invested is the kernel's holdings value, rendered in pounds.
+    expect(html).toContain("GBP 7,905.00");
+    expect(html).toContain("GBP 1,300.27");
+    expect(7905 + CASH_GBP).toBeCloseTo(total, 2);
   });
 
   it("charted closes are base-currency and anchored on the GBP cost basis", () => {
