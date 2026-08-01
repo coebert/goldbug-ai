@@ -11,7 +11,7 @@
 //      URL fall back to a correctly percent-encoded Google News search whose
 //      query round-trips back to the original non-Latin headline.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, beforeAll, afterAll } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { NewsReelItem } from "@/lib/news-reel.server";
@@ -152,10 +152,29 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#x27;");
 }
 
+// The reel renders a live "updated Xs ago" label derived from
+// `Date.now()` and React Query's `dataUpdatedAt`. Under a loaded parallel
+// run a render could straddle the 5s boundary, so two renders of the same
+// fixtures produced different markup ("just now" vs "6s ago") and the
+// byte-identical assertion flaked. Freezing the clock removes the only
+// non-deterministic input; the fixtures themselves are static.
+const FROZEN_NOW = new Date("2026-07-30T14:00:00Z");
+
+beforeAll(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: false });
+  vi.setSystemTime(FROZEN_NOW);
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
+
 let html = "";
 beforeEach(() => {
+  // Re-assert the frozen instant in case a prior test advanced timers.
+  vi.setSystemTime(FROZEN_NOW);
   html = render(ITEMS);
 });
+
 
 describe("news reel with mixed Latin / CJK / Cyrillic headlines", () => {
   it("renders every headline, in its original script, once per layout variant", () => {
