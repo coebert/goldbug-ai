@@ -42,6 +42,41 @@ export function InstrumentCcyAlert({
   });
 
   const findings = data?.findings ?? [];
+  const plan = planInstrumentCcyFixes(findings);
+
+  const fix = useServerFn(applyInstrumentCcyFixes);
+  const queryClient = useQueryClient();
+  const { mutate: applyFixes, isPending } = useMutation<InstrumentCcyFixResult>({
+    mutationFn: () => fix({ data: { portfolioId } }),
+    onSuccess: (result) => {
+      if (result.errors.length) {
+        toast.error(`Could not re-tag ${result.errors.length} holding(s)`, {
+          description: result.errors.map((e) => `${e.symbol}: ${e.message}`).join("; "),
+        });
+      }
+      if (result.applied.length) {
+        toast.success(
+          `Re-tagged ${result.applied.length} holding${result.applied.length === 1 ? "" : "s"}`,
+          {
+            description: result.applied
+              .map((f) => `${f.symbol}: ${f.from_ccy ?? "untagged"} → ${f.to_ccy}`)
+              .join(", "),
+          },
+        );
+      } else if (!result.errors.length) {
+        toast.info(result.summary);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["instrument-ccy-check", portfolioId] });
+      void queryClient.invalidateQueries({ queryKey: ["holdings"] });
+      void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+    },
+    onError: (err: unknown) => {
+      toast.error("Bulk currency fix failed", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    },
+  });
+
   if (findings.length === 0) return null;
 
   return (
