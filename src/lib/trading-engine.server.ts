@@ -99,6 +99,18 @@ import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
 // "HSBA:xlon") and `priceMap` keys (uppercase). Falls back to the stored
 // avg_cost with GBX→GBP normalization so LSE common stocks don't inflate the
 // class-exposure buckets by 100× when the priceMap lookup misses.
+// Price lookup by symbol alone (no holding row), tolerant of broker-native
+// spellings. Returns null rather than guessing so callers can distinguish
+// "no quote" from "quote is zero".
+function holdingPriceBySymbol(priceMap: Map<string, number>, symbol: string): number | null {
+  for (const key of priceSymbolVariants(symbol)) {
+    const v = priceMap.get(key) ?? priceMap.get(key.toLowerCase());
+    if (v != null && Number.isFinite(v) && v > 0) return v;
+  }
+  const v = priceMap.get(symbol);
+  return v != null && Number.isFinite(v) && v > 0 ? v : null;
+}
+
 function holdingLivePrice(
   priceMap: Map<string, number>,
   h: { symbol: string; avg_cost: number | string; asset_class?: string | null },
@@ -2539,10 +2551,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       // Observed holding of hedge symbol AFTER paper mutation (for live it's
       // the pre-broker mirror; drift vs advised.targetNotional will resolve
       // on the next broker sync).
+      // Match tolerantly: the hedge can be mirrored from the broker under a
+      // native spelling ("SGLN:xlon") while hedgeSym is the universe key.
       const observedQty = hedgeSym
-        ? Number(holdingsByS.get(hedgeSym)?.quantity ?? 0)
+        ? Number(
+            (holdingsByS.get(hedgeSym) ?? holdingsByS.get(engineSymbolKey(hedgeSym)))?.quantity ?? 0,
+          )
         : 0;
-      const observedPrice = hedgeSym ? (priceMap.get(hedgeSym) ?? null) : null;
+      const observedPrice = hedgeSym ? holdingPriceBySymbol(priceMap, hedgeSym) : null;
       tailHedgeReconciliation = reconcileTailHedge({
         decision: tailHedgeDecision,
         applied: {
