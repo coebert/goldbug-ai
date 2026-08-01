@@ -93,6 +93,19 @@ import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "
 import { valuePortfolioHoldings } from "./valuation/value-holdings.server";
 import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
 
+// Canonical in-engine key for a holding.
+//
+// `holdings.symbol` is broker-native once a portfolio is synced from Saxo
+// ("AAPL:xnas", "MKS:xlon"), while the universe, priceMap and every AI order
+// use the Yahoo-style key ("AAPL", "MKS.L"). Keying the working holdings map
+// on the raw broker symbol made every SELL path — stop-loss, chandelier trail,
+// tail-hedge trim, rebalance band — miss the position and reject with "no
+// holding to sell", so exits silently never fired on live accounts. Always
+// key by this, and keep the untouched `h.symbol` for persistence.
+function engineSymbolKey(symbol: string): string {
+  return resolvePriceSymbol(String(symbol ?? "")).toUpperCase();
+}
+
 // Resolve a live GBP-normalized price for a held symbol, tolerant of the
 // symbol casing mismatch between `holdings.symbol` (often lowercase, e.g.
 // "HSBA:xlon") and `priceMap` keys (uppercase). Falls back to the stored
@@ -102,10 +115,15 @@ function holdingLivePrice(
   priceMap: Map<string, number>,
   h: { symbol: string; avg_cost: number | string; asset_class?: string | null },
 ): number {
-  const live = priceMap.get(h.symbol) ?? priceMap.get(h.symbol.toUpperCase()) ?? priceMap.get(h.symbol.toLowerCase());
+  for (const key of priceSymbolVariants(h.symbol)) {
+    const live = priceMap.get(key) ?? priceMap.get(key.toLowerCase());
+    if (live != null && Number.isFinite(live)) return live;
+  }
+  const live = priceMap.get(h.symbol);
   if (live != null && Number.isFinite(live)) return live;
   return normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), h.asset_class ?? null);
 }
+
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
 import { runBrokerSimulatorGuard } from "./broker-simulator-integration";
 import {
