@@ -180,3 +180,23 @@ export async function withIdempotency<T>(
   await store.complete({ ...scope, response });
   return { replayed: false, response };
 }
+
+/** HTTP-shaped mapping so every endpoint answers idempotency faults alike. */
+export type IdempotencyFault = { status: number; code: string; message: string; expiredAt?: string | null };
+
+export function idempotencyFault(err: unknown): IdempotencyFault | null {
+  if (err instanceof IdempotencyKeyExpiredError) {
+    // 409: the key is not usable again, and nothing was executed this time.
+    return { status: 409, code: "idempotency_key_expired", message: err.message, expiredAt: err.expiredAt };
+  }
+  if (err instanceof IdempotencyKeyReuseError) {
+    return { status: 422, code: "idempotency_key_reused", message: err.message };
+  }
+  if (err instanceof IdempotencyInProgressError) {
+    return { status: 409, code: "idempotency_in_progress", message: err.message };
+  }
+  if (err instanceof InvalidIdempotencyKeyError) {
+    return { status: 400, code: "idempotency_key_invalid", message: err.message };
+  }
+  return null;
+}
