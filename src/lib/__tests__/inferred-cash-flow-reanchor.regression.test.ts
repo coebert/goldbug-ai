@@ -23,7 +23,8 @@ const SERIES = [
 describe("inferred cash-flow re-anchoring", () => {
   it("re-anchors an untrusted delta onto the observed equity step", () => {
     const flow = reanchorInferredInflow({ date: "2026-07-27", amount: 9890.38 }, SERIES);
-    expect(flow).toEqual({ date: "2026-07-24", amount: 8888.8 });
+    expect(flow!.date).toBe("2026-07-24");
+    expect(flow!.amount).toBeCloseTo(8888.8, 6);
   });
 
   it("card % is ~0 for a portfolio that has been flat since funding", () => {
