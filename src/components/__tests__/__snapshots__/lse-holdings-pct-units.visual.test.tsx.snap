@@ -15,27 +15,27 @@ exports[`holdings card + equity charts — LSE unit/percentage visual parity > f
 exports[`holdings card + equity charts — LSE unit/percentage visual parity > per-row cost basis and percentage labels snapshot 1`] = `
 [
   {
-    "pct": "5.00%",
+    "pct": "+5.00%",
     "symbol": "MKS:xlon",
     "unitCost": "4.00",
   },
   {
-    "pct": "5.00%",
+    "pct": "",
     "symbol": "HSBA.L",
     "unitCost": "15.00",
   },
   {
-    "pct": "10.00%",
+    "pct": "+10.00%",
     "symbol": "TSCO.L",
     "unitCost": "4.00",
   },
   {
-    "pct": "5.00%",
+    "pct": "+5.00%",
     "symbol": "VUKE.L",
     "unitCost": "46.00",
   },
   {
-    "pct": "5.00%",
+    "pct": "+5.00%",
     "symbol": "AAPL",
     "unitCost": "200.00",
   },

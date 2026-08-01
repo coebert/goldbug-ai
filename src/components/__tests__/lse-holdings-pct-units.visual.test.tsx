@@ -156,7 +156,8 @@ function extractRowLabels(html: string) {
     const idx = html.indexOf(`>${r.symbol}<`);
     const slice = idx >= 0 ? html.slice(idx, idx + 4000) : "";
     const unitCost = slice.match(/@ GBP\s*(?:<!-- -->)?\s*([\d.,]+)/)?.[1] ?? "";
-    const pct = slice.match(/(-?[\d.,]+%)/)?.[1] ?? "";
+    // Signed value = the "since purchase" change; "% of portfolio" is unsigned.
+    const pct = slice.match(/([+-][\d.,]+%)/)?.[1] ?? "";
     out.push({ symbol: r.symbol, unitCost, pct });
   }
   return out;
