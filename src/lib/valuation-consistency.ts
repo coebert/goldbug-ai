@@ -10,7 +10,7 @@
 // the price-unit audit for the suspect day, and reports which day broke, how
 // badly, and which quote is the likely culprit.
 
-import type { PriceUnitAudit, PriceUnitAuditRow } from "./price-unit-audit";
+import type { FxSource, PriceUnitAudit, PriceUnitAuditRow } from "./price-unit-audit";
 
 /** Default implausibility threshold: more than a 3x move in one step. */
 export const DEFAULT_JUMP_FACTOR = 3;
@@ -56,9 +56,46 @@ export type ValuationJump = {
     fx_rate: number;
     value_base: number;
     weight: number;
+    /** FX conversion detail for this symbol on this day. */
+    fx: SymbolFxConversion;
   }[];
+  /** Per-currency FX legs used to value the flagged day, largest first. */
+  fx_breakdown: FxLeg[];
   explanation: string;
 };
+
+/** How one symbol's instrument-currency value became a base-currency value. */
+export type SymbolFxConversion = {
+  /** Currency the instrument is priced in after any pence fold. */
+  from_ccy: string;
+  /** Portfolio base currency. */
+  to_ccy: string;
+  pair: string;
+  rate: number;
+  source: FxSource;
+  /** True when no rate existed and 1.0 was assumed. */
+  assumed: boolean;
+  value_from: number;
+  value_to: number;
+  /** e.g. "1,250.00 USD × 0.7840 USD/GBP = 980.00 GBP". */
+  detail: string;
+};
+
+/** One source-currency leg of the flagged day's valuation. */
+export type FxLeg = {
+  from_ccy: string;
+  to_ccy: string;
+  pair: string;
+  rate: number;
+  source: FxSource;
+  assumed: boolean;
+  positions: number;
+  value_from: number;
+  value_to: number;
+  /** Share of the day's marked book carried by this currency (0–1). */
+  weight: number;
+};
+
 
 export type ValuationConsistencyReport = {
   portfolio_id: string;
@@ -119,7 +156,80 @@ export function suspectRowsFor(
   return { rows: [], source: "unknown" };
 }
 
+function money(value: number, ccy: string): string {
+  return `${value.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${ccy}`;
+}
+
+function rateText(rate: number): string {
+  return rate.toLocaleString("en-GB", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+}
+
+/** Spell out the instrument→base conversion applied to one audit row. */
+export function fxConversionFor(row: PriceUnitAuditRow, baseCcy: string): SymbolFxConversion {
+  const from = (row.instrument_ccy || baseCcy).toUpperCase();
+  const to = baseCcy.toUpperCase();
+  const assumed = row.fx_source === "assumed_identity";
+  const detail =
+    from === to
+      ? `${money(row.value_instrument_ccy, from)} — already in base currency, no conversion`
+      : `${money(row.value_instrument_ccy, from)} × ${rateText(row.fx_rate)} ${row.fx_pair}` +
+        ` = ${money(row.value_base, to)}${assumed ? " (no rate found — 1.0 assumed)" : ""}`;
+
+  return {
+    from_ccy: from,
+    to_ccy: to,
+    pair: row.fx_pair || `${from}/${to}`,
+    rate: row.fx_rate,
+    source: row.fx_source,
+    assumed,
+    value_from: row.value_instrument_ccy,
+    value_to: row.value_base,
+    detail,
+  };
+}
+
+/** Per-source-currency FX legs behind a flagged day's valuation, largest first. */
+export function fxBreakdownFor(
+  audit: PriceUnitAudit | null | undefined,
+  baseCcy: string,
+): FxLeg[] {
+  if (!audit || audit.rows.length === 0) return [];
+  const to = baseCcy.toUpperCase();
+
+  const legs = new Map<string, FxLeg>();
+  for (const row of audit.rows) {
+    const from = (row.instrument_ccy || to).toUpperCase();
+    const existing = legs.get(from);
+    if (existing) {
+      existing.positions += 1;
+      existing.value_from = round(existing.value_from + row.value_instrument_ccy, 2);
+      existing.value_to = round(existing.value_to + row.value_base, 2);
+      existing.assumed = existing.assumed || row.fx_source === "assumed_identity";
+      if (row.fx_source === "assumed_identity") existing.source = "assumed_identity";
+      continue;
+    }
+    legs.set(from, {
+      from_ccy: from,
+      to_ccy: to,
+      pair: row.fx_pair || `${from}/${to}`,
+      rate: row.fx_rate,
+      source: row.fx_source,
+      assumed: row.fx_source === "assumed_identity",
+      positions: 1,
+      value_from: round(row.value_instrument_ccy, 2),
+      value_to: round(row.value_base, 2),
+      weight: 0,
+    });
+  }
+
+  const total = [...legs.values()].reduce((sum, leg) => sum + Math.abs(leg.value_to), 0);
+  return [...legs.values()]
+    .map((leg) => ({ ...leg, weight: total > 0 ? round(Math.abs(leg.value_to) / total, 4) : 0 }))
+    .sort((a, b) => Math.abs(b.value_to) - Math.abs(a.value_to));
+}
+
 function reasonFor(row: PriceUnitAuditRow): string {
+
   if (row.fx_source === "assumed_identity") {
     return `No ${row.fx_pair} rate — converted at 1.0`;
   }
@@ -202,7 +312,11 @@ export function checkValuationConsistency({
       fx_rate: r.fx_rate,
       value_base: r.value_base,
       weight: r.weight,
+      fx: fxConversionFor(r, baseCcy.toUpperCase()),
     }));
+
+    const fxBreakdown = explainedByCash ? [] : fxBreakdownFor(audit, baseCcy.toUpperCase());
+
 
     const direction: "up" | "down" = ratio >= 1 ? "up" : "down";
     const shown = round(ratio, 2);
@@ -223,6 +337,8 @@ export function checkValuationConsistency({
       holdings_ratio: holdingsRatio,
       suspected_source: source,
       suspect_symbols: suspects,
+      fx_breakdown: fxBreakdown,
+
       explanation,
     });
   }
