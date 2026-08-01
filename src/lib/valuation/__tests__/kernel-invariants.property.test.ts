@@ -52,7 +52,9 @@ describe("valuation kernel — properties", () => {
         expect(Number.isFinite(res.totalValue)).toBe(true);
         expect(Number.isFinite(res.cash)).toBe(true);
         expect(Number.isFinite(res.holdingsValue)).toBe(true);
-        expect(res.totalValue).toBeCloseTo(res.cash + res.holdingsValue, 4);
+        // The kernel rounds each component to 2dp, so the identity holds to
+        // the cent rather than to the bit.
+        expect(Math.abs(res.totalValue - (res.cash + res.holdingsValue))).toBeLessThanOrEqual(0.011);
       }),
       { seed: FC_SEED, numRuns: 300 },
     );
@@ -93,7 +95,10 @@ describe("valuation kernel — properties", () => {
         });
         // GBP total converted into USD must match the USD-based total.
         const expected = gbp.totalValue * rate("GBP", "USD")!;
-        const tolerance = Math.max(1e-2, Math.abs(expected) * 1e-6);
+        // Each line and wallet leg is rounded to 2dp in BOTH valuations, so the
+        // permitted gap scales with the number of rounded components.
+        const legs = i.holdings.length + Object.keys(i.wallet).length + 2;
+        const tolerance = Math.max(0.02 * legs, Math.abs(expected) * 1e-6);
         expect(Math.abs(usd.totalValue - expected)).toBeLessThanOrEqual(tolerance);
       }),
       { seed: FC_SEED, numRuns: 200 },
@@ -136,9 +141,8 @@ describe("valuation kernel — properties", () => {
           fx: rate,
         });
         const expected = base.holdingsValue * 2;
-        expect(Math.abs(doubled.holdingsValue - expected)).toBeLessThanOrEqual(
-          Math.max(1e-2, Math.abs(expected) * 1e-6),
-        );
+        const tolerance = Math.max(0.02 * (i.holdings.length + 2), Math.abs(expected) * 1e-6);
+        expect(Math.abs(doubled.holdingsValue - expected)).toBeLessThanOrEqual(tolerance);
       }),
       { seed: FC_SEED, numRuns: 200 },
     );
