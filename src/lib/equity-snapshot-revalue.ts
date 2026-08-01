@@ -114,7 +114,7 @@ export function symbolKeys(symbol: string): string[] {
   return [...keys];
 }
 
-const MIC_TO_CCY: Record<string, string> = {
+const _UNUSED_MIC_TO_CCY: Record<string, string> = {
   xlon: "GBP", xetr: "EUR", xpar: "EUR", xams: "EUR", xmil: "EUR",
   xmad: "EUR", xswx: "CHF", xtse: "CAD", xhkg: "HKD", xtks: "JPY",
   xasx: "AUD", xsto: "SEK", xcse: "DKK", xhel: "EUR", xose: "NOK",
@@ -128,13 +128,7 @@ const MIC_TO_CCY: Record<string, string> = {
  * GBP), which would silently skip the FX conversion.
  */
 export function instrumentCurrency(holding: RevalueHolding): string {
-  const raw = String(holding.instrument_ccy ?? "").trim();
-  const symbol = String(holding.symbol ?? "").trim().toUpperCase();
-  const mic = symbol.includes(":") ? symbol.slice(symbol.lastIndexOf(":") + 1).toLowerCase() : "";
-  const suffixCcy = symbol.endsWith(".L") ? "GBP" : MIC_TO_CCY[mic];
-  if (suffixCcy) return suffixCcy;
-  if (raw && raw.toUpperCase() !== "GBX" && raw !== "GBp") return raw.toUpperCase();
-  return "USD";
+  return instrumentCcyFor(String(holding.symbol ?? ""), holding.instrument_ccy ?? null);
 }
 
 /** Canonical identity used to line fills up with holdings. */
