@@ -30,12 +30,14 @@ const HIDDEN_PREFIXES = ["/auth"];
 
 export function MobileTabBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const prefetchOnTouch = usePrefetchOnTouch();
   if (HIDDEN_PREFIXES.some((p) => pathname.startsWith(p))) return null;
 
   const item = (t: Tab) => (
     <Link
       key={t.to}
       to={t.to}
+      onTouchStart={() => prefetchOnTouch({ to: t.to })}
       activeOptions={t.exact ? { exact: true } : undefined}
       className="flex min-h-[52px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[11px] text-muted-foreground transition-colors hover:text-foreground [&.active]:text-primary"
     >
@@ -43,6 +45,7 @@ export function MobileTabBar() {
       <span className="leading-none">{t.label}</span>
     </Link>
   );
+
 
   return (
     <nav
