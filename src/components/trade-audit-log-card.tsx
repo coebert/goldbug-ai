@@ -305,7 +305,9 @@ function AuditRow({
       {isOpen && (
         <tr className="border-t border-border bg-muted/30">
           <td colSpan={7} className="px-3 py-3">
-            <div className="grid gap-3 md:grid-cols-2">
+            <TradeExplanationPanel entry={entry} />
+            <div className="grid gap-3 md:grid-cols-2 mt-3">
+
               <div>
                 <div className="text-xs uppercase text-muted-foreground mb-1">Reason recorded</div>
                 <p className="text-sm break-words">{entry.reason || "—"}</p>
