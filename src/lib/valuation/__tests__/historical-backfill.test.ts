@@ -149,8 +149,8 @@ describe("backfillValuationHistory", () => {
     ],
     // 100x inflated history: pence treated as pounds.
     equity_snapshots: [
-      { snapshot_date: "2026-02-01", cash: 1000, holdings_value: 80000, total_value: 81000 },
-      { snapshot_date: "2026-02-02", cash: 1000, holdings_value: 81000, total_value: 82000 },
+      { portfolio_id: "p1", snapshot_date: "2026-02-01", cash: 1000, holdings_value: 80000, total_value: 81000 },
+      { portfolio_id: "p1", snapshot_date: "2026-02-02", cash: 1000, holdings_value: 81000, total_value: 82000 },
     ],
   });
 
@@ -171,8 +171,8 @@ describe("backfillValuationHistory", () => {
   it("is idempotent: a second pass over corrected rows writes nothing", async () => {
     const tables = baseTables();
     tables.equity_snapshots = [
-      { snapshot_date: "2026-02-01", cash: 1000, holdings_value: 800, total_value: 1800 },
-      { snapshot_date: "2026-02-02", cash: 1000, holdings_value: 810, total_value: 1810 },
+      { portfolio_id: "p1", snapshot_date: "2026-02-01", cash: 1000, holdings_value: 800, total_value: 1800 },
+      { portfolio_id: "p1", snapshot_date: "2026-02-02", cash: 1000, holdings_value: 810, total_value: 1810 },
     ];
     const res = await backfillValuationHistory(makeClient(tables, upserts), {});
     expect(res.totals.written).toBe(0);
