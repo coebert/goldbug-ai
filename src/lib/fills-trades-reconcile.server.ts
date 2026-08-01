@@ -18,6 +18,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { withOwnedClient } from "@/lib/_server/owned-client";
 import { findSymbol } from "@/lib/universe.server";
 import { instrumentCcyFor } from "@/lib/instrument-ccy-rules";
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
 import {
   rebuildLedgerFromFills,
   resolveFillPrice,
