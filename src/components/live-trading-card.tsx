@@ -73,7 +73,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   });
   const mDeact = useMutation({
     mutationFn: (reason?: string) => deactivate({ data: { portfolioId, reason } }),
-    onSuccess: (r) => { toast.success(r.changed ? "Reverted to paper mode" : "Already in paper mode"); refresh(); },
+    onSuccess: (r) => { toast.success(r.changed ? "Reverted to paper mode" : `Already in ${r.status.is_live ? r.status.mode : "paper"} mode`); refresh(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mPause = useMutation({
