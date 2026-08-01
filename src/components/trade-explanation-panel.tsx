@@ -162,8 +162,9 @@ export function TradeExplanationPanel({
             {report && report.totalSamples > 0 && (
               <div className="flex flex-wrap gap-1">
                 {report.bands
-                  .filter((b) => b.n > 0)
-                  .map((b) => (
+                  .filter((b: CalibrationBand) => b.n > 0)
+                  .map((b: CalibrationBand) => (
+
                     <Badge
                       key={b.label}
                       variant={b === reading.band ? "secondary" : "outline"}
