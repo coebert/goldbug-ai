@@ -325,42 +325,110 @@ const US_ROOTS = new Set([
   "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "JPM", "JNJ",
   "V", "MA", "UNH", "XOM", "PG", "HD", "KO", "PEP", "COST", "AVGO", "LLY",
   "VTI", "VOO", "SPY", "QQQ", "VT", "BND", "IVV", "SCHD", "GLD", "SLV",
+  // Additional large-cap US listings seen in broker exports
+  "BRK", "ABBV", "MRK", "CVX", "WMT", "BAC", "CRM", "ORCL", "AMD", "INTC",
+  "NFLX", "ADBE", "CSCO", "DIS", "MCD", "NKE", "TXN", "QCOM", "IBM", "GE",
+  "CAT", "BA", "GS", "MS", "WFC", "C", "T", "VZ", "PFE", "ABT", "TMO", "DHR",
+  "LIN", "HON", "UPS", "LOW", "SBUX", "PM", "MDT", "AMGN", "PLTR", "UBER",
+  // Broad ETF universe
+  "VXUS", "VEA", "VWO", "VUG", "VTV", "VYM", "VIG", "VNQ", "BNDX", "AGG",
+  "IEFA", "IEMG", "IJR", "IJH", "ITOT", "DIA", "IWM", "IWF", "IWD", "EFA",
+  "EEM", "TLT", "IEF", "SHY", "LQD", "HYG", "TIP", "ARKK", "SOXX", "SMH",
+  "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE",
+  "SLVP", "IAU", "USO", "UNG", "VOOG", "VOOV", "SPLG", "SPTM",
 ]);
+
+/** Common share-class markers that follow a dot but are not venue suffixes. */
+const SHARE_CLASS = new Set(["A", "B", "C", "D", "U", "WS", "PR", "UN"]);
+
+/** Fiat + crypto codes we accept as the quote leg of a pair. */
+const PAIR_QUOTES = new Set([
+  "USD", "GBP", "EUR", "CHF", "JPY", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK",
+  "SGD", "HKD", "ZAR", "PLN", "TRY", "MXN", "BRL", "INR", "CNY", "KRW",
+  "USDT", "USDC", "BTC", "ETH",
+]);
+
+/** Crypto/stablecoin quote leg → the fiat currency it values in. */
+const PAIR_SETTLES: Record<string, string> = { USDT: "USD", USDC: "USD" };
 
 function cleanCcy(value: unknown): string | null {
   const raw = String(value ?? "").trim().toUpperCase();
   return raw.length >= 3 && raw.length <= 8 ? raw : null;
 }
 
-/** Currency implied purely by the symbol, or null when the symbol says nothing. */
+/** Resolve the quote leg of an FX/crypto pair to a settlement currency. */
+function pairCurrency(quote: string): string | null {
+  if (!PAIR_QUOTES.has(quote)) return null;
+  return PAIR_SETTLES[quote] ?? quote;
+}
+
+/**
+ * Currency implied purely by the symbol, or null when the symbol says nothing.
+ *
+ * Understands, in order: FX/crypto pairs (`GBPUSD=X`, `BTC-USD`, `BTC/USDT`),
+ * MIC markers in either order and with either separator (`MKS:xlon`,
+ * `XLON:MKS`, `MKS.XLON`, `XLON/MKS`), Yahoo-style exchange suffixes
+ * (`ISF.L`, `SAP.DE`), Bloomberg composite codes (`VOD LN Equity`), and finally
+ * known US roots — including class shares such as `BRK.B`.
+ */
 export function venueCurrency(symbol: string): { currency: string; source: CcyRuleSource } | null {
   const s = String(symbol ?? "").trim().toUpperCase();
   if (!s) return null;
 
   // FX and crypto spot pairs.
   if (s.endsWith("=X")) return { currency: s.slice(0, -2).slice(-3) || "USD", source: "pair" };
-  const dash = s.lastIndexOf("-");
-  if (dash > 0 && s.length - dash - 1 === 3) {
-    return { currency: s.slice(dash + 1), source: "pair" };
+  for (const sep of ["-", "/", "_"]) {
+    const at = s.lastIndexOf(sep);
+    if (at > 0) {
+      const quote = pairCurrency(s.slice(at + 1));
+      if (quote) return { currency: quote, source: "pair" };
+    }
+  }
+  // Concatenated pairs (`BTCUSD`, `GBPUSD`) with no separator.
+  if (/^[A-Z]{6,8}$/.test(s)) {
+    for (const len of [4, 3]) {
+      if (s.length <= len) continue;
+      const quote = pairCurrency(s.slice(-len));
+      const base = s.slice(0, -len);
+      if (quote && base.length >= 3 && PAIR_QUOTES.has(base)) {
+        return { currency: quote, source: "pair" };
+      }
+    }
   }
 
-  const colon = s.lastIndexOf(":");
-  if (colon > 0) {
-    const mic = s.slice(colon + 1).toLowerCase();
-    const byMic = MIC_CCY[mic];
+  // MIC markers: either side of `:`, `/` or `.`, in either order.
+  const parts = s.split(/[:/.\s]+/).filter(Boolean);
+  for (const part of parts) {
+    const byMic = MIC_CCY[part.toLowerCase()];
     if (byMic) return { currency: byMic, source: "mic" };
   }
 
-  const root = colon > 0 ? s.slice(0, colon) : s;
-  const dot = root.lastIndexOf(".");
-  if (dot > 0) {
-    const bySuffix = SUFFIX_CCY[root.slice(dot + 1)];
-    if (bySuffix) return { currency: bySuffix, source: "suffix" };
+  // Bloomberg composite form: `VOD LN`, `AAPL US Equity`.
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    const tail = words[words.length - 1] === "EQUITY" ? words[words.length - 2] : words[words.length - 1];
+    const byComposite = tail ? BLOOMBERG_CCY[tail] : undefined;
+    if (byComposite) return { currency: byComposite, source: "composite" };
   }
 
-  if (US_ROOTS.has(root)) return { currency: "USD", source: "known_root" };
+  // Yahoo-style exchange suffix on the last dot segment.
+  const root = words[0] ?? s;
+  const bare = root.includes(":") ? (root.split(":").pop() as string) : root;
+  const segs = bare.split(".").filter(Boolean);
+  if (segs.length > 1) {
+    const last = segs[segs.length - 1] as string;
+    const bySuffix = SUFFIX_CCY[last];
+    if (bySuffix) return { currency: bySuffix, source: "suffix" };
+    // Class share such as BRK.B — decide from the root instead.
+    if (SHARE_CLASS.has(last) && US_ROOTS.has(segs[0] as string)) {
+      return { currency: "USD", source: "known_root" };
+    }
+  }
+
+  if (US_ROOTS.has(segs[0] as string)) return { currency: "USD", source: "known_root" };
   return null;
 }
+
 
 /**
  * Normalize the `instrument_ccy` for one row. The listing venue always wins:
