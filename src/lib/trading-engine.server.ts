@@ -1288,7 +1288,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
 
   let workingCash = cash;
-  const holdingsByS = new Map((holdings ?? []).map((h) => [h.symbol, { ...h }] as const));
+  // Keyed by canonical universe symbol (see engineSymbolKey); the record
+  // keeps its broker-native `symbol` so persistence targets the same row.
+  const holdingsByS = new Map(
+    (holdings ?? []).map((h) => [engineSymbolKey(h.symbol), { ...h }] as const),
+  );
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
@@ -1342,7 +1346,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         })());
       for (const t of recentSells ?? []) {
         // Only count fills after this position's opened_at.
-        const h = holdingsByS.get(String((t as { symbol: string }).symbol));
+        const h = holdingsByS.get(engineSymbolKey(String((t as { symbol: string }).symbol)));
         if (!h) continue;
         const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
         if (!openedAt) continue;
@@ -2042,7 +2046,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const existingExposureBySymbol = new Map<string, number>();
       for (const h of holdingsByS.values()) {
         const p = holdingLivePrice(priceMap, h);
-        existingExposureBySymbol.set(h.symbol, p * Number(h.quantity));
+        existingExposureBySymbol.set(engineSymbolKey(h.symbol), p * Number(h.quantity));
       }
       const corrRes = correlatedClusterAllowance({
         symbol: meta.symbol,
@@ -2326,7 +2330,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // ---- Rebalance-band trims: harvest overweight winners after buy pass ----
   const trims = computeRebalanceTrims({
     totalValue,
-    holdings: Array.from(holdingsByS.values()).map((h) => ({ symbol: h.symbol, quantity: Number(h.quantity) })),
+    holdings: Array.from(holdingsByS.entries()).map(([key, h]) => ({ symbol: key, quantity: Number(h.quantity) })),
     priceMap,
     targetPerSymbolPct: basePerSymbolPct,
     bandPct: 0.25,
