@@ -1690,7 +1690,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      let qty = Number(cur.quantity) * pct;
+      // Risk dial, sell side: a defensive profile exits faster than it
+      // enters. Clamped to the held quantity, so this can only accelerate an
+      // exit — never short.
+      let qty = aggressiveSellQty(Number(cur.quantity) * pct, Number(cur.quantity), aggression);
       // Phase 6 — discretionary AI sell: apply TOD gate/haircut and slice plan.
       const eaPreview = applyExecAlphaSell(meta.symbol, qty * price, price);
       if (!eaPreview.allow) {
