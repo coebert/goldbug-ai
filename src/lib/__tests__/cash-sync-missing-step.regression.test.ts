@@ -46,7 +46,7 @@ describe("cash-sync re-anchoring with no observable equity step", () => {
     expect(derive([cashSyncRows.junkPreviousStarting], series)).toEqual([]);
   });
 
-  it.each(noStepSeries)("card %% equals the raw equity delta on a %s series", (_label, series) => {
+  it.each(noStepSeries)("card pct on a %s series equals the raw equity delta", (_label, series) => {
     const flows = derive([cashSyncRows.missingPreviousStarting], series);
     const withFlow = computeCardRangePct(series, flows, false);
     const raw = computeCardRangePct(series, [], false);
@@ -57,7 +57,7 @@ describe("cash-sync re-anchoring with no observable equity step", () => {
     const flows = derive([cashSyncRows.missingPreviousStarting], flatSeries);
     expect(computeCardRangePct(flatSeries, flows, false)).toBeCloseTo(0, 10);
     // What the un-fixed code did:
-    const verbatim = [{ date: "2026-07-27", amount: 9890.38 }];
+    const verbatim = [{ date: "2026-07-24", amount: 9890.38 }];
     expect(computeCardRangePct(flatSeries, verbatim, false)!).toBeLessThan(-50);
   });
 
