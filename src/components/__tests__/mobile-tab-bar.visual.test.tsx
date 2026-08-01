@@ -16,7 +16,7 @@
 // removes `md:hidden`, both the full-markup snapshot AND the
 // contract assertions below fail — forcing a deliberate review.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // Mock the router primitives the tab bar reads from. `useRouterState`
