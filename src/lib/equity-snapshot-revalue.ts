@@ -21,6 +21,7 @@
 //     is idempotent and safe to re-run.
 
 import { normalizeLseDisplayPriceToBase } from "./market-price-units";
+import { instrumentCcyFor } from "./instrument-ccy-rules";
 
 export type RevalueHolding = {
   symbol: string;
@@ -114,12 +115,6 @@ export function symbolKeys(symbol: string): string[] {
   return [...keys];
 }
 
-const _UNUSED_MIC_TO_CCY: Record<string, string> = {
-  xlon: "GBP", xetr: "EUR", xpar: "EUR", xams: "EUR", xmil: "EUR",
-  xmad: "EUR", xswx: "CHF", xtse: "CAD", xhkg: "HKD", xtks: "JPY",
-  xasx: "AUD", xsto: "SEK", xcse: "DKK", xhel: "EUR", xose: "NOK",
-  xnas: "USD", xnys: "USD", arcx: "USD", bats: "USD",
-};
 
 /**
  * Settlement currency of a position, after the GBX→GBP fold. The listing
