@@ -344,14 +344,16 @@ export function checkValuationConsistency({
       suspected_source: source,
       suspect_symbols: suspects,
       fx_breakdown: fxBreakdown,
-
+      benign: explainedByCash,
       explanation,
     });
   }
 
-  const scored = [...jumps].sort(
-    (a, b) => Math.max(b.ratio, 1 / b.ratio) - Math.max(a.ratio, 1 / a.ratio),
-  );
+  const scored = [...jumps]
+    .filter((j) => !j.benign)
+    .sort(
+      (a, b) => Math.max(b.ratio, 1 / b.ratio) - Math.max(a.ratio, 1 / a.ratio),
+    );
 
   return {
     portfolio_id: portfolioId,
