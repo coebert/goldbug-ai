@@ -50,17 +50,17 @@ export function TodayHero({
 
 
   return (
-    <section className="mb-6 rounded-2xl border border-border/70 bg-surface-2 shadow-[var(--shadow-card)]">
-      <div className="grid gap-4 px-4 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6 sm:px-6 sm:py-6">
+    <section className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-surface-2 shadow-[var(--shadow-card)]">
+      <div className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6 sm:px-6 sm:py-6">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wide text-muted-foreground">
             <span>Today · real money equity</span>
             <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] font-medium normal-case text-foreground/70">
               {summary.real.count} portfolio{summary.real.count === 1 ? "" : "s"} at your broker
             </span>
           </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-display text-3xl font-bold leading-none tracking-tight tabular-nums sm:text-4xl">
+            <span className="font-display text-[1.75rem] font-bold leading-none tracking-tight tabular-nums break-all sm:text-4xl">
               {formatGBP(realNow)}
             </span>
             <span
@@ -90,21 +90,21 @@ export function TodayHero({
           </div>
           {mixedCurrency && (
             <div
-              className="mt-2 inline-flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-500"
+              className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-500 sm:inline-flex"
               role="status"
               aria-live="polite"
               title="Portfolios use different currencies; combined equity is the raw sum without FX conversion."
             >
               <AlertTriangle className="mt-[1px] h-3 w-3 shrink-0" aria-hidden />
-              <span>
+              <span className="min-w-0">
                 Combined figure is an un-converted sum — portfolios span {currencies.join(", ")}.
               </span>
             </div>
           )}
 
         </div>
-        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border/60 bg-surface-sunken px-3 py-2">
-          <Clock className="h-4 w-4 text-primary" aria-hidden />
+        <div className="flex w-full items-center gap-2 rounded-lg border border-border/60 bg-surface-sunken px-3 py-2 sm:w-auto sm:shrink-0">
+          <Clock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Next AI run</div>
             <div className="font-display text-sm font-semibold tabular-nums">
@@ -115,6 +115,7 @@ export function TodayHero({
       </div>
 
       <div className="grid gap-2 border-t border-border/60 px-4 py-3 sm:grid-cols-2 sm:gap-3 sm:px-6 sm:py-4">
+
         <ModeSummaryTile
           label="Real money"
           sublabel="Held at your broker"
