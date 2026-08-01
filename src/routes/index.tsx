@@ -161,7 +161,23 @@ function Home() {
     });
   }, [q.data, equityQ.data]);
 
+  // Warm the sections a phone user most often opens next: the real-money
+  // portfolio detail page, then Trades, Learn and Compare. Idle-time only,
+  // mobile-only, and skipped on Data Saver / 2g.
+  const prefetchTargets = useMemo(() => {
+    const list = q.data ?? [];
+    const first = list.find((p) => p.mode === "live_prod") ?? list[0];
+    return [
+      ...(first ? [{ to: "/portfolio/$id", params: { id: first.id } }] : []),
+      { to: "/trades" },
+      { to: "/learn" },
+      { to: "/compare" },
+    ];
+  }, [q.data]);
+  useIdlePrefetch(prefetchTargets, { enabled: ready && !!session });
+
   if (!ready || !session) return <PageLoading />;
+
 
   const portfolioCount = q.data?.length ?? 0;
   const allPortfolios = q.data ?? [];
