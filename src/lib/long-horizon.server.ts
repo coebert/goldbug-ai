@@ -10,6 +10,11 @@
 
 import { getDailyCandlesRange, sma, rsi, pctChange, dailyVolatility } from "./market-data.server";
 import { riskProfile, parseRiskConfig, effectiveCashFloorPct, type RiskConfig } from "./universe.server";
+import {
+  resolveAggressiveness,
+  aggressiveBuySpend,
+  aggressiveSellQty,
+} from "./risk-aggressiveness";
 import type { Database } from "@/integrations/supabase/types";
 
 type AssetClass = Database["public"]["Enums"]["asset_class"];
