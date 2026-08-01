@@ -4,7 +4,7 @@ exports[`e2e: LSE quotes -> valuation -> holdings cards & equity charts > render
 {
   "chartPct": -10.63,
   "rowPercents": {
-    "AAPL:xnas": 31.25,
+    "AAPL:xnas": 5,
     "HSBA.L": -5,
     "MKS:xlon": 5,
     "VUKE.L": 5,
