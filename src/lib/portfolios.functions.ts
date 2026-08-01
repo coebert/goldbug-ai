@@ -290,7 +290,7 @@ export const getPortfolio = createServerFn({ method: "GET" })
     // Heal missing snapshots for this portfolio before reading it.
     const { data: pfRow } = await context.supabase
       .from("portfolios")
-      .select("id,current_cash,created_at,live_activated_at")
+      .select("id,current_cash,currency,created_at,live_activated_at")
       .eq("id", data.id)
       .maybeSingle();
     if (pfRow) await backfillMissingEquitySnapshots(context.supabase as never, [pfRow as never]);
