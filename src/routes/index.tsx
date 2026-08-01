@@ -33,6 +33,7 @@ import { NextActionCard } from "@/components/home/next-action-card";
 import { PortfolioRow } from "@/components/home/portfolio-row";
 import { CreatePortfolioCard } from "@/components/home/create-portfolio-card";
 import { useFocusMode } from "@/components/home/use-focus-mode";
+import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 
 // Re-export so existing tests importing from "@/routes/index" keep working.
 export { ModeSummaryTile } from "@/components/home/mode-summary-tile";
