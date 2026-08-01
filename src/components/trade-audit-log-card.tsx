@@ -23,6 +23,8 @@ import {
   type AuditRuleTag,
 } from "@/lib/audit-log";
 import { listAuditDecisions, type AuditDecisionPage } from "@/lib/audit.functions";
+import { TradeExplanationPanel } from "@/components/trade-explanation-panel";
+
 
 type StatusFilter = "all" | "executed" | "rejected";
 
