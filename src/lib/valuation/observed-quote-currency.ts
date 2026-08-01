@@ -25,13 +25,43 @@ type MinimalClient = { from: (table: string) => any };
 
 const TABLE = "observed_quote_currency";
 
+/** Minor-unit (1/100th) quote currencies, canonicalised. */
+export const MINOR_UNIT_CURRENCIES = new Set(["GBX", "ZAC", "ILA"]);
+
+/** Canonicalise a feed currency, preserving the major/minor distinction. */
+export function canonicalQuoteCurrency(raw: string | null | undefined): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  if (s === "GBp" || s.toUpperCase() === "GBX") return "GBX";
+  if (s === "ZAc" || s.toUpperCase() === "ZAC") return "ZAC";
+  if (s === "ILa" || s.toUpperCase() === "ILA") return "ILA";
+  return s.toUpperCase();
+}
+
+/** True when quotes in `ccy` are 1/100th of the major unit. */
+export function isMinorUnitCurrency(ccy: string | null | undefined): boolean {
+  return MINOR_UNIT_CURRENCIES.has(canonicalQuoteCurrency(ccy));
+}
+
+/** The major currency a (possibly minor-unit) quote currency belongs to. */
+export function majorOf(ccy: string | null | undefined): string {
+  const c = canonicalQuoteCurrency(ccy);
+  if (c === "GBX") return "GBP";
+  if (c === "ZAC") return "ZAR";
+  if (c === "ILA") return "ILS";
+  return c;
+}
+
 /** Record (or refresh) the currency a feed quoted `symbol` in. */
 export async function recordObservedQuoteCurrency(
   client: MinimalClient,
   entry: { symbol: string; quoteCurrency: string; samplePrice?: number | null; source?: string },
 ): Promise<void> {
   const symbol = String(entry.symbol ?? "").trim().toUpperCase();
-  const ccy = String(entry.quoteCurrency ?? "").trim().toUpperCase();
+  // Yahoo signals pence with the casing "GBp" (and agorot/cents similarly).
+  // Canonicalise minor units to their ISO-ish minor code BEFORE uppercasing,
+  // otherwise the distinction that matters is destroyed.
+  const ccy = canonicalQuoteCurrency(entry.quoteCurrency);
   if (!symbol || !ccy) return;
   try {
     await client.from(TABLE).upsert(

@@ -10,6 +10,7 @@
 import { getFxRate } from "../fx.server";
 import { normalizeLseDisplayPriceToBase } from "../market-price-units";
 import { priceSymbolVariants } from "../price-symbol";
+import { isMinorUnitCurrency, majorOf } from "./observed-quote-currency";
 import {
   computeValuation,
   majorUnitCurrency,
@@ -93,16 +94,10 @@ export async function valuePortfolioHoldings(
     /* no observations yet — fall back to the heuristic below */
   }
 
-  /** "GBP" for pounds, "GBX" for pence, null when we have no observation. */
   const observedUnit = (symbol: string): "major" | "minor" | null => {
     const raw = observed(symbol);
     if (!raw) return null;
-    const u = raw.toUpperCase();
-    if (u === "GBX" || u === "GBP" || u === "ZAC" || u === "ILA") {
-      // Yahoo reports pence as "GBp"; the raw casing carries the distinction.
-      return raw === "GBP" || raw === "ZAR" || raw === "ILS" ? "major" : raw === "GBp" || u === "GBX" ? "minor" : "major";
-    }
-    return "major";
+    return isMinorUnitCurrency(raw) ? "minor" : "major";
   };
 
   const holdings = (input.holdings ?? []).map((h) => ({
@@ -143,12 +138,9 @@ export async function valuePortfolioHoldings(
     // Prices are already in major units, so tell the kernel not to divide.
     observedQuoteCcy: (symbol) => {
       const raw = observed(symbol);
-      if (raw) {
-        const u = raw.toUpperCase();
-        // Report the MAJOR currency: prices reaching the kernel are already in
-        // major units, so pence must not trigger a second divide.
-        return u === "GBX" ? "GBP" : u;
-      }
+      // Report the MAJOR currency: prices reaching the kernel are already in
+      // major units, so pence must not trigger a second divide.
+      if (raw) return majorOf(raw);
       const h = holdings.find((x) => String(x.symbol).toUpperCase() === symbol.toUpperCase());
       return majorUnitCurrency(symbol, h?.instrument_ccy ?? null, base);
     },
