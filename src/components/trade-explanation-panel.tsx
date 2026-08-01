@@ -77,7 +77,7 @@ export function TradeExplanationPanel({
   const trendPct = Math.round(x.trendShare * 100);
   const eventPct = Math.round(x.eventShare * 100);
 
-  const eventPct = Math.round(x.eventShare * 100);
+
 
   return (
     <section
