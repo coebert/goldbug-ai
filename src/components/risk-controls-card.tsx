@@ -55,22 +55,7 @@ const FX_CCY_OPTIONS: { code: string; label: string }[] = [
   { code: "CHF", label: "Swiss franc" },
 ];
 
-const DEFAULTS: RiskConfig = {
-  asset_class_limits: { stock: 0.6, etf: 0.8, crypto: 0.2, commodity: 0.3, fx: 0.3 },
-  per_symbol_limit_pct: null,
-  stop_loss_pct: 0.1,
-  take_profit_pct: 0.25,
-  atr_trailing_mult: 3,
-  max_hold_days: 0,
-  volatility_sizing: true,
-  vol_target_pct: 0.015,
-  max_daily_loss_pct: 0.05,
-  max_drawdown_halt_pct: 0.20,
-  commodity_group_limits: { Gold: 0.2, Basket: 0.15 },
-  commodity_min_adv_usd: 250_000,
-  commodity_max_atr_pct: 0.06,
-  fx_currency_limits: {},
-};
+const DEFAULTS: RiskConfig = RISK_DIAL_DEFAULTS;
 
 
 function parseCfg(raw: unknown): RiskConfig {
