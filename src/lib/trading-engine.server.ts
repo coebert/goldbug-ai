@@ -11,6 +11,11 @@ import { HEDGE_FUND_PLAYBOOK } from "./hedge-fund-playbook.server";
 import { COMMODITY_PLAYBOOK } from "./commodity-playbook.server";
 import { CRYPTO_PLAYBOOK } from "./crypto-playbook.server";
 import {
+  resolveAggressiveness,
+  aggressiveBuySpend,
+  aggressiveSellQty,
+} from "./risk-aggressiveness";
+import {
   buildLearningContext,
   formatLearningBlock,
   reflectAndUpdateLessons,
