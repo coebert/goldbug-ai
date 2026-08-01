@@ -76,7 +76,7 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
           try {
             const raw = await getPriceOn(sym, String((snap as any).snapshot_date));
             if (raw != null) {
-              prices.set(sym, normalizeMarketPriceForTrading(sym, raw, null));
+              prices.set(sym, normalizeMarketPriceForTrading(sym, raw));
             }
           } catch {
             /* leave unpriced — the kernel flags it */
@@ -120,7 +120,9 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
           portfolio_id: r.portfolioId,
           snapshot_date: r.snapshotDate,
           reason: `drift_${r.severity}`,
-          details: JSON.parse(JSON.stringify(r)),
+          source: "reconcile_drift",
+          attempted: JSON.parse(JSON.stringify(r)),
+          violations: JSON.parse(JSON.stringify(r.reasons)),
         })),
       );
     } catch {
