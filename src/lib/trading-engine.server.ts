@@ -91,21 +91,8 @@ import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { instrumentCcyFor } from "./instrument-ccy-rules";
 import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
 import { valuePortfolioHoldings } from "./valuation/value-holdings.server";
-import { resolvePriceSymbol, priceSymbolVariants } from "./price-symbol";
+import { engineSymbolKey, priceSymbolVariants } from "./price-symbol";
 import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
-
-// Canonical in-engine key for a holding.
-//
-// `holdings.symbol` is broker-native once a portfolio is synced from Saxo
-// ("AAPL:xnas", "MKS:xlon"), while the universe, priceMap and every AI order
-// use the Yahoo-style key ("AAPL", "MKS.L"). Keying the working holdings map
-// on the raw broker symbol made every SELL path — stop-loss, chandelier trail,
-// tail-hedge trim, rebalance band — miss the position and reject with "no
-// holding to sell", so exits silently never fired on live accounts. Always
-// key by this, and keep the untouched `h.symbol` for persistence.
-export function engineSymbolKey(symbol: string): string {
-  return resolvePriceSymbol(String(symbol ?? "")).toUpperCase();
-}
 
 // Resolve a live GBP-normalized price for a held symbol, tolerant of the
 // symbol casing mismatch between `holdings.symbol` (often lowercase, e.g.
