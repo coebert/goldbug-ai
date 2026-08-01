@@ -292,6 +292,8 @@ export async function callAiForDecision(args: {
   features: Awaited<ReturnType<typeof buildCandidateFeatures>>;
   news: Array<{ headline: string; source: string | null; sentiment: number | null }>;
   execPosts?: Array<{ symbol: string; score: number; posts: number; executives: string[]; latest_date: string | null }>;
+  /** Rules the AI itself derived from the executive-post ↔ market-pattern study. */
+  execPostLessons?: string[];
   crossAsset: string; // preformatted block
   optionsBlock: string; // preformatted options-implied block
   crossSectional: string; // preformatted cross-sectional ranking block
@@ -461,6 +463,11 @@ ${args.execPosts && args.execPosts.length > 0
       .join("\n")
   : "- none in the last 7 days"}
 Posts by figures such as Elon Musk can move a ticker within minutes; treat a strongly negative post score as a reason to shrink or skip a BUY, and a strongly positive one as confirmation only when the technicals already agree.
+
+Lessons you previously learned from studying these posts against the subsequent price path — apply them:
+${args.execPostLessons && args.execPostLessons.length > 0
+  ? args.execPostLessons.map((l) => `- ${l}`).join("\n")
+  : "- no study on file yet; treat post scores as a tie-breaker only, never as a standalone entry."}
 
 Return:
 - briefing: 2-3 sentences on market context today (mention the ${humanRegime(r.regime)} regime${r.transitioned ? " and today's transition" : ""}, and cross-asset posture).
@@ -1093,6 +1100,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           sentiment: n.sentiment,
         })),
         execPosts: execPostSignals.slice(0, 8),
+        execPostLessons: execLessons?.lessons?.slice(0, 12) ?? [],
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
         crossSectional: formatCrossSectionalBlock(rankMap),
