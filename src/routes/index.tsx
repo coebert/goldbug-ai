@@ -26,6 +26,7 @@ import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
 import { Sparkles, PlusCircle } from "lucide-react";
 
 import { TodayHero } from "@/components/home/today-hero";
+import { TodayHeroSkeleton } from "@/components/home/today-hero-skeleton";
 import { DashboardSettings } from "@/components/home/dashboard-settings";
 import { NewHereBanner } from "@/components/home/new-here-banner";
 import { NextActionCard } from "@/components/home/next-action-card";
@@ -93,20 +94,34 @@ function Home() {
     queryKey: ["portfolios"],
     queryFn: () => list(),
     enabled: !!session,
+    // Mobile browsers fire focus/visibility events constantly (tab switches,
+    // pull-to-refresh gestures). Serve from cache instead of refetching.
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const equityQ = useQuery({
     queryKey: ["all-portfolios-equity"],
     queryFn: () => fetchEquity(),
     enabled: !!session,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
   const checkMirrors = useServerFn(checkPortfolioMirrors);
   const mirrorQ = useQuery({
     queryKey: ["portfolio-mirror-check"],
     queryFn: () => checkMirrors(),
     enabled: !!session,
-    staleTime: 60_000,
+    // Diagnostic-only: never worth a refetch on focus or remount.
+    staleTime: 10 * 60_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
   const isRefreshingEquity = equityQ.isFetching && !equityQ.isLoading;
   const equityErrored = equityQ.isError && !equityQ.data;
@@ -227,11 +242,15 @@ function Home() {
         {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <TodayHero
-              summary={todaySummary}
-              mixedCurrency={equityQ.data?.mixedCurrency ?? false}
-              currencies={equityQ.data?.currencies ?? []}
-            />
+            {equityQ.isLoading && !equityQ.data ? (
+              <TodayHeroSkeleton />
+            ) : (
+              <TodayHero
+                summary={todaySummary}
+                mixedCurrency={equityQ.data?.mixedCurrency ?? false}
+                currencies={equityQ.data?.currencies ?? []}
+              />
+            )}
           </div>
           <NextActionCard action={nextAction} />
         </div>
