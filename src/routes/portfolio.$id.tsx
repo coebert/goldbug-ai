@@ -1092,6 +1092,12 @@ function PortfolioPage() {
                         <CalendarClock className="mr-1 h-4 w-4" /> Long-horizon backtest
                       </Button>
                     </Link>
+                    <Link to="/walk-forward/$id" params={{ id }}>
+                      <Button variant="outline">
+                        <CalendarClock className="mr-1 h-4 w-4" /> Walk-forward test
+                      </Button>
+                    </Link>
+
                     {(runDay.isPending || runBt.isPending) && (
                       <span className="text-xs text-muted-foreground">
                         Fetching prices, reading news, asking the AI…
