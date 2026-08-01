@@ -20,6 +20,7 @@ import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
@@ -100,6 +101,11 @@ const AdminRoute = AdminRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WalkForwardIdRoute = WalkForwardIdRouteImport.update({
+  id: '/walk-forward/$id',
+  path: '/walk-forward/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIdRoute = PortfolioIdRouteImport.update({
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
@@ -302,6 +309,7 @@ export interface FileRoutesByTo {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
@@ -342,6 +350,7 @@ export interface FileRoutesById {
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
+  '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
@@ -383,6 +392,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/walk-forward/$id'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/walk-forward/$id'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
@@ -461,6 +472,7 @@ export interface FileRouteTypes {
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
+    | '/walk-forward/$id'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
@@ -501,6 +513,7 @@ export interface RootRouteChildren {
   TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
+  WalkForwardIdRoute: typeof WalkForwardIdRoute
   ApiPublicAlgoRegimeAutotuneCronRoute: typeof ApiPublicAlgoRegimeAutotuneCronRoute
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
   ApiPublicHooksAiGatewayHealthRoute: typeof ApiPublicHooksAiGatewayHealthRoute
@@ -600,6 +613,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/walk-forward/$id': {
+      id: '/walk-forward/$id'
+      path: '/walk-forward/$id'
+      fullPath: '/walk-forward/$id'
+      preLoaderRoute: typeof WalkForwardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portfolio/$id': {
@@ -819,6 +839,7 @@ const rootRouteChildren: RootRouteChildren = {
   TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
+  WalkForwardIdRoute: WalkForwardIdRoute,
   ApiPublicAlgoRegimeAutotuneCronRoute: ApiPublicAlgoRegimeAutotuneCronRoute,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
   ApiPublicHooksAiGatewayHealthRoute: ApiPublicHooksAiGatewayHealthRoute,

@@ -187,7 +187,7 @@ function WalkForwardPage() {
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-base">Fold設定 — train once, score on untouched data</CardTitle>
+            <CardTitle className="text-base">Fold setup — train once, score on untouched data</CardTitle>
             <CardDescription>
               Parameters are chosen on each training window only, then scored on the following
               out-of-sample window. Consistent OOS results are the pre-flight check for the live
