@@ -259,11 +259,14 @@ function AuditRow({
   entry,
   isOpen,
   onToggle,
+  portfolioId,
 }: {
   entry: AuditEntry;
   isOpen: boolean;
   onToggle: () => void;
+  portfolioId?: string;
 }) {
+
   const aligned = entry.newsFactors.filter((n) => n.alignment === "aligned").length;
   const opposing = entry.newsFactors.filter((n) => n.alignment === "opposing").length;
   return (
