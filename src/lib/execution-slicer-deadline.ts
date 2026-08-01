@@ -41,7 +41,7 @@ export type DeadlineOptions<T> = {
  */
 export async function withSlicerDeadline<T>(
   op: string,
-  work: Promise<T> | (() => Promise<T>),
+  work: PromiseLike<T> | (() => PromiseLike<T>),
   options: DeadlineOptions<T> = {},
 ): Promise<T> {
   const timeoutMs =
@@ -50,7 +50,7 @@ export async function withSlicerDeadline<T>(
       : SLICER_DB_TIMEOUT_MS;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const promise = typeof work === "function" ? work() : work;
+  const promise = Promise.resolve(typeof work === "function" ? work() : work);
 
   try {
     return await Promise.race([
