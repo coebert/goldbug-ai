@@ -289,7 +289,7 @@ function Home() {
                 {portfolioCount === 0 ? "" : `${portfolioCount} portfolio${portfolioCount === 1 ? "" : "s"} in total`}
               </span>
             </div>
-            {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
+            {q.isLoading && <PortfolioListSkeleton count={1} />}
             {q.data && q.data.length === 0 && (
               <Card className="border-primary/40 bg-primary/5">
                 <CardContent className="flex flex-col items-start gap-3 py-8 sm:flex-row sm:items-center sm:justify-between">
