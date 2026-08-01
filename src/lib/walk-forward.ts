@@ -78,57 +78,31 @@ export function buildWalkForwardFolds(opts: BuildFoldsOptions): WalkForwardFold[
   const maxFolds = Math.max(1, Math.floor(opts.maxFolds ?? 24));
 
   if (!(to > from)) return [];
-  const span = daysBetween(from, to);
-  if (span < trainDays + testDays) return [];
+  if (daysBetween(from, to) + 1 < trainDays + testDays) return [];
 
   const folds: WalkForwardFold[] = [];
+  // Cursor = first day of the current training window (rolling) or the day the
+  // anchored window must grow to cover.
   let trainStart = from;
-  let index = 0;
+  let trainEnd = addDaysISO(from, trainDays - 1);
+
   while (folds.length < maxFolds) {
-    const trainEnd = addDaysISO(trainStart, trainDays - 1);
     const testStart = addDaysISO(trainEnd, 1);
     const testEnd = addDaysISO(testStart, testDays - 1);
     if (testEnd > to) break;
     folds.push({
-      index,
+      index: folds.length,
       train: { from: mode === "anchored" ? from : trainStart, to: trainEnd },
       test: { from: testStart, to: testEnd },
     });
-    index += 1;
-    // Advance by one test window so OOS slices tile the range exactly once.
-    trainStart = mode === "anchored" ? trainStart : addDaysISO(trainStart, testDays);
-    if (mode === "anchored") {
-      // Anchored: train window grows, so extend its length instead of sliding.
-      const nextTrainEnd = addDaysISO(testEnd, 0);
-      trainStart = from;
-      // Recompute by growing trainDays for the next iteration.
-      opts = { ...opts, trainDays: daysBetween(from, nextTrainEnd) + 1 };
-      // eslint-disable-next-line no-param-reassign
-      (opts as BuildFoldsOptions).trainDays = daysBetween(from, nextTrainEnd) + 1;
-      // Loop uses the local `trainDays` binding, so mutate via closure variable:
-      // handled below by reassigning through the outer let.
-      // (see trainDaysRef)
-    }
-    if (mode === "anchored") {
-      // Grow the anchored window: next train ends where this test ended.
-      // Implemented by moving the cursor forward and recomputing length.
-      const grown = daysBetween(from, testEnd) + 1;
-      // Emulate a growing window by adjusting the local length variable.
-      // eslint-disable-next-line no-param-reassign
-      (opts as BuildFoldsOptions).trainDays = grown;
-      trainStartLength = grown;
-    }
+    // Advance by exactly one test window so OOS slices tile the range once.
+    // Rolling keeps a fixed-length window; anchored keeps `from` and grows.
+    trainStart = mode === "anchored" ? from : addDaysISO(trainStart, testDays);
+    trainEnd = testEnd;
   }
   return folds;
-
-  // Placeholder to satisfy the anchored branch above.
-  // eslint-disable-next-line no-unreachable
-  function noop() {}
 }
 
-// Anchored mode needs a growing window; the loop above is easier to express
-// with an explicit implementation, so `buildWalkForwardFolds` delegates to it.
-let trainStartLength = 0;
 
 export type ParamCandidate<P> = {
   params: P;
