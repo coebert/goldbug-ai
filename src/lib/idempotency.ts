@@ -62,6 +62,26 @@ export class IdempotencyInProgressError extends Error {
   }
 }
 
+/**
+ * The key was used successfully, but its replay window has closed, so the
+ * original response is gone. We refuse to run the operation again under an
+ * expired key: the client must decide whether the first attempt counted.
+ */
+export class IdempotencyKeyExpiredError extends Error {
+  readonly key: string;
+  readonly expiredAt: string | null;
+  constructor(key: string, expiredAt: string | null) {
+    super(
+      `Idempotency-Key "${key}" has expired${expiredAt ? ` (replay window closed ${expiredAt})` : ""}. ` +
+        `The original response is no longer stored and the request was NOT re-run. ` +
+        `Check the current state, then retry with a new Idempotency-Key if the operation is still needed.`,
+    );
+    this.name = "IdempotencyKeyExpiredError";
+    this.key = key;
+    this.expiredAt = expiredAt ?? null;
+  }
+}
+
 export class InvalidIdempotencyKeyError extends Error {
   constructor() {
     super(`Idempotency-Key must be a non-empty string of at most ${IDEMPOTENCY_KEY_MAX} characters.`);
@@ -70,10 +90,13 @@ export class InvalidIdempotencyKeyError extends Error {
 }
 
 export type IdempotencyRecord = {
-  status: "in_progress" | "completed";
+  status: "in_progress" | "completed" | "expired";
   request_hash: string;
   response: unknown;
+  /** Set when `status === "expired"`: when the replay window closed. */
+  expired_at?: string | null;
 };
+
 
 export type IdempotencyStore = {
   /**
