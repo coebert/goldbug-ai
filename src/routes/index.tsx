@@ -149,6 +149,37 @@ function Home() {
   if (!ready || !session) return <PageLoading />;
 
   const portfolioCount = q.data?.length ?? 0;
+  const allPortfolios = q.data ?? [];
+  const realPortfolios = allPortfolios.filter((p) => p.mode === "live_prod");
+  const simPortfolios = allPortfolios.filter((p) => p.mode !== "live_prod");
+
+  const renderPortfolioRow = (p: (typeof allPortfolios)[number]) => (
+    <PortfolioRow
+      key={p.id}
+      portfolio={p}
+      sparkSeries={sparkByPortfolio[p.id] ?? []}
+      deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
+      includeDeposits={includeDeposits}
+      isLoadingEquity={equityQ.isLoading}
+      isRefreshingEquity={isRefreshingEquity}
+      equityError={equityErrored ? equityErrorMessage : null}
+      onRetryEquity={() => equityQ.refetch()}
+      equityDecimals={equityDecimals}
+      brokerCurrency={
+        (equityQ.data as { brokerCurrencyByPortfolio?: Record<string, string> } | undefined)
+          ?.brokerCurrencyByPortfolio?.[p.id] ?? null
+      }
+      holdings={
+        (equityQ.data as {
+          holdingsByPortfolio?: Record<
+            string,
+            Array<{ symbol: string; quantity: number; avg_cost: number; asset_class: string | null }>
+          >;
+        } | undefined)?.holdingsByPortfolio?.[p.id] ?? []
+      }
+    />
+  );
+
 
   return (
     <div className="min-h-dvh bg-surface-1">
