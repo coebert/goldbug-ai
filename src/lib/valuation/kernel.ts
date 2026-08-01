@@ -16,7 +16,7 @@
 // price map and an FX resolver. That keeps it testable in any environment and
 // makes the golden-file suite meaningful.
 
-import { instrumentCcyFor } from "../instrument-ccy-rules";
+import { instrumentCcyFor, venueCurrency } from "../instrument-ccy-rules";
 import { isLseGbxDisplayQuoted } from "../market-price-units";
 import { priceSymbolVariants } from "../price-symbol";
 
@@ -45,7 +45,19 @@ export type FxResolve = (from: string, to: string) => number | null | undefined;
  */
 export type ObservedQuoteCcy = (symbol: string) => string | null | undefined;
 
-export type PriceSource = "market" | "cost_basis" | "missing";
+export type PriceSource = "market" | "cost_basis" | "missing" | "unresolved_units";
+
+/** Outcome of deciding what units a raw quote arrives in. */
+export type QuoteUnits = {
+  quoteCurrency: string;
+  quoteCurrencySource: "observed" | "rules" | "unresolved";
+  /** 100 for GBX, otherwise 1. Meaningless when `resolved` is false. */
+  unitDivisor: number;
+  instrumentCurrency: string;
+  /** False when GBX vs GBP (or any currency) could not be determined. */
+  resolved: boolean;
+  unresolvedReason?: string;
+};
 export type FxSource = "identity" | "resolved" | "fallback_identity";
 
 /** Per-holding provenance: everything needed to explain one line of a total. */
@@ -59,7 +71,9 @@ export type ValuationLine = {
   /** Currency the raw quote is expressed in ("GBX" for pence-quoted LSE). */
   quoteCurrency: string;
   /** How the quote currency was decided. */
-  quoteCurrencySource: "observed" | "rules";
+  quoteCurrencySource: "observed" | "rules" | "unresolved";
+  /** False when the quote units could not be decided; value withheld. */
+  unitsResolved: boolean;
   /** 100 for GBX, otherwise 1. */
   unitDivisor: number;
   /** Currency after the divisor is applied (GBX -> GBP). */
@@ -85,6 +99,7 @@ export type ValuationWarningCode =
   | "missing_price"
   | "cost_basis_fallback"
   | "missing_fx_rate"
+  | "unresolved_quote_units"
   | "non_finite_input";
 
 export type ValuationWarning = {
