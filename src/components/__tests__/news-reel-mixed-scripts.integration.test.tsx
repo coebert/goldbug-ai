@@ -11,7 +11,7 @@
 //      URL fall back to a correctly percent-encoded Google News search whose
 //      query round-trips back to the original non-Latin headline.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, beforeAll, afterAll } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { NewsReelItem } from "@/lib/news-reel.server";
