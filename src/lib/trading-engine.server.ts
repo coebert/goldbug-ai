@@ -1042,11 +1042,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // from each depth below the index high. Deep holes historically needed a
   // confirmed turn, so the playbook is allowed to SHRINK the per-symbol cap
   // there — never to widen it beyond the configured risk limit.
-  const ddSizing = drawdownSizeScale(
+  const macroDdSizing = drawdownSizeScale(
     effectiveRegime.signals.spy_drawdown_pct,
     macroLessons?.drawdown_rules ?? null,
   );
-  const ddSizeScale = Math.min(1, ddSizing.scale);
+  const ddSizeScale = Math.min(1, macroDdSizing.scale);
   const maxPosVal = totalValue * basePerSymbolPct * ddSizeScale;
 
   // Build FX context (wallet, exposure by currency, live rates, circuit state).
