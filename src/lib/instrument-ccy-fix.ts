@@ -10,7 +10,7 @@ import type { InstrumentCcyFinding } from "./instrument-ccy-check";
 import { venueCurrency } from "./instrument-ccy-rules";
 
 /** Sources we trust to decide a currency without a human in the loop. */
-const CONFIDENT_SOURCES = new Set(["mic", "suffix", "pair", "known_root"]);
+const CONFIDENT_SOURCES = new Set(["mic", "suffix", "composite", "pair", "known_root"]);
 
 /** Issue codes that a currency re-tag actually fixes. */
 const FIXABLE = new Set([
@@ -87,7 +87,7 @@ export function planInstrumentCcyFixes(findings: InstrumentCcyFinding[]): Instru
     if (!venue || !CONFIDENT_SOURCES.has(venue.source)) {
       skipped.push({
         symbol,
-        reason: `No venue marker on ${symbol} (no MIC, exchange suffix or pair), so the correct currency cannot be inferred with confidence.`,
+        reason: `No venue marker on ${symbol} (no MIC, exchange suffix, composite code or pair), so the correct currency cannot be inferred with confidence.`,
       });
       continue;
     }
