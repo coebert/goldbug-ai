@@ -402,10 +402,14 @@ export async function runLongHorizonBacktest(opts: {
       const investable = Math.max(0, totalValue - cashFloor);
 
       // Base target weight = equal-weight across picks, capped by per-symbol,
-      // per-class limits, and optional vol targeting.
-      const perSymCap = rc.per_symbol_limit_pct ?? rp.maxPositionPct;
+      // per-class limits, the dial's size multiplier, and optional vol
+      // targeting.
+      const perSymCap = Math.min(
+        1,
+        (rc.per_symbol_limit_pct ?? rp.maxPositionPct) * aggression.sizeMult,
+      );
       const rawWeights = new Map<string, number>();
-      const baseW = picks.length > 0 ? Math.min(perSymCap, 1 / picks.length) : 0;
+      const baseW = picks.length > 0 ? Math.min(perSymCap, aggression.sizeMult / picks.length) : 0;
       for (const p of picks) {
         let w = baseW;
         if (rc.volatility_sizing && p.vol && p.vol > 0) {
