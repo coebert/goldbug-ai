@@ -360,11 +360,13 @@ export async function syncLiveCashFromBroker(
     const decision = evaluateDepositGate({
       mode: "live_prod",
       hasLocalHoldings,
+      brokerCash,
       delta,
       explainedCashDelta,
       brokerTotalValue,
       prevTotalValue,
     });
+
     canTreatDriftAsDeposit = decision.canTreatDriftAsDeposit;
     depositGateReason = decision.depositGateReason;
   }
