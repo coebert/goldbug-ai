@@ -64,6 +64,14 @@ function SettingsPage() {
         </h2>
         <TradingControlsCard />
       </section>
+
+      <section aria-labelledby="maintenance-heading" className="space-y-3">
+        <h2 id="maintenance-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Data maintenance
+        </h2>
+        <ValuationHistoryBackfillCard />
+      </section>
+    </div>
     </div>
   );
 }
