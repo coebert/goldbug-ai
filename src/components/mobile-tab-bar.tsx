@@ -1,5 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, Receipt, BookOpen, MoreHorizontal, Plus } from "lucide-react";
+import { usePrefetchOnTouch } from "@/hooks/use-idle-prefetch";
+
 
 type Tab = {
   to: "/" | "/trades" | "/learn";
