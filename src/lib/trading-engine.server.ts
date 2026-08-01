@@ -42,7 +42,9 @@ import {
   type RankInfo,
 } from "./cross-sectional-ranking.server";
 import { getNewsForDate } from "./news.server";
-import { computeExecPostSignals, execPostSentimentNudge } from "./exec-posts";
+import { computeExecPostSignals } from "./exec-posts";
+import { learnedExecPostNudge, learnedHalfLifeHours } from "./exec-post-learning";
+import { loadActiveExecPostLessons } from "./exec-post-analysis.server";
 import {
   extractMarketEvents,
   macroEventFeatures,
@@ -864,6 +866,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Tracked CEO/founder social posts (Musk & co.) reported by the wires.
   // These move tickers faster than ordinary coverage, so they get a small,
   // bounded nudge on top of the standard news sentiment.
+  //
+  // The strength, direction and decay of that nudge are no longer hardcoded:
+  // `runExecPostAnalysis` studies how each person's posts actually mapped onto
+  // forward returns and stores learned per-executive coefficients, which are
+  // loaded here. With no study on file this falls back to the catalogued
+  // defaults, so the engine behaves exactly as before.
+  const execLessons = portfolio.user_id
+    ? await loadActiveExecPostLessons(supabaseAdmin as never, portfolio.user_id).catch(() => null)
+    : null;
+  const execCoefficients = execLessons?.coefficients ?? null;
+
   const execPostSignals = computeExecPostSignals(
     [
       ...scoredNews.map((n) => ({
@@ -880,6 +893,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       })),
     ],
     asOf,
+    execCoefficients && execCoefficients.length > 0
+      ? { halfLifeHours: learnedHalfLifeHours(execCoefficients) }
+      : undefined,
   );
 
   // Market-event ingestion: type today's + the rolling window's headlines into
@@ -910,7 +926,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   for (const f of features) {
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
-    const execNudge = execPostSentimentNudge(f.symbol, execPostSignals);
+    const execNudge = learnedExecPostNudge(f.symbol, execPostSignals, execCoefficients).nudge;
     const evf = symbolEventFeatures(f.symbol, f.name, marketEvents);
     const evTilt = eventTilt(evf, macroEvents);
     const base = agg.contributors > 0 ? agg.score : 0;
