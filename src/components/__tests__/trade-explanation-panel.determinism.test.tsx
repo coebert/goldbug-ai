@@ -13,11 +13,23 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // The panel loads calibration through a server fn; tests always pass the
 // calibration in directly, so the hook must never fire a request.
-vi.mock("@tanstack/react-start", () => ({
-  useServerFn: () => async () => {
-    throw new Error("network access is not allowed in determinism tests");
-  },
-}));
+vi.mock("@tanstack/react-start", () => {
+  const chain = () => {
+    const self: Record<string, unknown> = {};
+    self.middleware = () => self;
+    self.inputValidator = () => self;
+    self.handler = () => self;
+    return self;
+  };
+  return {
+    createServerFn: () => chain(),
+    createMiddleware: () => chain(),
+    useServerFn: () => async () => {
+      throw new Error("network access is not allowed in determinism tests");
+    },
+  };
+});
+
 
 import { TradeExplanationPanel } from "@/components/trade-explanation-panel";
 import type { AuditEntry } from "@/lib/audit-log";
