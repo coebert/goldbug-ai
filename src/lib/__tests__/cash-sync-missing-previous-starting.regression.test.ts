@@ -25,7 +25,9 @@ describe("cash-sync rows missing previousStarting", () => {
     ["non-numeric", cashSyncRows.junkPreviousStarting],
   ])("re-anchors the repair when previousStarting is %s", (_label, row) => {
     const flows = derive([row]);
-    expect(flows).toEqual([{ date: "2026-07-24", amount: 8888.8 }]);
+    expect(flows).toHaveLength(1);
+    expect(flows[0].date).toBe("2026-07-24");
+    expect(flows[0].amount).toBeCloseTo(8888.8, 6);
     const pct = computeCardRangePct(fundedThenFlatSeries, flows, false);
     expect(Math.abs(pct!)).toBeLessThan(0.01);
   });

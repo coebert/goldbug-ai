@@ -7,6 +7,8 @@
 // must never be netted verbatim out of the equity series (that is the
 // "-49% / -8.9% phantom deposit" bug). See src/lib/infer-cash-flow.ts.
 
+import { trustedPreviousStarting } from "../../infer-cash-flow";
+
 export type CashSyncLogRow = {
   portfolio_id: string;
   created_at: string;
@@ -165,7 +167,7 @@ export function deriveFlowsFromCashSyncs(
   for (const r of rows) {
     const resp = r.response ?? {};
     if (!resp.startingCashAdjusted) continue;
-    const prevStart = Number(resp.previousStarting);
+    const prevStart = trustedPreviousStarting(resp.previousStarting) ?? Number.NaN;
     const newStart = Number(resp.newStarting);
     if (Number.isFinite(prevStart) && Number.isFinite(newStart) && prevStart === newStart) {
       continue;
