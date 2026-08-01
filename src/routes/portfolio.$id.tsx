@@ -1008,6 +1008,7 @@ function PortfolioPage() {
                 <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
                 <ValuationConsistencyAlert portfolioId={id} className="mb-4" />
+                <InstrumentCcyAlert portfolioId={id} className="mb-4" />
                 <ReconcileFillsCard portfolioId={id} className="mb-4" />
                 <PriceUnitAuditCard portfolioId={id} className="mb-4" />
                 <div className="mb-6">
