@@ -337,6 +337,8 @@ export function checkValuationConsistency({
       holdings_ratio: holdingsRatio,
       suspected_source: source,
       suspect_symbols: suspects,
+      fx_breakdown: fxBreakdown,
+
       explanation,
     });
   }
