@@ -183,13 +183,15 @@ describe("deactivation releases the broker-account claim", () => {
     deactivate(table, "p-high");
     await activate(table, "p-crypto", ACCOUNT);
 
+    // Only the new claimant holds the synced book; the released portfolio is
+    // empty, so there is nothing for the detector to call mirrored.
     const findings = detectMirroredPortfolios(
       table.rows.map((r) => ({
         id: r.id,
         name: r.name,
-        broker: r.broker,
-        broker_account_id: r.broker_account_id,
-        mode: r.mode,
+        equity: r.broker_account_id === ACCOUNT ? 10_215.95 : 0,
+        current_cash: r.broker_account_id === ACCOUNT ? 1_200 : 0,
+        holdings: r.broker_account_id === ACCOUNT ? [{ symbol: "ULVR.L", quantity: 40 }] : [],
       })) as never,
     );
     expect(findings).toHaveLength(0);
