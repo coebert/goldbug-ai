@@ -52,6 +52,18 @@ function syntheticBars(): IndexBar[] {
   return bars;
 }
 
+function macroStudy() {
+  return {
+    generated_at: "2026-01-01T00:00:00.000Z",
+    index: analyseIndexHistory("SPY", syntheticBars()),
+    secondary: null,
+    kind_responses: [],
+    episodes: MACRO_EPISODES,
+    news_window_days: 365,
+    news_events: 0,
+  };
+}
+
 describe("macro episode catalogue", () => {
   it("covers two decades and every episode carries a lesson", () => {
     const years = MACRO_EPISODES.map((e) => Number(e.start.slice(0, 4)));
@@ -59,7 +71,7 @@ describe("macro episode catalogue", () => {
     expect(Math.max(...years)).toBeGreaterThanOrEqual(2020);
     for (const e of MACRO_EPISODES) {
       expect(e.lesson.length).toBeGreaterThan(10);
-      expect(e.name.length).toBeGreaterThan(2);
+      expect(e.label.length).toBeGreaterThan(2);
     }
   });
 
@@ -76,9 +88,9 @@ describe("drawdown detection", () => {
   it("finds the engineered crash and measures its depth", () => {
     const eps = findDrawdownEpisodes(bars, 8);
     expect(eps.length).toBeGreaterThan(0);
-    const worst = eps.reduce((a, b) => (a.depth_pct < b.depth_pct ? a : b));
-    expect(worst.depth_pct).toBeLessThan(-25);
-    expect(worst.depth_pct).toBeGreaterThan(-40);
+    const worst = eps.reduce((a, b) => (a.drawdown_pct > b.drawdown_pct ? a : b));
+    expect(worst.drawdown_pct).toBeGreaterThan(25);
+    expect(worst.drawdown_pct).toBeLessThan(40);
     expect(worst.trough_date > worst.peak_date).toBe(true);
   });
 
@@ -107,7 +119,7 @@ describe("index history study", () => {
     expect(study.symbol).toBe("SPY");
     expect(study.bars).toBeGreaterThan(900);
     expect(study.years).toBeGreaterThan(2);
-    expect(study.first_date < study.last_date).toBe(true);
+    expect(study.from < study.to).toBe(true);
   });
 
   it("buckets forward returns by drawdown depth with monotonic bounds", () => {
@@ -128,8 +140,8 @@ describe("index history study", () => {
     const bars = syntheticBars();
     const shuffled = [...bars.slice(500), ...bars.slice(0, 500), bars[10]!];
     const a = analyseIndexHistory("SPY", shuffled);
-    expect(a.first_date).toBe(study.first_date);
-    expect(a.last_date).toBe(study.last_date);
+    expect(a.from).toBe(study.from);
+    expect(a.to).toBe(study.to);
   });
 });
 
@@ -140,7 +152,7 @@ describe("measureKindResponses", () => {
     // Tag days inside the recovery leg.
     const dates = bars.slice(340, 380).map((b) => b.date);
     const res = measureKindResponses(
-      dates.map((d) => ({ date: d, kinds: ["rate_cut"] })),
+      new Map(dates.map((d) => [d, ["rate_cut"]])),
       bars,
     );
     const rc = res.find((r) => r.kind === "rate_cut");
@@ -151,7 +163,7 @@ describe("measureKindResponses", () => {
 
   it("ignores event days with no usable forward window", () => {
     const res = measureKindResponses(
-      [{ date: bars[bars.length - 1]!.date, kinds: ["tariffs"] }],
+      new Map([[bars[bars.length - 1]!.date, ["tariffs"]]]),
       bars,
     );
     const t = res.find((r) => r.kind === "tariffs");
@@ -159,7 +171,7 @@ describe("measureKindResponses", () => {
   });
 
   it("returns an empty result when there are no tagged days", () => {
-    expect(measureKindResponses([], bars)).toEqual([]);
+    expect(measureKindResponses(new Map(), bars)).toEqual([]);
   });
 });
 
@@ -180,12 +192,11 @@ describe("playbook derivation", () => {
     const derived = derivePlaybookEntry("tariffs", {
       kind: "tariffs",
       samples: 2,
-      mean_fwd_1d: -1,
       mean_fwd_5d: -2,
       mean_fwd_20d: -3,
-      hit_rate: 0.1,
+      up_rate: 0.1,
       persistence: -1,
-    } as never);
+    });
     expect(derived).toEqual(base);
   });
 
@@ -193,12 +204,11 @@ describe("playbook derivation", () => {
     const derived = derivePlaybookEntry("tariffs", {
       kind: "tariffs",
       samples: 40,
-      mean_fwd_1d: 0.8,
       mean_fwd_5d: 2.2,
       mean_fwd_20d: 3.4,
-      hit_rate: 0.7,
+      up_rate: 0.7,
       persistence: 1.2,
-    } as never);
+    });
     expect(derived.response).toBe("follow");
     expect(derived.confidence).toBeGreaterThan(defaultPlaybookEntry("tariffs").confidence);
     expect(derived.note).toContain("40 event day");
@@ -208,34 +218,23 @@ describe("playbook derivation", () => {
     const derived = derivePlaybookEntry("credit_downgrade", {
       kind: "credit_downgrade",
       samples: 200,
-      mean_fwd_1d: 3,
       mean_fwd_5d: 6,
       mean_fwd_20d: 9,
-      hit_rate: 0.95,
+      up_rate: 0.95,
       persistence: 3,
-    } as never);
+    });
     expect(derived.response).toBe("de_risk");
   });
 
   it("derives a full playbook from a study", () => {
-    const study = {
-      index: analyseIndexHistory("SPY", syntheticBars()),
-      kind_responses: [],
-      episodes: [],
-    } as never;
-    const pb = derivePlaybook(study);
+    const pb = derivePlaybook(macroStudy());
     expect(pb.length).toBe(playbookKinds().length);
     expect(new Set(pb.map((e) => String(e.kind))).size).toBe(pb.length);
   });
 });
 
 describe("drawdown sizing rules", () => {
-  const study = {
-    index: analyseIndexHistory("SPY", syntheticBars()),
-    kind_responses: [],
-    episodes: [],
-  } as never;
-  const rules = deriveDrawdownRules((study as { index: unknown }).index as never);
+  const rules = deriveDrawdownRules(macroStudy());
 
   it("keeps every size scale inside 0.3–1.5", () => {
     for (const r of rules) {
