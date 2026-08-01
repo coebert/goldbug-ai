@@ -379,6 +379,7 @@ export function computeValuation(input: ComputeValuationInput): ValuationResult 
       nativeQuote,
       quoteCurrency: units.quoteCurrency,
       quoteCurrencySource: units.quoteCurrencySource,
+      unitsResolved: true,
       unitDivisor: units.unitDivisor,
       instrumentCurrency: units.instrumentCurrency,
       nativeValue,
