@@ -187,7 +187,7 @@ function Home() {
       <HomeCoachMarks />
       <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
         {/* Page heading + density control */}
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:mb-7">
+        <div className="mb-5 space-y-3 sm:mb-7 sm:flex sm:flex-wrap sm:items-start sm:justify-between sm:gap-3 sm:space-y-0">
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Your money</h1>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
@@ -196,7 +196,7 @@ function Home() {
                 : "Everything below updates by itself. The AI reviews the market every hour."}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:flex-nowrap">
             <ExperienceLevelToggle />
             <DashboardSettings
               includeDeposits={includeDeposits}
@@ -211,13 +211,14 @@ function Home() {
                 <PlusCircle className="mr-1 h-4 w-4" /> New portfolio
               </Button>
             </a>
-            <a href="#create-portfolio" className="sm:hidden">
+            <a href="#create-portfolio" className="ml-auto sm:hidden">
               <Button size="sm" className="h-8">
                 <PlusCircle className="mr-1 h-4 w-4" /> New
               </Button>
             </a>
           </div>
         </div>
+
 
         <SnapshotMismatchAlert mismatches={equityQ.data?.mismatches ?? []} />
 
