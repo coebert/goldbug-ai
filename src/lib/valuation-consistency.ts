@@ -10,7 +10,7 @@
 // the price-unit audit for the suspect day, and reports which day broke, how
 // badly, and which quote is the likely culprit.
 
-import type { PriceUnitAudit, PriceUnitAuditRow } from "./price-unit-audit";
+import type { FxSource, PriceUnitAudit, PriceUnitAuditRow } from "./price-unit-audit";
 
 /** Default implausibility threshold: more than a 3x move in one step. */
 export const DEFAULT_JUMP_FACTOR = 3;
