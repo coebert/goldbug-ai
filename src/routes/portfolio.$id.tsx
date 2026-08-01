@@ -1972,6 +1972,12 @@ function PortfolioPage() {
                   riskConfig={p.risk_config}
                   baseCurrency={p.currency}
                 />
+                <RiskCurveComparisonCard
+                  portfolioId={id}
+                  currentLevel={clampDialLevel(
+                    (p.risk_config as { risk_level?: number } | null)?.risk_level,
+                  )}
+                />
                 <ExecutionCalibrationCard
                   portfolioId={id}
                   execParams={
