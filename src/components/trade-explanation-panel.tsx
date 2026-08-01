@@ -1,9 +1,17 @@
 import { useMemo } from "react";
 import { Activity, Newspaper, ShieldAlert, Sparkles } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import type { AuditEntry } from "@/lib/audit-log";
 import { buildTradeExplanation, type ExplainedSignal } from "@/lib/trade-explanation";
+import { readCalibration, type CalibrationBand } from "@/lib/confidence-calibration";
+import {
+  getConfidenceCalibration,
+  type ConfidenceCalibrationResult,
+} from "@/lib/confidence-calibration.functions";
+
 
 function SignalList({
   title,
