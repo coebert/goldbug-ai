@@ -27,6 +27,8 @@ import { Sparkles, PlusCircle } from "lucide-react";
 
 import { TodayHero } from "@/components/home/today-hero";
 import { TodayHeroSkeleton } from "@/components/home/today-hero-skeleton";
+import { PortfolioListSkeleton } from "@/components/home/portfolio-row-skeleton";
+import { MirrorAlertSkeleton } from "@/components/home/mirror-alert-skeleton";
 import { DashboardSettings } from "@/components/home/dashboard-settings";
 import { NewHereBanner } from "@/components/home/new-here-banner";
 import { NextActionCard } from "@/components/home/next-action-card";
