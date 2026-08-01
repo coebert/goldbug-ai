@@ -158,4 +158,39 @@ describe("mobile tab bar — visual regression", () => {
       });
     },
   );
+
+  // -------------------------------------------------------------------
+  // Determinism: the snapshot must not depend on when or where it runs.
+  // -------------------------------------------------------------------
+  describe("deterministic rendering", () => {
+    it("produces byte-identical markup across repeated renders", () => {
+      for (const path of ROUTES) {
+        expect(renderAt(path), `unstable markup @ ${path}`).toBe(renderAt(path));
+      }
+    });
+
+    it("is unaffected by the wall clock advancing", () => {
+      const before = renderAt("/");
+      vi.setSystemTime(new Date("2027-01-01T03:17:42Z"));
+      const after = renderToStaticMarkup(<MobileTabBar />);
+      vi.setSystemTime(FROZEN_NOW);
+      expect(after).toBe(before);
+    });
+
+    it("never branches on matchMedia / viewport width", () => {
+      matchMediaCalls.length = 0;
+      for (const path of ROUTES) renderAt(path);
+      // Breakpoint behaviour belongs in CSS (`md:hidden`). A JS media query
+      // here would make the snapshot environment-dependent.
+      expect(matchMediaCalls).toEqual([]);
+    });
+
+    it("emits no time-, random- or id-shaped values in the markup", () => {
+      const html = renderAt("/");
+      expect(html).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/); // ISO timestamps
+      expect(html).not.toMatch(/\bago\b/); // relative-time labels
+      expect(html).not.toMatch(/\bdata-reactid|:r[0-9a-z]+:/); // React useId output
+    });
+  });
+
 });
