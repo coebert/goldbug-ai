@@ -404,10 +404,11 @@ export const deletePortfolio = createServerFn({ method: "POST" })
   .middleware([requireAal2])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("portfolios").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    // Releases the broker-account claim before removing the row, so the account
+    // can be linked to another portfolio afterwards.
+    return await deletePortfolioWithCleanup(context.supabase as never, data.id);
   });
+
 
 export const renamePortfolio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
