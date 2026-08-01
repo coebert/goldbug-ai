@@ -1329,6 +1329,57 @@ export type Database = {
           },
         ]
       }
+      macro_lessons: {
+        Row: {
+          active: boolean
+          created_at: string
+          drawdown_rules: Json
+          episodes: number
+          generated_at: string
+          id: string
+          lessons: Json
+          model: string | null
+          narrative: string
+          news_window_days: number
+          playbook: Json
+          stats: Json
+          user_id: string
+          years_covered: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          drawdown_rules?: Json
+          episodes?: number
+          generated_at?: string
+          id?: string
+          lessons?: Json
+          model?: string | null
+          narrative?: string
+          news_window_days?: number
+          playbook?: Json
+          stats?: Json
+          user_id: string
+          years_covered?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          drawdown_rules?: Json
+          episodes?: number
+          generated_at?: string
+          id?: string
+          lessons?: Json
+          model?: string | null
+          narrative?: string
+          news_window_days?: number
+          playbook?: Json
+          stats?: Json
+          user_id?: string
+          years_covered?: number
+        }
+        Relationships: []
+      }
       market_events: {
         Row: {
           created_at: string
