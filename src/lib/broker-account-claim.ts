@@ -49,16 +49,22 @@ export function brokerAccountClaimedMessage(accountId: string, otherName: string
   );
 }
 
-/**
- * Throws when `brokerAccountId` is already linked to a portfolio other than
- * `portfolioId`. No-ops when the account id is empty (paper/unlinked).
- */
-export async function assertBrokerAccountUnclaimed(
+/** Fallback owner label when the conflicting row can't be read (e.g. RLS hides it). */
+export const UNKNOWN_CLAIM_OWNER = "another portfolio";
+
+export type ClaimLookupArgs = {
+  portfolioId: string;
+  broker: string;
+  brokerAccountId: string | null | undefined;
+};
+
+/** The portfolio (other than `portfolioId`) currently holding this account, if any. */
+export async function findBrokerAccountClaimant(
   supabase: ClaimQueryClient,
-  args: { portfolioId: string; broker: string; brokerAccountId: string | null | undefined },
-): Promise<void> {
+  args: ClaimLookupArgs,
+): Promise<ClaimRow | null> {
   const accountId = (args.brokerAccountId ?? "").trim();
-  if (!accountId) return;
+  if (!accountId) return null;
 
   const claimed = await supabase
     .from("portfolios")
@@ -68,6 +74,42 @@ export async function assertBrokerAccountUnclaimed(
     .neq("id", args.portfolioId);
 
   if (claimed.error) throw new Error(claimed.error.message);
-  const other = claimed.data?.[0];
+  return claimed.data?.[0] ?? null;
+}
+
+/**
+ * THE single source of the conflict wording. Both the pre-check and the
+ * unique-index violation path go through here, so a user sees byte-identical
+ * text whether the clash was caught before the write or by Postgres during a
+ * concurrent activation race.
+ */
+export async function brokerAccountConflictMessage(
+  supabase: ClaimQueryClient,
+  args: ClaimLookupArgs,
+): Promise<string> {
+  const accountId = (args.brokerAccountId ?? "").trim();
+  let owner = UNKNOWN_CLAIM_OWNER;
+  try {
+    const other = await findBrokerAccountClaimant(supabase, args);
+    if (other) owner = other.name ?? other.id;
+  } catch {
+    // Lookup failure must never mask the real conflict — fall back to the
+    // generic owner label rather than surfacing a different error.
+  }
+  return brokerAccountClaimedMessage(accountId, owner);
+}
+
+/**
+ * Throws when `brokerAccountId` is already linked to a portfolio other than
+ * `portfolioId`. No-ops when the account id is empty (paper/unlinked).
+ */
+export async function assertBrokerAccountUnclaimed(
+  supabase: ClaimQueryClient,
+  args: ClaimLookupArgs,
+): Promise<void> {
+  const accountId = (args.brokerAccountId ?? "").trim();
+  if (!accountId) return;
+
+  const other = await findBrokerAccountClaimant(supabase, args);
   if (other) throw new Error(brokerAccountClaimedMessage(accountId, other.name ?? other.id));
 }
