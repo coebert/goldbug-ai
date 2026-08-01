@@ -112,8 +112,18 @@ export const deactivateLive = createServerFn({ method: "POST" })
       .select("id, user_id, mode, broker, broker_account_id").eq("id", data.portfolioId).maybeSingle();
     if (own.error || !own.data || own.data.user_id !== context.userId) throw new Error("Portfolio not found");
     const previousMode = own.data.mode;
-    // Idempotent: already paper → log noop, don't rewrite.
-    if (previousMode === "paper" || previousMode === "backtest") {
+    const previousAccount = own.data.broker_account_id ?? null;
+
+    // Single atomic UPDATE: flips mode → paper and nulls broker_account_id
+    // together, guarded on owner + live mode. Nothing can observe (or race
+    // into) a paper row that still holds its broker account. A repeat call
+    // matches zero rows and is reported as a no-op rather than an error.
+    const released = await releaseBrokerAccountAtomically(context.supabase as never, {
+      portfolioId: data.portfolioId,
+      userId: context.userId,
+    });
+
+    if (!released.changed) {
       await logAudit({
         userId: context.userId, portfolioId: data.portfolioId, action: "DEACTIVATE",
         request: { reason: data.reason ?? null },
@@ -121,19 +131,15 @@ export const deactivateLive = createServerFn({ method: "POST" })
       });
       return { ok: true, changed: false };
     }
-    // RLS scopes the update to the caller's own portfolios.
-    // Releases the broker-account claim too, so another portfolio can link
-    // this account afterwards (see broker-account-claim.ts).
-    const upd = await context.supabase.from("portfolios")
-      .update(releaseBrokerAccountPatch()).eq("id", data.portfolioId);
-    if (upd.error) throw new Error(upd.error.message);
+
     await logAudit({
       userId: context.userId, portfolioId: data.portfolioId, action: "DEACTIVATE",
       request: { reason: data.reason ?? null },
-      response: { previousMode, newMode: "paper", releasedBrokerAccountId: own.data.broker_account_id ?? null },
+      response: { previousMode, newMode: "paper", releasedBrokerAccountId: previousAccount },
     });
     return { ok: true, changed: true };
   });
+
 
 export const pauseLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
