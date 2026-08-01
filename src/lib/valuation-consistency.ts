@@ -61,6 +61,12 @@ export type ValuationJump = {
   }[];
   /** Per-currency FX legs used to value the flagged day, largest first. */
   fx_breakdown: FxLeg[];
+  /**
+   * True when an external cash flow (deposit/withdrawal) fully explains the
+   * move. Those days are reported for the audit trail but are NOT faults, so
+   * the UI must not surface them as errors.
+   */
+  benign: boolean;
   explanation: string;
 };
 
@@ -338,14 +344,16 @@ export function checkValuationConsistency({
       suspected_source: source,
       suspect_symbols: suspects,
       fx_breakdown: fxBreakdown,
-
+      benign: explainedByCash,
       explanation,
     });
   }
 
-  const scored = [...jumps].sort(
-    (a, b) => Math.max(b.ratio, 1 / b.ratio) - Math.max(a.ratio, 1 / a.ratio),
-  );
+  const scored = [...jumps]
+    .filter((j) => !j.benign)
+    .sort(
+      (a, b) => Math.max(b.ratio, 1 / b.ratio) - Math.max(a.ratio, 1 / a.ratio),
+    );
 
   return {
     portfolio_id: portfolioId,
