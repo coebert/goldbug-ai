@@ -113,3 +113,18 @@ export async function assertBrokerAccountUnclaimed(
   const other = await findBrokerAccountClaimant(supabase, args);
   if (other) throw new Error(brokerAccountClaimedMessage(accountId, other.name ?? other.id));
 }
+
+/**
+ * The patch that RELEASES a broker-account claim when a portfolio goes back to
+ * paper. `broker_account_id` must be nulled: the partial unique index only
+ * covers non-null ids, and the pre-check matches on (broker, account) with no
+ * regard for mode — so leaving the id behind keeps the account locked to a
+ * portfolio that no longer trades it.
+ */
+export function releaseBrokerAccountPatch() {
+  return {
+    mode: "paper" as const,
+    live_paused: false,
+    broker_account_id: null,
+  };
+}
