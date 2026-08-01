@@ -137,22 +137,24 @@ describe("sparkline invariants: untrusted cash-syncs never introduce deposits", 
     }
   });
 
-  it("card % stays between the verbatim-netted and raw deltas", () => {
+  it("card % stays between the worst-case phantom netting and the raw delta", () => {
     for (const { seed, rand, series } of CASES) {
       const row = makeUntrustedRow(rand, series);
       const flows = derive([row], series);
       const actual = computeCardRangePct(series, flows, false);
       const raw = computeCardRangePct(series, [], false);
-      const verbatim = computeCardRangePct(
+      // Worst case: the full reported delta netted in-window (the "-49%" bug).
+      const lastDate = [...series].sort((a, b) => (a.date < b.date ? -1 : 1)).at(-1)!.date;
+      const phantom = computeCardRangePct(
         series,
-        [{ date: String(row.created_at).slice(0, 10), amount: Number(row.response.delta) }],
+        [{ date: lastDate, amount: Number(row.response.delta) }],
         false,
       );
       expect(actual, `seed ${seed}`).not.toBeNull();
       // Netting an inflow can only reduce the reported gain…
       expect(actual!, `seed ${seed}`).toBeLessThanOrEqual(raw! + 1e-6);
       // …but never below what the phantom deposit would have produced.
-      expect(actual!, `seed ${seed}`).toBeGreaterThanOrEqual(verbatim! - 1e-6);
+      expect(actual!, `seed ${seed}`).toBeGreaterThanOrEqual(phantom! - 1e-6);
     }
   });
 
