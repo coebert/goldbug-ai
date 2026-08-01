@@ -74,3 +74,21 @@ export function normalizeLseDisplayPriceToBase(
   return isLseGbxDisplayQuoted(symbol, assetClass) ? price / 100 : price;
 }
 
+/**
+ * Cost basis stored on `holdings.avg_cost` is ALREADY in the portfolio's base
+ * currency: every writer (`live-holdings-sync`, `fills-trades-reconcile`,
+ * the ledger rebuild) normalises broker GBX into GBP before persisting.
+ *
+ * Read paths must therefore NOT normalise again — doing so divides an LSE
+ * cost basis by 100 a second time (MKS £4.04 → "GBP 0.04") and reports
+ * absurd gains such as +9900%. Use this helper on every read so the rule is
+ * stated in exactly one place.
+ */
+export function holdingAvgCostBase(
+  _symbol: string,
+  avgCost: number | string | null | undefined,
+): number {
+  const n = Number(avgCost);
+  return Number.isFinite(n) ? n : 0;
+}
+

@@ -11,7 +11,7 @@
 // headline Invested figure, which would otherwise disagree with the
 // broker snapshot and produce percentages that don't add to 100.
 
-import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { holdingAvgCostBase } from "@/lib/market-price-units";
 
 export type StripHolding = {
   symbol: string;
@@ -54,9 +54,7 @@ export function deriveStripAllocation(
     // pence-quoted row like HSBA:xlon (avg_cost=1555.19p) does not
     // swamp GBP-quoted ETF rows (VUKE/VMID) and round their weights
     // to 0.0%. LSE ETFs and non-LSE symbols pass through unchanged.
-    const avg = Number.isFinite(avgRaw)
-      ? normalizeLseDisplayPriceToBase(h.symbol, avgRaw, h.asset_class ?? null)
-      : avgRaw;
+    const avg = Number.isFinite(avgRaw) ? holdingAvgCostBase(h.symbol, avgRaw) : avgRaw;
     const raw = Number.isFinite(qty) && Number.isFinite(avg) ? qty * avg : 0;
     return { ...h, qty, avg, raw };
   });

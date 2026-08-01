@@ -6,10 +6,14 @@
 // invested=£1,861. Because avg_cost for HSBA was pence, the raw
 // cost-basis for HSBA was 102×1555.19 = £158,629 which dwarfed the
 // ETF rows and scaled their chip weights to ~0.09%, rendering as
-// "0.0%" while HSBA showed "18.1%". After normalising GBX → GBP for
-// LSE common stocks (asset_class !== 'etf'), all three chips should
-// share the £1,861 invested pot proportionally and no ETF row should
-// round to 0.0% weight.
+// "0.0%" while HSBA showed "18.1%".
+//
+// The fix now lives at the WRITE boundary: broker sync and fills
+// reconciliation normalise GBX → GBP before persisting `avg_cost`, so a
+// stored cost basis is always in the portfolio's base currency. Read
+// paths must NOT divide again (that produced "GBP 0.04" and +9900%
+// tiles). These cases therefore feed already-normalised GBP costs and
+// assert every chip still gets a proportional, non-zero weight.
 
 import { describe, expect, it } from "vitest";
 import { deriveStripAllocation } from "@/lib/derive-strip-allocation";
@@ -18,7 +22,7 @@ describe("deriveStripAllocation — LSE GBX avg_cost must not zero out ETF rows"
   it("HSBA:xlon (GBX pence) alongside VMID/VUKE:xlon (GBP) — all chips get proportional weight", () => {
     const a = deriveStripAllocation(
       [
-        { symbol: "HSBA:xlon", quantity: 102, avg_cost: 1555.19, asset_class: "stock" },
+        { symbol: "HSBA:xlon", quantity: 102, avg_cost: 15.5519, asset_class: "stock" },
         { symbol: "VMID:xlon", quantity: 4, avg_cost: 36.44, asset_class: "etf" },
         { symbol: "VUKE:xlon", quantity: 3, avg_cost: 46.34, asset_class: "etf" },
       ],
@@ -51,13 +55,13 @@ describe("deriveStripAllocation — LSE GBX avg_cost must not zero out ETF rows"
     expect(a.investedValue).toBe(460);
   });
 
-  it(".L suffix common stock (asset_class='stock') is normalised too", () => {
+  it(".L suffix common stock cost basis is used as-is (already GBP)", () => {
     const a = deriveStripAllocation(
-      [{ symbol: "LLOY.L", quantity: 100, avg_cost: 55.4, asset_class: "stock" }],
+      [{ symbol: "LLOY.L", quantity: 100, avg_cost: 0.554, asset_class: "stock" }],
       100,
       155.4,
     );
-    // 100 × 0.554 = £55.40, not £5540.
+    // Stored cost is £0.554/share → £55.40, and must not be divided again.
     expect(a.rawInvested).toBeCloseTo(55.4, 6);
   });
 });
