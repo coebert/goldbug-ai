@@ -202,13 +202,33 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         }
         const amt = Number(resp.delta);
         if (!Number.isFinite(amt) || amt === 0) continue;
-        deposits.push({
-          portfolio_id: row.portfolio_id,
+        const raw = {
           date: String(row.created_at).slice(0, 10),
           amount: amt,
+        };
+        // No known prior baseline → the delta is a starting_cash repair,
+        // not measured cash movement. Re-anchor it onto the equity step
+        // the portfolio actually shows so the card doesn't net out money
+        // that never arrived (see src/lib/infer-cash-flow.ts).
+        const trusted = Number.isFinite(prevStart);
+        const flow = trusted
+          ? raw
+          : reanchorInferredInflow(
+              raw,
+              (built.perPortfolioSeries?.[row.portfolio_id] ?? []) as Array<{
+                date: string;
+                value: number;
+              }>,
+            );
+        if (!flow) continue;
+        deposits.push({
+          portfolio_id: row.portfolio_id,
+          date: flow.date,
+          amount: flow.amount,
         });
       }
     }
+
 
     const liveIds = list.filter((p) => p.mode === "live_prod").map((p) => p.id);
     let mismatches: SnapshotMismatch[] = [];
