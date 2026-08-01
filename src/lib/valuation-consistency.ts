@@ -61,6 +61,12 @@ export type ValuationJump = {
   }[];
   /** Per-currency FX legs used to value the flagged day, largest first. */
   fx_breakdown: FxLeg[];
+  /**
+   * True when an external cash flow (deposit/withdrawal) fully explains the
+   * move. Those days are reported for the audit trail but are NOT faults, so
+   * the UI must not surface them as errors.
+   */
+  benign: boolean;
   explanation: string;
 };
 
