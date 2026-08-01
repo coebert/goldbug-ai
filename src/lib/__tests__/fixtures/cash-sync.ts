@@ -66,6 +66,65 @@ export const fundedAtBaselineSeries: SeriesPoint[] = [
   { date: "2026-07-26", value: 10150.0 },
 ];
 
+// --- Series with NO re-anchorable equity step -------------------------
+// The repair claims money arrived, but the equity series never rises.
+// Every one of these must make the inferred flow disappear rather than
+// be netted verbatim (which would fabricate a large loss on the card).
+
+/** Perfectly flat equity — nothing ever moved. */
+export const flatSeries: SeriesPoint[] = [
+  { date: "2026-07-22", value: 10189.12 },
+  { date: "2026-07-23", value: 10189.12 },
+  { date: "2026-07-24", value: 10189.12 },
+  { date: "2026-07-25", value: 10189.12 },
+];
+
+/** Strictly monotonic decline, larger window than `decliningSeries`. */
+export const steadyDeclineSeries: SeriesPoint[] = [
+  { date: "2026-07-18", value: 12000 },
+  { date: "2026-07-19", value: 11900 },
+  { date: "2026-07-20", value: 11750 },
+  { date: "2026-07-21", value: 11500 },
+  { date: "2026-07-22", value: 11480 },
+  { date: "2026-07-23", value: 11000 },
+];
+
+/** Down-and-flat: some steps are zero, none are positive. */
+export const declineThenFlatSeries: SeriesPoint[] = [
+  { date: "2026-07-20", value: 9000 },
+  { date: "2026-07-21", value: 8500 },
+  { date: "2026-07-22", value: 8500 },
+  { date: "2026-07-23", value: 8500 },
+  { date: "2026-07-24", value: 8200 },
+];
+
+/** Out-of-order rows that still contain no positive step once sorted. */
+export const unsortedDeclineSeries: SeriesPoint[] = [
+  { date: "2026-07-23", value: 9100 },
+  { date: "2026-07-20", value: 10000 },
+  { date: "2026-07-22", value: 9400 },
+  { date: "2026-07-21", value: 9700 },
+];
+
+/** Only one usable snapshot — not enough series to judge a step. */
+export const singlePointSeries: SeriesPoint[] = [
+  { date: "2026-07-24", value: 10189.12 },
+];
+
+/** No snapshots at all. */
+export const emptySeries: SeriesPoint[] = [];
+
+/**
+ * Rows exist but their values are junk, so after cleaning there are
+ * fewer than two usable points. Cards built on such a series render no
+ * percentage at all, so a pass-through flow is inert.
+ */
+export const corruptSeries = [
+  { date: "2026-07-23", value: Number.NaN },
+  { date: "2026-07-24", value: Number.POSITIVE_INFINITY },
+  { date: "2026-07-25", value: "n/a" },
+] as unknown as SeriesPoint[];
+
 export const cashSyncRows = {
   /** The canonical bug row: repair with no known prior baseline. */
   missingPreviousStarting: row("2026-07-27T06:12:00.000Z", {
