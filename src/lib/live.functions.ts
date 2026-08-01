@@ -13,6 +13,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
+import {
+  assertBrokerAccountUnclaimed,
+  brokerAccountClaimedMessage,
+  isBrokerAccountUniqueViolation,
+} from "@/lib/broker-account-claim";
+
 
 
 /** Activate live trading on a portfolio. Requires ping + optional balance read. */
