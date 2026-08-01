@@ -1853,8 +1853,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
 
       const spendableCash = Math.max(0, workingCash - cashFloor);
-      let spend = spendableCash * pct;
-      const sizingNotes: string[] = [];
+      // Risk dial, buy side: position-size multiplier × buy aggressiveness.
+      // Every downstream cap (per-symbol, class, vol, cash) still applies.
+      let spend = aggressiveBuySpend(spendableCash * pct, aggression);
+      const sizingNotes: string[] = [
+        `dial ${aggression.level} (${aggression.name}) size×${aggression.sizeMult.toFixed(2)} buy×${aggression.buy.toFixed(2)}`,
+      ];
 
       // Conviction-weighted Kelly cap (only shrinks; never grows above requested %)
       if (typeof order.conviction === "number") {
