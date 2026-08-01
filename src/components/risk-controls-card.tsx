@@ -370,6 +370,63 @@ export function RiskControlsCard({
                 <span>Growth</span>
                 <span>High risk</span>
               </div>
+
+              {/* Sizing and per-side aggressiveness. The preset sets these,
+                  but they can be fine-tuned without moving the whole dial. */}
+              <div className="mt-4 space-y-4 border-t border-border/60 pt-4">
+                <p className="flex items-center gap-2 text-xs font-semibold">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> Sizing &
+                  aggressiveness
+                </p>
+                {(
+                  [
+                    {
+                      key: "size_multiplier" as const,
+                      label: "Position size",
+                      hint: "Scales every buy budget and the per-symbol cap.",
+                      bounds: SIZE_MULT_BOUNDS,
+                    },
+                    {
+                      key: "buy_aggressiveness" as const,
+                      label: "Buy aggressiveness",
+                      hint: "How much of a wanted buy is taken in one go.",
+                      bounds: AGGRESSIVENESS_BOUNDS,
+                    },
+                    {
+                      key: "sell_aggressiveness" as const,
+                      label: "Sell aggressiveness",
+                      hint: "How fast trims and exits are completed.",
+                      bounds: AGGRESSIVENESS_BOUNDS,
+                    },
+                  ]
+                ).map((row) => {
+                  const value = clampRange(
+                    cfg[row.key],
+                    row.bounds.min,
+                    row.bounds.max,
+                    1,
+                  );
+                  return (
+                    <div key={row.key} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <Label className="text-xs">{row.label}</Label>
+                        <span className="font-medium text-primary">{value.toFixed(2)}×</span>
+                      </div>
+                      <Slider
+                        min={row.bounds.min}
+                        max={row.bounds.max}
+                        step={0.05}
+                        value={[value]}
+                        onValueChange={(v) =>
+                          setCfg((c) => ({ ...c, [row.key]: v[0] ?? value }))
+                        }
+                      />
+                      <p className="text-[11px] text-muted-foreground">{row.hint}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
               {lastChange && (
                 <div className="mt-4 rounded-md border border-primary/30 bg-background/60 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
