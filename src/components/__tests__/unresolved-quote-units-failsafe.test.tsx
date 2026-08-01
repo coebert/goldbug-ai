@@ -189,7 +189,8 @@ describe("UI: unresolvable units render as unknown, never as a percentage", () =
       closes: [4, 4.2],
       dates: ["2026-07-31", "2026-08-01"],
       currentPrice: 4.2,
-      pctChangeSincePurchase: 5,
+      // Fractions: the card renders these as percentages.
+      pctChangeSincePurchase: 0.05,
       valueChangeSincePurchase: 100,
       opened_at: "2026-07-01",
       hourly: [],
@@ -199,7 +200,7 @@ describe("UI: unresolvable units render as unknown, never as a percentage", () =
       dates: ["2026-07-31", "2026-08-01"],
       currentPrice: 275,
       // A number the pipeline would happily have rendered — it must not appear.
-      pctChangeSincePurchase: 10,
+      pctChangeSincePurchase: 0.1,
       valueChangeSincePurchase: 25_000,
       opened_at: "2026-07-01",
       hourly: [],
@@ -230,10 +231,10 @@ describe("UI: unresolvable units render as unknown, never as a percentage", () =
   it("never renders the unresolved row's percentage change", () => {
     const html = render();
     // The would-be percentage (+10.0%) and value change must be absent.
-    expect(html).not.toMatch(/\+?10\.0\s*%/);
+    expect(html).not.toMatch(/\+?10\.00\s*%/);
     expect(html).not.toContain("25,000");
     // The resolvable neighbour still shows its correct +5%.
-    expect(html).toMatch(/5\.0\s*%/);
+    expect(html).toMatch(/\+5\.00\s*%/);
   });
 
   it("does not let unknown units inflate portfolio weights", () => {
