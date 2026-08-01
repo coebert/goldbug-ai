@@ -108,6 +108,26 @@ function parseCfg(raw: unknown): RiskConfig {
       return out;
     })(),
     risk_level: lvl && lvl >= 1 && lvl <= 5 ? lvl : undefined,
+    // Sizing / aggressiveness knobs — clamped on read so a bad stored value
+    // can never widen risk beyond the hard bounds.
+    size_multiplier: clampRange(
+      r.size_multiplier,
+      SIZE_MULT_BOUNDS.min,
+      SIZE_MULT_BOUNDS.max,
+      resolveAggressiveness(r).sizeMult,
+    ),
+    buy_aggressiveness: clampRange(
+      r.buy_aggressiveness,
+      AGGRESSIVENESS_BOUNDS.min,
+      AGGRESSIVENESS_BOUNDS.max,
+      resolveAggressiveness(r).buy,
+    ),
+    sell_aggressiveness: clampRange(
+      r.sell_aggressiveness,
+      AGGRESSIVENESS_BOUNDS.min,
+      AGGRESSIVENESS_BOUNDS.max,
+      resolveAggressiveness(r).sell,
+    ),
     diversification_tilt:
       r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
         ? r.diversification_tilt
