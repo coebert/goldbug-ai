@@ -1069,6 +1069,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
 
   const cfg = tightened.cfg;
+  // Risk dial (1..5) → position sizing + per-side trade aggressiveness.
+  const aggression = resolveAggressiveness(portfolio.risk_config);
   const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
   const cashFloor = totalValue * cashFloorPctEff;
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
