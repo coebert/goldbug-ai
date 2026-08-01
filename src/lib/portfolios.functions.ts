@@ -11,6 +11,7 @@ import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
 import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
 import { deletePortfolioWithCleanup } from "./portfolio-delete-cleanup";
+import { reanchorInferredInflow } from "./infer-cash-flow";
 
 import {
   detectSnapshotTimingMismatches,
@@ -202,13 +203,33 @@ export const getAllPortfoliosEquity = createServerFn({ method: "GET" })
         }
         const amt = Number(resp.delta);
         if (!Number.isFinite(amt) || amt === 0) continue;
-        deposits.push({
-          portfolio_id: row.portfolio_id,
+        const raw = {
           date: String(row.created_at).slice(0, 10),
           amount: amt,
+        };
+        // No known prior baseline → the delta is a starting_cash repair,
+        // not measured cash movement. Re-anchor it onto the equity step
+        // the portfolio actually shows so the card doesn't net out money
+        // that never arrived (see src/lib/infer-cash-flow.ts).
+        const trusted = Number.isFinite(prevStart);
+        const flow = trusted
+          ? raw
+          : reanchorInferredInflow(
+              raw,
+              (built.perPortfolioSeries?.[row.portfolio_id] ?? []) as Array<{
+                date: string;
+                value: number;
+              }>,
+            );
+        if (!flow) continue;
+        deposits.push({
+          portfolio_id: row.portfolio_id,
+          date: flow.date,
+          amount: flow.amount,
         });
       }
     }
+
 
     const liveIds = list.filter((p) => p.mode === "live_prod").map((p) => p.id);
     let mismatches: SnapshotMismatch[] = [];
@@ -354,12 +375,17 @@ export const getPortfolio = createServerFn({ method: "GET" })
         .eq("method", "CASH_SYNC")
         .eq("status", 200)
         .order("created_at", { ascending: false });
+      const ownSeries = (equity ?? []).map((r) => ({
+        date: String((r as { snapshot_date?: unknown }).snapshot_date ?? ""),
+        value: Number((r as { total_value?: unknown }).total_value ?? Number.NaN),
+      }));
       for (const row of cashSyncs ?? []) {
         if (!row.created_at) continue;
         const resp = (row.response ?? {}) as {
           delta?: number | string;
           startingCashAdjusted?: boolean;
           currency?: string;
+          previousStarting?: number | string;
         };
         if (!brokerCurrency && typeof resp.currency === "string" && resp.currency) {
           brokerCurrency = resp.currency.toUpperCase();
@@ -367,10 +393,19 @@ export const getPortfolio = createServerFn({ method: "GET" })
         if (!resp.startingCashAdjusted) continue;
         const amt = Number(resp.delta);
         if (!Number.isFinite(amt) || amt === 0) continue;
-        deposits.push({ date: String(row.created_at).slice(0, 10), amount: amt });
-        startingCashAbsorbed += amt;
+        const raw = { date: String(row.created_at).slice(0, 10), amount: amt };
+        // Same rule as the home-page list: a sync with no known prior
+        // baseline is a starting_cash repair, so re-anchor it onto the
+        // equity step the portfolio actually shows.
+        const flow = Number.isFinite(Number(resp.previousStarting))
+          ? raw
+          : reanchorInferredInflow(raw, ownSeries);
+        if (!flow) continue;
+        deposits.push(flow);
+        startingCashAbsorbed += flow.amount;
       }
     }
+
 
     const startingCash = Number(
       (portfolio as { starting_cash?: number | string }).starting_cash ?? 0,
