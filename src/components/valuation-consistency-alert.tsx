@@ -76,15 +76,44 @@ export function ValuationConsistencyAlert({
                 </div>
                 <p className="text-xs text-muted-foreground">{jump.explanation}</p>
                 {jump.suspect_symbols.length > 0 ? (
-                  <ul className="space-y-0.5 pl-3">
+                  <ul className="space-y-1 pl-3">
                     {jump.suspect_symbols.map((s) => (
                       <li key={s.symbol} className="text-[11px] text-muted-foreground">
                         <span className="font-mono text-foreground">{s.symbol}</span> — {s.reason} ·{" "}
                         {fmt(s.value_base)} {data?.base_ccy} ({fmt(s.weight * 100, 1)}% of book)
+                        <div className="font-mono text-[10px] text-muted-foreground/80">
+                          FX {s.fx.from_ccy} → {s.fx.to_ccy} @ {fmt(s.fx.rate, 4)} ({s.fx.pair})
+                          {s.fx.assumed ? " · no rate found, 1.0 assumed" : null}
+                        </div>
+                        <div className="font-mono text-[10px] text-muted-foreground/70">
+                          {s.fx.detail}
+                        </div>
                       </li>
                     ))}
                   </ul>
                 ) : null}
+                {jump.fx_breakdown.length > 0 ? (
+                  <div className="pl-3">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
+                      FX conversion on {jump.date}
+                    </p>
+                    <ul className="space-y-0.5">
+                      {jump.fx_breakdown.map((leg) => (
+                        <li
+                          key={leg.from_ccy}
+                          className="font-mono text-[10px] text-muted-foreground"
+                        >
+                          {leg.from_ccy} → {leg.to_ccy} @ {fmt(leg.rate, 4)} · {fmt(leg.value_from)}{" "}
+                          {leg.from_ccy} = {fmt(leg.value_to)} {leg.to_ccy} ·{" "}
+                          {fmt(leg.weight * 100, 1)}% of marks · {leg.positions}{" "}
+                          {leg.positions === 1 ? "position" : "positions"}
+                          {leg.assumed ? " · rate assumed 1.0" : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
               </li>
             ))}
           </ul>
