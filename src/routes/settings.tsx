@@ -4,6 +4,7 @@ import { PushNotificationsCard } from "@/components/push-notifications-card";
 import { TradingControlsCard } from "@/components/trading-controls-card";
 import { MfaCard } from "@/components/mfa-card";
 import { CorporateActionAlertSettingsCard } from "@/components/corporate-action-alert-settings-card";
+import { ValuationHistoryBackfillCard } from "@/components/valuation-history-backfill-card";
 
 
 export const Route = createFileRoute("/settings")({
