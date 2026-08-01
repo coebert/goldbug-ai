@@ -36,44 +36,57 @@ export function TodayHero({
     );
   }
 
-  const combinedNow = safe(summary.real.now) + safe(summary.sim.now);
-  const combinedPnl = safe(summary.real.pnl) + safe(summary.sim.pnl);
-  const prevBase = combinedNow - combinedPnl;
-  const combinedPct = prevBase > 0 ? (combinedPnl / prevBase) * 100 : 0;
-  const positive = combinedPnl >= 0;
+  // Real money leads: the headline figure is the broker-held equity.
+  const realNow = safe(summary.real.now);
+  const realPnl = safe(summary.real.pnl);
+  const realBase = realNow - realPnl;
+  const realPct = realBase > 0 ? (realPnl / realBase) * 100 : 0;
+  const positive = realPnl >= 0;
   const TrendIcon = positive ? TrendingUp : TrendingDown;
-  const totalPortfolios = summary.real.count + summary.sim.count;
+  const simNow = safe(summary.sim.now);
+  const simPnl = safe(summary.sim.pnl);
+  const simPositive = simPnl >= 0;
+  const combinedNow = realNow + simNow;
+
 
   return (
     <section className="mb-6 rounded-2xl border border-border/70 bg-surface-2 shadow-[var(--shadow-card)]">
       <div className="grid gap-4 px-4 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6 sm:px-6 sm:py-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-            <span>Today · combined equity</span>
+            <span>Today · real money equity</span>
             <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] font-medium normal-case text-foreground/70">
-              {totalPortfolios} portfolio{totalPortfolios === 1 ? "" : "s"}
+              {summary.real.count} portfolio{summary.real.count === 1 ? "" : "s"} at your broker
             </span>
           </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-display text-3xl font-bold leading-none tracking-tight tabular-nums sm:text-4xl">
-              {formatGBP(combinedNow)}
+              {formatGBP(realNow)}
             </span>
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
                 positive ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive"
               }`}
-              aria-label={`Change since yesterday: ${positive ? "up" : "down"} ${Math.abs(combinedPct).toFixed(2)} percent`}
+              aria-label={`Change since yesterday: ${positive ? "up" : "down"} ${Math.abs(realPct).toFixed(2)} percent`}
             >
               <TrendIcon className="h-3 w-3" aria-hidden />
               {positive ? "+" : ""}
-              {combinedPct.toFixed(2)}%
+              {realPct.toFixed(2)}%
             </span>
             <span
               className={`text-xs tabular-nums ${positive ? "text-success" : "text-destructive"}`}
             >
               {positive ? "+" : ""}
-              {formatGBP(combinedPnl)} vs yesterday
+              {formatGBP(realPnl)} vs yesterday
             </span>
+          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground tabular-nums">
+            Practice money: {formatGBP(simNow)}{" "}
+            <span className={simPositive ? "text-success" : "text-destructive"}>
+              ({simPositive ? "+" : ""}
+              {formatGBP(simPnl)})
+            </span>{" "}
+            · Combined {formatGBP(combinedNow)}
           </div>
           {mixedCurrency && (
             <div
@@ -88,6 +101,7 @@ export function TodayHero({
               </span>
             </div>
           )}
+
         </div>
         <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border/60 bg-surface-sunken px-3 py-2">
           <Clock className="h-4 w-4 text-primary" aria-hidden />
@@ -102,15 +116,6 @@ export function TodayHero({
 
       <div className="grid gap-2 border-t border-border/60 px-4 py-3 sm:grid-cols-2 sm:gap-3 sm:px-6 sm:py-4">
         <ModeSummaryTile
-          label="Practice money"
-          sublabel="Pretend cash, real prices"
-          tone="sim"
-          money={summary.sim.now}
-          pnl={summary.sim.pnl}
-          pct={summary.sim.pct}
-          count={summary.sim.count}
-        />
-        <ModeSummaryTile
           label="Real money"
           sublabel="Held at your broker"
           tone="real"
@@ -119,7 +124,19 @@ export function TodayHero({
           pct={summary.real.pct}
           count={summary.real.count}
         />
+        <div className="opacity-70">
+          <ModeSummaryTile
+            label="Practice money"
+            sublabel="Pretend cash, real prices"
+            tone="sim"
+            money={summary.sim.now}
+            pnl={summary.sim.pnl}
+            pct={summary.sim.pct}
+            count={summary.sim.count}
+          />
+        </div>
       </div>
+
     </section>
   );
 }

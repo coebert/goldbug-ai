@@ -149,6 +149,37 @@ function Home() {
   if (!ready || !session) return <PageLoading />;
 
   const portfolioCount = q.data?.length ?? 0;
+  const allPortfolios = q.data ?? [];
+  const realPortfolios = allPortfolios.filter((p) => p.mode === "live_prod");
+  const simPortfolios = allPortfolios.filter((p) => p.mode !== "live_prod");
+
+  const renderPortfolioRow = (p: (typeof allPortfolios)[number]) => (
+    <PortfolioRow
+      key={p.id}
+      portfolio={p}
+      sparkSeries={sparkByPortfolio[p.id] ?? []}
+      deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
+      includeDeposits={includeDeposits}
+      isLoadingEquity={equityQ.isLoading}
+      isRefreshingEquity={isRefreshingEquity}
+      equityError={equityErrored ? equityErrorMessage : null}
+      onRetryEquity={() => equityQ.refetch()}
+      equityDecimals={equityDecimals}
+      brokerCurrency={
+        (equityQ.data as { brokerCurrencyByPortfolio?: Record<string, string> } | undefined)
+          ?.brokerCurrencyByPortfolio?.[p.id] ?? null
+      }
+      holdings={
+        (equityQ.data as {
+          holdingsByPortfolio?: Record<
+            string,
+            Array<{ symbol: string; quantity: number; avg_cost: number; asset_class: string | null }>
+          >;
+        } | undefined)?.holdingsByPortfolio?.[p.id] ?? []
+      }
+    />
+  );
+
 
   return (
     <div className="min-h-dvh bg-surface-1">
@@ -206,13 +237,13 @@ function Home() {
 
         <NewHereBanner />
 
-        {/* Portfolios — the second thing anyone looks for */}
+        {/* Portfolios — real money first, practice money folded away */}
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="font-display text-lg font-semibold tracking-tight">Your portfolios</h2>
+              <h2 className="font-display text-lg font-semibold tracking-tight">Real money</h2>
               <span className="text-xs text-muted-foreground">
-                {portfolioCount === 0 ? "" : `${portfolioCount} in total`}
+                {portfolioCount === 0 ? "" : `${portfolioCount} portfolio${portfolioCount === 1 ? "" : "s"} in total`}
               </span>
             </div>
             {q.isLoading && <p className="text-sm text-muted-foreground">Loading portfolios…</p>}
@@ -234,37 +265,30 @@ function Home() {
                 </CardContent>
               </Card>
             )}
-            {q.data?.map((p) => (
-              <PortfolioRow
-                key={p.id}
-                portfolio={p}
-                sparkSeries={sparkByPortfolio[p.id] ?? []}
-                deposits={((equityQ.data as { deposits?: Array<{ portfolio_id: string; date: string; amount: number }> } | undefined)?.deposits ?? []).filter((d) => d.portfolio_id === p.id).map((d) => ({ date: d.date, amount: d.amount }))}
-                includeDeposits={includeDeposits}
-                isLoadingEquity={equityQ.isLoading}
-                isRefreshingEquity={isRefreshingEquity}
-                equityError={equityErrored ? equityErrorMessage : null}
-                onRetryEquity={() => equityQ.refetch()}
-                equityDecimals={equityDecimals}
-                brokerCurrency={
-                  (equityQ.data as { brokerCurrencyByPortfolio?: Record<string, string> } | undefined)
-                    ?.brokerCurrencyByPortfolio?.[p.id] ?? null
-                }
-                holdings={
-                  (equityQ.data as {
-                    holdingsByPortfolio?: Record<
-                      string,
-                      Array<{ symbol: string; quantity: number; avg_cost: number; asset_class: string | null }>
-                    >;
-                  } | undefined)?.holdingsByPortfolio?.[p.id] ?? []
-                }
-              />
-            ))}
+            {q.data && q.data.length > 0 && realPortfolios.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No real-money portfolio connected yet. Your practice portfolios are below.
+              </p>
+            )}
+            {realPortfolios.map(renderPortfolioRow)}
+
+            {simPortfolios.length > 0 && (
+              <div className="pt-3">
+                <AdvancedSection
+                  title={`Practice portfolios (${simPortfolios.length})`}
+                  summary="Simulated money at real prices. Useful for comparison — no real cash involved."
+                  defaultOpen={false}
+                >
+                  <div className="space-y-3">{simPortfolios.map(renderPortfolioRow)}</div>
+                </AdvancedSection>
+              </div>
+            )}
           </div>
           <div id="create-portfolio" className="scroll-mt-24">
             <CreatePortfolioCard />
           </div>
         </div>
+
 
         {/* Everything expert-level lives here: present, labelled in plain
             English, but folded away unless asked for. */}
