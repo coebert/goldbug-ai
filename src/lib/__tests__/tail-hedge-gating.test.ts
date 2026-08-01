@@ -116,11 +116,11 @@ describe("tail-hedge SELL is not suppressed when the position can support it", (
     expect(res.reason).toContain("cost basis");
   });
 
-  it("applies the GBX→GBP rule to an LSE cost-basis fallback, like the engine does", () => {
-    // avg_cost on an LSE line is pence-quoted; 4000p = £40, so a £400 clip is
-    // 10 units — not 1000. Same normalisation the engine's holdingLivePrice
-    // fallback uses, so hedge sizing can't disagree with exposure maths.
-    const holdings = new Map<string, Holding>([["SGLN.L", holding("SGLN.L", 100, 4000)]]);
+  it("uses the stored LSE cost basis verbatim (already GBP), like the engine does", () => {
+    // avg_cost is persisted in base currency by the broker-sync writers, so a
+    // £40 SGLN.L line sizes a £400 clip at 10 units. Re-dividing by 100 here
+    // would size 1000 units and disagree with the engine's exposure maths.
+    const holdings = new Map<string, Holding>([["SGLN.L", holding("SGLN.L", 100, 40)]]);
     const res = applyTailHedgeToPaperPortfolio({
       ...BASE,
       decision: sellDecision(400),
