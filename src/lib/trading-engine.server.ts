@@ -103,7 +103,7 @@ import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
 // tail-hedge trim, rebalance band — miss the position and reject with "no
 // holding to sell", so exits silently never fired on live accounts. Always
 // key by this, and keep the untouched `h.symbol` for persistence.
-function engineSymbolKey(symbol: string): string {
+export function engineSymbolKey(symbol: string): string {
   return resolvePriceSymbol(String(symbol ?? "")).toUpperCase();
 }
 
