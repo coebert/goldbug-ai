@@ -73,7 +73,7 @@ export function AdvancedSection({
       </button>
       {rendered && (
         <div
-          hidden={!open}
+          aria-hidden={!open}
           className={`space-y-4 border-t border-border/60 p-3 sm:p-4 ${
             open
               ? "animate-in fade-in slide-in-from-top-1 duration-200 ease-out"
