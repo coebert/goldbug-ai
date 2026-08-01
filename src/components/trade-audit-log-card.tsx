@@ -312,7 +312,7 @@ function AuditRow({
       {isOpen && (
         <tr className="border-t border-border bg-muted/30">
           <td colSpan={7} className="px-3 py-3">
-            <TradeExplanationPanel entry={entry} />
+            <TradeExplanationPanel entry={entry} portfolioId={portfolioId} />
             <div className="grid gap-3 md:grid-cols-2 mt-3">
 
               <div>
