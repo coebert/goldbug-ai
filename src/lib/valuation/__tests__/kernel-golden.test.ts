@@ -32,7 +32,7 @@ describe("valuation kernel — golden cases", () => {
       price: () => 350, // pence
     });
     // 100 shares at 350p = GBP 350, not GBP 35,000.
-    expect(res.total).toBeCloseTo(350, 6);
+    expect(res.totalValue).toBeCloseTo(350, 6);
   });
 
   it("already-normalised GBP prices are not divided a second time", () => {
@@ -41,7 +41,7 @@ describe("valuation kernel — golden cases", () => {
       price: () => 3.5,
       observedQuoteCcy: () => "GBP",
     });
-    expect(res.total).toBeCloseTo(350, 6);
+    expect(res.totalValue).toBeCloseTo(350, 6);
   });
 
   it("USD holdings are FX-converted, never counted 1:1 as GBP", () => {
@@ -49,7 +49,7 @@ describe("valuation kernel — golden cases", () => {
       holdings: [{ symbol: "AAPL", quantity: 10, avg_cost: 150, instrument_ccy: "USD" }],
       price: () => 200,
     });
-    expect(res.total).toBeCloseTo(10 * 200 * 0.79, 6);
+    expect(res.totalValue).toBeCloseTo(10 * 200 * 0.79, 6);
   });
 
   it("flags a missing FX rate instead of silently using 1:1", () => {
@@ -60,7 +60,9 @@ describe("valuation kernel — golden cases", () => {
       price: () => 40,
       fx: () => null,
     });
-    expect(res.warnings.map((w) => w.code)).toContain("fx_fallback_identity");
+    expect(res.provenance.warnings.map((w) => w.code)).toContain("missing_fx_rate");
+    expect(res.provenance.lines[0]?.fxSource).toBe("fallback_identity");
+    expect(res.provenance.degraded).toBe(true);
   });
 
   it("multi-currency wallet is converted per currency", () => {
@@ -68,12 +70,12 @@ describe("valuation kernel — golden cases", () => {
       holdings: [],
       wallet: { GBP: 1000, USD: 1000, EUR: 1000 },
     });
-    expect(res.cashTotal).toBeCloseTo(1000 + 790 + 850, 6);
+    expect(res.cash).toBeCloseTo(1000 + 790 + 850, 6);
   });
 
   it("GBX wallet balance is treated as pence", () => {
     const res = run({ holdings: [], wallet: { GBX: 10_000 } });
-    expect(res.cashTotal).toBeCloseTo(100, 6);
+    expect(res.cash).toBeCloseTo(100, 6);
   });
 
   it("cash + holdings identity always holds", () => {
@@ -85,7 +87,7 @@ describe("valuation kernel — golden cases", () => {
       wallet: { GBP: 500, USD: 200 },
       price: (s) => (s === "AAPL" ? 200 : 350),
     });
-    expect(res.total).toBeCloseTo(res.cashTotal + res.holdingsTotal, 6);
+    expect(res.totalValue).toBeCloseTo(res.cash + res.holdingsValue, 6);
   });
 
   it("cost-basis fallback is opt-in and marked in provenance", () => {
@@ -111,7 +113,7 @@ describe("valuation kernel — golden cases", () => {
       ],
       price: () => 100,
     });
-    expect(res.holdingsTotal).toBeCloseTo(-5 * 100 * 0.79, 6);
+    expect(res.holdingsValue).toBeCloseTo(-5 * 100 * 0.79, 6);
   });
 
   it("non-finite prices are rejected rather than producing NaN totals", () => {
@@ -119,17 +121,19 @@ describe("valuation kernel — golden cases", () => {
       holdings: [{ symbol: "AAPL", quantity: 10, avg_cost: 150, instrument_ccy: "USD" }],
       price: () => Number.NaN,
     });
-    expect(Number.isFinite(res.total)).toBe(true);
+    expect(Number.isFinite(res.totalValue)).toBe(true);
   });
 });
 
 describe("resolveQuoteUnits", () => {
   it("divides LSE pence by 100 and leaves US quotes alone", () => {
-    expect(resolveQuoteUnits("MKS.L", "GBP", "GBP").divisor).toBe(100);
-    expect(resolveQuoteUnits("AAPL", "USD", "GBP").divisor).toBe(1);
+    expect(resolveQuoteUnits("MKS.L", "GBP", null, "GBP").unitDivisor).toBe(100);
+    expect(resolveQuoteUnits("AAPL", "USD", null, "GBP").unitDivisor).toBe(1);
   });
 
   it("honours an explicitly observed major-unit currency", () => {
-    expect(resolveQuoteUnits("MKS.L", "GBP", "GBP", "GBP").divisor).toBe(1);
+    const r = resolveQuoteUnits("MKS.L", "GBP", "GBP", "GBP");
+    expect(r.unitDivisor).toBe(1);
+    expect(r.quoteCurrencySource).toBe("observed");
   });
 });
