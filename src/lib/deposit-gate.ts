@@ -22,7 +22,10 @@ export const DRIFT_EPSILON = 0.5;
 export type DepositGateInput = {
   mode: "live_sim" | "live_prod";
   hasLocalHoldings: boolean;
+  /** Broker's reported cash balance for this account, if known. */
+  brokerCash?: number | null;
   /** brokerCash − localCash (before this sync). */
+
   delta: number;
   /** Net cash effect of recent fills within the lookback window. */
   explainedCashDelta: number;
