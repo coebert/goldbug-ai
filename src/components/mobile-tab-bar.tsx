@@ -79,6 +79,7 @@ export function MobileTabBar() {
 
         <Link
           to="/compare"
+          onTouchStart={() => prefetchOnTouch({ to: "/compare" })}
           aria-label="More destinations"
           className="flex min-h-[52px] min-w-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[11px] text-muted-foreground transition-colors hover:text-foreground [&.active]:text-primary"
         >
