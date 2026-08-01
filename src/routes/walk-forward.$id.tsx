@@ -360,7 +360,7 @@ function WalkForwardPage() {
                     type="monotone"
                     dataKey="pct"
                     name="Out-of-sample"
-                    stroke={CHART_ROLE.primary}
+                    stroke={CHART_ROLE.positive}
                     dot={false}
                     strokeWidth={2}
                   />
