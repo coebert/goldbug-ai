@@ -61,13 +61,14 @@ describe("holding trend chart window & baseline parity", () => {
   });
 
   it("LSE GBX rows use the same GBP baseline in chart and headline", () => {
-    // HSBA.L stores avg_cost and closes in pence (GBX); normalizer converts
-    // BOTH to GBP so the sparkline and headline share one currency.
+    // HSBA.L feed closes arrive in pence (GBX) and are converted to GBP,
+    // while avg_cost is persisted in GBP already — so the sparkline and the
+    // headline share one currency without double-converting the cost basis.
     const s = buildHoldingSeries(
       {
         symbol: "HSBA:xlon",
         quantity: 100,
-        avg_cost: 1500, // 1500p == £15.00
+        avg_cost: 15, // already GBP (writers normalise 1500p → £15.00)
         opened_at: "2026-06-01",
         asset_class: "stock",
       },
