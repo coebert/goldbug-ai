@@ -75,6 +75,36 @@ export async function valuePortfolioHoldings(
   input: ValueHoldingsInput,
 ): Promise<ValuationResult> {
   const base = (input.baseCcy || "GBP").toUpperCase();
+
+  // Prefer the currency the price feed actually quoted each symbol in over the
+  // ticker-suffix heuristic. This is the fact that stops "is this LSE line in
+  // pence?" from being an allowlist maintenance problem.
+  let observed: (symbol: string) => string | null = () => null;
+  try {
+    const [{ supabaseAdmin }, { loadObservedQuoteCurrencies }] = await Promise.all([
+      import("@/integrations/supabase/client.server"),
+      import("./observed-quote-currency"),
+    ]);
+    observed = await loadObservedQuoteCurrencies(
+      supabaseAdmin,
+      (input.holdings ?? []).map((h) => String(h.symbol)),
+    );
+  } catch {
+    /* no observations yet — fall back to the heuristic below */
+  }
+
+  /** "GBP" for pounds, "GBX" for pence, null when we have no observation. */
+  const observedUnit = (symbol: string): "major" | "minor" | null => {
+    const raw = observed(symbol);
+    if (!raw) return null;
+    const u = raw.toUpperCase();
+    if (u === "GBX" || u === "GBP" || u === "ZAC" || u === "ILA") {
+      // Yahoo reports pence as "GBp"; the raw casing carries the distinction.
+      return raw === "GBP" || raw === "ZAR" || raw === "ILS" ? "major" : raw === "GBp" || u === "GBX" ? "minor" : "major";
+    }
+    return "major";
+  };
+
   const holdings = (input.holdings ?? []).map((h) => ({
     ...h,
     // Cost basis is stored in native quote units; bring it into major units so
@@ -82,7 +112,16 @@ export async function valuePortfolioHoldings(
     avg_cost:
       h.avg_cost == null
         ? null
-        : normalizeLseDisplayPriceToBase(String(h.symbol), Number(h.avg_cost), h.asset_class ?? null),
+        : (() => {
+            const unit = observedUnit(String(h.symbol));
+            if (unit === "minor") return Number(h.avg_cost) / 100;
+            if (unit === "major") return Number(h.avg_cost);
+            return normalizeLseDisplayPriceToBase(
+              String(h.symbol),
+              Number(h.avg_cost),
+              h.asset_class ?? null,
+            );
+          })(),
   }));
 
   const currencies = new Set<string>([base]);
@@ -103,6 +142,13 @@ export async function valuePortfolioHoldings(
     fx: (from, to) => (from === to ? 1 : (rates.get(`${from.toUpperCase()}>${to.toUpperCase()}`) ?? null)),
     // Prices are already in major units, so tell the kernel not to divide.
     observedQuoteCcy: (symbol) => {
+      const raw = observed(symbol);
+      if (raw) {
+        const u = raw.toUpperCase();
+        // Report the MAJOR currency: prices reaching the kernel are already in
+        // major units, so pence must not trigger a second divide.
+        return u === "GBX" ? "GBP" : u;
+      }
       const h = holdings.find((x) => String(x.symbol).toUpperCase() === symbol.toUpperCase());
       return majorUnitCurrency(symbol, h?.instrument_ccy ?? null, base);
     },
