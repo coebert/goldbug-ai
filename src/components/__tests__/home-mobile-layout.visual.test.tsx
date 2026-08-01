@@ -29,8 +29,16 @@ import { AdvancedSection } from "@/components/advanced-section";
 import type { ModeSummaryPair } from "@/lib/mode-summary";
 
 // Frozen clock so the hero's "next AI run" countdown is deterministic.
+//
+// This MUST run at module scope, not in `beforeAll`: the `describe`
+// bodies below render their markup during collection, which happens
+// *before* any hook fires. Freezing in `beforeAll` left those renders
+// on the wall clock, so the "in MM:SS" countdown differed on every run
+// and the snapshot churned. 10:17:30 BST => next run 11:00 BST, 42:30.
+vi.useFakeTimers();
+vi.setSystemTime(new Date("2026-08-01T09:17:30Z"));
+
 beforeAll(() => {
-  vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-08-01T09:17:30Z"));
 });
 afterAll(() => {
