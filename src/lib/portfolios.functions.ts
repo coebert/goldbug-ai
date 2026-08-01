@@ -10,6 +10,8 @@ import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
 import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
+import { deletePortfolioWithCleanup } from "./portfolio-delete-cleanup";
+
 import {
   detectSnapshotTimingMismatches,
   logSnapshotTimingMismatches,
