@@ -212,6 +212,8 @@ export function TradeAuditLogCard({
                   const isOpen = expanded === key;
                   return (
                     <AuditRow
+                      portfolioId={portfolioId}
+
                       key={key}
                       entry={e}
                       isOpen={isOpen}
