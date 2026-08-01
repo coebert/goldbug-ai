@@ -15,7 +15,7 @@ export const COMPLETED_TTL_MS = 24 * 60 * 60 * 1000;
 export const IN_PROGRESS_TTL_MS = 60 * 60 * 1000;
 
 export function expiryFor(status: "in_progress" | "completed", now: number = Date.now()): string {
-  const ttl = status === "completed" ? COMPLETED_TTL_MS : COMPLETED_TTL_MS;
+  const ttl = status === "completed" ? COMPLETED_TTL_MS : IN_PROGRESS_TTL_MS;
   return new Date(now + ttl).toISOString();
 }
 
