@@ -38,11 +38,40 @@ export const activateLive = createServerFn({ method: "POST" })
     if (!ping.ok) throw new Error(`Broker ping failed: ${ping.reason ?? "unknown"}`);
 
     let starting: number | null = null;
-    let brokerAccountId: string | null = ping.accountId ?? null;
+    const brokerAccountId: string | null = ping.accountId ?? null;
+
+    // ONE BROKER ACCOUNT PER PORTFOLIO.
+    // Saxo resolves the same account key for every activation made with the
+    // same credentials. Without this guard a second portfolio silently claims
+    // an account another portfolio already owns, and from then on every sync
+    // writes one broker snapshot into both books — the "portfolios are showing
+    // identical data" mirror error. A DB unique index backs this up, but we
+    // check here first so the user gets a readable message instead of a
+    // constraint violation.
+    if (brokerAccountId) {
+      const claimed = await supabase
+        .from("portfolios")
+        .select("id, name")
+        .eq("broker", "saxo")
+        .eq("broker_account_id", brokerAccountId)
+        .neq("id", data.portfolioId);
+      if (claimed.error) throw new Error(claimed.error.message);
+      const other = claimed.data?.[0];
+      if (other) {
+        throw new Error(
+          `Broker account ${brokerAccountId} is already linked to "${other.name}". ` +
+            `Two portfolios cannot share one broker account — they would mirror each other's ` +
+            `holdings and equity. Deactivate live trading on "${other.name}" first, or use a ` +
+            `different Saxo account for this portfolio.`,
+        );
+      }
+    }
+
     if (data.useBrokerBalance) {
       const bal = await adapter.getBalance();
       starting = bal.totalValue;
     }
+
     const patch = {
       mode: (data.targetEnv === "prod" ? "live_prod" : "live_sim") as "live_prod" | "live_sim",
       broker: "saxo",
