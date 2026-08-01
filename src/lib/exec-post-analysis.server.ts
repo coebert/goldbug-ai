@@ -91,7 +91,7 @@ export async function loadPriceSeries(
   return out;
 }
 
-function buildPrompt(summary: ExecPostStudySummary, events: ExecPostEvent[]): string {
+export function buildPrompt(summary: ExecPostStudySummary, events: ExecPostEvent[]): string {
   const sample = events.slice(0, 40).map((e) => ({
     d: e.post_date,
     who: e.executive_name,
