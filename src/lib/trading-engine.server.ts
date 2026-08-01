@@ -1351,10 +1351,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
         if (!openedAt) continue;
         if (String((t as { trade_date: string }).trade_date) >= openedAt.slice(0, 10)) {
-          scaleOutTakenBySym.set(
-            String((t as { symbol: string }).symbol),
-            (scaleOutTakenBySym.get(String((t as { symbol: string }).symbol)) ?? 0) + 1,
-          );
+          const key = engineSymbolKey(String((t as { symbol: string }).symbol));
+          scaleOutTakenBySym.set(key, (scaleOutTakenBySym.get(key) ?? 0) + 1);
+
         }
       }
     } catch {
