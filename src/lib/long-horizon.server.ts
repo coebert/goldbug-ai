@@ -459,10 +459,13 @@ export async function runLongHorizonBacktest(opts: {
         const cur = holdings.get(p.sym.symbol);
         const curValue = (cur?.qty ?? 0) * p.price;
         const diff = targetValue - curValue;
-        // ignore drift smaller than either 0.5% of portfolio or the min trade size
-        if (Math.abs(diff) < Math.max(totalValue2 * 0.005, execution.min_trade_value)) continue;
+        // Ignore drift smaller than the dial's band or the min trade size.
+        // A patient dial tolerates more drift; an aggressive one chases the
+        // target on thinner gaps.
+        if (Math.abs(diff) < Math.max(totalValue2 * aggression.driftBand, execution.min_trade_value))
+          continue;
         if (diff > 0) {
-          const spend = Math.min(diff, cash - cashFloor);
+          const spend = Math.min(aggressiveBuySpend(diff, aggression), cash - cashFloor);
           if (spend <= 0) continue;
           const res = buyShares(p.sym.symbol, spend, p.price);
           if (!res) continue;
@@ -470,7 +473,8 @@ export async function runLongHorizonBacktest(opts: {
           const newCost = ((cur?.qty ?? 0) * (cur?.avgCost ?? 0) + res.qty * res.effCost) / newQty;
           holdings.set(p.sym.symbol, { qty: newQty, avgCost: newCost });
         } else if (cur) {
-          const sellQty = Math.min(cur.qty, (-diff) / p.price);
+          const sellQty = aggressiveSellQty((-diff) / p.price, cur.qty, aggression);
+
           const ok = sellShares(p.sym.symbol, sellQty, p.price);
           if (ok == null) continue;
           const remaining = cur.qty - sellQty;
