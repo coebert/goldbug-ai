@@ -310,7 +310,7 @@ export async function tickSlicer(portfolioId: string, ownerUserId: string) {
       .then((r) => r),
     {
       timeoutMs: budget.slice(),
-      fallback: { data: [] } as { data: unknown[] },
+      fallback: { data: [], error: null } as unknown as never,
       onTimeout: (op, ms) => slicerLog.warn("slicer deadline exceeded", { op, ms, portfolioId: clean.portfolioId }),
     },
   );
