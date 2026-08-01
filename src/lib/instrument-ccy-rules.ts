@@ -105,7 +105,6 @@ export const MIC_CCY: Record<string, string> = {
   roco: "TWD",
   xshg: "CNY",
   xshe: "CNY",
-  xbse_in: "INR",
   xbom: "INR",
   xnse: "INR",
   xidx: "IDR",
@@ -158,7 +157,6 @@ export const SUFFIX_CCY: Record<string, string> = {
   VI: "EUR",
   SW: "CHF",
   EB: "CHF",
-  Z: "CHF",
   // Rest of Europe
   PA: "EUR",
   AS: "EUR",
