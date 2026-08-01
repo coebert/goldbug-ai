@@ -91,6 +91,7 @@ import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { instrumentCcyFor } from "./instrument-ccy-rules";
 import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
 import { valuePortfolioHoldings } from "./valuation/value-holdings.server";
+import { resolvePriceSymbol, priceSymbolVariants } from "./price-symbol";
 import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
 
 // Canonical in-engine key for a holding.
