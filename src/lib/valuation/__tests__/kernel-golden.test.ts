@@ -90,19 +90,21 @@ describe("valuation kernel — golden cases", () => {
     expect(res.totalValue).toBeCloseTo(res.cash + res.holdingsValue, 6);
   });
 
-  it("cost-basis fallback is opt-in and marked in provenance", () => {
+  it("cost-basis fallback can be disabled and is always marked in provenance", () => {
     const off = run({
       holdings: [{ symbol: "AAPL", quantity: 10, avg_cost: 150, instrument_ccy: "USD" }],
+      allowCostBasisFallback: false,
     });
-    expect(off.holdingsTotal).toBe(0);
-    expect(off.warnings.map((w) => w.code)).toContain("missing_price");
+    expect(off.holdingsValue).toBe(0);
+    expect(off.provenance.warnings.map((w) => w.code)).toContain("missing_price");
 
     const on = run({
       holdings: [{ symbol: "AAPL", quantity: 10, avg_cost: 150, instrument_ccy: "USD" }],
       allowCostBasisFallback: true,
     });
-    expect(on.holdingsTotal).toBeCloseTo(10 * 150 * 0.79, 6);
-    expect(on.lines[0]?.priceSource).toBe("cost_basis");
+    expect(on.holdingsValue).toBeCloseTo(10 * 150 * 0.79, 6);
+    expect(on.provenance.lines[0]?.priceSource).toBe("cost_basis");
+    expect(on.provenance.degraded).toBe(true);
   });
 
   it("zero and negative quantities do not inflate the book", () => {
