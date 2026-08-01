@@ -4,6 +4,7 @@ import { PushNotificationsCard } from "@/components/push-notifications-card";
 import { TradingControlsCard } from "@/components/trading-controls-card";
 import { MfaCard } from "@/components/mfa-card";
 import { CorporateActionAlertSettingsCard } from "@/components/corporate-action-alert-settings-card";
+import { ValuationHistoryBackfillCard } from "@/components/valuation-history-backfill-card";
 
 
 export const Route = createFileRoute("/settings")({
@@ -62,6 +63,13 @@ function SettingsPage() {
           Trading safety
         </h2>
         <TradingControlsCard />
+      </section>
+
+      <section aria-labelledby="maintenance-heading" className="space-y-3">
+        <h2 id="maintenance-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Data maintenance
+        </h2>
+        <ValuationHistoryBackfillCard />
       </section>
     </div>
   );
