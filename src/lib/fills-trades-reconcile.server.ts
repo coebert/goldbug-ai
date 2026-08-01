@@ -197,7 +197,8 @@ export async function reconcileFillsToTradesForPortfolio(
           symbol: p.symbol,
           asset_class: classFor(p.symbol),
           quantity: p.quantity,
-          avg_cost: p.avgCost,
+          // Broker fill prices for LSE arrive in GBX; store cost basis in GBP.
+          avg_cost: normalizeLseDisplayPriceToBase(p.symbol, p.avgCost, classFor(p.symbol)),
           instrument_ccy: instrumentCcyFor(p.symbol),
         })),
       );
