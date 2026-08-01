@@ -166,13 +166,19 @@ export async function reconcileLiveHoldingsFromBroker(
     .map((p) => {
       const mapped = saxoAssetToClass(p.assetType);
       const asset_class: AssetClass = ALLOWED_ASSET_CLASSES.has(mapped) ? mapped : "stock";
+      // Saxo quotes LSE common stock in GBX (pence) while every stored number
+      // in Aegis is in the instrument's base unit (GBP). Storing the raw
+      // pence average made cost basis 100x the marked price, which surfaced
+      // as "divisor ÷100 vs ÷1" mismatches on MKS/HSBA/ULVR/TSCO.
+      const rawCost = p.avgPrice || p.marketPrice || 0;
+      const avgCostBase = normalizeLseDisplayPriceToBase(p.symbol, rawCost, asset_class);
       return {
         portfolio_id: portfolioId,
         symbol: p.symbol,
         asset_class,
         quantity: p.quantity,
-        avg_cost: p.avgPrice || p.marketPrice || 0,
-        high_water_mark: p.avgPrice || p.marketPrice || 0,
+        avg_cost: avgCostBase,
+        high_water_mark: avgCostBase,
         // Tagging rules own the settlement currency: broker payloads often
         // echo the account currency, which would skip the FX leg.
         instrument_ccy: instrumentCcyFor(p.symbol),
