@@ -70,7 +70,10 @@ describe("valuation kernel — properties", () => {
           price: (s) => i.prices[s] ?? null,
           fx: rate,
         });
-        expect(res.provenance.lines).toHaveLength(i.holdings.length);
+        // Zero-quantity rows contribute nothing and are dropped; every other
+        // holding must be explainable by exactly one provenance line.
+        const priced = i.holdings.filter((h) => h.quantity !== 0);
+        expect(res.provenance.lines).toHaveLength(priced.length);
       }),
       { seed: FC_SEED, numRuns: 200 },
     );
