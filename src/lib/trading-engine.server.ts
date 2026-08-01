@@ -72,6 +72,7 @@ import {
 } from "./circuit-breaker.server";
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
+import { instrumentCcyFor } from "./instrument-ccy-rules";
 import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
 
 // Resolve a live GBP-normalized price for a held symbol, tolerant of the
@@ -2437,7 +2438,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         executed_at: executedAt,
         trade_date: asOf,
         reason: t.reason + (t.rejected ? ` [REJECTED: ${t.rejected}]` : ""),
-        instrument_ccy: t.instrument_ccy ?? inferSaxoCurrency(t.symbol),
+        instrument_ccy: instrumentCcyFor(t.symbol, t.instrument_ccy ?? null, inferSaxoCurrency(t.symbol)),
       }));
     if (tradesRows.length > 0) await admin.from("trades").insert(tradesRows);
 
@@ -2458,9 +2459,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           avg_cost: Number(h.avg_cost),
           opened_at: hExt.opened_at ?? new Date().toISOString(),
           high_water_mark: hExt.high_water_mark ?? Number(h.avg_cost),
-          instrument_ccy:
-            (h as unknown as { instrument_ccy?: string | null }).instrument_ccy ??
+          instrument_ccy: instrumentCcyFor(
+            h.symbol,
+            (h as unknown as { instrument_ccy?: string | null }).instrument_ccy ?? null,
             inferSaxoCurrency(h.symbol),
+          ),
         };
       });
     if (holdingsRows.length > 0) await admin.from("holdings").insert(holdingsRows);
@@ -2810,7 +2813,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       model: "google/gemini-2.5-flash",
       executed: executed.map((t) => ({
         ...t,
-        instrument_ccy: t.instrument_ccy ?? inferSaxoCurrency(t.symbol),
+        instrument_ccy: instrumentCcyFor(t.symbol, t.instrument_ccy ?? null, inferSaxoCurrency(t.symbol)),
       })) as unknown as Parameters<typeof recordAiDecisionAudit>[0]["executed"],
       heldAfter,
       features: features as unknown as Record<string, unknown>,

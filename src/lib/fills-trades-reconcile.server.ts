@@ -17,6 +17,7 @@
 import type { Database } from "@/integrations/supabase/types";
 import { withOwnedClient } from "@/lib/_server/owned-client";
 import { findSymbol } from "@/lib/universe.server";
+import { instrumentCcyFor } from "@/lib/instrument-ccy-rules";
 import {
   rebuildLedgerFromFills,
   resolveFillPrice,
@@ -196,6 +197,7 @@ export async function reconcileFillsToTradesForPortfolio(
           asset_class: classFor(p.symbol),
           quantity: p.quantity,
           avg_cost: p.avgCost,
+          instrument_ccy: instrumentCcyFor(p.symbol),
         })),
       );
       if (ins.error) throw new Error(`insert holdings failed: ${ins.error.message}`);
