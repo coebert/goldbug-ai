@@ -178,6 +178,7 @@ import { CashReconciliationLogCard } from "@/components/cash-reconciliation-log-
 import { ReconcileFillsCard } from "@/components/reconcile-fills-card";
 import { PriceUnitAuditCard } from "@/components/price-unit-audit-card";
 import { ValuationConsistencyAlert } from "@/components/valuation-consistency-alert";
+import { InstrumentCcyAlert } from "@/components/instrument-ccy-alert";
 import { CurrencyDiagnosticsBanner } from "@/components/currency-diagnostics-banner";
 import { FxAuditCard } from "@/components/fx-audit-card";
 import { FxTradeDrilldownCard } from "@/components/fx-trade-drilldown-card";
