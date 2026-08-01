@@ -1,0 +1,98 @@
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { AlertTriangle, Coins } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  getInstrumentCcyCheck,
+  type InstrumentCcyCheckResult,
+} from "@/lib/instrument-ccy-check.functions";
+import type { Severity } from "@/lib/instrument-ccy-check";
+
+const SEVERITY_VARIANT: Record<Severity, "destructive" | "default" | "secondary"> = {
+  high: "destructive",
+  medium: "default",
+  low: "secondary",
+};
+
+/**
+ * Flags holdings whose stored `instrument_ccy` disagrees with the listing
+ * venue, or whose recent quotes imply a different pence/pound divisor than the
+ * one valuation applies.
+ */
+export function InstrumentCcyAlert({
+  portfolioId,
+  className,
+}: {
+  portfolioId: string;
+  className?: string;
+}) {
+  const run = useServerFn(getInstrumentCcyCheck);
+  const { data } = useQuery<InstrumentCcyCheckResult>({
+    queryKey: ["instrument-ccy-check", portfolioId],
+    queryFn: () => run({ data: { portfolioId } }),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+  const findings = data?.findings ?? [];
+  if (findings.length === 0) return null;
+
+  return (
+    <div
+      className={`rounded-xl border border-destructive/50 bg-destructive/10 p-4 ${className ?? ""}`}
+      data-testid="instrument-ccy-alert"
+      role="alert"
+    >
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+        <div className="min-w-0 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-destructive">
+              Currency / price-unit mismatch on {findings.length} holding
+              {findings.length === 1 ? "" : "s"}
+            </p>
+            <p className="text-xs text-muted-foreground">{data?.summary}</p>
+          </div>
+
+          <ul className="space-y-2">
+            {findings.slice(0, 6).map((f) => (
+              <li
+                key={f.symbol}
+                className="rounded-lg border border-border/60 bg-card/50 p-2.5"
+                data-testid={`instrument-ccy-finding-${f.symbol}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Coins className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="font-mono text-sm font-semibold text-foreground">
+                    {f.symbol}
+                  </span>
+                  <Badge variant={SEVERITY_VARIANT[f.severity ?? "low"]} className="text-[10px]">
+                    {f.declared_ccy ?? "no ccy"} → {f.venue_ccy}
+                  </Badge>
+                  {f.implied_divisor && f.implied_divisor !== f.expected_divisor ? (
+                    <Badge variant="destructive" className="text-[10px]">
+                      divisor ÷{f.expected_divisor} vs ÷{f.implied_divisor}
+                    </Badge>
+                  ) : null}
+                </div>
+                <ul className="mt-1.5 space-y-1">
+                  {f.issues.map((issue) => (
+                    <li key={issue.code} className="text-xs text-muted-foreground">
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+
+          {findings.length > 6 ? (
+            <p className="text-xs text-muted-foreground">
+              +{findings.length - 6} more holding{findings.length - 6 === 1 ? "" : "s"} flagged.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
