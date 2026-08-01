@@ -54,6 +54,12 @@ import {
   type SymbolEventFeatures,
 } from "./market-events";
 import {
+  playbookAdjustedTilt,
+  formatMacroPlaybookBlock,
+  drawdownSizeScale,
+} from "./macro-playbook";
+import { loadActiveMacroLessons } from "./macro-history-analysis.server";
+import {
   ensureSentimentScored,
   aggregatedSentimentForSymbol,
   loadScoredNewsWindow,
@@ -884,6 +890,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     : null;
   const execCoefficients = execLessons?.coefficients ?? null;
 
+  // Learned macro playbook: `runMacroHistoryAnalysis` studies ~20 years of
+  // index history plus the documented episode catalogue and stores, per
+  // event kind, whether the first move historically extended (follow),
+  // round-tripped (fade), needed confirmation (wait) or preceded a slow bear
+  // (de_risk) — plus buy-size scaling by how deep the index already is.
+  // With no study on file every multiplier is 1 and the engine is unchanged.
+  const macroLessons = portfolio.user_id
+    ? await loadActiveMacroLessons(supabaseAdmin as never, portfolio.user_id).catch(() => null)
+    : null;
+  const macroPlaybook = macroLessons?.playbook ?? null;
+
   const execPostSignals = computeExecPostSignals(
     [
       ...scoredNews.map((n) => ({
@@ -935,7 +952,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
     const execNudge = learnedExecPostNudge(f.symbol, execPostSignals, execCoefficients).nudge;
     const evf = symbolEventFeatures(f.symbol, f.name, marketEvents);
-    const evTilt = eventTilt(evf, macroEvents);
+    const rawTilt = eventTilt(evf, macroEvents);
+    // The playbook re-weights the tilt by what this event kind historically
+    // did — including flipping the sign for "fade" kinds. Still hard-capped
+    // at MAX_EVENT_TILT inside `playbookAdjustedTilt`.
+    const evTilt = playbookAdjustedTilt(
+      rawTilt,
+      [...evf.top_kinds, ...macroEvents.drivers.map((d) => d.kind)],
+      macroPlaybook,
+    );
     const base = agg.contributors > 0 ? agg.score : 0;
     const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt));
     f.news_score =
