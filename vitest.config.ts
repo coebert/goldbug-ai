@@ -42,6 +42,10 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "src") },
   },
   test: {
+    // Suites that dynamically import heavy server modules can exceed the 5s
+    // default when the full suite runs in parallel.
+    testTimeout: 30000,
+    hookTimeout: 30000,
     projects: [
       {
         extends: true,
