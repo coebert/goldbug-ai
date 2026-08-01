@@ -58,7 +58,7 @@ describe("cash-sync re-anchoring with no observable equity step", () => {
     expect(computeCardRangePct(flatSeries, flows, false)).toBeCloseTo(0, 10);
     // What the un-fixed code did:
     const verbatim = [{ date: "2026-07-24", amount: 9890.38 }];
-    expect(computeCardRangePct(flatSeries, verbatim, false)!).toBeLessThan(-50);
+    expect(computeCardRangePct(flatSeries, verbatim, false)!).toBeLessThan(-40); // the reported -49%
   });
 
   it("never deepens a genuine decline", () => {
