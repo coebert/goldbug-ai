@@ -187,6 +187,8 @@ export type ExecPostSignal = {
   score: number;
   posts: number;
   executives: string[];
+  /** Ids of the contributing executives, for lesson-aware weighting. */
+  executive_ids: string[];
   latest_date: string | null;
 };
 
@@ -241,7 +243,14 @@ export function computeExecPostSignals(
 
   const acc = new Map<
     string,
-    { num: number; denom: number; posts: number; execs: Set<string>; latest: string | null }
+    {
+      num: number;
+      denom: number;
+      posts: number;
+      execs: Set<string>;
+      execIds: Set<string>;
+      latest: string | null;
+    }
   >();
 
   for (const p of posts) {
@@ -259,11 +268,19 @@ export function computeExecPostSignals(
       if (w <= 0) return;
       const key = symbol.toUpperCase();
       const cur =
-        acc.get(key) ?? { num: 0, denom: 0, posts: 0, execs: new Set<string>(), latest: null };
+        acc.get(key) ?? {
+          num: 0,
+          denom: 0,
+          posts: 0,
+          execs: new Set<string>(),
+          execIds: new Set<string>(),
+          latest: null,
+        };
       cur.num += (p.sentiment as number) * w;
       cur.denom += w;
       cur.posts += 1;
       cur.execs.add(exec.name);
+      cur.execIds.add(exec.id);
       const d = (p.date ?? "").slice(0, 10) || null;
       if (d && (!cur.latest || d > cur.latest)) cur.latest = d;
       acc.set(key, cur);
@@ -276,6 +293,7 @@ export function computeExecPostSignals(
       score: v.denom > 0 ? Number((v.num / v.denom).toFixed(3)) : 0,
       posts: v.posts,
       executives: Array.from(v.execs).sort(),
+      executive_ids: Array.from(v.execIds).sort(),
       latest_date: v.latest,
     }))
     .sort((a, b) => Math.abs(b.score) - Math.abs(a.score) || a.symbol.localeCompare(b.symbol));

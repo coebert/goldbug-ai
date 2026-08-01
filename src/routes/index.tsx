@@ -49,6 +49,9 @@ const NewsReel = lazy(() =>
 const ExecPostsCard = lazy(() =>
   import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
 );
+const ExecPostLessonsCard = lazy(() =>
+  import("@/components/exec-post-lessons-card").then((m) => ({ default: m.ExecPostLessonsCard })),
+);
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
 );
@@ -391,6 +394,16 @@ function Home() {
             >
               <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <ExecPostsCard />
+              </Suspense>
+            </AdvancedSection>
+
+            <AdvancedSection
+              title="What the AI learned from CEO posts"
+              summary="The study of past posts against the price path that followed, and the rules it now applies."
+              defaultOpen={false}
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <ExecPostLessonsCard />
               </Suspense>
             </AdvancedSection>
 
