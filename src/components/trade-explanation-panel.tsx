@@ -41,17 +41,42 @@ export function TradeExplanationPanel({
   entry,
   unitsUnresolved,
   unitsReason,
+  portfolioId,
+  calibration,
 }: {
   entry: AuditEntry;
   unitsUnresolved?: boolean;
   unitsReason?: string;
+  /** When provided, the panel loads historical calibration for this portfolio. */
+  portfolioId?: string;
+  /** Pre-supplied calibration (tests / server-rendered callers). */
+  calibration?: ConfidenceCalibrationResult;
 }) {
   const x = useMemo(
     () => buildTradeExplanation(entry, { unitsUnresolved, unitsReason }),
     [entry, unitsUnresolved, unitsReason],
   );
 
+  const calibrationFn = useServerFn(getConfidenceCalibration);
+  const query = useQuery({
+    queryKey: ["confidence-calibration", portfolioId],
+    enabled: !!portfolioId && !calibration,
+    staleTime: 10 * 60_000,
+    queryFn: () =>
+      calibrationFn({ data: { portfolioId: portfolioId! } }) as Promise<ConfidenceCalibrationResult>,
+  });
+
+  const data = calibration ?? query.data;
+  const calibrationLoading = !calibration && !!portfolioId && query.isLoading;
+  const report = data?.report ?? null;
+  const reading = useMemo(
+    () => (data ? readCalibration(x.confidence.score, data.report, data.samples) : null),
+    [data, x.confidence.score],
+  );
+
   const trendPct = Math.round(x.trendShare * 100);
+  const eventPct = Math.round(x.eventShare * 100);
+
   const eventPct = Math.round(x.eventShare * 100);
 
   return (
