@@ -23,7 +23,7 @@ import type { Database } from "@/integrations/supabase/types";
 import type { TailHedgeDecision } from "./tail-hedge";
 import { findSymbol } from "@/lib/universe.server";
 import { engineSymbolKey, priceSymbolVariants } from "@/lib/price-symbol";
-import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { holdingAvgCostBase } from "@/lib/market-price-units";
 import type { ExecutedTrade } from "@/lib/trading-engine.server";
 
 type Holding = Database["public"]["Tables"]["holdings"]["Row"];
@@ -143,11 +143,7 @@ export function applyTailHedgeToPaperPortfolio(
   let price = livePrice;
   let priceSource: "live" | "avg_cost" = "live";
   if (price == null && decision.action === "sell" && found) {
-    const fallback = normalizeLseDisplayPriceToBase(
-      found.holding.symbol,
-      Number(found.holding.avg_cost),
-      found.holding.asset_class ?? null,
-    );
+    const fallback = holdingAvgCostBase(found.holding.symbol, found.holding.avg_cost);
     if (Number.isFinite(fallback) && fallback > 0) {
       price = fallback;
       priceSource = "avg_cost";

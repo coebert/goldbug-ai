@@ -16,7 +16,7 @@ import {
   formatMoneySigned,
   roundMoney,
 } from "@/lib/format-money";
-import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { holdingAvgCostBase } from "@/lib/market-price-units";
 import { useEffect, useState } from "react";
 import { auditHoldingSeriesBatch, formatIssue } from "@/lib/holdings-series-sanity";
 import { HoldingSellDialog } from "@/components/holding-sell-dialog";
@@ -158,7 +158,7 @@ export function LiveHoldingsCard({
       // largest-remainder allocation is comparable across all rows. Without
       // this, one HSBA row in pence (~1550) dwarfs an ETF row in pounds
       // (~36) by a factor of 100 and the ETFs get 0.0% of the portfolio.
-      const avg = normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), h.asset_class);
+      const avg = holdingAvgCostBase(h.symbol, h.avg_cost);
       const s = series?.[h.symbol];
       // Prefer live price when we have one, otherwise fall back to cost.
       // `pricedAtCost` flags rows whose value is computed off `avg_cost`

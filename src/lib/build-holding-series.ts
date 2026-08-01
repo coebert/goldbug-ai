@@ -3,7 +3,7 @@
 // without a database round-trip. The server function is a thin wrapper that
 // resolves rows from Supabase and delegates to this function.
 
-import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
+import { holdingAvgCostBase } from "@/lib/market-price-units";
 
 export type HoldingInput = {
   symbol: string;
@@ -50,7 +50,8 @@ export function buildHoldingSeries(
   intraday: IntradayPoint[] = [],
 ): BuiltHoldingSeries {
   const assetClass = h.asset_class ?? null;
-  const avg = normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), assetClass);
+  // avg_cost is persisted in base currency already — do not re-normalise.
+  const avg = holdingAvgCostBase(h.symbol, h.avg_cost);
   const openedAt = h.opened_at ?? null;
   const openedDate = openedAt ? openedAt.slice(0, 10) : null;
 

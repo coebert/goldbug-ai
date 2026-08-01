@@ -89,7 +89,7 @@ import {
 import { applyBuyExecution, applySellExecution } from "./execution-realism.server";
 import { estimateSaxoCommission, inferSaxoCurrency } from "./saxo-fees";
 import { instrumentCcyFor } from "./instrument-ccy-rules";
-import { normalizeMarketPriceForTrading, normalizeLseDisplayPriceToBase } from "./market-price-units";
+import { normalizeMarketPriceForTrading, holdingAvgCostBase } from "./market-price-units";
 import { valuePortfolioHoldings } from "./valuation/value-holdings.server";
 import { engineSymbolKey, priceSymbolVariants } from "./price-symbol";
 import { writeEquitySnapshot } from "./valuation/write-snapshot.server";
@@ -121,7 +121,7 @@ function holdingLivePrice(
   }
   const live = priceMap.get(h.symbol);
   if (live != null && Number.isFinite(live)) return live;
-  return normalizeLseDisplayPriceToBase(h.symbol, Number(h.avg_cost), h.asset_class ?? null);
+  return holdingAvgCostBase(h.symbol, h.avg_cost);
 }
 
 import { computeCommodityTradeLiquidity } from "./commodity-liquidity-metrics";
