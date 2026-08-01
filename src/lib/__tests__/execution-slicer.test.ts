@@ -62,6 +62,7 @@ function makeAdminMock() {
       chain.lt = () => chain;
       chain.lte = () => chain;
       chain.order = () => chain;
+      chain.limit = () => chain;
       chain.single = async () => resolve();
       chain.maybeSingle = async () => resolve();
       chain.then = (onFulfilled: (v: unknown) => unknown) => Promise.resolve(resolve()).then(onFulfilled);

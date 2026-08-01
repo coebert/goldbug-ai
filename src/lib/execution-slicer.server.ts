@@ -47,9 +47,15 @@ const LARGE_ORDER_USD = 5_000;
 import {
   buildSliceSchedule,
   chooseSliceCount,
+  sanitizeSchedule,
+  MAX_WINDOW_MINUTES,
   type ScheduleBucket,
   type SliceStrategy,
 } from "./execution-vwap";
+import { createTickBudget, withSlicerDeadline } from "./execution-slicer-deadline";
+
+/** Never fan out more child orders than this from one tick. */
+export const MAX_SLICES_PER_TICK = 50;
 
 
 
@@ -266,22 +272,50 @@ export async function tickSlicer(portfolioId: string, ownerUserId: string) {
   await assertPortfolioOwnership("tickSlicer", clean.portfolioId, clean.ownerUserId);
 
   const now = new Date().toISOString();
-  // Expire past-due slices
-  await supabaseAdmin
-    .from("pending_slices")
-    .update({ status: "expired" })
-    .eq("portfolio_id", clean.portfolioId)
-    .eq("status", "active")
-    .lt("expires_at", now);
+  const budget = createTickBudget();
 
-  const { data } = await supabaseAdmin
-    .from("pending_slices")
-    .select("*")
-    .eq("portfolio_id", clean.portfolioId)
-    .eq("status", "active")
-    .lte("next_at", now)
-    .order("next_at", { ascending: true });
-  return (data ?? []) as Array<{
+  // Expire past-due slices. A stalled sweep must not block the send path, so
+  // it runs under its own deadline and a timeout is non-fatal.
+  await withSlicerDeadline(
+    "tickSlicer.expire",
+    supabaseAdmin
+      .from("pending_slices")
+      .update({ status: "expired" })
+      .eq("portfolio_id", clean.portfolioId)
+      .eq("status", "active")
+      .lt("expires_at", now)
+      .then((r) => r),
+    {
+      timeoutMs: budget.slice(),
+      fallback: undefined as unknown as never,
+      onTimeout: (op, ms) => slicerLog.warn("slicer deadline exceeded", { op, ms, portfolioId: clean.portfolioId }),
+    },
+  );
+
+  if (budget.expired()) {
+    slicerLog.warn("slicer tick budget exhausted before fetch", { portfolioId: clean.portfolioId });
+    return [];
+  }
+
+  const { data } = await withSlicerDeadline(
+    "tickSlicer.fetch",
+    supabaseAdmin
+      .from("pending_slices")
+      .select("*")
+      .eq("portfolio_id", clean.portfolioId)
+      .eq("status", "active")
+      .lte("next_at", now)
+      .order("next_at", { ascending: true })
+      .limit(MAX_SLICES_PER_TICK)
+      .then((r) => r),
+    {
+      timeoutMs: budget.slice(),
+      fallback: { data: [], error: null } as unknown as never,
+      onTimeout: (op, ms) => slicerLog.warn("slicer deadline exceeded", { op, ms, portfolioId: clean.portfolioId }),
+    },
+  );
+  const rows = Array.isArray(data) ? data.slice(0, MAX_SLICES_PER_TICK) : [];
+  return rows as Array<{
     id: string; symbol: string; side: string; slice_qty: number; remaining_qty: number;
     slices_done: number; slice_count: number; limit_price: number | null; expires_at: string;
   }>;
@@ -349,17 +383,27 @@ export async function recordSliceFill(
   // next child order carries the correct bucket qty and fires at the
   // planned wall-clock offset. Falls back to the legacy 20-min TWAP
   // cadence for legacy rows written before schedule_json existed.
-  const schedule = Array.isArray(typed.schedule_json) ? typed.schedule_json : null;
+  // A corrupted or legacy `schedule_json` (NaN qty, absurd offset, wrong
+  // shape) must not produce an Invalid Date `next_at` — a row like that never
+  // becomes due again and silently strands the parent order.
+  const schedule = sanitizeSchedule(typed.schedule_json);
   const next = schedule?.[done] ?? null;
-  const createdMs = new Date(typed.created_at).getTime();
+  const createdMsRaw = new Date(typed.created_at).getTime();
+  const createdMs = Number.isFinite(createdMsRaw) ? createdMsRaw : Date.now();
+  const expiresMsRaw = new Date(typed.expires_at).getTime();
+  const expiresMs = Number.isFinite(expiresMsRaw) ? expiresMsRaw : null;
   let nextAt: string | null = null;
   let nextSliceQty: number | null = null;
   if (status === "active") {
+    const plannedMs = next
+      ? createdMs + Math.min(MAX_WINDOW_MINUTES, Math.max(0, Number(next.offset_min))) * 60_000
+      : Date.now() + 20 * 60_000;
+    // Never schedule a child order past the parent's expiry; that slice would
+    // be swept as expired before it could ever send.
+    const boundedMs = expiresMs !== null ? Math.min(plannedMs, expiresMs) : plannedMs;
+    nextAt = new Date(boundedMs).toISOString();
     if (next) {
-      nextAt = new Date(createdMs + Math.max(0, Number(next.offset_min)) * 60_000).toISOString();
       nextSliceQty = Math.max(1e-4, Math.min(remaining, Number(next.qty)));
-    } else {
-      nextAt = new Date(Date.now() + 20 * 60_000).toISOString();
     }
   }
 
