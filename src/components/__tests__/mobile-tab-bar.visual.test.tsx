@@ -16,7 +16,7 @@
 // removes `md:hidden`, both the full-markup snapshot AND the
 // contract assertions below fail — forcing a deliberate review.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // Mock the router primitives the tab bar reads from. `useRouterState`
@@ -59,13 +59,52 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 
+// ---------------------------------------------------------------------------
+// Determinism guards.
+//
+// A visual snapshot must be identical whether this file runs alone or inside
+// the full parallel suite. Two classes of input could break that:
+//   * wall-clock time (a "Xs ago"-style label, a date, an animation delay);
+//   * viewport-dependent branching (matchMedia / window.innerWidth), which
+//     differs between the jsdom-less `ci` project and a DOM environment.
+// The component uses neither today — Tailwind's `md:hidden` handles the
+// breakpoint in CSS, not JS — so we freeze the clock and install a matchMedia
+// spy that FAILS the run if anything in the tree starts querying it.
+// ---------------------------------------------------------------------------
+const FROZEN_NOW = new Date("2026-07-30T14:00:00Z");
+const matchMediaCalls: string[] = [];
+
+beforeAll(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: false });
+  vi.setSystemTime(FROZEN_NOW);
+  (globalThis as { window?: unknown }).window ??= globalThis;
+  (globalThis as unknown as { matchMedia: (q: string) => unknown }).matchMedia = (q: string) => {
+    matchMediaCalls.push(q);
+    return {
+      matches: false,
+      media: q,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    };
+  };
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
+
 function renderAt(pathname: string): string {
   (globalThis as { __PATH__?: string }).__PATH__ = pathname;
+  vi.setSystemTime(FROZEN_NOW);
   return renderToStaticMarkup(<MobileTabBar />);
 }
 
 // Representative routes: root, a leaf, and a hidden-prefix route.
 const ROUTES = ["/", "/trades", "/learn", "/compare", "/auth/sign-in"] as const;
+
 
 describe("mobile tab bar — visual regression", () => {
   for (const path of ROUTES) {
@@ -119,4 +158,39 @@ describe("mobile tab bar — visual regression", () => {
       });
     },
   );
+
+  // -------------------------------------------------------------------
+  // Determinism: the snapshot must not depend on when or where it runs.
+  // -------------------------------------------------------------------
+  describe("deterministic rendering", () => {
+    it("produces byte-identical markup across repeated renders", () => {
+      for (const path of ROUTES) {
+        expect(renderAt(path), `unstable markup @ ${path}`).toBe(renderAt(path));
+      }
+    });
+
+    it("is unaffected by the wall clock advancing", () => {
+      const before = renderAt("/");
+      vi.setSystemTime(new Date("2027-01-01T03:17:42Z"));
+      const after = renderToStaticMarkup(<MobileTabBar />);
+      vi.setSystemTime(FROZEN_NOW);
+      expect(after).toBe(before);
+    });
+
+    it("never branches on matchMedia / viewport width", () => {
+      matchMediaCalls.length = 0;
+      for (const path of ROUTES) renderAt(path);
+      // Breakpoint behaviour belongs in CSS (`md:hidden`). A JS media query
+      // here would make the snapshot environment-dependent.
+      expect(matchMediaCalls).toEqual([]);
+    });
+
+    it("emits no time-, random- or id-shaped values in the markup", () => {
+      const html = renderAt("/");
+      expect(html).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/); // ISO timestamps
+      expect(html).not.toMatch(/\bago\b/); // relative-time labels
+      expect(html).not.toMatch(/\bdata-reactid|:r[0-9a-z]+:/); // React useId output
+    });
+  });
+
 });
