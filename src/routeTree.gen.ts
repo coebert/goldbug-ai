@@ -29,6 +29,7 @@ import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id
 import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
 import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/api/public/algo-regime-autotune-cron'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
+import { Route as ApiPublicHooksValuationDriftRouteImport } from './routes/api/public/hooks/valuation-drift'
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
 import { Route as ApiPublicHooksTickerWatchRouteImport } from './routes/api/public/hooks/ticker-watch'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
@@ -147,6 +148,12 @@ const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
   path: '/api/public/saxo/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksValuationDriftRoute =
+  ApiPublicHooksValuationDriftRouteImport.update({
+    id: '/api/public/hooks/valuation-drift',
+    path: '/api/public/hooks/valuation-drift',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTranslationRefreshRoute =
   ApiPublicHooksTranslationRefreshRouteImport.update({
     id: '/api/public/hooks/translation-refresh',
@@ -278,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
+  '/api/public/hooks/valuation-drift': typeof ApiPublicHooksValuationDriftRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -316,6 +324,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
+  '/api/public/hooks/valuation-drift': typeof ApiPublicHooksValuationDriftRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRoutesById {
@@ -355,6 +364,7 @@ export interface FileRoutesById {
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
+  '/api/public/hooks/valuation-drift': typeof ApiPublicHooksValuationDriftRoute
   '/api/public/saxo/callback': typeof ApiPublicSaxoCallbackRoute
 }
 export interface FileRouteTypes {
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
+    | '/api/public/hooks/valuation-drift'
     | '/api/public/saxo/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -433,6 +444,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
+    | '/api/public/hooks/valuation-drift'
     | '/api/public/saxo/callback'
   id:
     | '__root__'
@@ -471,6 +483,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
+    | '/api/public/hooks/valuation-drift'
     | '/api/public/saxo/callback'
   fileRoutesById: FileRoutesById
 }
@@ -506,6 +519,7 @@ export interface RootRouteChildren {
   ApiPublicHooksSaxoRefreshRoute: typeof ApiPublicHooksSaxoRefreshRoute
   ApiPublicHooksTickerWatchRoute: typeof ApiPublicHooksTickerWatchRoute
   ApiPublicHooksTranslationRefreshRoute: typeof ApiPublicHooksTranslationRefreshRoute
+  ApiPublicHooksValuationDriftRoute: typeof ApiPublicHooksValuationDriftRoute
   ApiPublicSaxoCallbackRoute: typeof ApiPublicSaxoCallbackRoute
 }
 
@@ -649,6 +663,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/saxo/callback'
       fullPath: '/api/public/saxo/callback'
       preLoaderRoute: typeof ApiPublicSaxoCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/valuation-drift': {
+      id: '/api/public/hooks/valuation-drift'
+      path: '/api/public/hooks/valuation-drift'
+      fullPath: '/api/public/hooks/valuation-drift'
+      preLoaderRoute: typeof ApiPublicHooksValuationDriftRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/translation-refresh': {
@@ -819,6 +840,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksSaxoRefreshRoute: ApiPublicHooksSaxoRefreshRoute,
   ApiPublicHooksTickerWatchRoute: ApiPublicHooksTickerWatchRoute,
   ApiPublicHooksTranslationRefreshRoute: ApiPublicHooksTranslationRefreshRoute,
+  ApiPublicHooksValuationDriftRoute: ApiPublicHooksValuationDriftRoute,
   ApiPublicSaxoCallbackRoute: ApiPublicSaxoCallbackRoute,
 }
 export const routeTree = rootRouteImport
