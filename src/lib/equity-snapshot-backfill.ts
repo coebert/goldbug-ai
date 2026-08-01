@@ -17,12 +17,16 @@
 //  3. Rows are never dated before the portfolio's inception date.
 
 import { normalizeLseDisplayPriceToBase } from "./market-price-units";
+import { priceSymbolVariants } from "./price-symbol";
+import { instrumentCcyFor } from "./instrument-ccy-rules";
 
 export type BackfillPortfolio = {
   id: string;
   current_cash: number | string | null;
   /** ISO date (YYYY-MM-DD) of inception, or null when unknown. */
   inception: string | null;
+  /** Reporting currency; foreign holdings are converted into it. */
+  currency?: string | null;
 };
 
 export type BackfillHolding = {
@@ -31,7 +35,16 @@ export type BackfillHolding = {
   quantity: number | string | null;
   avg_cost?: number | string | null;
   asset_class?: string | null;
+  instrument_ccy?: string | null;
 };
+
+/**
+ * FX lookup: returns the multiplier that converts one unit of `from` into
+ * `to`. Return null/undefined when unknown — the caller then treats the
+ * holding as already in the reporting currency (previous behaviour).
+ */
+export type FxLookup = (from: string, to: string) => number | null | undefined;
+
 
 export type BackfillSnapshot = {
   portfolio_id: string;
@@ -71,25 +84,55 @@ function addDays(date: string, days: number): string {
  * the symbol's native quote unit; LSE pence quotes are folded to GBP. Symbols
  * without a usable price fall back to `avg_cost` (cost basis) so a missing
  * quote never silently zeroes a position.
+ *
+ * Two unit invariants, both of which produced 100x inflated tiles before:
+ *  - The price lookup must try broker-native ("MKS:xlon") AND Yahoo-style
+ *    ("MKS.L") keys, otherwise every LSE row misses and falls back to cost.
+ *  - The cost-basis fallback is stored in the SAME native unit as the quote
+ *    (GBX for LSE common stock), so it must go through the same GBX→GBP
+ *    normalisation as a live price.
  */
 export function markHoldingsToMarket(
   holdings: BackfillHolding[],
   prices: Map<string, number>,
+  opts?: { baseCurrency?: string | null; fx?: FxLookup },
 ): number {
+  const base = String(opts?.baseCurrency ?? "").toUpperCase();
   let total = 0;
   for (const h of holdings) {
     const qty = num(h.quantity);
     if (!(qty > 0)) continue;
     const symbol = String(h.symbol ?? "").trim();
-    const raw = prices.get(symbol.toUpperCase());
-    const px = raw != null && Number.isFinite(raw) && raw > 0
-      ? normalizeLseDisplayPriceToBase(symbol, raw, h.asset_class)
-      : num(h.avg_cost);
+    let raw: number | undefined;
+    for (const key of priceSymbolVariants(symbol)) {
+      const hit = prices.get(key);
+      if (hit != null && Number.isFinite(hit) && hit > 0) {
+        raw = hit;
+        break;
+      }
+    }
+    const native = raw != null ? raw : num(h.avg_cost);
+    const px = normalizeLseDisplayPriceToBase(symbol, native, h.asset_class);
     if (!(px > 0)) continue;
-    total += qty * px;
+
+    // Convert foreign-currency positions into the portfolio's reporting
+    // currency; without this a USD position was added to a GBP total 1:1.
+    let value = qty * px;
+    if (base && opts?.fx) {
+      const ccy = String(
+        h.instrument_ccy || instrumentCcyFor(symbol, h.instrument_ccy ?? null) || base,
+      ).toUpperCase();
+      const quoteCcy = ccy === "GBX" ? "GBP" : ccy;
+      if (quoteCcy && quoteCcy !== base) {
+        const rate = opts.fx(quoteCcy, base);
+        if (rate != null && Number.isFinite(rate) && rate > 0) value *= rate;
+      }
+    }
+    total += value;
   }
   return round2(total);
 }
+
 
 export function planMissingEquitySnapshots({
   portfolios,
@@ -98,6 +141,7 @@ export function planMissingEquitySnapshots({
   prices,
   today,
   maxCarryForwardDays = 30,
+  fx,
 }: {
   portfolios: BackfillPortfolio[];
   snapshots: BackfillSnapshot[];
@@ -105,6 +149,7 @@ export function planMissingEquitySnapshots({
   prices: Map<string, number>;
   today: string;
   maxCarryForwardDays?: number;
+  fx?: FxLookup;
 }): PlannedSnapshot[] {
   const snapsByPortfolio = new Map<string, BackfillSnapshot[]>();
   for (const s of snapshots) {
@@ -168,6 +213,7 @@ export function planMissingEquitySnapshots({
     const holdingsValue = markHoldingsToMarket(
       holdingsByPortfolio.get(portfolio.id) ?? [],
       prices,
+      { baseCurrency: portfolio.currency ?? null, fx },
     );
     const total = round2(cash + holdingsValue);
     const todayRow = rows.find((row) => String(row.snapshot_date).slice(0, 10) === today);

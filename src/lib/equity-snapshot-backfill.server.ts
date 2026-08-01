@@ -13,12 +13,17 @@ import {
   type PlannedSnapshot,
 } from "./equity-snapshot-backfill";
 import { portfolioInceptionDate } from "./portfolio-inception";
+import { priceSymbolVariants } from "./price-symbol";
+import { instrumentCcyFor } from "./instrument-ccy-rules";
+import { getFxRate } from "./fx.server";
 
 export type BackfillPortfolioRow = {
   id: string;
   current_cash: number | string | null;
   created_at?: string | null;
   live_activated_at?: string | null;
+  /** Reporting currency; foreign positions are converted into it. */
+  currency?: string | null;
 };
 
 export type EquitySnapshotBackfillResult = {
@@ -68,24 +73,67 @@ export async function backfillMissingEquitySnapshots(
         .order("snapshot_date", { ascending: true }),
       supabase
         .from("holdings")
-        .select("portfolio_id, symbol, quantity, avg_cost, asset_class")
+        .select("portfolio_id, symbol, quantity, avg_cost, asset_class, instrument_ccy")
         .in("portfolio_id", ids),
     ]);
 
     const holdings = (holdingRows ?? []) as unknown as BackfillHolding[];
-    const symbols = [...new Set(holdings.map((h) => String(h.symbol)))];
+    // price_cache is keyed by Yahoo-style tickers ("MKS.L") while holdings may
+    // store broker-native MIC symbols ("MKS:xlon") — query both shapes.
+    const symbols = [
+      ...new Set(holdings.flatMap((h) => [String(h.symbol), ...priceSymbolVariants(String(h.symbol))])),
+    ].filter(Boolean);
     const prices = await loadLatestPrices(supabase, symbols);
+
+    // FX: value foreign positions in each portfolio's reporting currency.
+    // Rates are resolved once per (from,to) pair; failures fall back to 1:1,
+    // which is exactly the previous behaviour.
+    const baseCcys = new Set(
+      portfolios
+        .map((p) => String(p.currency ?? "").toUpperCase())
+        .filter(Boolean),
+    );
+    const quoteCcys = new Set(
+      holdings
+        .map((h) => {
+          const tagged = String(h.instrument_ccy ?? "").toUpperCase();
+          const ccy = tagged || instrumentCcyFor(String(h.symbol), null) || "";
+          return ccy === "GBX" ? "GBP" : ccy;
+        })
+        .filter(Boolean),
+    );
+    const fxRates = new Map<string, number>();
+    await Promise.all(
+      [...baseCcys].flatMap((to) =>
+        [...quoteCcys]
+          .filter((from) => from !== to)
+          .map(async (from) => {
+            try {
+              const r = await getFxRate(from, to);
+              if (r && Number.isFinite(r.rate) && r.rate > 0) {
+                fxRates.set(`${from}>${to}`, r.rate);
+              }
+            } catch {
+              /* leave unset — valuation falls back to 1:1 */
+            }
+          }),
+      ),
+    );
+    const fx = (from: string, to: string) => fxRates.get(`${from}>${to}`) ?? null;
+
 
     const planned = planMissingEquitySnapshots({
       portfolios: portfolios.map<BackfillPortfolio>((p) => ({
         id: p.id,
         current_cash: p.current_cash,
         inception: portfolioInceptionDate(p as never),
+        currency: p.currency ?? null,
       })),
       snapshots: (snaps ?? []) as never,
       holdings,
       prices,
       today,
+      fx,
     });
 
     if (planned.length === 0) return { planned, written: 0 };
