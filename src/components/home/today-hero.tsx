@@ -116,15 +116,6 @@ export function TodayHero({
 
       <div className="grid gap-2 border-t border-border/60 px-4 py-3 sm:grid-cols-2 sm:gap-3 sm:px-6 sm:py-4">
         <ModeSummaryTile
-          label="Practice money"
-          sublabel="Pretend cash, real prices"
-          tone="sim"
-          money={summary.sim.now}
-          pnl={summary.sim.pnl}
-          pct={summary.sim.pct}
-          count={summary.sim.count}
-        />
-        <ModeSummaryTile
           label="Real money"
           sublabel="Held at your broker"
           tone="real"
@@ -133,7 +124,19 @@ export function TodayHero({
           pct={summary.real.pct}
           count={summary.real.count}
         />
+        <div className="opacity-70">
+          <ModeSummaryTile
+            label="Practice money"
+            sublabel="Pretend cash, real prices"
+            tone="sim"
+            money={summary.sim.now}
+            pnl={summary.sim.pnl}
+            pct={summary.sim.pct}
+            count={summary.sim.count}
+          />
+        </div>
       </div>
+
     </section>
   );
 }
