@@ -24,6 +24,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 // the selector pick a pathname. `Link` renders a plain <a> so the
 // serialized HTML stays stable across router upgrades.
 vi.mock("@tanstack/react-router", () => ({
+  // `usePrefetchOnTouch` (via use-idle-prefetch) calls `useRouter()`; the tab
+  // bar only ever invokes `preloadRoute` from touch handlers, which never fire
+  // during static SSR rendering — a no-op stub is enough.
+  useRouter: () => ({
+    preloadRoute: () => Promise.resolve(),
+    buildLocation: () => ({ href: "/" }),
+  }),
   useRouterState: (opts: { select: (s: { location: { pathname: string } }) => unknown }) =>
     opts.select({ location: { pathname: (globalThis as { __PATH__?: string }).__PATH__ ?? "/" } }),
   Link: ({
