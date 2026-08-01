@@ -31,6 +31,14 @@ export type HaltInputs = {
   priorCloseEquity: number | null; // yesterday's snapshot (null if none yet)
   peakEquity: number | null;       // all-time peak snapshot (null if none)
   thresholds: HaltThresholds;
+  /**
+   * Portion of `currentEquity` that was valued off cost basis because no live
+   * quote resolved. When this is a material share of the book the NAV is not
+   * trustworthy and must not be allowed to fabricate a drawdown halt.
+   */
+  unpricedHoldingsValue?: number;
+  /** Independent NAV from the broker. Preferred over the derived valuation. */
+  brokerEquity?: number | null;
 };
 
 export type HaltStatus = {
@@ -40,32 +48,68 @@ export type HaltStatus = {
   drawdown_halt: boolean;
   any_halt: boolean;
   reason: string | null;         // human-readable summary when halted
+  /** True when halts were suppressed because the valuation looked unreliable. */
+  valuation_suspect: boolean;
+  valuation_source: "derived" | "broker";
   thresholds: HaltThresholds;
   inputs: {
     starting_equity: number;
     current_equity: number;
     prior_close_equity: number | null;
     peak_equity: number | null;
+    unpriced_holdings_value: number;
+    broker_equity: number | null;
   };
 };
 
+/** Share of NAV that may be cost-basis-valued before we distrust the NAV. */
+const MAX_UNPRICED_SHARE = 0.1;
+/** A single-step collapse this deep vs prior close is a data fault, not a market move. */
+const IMPLAUSIBLE_COLLAPSE = 0.5;
+
 export function evaluateRiskHalts(i: HaltInputs): HaltStatus {
+  const brokerEquity =
+    i.brokerEquity != null && Number.isFinite(i.brokerEquity) && i.brokerEquity > 0
+      ? i.brokerEquity
+      : null;
+  // The broker's own NAV is authoritative when we have it: the derived
+  // valuation can miss quotes, while the broker prices the whole book.
+  const currentEquity = brokerEquity ?? i.currentEquity;
+  const valuationSource: "derived" | "broker" = brokerEquity != null ? "broker" : "derived";
+
+  const unpriced = Math.max(0, i.unpricedHoldingsValue ?? 0);
+
   const dailyDenominator = i.priorCloseEquity && i.priorCloseEquity > 0
     ? i.priorCloseEquity
     : i.startingEquity;
   const dailyLossPct = dailyDenominator > 0
-    ? (i.currentEquity - dailyDenominator) / dailyDenominator
+    ? (currentEquity - dailyDenominator) / dailyDenominator
     : 0;
 
-  const peakBasis = Math.max(i.peakEquity ?? 0, i.startingEquity, i.currentEquity);
+  const peakBasis = Math.max(i.peakEquity ?? 0, i.startingEquity, currentEquity);
   const drawdownPct = peakBasis > 0
-    ? Math.max(0, (peakBasis - i.currentEquity) / peakBasis)
+    ? Math.max(0, (peakBasis - currentEquity) / peakBasis)
     : 0;
+
+  // Two independent signals that the NAV we just computed is not real:
+  //   • a material slice of the book had no quote (cost-basis fallback), or
+  //   • equity supposedly halved (or worse) in one step versus prior close.
+  // Either one previously produced a phantom "drawdown breached" halt that
+  // blocked every buy for the rest of the day.
+  const unpricedShare = currentEquity > 0 ? unpriced / currentEquity : 0;
+  const collapsedVsPrior =
+    i.priorCloseEquity != null &&
+    i.priorCloseEquity > 0 &&
+    currentEquity < i.priorCloseEquity * (1 - IMPLAUSIBLE_COLLAPSE);
+  const valuationSuspect =
+    valuationSource === "derived" && (unpricedShare > MAX_UNPRICED_SHARE || collapsedVsPrior);
 
   const dailyHalt =
+    !valuationSuspect &&
     i.thresholds.max_daily_loss_pct > 0 &&
     dailyLossPct <= -i.thresholds.max_daily_loss_pct;
   const drawHalt =
+    !valuationSuspect &&
     i.thresholds.max_drawdown_halt_pct > 0 &&
     drawdownPct >= i.thresholds.max_drawdown_halt_pct;
 
@@ -87,15 +131,20 @@ export function evaluateRiskHalts(i: HaltInputs): HaltStatus {
     drawdown_halt: drawHalt,
     any_halt: dailyHalt || drawHalt,
     reason: reasons.length ? reasons.join("; ") : null,
+    valuation_suspect: valuationSuspect,
+    valuation_source: valuationSource,
     thresholds: i.thresholds,
     inputs: {
       starting_equity: i.startingEquity,
-      current_equity: i.currentEquity,
+      current_equity: currentEquity,
       prior_close_equity: i.priorCloseEquity,
       peak_equity: i.peakEquity,
+      unpriced_holdings_value: unpriced,
+      broker_equity: brokerEquity,
     },
   };
 }
+
 
 /**
  * Reads all equity snapshots for the portfolio to derive:
