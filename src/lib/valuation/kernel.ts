@@ -152,12 +152,7 @@ export function resolveQuoteUnits(
   declaredCcy: string | null | undefined,
   observed: string | null | undefined,
   defaultCcy: string,
-): {
-  quoteCurrency: string;
-  quoteCurrencySource: "observed" | "rules";
-  unitDivisor: number;
-  instrumentCurrency: string;
-} {
+): QuoteUnits {
   const obs = (observed ?? "").trim().toUpperCase();
   if (obs) {
     const divisor = obs === "GBX" ? 100 : 1;
@@ -166,6 +161,7 @@ export function resolveQuoteUnits(
       quoteCurrencySource: "observed",
       unitDivisor: divisor,
       instrumentCurrency: obs === "GBX" ? "GBP" : obs,
+      resolved: true,
     };
   }
 
@@ -177,6 +173,7 @@ export function resolveQuoteUnits(
       quoteCurrencySource: "rules",
       unitDivisor: 100,
       instrumentCurrency: "GBP",
+      resolved: true,
     };
   }
 
@@ -186,6 +183,23 @@ export function resolveQuoteUnits(
       quoteCurrencySource: "rules",
       unitDivisor: 100,
       instrumentCurrency: "GBP",
+      resolved: true,
+    };
+  }
+
+  // Nothing to go on: no observed quote currency, no stored tag, and the
+  // symbol carries no venue marker the rules layer recognises. Guessing here
+  // is exactly how a pence quote gets treated as pounds (or a USD quote as
+  // GBP) and a tile reports a 100x or 25% wrong percentage. Report it as
+  // unresolved and let callers withhold the number instead.
+  if (!declared && !venueCurrency(symbol)) {
+    return {
+      quoteCurrency: "UNKNOWN",
+      quoteCurrencySource: "unresolved",
+      unitDivisor: 1,
+      instrumentCurrency: (defaultCcy || "GBP").trim().toUpperCase(),
+      resolved: false,
+      unresolvedReason: `No observed quote currency, no stored instrument_ccy, and no recognised venue for "${String(symbol ?? "").trim() || "(blank symbol)"}" — GBX vs GBP cannot be decided.`,
     };
   }
 
@@ -195,8 +209,24 @@ export function resolveQuoteUnits(
     quoteCurrencySource: "rules",
     unitDivisor: 1,
     instrumentCurrency: ccy,
+    resolved: true,
   };
 }
+
+/**
+ * UI-facing predicate: can this row's quote units be decided at all?
+ * Components use it to render "—" instead of a percentage that would be
+ * silently off by 100x (or by an FX leg).
+ */
+export function quoteUnitsResolved(
+  symbol: string,
+  declaredCcy?: string | null,
+  observed?: string | null,
+  defaultCcy = "GBP",
+): boolean {
+  return resolveQuoteUnits(symbol, declaredCcy, observed, defaultCcy).resolved;
+}
+
 
 /** Look a price up under every key this holding might be cached under. */
 function lookupPrice(price: PriceLookup, symbol: string): { value: number | null; key: string } {
