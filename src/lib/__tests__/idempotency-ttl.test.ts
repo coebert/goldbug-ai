@@ -129,7 +129,7 @@ describe("store TTL enforcement", () => {
     expect(Date.parse(rows[0]!["expires_at"])).toBeGreaterThan(reserved);
   });
 
-  it("treats an expired completed row as absent and lets the key be reused", async () => {
+  it("reports a recently expired completed row as expired rather than re-running", async () => {
     const rows: Row[] = [
       {
         user_id: scope.userId,
@@ -145,11 +145,32 @@ describe("store TTL enforcement", () => {
     const store = createIdempotencyStore(fakeSupabase(rows));
 
     const res = await store.reserve({ ...scope, requestHash: "new" });
+    expect(res).toMatchObject({ reserved: false, existing: { status: "expired" } });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("lets the key be reused once the expired row is past its grace window", async () => {
+    const rows: Row[] = [
+      {
+        user_id: scope.userId,
+        endpoint: scope.endpoint,
+        idempotency_key: scope.key,
+        request_hash: "old",
+        status: "completed",
+        response: { stale: true },
+        created_at: iso(-COMPLETED_TTL_MS - EXPIRED_GRACE_MS - 2000),
+        expires_at: iso(-EXPIRED_GRACE_MS - 1000),
+      },
+    ];
+    const store = createIdempotencyStore(fakeSupabase(rows));
+
+    const res = await store.reserve({ ...scope, requestHash: "new" });
     expect(res).toEqual({ reserved: true });
     expect(rows).toHaveLength(1);
     expect(rows[0]!["request_hash"]).toBe("new");
     expect(rows[0]!["status"]).toBe("in_progress");
   });
+
 
   it("reclaims a stuck in_progress reservation after its TTL", async () => {
     const rows: Row[] = [
