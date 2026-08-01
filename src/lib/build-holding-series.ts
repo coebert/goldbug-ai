@@ -3,7 +3,7 @@
 // without a database round-trip. The server function is a thin wrapper that
 // resolves rows from Supabase and delegates to this function.
 
-import { holdingAvgCostBase } from "@/lib/market-price-units";
+import { holdingAvgCostBase, normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
 
 export type HoldingInput = {
   symbol: string;
