@@ -293,6 +293,8 @@ export type CcyRuleSource =
   | "mic"
   /** Yahoo-style dot suffix (`.L`). */
   | "suffix"
+  /** Bloomberg composite country code (`VOD LN Equity`). */
+  | "composite"
   /** Crypto or FX pair convention (`BTC-USD`, `GBPUSD=X`). */
   | "pair"
   /** Known symbol root with no venue marker (`AAPL`, `VTI`). */
