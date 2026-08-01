@@ -43,15 +43,16 @@ export const runPriceScalingAudit = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({}).parse(input ?? {}),
   )
-  .handler(async (): Promise<ScalingAuditResponse> => {
+  .handler(async ({ context }): Promise<ScalingAuditResponse> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Use the admin client so the auditor can see every holding for every
-    // portfolio the caller owns — the middleware has already verified the
-    // caller is an authenticated user; RLS on `holdings` is enforced by
-    // the join to `portfolios` in the query below.
+    // The admin client bypasses RLS, so ownership MUST be enforced here:
+    // scope the portfolio scan to the authenticated caller's own rows and
+    // derive every downstream query from those ids only.
     const { data: portfolios } = await supabaseAdmin
       .from("portfolios")
-      .select("id, name");
+      .select("id, name")
+      .eq("user_id", context.userId);
+
     const nameById = new Map<string, string>();
     for (const p of portfolios ?? []) nameById.set(p.id, p.name);
     const portfolioIds = [...nameById.keys()];
