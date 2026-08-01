@@ -22,6 +22,8 @@
 import type { Database } from "@/integrations/supabase/types";
 import type { TailHedgeDecision } from "./tail-hedge";
 import { findSymbol } from "@/lib/universe.server";
+import { engineSymbolKey, priceSymbolVariants } from "@/lib/price-symbol";
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
 import type { ExecutedTrade } from "@/lib/trading-engine.server";
 
 type Holding = Database["public"]["Tables"]["holdings"]["Row"];
@@ -31,6 +33,54 @@ export function defaultHedgeSymbolFor(currency: string): string {
   if (c === "USD") return "GLD";
   if (c === "EUR") return "SGLN.L"; // LSE gold ETC quotes in GBp/USD, still Saxo-tradable
   return "SGLN.L";
+}
+
+/** Quantities below this are dust — not worth a ticket, and not a blocker. */
+const DUST_QTY = 1e-8;
+/** Smallest notional worth booking as a hedge leg. */
+const MIN_TICKET_NOTIONAL = 1;
+
+/**
+ * Look a holding up tolerantly.
+ *
+ * `holdingsByS` is keyed canonically by the engine, but a hedge position can
+ * arrive from a broker sync spelled "SGLN:xlon" while the hedge symbol is
+ * "SGLN.L". A raw `.get(symbol)` missed those and reported "no SGLN.L to
+ * unwind" while the position was sitting right there — a correct trim
+ * suppressed by a lookup, not by risk.
+ */
+function findHolding(
+  holdingsByS: Map<string, Holding>,
+  symbol: string,
+): { key: string; holding: Holding } | null {
+  const direct = holdingsByS.get(symbol);
+  if (direct) return { key: symbol, holding: direct };
+  for (const variant of [symbol, ...priceSymbolVariants(symbol)]) {
+    for (const key of [variant, variant.toUpperCase(), variant.toLowerCase(), engineSymbolKey(variant)]) {
+      const h = holdingsByS.get(key);
+      if (h) return { key, holding: h };
+    }
+  }
+  // Last resort: canonical-vs-canonical scan, which catches broker-native
+  // spellings the variant list doesn't enumerate.
+  const want = engineSymbolKey(symbol);
+  for (const [key, h] of holdingsByS) {
+    if (engineSymbolKey(key) === want || engineSymbolKey(h.symbol) === want) {
+      return { key, holding: h };
+    }
+  }
+  return null;
+}
+
+/** Resolve a hedge price tolerantly across symbol spellings. */
+function findPrice(priceMap: Map<string, number>, symbol: string): number | null {
+  for (const variant of [symbol, ...priceSymbolVariants(symbol)]) {
+    for (const key of [variant, variant.toUpperCase(), variant.toLowerCase()]) {
+      const p = priceMap.get(key);
+      if (p != null && Number.isFinite(p) && p > 0) return p;
+    }
+  }
+  return null;
 }
 
 export type TailHedgeExecInputs = {
@@ -53,6 +103,10 @@ export type TailHedgeExecResult = {
   symbol: string | null;
   qty: number;
   notional: number;
+  /** True when the leg executed smaller than advised but still executed. */
+  partial?: boolean;
+  /** Set when the executor had to size off a stale/cost-basis price. */
+  priceSource?: "live" | "avg_cost";
 };
 
 export function applyTailHedgeToPaperPortfolio(
@@ -70,7 +124,7 @@ export function applyTailHedgeToPaperPortfolio(
     notional: 0,
   };
 
-  if (decision.action === "hold" || Math.abs(decision.deltaNotional) < 1) {
+  if (decision.action === "hold" || Math.abs(decision.deltaNotional) < MIN_TICKET_NOTIONAL) {
     return { ...base, reason: `hold: ${decision.reason}` };
   }
 
@@ -78,8 +132,30 @@ export function applyTailHedgeToPaperPortfolio(
     || defaultHedgeSymbolFor(portfolioCurrency);
   const meta = findSymbol(symbol);
   if (!meta) return { ...base, reason: `unknown hedge symbol ${symbol}` };
-  const price = priceMap.get(symbol);
-  if (!price || price <= 0) return { ...base, reason: `no price for ${symbol}`, symbol };
+
+  const found = findHolding(holdingsByS, symbol);
+  const livePrice = findPrice(priceMap, symbol);
+
+  // A SELL only needs a price to *size* the unwind. When the quote is missing
+  // we can still safely reduce risk using the position's own cost basis, so
+  // reducing exposure is never blocked by a data gap. A BUY genuinely needs a
+  // live quote — spending cash on a stale mark is not "safe execution".
+  let price = livePrice;
+  let priceSource: "live" | "avg_cost" = "live";
+  if (price == null && decision.action === "sell" && found) {
+    const fallback = normalizeLseDisplayPriceToBase(
+      found.holding.symbol,
+      Number(found.holding.avg_cost),
+      found.holding.asset_class ?? null,
+    );
+    if (Number.isFinite(fallback) && fallback > 0) {
+      price = fallback;
+      priceSource = "avg_cost";
+    }
+  }
+  if (price == null || price <= 0) {
+    return { ...base, symbol, reason: `no price for ${symbol}` };
+  }
 
   const executedAt = new Date().toISOString();
 
@@ -94,28 +170,37 @@ export function applyTailHedgeToPaperPortfolio(
   if (decision.action === "buy") {
     const affordable = Math.max(0, workingCash * (1 - bufferPct));
     const spend = Math.min(decision.deltaNotional, affordable);
-    if (spend < price) {
+    // Live venues need whole shares; paper books fractional units, so a
+    // sub-share budget is still a valid (partial) hedge add there.
+    const minSpend = isLivePortfolio ? price : Math.min(price, MIN_TICKET_NOTIONAL);
+    if (spend < minSpend) {
       return { ...base, symbol, reason: `insufficient cash for 1 share of ${symbol}` };
     }
-    const qty = spend / price;
+    const rawQty = spend / price;
+    const qty = isLivePortfolio ? Math.floor(rawQty) : rawQty;
+    if (qty <= 0) {
+      return { ...base, symbol, reason: `insufficient cash for 1 share of ${symbol}` };
+    }
+    const partial = decision.deltaNotional - qty * price > MIN_TICKET_NOTIONAL;
 
     if (mutateLocalState) {
       workingCash -= qty * price;
-      const cur = holdingsByS.get(symbol);
+      const key = found?.key ?? engineSymbolKey(symbol);
+      const cur = found?.holding;
       if (cur) {
         const newQty = Number(cur.quantity) + qty;
         const newCost = (Number(cur.avg_cost) * Number(cur.quantity) + qty * price) / newQty;
         const curHwm = Number(
           (cur as unknown as { high_water_mark?: number | null }).high_water_mark ?? Number(cur.avg_cost),
         );
-        holdingsByS.set(symbol, {
+        holdingsByS.set(key, {
           ...cur,
           quantity: newQty,
           avg_cost: newCost,
           high_water_mark: Math.max(curHwm, price),
         } as Holding);
       } else {
-        holdingsByS.set(symbol, {
+        holdingsByS.set(key, {
           id: crypto.randomUUID(),
           portfolio_id: portfolioId,
           symbol,
@@ -130,41 +215,64 @@ export function applyTailHedgeToPaperPortfolio(
     }
 
     const routingNote = isLivePortfolio ? " [live: routed via broker executor]" : "";
+    const partialNote = partial ? " [partial: cash-capped]" : "";
     const trade: ExecutedTrade = {
       symbol, side: "buy", quantity: qty, price, value: qty * price,
-      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${routingNote}`,
+      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${routingNote}`,
     };
     return {
       applied: true, workingCash, symbol, qty, notional: qty * price,
-      trade, reason: trade.reason,
+      trade, reason: trade.reason, partial, priceSource,
     };
   }
 
   // action === "sell": unwind up to |delta| notional of the existing hedge.
   // No-borrow: never sell more than the current held quantity (mirrored from
   // broker for live modes by live-holdings-sync).
-  const cur = holdingsByS.get(symbol);
-  if (!cur || Number(cur.quantity) <= 1e-8) {
+  //
+  // Gating principle for reductions: a de-risking trim is only suppressed when
+  // there is genuinely nothing to sell. Anything the position *can* support —
+  // a smaller-than-advised clip, an odd lot, a stale quote — executes at the
+  // safe size rather than being dropped.
+  if (!found || Number(found.holding.quantity) <= DUST_QTY) {
     return { ...base, symbol, reason: `no ${symbol} to unwind` };
   }
+  const heldQty = Number(found.holding.quantity);
   const wantQty = Math.abs(decision.deltaNotional) / price;
-  const qty = Math.min(Number(cur.quantity), wantQty);
-  if (qty <= 0) return { ...base, symbol, reason: "computed sell qty is zero" };
+  let qty = Math.min(heldQty, wantQty);
+
+  if (isLivePortfolio) {
+    // Whole shares only at the broker — but never round a real reduction down
+    // to nothing: if the clip floors to zero, or the residual would be an
+    // unsellable odd lot, close what's there instead of suppressing the trim.
+    const floored = Math.floor(qty);
+    if (floored <= 0) qty = heldQty <= 1 ? heldQty : 1;
+    else if (heldQty - floored <= 1) qty = heldQty;
+    else qty = floored;
+  }
+
+  if (qty <= DUST_QTY) return { ...base, symbol, reason: "computed sell qty is zero" };
+  // Leaving dust behind costs another ticket later; close the tail instead.
+  if (heldQty - qty <= DUST_QTY) qty = heldQty;
+  const partial = Math.abs(decision.deltaNotional) - qty * price > MIN_TICKET_NOTIONAL;
 
   if (mutateLocalState) {
-    const remaining = Number(cur.quantity) - qty;
+    const remaining = heldQty - qty;
     workingCash += qty * price;
-    if (remaining <= 1e-8) holdingsByS.delete(symbol);
-    else holdingsByS.set(symbol, { ...cur, quantity: remaining } as Holding);
+    if (remaining <= DUST_QTY) holdingsByS.delete(found.key);
+    else holdingsByS.set(found.key, { ...found.holding, quantity: remaining } as Holding);
   }
 
   const routingNote = isLivePortfolio ? " [live: routed via broker executor]" : "";
+  const partialNote = partial ? " [partial: position-capped]" : "";
+  const priceNote = priceSource === "avg_cost" ? " [sized off cost basis — no live quote]" : "";
   const trade: ExecutedTrade = {
     symbol, side: "sell", quantity: qty, price, value: qty * price,
-    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${routingNote}`,
+    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${priceNote}${routingNote}`,
   };
   return {
     applied: true, workingCash, symbol, qty, notional: qty * price,
-    trade, reason: trade.reason,
+    trade, reason: trade.reason, partial, priceSource,
   };
 }
+
