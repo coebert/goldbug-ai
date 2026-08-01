@@ -157,7 +157,7 @@ function extractRowLabels(html: string) {
     const slice = idx >= 0 ? html.slice(idx, idx + 4000) : "";
     const unitCost = slice.match(/@ GBP\s*(?:<!-- -->)?\s*([\d.,]+)/)?.[1] ?? "";
     // Signed value = the "since purchase" change; "% of portfolio" is unsigned.
-    const pct = slice.match(/([+-][\d.,]+%)/)?.[1] ?? "";
+    const pct = slice.match(/([+\-\u2212][\d.,]+%)/)?.[1] ?? "";
     out.push({ symbol: r.symbol, unitCost, pct });
   }
   return out;
@@ -176,7 +176,7 @@ describe("holdings card + equity charts — LSE unit/percentage visual parity", 
     const labels = extractRowLabels(renderCard());
     for (const { symbol, pct } of labels) {
       const expected = EXPECTED_PCT[symbol] * 100;
-      const shown = Number(pct.replace(/[%+,]/g, ""));
+      const shown = Number(pct.replace(/\u2212/g, "-").replace(/[%+,]/g, ""));
       expect(Math.abs(shown - expected)).toBeLessThan(0.05);
     }
   });
