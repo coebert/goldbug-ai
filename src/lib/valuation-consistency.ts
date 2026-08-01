@@ -56,9 +56,46 @@ export type ValuationJump = {
     fx_rate: number;
     value_base: number;
     weight: number;
+    /** FX conversion detail for this symbol on this day. */
+    fx: SymbolFxConversion;
   }[];
+  /** Per-currency FX legs used to value the flagged day, largest first. */
+  fx_breakdown: FxLeg[];
   explanation: string;
 };
+
+/** How one symbol's instrument-currency value became a base-currency value. */
+export type SymbolFxConversion = {
+  /** Currency the instrument is priced in after any pence fold. */
+  from_ccy: string;
+  /** Portfolio base currency. */
+  to_ccy: string;
+  pair: string;
+  rate: number;
+  source: FxSource;
+  /** True when no rate existed and 1.0 was assumed. */
+  assumed: boolean;
+  value_from: number;
+  value_to: number;
+  /** e.g. "1,250.00 USD × 0.7840 USD/GBP = 980.00 GBP". */
+  detail: string;
+};
+
+/** One source-currency leg of the flagged day's valuation. */
+export type FxLeg = {
+  from_ccy: string;
+  to_ccy: string;
+  pair: string;
+  rate: number;
+  source: FxSource;
+  assumed: boolean;
+  positions: number;
+  value_from: number;
+  value_to: number;
+  /** Share of the day's marked book carried by this currency (0–1). */
+  weight: number;
+};
+
 
 export type ValuationConsistencyReport = {
   portfolio_id: string;
