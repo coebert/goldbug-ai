@@ -9,11 +9,18 @@
 // live-reconcile.server.ts so this file stays a thin server-fn wrapper.
 
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
 import { deactivateLivePortfolio } from "@/lib/live-deactivate";
+import {
+  withIdempotency,
+  normalizeIdempotencyKey,
+  IDEMPOTENCY_KEY_MAX,
+} from "@/lib/idempotency";
+import { createIdempotencyStore } from "@/lib/idempotency-store.server";
 import {
   assertBrokerAccountUnclaimed,
   brokerAccountConflictMessage,
@@ -108,35 +115,68 @@ export const activateLive = createServerFn({ method: "POST" })
  * Deactivate live trading. Idempotent: repeated calls are a no-op that still
  * return the portfolio's current live/paper status, so a client that lost the
  * first response can just call again instead of guessing.
+ *
+ * Additionally honours an `Idempotency-Key` (header or `idempotencyKey` field):
+ * repeats with the same key return the ORIGINAL stored payload verbatim —
+ * including `changed: true` — rather than a fresh "already_paper" read.
  */
 export const deactivateLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
-    z.object({ portfolioId: z.string().uuid(), reason: z.string().max(500).optional() }).parse(data),
+    z.object({
+      portfolioId: z.string().uuid(),
+      reason: z.string().max(500).optional(),
+      idempotencyKey: z.string().min(1).max(IDEMPOTENCY_KEY_MAX).optional(),
+    }).parse(data),
   )
   .handler(async ({ data, context }) => {
-    // Ownership, the live-mode precondition and the atomic release all live in
-    // the shared helper so this and any other caller cannot drift apart.
-    const result = await deactivateLivePortfolio(context.supabase as never, {
-      portfolioId: data.portfolioId,
-      userId: context.userId,
-    });
+    // Header wins over the body field so an HTTP-level retry proxy can supply
+    // the key without the client payload changing.
+    let headerKey: string | null = null;
+    try {
+      headerKey = getRequest().headers.get("idempotency-key");
+    } catch {
+      headerKey = null;
+    }
+    const key = normalizeIdempotencyKey(headerKey ?? data.idempotencyKey ?? null);
 
-    await logAudit({
-      userId: context.userId,
-      portfolioId: data.portfolioId,
-      action: "DEACTIVATE",
-      request: { reason: data.reason ?? null },
-      response: {
-        noop: !result.changed,
-        previousMode: result.previous_mode,
-        newMode: result.status.mode,
-        releasedBrokerAccountId: result.released_broker_account_id,
+    const { replayed, response } = await withIdempotency(
+      createIdempotencyStore(context.supabase as never),
+      {
+        userId: context.userId,
+        endpoint: "deactivateLive",
+        key,
+        request: { portfolioId: data.portfolioId, reason: data.reason ?? null },
       },
-    });
+      async () => {
+        // Ownership, the live-mode precondition and the atomic release all live
+        // in the shared helper so callers cannot drift apart.
+        const result = await deactivateLivePortfolio(context.supabase as never, {
+          portfolioId: data.portfolioId,
+          userId: context.userId,
+        });
 
-    return result;
+        await logAudit({
+          userId: context.userId,
+          portfolioId: data.portfolioId,
+          action: "DEACTIVATE",
+          request: { reason: data.reason ?? null, idempotencyKey: key },
+          response: {
+            noop: !result.changed,
+            previousMode: result.previous_mode,
+            newMode: result.status.mode,
+            releasedBrokerAccountId: result.released_broker_account_id,
+          },
+        });
+
+        return result;
+      },
+    );
+
+    // `replayed` is additive metadata; the payload itself is unchanged.
+    return { ...response, replayed };
   });
+
 
 
 
