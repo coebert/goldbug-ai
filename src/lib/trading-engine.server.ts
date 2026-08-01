@@ -44,6 +44,14 @@ import {
 import { getNewsForDate } from "./news.server";
 import { computeExecPostSignals, execPostSentimentNudge } from "./exec-posts";
 import {
+  extractMarketEvents,
+  macroEventFeatures,
+  symbolEventFeatures,
+  eventTilt,
+  formatMarketEventsBlock,
+  type SymbolEventFeatures,
+} from "./market-events";
+import {
   ensureSentimentScored,
   aggregatedSentimentForSymbol,
   loadScoredNewsWindow,
@@ -209,6 +217,8 @@ async function buildCandidateFeatures(
     news_score: number | null;
     news_contributors: number;
     news_momentum: SentimentMomentum | null;
+    // Typed market-event features derived from the global news feed
+    event_features: SymbolEventFeatures | null;
     cooling: boolean;
     // Cross-sectional rank across today's universe (filled in later)
     rank_info: RankInfo | null;
@@ -243,6 +253,7 @@ async function buildCandidateFeatures(
         news_score: null,
         news_contributors: 0,
         news_momentum: null,
+        event_features: null,
         cooling: false,
         rank_info: null,
       });
@@ -282,6 +293,7 @@ export async function callAiForDecision(args: {
   crossAsset: string; // preformatted block
   optionsBlock: string; // preformatted options-implied block
   crossSectional: string; // preformatted cross-sectional ranking block
+  marketEvents?: string | null; // preformatted typed market-event block
   events: Array<{ event_date: string; kind: string; symbol: string | null; title: string; impact: string }>;
   cooling: string[];
   asOf: string;
@@ -375,6 +387,8 @@ ${args.optionsBlock}
 
 ${args.crossSectional}
 
+${args.marketEvents ?? ""}
+
 ${eventsBlock}
 ${coolingBlock}
 
@@ -459,7 +473,7 @@ Return:
       sma_trend       — MA trend AND MACD histogram / crosses (grouped)
       rsi             — daily RSI-14 AND weekly RSI alignment
       price_change    — recent price change (5d/30d) AND volume-weighted momentum
-      news_sentiment  — weighted LLM sentiment for this symbol, INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL or skip.
+      news_sentiment  — weighted LLM sentiment for this symbol, its typed event_features (catalysts from the MARKET-EVENT FEED), INCLUDING its 3d/7d momentum (surge/accel in news_momentum). Rising sentiment (positive delta_3d and accel > 0) supports BUY; deteriorating sentiment (negative delta_3d, accel < 0) supports SELL or skip.
       volatility      — 20d vol, ATR%, Bollinger width
 - fx_intents (PREFERRED when the FX WALLET & EXPOSURE block is present): array of typed intents (kind = "pre_fund" | "hedge" | "sweep_idle" | "carry_tilt" | "close_hedge") — see the FX STRATEGY playbook for the required fields per kind. Guardrails (per-tick turnover, min notional, tilt-exposure cap) are applied server-side; oversized intents are trimmed rather than rejected. Reason MUST cite the numbered rule and its numeric trigger.
 - fx_conversions (LEGACY, discouraged unless no intent kind fits): array of { from_ccy, to_ccy, amount_percent (1..100 of the from-currency balance), reason }. Prefer fx_intents. Omit both if no FX action is warranted.
@@ -868,17 +882,56 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     asOf,
   );
 
+  // Market-event ingestion: type today's + the rolling window's headlines into
+  // dated events (earnings, guidance, M&A, rate decisions, tariffs, shocks) so
+  // the decision layer sees explicit catalysts, not just an average sentiment.
+  const marketEvents = extractMarketEvents(
+    [
+      ...scoredNews.map((n) => ({
+        headline: n.headline,
+        source: n.source,
+        sentiment: n.sentiment,
+        entities: n.entities,
+        source_weight: n.source_weight,
+        date: asOf,
+      })),
+      ...scoredWindow.map((n) => ({
+        headline: n.headline,
+        source: n.source,
+        sentiment: n.sentiment,
+        entities: n.entities,
+        source_weight: n.source_weight,
+        date: n.news_date,
+      })),
+    ],
+    asOf,
+  );
+  const macroEvents = macroEventFeatures(marketEvents);
+
   for (const f of features) {
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
     const execNudge = execPostSentimentNudge(f.symbol, execPostSignals);
+    const evf = symbolEventFeatures(f.symbol, f.name, marketEvents);
+    const evTilt = eventTilt(evf, macroEvents);
     const base = agg.contributors > 0 ? agg.score : 0;
-    const blended = Math.max(-1, Math.min(1, base + execNudge));
+    const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt));
     f.news_score =
-      agg.contributors > 0 || execNudge !== 0 ? Number(blended.toFixed(3)) : null;
+      agg.contributors > 0 || execNudge !== 0 || evTilt !== 0
+        ? Number(blended.toFixed(3))
+        : null;
     f.news_contributors = agg.contributors;
     f.news_momentum = computeSentimentMomentum(f.symbol, f.name, scoredWindow, asOf);
+    f.event_features = evf.event_count > 0 ? evf : null;
     f.cooling = isSymbolCooling(cooldowns, f.symbol, asOf);
   }
+
+  const marketEventsBlock = formatMarketEventsBlock(
+    macroEvents,
+    features.map((f) => ({
+      symbol: f.symbol,
+      features: f.event_features ?? { event_score: 0, event_pressure: 0, event_count: 0, hard_catalyst: false, top_kinds: [] },
+    })),
+  );
 
   // Cross-sectional ranking across today's universe (momentum + trend + quality + low-vol)
   const rankMap = computeCrossSectionalRanks(features);
@@ -1027,6 +1080,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
         crossSectional: formatCrossSectionalBlock(rankMap),
+        marketEvents: marketEventsBlock,
         events,
         cooling: coolingSymbols,
         asOf,
@@ -2734,6 +2788,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
             crossSectional: formatCrossSectionalBlock(rankMap),
+            marketEvents: marketEventsBlock,
             events,
             cooling: coolingSymbols,
             asOf,
