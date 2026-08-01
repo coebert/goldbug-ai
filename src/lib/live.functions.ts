@@ -16,6 +16,7 @@ import { logAudit, runReconciliation } from "@/lib/live-reconcile.server";
 import {
   assertBrokerAccountUnclaimed,
   brokerAccountConflictMessage,
+  releaseBrokerAccountPatch,
   isBrokerAccountUniqueViolation,
 } from "@/lib/broker-account-claim";
 
@@ -121,14 +122,15 @@ export const deactivateLive = createServerFn({ method: "POST" })
       return { ok: true, changed: false };
     }
     // RLS scopes the update to the caller's own portfolios.
-    const upd = await context.supabase.from("portfolios").update({
-      mode: "paper", live_paused: false,
-    }).eq("id", data.portfolioId);
+    // Releases the broker-account claim too, so another portfolio can link
+    // this account afterwards (see broker-account-claim.ts).
+    const upd = await context.supabase.from("portfolios")
+      .update(releaseBrokerAccountPatch()).eq("id", data.portfolioId);
     if (upd.error) throw new Error(upd.error.message);
     await logAudit({
       userId: context.userId, portfolioId: data.portfolioId, action: "DEACTIVATE",
       request: { reason: data.reason ?? null },
-      response: { previousMode, newMode: "paper" },
+      response: { previousMode, newMode: "paper", releasedBrokerAccountId: own.data.broker_account_id ?? null },
     });
     return { ok: true, changed: true };
   });
