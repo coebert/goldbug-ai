@@ -4,12 +4,14 @@
 // `idempotency_keys_scope_unique (user_id, endpoint, idempotency_key)`:
 // two concurrent inserts race, exactly one succeeds, the loser reads the row.
 //
-// Rows carry an `expires_at`; see idempotency-ttl.ts. An expired row is treated
-// as absent here and deleted on sight, so a key becomes reusable the moment its
-// TTL lapses even if the hourly database purge has not run.
+// Rows carry an `expires_at`; see idempotency-ttl.ts. Once a completed row's
+// replay window lapses it is kept as a tombstone for the grace period and
+// reported with status "expired", so a late retry gets a clear answer rather
+// than a second execution. Stale locks and rows past the grace window are
+// deleted on sight, even if the hourly database purge has not run.
 
 import type { IdempotencyRecord, IdempotencyStore } from "./idempotency";
-import { expiryFor, isExpiredRow } from "./idempotency-ttl";
+import { classifyRow, expiredAtIso, expiryFor } from "./idempotency-ttl";
 
 type PgError = { message: string; code?: string };
 
@@ -36,7 +38,14 @@ export function createIdempotencyStore(supabase: IdempotencySupabase): Idempoten
     if (del.error) throw new Error(del.error.message);
   }
 
-  /** Returns the live record, or null when missing or expired (expired rows are purged). */
+  /**
+   * Returns the record for a key, or null when it is absent / reclaimable.
+   *
+   * A completed row past its TTL comes back with status "expired" (inside the
+   * grace window) so the caller can tell the client its key expired instead of
+   * silently re-running the operation. Reclaimable locks and rows past the
+   * grace window are deleted and reported as absent.
+   */
   async function read(args: {
     userId: string;
     endpoint: string;
@@ -51,9 +60,19 @@ export function createIdempotencyStore(supabase: IdempotencySupabase): Idempoten
       .maybeSingle();
     if (res.error) throw new Error(res.error.message);
     if (!res.data) return null;
-    if (isExpiredRow(res.data)) {
+
+    const state = classifyRow(res.data);
+    if (state === "reclaimable" || state === "purgeable") {
       await hardDelete(args).catch(() => undefined);
       return null;
+    }
+    if (state === "expired") {
+      return {
+        status: "expired",
+        request_hash: String(res.data.request_hash ?? ""),
+        response: null,
+        expired_at: expiredAtIso(res.data),
+      };
     }
     return {
       status: res.data.status === "completed" ? "completed" : "in_progress",
@@ -84,8 +103,8 @@ export function createIdempotencyStore(supabase: IdempotencySupabase): Idempoten
       if (!ins.error) return { reserved: true };
       if (!isUniqueViolation(ins.error)) throw new Error(ins.error.message);
 
-      // `read` deletes the row when it is past its TTL, so a null here can mean
-      // "expired and reclaimed" as well as "winner rolled back": retry once.
+      // `read` deletes stale locks and fully-aged rows, so a null here can mean
+      // "reclaimed" as well as "winner rolled back": retry once.
       const existing = await read(args);
       if (!existing) {
         const retry = await insertReservation(args);

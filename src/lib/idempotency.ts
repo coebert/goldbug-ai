@@ -62,6 +62,26 @@ export class IdempotencyInProgressError extends Error {
   }
 }
 
+/**
+ * The key was used successfully, but its replay window has closed, so the
+ * original response is gone. We refuse to run the operation again under an
+ * expired key: the client must decide whether the first attempt counted.
+ */
+export class IdempotencyKeyExpiredError extends Error {
+  readonly key: string;
+  readonly expiredAt: string | null;
+  constructor(key: string, expiredAt: string | null) {
+    super(
+      `Idempotency-Key "${key}" has expired${expiredAt ? ` (replay window closed ${expiredAt})` : ""}. ` +
+        `The original response is no longer stored and the request was NOT re-run. ` +
+        `Check the current state, then retry with a new Idempotency-Key if the operation is still needed.`,
+    );
+    this.name = "IdempotencyKeyExpiredError";
+    this.key = key;
+    this.expiredAt = expiredAt ?? null;
+  }
+}
+
 export class InvalidIdempotencyKeyError extends Error {
   constructor() {
     super(`Idempotency-Key must be a non-empty string of at most ${IDEMPOTENCY_KEY_MAX} characters.`);
@@ -70,10 +90,13 @@ export class InvalidIdempotencyKeyError extends Error {
 }
 
 export type IdempotencyRecord = {
-  status: "in_progress" | "completed";
+  status: "in_progress" | "completed" | "expired";
   request_hash: string;
   response: unknown;
+  /** Set when `status === "expired"`: when the replay window closed. */
+  expired_at?: string | null;
 };
+
 
 export type IdempotencyStore = {
   /**
@@ -133,11 +156,17 @@ export async function withIdempotency<T>(
   const reservation = await store.reserve({ ...scope, requestHash });
   if (!reservation.reserved) {
     const existing = reservation.existing;
+    // Expired keys are answered before the payload check: the stored request
+    // hash may itself be gone, and "your key expired" is the useful answer.
+    if (existing.status === "expired") {
+      throw new IdempotencyKeyExpiredError(args.key, existing.expired_at ?? null);
+    }
     // Different payload under the same key: never replay someone else's answer.
     if (existing.request_hash !== requestHash) throw new IdempotencyKeyReuseError(args.key);
     if (existing.status !== "completed") throw new IdempotencyInProgressError(args.key);
     return { replayed: true, response: existing.response as T };
   }
+
 
   let response: T;
   try {
@@ -150,4 +179,24 @@ export async function withIdempotency<T>(
 
   await store.complete({ ...scope, response });
   return { replayed: false, response };
+}
+
+/** HTTP-shaped mapping so every endpoint answers idempotency faults alike. */
+export type IdempotencyFault = { status: number; code: string; message: string; expiredAt?: string | null };
+
+export function idempotencyFault(err: unknown): IdempotencyFault | null {
+  if (err instanceof IdempotencyKeyExpiredError) {
+    // 409: the key is not usable again, and nothing was executed this time.
+    return { status: 409, code: "idempotency_key_expired", message: err.message, expiredAt: err.expiredAt };
+  }
+  if (err instanceof IdempotencyKeyReuseError) {
+    return { status: 422, code: "idempotency_key_reused", message: err.message };
+  }
+  if (err instanceof IdempotencyInProgressError) {
+    return { status: 409, code: "idempotency_in_progress", message: err.message };
+  }
+  if (err instanceof InvalidIdempotencyKeyError) {
+    return { status: 400, code: "idempotency_key_invalid", message: err.message };
+  }
+  return null;
 }
