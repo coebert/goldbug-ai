@@ -23,6 +23,7 @@ import { recordIntradayPrices } from "@/lib/price-intraday.server";
 
 import { resolvePortfolioBrokerLink } from "@/lib/brokers/portfolio-broker-link.server";
 import { asJson, type Insert } from "@/lib/_server/db-json";
+import { instrumentCcyFor } from "@/lib/instrument-ccy-rules";
 import type { Database } from "@/integrations/supabase/types";
 import type { OwnedDbClient } from "@/lib/_server/owned-client";
 
@@ -171,6 +172,9 @@ export async function reconcileLiveHoldingsFromBroker(
         quantity: p.quantity,
         avg_cost: p.avgPrice || p.marketPrice || 0,
         high_water_mark: p.avgPrice || p.marketPrice || 0,
+        // Tagging rules own the settlement currency: broker payloads often
+        // echo the account currency, which would skip the FX leg.
+        instrument_ccy: instrumentCcyFor(p.symbol, p.currency ?? null),
       };
     });
   if (rowsToUpsert.length > 0) {
