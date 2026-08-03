@@ -471,6 +471,11 @@ function AdminPage() {
             </div>
           )}
 
+          {manual.isSuccess && manual.data?.portfolio_status && (
+            <RunPortfolioStatusTable rows={manual.data.portfolio_status} />
+          )}
+
+
 
 
         </CardContent>
