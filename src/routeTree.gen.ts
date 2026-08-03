@@ -17,6 +17,7 @@ import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
 import { Route as LearnRouteImport } from './routes/learn'
 import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as CompareRouteImport } from './routes/compare'
+import { Route as BrokerBlocksRouteImport } from './routes/broker-blocks'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -86,6 +87,11 @@ const GetStartedRoute = GetStartedRouteImport.update({
 const CompareRoute = CompareRouteImport.update({
   id: '/compare',
   path: '/compare',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrokerBlocksRoute = BrokerBlocksRouteImport.update({
+  id: '/broker-blocks',
+  path: '/broker-blocks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -259,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
   '/learn': typeof LearnRoute
@@ -299,6 +306,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
   '/learn': typeof LearnRoute
@@ -340,6 +348,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
   '/learn': typeof LearnRoute
@@ -382,6 +391,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/broker-blocks'
     | '/compare'
     | '/get-started'
     | '/learn'
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/broker-blocks'
     | '/compare'
     | '/get-started'
     | '/learn'
@@ -462,6 +473,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/broker-blocks'
     | '/compare'
     | '/get-started'
     | '/learn'
@@ -503,6 +515,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
+  BrokerBlocksRoute: typeof BrokerBlocksRoute
   CompareRoute: typeof CompareRoute
   GetStartedRoute: typeof GetStartedRoute
   LearnRoute: typeof LearnRoute
@@ -592,6 +605,13 @@ declare module '@tanstack/react-router' {
       path: '/compare'
       fullPath: '/compare'
       preLoaderRoute: typeof CompareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/broker-blocks': {
+      id: '/broker-blocks'
+      path: '/broker-blocks'
+      fullPath: '/broker-blocks'
+      preLoaderRoute: typeof BrokerBlocksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -829,6 +849,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
+  BrokerBlocksRoute: BrokerBlocksRoute,
   CompareRoute: CompareRoute,
   GetStartedRoute: GetStartedRoute,
   LearnRoute: LearnRoute,
@@ -867,3 +888,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
