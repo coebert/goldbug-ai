@@ -289,7 +289,9 @@ async function runHourlyCycleInner(
     for (const p of portfolios) {
       try {
         const elapsed = Date.now() - runStartedAt;
-        if (elapsed > RUN_BUDGET_MS) {
+        const starvedFor = Date.now() - (lastDecisionAt.get(p.id) ?? 0);
+        const mayOverride = starvedFor > STARVED_MS && starvationOverridesLeft > 0;
+        if (elapsed > RUN_BUDGET_MS && !mayOverride) {
           bumpBudgetExceeded();
           results.push({
             id: p.id,
@@ -299,6 +301,8 @@ async function runHourlyCycleInner(
           });
           continue;
         }
+        if (elapsed > RUN_BUDGET_MS && mayOverride) starvationOverridesLeft -= 1;
+
 
         // Market-hours gate: skip AI decision cycles when every venue in this
         // portfolio's universe is currently closed. Crypto/FX are always
