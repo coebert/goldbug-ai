@@ -33,8 +33,8 @@ export function ExecutionQualityCard({ portfolioId }: Props) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
-        <div>
+      <CardHeader className="flex flex-col items-start gap-3 pb-3 sm:flex-row sm:justify-between">
+        <div className="min-w-0">
           <CardTitle className="text-base">Execution quality</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
             Fill rate, slippage vs limit price, and parent-slice adherence for buy and sell orders.

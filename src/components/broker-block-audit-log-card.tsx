@@ -28,7 +28,7 @@ export function BrokerBlockAuditLogCard() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
+      <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
           <ScrollText className="h-4 w-4 text-muted-foreground" />
           Rejection audit log

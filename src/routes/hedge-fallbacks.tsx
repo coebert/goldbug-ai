@@ -26,9 +26,9 @@ export const Route = createFileRoute("/hedge-fallbacks")({
 
 function HedgeFallbacksPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <AppHeader />
-      <main className="mx-auto w-full max-w-4xl space-y-4 p-4">
+      <main className="mx-auto w-full min-w-0 max-w-4xl space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Hedge fallbacks</h1>

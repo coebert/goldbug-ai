@@ -379,7 +379,7 @@ function AdminPage() {
 
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6 overflow-x-hidden p-4 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold sm:text-2xl">Admin — Broker & Routing Health</h1>
@@ -387,7 +387,7 @@ function AdminPage() {
             Live SIM/PROD broker status, OAuth token countdown, last routed order, and alerts.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
           <Link to="/broker-blocks" className="text-sm text-muted-foreground hover:text-foreground">Blocked instruments</Link>
           <Link to="/hedge-fallbacks" className="text-sm text-muted-foreground hover:text-foreground">Hedge fallbacks</Link>
