@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { planManualRunRetry, type ManualRunRetryDecision } from "@/lib/manual-run-retry";
 import { toast } from "sonner";
 import { getAdminHealth, type AdminHealthSnapshot, type BrokerEnvHealth } from "@/lib/admin.functions";
 import { triggerHourlyRunNow } from "@/lib/trading.functions";
@@ -243,6 +244,26 @@ function AdminPage() {
     ["paper", "live_sim", "live_prod"].includes(p.mode as string),
   );
 
+  // --- Manual run with bounded automatic retry -----------------------------
+  // The server keeps its hard 55s deadline; we simply make additional bounded
+  // attempts for portfolios the deadline left un-ticked.
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptRef = useRef(0);
+  const startedAtRef = useRef(0);
+  const requestedRef = useRef<string[]>([]);
+  const [retryState, setRetryState] = useState<{
+    attempt: number;
+    pending: number;
+    reason: string;
+  } | null>(null);
+
+  useEffect(
+    () => () => {
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    },
+    [],
+  );
+
   const manual = useMutation({
     mutationFn: (vars: { force?: boolean; portfolioIds?: string[] } = {}) =>
       triggerRun({
@@ -252,9 +273,27 @@ function AdminPage() {
     onSuccess: (result) => {
       const ran = result.results.filter((r) => r.ok && !r.skipped).length;
       const skipped = result.results.filter((r) => r.skipped).length;
-      toast.success("Hourly run completed", {
-        description: `${ran} portfolio tick(s) ran, ${skipped} skipped. Live portfolios are prioritised to keep manual runs reliable.`,
+      const plan = planManualRunRetry({
+        attempt: attemptRef.current,
+        elapsedMs: Date.now() - startedAtRef.current,
+        requestedIds: requestedRef.current,
+        outcome: { kind: "success", portfolioStatus: result.portfolio_status ?? [] },
       });
+      if (plan.shouldRetry) {
+        scheduleRetry(plan);
+        toast.warning("Run incomplete — retrying", { description: plan.reason });
+      } else {
+        setRetryState(null);
+        if (plan.outcome === "complete") {
+          toast.success("Hourly run completed", {
+            description: `${ran} portfolio tick(s) ran, ${skipped} skipped. Live portfolios are prioritised to keep manual runs reliable.`,
+          });
+        } else {
+          toast.warning("Run finished with portfolios left un-ticked", {
+            description: plan.reason,
+          });
+        }
+      }
       // Poll health a few times so the UI catches up without needing a manual refresh.
       q.refetch();
       setTimeout(() => q.refetch(), 15_000);
@@ -262,6 +301,21 @@ function AdminPage() {
       setTimeout(() => q.refetch(), 90_000);
     },
     onError: (e: Error & { code?: string; ageMs?: number | null }) => {
+      const plan = planManualRunRetry({
+        attempt: attemptRef.current,
+        elapsedMs: Date.now() - startedAtRef.current,
+        requestedIds: requestedRef.current,
+        outcome: { kind: "error", code: e.code, message: e.message },
+      });
+      if (plan.shouldRetry) {
+        scheduleRetry(plan);
+        toast.warning(
+          plan.outcome === "lock_held" ? "Run already in progress — retrying" : "Run timed out — retrying",
+          { description: plan.reason },
+        );
+        return;
+      }
+      setRetryState(null);
       if (e.code === "run_in_progress") {
         toast.warning("Run already in progress", {
           description: `${e.message} Use "Force clear lock & run" if the previous run crashed.`,
@@ -271,6 +325,31 @@ function AdminPage() {
       }
     },
   });
+
+  function scheduleRetry(plan: ManualRunRetryDecision) {
+    attemptRef.current += 1;
+    setRetryState({
+      attempt: attemptRef.current,
+      pending: plan.portfolioIds.length,
+      reason: plan.reason,
+    });
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    retryTimer.current = setTimeout(() => {
+      // Never force on a retry: the engine's "already ticked" guard must stay
+      // active so completed portfolios are not double-ticked.
+      manual.mutate({ portfolioIds: plan.portfolioIds });
+    }, plan.delayMs);
+  }
+
+  function startManualRun(vars: { force?: boolean; portfolioIds?: string[] } = {}) {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    attemptRef.current = 1;
+    startedAtRef.current = Date.now();
+    requestedRef.current = vars.portfolioIds ?? [];
+    setRetryState(null);
+    manual.mutate(vars);
+  }
+
 
   const backfill = useMutation({
     mutationFn: () => runBackfill({ data: { dryRun: false } }),
@@ -374,7 +453,7 @@ function AdminPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              onClick={() => manual.mutate({ portfolioIds: selectedIds })}
+              onClick={() => startManualRun({ portfolioIds: selectedIds })}
               disabled={manual.isPending}
               className="gap-2"
             >
@@ -394,7 +473,7 @@ function AdminPage() {
                     ? `${selectedIds.length} selected portfolio(s)`
                     : "all eligible portfolios";
                 if (window.confirm(`Force clear the current run lock and start a fresh run for ${scope}? Only use this if the previous run crashed or is genuinely stuck.`)) {
-                  manual.mutate({ force: true, portfolioIds: selectedIds });
+                  startManualRun({ force: true, portfolioIds: selectedIds });
                 }
               }}
               disabled={manual.isPending}
@@ -474,6 +553,15 @@ function AdminPage() {
 
           {manual.isSuccess && manual.data?.portfolio_status && (
             <RunPortfolioStatusTable rows={manual.data.portfolio_status} />
+          )}
+
+          {retryState && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-500">
+              Auto-retry {retryState.attempt} of 3 queued
+              {retryState.pending > 0 ? ` for ${retryState.pending} portfolio(s)` : ""} — {retryState.reason}
+              {" "}The per-run deadline is unchanged; retries are extra bounded attempts.
+            </div>
+
           )}
 
 
