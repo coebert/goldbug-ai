@@ -54,6 +54,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { qk } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/compare")({
   ssr: false,
@@ -101,7 +102,7 @@ function ComparePage() {
   const runMany = useServerFn(runBacktestMany);
 
   const portfoliosQ = useQuery({
-    queryKey: ["portfolios"],
+    queryKey: qk.portfolios.all(),
     queryFn: () => list(),
     enabled: !!session,
   });

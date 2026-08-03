@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { qk } from "@/lib/query-keys";
 
 function fmt(currency: string, n: number) {
   try {
@@ -76,10 +77,10 @@ export function AddSimFundsDialog({
       setAddedAmount(n);
       onAdded?.(n);
       await Promise.all([
-        qc.refetchQueries({ queryKey: ["portfolios"], type: "active" }),
-        qc.refetchQueries({ queryKey: ["portfolio", portfolioId], type: "active" }),
+        qc.refetchQueries({ queryKey: qk.portfolios.all(), type: "active" }),
+        qc.refetchQueries({ queryKey: qk.portfolio.detail(portfolioId), type: "active" }),
         qc.refetchQueries({ queryKey: ["sim-fund-events", portfolioId], type: "active" }),
-        qc.refetchQueries({ queryKey: ["all-portfolios-equity"], type: "active" }),
+        qc.refetchQueries({ queryKey: qk.portfolios.equity(), type: "active" }),
       ]);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to add funds"),

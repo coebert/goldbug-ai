@@ -28,6 +28,7 @@ import {
 import { listPortfolios } from "@/lib/trading.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { qk } from "@/lib/query-keys";
 
 /**
  * Global Cmd/Ctrl-K command palette. Provides fast access to every
@@ -59,7 +60,7 @@ export function CommandPalette({
 
   const list = useServerFn(listPortfolios);
   const q = useQuery({
-    queryKey: ["portfolios", "palette"],
+    queryKey: qk.portfolios.list(),
     queryFn: () => list(),
     enabled: enabled && open,
     staleTime: 60_000,

@@ -35,6 +35,7 @@ import { Explain } from "@/components/explain";
 import { createPortfolio } from "@/lib/trading.functions";
 import { activateLive, getSaxoOAuthStatus, previewBrokerBalance } from "@/lib/live.functions";
 import { formatUkTime } from "@/lib/uk-time";
+import { qk } from "@/lib/query-keys";
 
 const RISK_LABELS: Record<string, string> = {
   conservative: "Conservative — max 10% per asset, 20% cash floor",
@@ -166,7 +167,7 @@ export function CreatePortfolioCard() {
             ? "Portfolio created and activated on Saxo SIM."
             : "Portfolio created.",
       );
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
+      qc.invalidateQueries({ queryKey: qk.portfolios.all() });
       navigate({ to: "/portfolio/$id", params: { id: r.id } });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),

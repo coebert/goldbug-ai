@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, ScrollText } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import { POLL } from "@/lib/query-keys";
 
 interface Props {
   portfolioId: string;
@@ -26,7 +27,7 @@ export function FxAuditCard({ portfolioId, active = true }: Props) {
     queryFn: () => fetchAudit({ data: { portfolioId } }),
     enabled: active,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const data = q.data;
 

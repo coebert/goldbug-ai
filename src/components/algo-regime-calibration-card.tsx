@@ -12,6 +12,7 @@ import {
   rollbackAlgoRegimeTune,
   evaluateAlgoRegimeShadow,
 } from "@/lib/algo-regime-scheduled-autotune.functions";
+import { POLL } from "@/lib/query-keys";
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
@@ -34,13 +35,13 @@ export function AlgoRegimeCalibrationCard({ portfolioId }: { portfolioId: string
   const { data, isLoading, error } = useQuery({
     queryKey: ["algo-regime-calibration", portfolioId],
     queryFn: () => fetchCal({ data: { portfolioId, limit: 200 } }),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
   });
 
   const history = useQuery({
     queryKey: ["algo-regime-tune-history", portfolioId],
     queryFn: () => listHistoryFn({ data: { portfolioId, limit: 20 } }),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
   });
 
   const invalidateAll = () => {

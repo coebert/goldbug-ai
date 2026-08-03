@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { POLL } from "@/lib/query-keys";
 
 const CATEGORY = "pending_slices";
 
@@ -46,7 +47,7 @@ export function NotificationsPanel() {
   const q = useQuery({
     queryKey: ["notifications", CATEGORY, tab],
     queryFn: () => list({ data: { category: CATEGORY, unreadOnly: tab === "unread", limit: 100 } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["notifications"] });

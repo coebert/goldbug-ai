@@ -32,6 +32,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { qk } from "@/lib/query-keys";
 
 function compactNum(v: number) {
   const a = Math.abs(v);
@@ -68,7 +69,7 @@ type PortfolioMeta = { id: string; name: string; currency: string; mode: string 
 export function AllPortfoliosChart() {
   const fetchAll = useServerFn(getAllPortfoliosEquity);
   const q = useQuery({
-    queryKey: ["all-portfolios-equity"],
+    queryKey: qk.portfolios.equity(),
     queryFn: () => fetchAll(),
     staleTime: 30_000,
   });

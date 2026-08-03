@@ -9,6 +9,7 @@ import { getPortfolioRiskHalts } from "@/lib/risk-halts.functions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { JargonText } from "@/components/jargon-text";
 import { cn } from "@/lib/utils";
+import { POLL } from "@/lib/query-keys";
 
 function pct(n: number): string {
   return `${(n * 100).toFixed(2)}%`;
@@ -19,7 +20,7 @@ export function RiskHaltBanner({ portfolioId, className }: { portfolioId: string
   const { data } = useQuery({
     queryKey: ["risk-halts", portfolioId],
     queryFn: () => fetchHalts({ data: { portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
     staleTime: 30_000,
   });
 

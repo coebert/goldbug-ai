@@ -45,6 +45,7 @@ import { computeCardRangePct } from "@/lib/card-range-pct";
 import { deriveCardEquity } from "@/lib/derive-card-equity";
 import { deriveStripAllocation } from "@/lib/derive-strip-allocation";
 import { formatMoney, formatMoneyAmount } from "@/lib/format-money";
+import { qk } from "@/lib/query-keys";
 
 export type SparkPoint = { date: string; value: number };
 export type SparkRange = "1W" | "1M" | "3M" | "1Y" | "All";
@@ -154,7 +155,7 @@ export function PortfolioRow({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => {
       toast.success("Portfolio deleted");
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
+      qc.invalidateQueries({ queryKey: qk.portfolios.all() });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });

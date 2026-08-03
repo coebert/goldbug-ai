@@ -5,6 +5,7 @@ import { Activity } from "lucide-react";
 import { listAlgoRegimeHistory } from "@/lib/algo-regime-history.functions";
 import { AlgoRegimeCard } from "@/components/algo-regime-card";
 import type { AlgoRegimeSnapshot } from "@/lib/microstructure/algo-regime";
+import { POLL } from "@/lib/query-keys";
 
 const TIER_BG: Record<AlgoRegimeSnapshot["tier"], string> = {
   normal: "bg-emerald-500/70",
@@ -17,7 +18,7 @@ export function AlgoRegimeHistoryCard({ portfolioId }: { portfolioId: string }) 
   const { data, isLoading, error } = useQuery({
     queryKey: ["algo-regime-history", portfolioId],
     queryFn: () => fetchHistory({ data: { portfolioId, limit: 60 } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const rows = data ?? [];

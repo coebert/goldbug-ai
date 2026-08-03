@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Layers, Newspaper, RefreshCw } from "lucide-react";
 import { JargonText } from "@/components/jargon-text";
+import { POLL } from "@/lib/query-keys";
 
 function tone(v: number | null) {
   if (v == null) return { label: "unscored", cls: "text-muted-foreground bg-muted" };
@@ -32,7 +33,7 @@ export function DecisionNewsBreakdown() {
     queryKey: ["decision-news-breakdown"],
     queryFn: () => fetchFn(),
     staleTime: 2 * 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
   });
 
   const items = useMemo(() => q.data?.items ?? [], [q.data]);

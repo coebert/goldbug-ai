@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { runValuationHistoryBackfill } from "@/lib/valuation/historical-backfill.functions";
+import { qk } from "@/lib/query-keys";
 
 type RunResult = Awaited<ReturnType<typeof runValuationHistoryBackfill>>;
 
@@ -32,7 +33,7 @@ export function ValuationHistoryBackfillCard({ className }: { className?: string
       );
       if (!res.dryRun) {
         queryClient.invalidateQueries({ queryKey: ["equity-snapshots"] });
-        queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+        queryClient.invalidateQueries({ queryKey: qk.portfolio.all() });
       }
     },
     onError: (e: unknown) =>

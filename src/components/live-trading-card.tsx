@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Send, Clock, Ban, Zap, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { Explain } from "@/components/explain";
+import { qk, POLL } from "@/lib/query-keys";
 
 export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const qc = useQueryClient();
@@ -38,26 +39,26 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const [showAudit, setShowAudit] = useState(false);
 
   const q = useQuery({
-    queryKey: ["live-status", portfolioId],
+    queryKey: qk.live.status(portfolioId),
     queryFn: () => status({ data: { portfolioId } }),
   });
 
   const auditQ = useQuery({
-    queryKey: ["live-audit", portfolioId],
+    queryKey: qk.live.audit(portfolioId),
     queryFn: () => audit({ data: { portfolioId, limit: 20 } }),
     enabled: showAudit,
   });
 
   const tradeAlertFn = useServerFn(getLiveTradeAlert);
   const alertQ = useQuery({
-    queryKey: ["live-trade-alert", portfolioId],
+    queryKey: qk.live.tradeAlert(portfolioId),
     queryFn: () => tradeAlertFn({ data: { portfolioId, windowRuns: 5 } }),
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: POLL.SLOW,
   });
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
-    qc.invalidateQueries({ queryKey: ["live-audit", portfolioId] });
+    qc.invalidateQueries({ queryKey: qk.live.status(portfolioId) });
+    qc.invalidateQueries({ queryKey: qk.live.audit(portfolioId) });
   };
 
   const promptReason = (label: string) => {

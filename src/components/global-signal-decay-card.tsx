@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getGlobalSignalDecay } from "@/lib/insights.functions";
 import { Activity, TrendingDown, TrendingUp } from "lucide-react";
+import { POLL } from "@/lib/query-keys";
 
 const LABELS: Record<string, string> = {
   sma_trend: "SMA trend",
@@ -18,7 +19,7 @@ export function GlobalSignalDecayCard() {
     queryKey: ["global-signal-decay"],
     queryFn: () => fetchFn(),
     staleTime: 60_000,
-    refetchInterval: 300_000,
+    refetchInterval: POLL.SLOW,
   });
 
   const rows = data ?? [];

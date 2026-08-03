@@ -15,6 +15,7 @@ import {
   TOOLTIP_CONTENT_STYLE,
 } from "@/lib/chart-palette";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { POLL } from "@/lib/query-keys";
 
 interface Props {
   portfolioId: string;
@@ -34,7 +35,7 @@ export function FxHealthCard({ portfolioId, active = true }: Props) {
     queryFn: () => fetchHealth({ data: { portfolioId, sinceHours: 24 } }),
     enabled: active,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const data = query.data;

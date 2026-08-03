@@ -36,6 +36,7 @@ import { PortfolioRow } from "@/components/home/portfolio-row";
 import { CreatePortfolioCard } from "@/components/home/create-portfolio-card";
 import { useFocusMode } from "@/components/home/use-focus-mode";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
+import { qk } from "@/lib/query-keys";
 
 // Re-export so existing tests importing from "@/routes/index" keep working.
 export { ModeSummaryTile } from "@/components/home/mode-summary-tile";
@@ -100,7 +101,7 @@ function Home() {
   const list = useServerFn(listPortfolios);
   const fetchEquity = useServerFn(getAllPortfoliosEquity);
   const q = useQuery({
-    queryKey: ["portfolios"],
+    queryKey: qk.portfolios.all(),
     queryFn: () => list(),
     enabled: !!session,
     // Mobile browsers fire focus/visibility events constantly (tab switches,
@@ -111,7 +112,7 @@ function Home() {
     refetchOnReconnect: false,
   });
   const equityQ = useQuery({
-    queryKey: ["all-portfolios-equity"],
+    queryKey: qk.portfolios.equity(),
     queryFn: () => fetchEquity(),
     enabled: !!session,
     staleTime: 60_000,

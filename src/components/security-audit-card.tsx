@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ShieldAlert, RefreshCw } from "lucide-react";
+import { POLL } from "@/lib/query-keys";
 
 const ANY = "__any__";
 
@@ -48,7 +49,7 @@ export function SecurityAuditCard() {
   const q = useQuery({
     queryKey: ["security-audit", filters],
     queryFn: () => list({ data: filters }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const rows: SecurityAuditRow[] = q.data?.rows ?? [];

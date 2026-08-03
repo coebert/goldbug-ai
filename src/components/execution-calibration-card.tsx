@@ -7,6 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { calibrateExecution } from "@/lib/trading.functions";
 import { toast } from "sonner";
 import { Wand2 } from "lucide-react";
+import { qk } from "@/lib/query-keys";
 
 type CalibrationMeta = {
   as_of: string;
@@ -52,7 +53,7 @@ export function ExecutionCalibrationCard({
       });
       if (apply) {
         toast.success("Calibrated execution model updated");
-        qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+        qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
       } else {
         toast.message("Preview ready — click Apply to save.");
       }

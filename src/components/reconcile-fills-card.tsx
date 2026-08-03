@@ -13,6 +13,7 @@ import {
 } from "@/lib/equity-snapshot-revalue.functions";
 
 import { toast } from "sonner";
+import { qk } from "@/lib/query-keys";
 
 /**
  * Prominent one-click "rebuild my ledger from real broker fills" action.
@@ -43,9 +44,9 @@ export function ReconcileFillsCard({
         { duration: 10000 },
       );
       queryClient.invalidateQueries({ queryKey: ["order-recon-view"] });
-      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
-      queryClient.invalidateQueries({ queryKey: ["trades"] });
-      queryClient.invalidateQueries({ queryKey: ["holdings"] });
+      queryClient.invalidateQueries({ queryKey: qk.portfolio.all() });
+      queryClient.invalidateQueries({ queryKey: qk.trades.all() });
+      queryClient.invalidateQueries({ queryKey: qk.holdings.all() });
     },
     onError: (e: unknown) =>
       toast.error(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -62,7 +63,7 @@ export function ReconcileFillsCard({
         { duration: 10000 },
       );
       queryClient.invalidateQueries({ queryKey: ["equity"] });
-      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      queryClient.invalidateQueries({ queryKey: qk.portfolio.all() });
     },
     onError: (e: unknown) =>
       toast.error(`Revalue failed: ${e instanceof Error ? e.message : String(e)}`),

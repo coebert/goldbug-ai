@@ -42,6 +42,7 @@ import {
   TOOLTIP_ITEM_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
+import { qk } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/walk-forward/$id")({
   ssr: false,
@@ -108,7 +109,7 @@ function WalkForwardPage() {
   const runWF = useServerFn(runWalkForward);
 
   const pQ = useQuery({
-    queryKey: ["portfolio", id],
+    queryKey: qk.portfolio.detail(id),
     queryFn: () => getP({ data: { id } }),
     enabled: !!session,
   });

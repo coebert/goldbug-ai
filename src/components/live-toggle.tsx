@@ -10,6 +10,7 @@ import { pauseLive } from "@/lib/live.functions";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
+import { qk } from "@/lib/query-keys";
 
 interface Props {
   portfolioId: string;
@@ -28,9 +29,9 @@ export function LiveToggle({ portfolioId, mode, livePaused, size = "md" }: Props
     mutationFn: (paused: boolean) => pause({ data: { portfolioId, paused } }),
     onSuccess: (r) => {
       toast.success(r.paused ? "Portfolio set to Offline — cron will skip it" : "Portfolio Active — cron will trade it hourly");
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
-      qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
-      qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+      qc.invalidateQueries({ queryKey: qk.portfolios.all() });
+      qc.invalidateQueries({ queryKey: qk.live.status(portfolioId) });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
     },
     onError: (e: Error) => toast.error(e.message),
   });
