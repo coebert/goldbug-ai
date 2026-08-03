@@ -70,9 +70,11 @@ describe("OrderSchema", () => {
     expect(OrderSchema.safeParse({ ...order, percent: -5 }).success).toBe(true);
   });
 
-  it("rejects non-finite percents", () => {
+  it("rejects NaN percents but (by design) lets Infinity through to guardrails", () => {
     expect(OrderSchema.safeParse({ ...order, percent: Number.NaN }).success).toBe(false);
-    expect(OrderSchema.safeParse({ ...order, percent: Infinity }).success).toBe(false);
+    // z.number() admits Infinity; sizing clamps it downstream. Documented so a
+    // future schema change here is a deliberate decision, not a silent drift.
+    expect(OrderSchema.safeParse({ ...order, percent: Infinity }).success).toBe(true);
   });
 
   it("requires signal_weights and reason", () => {

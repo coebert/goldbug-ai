@@ -6,9 +6,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 type Any = Record<string, unknown>;
 
+const { state, selects, supabaseAdmin } = vi.hoisted(() => {
 const state: {
-  portfolio: Any | null;
-  holdings: Any[] | null;
+  portfolio: Record<string, unknown> | null;
+  holdings: Array<Record<string, unknown>> | null;
 } = { portfolio: null, holdings: null };
 
 const selects: string[] = [];
@@ -34,6 +35,9 @@ const supabaseAdmin = {
     throw new Error(`unexpected table ${table}`);
   },
 };
+
+return { state, selects, supabaseAdmin };
+});
 
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin }));
 
