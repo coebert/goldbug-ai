@@ -101,3 +101,24 @@ export async function loadActiveBrokerBlocks(
     lastSeenAt: r.last_seen_at as string,
   }));
 }
+
+/** Clear an active block so the symbol re-enters the live universe. */
+export async function clearBrokerBlock(args: {
+  userId: string;
+  symbolKey: string;
+  broker?: string;
+}): Promise<boolean> {
+  const key = blockSymbolKey(args.symbolKey);
+  const { error } = await supabaseAdmin
+    .from("broker_instrument_blocks")
+    .update({ cleared_at: new Date().toISOString() })
+    .eq("user_id", args.userId)
+    .eq("broker", args.broker ?? "saxo")
+    .eq("symbol_key", key)
+    .is("cleared_at", null);
+  if (error) {
+    console.warn("[broker-blocks] clear failed:", error.message);
+    return false;
+  }
+  return true;
+}
