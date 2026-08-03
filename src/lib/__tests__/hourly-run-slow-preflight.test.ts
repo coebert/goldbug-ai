@@ -243,3 +243,43 @@ describe("hourly run scheduling — slow pre-flight", () => {
     }
   });
 });
+
+describe("manual runs", () => {
+  const now = Date.UTC(2026, 7, 3, 12, 0, 0);
+
+  it("manual gate lets EVERY stale portfolio through a blown budget", () => {
+    // Manual = explicit user intent: overrides = portfolio count, 30-min
+    // staleness threshold (what hourly-run.server passes for triggeredBy:manual).
+    const last = new Map<string, number>([
+      ["real", now - 2 * HOUR],
+      ["high-sim", now - 3 * HOUR],
+      ["balanced-sim", now - 3 * HOUR],
+      ["crypto", now - 3 * HOUR],
+    ]);
+    const gate = createBudgetGate(22_000, last, {
+      starvedMs: 30 * 60 * 1000,
+      overrides: 4,
+    });
+    for (const id of ["real", "high-sim", "balanced-sim", "crypto"]) {
+      expect(gate.shouldSkip(id, 90_000, now), `${id} skipped on manual run`).toBe(false);
+    }
+  });
+
+  it("manual gate still skips a portfolio that ticked minutes ago", () => {
+    const gate = createBudgetGate(22_000, new Map([["fresh", now - 5 * 60_000]]), {
+      starvedMs: 30 * 60 * 1000,
+      overrides: 4,
+    });
+    expect(gate.shouldSkip("fresh", 90_000, now)).toBe(true);
+  });
+
+  it("cron gate is unchanged: one 6h override only", () => {
+    const last = new Map<string, number>([
+      ["a", now - 8 * HOUR],
+      ["b", now - 8 * HOUR],
+    ]);
+    const gate = createBudgetGate(22_000, last, { overrides: 1 });
+    expect(gate.shouldSkip("a", 90_000, now)).toBe(false);
+    expect(gate.shouldSkip("b", 90_000, now)).toBe(true);
+  });
+});
