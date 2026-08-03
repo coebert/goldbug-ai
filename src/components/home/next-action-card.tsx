@@ -36,7 +36,7 @@ export function NextActionCard({ action, className = "" }: { action: NextAction;
   return (
     <section
       aria-labelledby="next-action-title"
-      className={`flex flex-col justify-between rounded-2xl border ${tone.ring} ${tone.wash} p-4 shadow-[var(--shadow-card)] sm:p-5 ${className}`}
+      className={`flex min-w-0 flex-col justify-between rounded-2xl border ${tone.ring} ${tone.wash} p-4 shadow-[var(--shadow-card)] sm:p-5 ${className}`}
     >
       <div>
         <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -45,15 +45,19 @@ export function NextActionCard({ action, className = "" }: { action: NextAction;
         </div>
         <h2
           id="next-action-title"
-          className="mt-2 font-display text-lg font-semibold leading-snug tracking-tight sm:text-xl"
+          className="mt-2 break-words font-display text-lg font-semibold leading-snug tracking-tight sm:text-xl"
         >
           {action.title}
         </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{action.body}</p>
+        <p className="mt-1.5 break-words text-sm leading-relaxed text-muted-foreground">{action.body}</p>
       </div>
       <div className="mt-4">
-        <Link to={action.ctaTo} hash={action.ctaHash}>
-          <Button size="sm" variant={action.tone === "calm" ? "secondary" : "default"}>
+        <Link to={action.ctaTo} hash={action.ctaHash} className="inline-flex max-w-full">
+          <Button
+            size="sm"
+            variant={action.tone === "calm" ? "secondary" : "default"}
+            className="h-auto max-w-full whitespace-normal py-2 text-left"
+          >
             {action.ctaLabel}
             <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
           </Button>

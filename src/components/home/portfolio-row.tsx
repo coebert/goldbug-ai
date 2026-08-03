@@ -167,7 +167,7 @@ export function PortfolioRow({
   return (
     <Card>
       <CardContent className="p-4 sm:p-5">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Link
@@ -276,7 +276,7 @@ export function PortfolioRow({
           data-testid="portfolio-row-equity"
         >
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <Sparkline values={values} width={120} height={32} />
               {equityError ? (
                 <span
@@ -375,7 +375,7 @@ export function PortfolioRow({
               ))}
             </div>
           </div>
-          <div className="shrink-0 text-right">
+          <div className="min-w-0 text-right">
             <TooltipProvider delayDuration={150}>
               <div className="flex items-center justify-start gap-1.5 sm:justify-end text-[10px] uppercase tracking-wide text-muted-foreground">
                 Total equity
@@ -476,7 +476,7 @@ export function PortfolioRow({
               </>
             ) : (
               <>
-                <div className="font-display text-2xl font-bold leading-tight tabular-nums">
+                <div className="break-words font-display text-xl font-bold leading-tight tabular-nums sm:text-2xl">
                   {portfolio.currency} {formatMoneyAmount(totalEquity, equityDecimals)}
                 </div>
                 {(() => {
