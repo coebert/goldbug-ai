@@ -9,6 +9,8 @@ export type LockAcquired = {
   acquired: true;
   owner: string;
   release: () => Promise<void>;
+  /** Refresh acquired_at so a healthy long run isn't swept as stale. */
+  renew: () => Promise<void>;
 };
 
 export type LockBusy = {
@@ -40,6 +42,7 @@ export async function acquireRunLock(
       acquired: true,
       owner,
       release: () => releaseRunLock(name, owner),
+      renew: () => renewRunLock(name, owner),
     };
   }
 
@@ -58,7 +61,12 @@ export async function acquireRunLock(
       .select("owner, acquired_at")
       .maybeSingle();
     if (retry.data) {
-      return { acquired: true, owner, release: () => releaseRunLock(name, owner) };
+      return {
+        acquired: true,
+        owner,
+        release: () => releaseRunLock(name, owner),
+        renew: () => renewRunLock(name, owner),
+      };
     }
     return { acquired: false, heldBy: null, acquiredAt: now.toISOString(), ageMs: 0 };
   }
@@ -87,7 +95,12 @@ export async function acquireRunLock(
         .maybeSingle();
       if (claim.data) {
         console.warn(`run-lock: evicted stale "${name}" (age ${Math.round(ageMs / 1000)}s, prev owner ${cur.data.owner ?? "unknown"})`);
-        return { acquired: true, owner, release: () => releaseRunLock(name, owner) };
+        return {
+          acquired: true,
+          owner,
+          release: () => releaseRunLock(name, owner),
+          renew: () => renewRunLock(name, owner),
+        };
       }
     }
     // Someone else won the takeover race — fall through to busy.
@@ -100,6 +113,23 @@ export async function acquireRunLock(
     acquiredAt,
     ageMs,
   };
+}
+
+/**
+ * Heartbeat: push `acquired_at` forward for a lock we still hold. This lets the
+ * staleness window stay short (a dead isolate frees the lock quickly) without
+ * a healthy long-running cycle getting evicted mid-flight.
+ */
+export async function renewRunLock(name: string, owner: string): Promise<void> {
+  try {
+    await supabaseAdmin
+      .from("run_locks")
+      .update({ acquired_at: new Date().toISOString() })
+      .eq("name", name)
+      .eq("owner", owner);
+  } catch (e) {
+    console.warn(`run-lock: renew failed for "${name}"`, e);
+  }
 }
 
 export async function releaseRunLock(name: string, owner: string): Promise<void> {

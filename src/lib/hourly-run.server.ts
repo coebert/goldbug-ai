@@ -89,7 +89,10 @@ async function runHourlyCycleInner(
   // the try/finally could release the lock, the row can wedge every future
   // cron tick. Unconditionally drop any hourly-run row older than the
   // staleness window so acquireRunLock always starts from a clean slate.
-  const STALE_MS = 3 * 60 * 1000;
+  // Short window: a run whose isolate died must not wedge the next cron tick
+  // for minutes. Healthy runs heartbeat the lock (see below), so they are
+  // never evicted while alive.
+  const STALE_MS = 90 * 1000;
   try {
     const cutoff = new Date(Date.now() - STALE_MS).toISOString();
     const swept = await supabaseAdmin
@@ -117,6 +120,15 @@ async function runHourlyCycleInner(
       lock.acquiredAt,
       lock.ageMs,
     );
+  }
+
+  // Heartbeat so a long-but-healthy cycle keeps its lock while a crashed one
+  // ages out within STALE_MS.
+  const heartbeat = setInterval(() => {
+    void lock.renew();
+  }, 30_000);
+  if (typeof (heartbeat as unknown as { unref?: () => void }).unref === "function") {
+    (heartbeat as unknown as { unref: () => void }).unref();
   }
 
   try {
@@ -442,6 +454,7 @@ async function runHourlyCycleInner(
       metrics: metricsSnap,
     };
   } finally {
+    clearInterval(heartbeat);
     await lock.release();
   }
 }

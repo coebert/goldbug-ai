@@ -41,8 +41,8 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
         .maybeSingle();
       if (existing) {
         const ageMs = Date.now() - new Date(existing.acquired_at as string).getTime();
-        // Match the runHourlyCycle staleness threshold (3 min).
-        if (ageMs < 3 * 60 * 1000) {
+        // Match the runHourlyCycle staleness threshold (90s).
+        if (ageMs < 90 * 1000) {
           const err = new Error(
             `An hourly run is already in progress (started by ${existing.owner ?? "unknown"} ${Math.round(ageMs / 1000)}s ago). Use "Force clear lock & run" if it is stuck.`,
           ) as Error & { code?: string; heldBy?: string | null; ageMs?: number | null };
