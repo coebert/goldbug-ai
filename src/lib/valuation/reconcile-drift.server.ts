@@ -14,6 +14,17 @@ import type { KernelHolding } from "./kernel";
 export const DRIFT_WARN_PCT = 0.005; // 0.5%
 export const DRIFT_ALERT_PCT = 0.02; // 2%
 
+type PortfolioRow = {
+  id: string;
+  name: string | null;
+  base_currency: string | null;
+  cash: number | null;
+};
+
+type SnapshotRow = { snapshot_date: string; total_value: number | null };
+
+type HoldingRow = { symbol: string };
+
 export type DriftRow = {
   portfolioId: string;
   portfolioName: string;
@@ -48,9 +59,9 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
 
   const out: DriftRow[] = [];
 
-  for (const p of portfolios ?? []) {
-    const portfolioId = String((p as any).id);
-    const base = String((p as any).base_currency ?? "GBP").toUpperCase();
+  for (const p of (portfolios ?? []) as PortfolioRow[]) {
+    const portfolioId = String(p.id);
+    const base = String(p.base_currency ?? "GBP").toUpperCase();
 
     const { data: snap } = await supabaseAdmin
       .from("equity_snapshots")
@@ -60,13 +71,14 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
       .limit(1)
       .maybeSingle();
     if (!snap) continue;
+    const snapshot = snap as SnapshotRow;
 
     const { data: holdings } = await supabaseAdmin
       .from("holdings")
       .select("symbol, quantity, avg_cost, instrument_ccy, asset_class")
       .eq("portfolio_id", portfolioId);
 
-    const symbols = [...new Set((holdings ?? []).map((h: any) => String(h.symbol)))];
+    const symbols = [...new Set(((holdings ?? []) as HoldingRow[]).map((h) => String(h.symbol)))];
     const prices = new Map<string, number>();
     if (symbols.length > 0) {
       const { getPriceOn } = await import("@/lib/market-data.server");
@@ -74,7 +86,7 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
       await Promise.all(
         symbols.map(async (sym) => {
           try {
-            const raw = await getPriceOn(sym, String((snap as any).snapshot_date));
+            const raw = await getPriceOn(sym, String(snapshot.snapshot_date));
             if (raw != null) {
               prices.set(sym, normalizeMarketPriceForTrading(sym, raw));
             }
@@ -88,18 +100,18 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
     const res = await valuePortfolioHoldings({
       holdings: (holdings ?? []) as unknown as KernelHolding[],
       normalizedPrices: prices,
-      wallet: { [base]: Number((p as any).cash ?? 0) },
+      wallet: { [base]: Number(p.cash ?? 0) },
       baseCcy: base,
-      asOf: String((snap as any).snapshot_date),
+      asOf: String(snapshot.snapshot_date),
     });
 
-    const stored = Number((snap as any).total_value ?? 0);
+    const stored = Number(snapshot.total_value ?? 0);
     const { diff, diffPct, severity } = classifyDrift(stored, res.totalValue);
 
     out.push({
       portfolioId,
-      portfolioName: String((p as any).name ?? "Portfolio"),
-      snapshotDate: String((snap as any).snapshot_date),
+      portfolioName: String(p.name ?? "Portfolio"),
+      snapshotDate: String(snapshot.snapshot_date),
       storedTotal: stored,
       recomputedTotal: res.totalValue,
       diff,

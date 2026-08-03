@@ -65,7 +65,7 @@ export function ShadowVariantCard({ portfolioId }: { portfolioId: string }) {
               <div className="space-y-2">
                 <div className="text-xs font-medium text-muted-foreground">Recent runs</div>
                 {recent.map((r: any) => {
-                  const divs = (r.divergences as any[]) ?? [];
+                  const divs = Array.isArray(r.divergences) ? r.divergences : [];
                   return (
                     <div key={r.id} className="rounded-md border p-2 text-xs space-y-1">
                       <div className="flex items-center justify-between">
