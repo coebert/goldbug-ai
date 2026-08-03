@@ -75,6 +75,11 @@ function classesFromUniverse(u: unknown): Array<"stock" | "etf" | "crypto" | "co
 export async function runHourlyCycle(opts: {
   triggeredBy: "manual" | "cron";
   force?: boolean;
+  /**
+   * Manual runs only: ignore the 10-minute "already ticked" window WITHOUT
+   * force-clearing the run lock. `force: true` implies this.
+   */
+  forceTick?: boolean;
   /** Keep request-bound runs below platform timeout. Defaults to 24s. */
   timeBudgetMs?: number;
   /** Skip per-tick news scoring; news-refresh cron keeps cache warm separately. */
@@ -88,7 +93,7 @@ export async function runHourlyCycle(opts: {
 }
 
 async function runHourlyCycleInner(
-  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean; portfolioIds?: string[] },
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean; forceTick?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean; portfolioIds?: string[] },
   metrics: import("@/lib/run-metrics.server").RunMetrics,
 ): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
@@ -110,6 +115,10 @@ async function runHourlyCycleInner(
 
   const manualTrigger = opts.triggeredBy === "manual";
   const forceClear = opts.force === true;
+  // Override for the 10-minute "already ticked" guard. `force` (force clear
+  // lock & run) implies it; `forceTick` enables it on its own so an operator
+  // can re-tick without evicting a lock that may still be healthy.
+  const overrideTickWindow = forceClear || opts.forceTick === true;
 
   if (forceClear) {
     await supabaseAdmin.from("run_locks").delete().eq("name", "hourly-run");
@@ -432,7 +441,7 @@ async function runHourlyCycleInner(
 
 
         const sinceIso = manualTrigger ? recentWindowIso : hourStartIso;
-        if (!(manualTrigger && forceClear)) {
+        if (!(manualTrigger && overrideTickWindow)) {
           const recent = await supabaseAdmin
             .from("decisions")
             .select("id, created_at")
@@ -443,7 +452,7 @@ async function runHourlyCycleInner(
             .maybeSingle();
           if (recent.data) {
             const label = manualTrigger
-              ? `already ticked at ${recent.data.created_at} — pass force:true to override`
+              ? `already ticked at ${recent.data.created_at} — enable "Force clear" (or pass forceTick:true) to override`
               : "already ticked this hour";
             tel.tickSkipped(p.id, String(p.mode), label);
             push({

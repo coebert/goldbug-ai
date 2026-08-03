@@ -225,6 +225,8 @@ function AdminPage() {
   const fetchPortfolios = useServerFn(listPortfolios);
   const [tick, setTick] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Force clear: override the engine's 10-minute "already ticked" skip window.
+  const [forceTick, setForceTick] = useState(false);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(t);
@@ -266,9 +268,13 @@ function AdminPage() {
   );
 
   const manual = useMutation({
-    mutationFn: (vars: { force?: boolean; portfolioIds?: string[] } = {}) =>
+    mutationFn: (vars: { force?: boolean; forceTick?: boolean; portfolioIds?: string[] } = {}) =>
       triggerRun({
-        data: { force: vars.force === true, portfolioIds: vars.portfolioIds ?? [] },
+        data: {
+          force: vars.force === true,
+          forceTick: vars.forceTick === true,
+          portfolioIds: vars.portfolioIds ?? [],
+        },
       }),
 
     onSuccess: (result) => {
@@ -342,13 +348,15 @@ function AdminPage() {
     }, plan.delayMs);
   }
 
-  function startManualRun(vars: { force?: boolean; portfolioIds?: string[] } = {}) {
+  function startManualRun(vars: { force?: boolean; forceTick?: boolean; portfolioIds?: string[] } = {}) {
     if (retryTimer.current) clearTimeout(retryTimer.current);
     attemptRef.current = 1;
     startedAtRef.current = Date.now();
     requestedRef.current = vars.portfolioIds ?? [];
     setRetryState(null);
-    manual.mutate(vars);
+    // The Force clear toggle applies to the operator-initiated attempt only;
+    // automatic retries never override the guard.
+    manual.mutate({ ...vars, forceTick: vars.forceTick ?? forceTick });
   }
 
 
@@ -451,6 +459,22 @@ function AdminPage() {
               </Button>
             )}
           </div>
+
+          <label className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
+            <Checkbox
+              checked={forceTick}
+              onCheckedChange={(v) => setForceTick(v === true)}
+              disabled={manual.isPending}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-foreground">Force clear the “already ticked” window</span>
+              <span className="block text-muted-foreground">
+                Re-tick portfolios that already ran in the last 10 minutes, without clearing the
+                run lock. Automatic retries ignore this.
+              </span>
+            </span>
+          </label>
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
