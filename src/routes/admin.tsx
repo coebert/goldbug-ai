@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { getAdminHealth, type AdminHealthSnapshot, type BrokerEnvHealth } from "@/lib/admin.functions";
 import { triggerHourlyRunNow } from "@/lib/trading.functions";
 import { backfillHoldingsHistory } from "@/lib/backfill-holdings-history.functions";
+import { listPortfolios } from "@/lib/portfolios.functions";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -217,7 +219,9 @@ function AdminPage() {
   const fetchHealth = useServerFn(getAdminHealth);
   const triggerRun = useServerFn(triggerHourlyRunNow);
   const runBackfill = useServerFn(backfillHoldingsHistory);
+  const fetchPortfolios = useServerFn(listPortfolios);
   const [tick, setTick] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(t);
@@ -229,8 +233,21 @@ function AdminPage() {
     refetchInterval: 60_000,
   });
 
+  const portfoliosQ = useQuery({
+    queryKey: ["admin-portfolios"],
+    queryFn: () => fetchPortfolios(),
+    staleTime: 60_000,
+  });
+  const portfolioOptions = (portfoliosQ.data ?? []).filter((p) =>
+    ["paper", "live_sim", "live_prod"].includes(p.mode as string),
+  );
+
   const manual = useMutation({
-    mutationFn: (vars: { force?: boolean } = {}) => triggerRun({ data: { force: vars.force === true } }),
+    mutationFn: (vars: { force?: boolean; portfolioIds?: string[] } = {}) =>
+      triggerRun({
+        data: { force: vars.force === true, portfolioIds: vars.portfolioIds ?? [] },
+      }),
+
     onSuccess: (result) => {
       const ran = result.results.filter((r) => r.ok && !r.skipped).length;
       const skipped = result.results.filter((r) => r.skipped).length;
@@ -308,27 +325,84 @@ function AdminPage() {
             current UTC hour are skipped automatically, so this is safe to click any time
             between scheduled runs.
           </p>
+
+          <div className="rounded-md border p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">Portfolios to run</span>
+              <span className="text-xs text-muted-foreground">
+                {selectedIds.length === 0
+                  ? "All eligible portfolios"
+                  : `${selectedIds.length} selected`}
+              </span>
+            </div>
+            {portfoliosQ.isLoading ? (
+              <p className="text-xs text-muted-foreground">Loading portfolios…</p>
+            ) : portfolioOptions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No eligible portfolios found.</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {portfolioOptions.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={selectedIds.includes(p.id)}
+                      onCheckedChange={(v) =>
+                        setSelectedIds((prev) =>
+                          v === true ? [...prev, p.id] : prev.filter((id) => id !== p.id),
+                        )
+                      }
+                    />
+                    <span className="truncate">{p.name}</span>
+                    <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
+                      {String(p.mode).replace("_", " ")}
+                    </Badge>
+                  </label>
+                ))}
+              </div>
+            )}
+            {selectedIds.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2 h-7 px-2 text-xs"
+                onClick={() => setSelectedIds([])}
+              >
+                Clear selection
+              </Button>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              onClick={() => manual.mutate({})}
+              onClick={() => manual.mutate({ portfolioIds: selectedIds })}
               disabled={manual.isPending}
               className="gap-2"
             >
               <PlayCircle className={`h-4 w-4 ${manual.isPending ? "animate-pulse" : ""}`} />
-              {manual.isPending ? "Running full cycle…" : "Trigger hourly run now"}
+              {manual.isPending
+                ? "Running cycle…"
+                : selectedIds.length > 0
+                  ? `Run ${selectedIds.length} selected portfolio${selectedIds.length > 1 ? "s" : ""}`
+                  : "Trigger hourly run now"}
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                if (window.confirm("Force clear the current run lock and start a fresh run? Only use this if the previous run crashed or is genuinely stuck.")) {
-                  manual.mutate({ force: true });
+                const scope =
+                  selectedIds.length > 0
+                    ? `${selectedIds.length} selected portfolio(s)`
+                    : "all eligible portfolios";
+                if (window.confirm(`Force clear the current run lock and start a fresh run for ${scope}? Only use this if the previous run crashed or is genuinely stuck.`)) {
+                  manual.mutate({ force: true, portfolioIds: selectedIds });
                 }
               }}
               disabled={manual.isPending}
             >
-              Force clear lock & run
+              {selectedIds.length > 0
+                ? "Force clear lock & run selected"
+                : "Force clear lock & run"}
             </Button>
+
             <Button
               variant="secondary"
               size="sm"

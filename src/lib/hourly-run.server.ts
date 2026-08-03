@@ -62,12 +62,14 @@ export async function runHourlyCycle(opts: {
   skipNewsInTicks?: boolean;
   /** Run broad token/news/regime/price refreshes before portfolio ticks. */
   preflightRefresh?: boolean;
+  /** Restrict the run to these portfolio ids (manual runs). Empty/undefined = all. */
+  portfolioIds?: string[];
 }): Promise<HourlyRunResult> {
   return withRunMetrics((metrics) => runHourlyCycleInner(opts, metrics));
 }
 
 async function runHourlyCycleInner(
-  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean },
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean; portfolioIds?: string[] },
   metrics: import("@/lib/run-metrics.server").RunMetrics,
 ): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
@@ -141,7 +143,14 @@ async function runHourlyCycleInner(
 
     if (error) throw new Error(error.message);
 
-    const portfolios = (allPortfolios ?? []).filter(
+    // Optional manual scoping: run only the selected portfolios so a targeted
+    // run isn't spent on unrelated profiles.
+    const selection = (opts.portfolioIds ?? []).filter((id) => typeof id === "string" && id);
+    const selected = selection.length
+      ? (allPortfolios ?? []).filter((p) => selection.includes(p.id))
+      : (allPortfolios ?? []);
+
+    const portfolios = selected.filter(
       (p) => !(p.mode !== "paper" && p.live_paused),
     );
     // Order: real money first, then STALEST first. Without the staleness
@@ -168,7 +177,7 @@ async function runHourlyCycleInner(
     const ordered = orderPortfoliosForRun(portfolios, lastDecisionAt);
     portfolios.length = 0;
     portfolios.push(...ordered);
-    const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
+    const skippedPaused = selected.length - portfolios.length;
     // Starvation guard: a portfolio that hasn't produced a decision recently
     // may bypass the time budget, so every portfolio makes progress even when
     // earlier ticks consume the whole budget. A manual run is explicit user
