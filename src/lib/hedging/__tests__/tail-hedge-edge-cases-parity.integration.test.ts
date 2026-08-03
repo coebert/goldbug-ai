@@ -175,16 +175,24 @@ function runnerExpectedBucket(
   if (dec.action === "hold") return "hold";
   if (price <= 0) return "no_price";
   if (Math.abs(dec.deltaNotional) < 1) return "sub_threshold";
+  // Both paths size through the shared rule (tail-hedge-sizing), so the
+  // expectation derives from it too rather than re-deriving the maths.
   if (dec.action === "buy") {
-    const affordable = Math.max(0, cash * (1 - (cfg.hedgeCashBufferPct ?? BUFFER)));
-    const spend = Math.min(dec.deltaNotional, affordable);
-    return spend < price ? "insufficient_cash" : "fill";
+    const sized = sizeHedgeBuy({
+      deltaNotional: dec.deltaNotional,
+      cash,
+      price,
+      bufferPct: cfg.hedgeCashBufferPct ?? BUFFER,
+      wholeShares: false,
+    });
+    return sized.ok ? "fill" : "insufficient_cash";
   }
-  // sell
-  if (held <= 1e-9) return "no_position_to_unwind";
-  const qty = Math.min(held, Math.abs(dec.deltaNotional) / price);
-  return qty <= 1e-9 ? "no_position_to_unwind" : "fill";
+  const sized = sizeHedgeSell({
+    deltaNotional: dec.deltaNotional, heldQty: held, price, wholeShares: false,
+  });
+  return sized.ok ? "fill" : "no_position_to_unwind";
 }
+
 
 function zeroCostCfg(overrides: Partial<RunnerConfig> = {}): RunnerConfig {
   return {
