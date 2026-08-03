@@ -286,20 +286,20 @@ function applyTailHedgeCore(
   const mutateLocalState = !isLivePortfolio;
 
   if (decision.action === "buy") {
-    const affordable = Math.max(0, workingCash * (1 - bufferPct));
-    const spend = Math.min(decision.deltaNotional, affordable);
-    // Live venues need whole shares; paper books fractional units, so a
-    // sub-share budget is still a valid (partial) hedge add there.
-    const minSpend = isLivePortfolio ? price : Math.min(price, MIN_TICKET_NOTIONAL);
-    if (spend < minSpend) {
+    // Shared sizing rule (see tail-hedge-sizing.ts) so the Phase 6 backtest
+    // runner and this executor can never disagree about affordability.
+    const sized = sizeHedgeBuy({
+      deltaNotional: decision.deltaNotional,
+      cash: workingCash,
+      price,
+      bufferPct,
+      wholeShares: isLivePortfolio,
+    });
+    if (!sized.ok) {
       return { ...base, symbol, reason: `insufficient cash for 1 share of ${symbol}` };
     }
-    const rawQty = spend / price;
-    const qty = isLivePortfolio ? Math.floor(rawQty) : rawQty;
-    if (qty <= 0) {
-      return { ...base, symbol, reason: `insufficient cash for 1 share of ${symbol}` };
-    }
-    const partial = decision.deltaNotional - qty * price > MIN_TICKET_NOTIONAL;
+    const { qty, partial } = sized;
+
 
     if (mutateLocalState) {
       workingCash -= qty * price;
