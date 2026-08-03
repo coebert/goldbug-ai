@@ -756,9 +756,27 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const brokerBlockedSymbols: string[] = [];
   if (portfolio.mode === "live_prod") {
     const originalCount = fullUniverse.length;
+
+    // Learned account-level blocks (e.g. Saxo suitability test not taken for
+    // complex products like gold ETCs). Retrying these is guaranteed to fail.
+    let learnedBlocked: string[] = [];
+    try {
+      const { loadActiveBrokerBlocks } = await import("./broker-instrument-blocks.server");
+      learnedBlocked = (await loadActiveBrokerBlocks(portfolio.user_id as string)).map(
+        (b) => b.symbol,
+      );
+    } catch (e) {
+      console.warn("[trading-engine] could not load broker blocks:", e);
+    }
+    const { isSymbolBlocked } = await import("./broker-instrument-blocks");
+
     fullUniverse = fullUniverse.filter((u) => {
       const s = u.symbol.toUpperCase();
-      const untradeable = s.endsWith("=X") || s.endsWith("=F") || s.endsWith("-USD");
+      const untradeable =
+        s.endsWith("=X") ||
+        s.endsWith("=F") ||
+        s.endsWith("-USD") ||
+        (learnedBlocked.length > 0 && isSymbolBlocked(u.symbol, learnedBlocked));
       if (untradeable) brokerBlockedSymbols.push(u.symbol);
       return !untradeable;
     });
@@ -768,6 +786,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       );
     }
   }
+
 
   // Partial execution: drop symbols whose venue is currently closed so the
   // AI sizes trades only against instruments that could actually fill this
@@ -2576,7 +2595,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       portfolioId,
       portfolioCurrency: portfolio.currency ?? "GBP",
       isLivePortfolio,
+      blockedSymbols: brokerBlockedSymbols,
     });
+
     workingCash = exec.workingCash;
     if (exec.trade) executed.push(exec.trade);
     tailHedgeExecution = {

@@ -1575,6 +1575,25 @@ export async function routeOrdersToBroker(params: {
       })
       .eq("id", liveOrderId);
 
+    // Learn permanent, account-level rejections (e.g. Saxo's "suitability
+    // test has not been taken" on complex products such as gold ETCs) so the
+    // engine stops re-proposing the same symbol every hour.
+    if (brokerRes.status === "rejected" || brokerRes.status === "error") {
+      try {
+        const { recordBrokerRejection } = await import("./broker-instrument-blocks.server");
+        await recordBrokerRejection({
+          userId,
+          portfolioId: portfolio.id,
+          broker: "saxo",
+          symbol: order.symbol,
+          rejectReason: brokerRes.reason ?? null,
+        });
+      } catch (e) {
+        console.warn("[live-executor] block recording failed:", e);
+      }
+    }
+
+
     if (brokerRes.status === "filled" && brokerRes.filledQuantity && brokerRes.avgFillPrice) {
       const fillCcy = routeSymToCcy.get(order.symbol) ?? portfolioCurrency;
       await supabaseAdmin.from("live_fills").insert({
