@@ -144,3 +144,20 @@ export function isSymbolBlocked(symbol: string, blockedKeys: Iterable<string>): 
   }
   return false;
 }
+
+/**
+ * One-line "what to do next" for a block reason. Shared by the notification
+ * body, the audit log row, and the dashboard panel so all three agree.
+ */
+export function recommendedActionFor(reason: BrokerBlockReason | string): string {
+  switch (reason) {
+    case "suitability":
+      return "Complete Saxo's appropriateness/suitability test for this product category (Account → Profile → Investor profile), then clear the block in Blocked instruments.";
+    case "not_tradable":
+      return "Check the instrument is available for your Saxo account type and that you hold the required exchange/market-data subscription, then clear the block.";
+    case "not_permitted":
+      return "Request the missing trading permission for this product in your Saxo account, then clear the block once approved.";
+    default:
+      return "Contact Saxo support to confirm why this instrument is restricted, then clear the block.";
+  }
+}

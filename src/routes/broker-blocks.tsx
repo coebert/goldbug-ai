@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppHeader } from "@/components/app-header";
 import { BrokerSuitabilityBlocksCard } from "@/components/broker-suitability-blocks-card";
+import { BrokerBlockAuditLogCard } from "@/components/broker-block-audit-log-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/broker-blocks")({
@@ -48,6 +49,8 @@ function BrokerBlocksPage() {
         </div>
 
         <BrokerSuitabilityBlocksCard />
+
+        <BrokerBlockAuditLogCard />
 
         <Card>
           <CardHeader>

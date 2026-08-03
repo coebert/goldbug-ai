@@ -280,6 +280,69 @@ export type Database = {
         }
         Relationships: []
       }
+      broker_block_events: {
+        Row: {
+          broker: string
+          created_at: string
+          detail: string | null
+          error_code: string | null
+          first_block: boolean
+          hit_count: number
+          id: string
+          order_id: string | null
+          portfolio_id: string | null
+          quantity: number | null
+          reason: string
+          recommended_action: string
+          reject_reason: string | null
+          side: string | null
+          symbol: string
+          symbol_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          broker?: string
+          created_at?: string
+          detail?: string | null
+          error_code?: string | null
+          first_block?: boolean
+          hit_count?: number
+          id?: string
+          order_id?: string | null
+          portfolio_id?: string | null
+          quantity?: number | null
+          reason: string
+          recommended_action: string
+          reject_reason?: string | null
+          side?: string | null
+          symbol: string
+          symbol_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          broker?: string
+          created_at?: string
+          detail?: string | null
+          error_code?: string | null
+          first_block?: boolean
+          hit_count?: number
+          id?: string
+          order_id?: string | null
+          portfolio_id?: string | null
+          quantity?: number | null
+          reason?: string
+          recommended_action?: string
+          reject_reason?: string | null
+          side?: string | null
+          symbol?: string
+          symbol_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       broker_instrument_blocks: {
         Row: {
           broker: string
