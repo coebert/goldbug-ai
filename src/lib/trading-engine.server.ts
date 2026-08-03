@@ -3098,7 +3098,12 @@ export async function snapshotPortfolio(portfolioId: string, asOf: string) {
     currency: baseCcy,
     source: "trading_engine",
     provenance: valuation.provenance,
+    brokerLinked: Boolean(
+      (portfolio as unknown as { broker_account_id?: string | null }).broker_account_id,
+    ),
+    positionCount: (holdings ?? []).length,
   });
+
 
   await recordIntradayEquity(supabaseAdmin as never, portfolioId, {
     cash: valuation.cash,
