@@ -340,7 +340,7 @@ async function runHourlyCycleInner(
     const recentWindowIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const results: HourlyRunResult["results"] = [];
 
-    for (const p of portfolios) {
+    const runTickFor = async (p: (typeof portfolios)[number]) => {
       const tickT0 = tel.tickStart(p.id, String(p.mode));
       try {
         const elapsed = Date.now() - runStartedAt;
@@ -354,7 +354,7 @@ async function runHourlyCycleInner(
             ok: true,
             skipped: reason,
           });
-          continue;
+          return;
         }
 
 
@@ -398,7 +398,7 @@ async function runHourlyCycleInner(
             tradeable_symbols: tradeableSymbols,
             excluded_symbols: excludedSymbols,
           });
-          continue;
+          return;
         }
 
 
@@ -425,7 +425,7 @@ async function runHourlyCycleInner(
               tradeable_symbols: tradeableSymbols,
               excluded_symbols: excludedSymbols,
             });
-            continue;
+            return;
           }
         }
 
@@ -508,7 +508,31 @@ async function runHourlyCycleInner(
         tel.tickEnd(p.id, String(p.mode), tickT0, "error", msg);
         results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
       }
+    };
+
+    // A single tick costs ~25-35s, so a serial loop can only ever complete one
+    // portfolio inside a request-bound manual run — everything else was skipped
+    // as `budget-exceeded`. Ticks are independent per portfolio, so manual runs
+    // fan them out with bounded concurrency and all selected profiles finish
+    // inside the same deadline. Cron keeps the serial path (it has repeated
+    // cycles and must stay gentle on broker rate limits).
+    const tickConcurrency = isManual ? Math.min(4, Math.max(1, portfolios.length)) : 1;
+    if (tickConcurrency <= 1) {
+      for (const p of portfolios) await runTickFor(p);
+    } else {
+      const queue = [...portfolios];
+      await Promise.all(
+        Array.from({ length: tickConcurrency }, async () => {
+          for (;;) {
+            const p = queue.shift();
+            if (!p) return;
+            await runTickFor(p);
+          }
+        }),
+      );
     }
+
+
 
     const metricsSnap = snapshot(metrics);
     const telemetry = tel.finish({
