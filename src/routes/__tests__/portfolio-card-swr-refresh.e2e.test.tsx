@@ -192,8 +192,9 @@ describe("Portfolio card: stale-while-revalidate refresh", () => {
     // 1. equityQ uses keepPreviousData for SWR.
     expect(src).toMatch(/keepPreviousData/);
     expect(src).toMatch(
-      /queryKey:\s*\["all-portfolios-equity"\][\s\S]*?placeholderData:\s*keepPreviousData/,
+      /queryKey:\s*qk\.portfolios\.equity\(\)[\s\S]*?placeholderData:\s*keepPreviousData/,
     );
+
     // 2. Refreshing flag derived from isFetching && !isLoading.
     expect(src).toMatch(
       /isRefreshingEquity\s*=\s*equityQ\.isFetching\s*&&\s*!equityQ\.isLoading/,
