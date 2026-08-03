@@ -280,6 +280,65 @@ export type Database = {
         }
         Relationships: []
       }
+      broker_instrument_blocks: {
+        Row: {
+          broker: string
+          cleared_at: string | null
+          created_at: string
+          detail: string | null
+          first_seen_at: string
+          hit_count: number
+          id: string
+          last_seen_at: string
+          portfolio_id: string | null
+          reason: string
+          reject_reason: string | null
+          symbol: string
+          symbol_key: string
+          user_id: string
+        }
+        Insert: {
+          broker?: string
+          cleared_at?: string | null
+          created_at?: string
+          detail?: string | null
+          first_seen_at?: string
+          hit_count?: number
+          id?: string
+          last_seen_at?: string
+          portfolio_id?: string | null
+          reason: string
+          reject_reason?: string | null
+          symbol: string
+          symbol_key: string
+          user_id: string
+        }
+        Update: {
+          broker?: string
+          cleared_at?: string | null
+          created_at?: string
+          detail?: string | null
+          first_seen_at?: string
+          hit_count?: number
+          id?: string
+          last_seen_at?: string
+          portfolio_id?: string | null
+          reason?: string
+          reject_reason?: string | null
+          symbol?: string
+          symbol_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_instrument_blocks_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broker_token_events: {
         Row: {
           created_at: string
