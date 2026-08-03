@@ -341,7 +341,18 @@ export async function reconcileOrderStatusesForPortfolio(params: {
         const key = baseTicker(row.symbol as string);
         const pos = positions?.get(key) ?? null;
         if (pos && Math.abs(pos.quantity) >= qty - 1e-6 && pos.avgPrice > 0) {
-          const fillPrice = pos.avgPrice;
+          const resolved = resolveFillRecord({
+            symbol: row.symbol as string,
+            orderCcy: row.instrument_ccy as string | null,
+            brokerCcy: pos.currency ?? null,
+            portfolioCurrency,
+            candidates: [
+              { source: "saxo_position_avg_price", value: pos.avgPrice, raw: false },
+              { source: "order_limit_price", value: row.limit_price as number | null, raw: false },
+            ],
+          });
+          const fillPrice = resolved?.fillPrice ?? pos.avgPrice;
+          const fillCurrency = resolved?.currency ?? portfolioCurrency;
           const upd = await supabaseAdmin
             .from("live_orders")
             .update({ status: "filled" })
@@ -356,7 +367,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
             quantity: qty,
             fill_price: fillPrice,
             fee: 0,
-            currency: pos.currency ?? "GBP",
+            currency: fillCurrency,
             broker_fill_id: brokerOrderId,
             filled_at: new Date().toISOString(),
           });
@@ -376,7 +387,7 @@ export async function reconcileOrderStatusesForPortfolio(params: {
               userId, portfolioId, orderId: row.id as string,
               symbol: row.symbol as string, side: row.side as string,
               quantity: qty, fillPrice: fillPrice,
-              currency: pos.currency ?? "GBP",
+              currency: fillCurrency,
               source: "reconciler:position",
             });
           }
