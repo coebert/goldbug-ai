@@ -60,6 +60,16 @@ export type SnapshotWriteInput = {
   /** Net external funding on this date, in base currency; explains a jump. */
   fundFlow?: number | null;
   /**
+   * True when the portfolio is bound to a broker account. Combined with
+   * `positionCount === 0`, an empty book means "positions have not been
+   * imported yet", not "the account is flat" — persisting that writes a
+   * cash-only snapshot that later shows up as an implausible jump the day
+   * the real positions land.
+   */
+  brokerLinked?: boolean;
+  /** Number of holdings rows the valuation was built from. */
+  positionCount?: number;
+  /**
    * Prior snapshot total, when the caller already has the series in memory
    * (backfill/revalue). Supplying it avoids a per-row database round-trip.
    * `null` means "explicitly no prior snapshot"; omit to have the gate look
@@ -70,10 +80,11 @@ export type SnapshotWriteInput = {
 
 export type SnapshotWriteResult = {
   written: boolean;
-  reason?: "invariants" | "implausible_jump" | "db_error";
+  reason?: "invariants" | "implausible_jump" | "unsynced_positions" | "db_error";
   message?: string;
   violations?: EquityInvariantViolation[];
 };
+
 
 type MinimalClient = {
   from: (table: string) => any;
