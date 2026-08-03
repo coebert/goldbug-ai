@@ -115,6 +115,10 @@ async function runHourlyCycleInner(
 
   const manualTrigger = opts.triggeredBy === "manual";
   const forceClear = opts.force === true;
+  // Override for the 10-minute "already ticked" guard. `force` (force clear
+  // lock & run) implies it; `forceTick` enables it on its own so an operator
+  // can re-tick without evicting a lock that may still be healthy.
+  const overrideTickWindow = forceClear || opts.forceTick === true;
 
   if (forceClear) {
     await supabaseAdmin.from("run_locks").delete().eq("name", "hourly-run");
