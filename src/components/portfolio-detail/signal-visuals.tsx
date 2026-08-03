@@ -42,6 +42,8 @@ export function SignalBadges({ s }: { s: SignalRow }) {
       </Badge>
     </div>
   );
+}
+
 
 
 const SIGNAL_LABELS: Array<{ key: keyof SignalWeights; label: string; color: string }> = [
