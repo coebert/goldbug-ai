@@ -388,16 +388,19 @@ async function runHourlyCycleInner(
         // portfolio's universe is currently closed. Crypto/FX are always
         // "open" so any portfolio that includes them will still tick.
         if (!forceClear && tradeableSymbols.length === 0 && excludedSymbols.length > 0) {
+          const reason = "all venues closed — AI tick skipped to save credits (pass force:true to override)";
+          tel.tickSkipped(p.id, String(p.mode), reason);
           results.push({
             id: p.id,
             mode: p.mode,
             ok: true,
-            skipped: "all venues closed — AI tick skipped to save credits (pass force:true to override)",
+            skipped: reason,
             tradeable_symbols: tradeableSymbols,
             excluded_symbols: excludedSymbols,
           });
           continue;
         }
+
 
         const sinceIso = manualTrigger ? recentWindowIso : hourStartIso;
         if (!(manualTrigger && forceClear)) {
