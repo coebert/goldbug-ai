@@ -92,7 +92,14 @@ export type TailHedgeExecInputs = {
   portfolioCurrency: string;
   isLivePortfolio: boolean;
   hedgeSymbol?: string | null;
+  /**
+   * Symbols the broker permanently refuses on this account (e.g. Saxo
+   * suitability test not taken for gold ETCs). Blocks BUYs only — unwinding
+   * an existing hedge must always stay possible.
+   */
+  blockedSymbols?: string[];
   cashBufferPct?: number; // fraction of cash to keep as safety, default 1%
+
 };
 
 export type TailHedgeExecResult = {
