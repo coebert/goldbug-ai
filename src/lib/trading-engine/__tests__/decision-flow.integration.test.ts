@@ -387,7 +387,7 @@ describe("decision flow — stage wiring", () => {
     // 2. snapshot valued and persisted exactly once
     expect(valuePortfolioHoldings).toHaveBeenCalledTimes(1);
     expect(writeEquitySnapshot).toHaveBeenCalledTimes(1);
-    expect(r.snapshot).toMatchObject({ totalValue: 10000 });
+    expect(writeEquitySnapshot.mock.calls[0][1]).toMatchObject({ totalValue: 10000 });
 
     // 3. AI call happened once and its output parses against the contract
     expect(generateText).toHaveBeenCalledTimes(1);
