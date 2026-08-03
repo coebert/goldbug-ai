@@ -73,3 +73,48 @@ export type Logger = ReturnType<typeof createLogger>;
 export function logSecurity(event: string, msg: string, meta?: LogMeta) {
   emit("warn", `SECURITY:${event}`, msg, meta);
 }
+
+/**
+ * Console-compatible structured logger.
+ *
+ * Phase 5: drop-in replacement for raw `console.warn(...)` / `console.error(...)`
+ * in server modules that log with positional arguments. The call shape is
+ * unchanged (`log.warn("news: gdelt failed", err)`), but the output is a single
+ * JSON record carrying `prefix`, the leading message and the remaining
+ * arguments, so production logs stay filterable.
+ *
+ * The headline (first console argument) keeps the original message verbatim so
+ * existing greps and test spies keep matching.
+ */
+export function createConsoleLogger(prefix: string) {
+  const write = (level: Level, args: unknown[]) => {
+    const [head, ...rest] = args;
+    const msg = typeof head === "string" ? head : JSON.stringify(head ?? null);
+    const meta: LogMeta = {};
+    if (rest.length > 0) {
+      meta.args = rest.map((a) => (a instanceof Error ? serializeError(a) : a));
+    }
+    const payload: Record<string, unknown> = {
+      ts: new Date().toISOString(),
+      level,
+      prefix,
+      msg,
+      ...meta,
+    };
+    const json = JSON.stringify(payload);
+    if (level === "error") console.error(msg, json);
+    else if (level === "warn") console.warn(msg, json);
+    else if (level === "info") console.info(msg, json);
+    else console.log(msg, json);
+  };
+  return {
+    prefix,
+    log: (...args: unknown[]) => write("debug", args),
+    debug: (...args: unknown[]) => write("debug", args),
+    info: (...args: unknown[]) => write("info", args),
+    warn: (...args: unknown[]) => write("warn", args),
+    error: (...args: unknown[]) => write("error", args),
+  };
+}
+
+export type ConsoleLogger = ReturnType<typeof createConsoleLogger>;

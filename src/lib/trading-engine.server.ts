@@ -160,6 +160,9 @@ import { DecisionSchema, OrderSchema, SignalWeightsSchema } from "./trading-engi
 export { DecisionSchema, OrderSchema, SignalWeightsSchema } from "./trading-engine/types";
 export type { DecisionOutput, ExecutedTrade, Portfolio, Holding } from "./trading-engine/types";
 import type { DecisionOutput, ExecutedTrade, Portfolio, Holding } from "./trading-engine/types";
+import { createConsoleLogger } from "@/lib/_server/log";
+
+const srvLog = createConsoleLogger("trading-engine");
 
 
 export async function runDailyTick(portfolioId: string, asOf: string, opts?: { skipNews?: boolean }) {
@@ -208,7 +211,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error("cash sync failed", portfolioId, msg);
+      srvLog.error("cash sync failed", portfolioId, msg);
       if (requiresBrokerCash) cashSyncFailure = msg;
     }
   }
@@ -272,7 +275,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         (b) => b.symbol,
       );
     } catch (e) {
-      console.warn("[trading-engine] could not load broker blocks:", e);
+      srvLog.warn("[trading-engine] could not load broker blocks:", e);
     }
     const { isSymbolBlocked } = await import("./broker-instrument-blocks");
 
@@ -287,7 +290,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       return !untradeable;
     });
     if (brokerBlockedSymbols.length > 0) {
-      console.info(
+      srvLog.info(
         `[trading-engine] live_prod broker filter dropped ${brokerBlockedSymbols.length}/${originalCount} untradeable symbols: ${brokerBlockedSymbols.join(", ")}`,
       );
     }
@@ -312,7 +315,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       return open;
     });
     if (closedSkipped.length > 0) {
-      console.info(
+      srvLog.info(
         `[trading-engine] partial-exec: dropped ${closedSkipped.length}/${beforeCount} closed-venue symbols: ${closedSkipped.slice(0, 12).join(", ")}${closedSkipped.length > 12 ? "…" : ""}`,
       );
     }
@@ -380,11 +383,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       ? Promise.resolve([])
       : cached("news", asOf, () => getNewsForDate(asOf)).catch(() => []),
     cached("regime", asOf, () => detectAndPersistRegime(asOf)).catch((e) => {
-      console.warn("Regime detection failed:", e);
+      srvLog.warn("Regime detection failed:", e);
       return null;
     }),
     buildLearningContext(portfolioId, asOf).catch((e) => {
-      console.warn("Learning context failed:", e);
+      srvLog.warn("Learning context failed:", e);
       return {
         stats: {
           window_days: 20, horizon_days: 5, evaluable: 0, wins: 0, losses: 0,
@@ -396,7 +399,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     }),
     cached("crossAsset", asOf, () => getCrossAssetSnapshot(asOf)).catch(() => null),
     cached("options", asOf, () => getOptionsSnapshot(asOf)).catch((e) => {
-      console.warn("Options snapshot failed:", e);
+      srvLog.warn("Options snapshot failed:", e);
       return null;
     }),
     refreshCooldownsFromRecentTrades(portfolioId, asOf).catch(() => ({})),
@@ -406,11 +409,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     computeAttribution(portfolioId, asOf).catch(() => null),
     // F. Walk-forward tuner (30d train / 7d validate cadence, audit-logged).
     getOrWalkForward(portfolioId, asOf).catch((e) => {
-      console.warn("Walk-forward tuning failed, falling back:", e);
+      srvLog.warn("Walk-forward tuning failed, falling back:", e);
       return getOrRefreshHyperparams(portfolioId, asOf).catch(() => null as TunedHyperparams | null);
     }),
     cached("sectorScores", asOf, () => refreshSectorScores(asOf)).catch((e) => {
-      console.warn("Sector rotation failed:", e);
+      srvLog.warn("Sector rotation failed:", e);
       return [] as Awaited<ReturnType<typeof refreshSectorScores>>;
     }),
     computePortfolioDrawdownSizing(portfolioId).catch(() => ({
@@ -626,7 +629,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     priceMap,
     candidateSymbols: candidateSymbols.map((c) => c.symbol),
   }).catch((e) => {
-    console.warn("fx context build failed", e);
+    srvLog.warn("fx context build failed", e);
     return null;
   });
 
@@ -663,7 +666,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       });
       return { decision: d, block: formatCryptoSignalsBlock(d) };
     } catch (e) {
-      console.warn("crypto sleeve decision failed", e);
+      srvLog.warn("crypto sleeve decision failed", e);
       return null;
     }
   })();
@@ -683,7 +686,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         portfolioId,
       });
     } catch (e) {
-      console.warn("algo-regime snapshot failed", e);
+      srvLog.warn("algo-regime snapshot failed", e);
       return null;
     }
   })();
@@ -865,7 +868,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     },
   });
   if (halts.valuation_suspect) {
-    console.warn(
+    srvLog.warn(
       `[trading-engine] risk halts suppressed for ${portfolioId}: valuation unreliable (unpriced ${unpricedHoldingsValue.toFixed(2)} of ${totalValue.toFixed(2)})`,
     );
   }
@@ -1970,7 +1973,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       priceMap: Object.fromEntries(priceMap.entries()),
     });
     if (!brokerSimGuard.ledgerMatchesEngine) {
-      console.warn(
+      srvLog.warn(
         "broker-simulator guard flagged divergence",
         {
           portfolioId,
@@ -1982,7 +1985,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       );
     }
   } catch (e) {
-    console.warn("broker-simulator guard skipped:", e);
+    srvLog.warn("broker-simulator guard skipped:", e);
   }
 
   // Persist state
@@ -2038,7 +2041,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       // and equity snapshot stay consistent with the wallet update above.
       workingCash += aiFxApplied.baseCashDelta;
     } catch (e) {
-      console.warn("ai-fx apply failed", e);
+      srvLog.warn("ai-fx apply failed", e);
     }
   }
 
@@ -2148,10 +2151,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         priorTargetNotional: Number.isFinite(prevNotional) && prevNotional > 0 ? prevNotional : 0,
       });
     } catch (e) {
-      console.warn("tail hedge reconcile skipped:", e);
+      srvLog.warn("tail hedge reconcile skipped:", e);
     }
   } catch (e) {
-    console.warn("tail hedge apply skipped:", e);
+    srvLog.warn("tail hedge apply skipped:", e);
   }
 
 
@@ -2233,7 +2236,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     .eq("id", portfolioId);
 
   await persistCircuit(portfolioId, circuit).catch((e) =>
-    console.warn("Circuit persist skipped:", e),
+    srvLog.warn("Circuit persist skipped:", e),
   );
 
 
@@ -2296,7 +2299,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       );
     }
   } catch (e) {
-    console.warn("wallet_snapshots upsert skipped:", e);
+    srvLog.warn("wallet_snapshots upsert skipped:", e);
   }
 
   // Plain-language explanation of this run (what was bought/sold, or why cash
@@ -2443,7 +2446,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       })),
     });
   } catch (e) {
-    console.warn("fear-index alert hook failed", e instanceof Error ? e.message : String(e));
+    srvLog.warn("fear-index alert hook failed", e instanceof Error ? e.message : String(e));
   }
 
   // Shadow variant B (fire-and-forget): runs an alternate prompt in the background
@@ -2484,7 +2487,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           },
         });
       } catch (e) {
-        console.warn("Shadow variant skipped:", e);
+        srvLog.warn("Shadow variant skipped:", e);
       }
     })();
   }
@@ -2524,7 +2527,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
 
     } catch (e) {
-      console.error("live routing failed", portfolioId, e);
+      srvLog.error("live routing failed", portfolioId, e);
       routedOrders = { error: e instanceof Error ? e.message : String(e) };
     }
     // Broker is authoritative for live portfolios: overwrite local holdings /
@@ -2540,7 +2543,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         withOwnedClient(portfolio.user_id),
       );
     } catch (e) {
-      console.warn("live holdings reconcile skipped", portfolioId, e);
+      srvLog.warn("live holdings reconcile skipped", portfolioId, e);
     }
   }
 
@@ -2572,24 +2575,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       rationale: decision.rationale,
     });
   } catch (e) {
-    console.warn("ai_decision_audit skipped", portfolioId, e);
+    srvLog.warn("ai_decision_audit skipped", portfolioId, e);
   }
 
   // Self-reflection: refresh distilled lessons periodically. Fire-and-forget so
   // reflection cost never blocks the tick; failures just skip this cycle.
 
   reflectAndUpdateLessons(portfolioId, asOf, learning).catch((e) =>
-    console.warn("Reflection skipped:", e),
+    srvLog.warn("Reflection skipped:", e),
   );
 
   // Signal-decay tracker: refresh rolling 30d hit rates & edge bps by signal.
   updateSignalPerformance(portfolioId, asOf).catch((e) =>
-    console.warn("Signal-decay update skipped:", e),
+    srvLog.warn("Signal-decay update skipped:", e),
   );
 
   // K. Calibration loop: recompute Brier score & global sizing multiplier for next cycle.
   computeAndPersistCalibration(portfolioId, asOf).catch((e) =>
-    console.warn("Calibration update skipped:", e),
+    srvLog.warn("Calibration update skipped:", e),
   );
 
 

@@ -1,6 +1,9 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { withRunMetrics, snapshot, bumpBudgetExceeded, bumpPortfolio } from "@/lib/run-metrics.server";
 import { createRunTelemetry, describeSelection, type RunTelemetrySnapshot } from "@/lib/run-telemetry";
+import { createConsoleLogger } from "@/lib/_server/log";
+
+const srvLog = createConsoleLogger("hourly-run");
 
 export type RunMetricsSnapshot = ReturnType<typeof snapshot>;
 
@@ -136,7 +139,7 @@ async function runHourlyCycleInner(
     fallbackTtlMs: STALE_MS,
   });
   if (removed > 0) {
-    console.warn(`hourly-run: TTL sweep removed ${removed} expired run_locks row(s)`);
+    srvLog.warn(`hourly-run: TTL sweep removed ${removed} expired run_locks row(s)`);
   }
 
   // The lock must outlive the run's own time budget (plus post-loop work such
@@ -213,7 +216,7 @@ async function runHourlyCycleInner(
         }
       }
     } catch (e) {
-      console.warn("hourly-run: staleness lookup failed", e);
+      srvLog.warn("hourly-run: staleness lookup failed", e);
     }
     const ordered = orderPortfoliosForRun(portfolios, lastDecisionAt);
     portfolios.length = 0;
@@ -265,13 +268,13 @@ async function runHourlyCycleInner(
             saxoRefresh[env] = r.refreshed ? { ok: true } : { ok: true, skipped: r.reason };
           } catch (e) {
             const msg = redactedError(e).message;
-            console.error(`hourly-run: saxo refresh failed for ${env}`, msg);
+            srvLog.error(`hourly-run: saxo refresh failed for ${env}`, msg);
             recordTokenRefreshOutcome({ env, source: "hourly-run", ok: false, error: e });
             saxoRefresh[env] = { ok: false, error: msg };
           }
         }
       } catch (e) {
-        console.error("hourly-run: saxo refresh module load failed", e);
+        srvLog.error("hourly-run: saxo refresh module load failed", e);
       }
       tel.recordPhase("saxo_refresh", Date.now() - saxoT0);
     } else {
@@ -292,7 +295,7 @@ async function runHourlyCycleInner(
           .eq("news_date", today);
         newsCount = count ?? 0;
       } catch (e) {
-        console.error("hourly-run: news cache count failed", e);
+        srvLog.error("hourly-run: news cache count failed", e);
       }
       tel.recordPhase("news", Date.now() - newsT0, false, `${newsCount} headlines`);
     } else {
@@ -306,7 +309,7 @@ async function runHourlyCycleInner(
         const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
         regimeInfo = await detectAndPersistRegime(today);
       } catch (e) {
-        console.error("hourly-run: regime detection failed", e);
+        srvLog.error("hourly-run: regime detection failed", e);
       }
       tel.recordPhase("regime", Date.now() - regimeT0);
     } else {
@@ -320,7 +323,7 @@ async function runHourlyCycleInner(
         const universe = filterUniverse(classesFromUniverse(p.universe));
         for (const c of universe.slice(0, 22)) symbolSet.add(c.symbol);
       } catch (e) {
-        console.warn("hourly-run: universe parse failed", p.id, e);
+        srvLog.warn("hourly-run: universe parse failed", p.id, e);
       }
     }
 
@@ -343,7 +346,7 @@ async function runHourlyCycleInner(
         const { refreshLatestCandles } = await import("@/lib/market-data.server");
         priceRefresh = await refreshLatestCandles(Array.from(symbolSet));
       } catch (e) {
-        console.error("hourly-run: price refresh failed", e);
+        srvLog.error("hourly-run: price refresh failed", e);
       }
       tel.recordPhase(
         "prices",
@@ -419,7 +422,7 @@ async function runHourlyCycleInner(
             else excludedSymbols.push({ symbol: s, venue: st.venue, phase: st.phase });
           }
         } catch (e) {
-          console.warn("hourly-run: market-hours audit failed", p.id, e);
+          srvLog.warn("hourly-run: market-hours audit failed", p.id, e);
         }
 
         // Market-hours gate: skip AI decision cycles when every venue in this
@@ -511,7 +514,7 @@ async function runHourlyCycleInner(
               lookbackHours: 72,
             });
           } catch (e) {
-            console.warn("hourly-run: order reconcile failed", p.id, e);
+            srvLog.warn("hourly-run: order reconcile failed", p.id, e);
           }
         }
 
@@ -541,7 +544,7 @@ async function runHourlyCycleInner(
 
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`hourly-run: portfolio ${p.id} failed`, msg);
+        srvLog.error(`hourly-run: portfolio ${p.id} failed`, msg);
         bumpPortfolio("error");
         tel.tickEnd(p.id, String(p.mode), tickT0, "error", msg);
         push({ id: p.id, mode: p.mode, ok: false, error: msg });
@@ -594,7 +597,7 @@ async function runHourlyCycleInner(
         }
       }
     } catch (e) {
-      console.warn("hourly-run: post-run last-decision lookup failed", e);
+      srvLog.warn("hourly-run: post-run last-decision lookup failed", e);
     }
     const portfolioStatus = buildPortfolioRunStatuses({
       portfolios: (allPortfolios ?? []).map((p) => ({
@@ -641,7 +644,7 @@ async function runHourlyCycleInner(
         price_errors: priceRefresh.errors,
       });
     } catch (e) {
-      console.error("hourly-run: failed to persist run_metrics", e);
+      srvLog.error("hourly-run: failed to persist run_metrics", e);
     }
 
     return {

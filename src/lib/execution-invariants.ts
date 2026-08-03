@@ -191,7 +191,11 @@ export function checkExecutionInvariants(args: {
       const isBuyLike = s.cash <= prevCash + MONEY_EPS;
       if (isBuyLike) {
         const spend = s.fillQuantity * s.fillPrice + s.fee;
-        if (spend > prevCash + MONEY_EPS) {
+        // Relative slack alongside the absolute epsilon: quantity x price
+        // accumulates float error proportional to the notional, so a fixed
+        // 1e-6 tolerance produced spurious violations on larger trades.
+        const slack = Math.max(MONEY_EPS, Math.abs(prevCash) * 1e-7);
+        if (spend > prevCash + slack) {
           violations.push({
             code: "BUY_EXCEEDS_PRIOR_CASH",
             step: s.step,
