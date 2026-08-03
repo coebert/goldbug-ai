@@ -243,6 +243,26 @@ function AdminPage() {
     ["paper", "live_sim", "live_prod"].includes(p.mode as string),
   );
 
+  // --- Manual run with bounded automatic retry -----------------------------
+  // The server keeps its hard 55s deadline; we simply make additional bounded
+  // attempts for portfolios the deadline left un-ticked.
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptRef = useRef(0);
+  const startedAtRef = useRef(0);
+  const requestedRef = useRef<string[]>([]);
+  const [retryState, setRetryState] = useState<{
+    attempt: number;
+    pending: number;
+    reason: string;
+  } | null>(null);
+
+  useEffect(
+    () => () => {
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    },
+    [],
+  );
+
   const manual = useMutation({
     mutationFn: (vars: { force?: boolean; portfolioIds?: string[] } = {}) =>
       triggerRun({
@@ -252,9 +272,27 @@ function AdminPage() {
     onSuccess: (result) => {
       const ran = result.results.filter((r) => r.ok && !r.skipped).length;
       const skipped = result.results.filter((r) => r.skipped).length;
-      toast.success("Hourly run completed", {
-        description: `${ran} portfolio tick(s) ran, ${skipped} skipped. Live portfolios are prioritised to keep manual runs reliable.`,
+      const plan = planManualRunRetry({
+        attempt: attemptRef.current,
+        elapsedMs: Date.now() - startedAtRef.current,
+        requestedIds: requestedRef.current,
+        outcome: { kind: "success", portfolioStatus: result.portfolio_status ?? [] },
       });
+      if (plan.shouldRetry) {
+        scheduleRetry(plan);
+        toast.warning("Run incomplete — retrying", { description: plan.reason });
+      } else {
+        setRetryState(null);
+        if (plan.outcome === "complete") {
+          toast.success("Hourly run completed", {
+            description: `${ran} portfolio tick(s) ran, ${skipped} skipped. Live portfolios are prioritised to keep manual runs reliable.`,
+          });
+        } else {
+          toast.warning("Run finished with portfolios left un-ticked", {
+            description: plan.reason,
+          });
+        }
+      }
       // Poll health a few times so the UI catches up without needing a manual refresh.
       q.refetch();
       setTimeout(() => q.refetch(), 15_000);
@@ -262,6 +300,21 @@ function AdminPage() {
       setTimeout(() => q.refetch(), 90_000);
     },
     onError: (e: Error & { code?: string; ageMs?: number | null }) => {
+      const plan = planManualRunRetry({
+        attempt: attemptRef.current,
+        elapsedMs: Date.now() - startedAtRef.current,
+        requestedIds: requestedRef.current,
+        outcome: { kind: "error", code: e.code, message: e.message },
+      });
+      if (plan.shouldRetry) {
+        scheduleRetry(plan);
+        toast.warning(
+          plan.outcome === "lock_held" ? "Run already in progress — retrying" : "Run timed out — retrying",
+          { description: plan.reason },
+        );
+        return;
+      }
+      setRetryState(null);
       if (e.code === "run_in_progress") {
         toast.warning("Run already in progress", {
           description: `${e.message} Use "Force clear lock & run" if the previous run crashed.`,
@@ -271,6 +324,31 @@ function AdminPage() {
       }
     },
   });
+
+  function scheduleRetry(plan: ManualRunRetryDecision) {
+    attemptRef.current += 1;
+    setRetryState({
+      attempt: attemptRef.current,
+      pending: plan.portfolioIds.length,
+      reason: plan.reason,
+    });
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    retryTimer.current = setTimeout(() => {
+      // Never force on a retry: the engine's "already ticked" guard must stay
+      // active so completed portfolios are not double-ticked.
+      manual.mutate({ portfolioIds: plan.portfolioIds });
+    }, plan.delayMs);
+  }
+
+  function startManualRun(vars: { force?: boolean; portfolioIds?: string[] } = {}) {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    attemptRef.current = 1;
+    startedAtRef.current = Date.now();
+    requestedRef.current = vars.portfolioIds ?? [];
+    setRetryState(null);
+    manual.mutate(vars);
+  }
+
 
   const backfill = useMutation({
     mutationFn: () => runBackfill({ data: { dryRun: false } }),
