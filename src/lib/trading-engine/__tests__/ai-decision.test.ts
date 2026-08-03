@@ -319,26 +319,28 @@ describe("callAiForDecision — failure fallback and order sizing", () => {
     expect(out.briefing).toContain("AI unavailable");
   });
 
-  it("sizes fallback buys identically across risk levels (all map to the balanced sleeve)", async () => {
+  it("sizes fallback buys per portfolio risk level (conservative/balanced/aggressive)", async () => {
     failWith(new Error("429 rate limited"));
+    const expected = {
+      conservative: { count: 1, percent: 5 },
+      balanced: { count: 2, percent: 8 },
+      aggressive: { count: 2, percent: 10 }, // only 2 momentum candidates exist
+    } as const;
     for (const level of ["conservative", "balanced", "aggressive"] as const) {
       const out = await callAiForDecision(
         baseArgs({ portfolio: portfolio({ risk_level: level }), features }),
       );
       const buys = out.orders.filter((o) => o.side === "buy");
-      // riskProfile levels are conservative/balanced/aggressive, while the
-      // heuristic sleeve keys off low/high — so every level lands on the
-      // balanced default: 2 names at 8% of cash. Pinned deliberately so a
-      // future mapping change is a conscious decision.
-      expect(buys).toHaveLength(2);
+      expect(buys).toHaveLength(expected[level].count);
       for (const b of buys) {
-        expect(b.percent).toBe(8);
+        expect(b.percent).toBe(expected[level].percent);
         expect(b.conviction).toBe(0.4);
         const w = b.signal_weights;
         expect(w.sma_trend + w.rsi + w.price_change + w.news_sentiment + w.volatility).toBe(100);
       }
     }
   });
+
 
   it("ranks fallback buys deterministically by momentum score", async () => {
     failWith(new Error("network"));
