@@ -458,7 +458,9 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
       if (decision.kind === "presumed_filled") {
         // Best-effort fill price for display only. Broker-side cash truth
-        // still comes from the /port/v1/positions reconcile.
+        // still comes from the /port/v1/positions reconcile. The order's
+        // own limit_price is the price the decision was sized against, so
+        // it beats a possibly-stale cache close; the cache is the backstop.
         const priceRow = await supabaseAdmin
           .from("price_cache")
           .select("close")
@@ -466,7 +468,17 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           .order("as_of", { ascending: false })
           .limit(1)
           .maybeSingle();
-        const fillPrice = Number(priceRow.data?.close ?? 0) || 0;
+        const candidates: FillPriceCandidate[] = [
+          { source: "order_limit_price", value: row.limit_price as number | null, raw: false },
+          { source: "price_cache_close", value: priceRow.data?.close ?? null, raw: true },
+        ];
+        const resolved = resolveFillRecord({
+          symbol: row.symbol as string,
+          orderCcy: row.instrument_ccy as string | null,
+          portfolioCurrency,
+          candidates,
+        });
+        const fillPrice = resolved?.fillPrice ?? null;
 
         const upd = await supabaseAdmin
           .from("live_orders")
@@ -474,7 +486,22 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           .eq("id", row.id as string);
 
         let fillInsertError: string | null = null;
-        if (qty > 0) {
+        if (qty > 0 && !resolved) {
+          // No usable price anywhere. Booking `0` here is what produced the
+          // phantom "free trade" rows — skip the insert and log instead, so
+          // the next reconcile pass can write a real one.
+          fillInsertError = "fill_price_unavailable";
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolioId, user_id: userId, broker: "saxo",
+            env: adapter.env, method: "ORDER_RECON_FILL_PRICE_UNAVAILABLE",
+            path: "live_fills", status: null,
+            request: asJson({
+              orderId: row.id, brokerOrderId, symbol: row.symbol,
+              tried: candidates.map((c) => c.source),
+            }),
+            error: "no positive fill price from limit_price or price_cache; fill row skipped",
+          });
+        } else if (qty > 0 && resolved) {
           const ins = await supabaseAdmin.from("live_fills").insert({
             order_id: row.id as string,
             portfolio_id: portfolioId,
@@ -482,9 +509,9 @@ export async function reconcileOrderStatusesForPortfolio(params: {
             symbol: row.symbol as string,
             side: row.side as string,
             quantity: qty,
-            fill_price: fillPrice,
+            fill_price: resolved.fillPrice,
             fee: 0,
-            currency: "GBP",
+            currency: resolved.currency,
             broker_fill_id: brokerOrderId,
             filled_at: new Date().toISOString(),
           });
@@ -500,13 +527,13 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           }
         }
 
-        if (qty > 0) {
+        if (qty > 0 && resolved) {
           const { notifyTradeFilled } = await import("./trade-fill-notify.server");
           notifyTradeFilled({
             userId, portfolioId, orderId: row.id as string,
             symbol: row.symbol as string, side: row.side as string,
-            quantity: qty, fillPrice: fillPrice || null,
-            currency: "GBP", source: "reconciler:presumed",
+            quantity: qty, fillPrice: resolved.fillPrice,
+            currency: resolved.currency, source: "reconciler:presumed",
           });
         }
 
