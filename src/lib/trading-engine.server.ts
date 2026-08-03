@@ -2707,7 +2707,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     currency: portfolio.currency || "GBP",
     source: "trading_engine",
     provenance: tickValuation.provenance,
+    brokerLinked: Boolean(
+      (portfolio as unknown as { broker_account_id?: string | null }).broker_account_id,
+    ),
+    positionCount: (holdings ?? []).length,
   });
+
 
   await recordIntradayEquity(admin as never, portfolioId, {
     cash: workingCash,
