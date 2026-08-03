@@ -460,6 +460,22 @@ function AdminPage() {
             )}
           </div>
 
+          <label className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
+            <Checkbox
+              checked={forceTick}
+              onCheckedChange={(v) => setForceTick(v === true)}
+              disabled={manual.isPending}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-foreground">Force clear the “already ticked” window</span>
+              <span className="block text-muted-foreground">
+                Re-tick portfolios that already ran in the last 10 minutes, without clearing the
+                run lock. Automatic retries ignore this.
+              </span>
+            </span>
+          </label>
+
           <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={() => startManualRun({ portfolioIds: selectedIds })}
