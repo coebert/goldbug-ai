@@ -57,7 +57,7 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
     const result = await runHourlyCycle({
       triggeredBy: "manual",
       force: data.force,
-      timeBudgetMs: 22_000,
+      timeBudgetMs: 55_000,
       skipNewsInTicks: true,
     });
 
