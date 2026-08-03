@@ -137,25 +137,37 @@ export function applyTailHedgeToPaperPortfolio(
     return { ...base, reason: `hold: ${decision.reason}` };
   }
 
-  const symbol = (input.hedgeSymbol && input.hedgeSymbol.trim())
-    || defaultHedgeSymbolFor(portfolioCurrency);
-  const meta = findSymbol(symbol);
-  if (!meta) return { ...base, reason: `unknown hedge symbol ${symbol}` };
+  // Instrument selection with fallback: if the preferred gold wrapper is
+  // blocked by the broker (Saxo ETC suitability) or has no quote, hedge with
+  // an equivalent gold ETC/ETF instead of dropping the hedge entirely.
+  const blocked = input.blockedSymbols ?? [];
+  const candidates = hedgeCandidatesFor(portfolioCurrency, input.hedgeSymbol ?? null);
+  const selection = selectHedgeInstrument({
+    candidates,
+    side: decision.action === "buy" ? "buy" : "sell",
+    eligibility: {
+      isKnown: (s) => findSymbol(s) != null,
+      hasPrice: (s) => findPrice(priceMap, s) != null,
+      isBlocked: (s) => blocked.length > 0 && isSymbolBlocked(s, blocked),
+      isHeld: (s) => {
+        const h = findHolding(holdingsByS, s);
+        return h != null && Number(h.holding.quantity) > DUST_QTY;
+      },
+    },
+  });
 
-  // Broker refuses this instrument on this account (suitability/permissions).
-  // Buying is pointless — every order would be rejected — but keep sells open.
-  if (
-    decision.action === "buy" &&
-    (input.blockedSymbols?.length ?? 0) > 0 &&
-    isSymbolBlocked(symbol, input.blockedSymbols!)
-  ) {
+  const symbol = selection.symbol;
+  if (!symbol) {
     return {
       ...base,
-      symbol,
-      reason: `hedge buy skipped: broker blocks ${symbol} on this account (suitability/permissions)`,
+      symbol: candidates[0] ?? null,
+      reason: decision.action === "buy"
+        ? `hedge buy skipped: ${selection.note}`
+        : `no gold hedge position to unwind (${selection.note})`,
     };
   }
-
+  const meta = findSymbol(symbol);
+  if (!meta) return { ...base, reason: `unknown hedge symbol ${symbol}` };
 
   const found = findHolding(holdingsByS, symbol);
   const livePrice = findPrice(priceMap, symbol);
@@ -176,6 +188,7 @@ export function applyTailHedgeToPaperPortfolio(
   if (price == null || price <= 0) {
     return { ...base, symbol, reason: `no price for ${symbol}` };
   }
+  const fallbackNote = selection.note;
 
   const executedAt = new Date().toISOString();
 
