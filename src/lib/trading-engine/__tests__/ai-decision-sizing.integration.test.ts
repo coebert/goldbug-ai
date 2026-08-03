@@ -188,7 +188,11 @@ function sizeDecision(args: {
 
     const target = cluster.allowed_weight * args.nav;
     const wanted = aggressiveBuySpend(target, agg);
-    const capped = Math.min(wanted, profile.maxPositionPct * args.nav, budget);
+    // The dial multiplier is applied after the cluster step, so re-clamp to the
+    // remaining cluster headroom — an aggressive dial must not re-inflate a
+    // trimmed order back through the cap.
+    const headroom = Math.max(0, (CLUSTER_CAP - cluster.cluster_weight_before) * args.nav);
+    const capped = Math.min(wanted, profile.maxPositionPct * args.nav, budget, headroom);
     const price = prices[o.symbol];
     if (!Number.isFinite(price) || !(price > 0) || !(capped > 0)) continue;
 
