@@ -6,10 +6,7 @@ import {
   type IntradayBackfillResult,
 } from "./equity-intraday-backfill.server";
 
-const inputSchema = z.object({
-  portfolioId: z.string().uuid().optional(),
-  days: z.number().int().min(1).max(3650).default(365),
-});
+import { inputSchema } from "./equity-intraday-backfill.helpers";
 
 /**
  * Seed `equity_intraday` from existing daily snapshots so the Hourly view has

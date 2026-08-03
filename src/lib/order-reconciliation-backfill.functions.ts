@@ -3,47 +3,9 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { OrderReconcileSummary } from "@/lib/order-reconciliation.server";
 
-export interface BackfillPortfolioResult {
-  portfolioId: string;
-  portfolioName: string | null;
-  ok: boolean;
-  error?: string;
-  summary?: {
-    scanned: number;
-    filled: number;
-    partial: number;
-    rejected: number;
-    cancelled: number;
-    stillWorking: number;
-    unknown: number;
-  };
-}
-
-export interface BackfillResult {
-  lookbackHours: number;
-  totals: {
-    scanned: number;
-    filled: number;
-    partial: number;
-    rejected: number;
-    cancelled: number;
-    stillWorking: number;
-    unknown: number;
-  };
-  portfolios: BackfillPortfolioResult[];
-}
-
-const Input = z
-  .object({
-    // 60 days default — captures anything since live routing began.
-    lookbackHours: z.number().int().min(1).max(24 * 365).default(24 * 60),
-    // Also include 'error' — orders that failed pre-broker won't reconcile,
-    // but historically some in-flight failures were stored as 'error' when
-    // the follow-up status update was lost.
-    includeError: z.boolean().default(true),
-    portfolioId: z.string().uuid().optional(),
-  })
-  .default({ lookbackHours: 24 * 60, includeError: true });
+import { Input } from "./order-reconciliation-backfill.helpers";
+import type { BackfillPortfolioResult, BackfillResult } from "./order-reconciliation-backfill.helpers";
+export type { BackfillPortfolioResult, BackfillResult };
 
 export const backfillOrderReconciliation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

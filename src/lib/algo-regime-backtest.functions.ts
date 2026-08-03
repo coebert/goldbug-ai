@@ -22,48 +22,9 @@ import {
   type DailyRegimeInput,
 } from "@/lib/microstructure/algo-regime-backtest";
 
-const DEFAULT_LOOKBACK_DAYS = 60;
-const MAX_OBSERVATION_DAYS = 120;
-const MAX_CROSS_SECTION_SYMBOLS = 4;
-
-type BarRow = { price_date: string; close: number; volume: number | null };
-
-function sliceBarsBefore(rows: readonly BarRow[], asOf: string, n: number) {
-  const cutIdx = (() => {
-    for (let i = rows.length - 1; i >= 0; i--) {
-      if (rows[i].price_date <= asOf) return i;
-    }
-    return -1;
-  })();
-  if (cutIdx < 0) return { closes: [] as number[], volumes: [] as number[] };
-  const start = Math.max(0, cutIdx - n + 1);
-  const slice = rows.slice(start, cutIdx + 1);
-  return {
-    closes: slice.map((r) => Number(r.close)).filter((v) => Number.isFinite(v)),
-    volumes: slice.map((r) => (r.volume == null ? 0 : Number(r.volume))),
-  };
-}
-
-function sliceReturnsBefore(rows: readonly BarRow[], asOf: string, n: number): number[] {
-  const { closes } = sliceBarsBefore(rows, asOf, n + 1);
-  const out: number[] = [];
-  for (let i = 1; i < closes.length; i++) {
-    const p = closes[i - 1];
-    if (p > 0) out.push((closes[i] - p) / p);
-  }
-  return out;
-}
-
-export type AlgoRegimeBacktestResponse = BacktestComparison & {
-  benchSymbol: string;
-  crossSectionSymbols: string[];
-  observationDates: string[];
-  lookbackDays: number;
-  activeConfig: AlgoRegimeConfig;
-  candidateConfig: AlgoRegimeConfig;
-  tuneNotes: string[];
-  candidateChanged: boolean;
-};
+import { DEFAULT_LOOKBACK_DAYS, MAX_OBSERVATION_DAYS, MAX_CROSS_SECTION_SYMBOLS, sliceBarsBefore, sliceReturnsBefore } from "./algo-regime-backtest.helpers";
+import type { BarRow, AlgoRegimeBacktestResponse } from "./algo-regime-backtest.helpers";
+export type { AlgoRegimeBacktestResponse };
 
 export const backtestAlgoRegimeCandidate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

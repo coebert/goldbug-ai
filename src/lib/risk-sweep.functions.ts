@@ -6,10 +6,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { RiskSweepResult } from "./risk-sweep.server";
 
-const InputSchema = z.object({
-  portfolioId: z.string().uuid(),
-  years: z.number().int().min(1).max(20).default(5),
-});
+import { InputSchema } from "./risk-sweep.helpers";
 
 export const runRiskSweepFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

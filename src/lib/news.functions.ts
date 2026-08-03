@@ -16,6 +16,29 @@ import { sortNewsLatestFirst } from "./news-reel-sort";
 import { dedupeNewsItems, normalizeHeadlineKey } from "./news-dedupe";
 import { transliterationKey } from "./news-transliterate";
 
+/**
+ * Narrow shape of a `decisions` row when only the news-related jsonb sub-keys
+ * are projected. Keeps the wire payload small — the full `raw` blob is orders
+ * of magnitude bigger and unused by the news views.
+ */
+type DecisionNewsSlice = {
+  id: string;
+  portfolio_id: string;
+  run_date: string;
+  rationale: string;
+  raw_news:
+    | Array<{
+        headline?: string;
+        source?: string | null;
+        url?: string | null;
+        sentiment?: number | null;
+        source_weight?: number | null;
+      }>
+    | null;
+  raw_executed: Array<{ action?: string; symbol?: string; qty?: number | null }> | null;
+  raw_orders: Array<{ action?: string; symbol?: string; qty?: number | null }> | null;
+};
+
 export const getGlobalNewsReel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { sinceDays?: number; limit?: number } | undefined) => {
@@ -91,10 +114,15 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     );
     const { data: decisions } = await context.supabase
       .from("decisions")
-      .select("id, portfolio_id, run_date, rationale, raw")
+      // Project only the jsonb sub-keys this view reads. The full `raw` payload
+      // is large enough to dominate the response, and none of it is used here.
+      .select(
+        "id, portfolio_id, run_date, rationale, raw_news:raw->news, raw_executed:raw->executed, raw_orders:raw->orders",
+      )
       .gte("run_date", since)
       .order("run_date", { ascending: false })
-      .limit(120);
+      .limit(120)
+      .overrideTypes<DecisionNewsSlice[]>();
 
     // 3. Build headline -> influences lookup.
     const infl = new Map<
@@ -113,10 +141,10 @@ export const getGlobalNewsReel = createServerFn({ method: "GET" })
     for (const d of decisions ?? []) {
       const p = pMap.get(d.portfolio_id);
       const name = p?.name ?? "Portfolio";
-      const raw = (d.raw ?? {}) as {
-        news?: Array<{ headline?: string; sentiment?: number | null; source_weight?: number | null }>;
-        executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
-        orders?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+      const raw = {
+        news: d.raw_news ?? [],
+        executed: d.raw_executed ?? [],
+        orders: d.raw_orders ?? [],
       };
       const usedNews = raw.news ?? [];
       if (usedNews.length === 0) continue;
@@ -261,16 +289,19 @@ export const getDecisionNewsBreakdown = createServerFn({ method: "GET" })
 
     const { data: decisions } = await context.supabase
       .from("decisions")
-      .select("id, portfolio_id, run_date, rationale, raw")
+      .select(
+        "id, portfolio_id, run_date, rationale, raw_news:raw->news, raw_executed:raw->executed, raw_orders:raw->orders",
+      )
       .gte("run_date", since)
       .order("run_date", { ascending: false })
-      .limit(30);
+      .limit(30)
+      .overrideTypes<DecisionNewsSlice[]>();
 
     const items: DecisionBreakdownItem[] = (decisions ?? []).map((d) => {
-      const raw = (d.raw ?? {}) as {
-        news?: Array<{ headline?: string; source?: string | null; url?: string | null; sentiment?: number | null }>;
-        executed?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
-        orders?: Array<{ action?: string; symbol?: string; qty?: number | null }>;
+      const raw = {
+        news: d.raw_news ?? [],
+        executed: d.raw_executed ?? [],
+        orders: d.raw_orders ?? [],
       };
       const news = (raw.news ?? []).filter((n) => (n.headline ?? "").trim().length > 0);
       const ranked = [...news].sort((a, b) => {

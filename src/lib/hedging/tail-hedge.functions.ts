@@ -15,36 +15,9 @@ import {
   type TailHedgeDecision,
 } from "./tail-hedge";
 
-async function readPreviousHedgeNotional(
-  supabase: {
-    from: (t: string) => {
-      select: (c: string) => {
-        eq: (c: string, v: string) => {
-          order: (c: string, o: { ascending: boolean }) => {
-            limit: (n: number) => { maybeSingle: () => Promise<{ data: { raw: unknown } | null }> };
-          };
-        };
-      };
-    };
-  },
-  portfolioId: string,
-): Promise<number> {
-  const { data } = await supabase
-    .from("decisions")
-    .select("raw")
-    .eq("portfolio_id", portfolioId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const raw = (data?.raw ?? null) as { tail_hedge?: { targetNotional?: number } } | null;
-  const n = Number(raw?.tail_hedge?.targetNotional ?? 0);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-export type TailHedgeStatus = TailHedgeDecision & {
-  nav: number;
-  currentNotional: number;
-};
+import { readPreviousHedgeNotional } from "./tail-hedge.helpers";
+import type { TailHedgeStatus } from "./tail-hedge.helpers";
+export type { TailHedgeStatus };
 
 export const getTailHedgeStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

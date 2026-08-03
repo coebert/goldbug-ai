@@ -5,23 +5,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const InputSchema = z.object({
-  portfolioId: z.string().uuid(),
-  sinceDays: z.number().int().min(1).max(3650).optional(),
-});
-
-export type WalletHistoryRow = {
-  snapshot_date: string;
-  base_ccy: string;
-  base_total: number;
-  cash_by_ccy: Record<string, number>;
-};
-
-export type WalletHistoryResult = {
-  rows: WalletHistoryRow[];
-  currencies: string[]; // union of currencies seen across the window
-  baseCcy: string | null;
-};
+import { InputSchema } from "./wallet-history.helpers";
+import type { WalletHistoryRow, WalletHistoryResult } from "./wallet-history.helpers";
+export type { WalletHistoryRow, WalletHistoryResult };
 
 export const getWalletHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

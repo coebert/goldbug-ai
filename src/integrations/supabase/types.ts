@@ -3165,6 +3165,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      prune_live_broker_log: { Args: never; Returns: undefined }
       purge_expired_idempotency_keys: { Args: never; Returns: number }
       sweep_expired_run_locks: { Args: never; Returns: number }
     }
