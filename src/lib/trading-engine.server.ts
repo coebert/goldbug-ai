@@ -2600,10 +2600,22 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
     workingCash = exec.workingCash;
     if (exec.trade) executed.push(exec.trade);
+    if (exec.fallback) {
+      const { recordHedgeFallbackEvent } = await import("./hedging/hedge-fallback-audit.server");
+      recordHedgeFallbackEvent({
+        userId: portfolio.user_id,
+        portfolioId,
+        currency: portfolio.currency ?? "GBP",
+        applied: exec.applied,
+        appliedNotional: exec.notional,
+        audit: exec.fallback,
+      });
+    }
     tailHedgeExecution = {
       applied: exec.applied, reason: exec.reason, symbol: exec.symbol,
       qty: exec.qty, notional: exec.notional,
     };
+
     try {
       const { reconcileTailHedge } = await import("./hedging/tail-hedge-reconcile");
       const hedgeSym = exec.symbol;
