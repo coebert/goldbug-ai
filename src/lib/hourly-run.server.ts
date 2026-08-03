@@ -505,11 +505,19 @@ async function runHourlyCycleInner(
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
         bumpPortfolio("error");
+        tel.tickEnd(p.id, String(p.mode), tickT0, "error", msg);
         results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
       }
     }
 
     const metricsSnap = snapshot(metrics);
+    const telemetry = tel.finish({
+      portfolios_total: portfolios.length,
+      skipped_paused: skippedPaused,
+      news_headlines: newsCount,
+      prices_refreshed: priceRefresh.refreshed,
+      price_errors: priceRefresh.errors,
+    });
     try {
       await supabaseAdmin.from("run_metrics").insert({
         triggered_by: manualTrigger ? "manual" : "cron",
@@ -546,7 +554,11 @@ async function runHourlyCycleInner(
       triggered_by: manualTrigger ? "manual" : "cron",
       results,
       metrics: metricsSnap,
+      telemetry,
     };
+  } catch (err) {
+    tel.failed(err);
+    throw err;
   } finally {
     clearInterval(heartbeat);
     await lock.release();
