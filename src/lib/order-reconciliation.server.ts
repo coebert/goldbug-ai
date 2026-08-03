@@ -676,55 +676,98 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     }
 
     let fillInsertError: string | null = null;
-    if ((mapped === "filled" || mapped === "partial") && hist.filledAmount > 0) {
-      // Insert (idempotent-ish): broker_fill_id = brokerOrderId means one row
-      // per broker order. If the row already exists we skip on unique-violation.
-      const fillPrice = hist.avgPrice ?? 0;
-      const ins = await supabaseAdmin.from("live_fills").insert({
-        order_id: row.id as string,
-        portfolio_id: portfolioId,
-        user_id: userId,
-        symbol: row.symbol as string,
-        side: row.side as string,
-        quantity: hist.filledAmount,
-        fill_price: fillPrice,
-        fee: 0,
-        currency: "GBP",
-        broker_fill_id: brokerOrderId,
-        filled_at: hist.filledAt ?? new Date().toISOString(),
-      });
-      if (ins.error && ins.error.code !== "23505") {
-        fillInsertError = ins.error.message;
-        // Non-duplicate insert failures should surface in the log but not fail
-        // the whole reconcile pass.
+    // Resolved once so the insert, the notification and the summary row
+    // all quote the same price and currency.
+    const histCandidates: FillPriceCandidate[] = [
+      { source: "saxo_hist_avg_price", value: hist?.avgPrice ?? null, raw: false },
+      { source: "order_limit_price", value: row.limit_price as number | null, raw: false },
+    ];
+    const histFill =
+      hist && (mapped === "filled" || mapped === "partial") && hist.filledAmount > 0
+        ? resolveFillRecord({
+            symbol: row.symbol as string,
+            orderCcy: row.instrument_ccy as string | null,
+            portfolioCurrency,
+            candidates: histCandidates,
+          })
+        : null;
+
+    if (hist && (mapped === "filled" || mapped === "partial") && hist.filledAmount > 0) {
+      if (!histFill) {
+        // Saxo returned no average price and the order carried no limit
+        // price. Writing `0` here is what created the phantom zero-cost
+        // fills — skip and log so a later pass can book the real number.
+        fillInsertError = "fill_price_unavailable";
         await supabaseAdmin.from("live_broker_log").insert({
           portfolio_id: portfolioId, user_id: userId, broker: "saxo",
-          env: adapter.env, method: "ORDER_RECON_FILL_INSERT_FAILED",
+          env: adapter.env, method: "ORDER_RECON_FILL_PRICE_UNAVAILABLE",
           path: "live_fills", status: null,
-          request: asJson({ orderId: row.id, brokerOrderId }),
-          error: ins.error.message,
+          request: asJson({
+            orderId: row.id, brokerOrderId, symbol: row.symbol,
+            tried: histCandidates.map((c) => c.source),
+          }),
+          error: "no positive fill price from Saxo /hist or order limit_price; fill row skipped",
         });
         await logReconcileEvent({
           ...commonEvent,
           newStatus: mapped,
           outcome: "error",
           reasonCode: "fill_insert_failed",
-          reason: `live_fills insert failed: ${ins.error.message}`,
+          reason: "live_fills insert skipped: no usable fill price",
           filledQuantity: hist.filledAmount,
-          avgFillPrice: hist.avgPrice,
+          avgFillPrice: null,
           saxoStatus: hist.status,
           saxoResponse: hist,
         });
+      } else {
+        // Insert (idempotent-ish): broker_fill_id = brokerOrderId means one row
+        // per broker order. If the row already exists we skip on unique-violation.
+        const ins = await supabaseAdmin.from("live_fills").insert({
+          order_id: row.id as string,
+          portfolio_id: portfolioId,
+          user_id: userId,
+          symbol: row.symbol as string,
+          side: row.side as string,
+          quantity: hist.filledAmount,
+          fill_price: histFill.fillPrice,
+          fee: 0,
+          currency: histFill.currency,
+          broker_fill_id: brokerOrderId,
+          filled_at: hist.filledAt ?? new Date().toISOString(),
+        });
+        if (ins.error && ins.error.code !== "23505") {
+          fillInsertError = ins.error.message;
+          // Non-duplicate insert failures should surface in the log but not fail
+          // the whole reconcile pass.
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolioId, user_id: userId, broker: "saxo",
+            env: adapter.env, method: "ORDER_RECON_FILL_INSERT_FAILED",
+            path: "live_fills", status: null,
+            request: asJson({ orderId: row.id, brokerOrderId }),
+            error: ins.error.message,
+          });
+          await logReconcileEvent({
+            ...commonEvent,
+            newStatus: mapped,
+            outcome: "error",
+            reasonCode: "fill_insert_failed",
+            reason: `live_fills insert failed: ${ins.error.message}`,
+            filledQuantity: hist.filledAmount,
+            avgFillPrice: histFill.fillPrice,
+            saxoStatus: hist.status,
+            saxoResponse: hist,
+          });
+        }
       }
     }
 
-    if ((mapped === "filled" || mapped === "partial") && hist.filledAmount > 0 && !fillInsertError) {
+    if (histFill && hist && hist.filledAmount > 0 && !fillInsertError) {
       const { notifyTradeFilled } = await import("./trade-fill-notify.server");
       notifyTradeFilled({
         userId, portfolioId, orderId: row.id as string,
         symbol: row.symbol as string, side: row.side as string,
-        quantity: hist.filledAmount, fillPrice: hist.avgPrice ?? null,
-        currency: "GBP", source: "reconciler:history",
+        quantity: hist.filledAmount, fillPrice: histFill.fillPrice,
+        currency: histFill.currency, source: "reconciler:history",
       });
     }
 
