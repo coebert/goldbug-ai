@@ -39,7 +39,9 @@ describe("holdingPriceBySymbol", () => {
   });
 
   it("handles empty and colon-only symbols without throwing", () => {
-    expect(holdingPriceBySymbol(new Map([["", 1]]), "")).toBeNull();
+    // An empty symbol has no variants, but the raw-key fallback still applies.
+    expect(holdingPriceBySymbol(new Map([["", 1]]), "")).toBe(1);
+    expect(holdingPriceBySymbol(new Map(), "")).toBeNull();
     expect(() => holdingPriceBySymbol(new Map(), ":")).not.toThrow();
   });
 
