@@ -15,6 +15,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
 import { Route as LearnRouteImport } from './routes/learn'
+import { Route as HedgeFallbacksRouteImport } from './routes/hedge-fallbacks'
 import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as BrokerBlocksRouteImport } from './routes/broker-blocks'
@@ -78,6 +79,11 @@ const SaxoReconnectRoute = SaxoReconnectRouteImport.update({
 const LearnRoute = LearnRouteImport.update({
   id: '/learn',
   path: '/learn',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HedgeFallbacksRoute = HedgeFallbacksRouteImport.update({
+  id: '/hedge-fallbacks',
+  path: '/hedge-fallbacks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GetStartedRoute = GetStartedRouteImport.update({
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
@@ -316,6 +323,7 @@ export interface FileRoutesByTo {
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
@@ -359,6 +367,7 @@ export interface FileRoutesById {
   '/broker-blocks': typeof BrokerBlocksRoute
   '/compare': typeof CompareRoute
   '/get-started': typeof GetStartedRoute
+  '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
     | '/broker-blocks'
     | '/compare'
     | '/get-started'
+    | '/hedge-fallbacks'
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
@@ -445,6 +455,7 @@ export interface FileRouteTypes {
     | '/broker-blocks'
     | '/compare'
     | '/get-started'
+    | '/hedge-fallbacks'
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
@@ -487,6 +498,7 @@ export interface FileRouteTypes {
     | '/broker-blocks'
     | '/compare'
     | '/get-started'
+    | '/hedge-fallbacks'
     | '/learn'
     | '/saxo-reconnect'
     | '/saxo-status'
@@ -530,6 +542,7 @@ export interface RootRouteChildren {
   BrokerBlocksRoute: typeof BrokerBlocksRoute
   CompareRoute: typeof CompareRoute
   GetStartedRoute: typeof GetStartedRoute
+  HedgeFallbacksRoute: typeof HedgeFallbacksRoute
   LearnRoute: typeof LearnRoute
   SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
@@ -604,6 +617,13 @@ declare module '@tanstack/react-router' {
       path: '/learn'
       fullPath: '/learn'
       preLoaderRoute: typeof LearnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hedge-fallbacks': {
+      id: '/hedge-fallbacks'
+      path: '/hedge-fallbacks'
+      fullPath: '/hedge-fallbacks'
+      preLoaderRoute: typeof HedgeFallbacksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/get-started': {
@@ -872,6 +892,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrokerBlocksRoute: BrokerBlocksRoute,
   CompareRoute: CompareRoute,
   GetStartedRoute: GetStartedRoute,
+  HedgeFallbacksRoute: HedgeFallbacksRoute,
   LearnRoute: LearnRoute,
   SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
