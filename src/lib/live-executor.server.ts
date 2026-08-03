@@ -1587,6 +1587,9 @@ export async function routeOrdersToBroker(params: {
           broker: "saxo",
           symbol: order.symbol,
           rejectReason: brokerRes.reason ?? null,
+          orderId: brokerRes.brokerOrderId || liveOrderId,
+          side: order.side,
+          quantity: order.quantity ?? null,
         });
       } catch (e) {
         console.warn("[live-executor] block recording failed:", e);
