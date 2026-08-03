@@ -943,9 +943,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     let triggerKind: "stop" | "take_profit" | "trail" | "time" | "max_hold" = "stop";
     let sellFraction = 1; // full liquidation unless a partial-exit layer overrides
 
-    // 1. Hard stop-loss / take-profit
-    if (cfg.stop_loss_pct > 0 && change <= -cfg.stop_loss_pct) {
-      trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(cfg.stop_loss_pct * 100).toFixed(1)}%)`;
+    // 1. Hard stop-loss / take-profit. The hard stop is ATR-scaled: quiet,
+    // gappy names get a tighter stop automatically, and it can never be wider
+    // than the configured fixed stop.
+    const hardStop = atrScaledStopPct({
+      fixedStopPct: cfg.stop_loss_pct,
+      atrPct,
+      atrMult: cfg.initial_stop_atr_mult,
+      floorPct: cfg.atr_scaled_stop_floor_pct,
+      enabled: cfg.atr_scaled_stop_enabled,
+    });
+    if (hardStop.effectiveStopPct > 0 && change <= -hardStop.effectiveStopPct) {
+      trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(hardStop.effectiveStopPct * 100).toFixed(2)}%) — ${hardStop.note}`;
       triggerKind = "stop";
     } else if (cfg.take_profit_pct > 0 && change >= cfg.take_profit_pct) {
       trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(cfg.take_profit_pct * 100).toFixed(1)}%)`;
