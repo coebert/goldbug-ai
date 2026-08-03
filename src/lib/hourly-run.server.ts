@@ -147,6 +147,7 @@ async function runHourlyCycleInner(
     // Order: real money first, then STALEST first. Without the staleness
     // ordering the same portfolio always won the fixed mode ordering and the
     // rest were permanently starved by the run's time budget.
+    const { orderPortfoliosForRun, createBudgetGate } = await import("./run-scheduling");
     const lastDecisionAt = new Map<string, number>();
     try {
       const { data: lastRows } = await supabaseAdmin
@@ -164,18 +165,15 @@ async function runHourlyCycleInner(
     } catch (e) {
       console.warn("hourly-run: staleness lookup failed", e);
     }
-    portfolios.sort((a, b) => {
-      const priority = (mode: string) => (mode === "live_prod" ? 0 : 1);
-      const dp = priority(String(a.mode)) - priority(String(b.mode));
-      if (dp !== 0) return dp;
-      return (lastDecisionAt.get(a.id) ?? 0) - (lastDecisionAt.get(b.id) ?? 0);
-    });
+    const ordered = orderPortfoliosForRun(portfolios, lastDecisionAt);
+    portfolios.length = 0;
+    portfolios.push(...ordered);
     const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
-    // Starvation guard: a portfolio that hasn't produced a decision in this
-    // long may bypass the time budget once per run, so every portfolio makes
-    // progress even when earlier ticks consume the whole budget.
-    const STARVED_MS = 6 * 60 * 60 * 1000;
-    let starvationOverridesLeft = 1;
+    // Starvation guard: a portfolio that hasn't produced a decision in 6h may
+    // bypass the time budget once per run, so every portfolio makes progress
+    // even when earlier ticks consume the whole budget.
+    const budgetGate = createBudgetGate(RUN_BUDGET_MS, lastDecisionAt);
+
 
 
     const saxoRefresh: Record<string, { ok: boolean; error?: string; skipped?: string }> = {};
@@ -289,9 +287,7 @@ async function runHourlyCycleInner(
     for (const p of portfolios) {
       try {
         const elapsed = Date.now() - runStartedAt;
-        const starvedFor = Date.now() - (lastDecisionAt.get(p.id) ?? 0);
-        const mayOverride = starvedFor > STARVED_MS && starvationOverridesLeft > 0;
-        if (elapsed > RUN_BUDGET_MS && !mayOverride) {
+        if (budgetGate.shouldSkip(p.id, elapsed, Date.now())) {
           bumpBudgetExceeded();
           results.push({
             id: p.id,
@@ -301,7 +297,7 @@ async function runHourlyCycleInner(
           });
           continue;
         }
-        if (elapsed > RUN_BUDGET_MS && mayOverride) starvationOverridesLeft -= 1;
+
 
 
         // Market-hours gate: skip AI decision cycles when every venue in this
