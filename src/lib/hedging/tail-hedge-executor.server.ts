@@ -138,37 +138,49 @@ export function applyTailHedgeToPaperPortfolio(
     return { ...base, reason: `hold: ${decision.reason}` };
   }
 
-  // Instrument selection with fallback: if the preferred gold wrapper is
-  // blocked by the broker (Saxo ETC suitability) or has no quote, hedge with
-  // an equivalent gold ETC/ETF instead of dropping the hedge entirely.
+  // Instrument selection with fallback: if the default gold wrapper is blocked
+  // by the broker (Saxo ETC suitability) we hedge with an equivalent gold
+  // ETC/ETF instead of dropping the hedge entirely. An explicit per-portfolio
+  // `hedgeSymbol` override is honoured verbatim — the caller picked that
+  // instrument deliberately, so we never silently substitute for it.
   const blocked = input.blockedSymbols ?? [];
-  const candidates = hedgeCandidatesFor(portfolioCurrency, input.hedgeSymbol ?? null);
+  const override = (input.hedgeSymbol ?? "").trim();
+  const primary = override || defaultHedgeSymbolFor(portfolioCurrency);
+  const candidates = override ? [override] : hedgeCandidatesFor(portfolioCurrency);
   const selection = selectHedgeInstrument({
     candidates,
     side: decision.action === "buy" ? "buy" : "sell",
     eligibility: {
-      isKnown: (s) => findSymbol(s) != null,
-      hasPrice: (s) => findPrice(priceMap, s) != null,
-      isBlocked: (s) => blocked.length > 0 && isSymbolBlocked(s, blocked),
-      isHeld: (s) => {
+      isKnown: (s: string) => findSymbol(s) != null,
+      hasPrice: (s: string) => findPrice(priceMap, s) != null,
+      isBlocked: (s: string) => blocked.length > 0 && isSymbolBlocked(s, blocked),
+      isHeld: (s: string) => {
         const h = findHolding(holdingsByS, s);
         return h != null && Number(h.holding.quantity) > DUST_QTY;
       },
     },
   });
 
-  const symbol = selection.symbol;
-  if (!symbol) {
-    return {
-      ...base,
-      symbol: candidates[0] ?? null,
-      reason: decision.action === "buy"
-        ? `hedge buy skipped: ${selection.note}`
-        : `no gold hedge position to unwind (${selection.note})`,
-    };
-  }
+  // No substitute qualified. Fall through on the primary so the existing,
+  // more specific diagnostics ("no price for X", "no X to unwind",
+  // "insufficient cash") still apply — unless the primary itself is blocked,
+  // where buying is genuinely pointless.
+  const symbol = selection.symbol ?? primary;
   const meta = findSymbol(symbol);
   if (!meta) return { ...base, reason: `unknown hedge symbol ${symbol}` };
+
+  if (
+    decision.action === "buy" &&
+    blocked.length > 0 &&
+    isSymbolBlocked(symbol, blocked)
+  ) {
+    return {
+      ...base,
+      symbol,
+      reason: `hedge buy skipped: broker blocks ${symbol} on this account (suitability/permissions) and no eligible gold substitute is available`,
+    };
+  }
+
 
   const found = findHolding(holdingsByS, symbol);
   const livePrice = findPrice(priceMap, symbol);
