@@ -55,11 +55,14 @@ export const listBrokerBlockEvents = createServerFn({ method: "POST" })
     return { events };
   });
 
+// Unblocking re-enters a symbol into the live universe, so it is gated by the
+// same second-factor policy as the trading server functions, and scoped to
+// rows the caller owns.
 export const clearBrokerInstrumentBlock = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAal2])
   .inputValidator((data) =>
     z
-      .object({ symbolKey: z.string().min(1).max(32), broker: z.string().max(32).optional() })
+      .object({ symbolKey: z.string().min(1).max(32), broker: z.string().min(1).max(32).optional() })
       .parse(data),
   )
   .handler(async ({ context, data }): Promise<{ cleared: boolean }> => {
@@ -71,5 +74,6 @@ export const clearBrokerInstrumentBlock = createServerFn({ method: "POST" })
       symbolKey: data.symbolKey,
       broker: data.broker ?? "saxo",
     });
-    return { cleared };
+    return { cleared: cleared > 0 };
   });
+
