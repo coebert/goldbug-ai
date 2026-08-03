@@ -16,6 +16,8 @@ import {
 } from "@/lib/backtest/phase-runner";
 import { applyTailHedgeToPaperPortfolio } from "@/lib/hedging/tail-hedge-executor.server";
 import { computeTailHedge } from "@/lib/hedging/tail-hedge";
+import { sizeHedgeBuy, sizeHedgeSell } from "@/lib/hedging/tail-hedge-sizing";
+
 import { findSymbol } from "@/lib/universe.server";
 import type { Database } from "@/integrations/supabase/types";
 
