@@ -62,12 +62,14 @@ export async function runHourlyCycle(opts: {
   skipNewsInTicks?: boolean;
   /** Run broad token/news/regime/price refreshes before portfolio ticks. */
   preflightRefresh?: boolean;
+  /** Restrict the run to these portfolio ids (manual runs). Empty/undefined = all. */
+  portfolioIds?: string[];
 }): Promise<HourlyRunResult> {
   return withRunMetrics((metrics) => runHourlyCycleInner(opts, metrics));
 }
 
 async function runHourlyCycleInner(
-  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean },
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean; portfolioIds?: string[] },
   metrics: import("@/lib/run-metrics.server").RunMetrics,
 ): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
