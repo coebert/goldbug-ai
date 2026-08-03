@@ -276,7 +276,7 @@ export function PortfolioRow({
           data-testid="portfolio-row-equity"
         >
           <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <div className="flex items-center gap-2">
               <Sparkline values={values} width={120} height={32} />
               {equityError ? (
                 <span
@@ -375,7 +375,7 @@ export function PortfolioRow({
               ))}
             </div>
           </div>
-          <div className="min-w-0 text-right">
+          <div className="shrink-0 text-right">
             <TooltipProvider delayDuration={150}>
               <div className="flex items-center justify-start gap-1.5 sm:justify-end text-[10px] uppercase tracking-wide text-muted-foreground">
                 Total equity
@@ -476,7 +476,7 @@ export function PortfolioRow({
               </>
             ) : (
               <>
-                <div className="break-words font-display text-xl font-bold leading-tight tabular-nums sm:text-2xl">
+                <div className="font-display text-2xl font-bold leading-tight tabular-nums">
                   {portfolio.currency} {formatMoneyAmount(totalEquity, equityDecimals)}
                 </div>
                 {(() => {
