@@ -31,18 +31,25 @@ import { runRiskSweepFn } from "@/lib/risk-sweep.functions";
 import type { RiskSweepResult } from "@/lib/risk-sweep.server";
 import {
   AXIS_PROPS,
+  CHART_SEQUENCE,
   GRID_PROPS,
   TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
 
 
+// Risk levels 1..5 are an ordered, non-semantic series: take them straight
+// off the shared colour-blind-safe sequence rather than hand-picking
+// `--chart-N` slots, so they stay distinguishable and theme-consistent.
 const LEVEL_COLORS: Record<number, string> = {
-  1: "var(--chart-5)",
-  2: "var(--chart-4)",
-  3: "var(--chart-1)",
-  4: "var(--chart-2)",
-  5: "var(--chart-3)",
+  1: CHART_SEQUENCE[0]!,
+  2: CHART_SEQUENCE[1]!,
+  3: CHART_SEQUENCE[2]!,
+  4: CHART_SEQUENCE[3]!,
+  5: CHART_SEQUENCE[4]!,
 };
+
 
 /** Merge per-level curves into one row-per-date shape for Recharts. */
 function mergeCurves(res: RiskSweepResult) {
