@@ -208,8 +208,33 @@ function applyTailHedgeCore(
     },
   });
 
+  // Audit every non-trivial instrument selection: either we substituted away
+  // from the primary wrapper, or nothing qualified at all. Both are decisions
+  // the operator must be able to reconstruct later.
+  {
+    const primaryReason = selection.rejected.find(
+      (r) => r.symbol.toUpperCase() === primary.toUpperCase(),
+    )?.reason;
+    if (selection.fallbackFrom != null || selection.symbol == null) {
+      sink.audit = {
+        side: decision.action === "buy" ? "buy" : "sell",
+        primarySymbol: primary,
+        chosenSymbol: selection.symbol,
+        reasonCode:
+          selection.symbol == null && primaryReason == null
+            ? "no_eligible_candidate"
+            : classifyRejection(primaryReason),
+        reasonDetail: selection.note.trim() ||
+          `${primary} unusable (${primaryReason ?? "ineligible"})`,
+        candidates: selection.rejected,
+        targetNotional: Math.abs(decision.deltaNotional),
+      };
+    }
+  }
+
   // No substitute qualified. Fall through on the primary so the existing,
   // more specific diagnostics ("no price for X", "no X to unwind",
+
   // "insufficient cash") still apply — unless the primary itself is blocked,
   // where buying is genuinely pointless.
   const symbol = selection.symbol ?? primary;
