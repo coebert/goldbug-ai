@@ -36,7 +36,7 @@ export const Route = createFileRoute("/api/public/hooks/hourly-run")({
           const result = await runHourlyCycle({
             triggeredBy: manualTrigger ? "manual" : "cron",
             force: forceClear,
-            timeBudgetMs: 22_000,
+            timeBudgetMs: 55_000,
             skipNewsInTicks: true,
           });
           console.log(
