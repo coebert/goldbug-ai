@@ -50,6 +50,8 @@ function BrokerBlocksPage() {
 
         <BrokerSuitabilityBlocksCard />
 
+        <BrokerBlockAuditLogCard />
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">How blocks work</CardTitle>
