@@ -25,15 +25,29 @@ export type HourlyRunResult = {
     error?: string;
     value?: number;
     skipped?: string;
+    /** Portfolio display name, so the admin UI needn't join on ids. */
+    name?: string | null;
+    /** ISO time this portfolio entered the tick loop. */
+    started_at?: string;
+    /** ISO time this portfolio left the tick loop (ticked or skipped). */
+    finished_at?: string;
+    /** Wall-clock ms spent on this portfolio. */
+    duration_ms?: number;
     /** Symbols whose venue was open at gate time (candidates AI could size). */
     tradeable_symbols?: string[];
     /** Symbols dropped by the market-hours gate, with venue + phase reason. */
     excluded_symbols?: Array<{ symbol: string; venue: string; phase: string }>;
   }>;
+  /**
+   * Per-portfolio run status for EVERY known portfolio — including ones left
+   * untouched by a scoped manual run — plus last-run timestamps before/after.
+   */
+  portfolio_status: import("@/lib/run-portfolio-status").RunPortfolioStatus[];
   metrics: RunMetricsSnapshot;
   /** Structured timings: pre-flight cost, selection, per-tick, deadline usage. */
   telemetry: RunTelemetrySnapshot;
 };
+
 
 
 export class RunInProgressError extends Error {
@@ -342,13 +356,28 @@ async function runHourlyCycleInner(
 
     const runTickFor = async (p: (typeof portfolios)[number]) => {
       const tickT0 = tel.tickStart(p.id, String(p.mode));
+      // Per-portfolio timing + name so the admin UI can show exactly what
+      // happened to each portfolio without a second round-trip.
+      const startedAtMs = Date.now();
+      const startedIso = new Date(startedAtMs).toISOString();
+      const push = (row: HourlyRunResult["results"][number]) => {
+        const finished = Date.now();
+        results.push({
+          ...row,
+          name: p.name ?? null,
+          started_at: startedIso,
+          finished_at: new Date(finished).toISOString(),
+          duration_ms: finished - startedAtMs,
+        });
+      };
       try {
+
         const elapsed = Date.now() - runStartedAt;
         if (budgetGate.shouldSkip(p.id, elapsed, Date.now())) {
           bumpBudgetExceeded();
           const reason = `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up`;
           tel.tickSkipped(p.id, String(p.mode), reason);
-          results.push({
+          push({
             id: p.id,
             mode: p.mode,
             ok: true,
@@ -390,7 +419,7 @@ async function runHourlyCycleInner(
         if (!forceClear && tradeableSymbols.length === 0 && excludedSymbols.length > 0) {
           const reason = "all venues closed — AI tick skipped to save credits (pass force:true to override)";
           tel.tickSkipped(p.id, String(p.mode), reason);
-          results.push({
+          push({
             id: p.id,
             mode: p.mode,
             ok: true,
@@ -417,7 +446,7 @@ async function runHourlyCycleInner(
               ? `already ticked at ${recent.data.created_at} — pass force:true to override`
               : "already ticked this hour";
             tel.tickSkipped(p.id, String(p.mode), label);
-            results.push({
+            push({
               id: p.id,
               mode: p.mode,
               ok: true,
@@ -432,7 +461,7 @@ async function runHourlyCycleInner(
         const r = await runDailyTick(p.id, today, { skipNews: opts.skipNewsInTicks ?? true });
         bumpPortfolio("ok");
         tel.tickEnd(p.id, String(p.mode), tickT0, "ok");
-        results.push({
+        push({
           id: p.id,
           mode: p.mode,
           ok: true,
@@ -506,7 +535,7 @@ async function runHourlyCycleInner(
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
         bumpPortfolio("error");
         tel.tickEnd(p.id, String(p.mode), tickT0, "error", msg);
-        results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
+        push({ id: p.id, mode: p.mode, ok: false, error: msg });
       }
     };
 
@@ -532,9 +561,47 @@ async function runHourlyCycleInner(
       );
     }
 
-
+    // Per-portfolio status board. Covers EVERY known portfolio, so a scoped
+    // manual run can prove that unselected profiles were left untouched, and
+    // carries last-run timestamps from before and after this run.
+    const { buildPortfolioRunStatuses } = await import("@/lib/run-portfolio-status");
+    const previousRunAt: Record<string, string | null> = {};
+    for (const [pid, ms] of lastDecisionAt) previousRunAt[pid] = new Date(ms).toISOString();
+    const lastRunAt: Record<string, string | null> = { ...previousRunAt };
+    try {
+      const ids = (allPortfolios ?? []).map((p) => p.id);
+      if (ids.length) {
+        const { data: freshRows } = await supabaseAdmin
+          .from("decisions")
+          .select("portfolio_id, created_at")
+          .in("portfolio_id", ids)
+          .order("created_at", { ascending: false })
+          .limit(500);
+        for (const r of freshRows ?? []) {
+          const pid = r.portfolio_id as string;
+          if (!(pid in lastRunAt) || lastRunAt[pid] === null || (r.created_at as string) > (lastRunAt[pid] as string)) {
+            lastRunAt[pid] = r.created_at as string;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("hourly-run: post-run last-decision lookup failed", e);
+    }
+    const portfolioStatus = buildPortfolioRunStatuses({
+      portfolios: (allPortfolios ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        mode: String(p.mode),
+        live_paused: p.live_paused,
+      })),
+      requestedIds: opts.portfolioIds,
+      results,
+      previousRunAt,
+      lastRunAt,
+    });
 
     const metricsSnap = snapshot(metrics);
+
     const telemetry = tel.finish({
       portfolios_total: portfolios.length,
       skipped_paused: skippedPaused,
@@ -577,6 +644,8 @@ async function runHourlyCycleInner(
       saxo_refresh: saxoRefresh,
       triggered_by: manualTrigger ? "manual" : "cron",
       results,
+      portfolio_status: portfolioStatus,
+
       metrics: metricsSnap,
       telemetry,
     };

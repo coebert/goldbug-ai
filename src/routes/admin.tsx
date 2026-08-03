@@ -23,6 +23,7 @@ import { TranslationQualityCard } from "@/components/translation-quality-card";
 import { BatchLessonsCard } from "@/components/batch-lessons-card";
 import { RetrainScheduleCard } from "@/components/retrain-schedule-card";
 import { RunMetricsCard } from "@/components/run-metrics-card";
+import { RunPortfolioStatusTable } from "@/components/admin/run-portfolio-status-table";
 import { MicrostructureCalibrationCard } from "@/components/microstructure-calibration-card";
 import { OrderReconciliationCard } from "@/components/order-reconciliation-card";
 import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-card";
@@ -470,6 +471,11 @@ function AdminPage() {
               </div>
             </div>
           )}
+
+          {manual.isSuccess && manual.data?.portfolio_status && (
+            <RunPortfolioStatusTable rows={manual.data.portfolio_status} />
+          )}
+
 
 
 
