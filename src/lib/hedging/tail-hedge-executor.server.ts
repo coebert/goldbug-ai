@@ -356,23 +356,15 @@ function applyTailHedgeCore(
     return { ...base, symbol, reason: `no ${symbol} to unwind` };
   }
   const heldQty = Number(found.holding.quantity);
-  const wantQty = Math.abs(decision.deltaNotional) / price;
-  let qty = Math.min(heldQty, wantQty);
+  const sized = sizeHedgeSell({
+    deltaNotional: decision.deltaNotional,
+    heldQty,
+    price,
+    wholeShares: isLivePortfolio,
+  });
+  if (!sized.ok) return { ...base, symbol, reason: "computed sell qty is zero" };
+  const { qty, partial } = sized;
 
-  if (isLivePortfolio) {
-    // Whole shares only at the broker — but never round a real reduction down
-    // to nothing: if the clip floors to zero, or the residual would be an
-    // unsellable odd lot, close what's there instead of suppressing the trim.
-    const floored = Math.floor(qty);
-    if (floored <= 0) qty = heldQty <= 1 ? heldQty : 1;
-    else if (heldQty - floored <= 1) qty = heldQty;
-    else qty = floored;
-  }
-
-  if (qty <= DUST_QTY) return { ...base, symbol, reason: "computed sell qty is zero" };
-  // Leaving dust behind costs another ticket later; close the tail instead.
-  if (heldQty - qty <= DUST_QTY) qty = heldQty;
-  const partial = Math.abs(decision.deltaNotional) - qty * price > MIN_TICKET_NOTIONAL;
 
   if (mutateLocalState) {
     const remaining = heldQty - qty;
