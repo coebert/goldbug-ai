@@ -217,7 +217,9 @@ function AdminPage() {
   const fetchHealth = useServerFn(getAdminHealth);
   const triggerRun = useServerFn(triggerHourlyRunNow);
   const runBackfill = useServerFn(backfillHoldingsHistory);
+  const fetchPortfolios = useServerFn(listPortfolios);
   const [tick, setTick] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(t);
@@ -229,8 +231,21 @@ function AdminPage() {
     refetchInterval: 60_000,
   });
 
+  const portfoliosQ = useQuery({
+    queryKey: ["admin-portfolios"],
+    queryFn: () => fetchPortfolios(),
+    staleTime: 60_000,
+  });
+  const portfolioOptions = (portfoliosQ.data ?? []).filter((p) =>
+    ["paper", "live_sim", "live_prod"].includes(p.mode as string),
+  );
+
   const manual = useMutation({
-    mutationFn: (vars: { force?: boolean } = {}) => triggerRun({ data: { force: vars.force === true } }),
+    mutationFn: (vars: { force?: boolean; portfolioIds?: string[] } = {}) =>
+      triggerRun({
+        data: { force: vars.force === true, portfolioIds: vars.portfolioIds ?? [] },
+      }),
+
     onSuccess: (result) => {
       const ran = result.results.filter((r) => r.ok && !r.skipped).length;
       const skipped = result.results.filter((r) => r.skipped).length;
