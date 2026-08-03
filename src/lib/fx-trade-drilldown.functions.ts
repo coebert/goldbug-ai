@@ -13,65 +13,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type FxTradeDrilldownLeg = {
-  triggeredBySymbol: string | null;
-  fromCcy: string | null;
-  toCcy: string | null;
-  amountFrom: number | null;
-  amountTo: number | null;
-  rate: number | null;
-  stale: boolean | null;
-  createdAt: string;
-};
-
-export type FxTradeDrilldownDecision = {
-  decisionId: string | null;
-  asOf: string | null;
-  createdAt: string;
-  /** Base→broker capture recorded at the start of the tick, if any. */
-  capture: {
-    pair: string;
-    rate: number | null;
-    source: string | null;
-    stale: boolean | null;
-  } | null;
-  legs: FxTradeDrilldownLeg[];
-};
-
-export type FxTradeDrilldown = {
-  requestedAt: string;
-  decisions: FxTradeDrilldownDecision[];
-};
-
-type LogRow = {
-  created_at: string;
-  method: string;
-  path: string | null;
-  request: unknown;
-  response: unknown;
-};
-
-function getStr(o: unknown, k: string): string | null {
-  if (o && typeof o === "object" && k in (o as Record<string, unknown>)) {
-    const v = (o as Record<string, unknown>)[k];
-    return typeof v === "string" ? v : null;
-  }
-  return null;
-}
-function getNum(o: unknown, k: string): number | null {
-  if (o && typeof o === "object" && k in (o as Record<string, unknown>)) {
-    const v = (o as Record<string, unknown>)[k];
-    return typeof v === "number" && Number.isFinite(v) ? v : null;
-  }
-  return null;
-}
-function getBool(o: unknown, k: string): boolean | null {
-  if (o && typeof o === "object" && k in (o as Record<string, unknown>)) {
-    const v = (o as Record<string, unknown>)[k];
-    return typeof v === "boolean" ? v : null;
-  }
-  return null;
-}
+import { getStr, getNum, getBool } from "./fx-trade-drilldown.helpers";
+import type { FxTradeDrilldownLeg, FxTradeDrilldownDecision, FxTradeDrilldown, LogRow } from "./fx-trade-drilldown.helpers";
+export type { FxTradeDrilldownLeg, FxTradeDrilldownDecision, FxTradeDrilldown };
 
 export const getFxTradeDrilldown = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

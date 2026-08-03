@@ -3,20 +3,9 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { TickerMetrics } from "@/lib/ticker-watch";
 
-export type TickerWatchView = {
-  id: string;
-  symbol: string;
-  label: string | null;
-  thesis: string | null;
-  buyAbove: number | null;
-  oversoldRsi: number;
-  maxVolPct: number;
-  dropBelow: number | null;
-  active: boolean;
-  metrics: TickerMetrics | null;
-  status: string;
-  firedToday: Array<{ code: string; price: number | null; at: string }>;
-};
+import { UpsertInput } from "./ticker-watch.helpers";
+import type { TickerWatchView, SecondOpinion } from "./ticker-watch.helpers";
+export type { TickerWatchView, SecondOpinion };
 
 /** Watches for the caller, each with live metrics and today's fired triggers. */
 export const listTickerWatches = createServerFn({ method: "POST" })
@@ -70,17 +59,6 @@ export const listTickerWatches = createServerFn({ method: "POST" })
     return { watches };
   });
 
-const UpsertInput = z.object({
-  symbol: z.string().trim().min(1).max(16).transform((s) => s.toUpperCase()),
-  label: z.string().trim().max(120).optional(),
-  thesis: z.string().trim().max(2000).optional(),
-  buyAbove: z.number().positive().nullable().optional(),
-  oversoldRsi: z.number().min(1).max(99).default(30),
-  maxVolPct: z.number().min(1).max(500).default(30),
-  dropBelow: z.number().positive().nullable().optional(),
-  active: z.boolean().default(true),
-});
-
 export const upsertTickerWatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((v: unknown) => UpsertInput.parse(v))
@@ -116,13 +94,6 @@ export const deleteTickerWatch = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
-
-export type SecondOpinion = {
-  symbol: string;
-  metrics: TickerMetrics | null;
-  verdict: string;
-  model: string | null;
-};
 
 /** On-demand AI read on a watched symbol, grounded in the live metrics. */
 export const askTickerSecondOpinion = createServerFn({ method: "POST" })

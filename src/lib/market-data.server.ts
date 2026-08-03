@@ -121,6 +121,119 @@ async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> 
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// In-flight/short-TTL memo cache.
+//
+// A single engine tick asks many independent modules (regime, sector rotation,
+// options, cross-asset, optimizer, stress...) for the SAME symbol's candles.
+// Each of those used to become its own `price_cache` round-trip, which is why
+// the read count dwarfed everything else in the database statistics. The Worker
+// instance is short-lived, so a module-scope map with a small TTL is effectively
+// a per-run cache: it collapses the duplicates without ever serving stale data
+// across runs.
+// ---------------------------------------------------------------------------
+const CANDLE_MEMO_TTL_MS = 60_000;
+const CANDLE_MEMO_MAX = 400;
+const candleMemo = new Map<string, { at: number; value: Promise<Candle[]> }>();
+
+function memoKey(symbol: string, days: number, asOf: string): string {
+  return `${symbol}|${days}|${asOf}`;
+}
+
+function readMemo(key: string): Promise<Candle[]> | null {
+  const hit = candleMemo.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > CANDLE_MEMO_TTL_MS) {
+    candleMemo.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function writeMemo(key: string, value: Promise<Candle[]>): void {
+  if (candleMemo.size >= CANDLE_MEMO_MAX) {
+    // Cheap eviction: drop the oldest insertion.
+    const oldest = candleMemo.keys().next().value;
+    if (oldest !== undefined) candleMemo.delete(oldest);
+  }
+  candleMemo.set(key, { at: Date.now(), value });
+}
+
+/** Drop every memoised candle series. Exposed for tests and long-lived jobs. */
+export function clearCandleMemo(): void {
+  candleMemo.clear();
+}
+
+/**
+ * Warm the memo for many symbols with ONE `price_cache` query instead of one
+ * per symbol. Symbols whose cache is complete are served from the memo by the
+ * subsequent `getDailyCandles` calls; the rest fall through to Yahoo as usual.
+ */
+export async function primeDailyCandles(
+  symbols: string[],
+  days: number,
+  asOf?: string,
+): Promise<{ primed: number }> {
+  const asOfDate = asOf ?? new Date().toISOString().slice(0, 10);
+  const unique = Array.from(new Set(symbols.filter(Boolean)));
+  const missing = unique.filter((s) => readMemo(memoKey(s, days, asOfDate)) === null);
+  if (missing.length === 0) return { primed: 0 };
+
+  let primed = 0;
+  // Chunked so the `in` list stays inside PostgREST's URL budget.
+  for (let i = 0; i < missing.length; i += 60) {
+    const chunk = missing.slice(i, i + 60);
+    // Bounded row budget: `days` per symbol, newest first.
+    const { data } = await supabaseAdmin
+      .from("price_cache")
+      .select("symbol, price_date, open, high, low, close, volume")
+      .in("symbol", chunk)
+      .lte("price_date", asOfDate)
+      .order("price_date", { ascending: false })
+      .limit(days * chunk.length);
+
+    const bySymbol = new Map<string, Candle[]>();
+    for (const r of data ?? []) {
+      const list = bySymbol.get(r.symbol as string) ?? [];
+      if (list.length >= days) continue;
+      list.push(rowToCandle(r));
+      bySymbol.set(r.symbol as string, list);
+    }
+    for (const [symbol, list] of bySymbol) {
+      // Same freshness rule as getDailyCandles: only trust a cache run that
+      // actually reaches the requested date.
+      const ordered = list.slice().reverse();
+      if (ordered.length < Math.min(days, 20)) continue;
+      if (ordered[ordered.length - 1].date !== asOfDate) continue;
+      writeMemo(memoKey(symbol, days, asOfDate), Promise.resolve(ordered));
+      primed++;
+    }
+  }
+  return { primed };
+}
+
+type PriceRow = {
+  price_date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+};
+
+function rowToCandle(r: PriceRow | Record<string, unknown>): Candle {
+  const row = r as PriceRow;
+  const close = Number(row.close);
+  return {
+    date: row.price_date,
+    open: Number(row.open ?? close),
+    high: Number(row.high ?? close),
+    low: Number(row.low ?? close),
+    close,
+    volume: Number(row.volume ?? 0),
+  };
+}
+
 /**
  * Get up to `days` daily candles ending on or before `asOf` for `symbol`.
  * Uses cache; refetches from Yahoo when cache is missing / stale.
@@ -131,7 +244,24 @@ export async function getDailyCandles(
   asOf?: string,
 ): Promise<Candle[]> {
   const asOfDate = asOf ?? new Date().toISOString().slice(0, 10);
+  const key = memoKey(symbol, days, asOfDate);
+  const memoised = readMemo(key);
+  if (memoised) return memoised;
+  const inflight = loadDailyCandles(symbol, days, asOfDate);
+  writeMemo(key, inflight);
+  try {
+    return await inflight;
+  } catch (err) {
+    candleMemo.delete(key);
+    throw err;
+  }
+}
 
+async function loadDailyCandles(
+  symbol: string,
+  days: number,
+  asOfDate: string,
+): Promise<Candle[]> {
   // First try cache
   const { data: cached } = await supabaseAdmin
     .from("price_cache")
@@ -140,6 +270,7 @@ export async function getDailyCandles(
     .lte("price_date", asOfDate)
     .order("price_date", { ascending: false })
     .limit(days);
+
 
   const cachedCandles: Candle[] = (cached ?? [])
     .map((r) => ({

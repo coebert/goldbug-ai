@@ -11,30 +11,9 @@ import { z } from "zod";
 import type { CorporateAction } from "./corporate-actions";
 import type { ImpactPreview } from "./corporate-action-impact";
 
-/** Wire shape: the raw Saxo row is dropped (not serializable / not needed). */
-export type CorporateActionView = Omit<CorporateAction, "raw"> & {
-  /** Cash-vs-scrip estimate for the position we actually hold. */
-  impact: ImpactPreview;
-};
-
-export type CorporateActionsResult = {
-  portfolioId: string;
-  /** false when the portfolio is not linked to a broker account. */
-  brokerBacked: boolean;
-  /** false when Saxo does not expose corporate actions on this environment. */
-  supported: boolean;
-  env: string | null;
-  endpoint: string | null;
-  fetchedAt: string;
-  events: CorporateActionView[];
-  /** Human-readable reason when nothing could be fetched. */
-  reason: string | null;
-};
-
-/** "ULVR:xlon" / "ULVR.L" → "ULVR" for cross-source symbol matching. */
-function baseTicker(symbol: string): string {
-  return symbol.split(/[:.]/)[0]!.trim().toUpperCase();
-}
+import { baseTicker } from "./corporate-actions.helpers";
+import type { CorporateActionView, CorporateActionsResult } from "./corporate-actions.helpers";
+export type { CorporateActionView, CorporateActionsResult };
 
 export const listCorporateActions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

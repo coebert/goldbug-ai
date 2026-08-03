@@ -23,6 +23,7 @@ import {
 } from "./learning.server";
 import {
   getDailyCandles,
+  primeDailyCandles,
   getPriceOn,
   sma,
   rsi,
@@ -254,6 +255,9 @@ async function buildCandidateFeatures(
     // Cross-sectional rank across today's universe (filled in later)
     rank_info: RankInfo | null;
   }> = [];
+  // One bulk `price_cache` read for the whole universe instead of one per
+  // symbol per consumer — the rest of the tick then hits the in-memory memo.
+  await primeDailyCandles(candidates.map((c) => c.symbol), 260, asOf);
   await Promise.all(
     candidates.map(async (c) => {
       const candles = await getDailyCandles(c.symbol, 260, asOf);

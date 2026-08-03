@@ -22,31 +22,9 @@ import {
   type SeriesSanityIssue,
 } from "@/lib/holdings-series-sanity";
 
-const MIC_TO_YAHOO: Record<string, string> = {
-  xlon: "L", xetr: "DE", xpar: "PA", xams: "AS", xmil: "MI",
-  xmad: "MC", xswx: "SW", xtse: "TO", xhkg: "HK", xtks: "T",
-  xasx: "AX", xsto: "ST", xcse: "CO", xhel: "HE", xose: "OL",
-  xnas: "", xnys: "", arcx: "", bats: "",
-};
-function resolveYahoo(sym: string): string {
-  const colon = sym.lastIndexOf(":");
-  if (colon < 0) return sym;
-  const base = sym.slice(0, colon);
-  const mic = sym.slice(colon + 1).toLowerCase();
-  const yahoo = MIC_TO_YAHOO[mic];
-  if (yahoo == null) return sym;
-  return yahoo ? `${base}.${yahoo}` : base;
-}
-
-export type BackfillReport = {
-  portfoliosScanned: number;
-  holdingsScanned: number;
-  symbolsRefreshed: number;
-  symbolsFailed: number;
-  seriesBuilt: number;
-  issues: SeriesSanityIssue[];
-  perSymbol: Array<{ symbol: string; refreshed: boolean; error?: string; days: number }>;
-};
+import { MIC_TO_YAHOO, resolveYahoo } from "./backfill-holdings-history.helpers";
+import type { BackfillReport } from "./backfill-holdings-history.helpers";
+export type { BackfillReport };
 
 export const backfillHoldingsHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

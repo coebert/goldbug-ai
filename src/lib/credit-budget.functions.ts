@@ -4,28 +4,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export interface CreditBudgetVerdictDTO {
-  enabled: boolean;
-  probedAt: string;
-  alertDate: string;
-  mtdCalls: number;
-  mtdCredits: number;
-  last7dCalls: number;
-  dailyBurnCredits: number;
-  projectedMonthCredits: number;
-  budgetCredits: number;
-  pctMtd: number;
-  pctProjection: number;
-  alerts: Array<{ kind: string; remedy: string }>;
-}
-
-export interface CreditBudgetSettingsDTO {
-  monthly_budget_credits: number;
-  credits_per_ai_call: number;
-  warn_pct_mtd: number;
-  warn_pct_projection: number;
-  enabled: boolean;
-}
+import { UpdateSchema } from "./credit-budget.helpers";
+import type { CreditBudgetVerdictDTO, CreditBudgetSettingsDTO } from "./credit-budget.helpers";
+export type { CreditBudgetVerdictDTO, CreditBudgetSettingsDTO };
 
 export const getCreditBudgetStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -37,14 +18,6 @@ export const getCreditBudgetStatus = createServerFn({ method: "GET" })
     ]);
     return { verdict, settings };
   });
-
-const UpdateSchema = z.object({
-  monthly_budget_credits: z.number().positive().max(1_000_000),
-  credits_per_ai_call: z.number().positive().max(1000),
-  warn_pct_mtd: z.number().min(1).max(100),
-  warn_pct_projection: z.number().min(1).max(200),
-  enabled: z.boolean(),
-});
 
 export const updateCreditBudgetSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

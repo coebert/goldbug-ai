@@ -6,10 +6,7 @@ import {
   type BackfillResult,
 } from "./daily-equity-changes-backfill.server";
 
-const inputSchema = z.object({
-  portfolioId: z.string().uuid().optional(),
-  days: z.number().int().min(1).max(3650).default(365),
-});
+import { inputSchema } from "./daily-equity-changes-backfill.helpers";
 
 export const backfillDailyEquityChanges = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

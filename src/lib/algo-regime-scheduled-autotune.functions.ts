@@ -41,118 +41,10 @@ import {
   type AlgoRegimeSnapshot,
 } from "@/lib/microstructure/algo-regime";
 
-/** Default shadow window before we're willing to evaluate a pending tune. */
-export const DEFAULT_SHADOW_WINDOW_DAYS = 7;
-
-// ---------- shared helpers -------------------------------------------------
-
-async function loadObservationsAndEquity(
-  supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
-  portfolioId: string,
-  sinceDate?: string,
-) {
-  let decQ = supabase
-    .from("decisions")
-    .select("run_date, raw")
-    .eq("portfolio_id", portfolioId)
-    .order("run_date", { ascending: true })
-    .limit(400);
-  if (sinceDate) decQ = decQ.gte("run_date", sinceDate);
-  const { data: decisions, error: decErr } = await decQ;
-  if (decErr) throw new Error(decErr.message);
-
-  const observations: RegimeObservation[] = [];
-  for (const d of decisions ?? []) {
-    const raw = d.raw as Record<string, unknown> | null;
-    const snap = raw?.algo_regime as AlgoRegimeSnapshot | null | undefined;
-    if (!snap || typeof snap.tier !== "string") continue;
-    observations.push({ date: d.run_date as string, tier: snap.tier });
-  }
-
-  let eqQ = supabase
-    .from("equity_snapshots")
-    .select("snapshot_date, total_value")
-    .eq("portfolio_id", portfolioId)
-    .order("snapshot_date", { ascending: true });
-  if (sinceDate) eqQ = eqQ.gte("snapshot_date", sinceDate);
-  const { data: eqRows, error: eqErr } = await eqQ;
-  if (eqErr) throw new Error(eqErr.message);
-  const equity: EquityPoint[] = (eqRows ?? []).map((r: {
-    snapshot_date: string; total_value: number | string;
-  }) => ({ date: r.snapshot_date, totalValue: Number(r.total_value) }));
-
-  return { observations, equity };
-}
-
-async function loadOverride(
-  supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
-  portfolioId: string,
-): Promise<AlgoRegimeConfig> {
-  const { data } = await supabase
-    .from("algo_regime_config_overrides")
-    .select("config")
-    .eq("portfolio_id", portfolioId)
-    .maybeSingle();
-  return {
-    ...DEFAULT_ALGO_REGIME_CONFIG,
-    ...((data?.config as Partial<AlgoRegimeConfig> | undefined) ?? {}),
-  };
-}
-
-async function loadRiskLevel(
-  supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
-  portfolioId: string,
-): Promise<RiskLevel> {
-  const { data } = await supabase
-    .from("portfolios")
-    .select("risk_level")
-    .eq("id", portfolioId)
-    .maybeSingle();
-  const r = (data?.risk_level as string | undefined) ?? "balanced";
-  return r === "conservative" || r === "aggressive" ? r : "balanced";
-}
-
-async function persistOverride(
-  supabase: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
-  portfolioId: string,
-  config: AlgoRegimeConfig,
-  notes: string,
-) {
-  const { error } = await supabase
-    .from("algo_regime_config_overrides")
-    .upsert(
-      {
-        portfolio_id: portfolioId,
-        config,
-        tuned_at: new Date().toISOString(),
-        notes,
-      },
-      { onConflict: "portfolio_id" },
-    );
-  if (error) throw new Error(error.message);
-}
-
-function tierMean(r: CalibrationReport, tier: "normal" | "extreme"): number | null {
-  const row = r.perTier.find((t) => t.tier === tier);
-  return row && row.count > 0 ? row.meanReturn : null;
-}
-
-// ---------- 1. apply with shadow ------------------------------------------
-
-export type ApplyTuneResponse = {
-  changed: boolean;
-  persisted: boolean;
-  historyId: string | null;
-  previous: AlgoRegimeConfig;
-  suggested: AlgoRegimeConfig;
-  notes: string[];
-  baseline: {
-    matched: number;
-    monotone: boolean;
-    normalMean: number | null;
-    extremeMean: number | null;
-  };
-};
+import { DEFAULT_SHADOW_WINDOW_DAYS, loadObservationsAndEquity, loadOverride, loadRiskLevel, persistOverride, tierMean } from "./algo-regime-scheduled-autotune.helpers";
+import type { ApplyTuneResponse, ShadowEvaluationRowResult, EvaluateShadowResponse, ManualRollbackResponse, TuneHistoryRow } from "./algo-regime-scheduled-autotune.helpers";
+export { DEFAULT_SHADOW_WINDOW_DAYS };
+export type { ApplyTuneResponse, ShadowEvaluationRowResult, EvaluateShadowResponse, ManualRollbackResponse, TuneHistoryRow };
 
 export const applyAlgoRegimeTuneWithShadow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -236,21 +128,6 @@ export const applyAlgoRegimeTuneWithShadow = createServerFn({ method: "POST" })
       baseline,
     };
   });
-
-// ---------- 2. evaluate the shadow window ---------------------------------
-
-export type ShadowEvaluationRowResult = {
-  historyId: string;
-  action: "keep" | "rollback" | "wait";
-  reason: string;
-  postMatched: number;
-  postMonotone: boolean;
-};
-
-export type EvaluateShadowResponse = {
-  processed: number;
-  results: ShadowEvaluationRowResult[];
-};
 
 export const evaluateAlgoRegimeShadow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -351,10 +228,6 @@ export const evaluateAlgoRegimeShadow = createServerFn({ method: "POST" })
     return { processed: results.length, results };
   });
 
-// ---------- 3. manual rollback --------------------------------------------
-
-export type ManualRollbackResponse = { restored: AlgoRegimeConfig };
-
 export const rollbackAlgoRegimeTune = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -388,19 +261,6 @@ export const rollbackAlgoRegimeTune = createServerFn({ method: "POST" })
 
     return { restored: prev };
   });
-
-// ---------- 4. history listing --------------------------------------------
-
-export type TuneHistoryRow = {
-  id: string;
-  appliedAt: string;
-  evaluatedAt: string | null;
-  status: "pending" | "accepted" | "rolled_back" | "superseded";
-  decisionReason: string | null;
-  notes: string | null;
-  baseline: { matched: number; monotone: boolean };
-  post: { matched: number | null; monotone: boolean | null };
-};
 
 export const listAlgoRegimeTuneHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
