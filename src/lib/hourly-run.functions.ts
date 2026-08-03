@@ -61,8 +61,10 @@ type ManualRunResult = {
 
 export const triggerHourlyRunNow = createServerFn({ method: "POST" })
   .middleware([requireAal2])
-  .inputValidator((data: { force?: boolean; portfolioIds?: string[] } | undefined) => ({
+  .inputValidator((data: { force?: boolean; forceTick?: boolean; portfolioIds?: string[] } | undefined) => ({
     force: data?.force === true,
+    // Override the "already ticked" skip window without clearing the lock.
+    forceTick: data?.forceTick === true,
     portfolioIds: Array.isArray(data?.portfolioIds)
       ? data.portfolioIds.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50)
       : [],
