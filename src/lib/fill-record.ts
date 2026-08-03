@@ -66,12 +66,26 @@ export function resolveFillPrice(
 }
 
 /**
+ * Quote units that look like ISO-4217 but are not currencies. `GBX`
+ * (pence) is the dangerous one: it passes a naive 3-letter check and
+ * would book an LSE fill 100x too large in a "currency" nothing else
+ * understands. Reject it and let the venue rule resolve GBP instead.
+ */
+const NON_CURRENCY_QUOTE_UNITS = new Set(["GBX", "GBP0", "ZAC", "ILA"]);
+
+function usableCcy(raw: string | null | undefined): string | null {
+  const c = normaliseCcy(raw);
+  if (!c || NON_CURRENCY_QUOTE_UNITS.has(c)) return null;
+  return c;
+}
+
+/**
  * Resolve the currency a fill should be booked in.
  *
  * Never falls back to a hardcoded "GBP": the order's own
  * `instrument_ccy` is authoritative, the venue rule covers legacy rows
  * that predate that column, and the portfolio's base currency is the
- * last resort.
+ * last resort. Pence-style quote units are rejected outright.
  */
 export function resolveFillCurrency(params: {
   symbol: string;
@@ -79,11 +93,11 @@ export function resolveFillCurrency(params: {
   brokerCcy?: string | null;
   portfolioCurrency?: string | null;
 }): string {
-  const fromOrder = normaliseCcy(params.orderCcy);
+  const fromOrder = usableCcy(params.orderCcy);
   if (fromOrder) return fromOrder;
-  const fromBroker = normaliseCcy(params.brokerCcy);
+  const fromBroker = usableCcy(params.brokerCcy);
   if (fromBroker) return fromBroker;
-  const base = normaliseCcy(params.portfolioCurrency) ?? "GBP";
+  const base = usableCcy(params.portfolioCurrency) ?? "GBP";
   // Venue rules map .L -> GBP, US tickers -> USD, etc.
   return instrumentCcyFor(params.symbol, null, base);
 }
