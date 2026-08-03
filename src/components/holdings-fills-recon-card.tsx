@@ -93,11 +93,11 @@ export function HoldingsFillsReconCard({
                     </p>
                     <Badge
                       variant="outline"
-                      className={"w-fit shrink-0 " +
+                      className={`w-fit shrink-0 ${
                         r.severity === "critical"
                           ? "border-destructive/50 text-destructive"
                           : "border-border text-muted-foreground"
-                      }
+                      }`}
                     >
                       {r.kind === "ok" ? "Matches" : KIND_LABEL[r.kind]}
                     </Badge>
