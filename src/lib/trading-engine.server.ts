@@ -2707,7 +2707,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     currency: portfolio.currency || "GBP",
     source: "trading_engine",
     provenance: tickValuation.provenance,
+    brokerLinked: Boolean(
+      (portfolio as unknown as { broker_account_id?: string | null }).broker_account_id,
+    ),
+    positionCount: (holdings ?? []).length,
   });
+
 
   await recordIntradayEquity(admin as never, portfolioId, {
     cash: workingCash,
@@ -3057,7 +3062,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 export async function snapshotPortfolio(portfolioId: string, asOf: string) {
   const { data: portfolio } = await supabaseAdmin
     .from("portfolios")
-    .select("current_cash, currency")
+    .select("current_cash, currency, broker_account_id")
     .eq("id", portfolioId)
     .single();
   if (!portfolio) return;
@@ -3093,7 +3098,12 @@ export async function snapshotPortfolio(portfolioId: string, asOf: string) {
     currency: baseCcy,
     source: "trading_engine",
     provenance: valuation.provenance,
+    brokerLinked: Boolean(
+      (portfolio as unknown as { broker_account_id?: string | null }).broker_account_id,
+    ),
+    positionCount: (holdings ?? []).length,
   });
+
 
   await recordIntradayEquity(supabaseAdmin as never, portfolioId, {
     cash: valuation.cash,
