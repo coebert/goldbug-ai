@@ -20,8 +20,10 @@ export const HEDGE_ESTABLISHED_RATIO = 0.8;
 
 export type ParsedFallback = { from: string; to: string; why: string };
 
+// The "why" clause itself may contain parentheses, e.g.
+// "(broker block (suitability/permissions))", so allow one nesting level.
 const FALLBACK_RE =
-  /\[hedge fallback:\s*([^\s]+)\s+unusable\s*\(([^)]*)\)\s*(?:→|->)\s*([^\]]+)\]/i;
+  /\[hedge fallback:\s*(\S+)\s+unusable\s*\(((?:[^()]|\([^()]*\))*)\)\s*(?:→|->)\s*([^\]]+)\]/i;
 
 /** Extract the substitution recorded in a hedge trade reason, if any. */
 export function parseHedgeFallbackNote(reason: string | null | undefined): ParsedFallback | null {
