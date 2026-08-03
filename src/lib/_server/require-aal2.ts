@@ -25,7 +25,7 @@ export class MfaRequiredError extends Error {
 const factorCache = new Map<string, { hasFactor: boolean; at: number }>();
 const FACTOR_TTL_MS = 60_000;
 
-async function hasVerifiedFactor(userId: string): Promise<boolean> {
+export async function hasVerifiedFactor(userId: string): Promise<boolean> {
   const hit = factorCache.get(userId);
   if (hit && Date.now() - hit.at < FACTOR_TTL_MS) return hit.hasFactor;
 
