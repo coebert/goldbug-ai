@@ -177,7 +177,7 @@ async function runHourlyCycleInner(
     const ordered = orderPortfoliosForRun(portfolios, lastDecisionAt);
     portfolios.length = 0;
     portfolios.push(...ordered);
-    const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
+    const skippedPaused = selected.length - portfolios.length;
     // Starvation guard: a portfolio that hasn't produced a decision recently
     // may bypass the time budget, so every portfolio makes progress even when
     // earlier ticks consume the whole budget. A manual run is explicit user
