@@ -29,6 +29,8 @@ export const updateRiskConfig = createServerFn({ method: "POST" })
       vol_target_pct: z.number().min(0.001).max(0.1).default(0.015),
       max_daily_loss_pct: z.number().min(0).max(0.9).default(0.05),
       max_drawdown_halt_pct: z.number().min(0).max(0.9).default(0.20),
+      atr_scaled_stop_enabled: z.boolean().optional(),
+      atr_scaled_stop_floor_pct: z.number().min(0).max(0.5).optional(),
       diversification_tilt: z.enum(["off", "balanced", "strong"]).optional(),
       risk_level: z.number().int().min(1).max(5).optional(),
       fx_currency_limits: z

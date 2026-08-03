@@ -207,6 +207,10 @@ export type RiskConfig = {
   chandelier_k_tight: number;
   chandelier_tighten_after_r: number;
   initial_stop_atr_mult: number;
+  /** Scale the hard stop by ATR (can only tighten, never widen, the fixed stop). */
+  atr_scaled_stop_enabled: boolean;
+  /** Lower bound for the ATR-scaled hard stop so noise can't trigger exits. */
+  atr_scaled_stop_floor_pct: number;
   scale_out_enabled: boolean;
   scale_out_levels: Array<{ r: number; frac: number }>;
   time_stop_enabled: boolean;
@@ -302,6 +306,8 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   chandelier_k_tight: 1.5,
   chandelier_tighten_after_r: 2.0,
   initial_stop_atr_mult: 2.5,
+  atr_scaled_stop_enabled: true,
+  atr_scaled_stop_floor_pct: 0.03,
   scale_out_enabled: true,
   scale_out_levels: [{ r: 1, frac: 0.25 }, { r: 2, frac: 0.25 }],
   time_stop_enabled: true,
@@ -426,6 +432,8 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("chandelier_k_tight", 0.25, 10);
   num("chandelier_tighten_after_r", 0.1, 20);
   num("initial_stop_atr_mult", 0.25, 10);
+  bool("atr_scaled_stop_enabled");
+  num("atr_scaled_stop_floor_pct", 0, 0.5);
   bool("scale_out_enabled");
   if (Array.isArray(r.scale_out_levels)) {
     const lvls = (r.scale_out_levels as unknown[])

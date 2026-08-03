@@ -110,7 +110,7 @@ HARD RULES YOU MUST NEVER BREAK:
 - Asset-class exposure caps: ${classLimitsStr}.
 ${fxCcyLimitsStr ? `- Non-base currency exposure caps (base=${args.portfolio.currency.toUpperCase()}, sum of foreign-denominated holdings in base terms): ${fxCcyLimitsStr}. Buys that would breach these caps are rejected — never rely on borrowing.` : ""}
 - Highly correlated buys are portfolio-capped at 35% of value (guardrails will scale down).
-- Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)` : "no stop-loss configured"}.
+- Positions with a ${cfg.stop_loss_pct > 0 ? `${(cfg.stop_loss_pct * 100).toFixed(0)}% drop from avg cost are auto-sold (stop-loss)${cfg.atr_scaled_stop_enabled ? `, and that stop tightens automatically to ${cfg.initial_stop_atr_mult}×ATR (floor ${(cfg.atr_scaled_stop_floor_pct * 100).toFixed(0)}%) for low-volatility names` : ""}` : "no stop-loss configured"}.
 - Positions with a ${cfg.take_profit_pct > 0 ? `${(cfg.take_profit_pct * 100).toFixed(0)}% gain from avg cost are auto-sold (take-profit)` : "no take-profit configured"}.
 - ${cfg.atr_trailing_mult > 0 ? `An ATR trailing stop at ${cfg.atr_trailing_mult}×ATR below each position's high-water mark auto-sells on breach.` : "No ATR trailing stop configured."}
 - ${cfg.max_hold_days > 0 ? `Positions held longer than ${cfg.max_hold_days} days are auto-exited (time-based exit).` : "No time-based exit configured."}

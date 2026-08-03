@@ -1,3 +1,4 @@
+export { atrScaledStopPct, type AtrScaledStopInputs, type AtrScaledStopResult } from "./atr-scaled-stop";
 export { evaluateChandelier, type ChandelierInputs, type ChandelierResult } from "./chandelier";
 export {
   evaluateScaleOut,
