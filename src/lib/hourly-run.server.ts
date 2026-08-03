@@ -341,18 +341,22 @@ async function runHourlyCycleInner(
     const results: HourlyRunResult["results"] = [];
 
     for (const p of portfolios) {
+      const tickT0 = tel.tickStart(p.id, String(p.mode));
       try {
         const elapsed = Date.now() - runStartedAt;
         if (budgetGate.shouldSkip(p.id, elapsed, Date.now())) {
           bumpBudgetExceeded();
+          const reason = `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up`;
+          tel.tickSkipped(p.id, String(p.mode), reason);
           results.push({
             id: p.id,
             mode: p.mode,
             ok: true,
-            skipped: `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up`,
+            skipped: reason,
           });
           continue;
         }
+
 
 
 
