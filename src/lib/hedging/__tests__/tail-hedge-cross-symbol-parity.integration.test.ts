@@ -276,15 +276,22 @@ describe("Phase 6 backtest ↔ executor: parity across configurable hedge symbol
       );
     });
 
-    it("share-boundary rounding: spend one bp under one share defers as insufficient", () => {
+    it("share-boundary rounding: one bp under a share stays in lockstep (whole-share venue defers)", () => {
       assertParity(
         [
           { date: "2024-01-01", price: 3.01 },
           { date: "2024-01-02", price: 3.01 },
         ],
         cfg({ initialCash: 100 }),
-        { requiredBuckets: ["insufficient_cash"] },
+        { minFills: 1 },
       );
+      // The same budget at a whole-share venue is genuinely unaffordable.
+      expect(
+        sizeHedgeBuy({
+          deltaNotional: 3, cash: 100, price: 3.01, bufferPct: BUFFER, wholeShares: true,
+        }).ok,
+      ).toBe(false);
     });
+
   });
 });
