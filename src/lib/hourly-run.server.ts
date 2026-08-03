@@ -167,6 +167,10 @@ async function runHourlyCycleInner(
     const portfolios = selected.filter(
       (p) => !(p.mode !== "paper" && p.live_paused),
     );
+    // Emitted before any portfolio is touched: which ids were requested,
+    // which matched, which were unknown, and which were dropped as paused.
+    tel.recordSelection(describeSelection(opts.portfolioIds, allPortfolios ?? []));
+
     // Order: real money first, then STALEST first. Without the staleness
     // ordering the same portfolio always won the fixed mode ordering and the
     // rest were permanently starved by the run's time budget.
