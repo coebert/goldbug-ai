@@ -30,10 +30,8 @@ import { toast } from "sonner";
 import { runRiskSweepFn } from "@/lib/risk-sweep.functions";
 import type { RiskSweepResult } from "@/lib/risk-sweep.server";
 import {
-  AXIS_LINE,
-  AXIS_TICK,
+  AXIS_PROPS,
   GRID_PROPS,
-  TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
 } from "@/lib/chart-palette";
 
