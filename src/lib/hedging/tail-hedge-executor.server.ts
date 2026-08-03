@@ -38,10 +38,14 @@ export function defaultHedgeSymbolFor(currency: string): string {
   return "SGLN.L";
 }
 
-/** Quantities below this are dust — not worth a ticket, and not a blocker. */
-const DUST_QTY = 1e-8;
-/** Smallest notional worth booking as a hedge leg. */
-const MIN_TICKET_NOTIONAL = 1;
+import {
+  sizeHedgeBuy,
+  sizeHedgeSell,
+  HEDGE_DUST_QTY as DUST_QTY,
+  HEDGE_MIN_TICKET_NOTIONAL as MIN_TICKET_NOTIONAL,
+} from "./tail-hedge-sizing";
+
+
 
 /**
  * Look a holding up tolerantly.
@@ -286,20 +290,20 @@ function applyTailHedgeCore(
   const mutateLocalState = !isLivePortfolio;
 
   if (decision.action === "buy") {
-    const affordable = Math.max(0, workingCash * (1 - bufferPct));
-    const spend = Math.min(decision.deltaNotional, affordable);
-    // Live venues need whole shares; paper books fractional units, so a
-    // sub-share budget is still a valid (partial) hedge add there.
-    const minSpend = isLivePortfolio ? price : Math.min(price, MIN_TICKET_NOTIONAL);
-    if (spend < minSpend) {
+    // Shared sizing rule (see tail-hedge-sizing.ts) so the Phase 6 backtest
+    // runner and this executor can never disagree about affordability.
+    const sized = sizeHedgeBuy({
+      deltaNotional: decision.deltaNotional,
+      cash: workingCash,
+      price,
+      bufferPct,
+      wholeShares: isLivePortfolio,
+    });
+    if (!sized.ok) {
       return { ...base, symbol, reason: `insufficient cash for 1 share of ${symbol}` };
     }
-    const rawQty = spend / price;
-    const qty = isLivePortfolio ? Math.floor(rawQty) : rawQty;
-    if (qty <= 0) {
-      return { ...base, symbol, reason: `insufficient cash for 1 share of ${symbol}` };
-    }
-    const partial = decision.deltaNotional - qty * price > MIN_TICKET_NOTIONAL;
+    const { qty, partial } = sized;
+
 
     if (mutateLocalState) {
       workingCash -= qty * price;
@@ -356,23 +360,15 @@ function applyTailHedgeCore(
     return { ...base, symbol, reason: `no ${symbol} to unwind` };
   }
   const heldQty = Number(found.holding.quantity);
-  const wantQty = Math.abs(decision.deltaNotional) / price;
-  let qty = Math.min(heldQty, wantQty);
+  const sized = sizeHedgeSell({
+    deltaNotional: decision.deltaNotional,
+    heldQty,
+    price,
+    wholeShares: isLivePortfolio,
+  });
+  if (!sized.ok) return { ...base, symbol, reason: "computed sell qty is zero" };
+  const { qty, partial } = sized;
 
-  if (isLivePortfolio) {
-    // Whole shares only at the broker — but never round a real reduction down
-    // to nothing: if the clip floors to zero, or the residual would be an
-    // unsellable odd lot, close what's there instead of suppressing the trim.
-    const floored = Math.floor(qty);
-    if (floored <= 0) qty = heldQty <= 1 ? heldQty : 1;
-    else if (heldQty - floored <= 1) qty = heldQty;
-    else qty = floored;
-  }
-
-  if (qty <= DUST_QTY) return { ...base, symbol, reason: "computed sell qty is zero" };
-  // Leaving dust behind costs another ticket later; close the tail instead.
-  if (heldQty - qty <= DUST_QTY) qty = heldQty;
-  const partial = Math.abs(decision.deltaNotional) - qty * price > MIN_TICKET_NOTIONAL;
 
   if (mutateLocalState) {
     const remaining = heldQty - qty;

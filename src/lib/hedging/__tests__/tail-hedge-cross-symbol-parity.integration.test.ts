@@ -16,6 +16,8 @@ import {
 } from "@/lib/backtest/phase-runner";
 import { applyTailHedgeToPaperPortfolio } from "@/lib/hedging/tail-hedge-executor.server";
 import { computeTailHedge } from "@/lib/hedging/tail-hedge";
+import { sizeHedgeBuy, sizeHedgeSell } from "@/lib/hedging/tail-hedge-sizing";
+
 import { findSymbol } from "@/lib/universe.server";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -118,15 +120,23 @@ function makeHarness(HEDGE: string) {
     if (dec.action === "hold") return "hold";
     if (price <= 0) return "no_price";
     if (Math.abs(dec.deltaNotional) < 1) return "sub_threshold";
+    // Both paths size through the shared rule, so the expectation does too.
     if (dec.action === "buy") {
-      const affordable = Math.max(0, cash * (1 - (c.hedgeCashBufferPct ?? BUFFER)));
-      const spend = Math.min(dec.deltaNotional, affordable);
-      return spend < price ? "insufficient_cash" : "fill";
+      const sized = sizeHedgeBuy({
+        deltaNotional: dec.deltaNotional,
+        cash,
+        price,
+        bufferPct: c.hedgeCashBufferPct ?? BUFFER,
+        wholeShares: false,
+      });
+      return sized.ok ? "fill" : "insufficient_cash";
     }
-    if (held <= 1e-9) return "no_position_to_unwind";
-    const qty = Math.min(held, Math.abs(dec.deltaNotional) / price);
-    return qty <= 1e-9 ? "no_position_to_unwind" : "fill";
+    const sized = sizeHedgeSell({
+      deltaNotional: dec.deltaNotional, heldQty: held, price, wholeShares: false,
+    });
+    return sized.ok ? "fill" : "no_position_to_unwind";
   }
+
 
   function assertParity(
     days: DayInput[],
@@ -231,7 +241,10 @@ describe("Phase 6 backtest ↔ executor: parity across configurable hedge symbol
       );
     });
 
-    it("tiny cash + expensive hedge defers with 'insufficient_cash'", () => {
+    it("tiny cash + expensive hedge: sub-share budget books fractionally in both paths", () => {
+      // NAV=50 → delta ≈ 1.50 vs a $10 share. Fractional books (backtest and
+      // paper) buy 0.15 units; the whole-share venue defers. Both paths must
+      // agree, which is what parity asserts here.
       assertParity(
         [
           { date: "2024-01-01", price: 10 },
@@ -239,9 +252,15 @@ describe("Phase 6 backtest ↔ executor: parity across configurable hedge symbol
           { date: "2024-01-03", price: 10 },
         ],
         cfg({ initialCash: 50 }),
-        { requiredBuckets: ["insufficient_cash"] },
+        { minFills: 1 },
       );
+      expect(
+        sizeHedgeBuy({
+          deltaNotional: 1.5, cash: 50, price: 10, bufferPct: BUFFER, wholeShares: true,
+        }).ok,
+      ).toBe(false);
     });
+
 
     it("post-initial-buy stability triggers 'hold' rebalance threshold", () => {
       assertParity(
@@ -257,15 +276,22 @@ describe("Phase 6 backtest ↔ executor: parity across configurable hedge symbol
       );
     });
 
-    it("share-boundary rounding: spend one bp under one share defers as insufficient", () => {
+    it("share-boundary rounding: one bp under a share stays in lockstep (whole-share venue defers)", () => {
       assertParity(
         [
           { date: "2024-01-01", price: 3.01 },
           { date: "2024-01-02", price: 3.01 },
         ],
         cfg({ initialCash: 100 }),
-        { requiredBuckets: ["insufficient_cash"] },
+        { minFills: 1 },
       );
+      // The same budget at a whole-share venue is genuinely unaffordable.
+      expect(
+        sizeHedgeBuy({
+          deltaNotional: 3, cash: 100, price: 3.01, bufferPct: BUFFER, wholeShares: true,
+        }).ok,
+      ).toBe(false);
     });
+
   });
 });

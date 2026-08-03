@@ -24,6 +24,8 @@ import {
   sizeAgainstClusterCap,
 } from "@/lib/sizing/correlation-cluster";
 import { computeTailHedge } from "@/lib/hedging/tail-hedge";
+import { sizeHedgeBuy, sizeHedgeSell } from "@/lib/hedging/tail-hedge-sizing";
+
 
 export type DailyBar = { date: string } & Bar;
 
@@ -396,11 +398,18 @@ export function runPhaseBacktest(
       if (dec.action !== "hold" && hedgePrice > 0 && Math.abs(dec.deltaNotional) >= 1) {
         const bps = perSideCostBps(flags.slicing);
         if (dec.action === "buy") {
-          const affordable = Math.max(0, cash * (1 - hedgeBufferPct));
-          const spend = Math.min(dec.deltaNotional, affordable);
-          if (spend >= hedgePrice) {
-            const priceWithCost = hedgePrice * (1 + bps / 10_000);
-            const qty = spend / priceWithCost;
+          // Same sizing rule as the paper/live executor (tail-hedge-sizing).
+          const priceWithCost = hedgePrice * (1 + bps / 10_000);
+          const sized = sizeHedgeBuy({
+            deltaNotional: dec.deltaNotional,
+            cash,
+            price: hedgePrice,
+            bufferPct: hedgeBufferPct,
+            wholeShares: false, // backtests book fractional units, like paper
+            effectivePrice: priceWithCost,
+          });
+          if (sized.ok) {
+            const qty = sized.qty;
             cash -= qty * priceWithCost;
             hedgeQty += qty;
             trades.push({
@@ -410,9 +419,14 @@ export function runPhaseBacktest(
           }
         } else {
           // sell: unwind up to |delta|/price, capped at held qty (no shorting).
-          const wantQty = Math.abs(dec.deltaNotional) / hedgePrice;
-          const qty = Math.min(hedgeQty, wantQty);
-          if (qty > 1e-9) {
+          const sized = sizeHedgeSell({
+            deltaNotional: dec.deltaNotional,
+            heldQty: hedgeQty,
+            price: hedgePrice,
+            wholeShares: false,
+          });
+          if (sized.ok) {
+            const qty = sized.qty;
             const proceeds = qty * hedgePrice * (1 - bps / 10_000);
             cash += proceeds;
             hedgeQty -= qty;
@@ -423,6 +437,7 @@ export function runPhaseBacktest(
             });
           }
         }
+
       }
       hedgePrevClose = hedgePrice;
     }
