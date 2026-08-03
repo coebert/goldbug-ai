@@ -111,6 +111,7 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
     const result = await runHourlyCycle({
       triggeredBy: "manual",
       force: data.force,
+      forceTick: data.forceTick,
       timeBudgetMs: 55_000,
       skipNewsInTicks: true,
       // Manual runs are request-bound. Broad refreshes are already performed
