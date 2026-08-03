@@ -570,6 +570,8 @@ function AdminPage() {
         </CardContent>
       </Card>
 
+      <PreflightAnomalyCard />
+
       <RunMetricsCard />
 
       <OrderReconciliationCard />
