@@ -15,6 +15,17 @@ import type {
 } from "./adapter";
 import { asJson } from "@/lib/_server/db-json";
 import { redactedError } from "@/lib/_server/redact";
+import type { ZodTypeAny } from "zod";
+import {
+  parseSaxo,
+  SaxoAccountsSchema,
+  SaxoBalanceSchema,
+  SaxoInstrumentDetailsSchema,
+  SaxoNetPositionsSchema,
+  SaxoPlaceOrderSchema,
+  SaxoUserSchema,
+  SaxoWorkingOrdersSchema,
+} from "./saxo-schemas";
 
 const BASE = {
   sim: "https://gateway.saxobank.com/sim/openapi",
@@ -256,6 +267,7 @@ export class SaxoAdapter implements BrokerAdapter {
           query: ckForAccount
             ? { AccountKey: ak, ClientKey: ckForAccount }
             : { AccountKey: ak },
+          schema: SaxoBalanceSchema,
         });
         source = "account";
       }
@@ -269,6 +281,7 @@ export class SaxoAdapter implements BrokerAdapter {
         if (ck) {
           bal = await this.req<SaxoBalance>("GET", "/port/v1/balances", {
             query: { ClientKey: ck },
+            schema: SaxoBalanceSchema,
           });
           source = "client";
         }
@@ -278,7 +291,7 @@ export class SaxoAdapter implements BrokerAdapter {
       }
     }
     if (bal == null) {
-      bal = await this.req<SaxoBalance>("GET", "/port/v1/balances/me");
+      bal = await this.req<SaxoBalance>("GET", "/port/v1/balances/me", { schema: SaxoBalanceSchema });
       source = "me";
     }
 
@@ -400,7 +413,7 @@ export class SaxoAdapter implements BrokerAdapter {
         AssetType?: string;
         Uic?: number;
       }>;
-    }>("GET", `/port/v1/netpositions/me?FieldGroups=${fieldGroups}`);
+    }>("GET", `/port/v1/netpositions/me?FieldGroups=${fieldGroups}`, { schema: SaxoNetPositionsSchema });
 
     const rows = res.Data ?? [];
     const out: BrokerPosition[] = [];
@@ -448,7 +461,7 @@ export class SaxoAdapter implements BrokerAdapter {
         try {
           const det = await this.req<{
             Symbol?: string; CurrencyCode?: string; AssetType?: string;
-          }>("GET", `/ref/v1/instruments/details/${uic}/${assetType}`);
+          }>("GET", `/ref/v1/instruments/details/${uic}/${assetType}`, { schema: SaxoInstrumentDetailsSchema });
           if (det.Symbol) symbol = det.Symbol;
           if (det.CurrencyCode) currency = det.CurrencyCode;
         } catch { /* leave symbol blank; row will be filtered upstream */ }
@@ -770,6 +783,7 @@ export class SaxoAdapter implements BrokerAdapter {
           body,
           maxAttempts: 5,
           retryCapMs: 10_000,
+          schema: SaxoPlaceOrderSchema,
           // 400 from /trade/v2/orders is almost always a business-rule
           // rejection (InsufficientCash, PositionLimit, MarketClosed). The
           // policy above lets an operator promote specific codes to loud
@@ -913,6 +927,7 @@ export class SaxoAdapter implements BrokerAdapter {
         maxAttempts: 5,
         retryCapMs: 10_000,
         silentStatuses: [400],
+        schema: SaxoPlaceOrderSchema,
       });
       this.lastOrderPostAt = Date.now();
       if (res.ErrorInfo) {
@@ -972,7 +987,7 @@ export class SaxoAdapter implements BrokerAdapter {
         AssetType?: string;
         DisplayAndFormat?: { Symbol?: string; Currency?: string };
       }>;
-    }>("GET", "/port/v1/orders/me", { query: { FieldGroups: "DisplayAndFormat" } });
+    }>("GET", "/port/v1/orders/me", { query: { FieldGroups: "DisplayAndFormat" }, schema: SaxoWorkingOrdersSchema });
     return (res.Data ?? []).map((o) => {
       const bs = String(o.BuySell ?? "");
       const p = Number(o.Price ?? o.OrderPrice ?? 0);
@@ -1122,7 +1137,7 @@ export class SaxoAdapter implements BrokerAdapter {
     // /hist/v3/orders/{key} lookups to 404 and left successful orders
     // stuck on "submitted" because reconciliation could not resolve them.
     try {
-      const me = await this.req<{ ClientKey?: string }>("GET", "/port/v1/users/me");
+      const me = await this.req<{ ClientKey?: string }>("GET", "/port/v1/users/me", { schema: SaxoUserSchema });
       if (me.ClientKey) {
         this.cachedClientKey = me.ClientKey;
         return this.cachedClientKey;
@@ -1158,7 +1173,7 @@ export class SaxoAdapter implements BrokerAdapter {
           Currency?: string;
           LegalAssetTypes?: string[];
         }>;
-      }>("GET", "/port/v1/accounts/me");
+      }>("GET", "/port/v1/accounts/me", { schema: SaxoAccountsSchema });
       const accounts = res.Data ?? [];
       const configured = this.accountKey
         ? accounts.find((a) => a.AccountKey === this.accountKey && a.Active !== false)
