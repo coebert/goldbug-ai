@@ -35,6 +35,7 @@ import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { lttb } from "@/lib/downsample";
 import { AXIS_LINE, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import { qk } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/long-horizon/$id")({
   ssr: false,
@@ -96,7 +97,7 @@ function LongHorizonPage() {
   const runLH = useServerFn(runLongHorizonBacktest);
 
   const pQ = useQuery({
-    queryKey: ["portfolio", id],
+    queryKey: qk.portfolio.detail(id),
     queryFn: () => getP({ data: { id } }),
     enabled: !!session,
   });

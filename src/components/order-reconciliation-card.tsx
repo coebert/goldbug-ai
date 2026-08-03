@@ -28,6 +28,7 @@ import {
   type MarketStatus,
 } from "@/lib/market-hours";
 import { toast } from "sonner";
+import { qk } from "@/lib/query-keys";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -105,9 +106,9 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
         { duration: 10000 },
       );
       queryClient.invalidateQueries({ queryKey: ["order-recon-view"] });
-      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
-      queryClient.invalidateQueries({ queryKey: ["trades"] });
-      queryClient.invalidateQueries({ queryKey: ["holdings"] });
+      queryClient.invalidateQueries({ queryKey: qk.portfolio.all() });
+      queryClient.invalidateQueries({ queryKey: qk.trades.all() });
+      queryClient.invalidateQueries({ queryKey: qk.holdings.all() });
     },
     onError: (e: unknown) =>
       toast.error(`Fills reconcile failed: ${e instanceof Error ? e.message : String(e)}`),

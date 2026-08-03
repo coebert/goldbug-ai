@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { qk } from "@/lib/query-keys";
 
 export function RenamePortfolioDialog({
   open,
@@ -40,8 +41,8 @@ export function RenamePortfolioDialog({
     mutationFn: (n: string) => rename({ data: { id: portfolioId, name: n } }),
     onSuccess: (res) => {
       toast.success("Portfolio renamed");
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
-      qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+      qc.invalidateQueries({ queryKey: qk.portfolios.all() });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
       onRenamed?.(res?.portfolio?.name ?? name);
       onOpenChange(false);
     },

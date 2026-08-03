@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { qk } from "@/lib/query-keys";
 
 const SUPPORTED = ["GBP", "USD", "EUR", "CHF", "JPY", "CAD", "AUD"] as const;
 
@@ -132,8 +133,8 @@ export function ManualFxConvertCard({ portfolio }: Props) {
         `Converted ${res.amountFrom.toLocaleString("en-GB")} ${res.fromCcy} → ${res.amountTo.toLocaleString("en-GB")} ${res.toCcy} @ ${res.rate.toFixed(4)}`,
       );
       setAmount("");
-      qc.invalidateQueries({ queryKey: ["portfolio", portfolio.id] });
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolio.id) });
+      qc.invalidateQueries({ queryKey: qk.portfolios.all() });
     },
     onError: (e: unknown) => {
       toast.error(e instanceof Error ? e.message : "Conversion failed");

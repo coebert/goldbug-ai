@@ -25,6 +25,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { reconcilePortfolio } from "@/lib/live.functions";
 import { toast } from "sonner";
+import { qk } from "@/lib/query-keys";
 
 
 
@@ -128,9 +129,9 @@ export function LiveHoldingsCard({
         toast.success(`Up to date with Saxo`, { description: summary, duration: 6000 });
       }
       if (portfolioId) {
-        qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+        qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
         qc.invalidateQueries({ queryKey: ["holdings-history", portfolioId] });
-        qc.invalidateQueries({ queryKey: ["live-status", portfolioId] });
+        qc.invalidateQueries({ queryKey: qk.live.status(portfolioId) });
       }
     },
     onError: (e: Error) => toast.error(`Sync failed: ${e.message}`),

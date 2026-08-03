@@ -14,6 +14,7 @@ import {
 } from "@/lib/instrument-ccy-fix.functions";
 import { planInstrumentCcyFixes } from "@/lib/instrument-ccy-fix";
 import type { Severity } from "@/lib/instrument-ccy-check";
+import { qk } from "@/lib/query-keys";
 
 const SEVERITY_VARIANT: Record<Severity, "destructive" | "default" | "secondary"> = {
   high: "destructive",
@@ -67,8 +68,8 @@ export function InstrumentCcyAlert({
         toast.info(result.summary);
       }
       void queryClient.invalidateQueries({ queryKey: ["instrument-ccy-check", portfolioId] });
-      void queryClient.invalidateQueries({ queryKey: ["holdings"] });
-      void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      void queryClient.invalidateQueries({ queryKey: qk.holdings.all() });
+      void queryClient.invalidateQueries({ queryKey: qk.portfolio.all() });
     },
     onError: (err: unknown) => {
       toast.error("Bulk currency fix failed", {

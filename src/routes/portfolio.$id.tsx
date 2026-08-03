@@ -224,6 +224,7 @@ import {
   REFERENCE_LINE,
   TICK_LINE,
 } from "@/lib/chart-palette";
+import { qk } from "@/lib/query-keys";
 
 type PortfolioTab =
   | "overview"
@@ -298,7 +299,7 @@ function PortfolioPage() {
 
   const get = useServerFn(getPortfolio);
   const q = useQuery({
-    queryKey: ["portfolio", id],
+    queryKey: qk.portfolio.detail(id),
     queryFn: () => get({ data: { id } }),
     enabled: ready,
   });
@@ -325,10 +326,10 @@ function PortfolioPage() {
       try {
         await reconcileFn({ data: { portfolioId: id } });
         if (cancelled) return;
-        qc.invalidateQueries({ queryKey: ["portfolio", id] });
+        qc.invalidateQueries({ queryKey: qk.portfolio.detail(id) });
         qc.invalidateQueries({ queryKey: ["holdings-history", id] });
         qc.invalidateQueries({ queryKey: ["live-orders", id] });
-        qc.invalidateQueries({ queryKey: ["trades", id] });
+        qc.invalidateQueries({ queryKey: qk.trades.forPortfolio(id) });
       } catch (e) {
         console.warn(`auto broker reconcile failed (${reason})`, e);
       }
@@ -497,7 +498,7 @@ function PortfolioPage() {
       toast.success(
         `AI ran. ${r.executedCount} filled${rejected ? `, ${rejected} rejected` : ""}. Showing decision trail…`,
       );
-      qc.invalidateQueries({ queryKey: ["portfolio", id] });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(id) });
       setTab("decisions");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
@@ -544,7 +545,7 @@ function PortfolioPage() {
       } else {
         toast.success(`Backtest done. Final value ~ ${r.finalValue.toFixed(2)}`);
       }
-      qc.invalidateQueries({ queryKey: ["portfolio", id] });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(id) });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
@@ -553,7 +554,7 @@ function PortfolioPage() {
     mutationFn: () => resetFn({ data: { id } }),
     onSuccess: () => {
       toast.success("Portfolio reset");
-      qc.invalidateQueries({ queryKey: ["portfolio", id] });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(id) });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });

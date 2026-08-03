@@ -37,6 +37,7 @@ import {
   clampRange,
   resolveAggressiveness,
 } from "@/lib/risk-aggressiveness";
+import { qk } from "@/lib/query-keys";
 
 // The dial config lives in `@/lib/risk-presets` so the server-side sweep and
 // the live engine read exactly the same table this card writes.
@@ -263,7 +264,7 @@ export function RiskControlsCard({
         },
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["portfolio", portfolioId] });
+      qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
