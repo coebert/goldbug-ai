@@ -218,9 +218,10 @@ describe("end-to-end reconcile records match the repaired ledger", () => {
     expect(r!.fillPrice).toBeCloseTo(c.expectPrice, 6);
     expect(r!.currency).toBe(c.expectCcy);
     expect(r!.fillPrice).toBeGreaterThan(0);
-    // Notional stays within an order of magnitude of the pounds value: the
-    // 100x fault always shows up here first.
-    expect(r!.fillPrice * c.quantity).toBeLessThan(c.rawQuote * c.quantity);
+    // Pence-quoted lines shrink by exactly 100x; everything else is untouched.
+    const expectedNotional = c.rawQuote * c.quantity / (isLseGbxDisplayQuoted(c.symbol) ? 100 : 1);
+    expect(r!.fillPrice * c.quantity).toBeCloseTo(expectedNotional, 6);
+
   });
 
   it("is idempotent — re-running reconciliation on a stored fill does not rescale it", () => {
