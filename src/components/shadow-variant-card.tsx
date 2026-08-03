@@ -25,7 +25,7 @@ type ShadowRunRow = {
   run_date: string;
   primary_order_count: number;
   shadow_order_count: number;
-  agreement: number;
+  agreement: number | null;
   divergences?: unknown;
 };
 
@@ -75,8 +75,8 @@ export function ShadowVariantCard({ portfolioId }: { portfolioId: string }) {
             ) : (
               <div className="space-y-2">
                 <div className="text-xs font-medium text-muted-foreground">Recent runs</div>
-                {recent.map((r: ShadowRunRow) => {
-                  const divs: Divergence[] = Array.isArray(r.divergences) ? r.divergences : [];
+                {recent.map((r) => {
+                  const divs = (Array.isArray(r.divergences) ? r.divergences : []) as Divergence[];
                   return (
                     <div key={r.id} className="rounded-md border p-2 text-xs space-y-1">
                       <div className="flex items-center justify-between">
