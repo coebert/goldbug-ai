@@ -64,6 +64,7 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       force: data.force,
       timeBudgetMs: 55_000,
       skipNewsInTicks: true,
+      portfolioIds: data.portfolioIds,
     });
 
     return {
