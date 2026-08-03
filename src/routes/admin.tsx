@@ -453,7 +453,7 @@ function AdminPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              onClick={() => manual.mutate({ portfolioIds: selectedIds })}
+              onClick={() => startManualRun({ portfolioIds: selectedIds })}
               disabled={manual.isPending}
               className="gap-2"
             >
@@ -473,7 +473,7 @@ function AdminPage() {
                     ? `${selectedIds.length} selected portfolio(s)`
                     : "all eligible portfolios";
                 if (window.confirm(`Force clear the current run lock and start a fresh run for ${scope}? Only use this if the previous run crashed or is genuinely stuck.`)) {
-                  manual.mutate({ force: true, portfolioIds: selectedIds });
+                  startManualRun({ force: true, portfolioIds: selectedIds });
                 }
               }}
               disabled={manual.isPending}
