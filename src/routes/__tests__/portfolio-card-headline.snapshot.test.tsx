@@ -97,7 +97,6 @@ describe("portfolio card headline — layout contract (source-level)", () => {
     expect(SOURCE).toMatch(
       /grid\s+grid-cols-1\s+gap-3[\s\S]{0,120}?sm:grid-cols-\[minmax\(0,1fr\)_auto\]\s+sm:items-end/,
     );
-  });
 
     // Sparkline column must be min-w-0 to let text/svg shrink.
     expect(SOURCE).toMatch(/<div className="min-w-0">\s*<div className="flex items-center gap-2">/);
@@ -105,6 +104,7 @@ describe("portfolio card headline — layout contract (source-level)", () => {
     // stays glued to the right edge on every breakpoint.
     expect(SOURCE).toMatch(/<div className="shrink-0 text-right">/);
   });
+
 
   it("headline £ number is text-2xl, bold, tabular-nums, and single-line", () => {
     // The prominent number is the WHOLE point of the card — lock its
