@@ -33,7 +33,7 @@ describe("parseHedgeFallbackNote", () => {
     expect(parseHedgeFallbackNote(NOTE)).toEqual({
       from: "SGLN.L",
       to: "SGLD.L",
-      why: "broker block (suitability/permissions",
+      why: "broker block (suitability/permissions)",
     });
   });
 
