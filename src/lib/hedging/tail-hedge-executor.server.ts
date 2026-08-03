@@ -158,17 +158,19 @@ function classifyRejection(reason: string | undefined): HedgeFallbackAudit["reas
 export function applyTailHedgeToPaperPortfolio(
   input: TailHedgeExecInputs,
 ): TailHedgeExecResult {
-  const result = applyTailHedgeCore(input);
-  return result;
+  const sink: { audit?: HedgeFallbackAudit } = {};
+  const result = applyTailHedgeCore(input, sink);
+  return sink.audit ? { ...result, fallback: sink.audit } : result;
 }
 
 function applyTailHedgeCore(
   input: TailHedgeExecInputs,
+  sink: { audit?: HedgeFallbackAudit },
 ): TailHedgeExecResult {
   const { decision, holdingsByS, priceMap, portfolioId, portfolioCurrency, isLivePortfolio } = input;
   let { workingCash } = input;
   const bufferPct = input.cashBufferPct ?? 0.01;
-  let fallback: HedgeFallbackAudit | undefined;
+
 
 
   const base = {
