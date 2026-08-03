@@ -67,15 +67,15 @@ function BlockRow({
 }) {
   const copy = copyFor(block.reason);
   return (
-    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-sm font-semibold text-foreground">
+    <div className="min-w-0 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <span className="break-all font-mono text-sm font-semibold text-foreground">
           {block.symbol}
         </span>
         <Badge variant="outline" className="border-amber-500/40 text-amber-500">
           {copy.label}
         </Badge>
-        <span className="text-xs text-muted-foreground">
+        <span className="w-full text-xs text-muted-foreground sm:w-auto">
           {block.hitCount} rejection{block.hitCount === 1 ? "" : "s"} · last{" "}
           {new Date(block.lastSeenAt).toLocaleDateString("en-GB")}
         </span>
@@ -92,8 +92,8 @@ function BlockRow({
         ))}
       </ol>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button asChild size="sm" variant="outline">
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+        <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
           <a
             href="https://www.home.saxo/en-gb"
             target="_blank"
@@ -102,7 +102,12 @@ function BlockRow({
             Open Saxo <ExternalLink className="ml-1 h-3.5 w-3.5" />
           </a>
         </Button>
-        <Button size="sm" onClick={onClear} disabled={clearing}>
+        <Button
+          size="sm"
+          onClick={onClear}
+          disabled={clearing}
+          className="h-auto w-full whitespace-normal py-2 text-center sm:w-auto"
+        >
           {clearing ? "Clearing…" : "I've completed this — unblock"}
         </Button>
       </div>
@@ -129,13 +134,13 @@ export function BrokerSuitabilityBlocksCard() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldAlert className="h-4 w-4 text-amber-500" />
-          Broker checks blocking trades
+      <CardHeader className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <CardTitle className="flex min-w-0 items-center gap-2 text-base">
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-500" />
+          <span className="min-w-0 break-words">Broker checks blocking trades</span>
         </CardTitle>
         {blocks.length > 0 && (
-          <Badge variant="outline" className="border-amber-500/40 text-amber-500">
+          <Badge variant="outline" className="w-fit shrink-0 border-amber-500/40 text-amber-500">
             {blocks.length} blocked
           </Badge>
         )}

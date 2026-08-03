@@ -30,11 +30,11 @@ export const Route = createFileRoute("/broker-blocks")({
 
 function BrokerBlocksPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <AppHeader />
-      <main className="mx-auto w-full max-w-4xl space-y-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
+      <main className="mx-auto w-full min-w-0 max-w-4xl space-y-4 p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold text-foreground">Blocked instruments</h1>
             <p className="text-sm text-muted-foreground">
               Symbols the AI will skip because Saxo refused them at account level.

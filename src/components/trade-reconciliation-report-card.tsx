@@ -69,12 +69,14 @@ export function TradeReconciliationReportCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <GitCompareArrows className="h-4 w-4 text-muted-foreground" />
-          Planned vs actual reconciliation
+      <CardHeader className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <CardTitle className="flex min-w-0 items-center gap-2 text-base">
+          <GitCompareArrows className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 break-words">Planned vs actual reconciliation</span>
         </CardTitle>
-        <Badge variant="outline">last {days}d</Badge>
+        <Badge variant="outline" className="w-fit shrink-0">
+          last {days}d
+        </Badge>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -89,7 +91,7 @@ export function TradeReconciliationReportCard({
         )}
 
         {s && (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "Attempts", value: String(s.attempts) },
               { label: "Filled", value: `${s.filled + s.partial}` },
@@ -102,9 +104,14 @@ export function TradeReconciliationReportCard({
                 value: formatMoney(s.unexecutedValue, currency),
               },
             ].map((k) => (
-              <div key={k.label} className="rounded-lg border border-border bg-muted/30 p-3">
-                <p className="text-xs text-muted-foreground">{k.label}</p>
-                <p className="text-lg font-semibold text-foreground">{k.value}</p>
+              <div
+                key={k.label}
+                className="flex min-w-0 items-baseline justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:block"
+              >
+                <p className="shrink-0 text-xs text-muted-foreground sm:shrink">{k.label}</p>
+                <p className="min-w-0 break-words text-right text-lg font-semibold tabular-nums text-foreground sm:text-left">
+                  {k.value}
+                </p>
               </div>
             ))}
           </div>
@@ -119,7 +126,7 @@ export function TradeReconciliationReportCard({
             </p>
             {report.suitability.map((g) => (
               <div key={g.symbolKey} className="text-sm">
-                <p className="font-mono font-semibold text-foreground">
+                <p className="break-all font-mono font-semibold text-foreground">
                   {g.symbol}{" "}
                   <span className="font-sans text-xs font-normal text-muted-foreground">
                     {g.attempts} attempt{g.attempts === 1 ? "" : "s"} ·{" "}
@@ -154,11 +161,11 @@ export function TradeReconciliationReportCard({
           {rows.slice(0, 40).map((r, i) => (
             <div
               key={`${r.decisionId}-${r.symbol}-${r.side}-${i}`}
-              className="rounded-lg border border-border bg-muted/30 p-3"
+              className="min-w-0 rounded-lg border border-border bg-muted/30 p-3"
             >
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                 <OutcomeIcon outcome={r.outcome} />
-                <span className="font-mono text-sm font-semibold text-foreground">
+                <span className="min-w-0 break-all font-mono text-sm font-semibold text-foreground">
                   {r.symbol}
                 </span>
                 <Badge variant="outline" className="uppercase">
@@ -167,7 +174,9 @@ export function TradeReconciliationReportCard({
                 <Badge variant="outline" className={OUTCOME_TONE[r.outcome]}>
                   {OUTCOME_LABEL[r.outcome]}
                 </Badge>
-                <span className="ml-auto text-xs text-muted-foreground">{r.runDate}</span>
+                <span className="w-full text-xs tabular-nums text-muted-foreground sm:ml-auto sm:w-auto">
+                  {r.runDate}
+                </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Planned {r.plannedQuantity}
