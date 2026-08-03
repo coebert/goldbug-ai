@@ -8,6 +8,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAal2 } from "@/lib/_server/require-aal2";
+import type { RunPortfolioStatus } from "@/lib/run-portfolio-status";
 
 type ManualRunResult = {
   ok: true;
@@ -20,7 +21,20 @@ type ManualRunResult = {
   symbols_watched: number;
   portfolios: number;
   skipped_paused: number;
-  results: Array<{ id: string; mode: string; ok: boolean; error?: string; skipped?: string; value?: number }>;
+  results: Array<{
+    id: string;
+    mode: string;
+    ok: boolean;
+    error?: string;
+    skipped?: string;
+    value?: number;
+    name?: string | null;
+    started_at?: string;
+    finished_at?: string;
+    duration_ms?: number;
+  }>;
+  /** Status + last-run timestamp for every portfolio, selected or not. */
+  portfolio_status: RunPortfolioStatus[];
   /** Deadline / pre-flight / selection diagnostics for this run. */
   telemetry: {
     run_id: string;
@@ -116,6 +130,7 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       portfolios: result.portfolios,
       skipped_paused: result.skipped_paused,
       results: result.results,
+      portfolio_status: result.portfolio_status,
       telemetry: {
         run_id: result.telemetry.run_id,
         budget_ms: result.telemetry.budget_ms,
