@@ -80,10 +80,19 @@ async function runHourlyCycleInner(
   const runStartedAt = Date.now();
   const RUN_BUDGET_MS = Math.max(8_000, Math.min(opts.timeBudgetMs ?? 24_000, 115_000));
   const runPreflightRefresh = opts.preflightRefresh ?? RUN_BUDGET_MS > 30_000;
+  // Structured telemetry: every record carries the same run_id so one manual
+  // run can be reconstructed from the logs with a single grep.
+  const tel = createRunTelemetry({
+    triggeredBy: opts.triggeredBy,
+    force: opts.force,
+    budgetMs: RUN_BUDGET_MS,
+    preflightRefresh: runPreflightRefresh,
+  });
   const { acquireRunLock } = await import("@/lib/run-lock.server");
   const { runDailyTick } = await import("@/lib/trading-engine.server");
   const { filterUniverse } = await import("@/lib/universe.server");
   const { getMarketStatusForSymbol } = await import("@/lib/market-hours");
+
 
   const manualTrigger = opts.triggeredBy === "manual";
   const forceClear = opts.force === true;
