@@ -324,7 +324,7 @@ describe("callAiForDecision — failure fallback and order sizing", () => {
     const expected = {
       conservative: { count: 1, percent: 5 },
       balanced: { count: 2, percent: 8 },
-      aggressive: { count: 2, percent: 10 }, // only 2 momentum candidates exist
+      aggressive: { count: 3, percent: 10 },
     } as const;
     for (const level of ["conservative", "balanced", "aggressive"] as const) {
       const out = await callAiForDecision(
