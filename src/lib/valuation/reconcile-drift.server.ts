@@ -59,7 +59,7 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
 
   const out: DriftRow[] = [];
 
-  for (const p of (portfolios ?? []) as PortfolioRow[]) {
+  for (const p of (portfolios ?? []) as unknown as PortfolioRow[]) {
     const portfolioId = String(p.id);
     const base = String(p.base_currency ?? "GBP").toUpperCase();
 
@@ -71,14 +71,14 @@ export async function reconcileValuationDrift(): Promise<DriftRow[]> {
       .limit(1)
       .maybeSingle();
     if (!snap) continue;
-    const snapshot = snap as SnapshotRow;
+    const snapshot = snap as unknown as SnapshotRow;
 
     const { data: holdings } = await supabaseAdmin
       .from("holdings")
       .select("symbol, quantity, avg_cost, instrument_ccy, asset_class")
       .eq("portfolio_id", portfolioId);
 
-    const symbols = [...new Set(((holdings ?? []) as HoldingRow[]).map((h) => String(h.symbol)))];
+    const symbols = [...new Set(((holdings ?? []) as unknown as HoldingRow[]).map((h) => String(h.symbol)))];
     const prices = new Map<string, number>();
     if (symbols.length > 0) {
       const { getPriceOn } = await import("@/lib/market-data.server");

@@ -18,6 +18,17 @@ const KIND_COLOR: Record<string, string> = {
   sizing_gap: "text-amber-500",
 };
 
+type Divergence = { kind: string; symbol: string };
+
+type ShadowRunRow = {
+  id: string;
+  run_date: string;
+  primary_order_count: number;
+  shadow_order_count: number;
+  agreement: number;
+  divergences?: unknown;
+};
+
 export function ShadowVariantCard({ portfolioId }: { portfolioId: string }) {
   const fetchFn = useServerFn(getShadowVariantReport);
   const { data, isLoading } = useQuery({
@@ -64,8 +75,8 @@ export function ShadowVariantCard({ portfolioId }: { portfolioId: string }) {
             ) : (
               <div className="space-y-2">
                 <div className="text-xs font-medium text-muted-foreground">Recent runs</div>
-                {recent.map((r: any) => {
-                  const divs = Array.isArray(r.divergences) ? r.divergences : [];
+                {recent.map((r: ShadowRunRow) => {
+                  const divs: Divergence[] = Array.isArray(r.divergences) ? r.divergences : [];
                   return (
                     <div key={r.id} className="rounded-md border p-2 text-xs space-y-1">
                       <div className="flex items-center justify-between">
