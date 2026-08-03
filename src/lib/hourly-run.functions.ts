@@ -21,7 +21,29 @@ type ManualRunResult = {
   portfolios: number;
   skipped_paused: number;
   results: Array<{ id: string; mode: string; ok: boolean; error?: string; skipped?: string; value?: number }>;
+  /** Deadline / pre-flight / selection diagnostics for this run. */
+  telemetry: {
+    run_id: string;
+    budget_ms: number;
+    duration_ms: number;
+    deadline_exceeded: boolean;
+    overrun_ms: number;
+    preflight_ms: number;
+    preflight_budget_pct: number;
+    preflight_refresh: boolean;
+    phases: Array<{ phase: string; ms: number; skipped: boolean; note?: string }>;
+    selection: {
+      scoped: boolean;
+      requested_count: number;
+      matched: string[];
+      unknown_ids: string[];
+      paused_excluded: string[];
+    } | null;
+    ticked: string[];
+    skipped_budget: string[];
+  };
 };
+
 
 export const triggerHourlyRunNow = createServerFn({ method: "POST" })
   .middleware([requireAal2])
