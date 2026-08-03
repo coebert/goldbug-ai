@@ -153,6 +153,7 @@ export async function renewRunLock(name: string, owner: string): Promise<void> {
 }
 
 export async function releaseRunLock(name: string, owner: string): Promise<void> {
+  clearContention(name);
   try {
     await supabaseAdmin.from("run_locks").delete().eq("name", name).eq("owner", owner);
   } catch (e) {
