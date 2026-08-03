@@ -268,9 +268,13 @@ function AdminPage() {
   );
 
   const manual = useMutation({
-    mutationFn: (vars: { force?: boolean; portfolioIds?: string[] } = {}) =>
+    mutationFn: (vars: { force?: boolean; forceTick?: boolean; portfolioIds?: string[] } = {}) =>
       triggerRun({
-        data: { force: vars.force === true, portfolioIds: vars.portfolioIds ?? [] },
+        data: {
+          force: vars.force === true,
+          forceTick: vars.forceTick === true,
+          portfolioIds: vars.portfolioIds ?? [],
+        },
       }),
 
     onSuccess: (result) => {
