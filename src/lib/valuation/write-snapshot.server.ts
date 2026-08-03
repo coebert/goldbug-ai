@@ -195,6 +195,23 @@ export async function writeEquitySnapshot(
     return { written: false, reason: "invariants", message, violations: invariants.violations };
   }
 
+  // A broker-linked account with an empty local book has not been synced yet.
+  // Writing that as a flat, cash-only day fabricates a valuation floor which
+  // the next (correct) snapshot then breaches as an "implausible jump".
+  if (
+    !AUTHORITATIVE_SOURCES.has(input.source) &&
+    input.brokerLinked === true &&
+    (input.positionCount ?? 0) === 0 &&
+    Math.abs(input.holdingsValue) < 0.005
+  ) {
+    const message =
+      "broker-linked portfolio has no imported holdings yet; refusing to store a cash-only snapshot";
+    await logRejection(client, input, "unsynced_positions", message, []);
+    return { written: false, reason: "unsynced_positions", message };
+  }
+
+
+
   if (!AUTHORITATIVE_SOURCES.has(input.source)) {
     const prior =
       input.priorTotal !== undefined
