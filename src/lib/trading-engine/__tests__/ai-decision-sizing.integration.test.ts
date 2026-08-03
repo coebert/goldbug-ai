@@ -25,7 +25,7 @@ const { generateText, NoObjectGeneratedError } = vi.hoisted(() => {
       return e instanceof NoObjectGeneratedError;
     }
   }
-  const generateText = vi.fn(async (): Promise<{ output: Any }> => ({
+  const generateText = vi.fn(async (_args?: Any): Promise<{ output: Any }> => ({
     output: { briefing: "b", rationale: "r", orders: [] as Any[] },
   }));
   return { generateText, NoObjectGeneratedError };
