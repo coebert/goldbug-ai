@@ -216,6 +216,7 @@ export class SaxoAdapter implements BrokerAdapter {
       const me = await this.req<{ ClientKey?: string; UserKey?: string; Name?: string }>(
         "GET",
         "/port/v1/users/me",
+        { schema: SaxoUserSchema },
       );
       return {
         ok: true,

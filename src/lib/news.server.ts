@@ -10,6 +10,9 @@ import { GDELT_SOURCES } from "./news-sources";
 import { fetchRssForDate } from "./news-rss.server";
 import { buildSeenKeySet, filterUnseen, normalizeHeadlineKey } from "./news-dedupe";
 import { detectLanguage, needsTranslation } from "./language-detect";
+import { createConsoleLogger } from "@/lib/_server/log";
+
+const srvLog = createConsoleLogger("news");
 
 
 
@@ -51,7 +54,7 @@ async function parseGdeltResponse(res: Response, dateISO: string): Promise<NewsI
   // GDELT rate-limit response is plain text starting with "Please limit requests…".
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
     const snippet = trimmed.slice(0, 160).replace(/\s+/g, " ");
-    console.warn(`news: gdelt returned non-JSON (likely rate-limited): ${snippet}`);
+    srvLog.warn(`news: gdelt returned non-JSON (likely rate-limited): ${snippet}`);
     return null;
   }
   try {
@@ -70,7 +73,7 @@ async function parseGdeltResponse(res: Response, dateISO: string): Promise<NewsI
 
       }));
   } catch (err) {
-    console.error("news: gdelt JSON parse failed", err);
+    srvLog.error("news: gdelt JSON parse failed", err);
     return null;
   }
 }
@@ -227,7 +230,7 @@ async function hydrateFromDbByOriginal(originals: string[]): Promise<void> {
     }
   } catch (err) {
     // Non-fatal — the cache just stays cold for these keys.
-    console.warn("news: cache hydrate failed", err instanceof Error ? err.message : String(err));
+    srvLog.warn("news: cache hydrate failed", err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -263,10 +266,10 @@ async function persistTranslations(
       .from("headline_translation_cache")
       .upsert(rows, { onConflict: "norm_key" });
     if (error) {
-      console.warn("news: translation cache upsert failed", error.message);
+      srvLog.warn("news: translation cache upsert failed", error.message);
     }
   } catch (err) {
-    console.warn("news: translation cache upsert threw", err instanceof Error ? err.message : String(err));
+    srvLog.warn("news: translation cache upsert threw", err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -292,7 +295,7 @@ export function refreshStaleTranslations(
         .order("expires_at", { ascending: true })
         .limit(max);
       if (error) {
-        console.warn("news: stale translation scan failed", error.message);
+        srvLog.warn("news: stale translation scan failed", error.message);
         return { scanned: 0, refreshed: 0 };
       }
       const rows = data ?? [];
@@ -311,11 +314,11 @@ export function refreshStaleTranslations(
       const fresh = await translateWithCache(originals);
       const refreshed = fresh.size;
       if (refreshed > 0) {
-        console.log(`news: refreshed ${refreshed}/${rows.length} stale translations`);
+        srvLog.log(`news: refreshed ${refreshed}/${rows.length} stale translations`);
       }
       return { scanned: rows.length, refreshed };
     } catch (err) {
-      console.warn("news: stale refresh threw", err instanceof Error ? err.message : String(err));
+      srvLog.warn("news: stale refresh threw", err instanceof Error ? err.message : String(err));
       return { scanned: 0, refreshed: 0 };
     } finally {
       refreshInFlight.p = null;
@@ -358,7 +361,7 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
     });
     if (!res.ok) {
       const body = await res.text();
-      console.warn(`news: translate LLM http ${res.status}: ${body.slice(0, 200)}`);
+      srvLog.warn(`news: translate LLM http ${res.status}: ${body.slice(0, 200)}`);
       return out;
     }
     const json = (await res.json()) as {
@@ -371,12 +374,12 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
     try {
       parsed = JSON.parse(cleaned);
     } catch {
-      console.warn(`news: translate LLM non-JSON reply: ${cleaned.slice(0, 200)}`);
+      srvLog.warn(`news: translate LLM non-JSON reply: ${cleaned.slice(0, 200)}`);
       return out;
     }
     const validated = TranslateSchema.safeParse(parsed);
     if (!validated.success) {
-      console.warn(`news: translate LLM schema mismatch: ${JSON.stringify(parsed).slice(0, 200)}`);
+      srvLog.warn(`news: translate LLM schema mismatch: ${JSON.stringify(parsed).slice(0, 200)}`);
       return out;
     }
     for (const r of validated.data.results) {
@@ -392,7 +395,7 @@ ${headlines.map((h) => `${h.i}. ${h.text}`).join("\n")}`;
       });
     }
   } catch (err) {
-    console.warn("news: translate LLM failed", err instanceof Error ? err.message : String(err));
+    srvLog.warn("news: translate LLM failed", err instanceof Error ? err.message : String(err));
   }
   return out;
 }
@@ -540,11 +543,11 @@ export function backfillTranslations(
         if (!error) translated++;
       }
       if (translated > 0) {
-        console.log(`news: backfilled ${translated}/${rows.length} translations for ${dateISO}`);
+        srvLog.log(`news: backfilled ${translated}/${rows.length} translations for ${dateISO}`);
       }
       return { scanned: rows.length, translated };
     } catch (err) {
-      console.warn("news: backfill threw", err instanceof Error ? err.message : String(err));
+      srvLog.warn("news: backfill threw", err instanceof Error ? err.message : String(err));
       return { scanned: 0, translated: 0 };
     } finally {
       backfillInFlight.delete(dateISO);
@@ -633,7 +636,7 @@ async function fetchGdeltWithRetry(
           const budgetWait = deadlineAt ? Math.max(0, deadlineAt - Date.now() - 500) : GDELT_MAX_BACKOFF_MS;
           const wait = Math.min(computeBackoffMs(attempt, retryAfter), budgetWait);
           if (wait <= 0) break;
-          console.warn(
+          srvLog.warn(
             `news: gdelt ${breakerName} ${lastReason} — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
           );
           await new Promise((r) => setTimeout(r, wait));
@@ -656,7 +659,7 @@ async function fetchGdeltWithRetry(
           const budgetWait = deadlineAt ? Math.max(0, deadlineAt - Date.now() - 500) : GDELT_MAX_BACKOFF_MS;
           const wait = Math.min(computeBackoffMs(attempt, null), budgetWait);
           if (wait <= 0) break;
-          console.warn(
+          srvLog.warn(
             `news: gdelt ${breakerName} throttled body — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
           );
           await new Promise((r) => setTimeout(r, wait));
@@ -671,7 +674,7 @@ async function fetchGdeltWithRetry(
         const budgetWait = deadlineAt ? Math.max(0, deadlineAt - Date.now() - 500) : GDELT_MAX_BACKOFF_MS;
         const wait = Math.min(computeBackoffMs(attempt, null), budgetWait);
         if (wait <= 0) break;
-        console.warn(
+        srvLog.warn(
           `news: gdelt ${breakerName} threw "${lastReason}" — backoff ${wait}ms (attempt ${attempt}/${GDELT_MAX_ATTEMPTS})`,
         );
         await new Promise((r) => setTimeout(r, wait));
@@ -679,7 +682,7 @@ async function fetchGdeltWithRetry(
       }
     }
   }
-  console.warn(
+  srvLog.warn(
     `news: gdelt ${breakerName} gave up after ${GDELT_MAX_ATTEMPTS} attempts — reason: ${lastReason} — url: ${url}`,
   );
   return { kind: "failed", reason: lastReason };
@@ -742,7 +745,7 @@ async function fetchGdeltForDate(
   for (let n = 0; n < GDELT_SOURCES.length; n++) {
     const src = GDELT_SOURCES[(offset + n) % GDELT_SOURCES.length];
     if (deadlineAt - Date.now() < 2_000) {
-      console.warn(`news: gdelt budget exhausted after ${n}/${GDELT_SOURCES.length} slices (offset ${offset})`);
+      srvLog.warn(`news: gdelt budget exhausted after ${n}/${GDELT_SOURCES.length} slices (offset ${offset})`);
       break;
     }
     if (n > 0) {
@@ -827,7 +830,7 @@ export async function getNewsForDate(
         }
       }
     } catch (err) {
-      console.warn("news: inline backfill failed", err instanceof Error ? err.message : String(err));
+      srvLog.warn("news: inline backfill failed", err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -841,7 +844,7 @@ export async function getNewsForDate(
   const [gdeltResult, rssResult] = await Promise.all([
     fetchGdeltForDate(dateISO, max),
     fetchRssForDate(dateISO, 4).catch((err) => {
-      console.warn("news: rss fan-out threw", err instanceof Error ? err.message : String(err));
+      srvLog.warn("news: rss fan-out threw", err instanceof Error ? err.message : String(err));
       return [] as Array<NewsItem & { source_weight: number }>;
     }),
   ]);
@@ -850,7 +853,7 @@ export async function getNewsForDate(
   const combined = [...gdelt, ...rssResult];
 
   if (combined.length === 0) {
-    console.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (all providers unavailable)`);
+    srvLog.warn(`news: keeping ${cachedItems.length} cached rows for ${dateISO} (all providers unavailable)`);
     return cachedItems;
   }
 
@@ -927,7 +930,7 @@ export async function getNewsForDate(
     }));
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("news_cache").insert(rows);
-    if (error) console.error("news: cache insert failed", error);
+    if (error) srvLog.error("news: cache insert failed", error);
   }
   return fresh;
 }
