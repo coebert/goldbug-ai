@@ -644,6 +644,8 @@ async function runHourlyCycleInner(
       saxo_refresh: saxoRefresh,
       triggered_by: manualTrigger ? "manual" : "cron",
       results,
+      portfolio_status: portfolioStatus,
+
       metrics: metricsSnap,
       telemetry,
     };
