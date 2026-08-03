@@ -432,8 +432,9 @@ function AdminPage() {
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
                 {portfolioOptions.map((p) => (
-                  <label key={p.id} className="flex items-center gap-2 text-sm">
+                  <label key={p.id} className="flex min-w-0 items-center gap-2 text-sm">
                     <Checkbox
+                      className="shrink-0"
                       checked={selectedIds.includes(p.id)}
                       onCheckedChange={(v) =>
                         setSelectedIds((prev) =>
@@ -441,7 +442,7 @@ function AdminPage() {
                         )
                       }
                     />
-                    <span className="truncate">{p.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{p.name}</span>
                     <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
                       {String(p.mode).replace("_", " ")}
                     </Badge>
