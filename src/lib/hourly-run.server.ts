@@ -75,6 +75,11 @@ function classesFromUniverse(u: unknown): Array<"stock" | "etf" | "crypto" | "co
 export async function runHourlyCycle(opts: {
   triggeredBy: "manual" | "cron";
   force?: boolean;
+  /**
+   * Manual runs only: ignore the 10-minute "already ticked" window WITHOUT
+   * force-clearing the run lock. `force: true` implies this.
+   */
+  forceTick?: boolean;
   /** Keep request-bound runs below platform timeout. Defaults to 24s. */
   timeBudgetMs?: number;
   /** Skip per-tick news scoring; news-refresh cron keeps cache warm separately. */
@@ -88,7 +93,7 @@ export async function runHourlyCycle(opts: {
 }
 
 async function runHourlyCycleInner(
-  opts: { triggeredBy: "manual" | "cron"; force?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean; portfolioIds?: string[] },
+  opts: { triggeredBy: "manual" | "cron"; force?: boolean; forceTick?: boolean; timeBudgetMs?: number; skipNewsInTicks?: boolean; preflightRefresh?: boolean; portfolioIds?: string[] },
   metrics: import("@/lib/run-metrics.server").RunMetrics,
 ): Promise<HourlyRunResult> {
   const runStartedAt = Date.now();
