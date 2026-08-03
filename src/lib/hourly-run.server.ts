@@ -209,6 +209,7 @@ async function runHourlyCycleInner(
 
 
     const saxoRefresh: Record<string, { ok: boolean; error?: string; skipped?: string }> = {};
+    const saxoT0 = Date.now();
     if (runPreflightRefresh) {
       try {
         const { forceRefreshTokens, getOAuthStatus } = await import("@/lib/brokers/saxo-oauth.server");
@@ -249,12 +250,15 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: saxo refresh module load failed", e);
       }
+      tel.recordPhase("saxo_refresh", Date.now() - saxoT0);
     } else {
       saxoRefresh.live = { ok: true, skipped: "bounded run — broker access refreshes inside live tick" };
       saxoRefresh.sim = { ok: true, skipped: "bounded run — broker access refreshes inside live tick" };
+      tel.recordPhase("saxo_refresh", 0, true, "preflight disabled for bounded run");
     }
 
     let newsCount = 0;
+    const newsT0 = Date.now();
     if (runPreflightRefresh) {
       try {
         const { invalidateContextCache } = await import("@/lib/market-context-cache.server");
@@ -267,9 +271,13 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: news cache count failed", e);
       }
+      tel.recordPhase("news", Date.now() - newsT0, false, `${newsCount} headlines`);
+    } else {
+      tel.recordPhase("news", 0, true, "preflight disabled for bounded run");
     }
 
     let regimeInfo: unknown = null;
+    const regimeT0 = Date.now();
     if (runPreflightRefresh) {
       try {
         const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
@@ -277,8 +285,12 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: regime detection failed", e);
       }
+      tel.recordPhase("regime", Date.now() - regimeT0);
+    } else {
+      tel.recordPhase("regime", 0, true, "preflight disabled for bounded run");
     }
 
+    const symbolsT0 = Date.now();
     const symbolSet = new Set<string>();
     for (const p of portfolios) {
       try {
@@ -299,8 +311,10 @@ async function runHourlyCycleInner(
           )
       : { data: [] as Array<{ symbol: string }> };
     for (const h of heldRows ?? []) symbolSet.add(h.symbol);
+    tel.recordPhase("symbols", Date.now() - symbolsT0, false, `${symbolSet.size} symbols`);
 
     let priceRefresh = { refreshed: 0, errors: 0 };
+    const pricesT0 = Date.now();
     if (runPreflightRefresh && symbolSet.size > 0) {
       try {
         const { refreshLatestCandles } = await import("@/lib/market-data.server");
@@ -308,7 +322,17 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: price refresh failed", e);
       }
+      tel.recordPhase(
+        "prices",
+        Date.now() - pricesT0,
+        false,
+        `${priceRefresh.refreshed} refreshed / ${priceRefresh.errors} errors`,
+      );
+    } else {
+      tel.recordPhase("prices", 0, true, runPreflightRefresh ? "no symbols" : "preflight disabled for bounded run");
     }
+
+
 
     const hourStartUtc = new Date();
     hourStartUtc.setUTCMinutes(0, 0, 0);
