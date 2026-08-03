@@ -24,6 +24,8 @@ import type { TailHedgeDecision } from "./tail-hedge";
 import { findSymbol } from "@/lib/universe.server";
 import { engineSymbolKey, priceSymbolVariants } from "@/lib/price-symbol";
 import { holdingAvgCostBase } from "@/lib/market-price-units";
+import { isSymbolBlocked } from "@/lib/broker-instrument-blocks";
+
 import type { ExecutedTrade } from "@/lib/trading-engine.server";
 
 type Holding = Database["public"]["Tables"]["holdings"]["Row"];
@@ -139,6 +141,21 @@ export function applyTailHedgeToPaperPortfolio(
     || defaultHedgeSymbolFor(portfolioCurrency);
   const meta = findSymbol(symbol);
   if (!meta) return { ...base, reason: `unknown hedge symbol ${symbol}` };
+
+  // Broker refuses this instrument on this account (suitability/permissions).
+  // Buying is pointless — every order would be rejected — but keep sells open.
+  if (
+    decision.action === "buy" &&
+    (input.blockedSymbols?.length ?? 0) > 0 &&
+    isSymbolBlocked(symbol, input.blockedSymbols!)
+  ) {
+    return {
+      ...base,
+      symbol,
+      reason: `hedge buy skipped: broker blocks ${symbol} on this account (suitability/permissions)`,
+    };
+  }
+
 
   const found = findHolding(holdingsByS, symbol);
   const livePrice = findPrice(priceMap, symbol);
