@@ -25,7 +25,12 @@ type ManualRunResult = {
 
 export const triggerHourlyRunNow = createServerFn({ method: "POST" })
   .middleware([requireAal2])
-  .inputValidator((data: { force?: boolean } | undefined) => ({ force: data?.force === true }))
+  .inputValidator((data: { force?: boolean; portfolioIds?: string[] } | undefined) => ({
+    force: data?.force === true,
+    portfolioIds: Array.isArray(data?.portfolioIds)
+      ? data!.portfolioIds.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50)
+      : [],
+  }))
   .handler(async ({ data }): Promise<ManualRunResult> => {
     const started = Date.now();
     const { runHourlyCycle } = await import("@/lib/hourly-run.server");
