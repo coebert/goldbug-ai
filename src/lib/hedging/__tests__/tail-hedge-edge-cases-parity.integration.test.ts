@@ -353,14 +353,20 @@ describe("Phase 6 backtest ↔ executor: edge-case parity", () => {
     expect(btHedge.every((t) => t.date === "2024-01-01")).toBe(true);
   });
 
-  it("share-boundary rounding: spend one bp below one share defers as insufficient in both paths", () => {
-    // Force spend < price by a hair via a $0.01 price bump above target.
-    // NAV=100, target=3.0, price=3.01 → spend=3.0 < 3.01 → both defer.
+  it("share-boundary rounding: one bp below a share stays in lockstep (whole-share venue defers)", () => {
+    // NAV=100, target=3.0, price=3.01 → fractional books buy 0.997 units,
+    // a whole-share venue can't afford a single share.
     const cfg = zeroCostCfg({ initialCash: 100 });
     const days: DayInput[] = [
       { date: "2024-01-01", price: 3.01 },
       { date: "2024-01-02", price: 3.01 },
     ];
-    assertParity(days, cfg, { requiredBuckets: ["insufficient_cash"] });
+    assertParity(days, cfg, { minFills: 1 });
+    expect(
+      sizeHedgeBuy({
+        deltaNotional: 3, cash: 100, price: 3.01, bufferPct: BUFFER, wholeShares: true,
+      }).ok,
+    ).toBe(false);
   });
+
 });
