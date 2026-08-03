@@ -105,5 +105,28 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       portfolios: result.portfolios,
       skipped_paused: result.skipped_paused,
       results: result.results,
+      telemetry: {
+        run_id: result.telemetry.run_id,
+        budget_ms: result.telemetry.budget_ms,
+        duration_ms: result.telemetry.duration_ms,
+        deadline_exceeded: result.telemetry.deadline_exceeded,
+        overrun_ms: result.telemetry.overrun_ms,
+        preflight_ms: result.telemetry.preflight_ms,
+        preflight_budget_pct: result.telemetry.preflight_budget_pct,
+        preflight_refresh: result.telemetry.preflight_refresh,
+        phases: result.telemetry.phases,
+        selection: result.telemetry.selection
+          ? {
+              scoped: result.telemetry.selection.scoped,
+              requested_count: result.telemetry.selection.requested_count,
+              matched: result.telemetry.selection.matched,
+              unknown_ids: result.telemetry.selection.unknown_ids,
+              paused_excluded: result.telemetry.selection.paused_excluded,
+            }
+          : null,
+        ticked: result.telemetry.ticked,
+        skipped_budget: result.telemetry.skipped_budget,
+      },
+
     };
   });
