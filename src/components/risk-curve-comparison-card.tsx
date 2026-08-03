@@ -123,29 +123,25 @@ export function RiskCurveComparisonCard({
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={rows} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                  <CartesianGrid {...GRID_PROPS} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10 }}
-                    stroke="var(--muted-foreground)"
+                    tick={AXIS_TICK}
                     minTickGap={40}
+                    tickMargin={6}
                     tickFormatter={(d: string) => String(d).slice(0, 7)}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
                   <YAxis
-                    tick={{ fontSize: 10 }}
-                    stroke="var(--muted-foreground)"
-                    width={44}
+                    tick={AXIS_TICK}
+                    width={56}
                     domain={["auto", "auto"]}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--popover)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      fontSize: 12,
-                      color: "var(--popover-foreground)",
-                    }}
-                  />
+                  <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} />
+
                   {result.legs.map((leg) => (
                     <Line
                       key={leg.level}
