@@ -31,7 +31,10 @@ export type HourlyRunResult = {
     excluded_symbols?: Array<{ symbol: string; venue: string; phase: string }>;
   }>;
   metrics: RunMetricsSnapshot;
+  /** Structured timings: pre-flight cost, selection, per-tick, deadline usage. */
+  telemetry: RunTelemetrySnapshot;
 };
+
 
 export class RunInProgressError extends Error {
   code = "run_in_progress" as const;
