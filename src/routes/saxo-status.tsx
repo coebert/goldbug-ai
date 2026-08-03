@@ -420,6 +420,8 @@ function SaxoStatusPage() {
           </div>
         )}
 
+        <BrokerSuitabilityBlocksCard />
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Troubleshooting</CardTitle>
