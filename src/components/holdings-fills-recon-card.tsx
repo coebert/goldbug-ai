@@ -37,13 +37,13 @@ export function HoldingsFillsReconCard({
 
   return (
     <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ScaleIcon className="h-4 w-4 text-muted-foreground" />
-          Ledger vs holdings check
+      <CardHeader className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <CardTitle className="flex min-w-0 items-center gap-2 text-base">
+          <ScaleIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 break-words">Ledger vs holdings check</span>
         </CardTitle>
         {report && (
-          <Badge variant="outline">
+          <Badge variant="outline" className="w-fit shrink-0">
             {report.checked} position{report.checked === 1 ? "" : "s"} checked
           </Badge>
         )}
@@ -78,14 +78,14 @@ export function HoldingsFillsReconCard({
               {rows.map((r) => (
                 <li
                   key={`${r.portfolioId}-${r.symbol}`}
-                  className={`rounded-lg border p-3 ${
+                  className={`min-w-0 rounded-lg border p-3 ${
                     r.severity === "critical"
                       ? "border-destructive/40 bg-destructive/5"
                       : "border-border bg-muted/30"
                   }`}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-mono text-sm font-semibold text-foreground">
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-2">
+                    <p className="min-w-0 break-all font-mono text-sm font-semibold text-foreground">
                       {r.symbol}
                       <span className="ml-2 font-sans text-xs font-normal text-muted-foreground">
                         {names.get(r.portfolioId) ?? "Portfolio"}
@@ -93,7 +93,7 @@ export function HoldingsFillsReconCard({
                     </p>
                     <Badge
                       variant="outline"
-                      className={
+                      className={"w-fit shrink-0 " +
                         r.severity === "critical"
                           ? "border-destructive/50 text-destructive"
                           : "border-border text-muted-foreground"
@@ -102,10 +102,23 @@ export function HoldingsFillsReconCard({
                       {r.kind === "ok" ? "Matches" : KIND_LABEL[r.kind]}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Ledger {qty(r.fillsQuantity)} · holdings {qty(r.holdingsQuantity)} · difference{" "}
-                    {qty(r.difference)}
-                  </p>
+                  <dl className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground sm:grid-cols-3 sm:gap-2">
+                    {[
+                      { label: "Ledger", value: qty(r.fillsQuantity) },
+                      { label: "Holdings", value: qty(r.holdingsQuantity) },
+                      { label: "Difference", value: qty(r.difference) },
+                    ].map((m) => (
+                      <div
+                        key={m.label}
+                        className="flex min-w-0 items-baseline justify-between gap-2 sm:block"
+                      >
+                        <dt className="shrink-0 uppercase tracking-wide">{m.label}</dt>
+                        <dd className="min-w-0 break-words text-right font-medium tabular-nums text-foreground sm:mt-0.5 sm:text-left">
+                          {m.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
                   <p className="mt-1 text-xs text-muted-foreground">{r.detail}</p>
                 </li>
               ))}
