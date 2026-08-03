@@ -36,7 +36,7 @@ export const DecisionSchema = z.object({
 
 export type DecisionOutput = z.infer<typeof DecisionSchema>;
 
-export export type ExecutedTrade = {
+export type ExecutedTrade = {
   symbol: string;
   side: "buy" | "sell";
   quantity: number;
