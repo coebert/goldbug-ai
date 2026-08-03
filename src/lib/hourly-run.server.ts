@@ -614,6 +614,11 @@ async function runHourlyCycleInner(
         triggered_by: manualTrigger ? "manual" : "cron",
         success: true,
         duration_ms: metricsSnap.duration_ms,
+        // Pre-flight timings feed the slow-step anomaly detector.
+        preflight_ms: telemetry.preflight_ms,
+        preflight_budget_pct: telemetry.preflight_budget_pct,
+        budget_ms: telemetry.budget_ms,
+        phases: telemetry.phases,
         portfolios_total: portfolios.length,
         portfolios_ok: metricsSnap.portfolios_ok,
         portfolios_error: metricsSnap.portfolios_error,
