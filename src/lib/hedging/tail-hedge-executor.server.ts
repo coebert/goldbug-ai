@@ -117,14 +117,59 @@ export type TailHedgeExecResult = {
   partial?: boolean;
   /** Set when the executor had to size off a stale/cost-basis price. */
   priceSource?: "live" | "avg_cost";
+  /**
+   * Audit record of instrument selection, emitted whenever the primary hedge
+   * wrapper could not be used (substituted, or no substitute found).
+   */
+  fallback?: HedgeFallbackAudit;
 };
 
+/** One auditable hedge-instrument fallback event. */
+export type HedgeFallbackAudit = {
+  side: "buy" | "sell";
+  /** The wrapper we intended to trade (override or currency default). */
+  primarySymbol: string;
+  /** The substitute actually selected, or null when none qualified. */
+  chosenSymbol: string | null;
+  /** Machine reason the primary was rejected. */
+  reasonCode:
+    | "broker_block"
+    | "no_live_price"
+    | "not_in_universe"
+    | "nothing_held"
+    | "ineligible"
+    | "no_eligible_candidate";
+  /** Human-readable explanation, including the full candidate ladder verdict. */
+  reasonDetail: string;
+  /** Every candidate that was rejected, with its reason. */
+  candidates: Array<{ symbol: string; reason: string }>;
+  targetNotional: number;
+};
+
+function classifyRejection(reason: string | undefined): HedgeFallbackAudit["reasonCode"] {
+  if (!reason) return "ineligible";
+  if (reason.includes("broker block")) return "broker_block";
+  if (reason.includes("no live price")) return "no_live_price";
+  if (reason.includes("not in universe")) return "not_in_universe";
+  if (reason.includes("nothing held")) return "nothing_held";
+  return "ineligible";
+}
+
 export function applyTailHedgeToPaperPortfolio(
+  input: TailHedgeExecInputs,
+): TailHedgeExecResult {
+  const result = applyTailHedgeCore(input);
+  return result;
+}
+
+function applyTailHedgeCore(
   input: TailHedgeExecInputs,
 ): TailHedgeExecResult {
   const { decision, holdingsByS, priceMap, portfolioId, portfolioCurrency, isLivePortfolio } = input;
   let { workingCash } = input;
   const bufferPct = input.cashBufferPct ?? 0.01;
+  let fallback: HedgeFallbackAudit | undefined;
+
 
   const base = {
     applied: false as boolean,
