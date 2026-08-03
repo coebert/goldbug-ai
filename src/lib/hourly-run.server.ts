@@ -452,7 +452,7 @@ async function runHourlyCycleInner(
             .maybeSingle();
           if (recent.data) {
             const label = manualTrigger
-              ? `already ticked at ${recent.data.created_at} — pass force:true to override`
+              ? `already ticked at ${recent.data.created_at} — enable "Force clear" (or pass forceTick:true) to override`
               : "already ticked this hour";
             tel.tickSkipped(p.id, String(p.mode), label);
             push({
