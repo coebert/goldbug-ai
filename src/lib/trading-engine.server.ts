@@ -2595,7 +2595,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       portfolioId,
       portfolioCurrency: portfolio.currency ?? "GBP",
       isLivePortfolio,
+      blockedSymbols: brokerBlockedSymbols,
     });
+
     workingCash = exec.workingCash;
     if (exec.trade) executed.push(exec.trade);
     tailHedgeExecution = {
