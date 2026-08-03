@@ -123,16 +123,61 @@ import {
  *     spoofing bursts) — those are exactly when the AI's judgement matters
  *     most, so we do not substitute a rule-set for it.
  *   • Cap the total buy sleeve at 25% of cash, split across up to N names
- *     (N tightens with risk_level so a low-risk portfolio never opens more
- *     than 1 fallback name per tick).
+ *     (N tightens with risk_level so a conservative portfolio never opens
+ *     more than 1 fallback name per tick). Levels are normalised via
+ *     normalizeHeuristicRiskLevel so conservative/aggressive (portfolio
+ *     vocabulary) and legacy low/high map to the same sleeve.
  *   • Env kill-switch: HEURISTIC_BUYS_ENABLED=false disables the whole path.
  */
+/**
+ * Canonical heuristic risk vocabulary.
+ *
+ * Portfolios store `risk_level` as conservative | balanced | aggressive
+ * (Database["public"]["Enums"]["risk_level"]). Older sim/backtest code used
+ * low | balanced | high. Both are accepted here and normalised to the
+ * portfolio vocabulary so the fallback buy sleeve is identical regardless of
+ * which caller supplies the level.
+ */
+export type HeuristicRiskLevel = "conservative" | "balanced" | "aggressive";
+export type HeuristicRiskLevelInput =
+  | HeuristicRiskLevel
+  | "low"
+  | "high"
+  | string
+  | null
+  | undefined;
+
+export function normalizeHeuristicRiskLevel(
+  level: HeuristicRiskLevelInput,
+): HeuristicRiskLevel {
+  switch ((level ?? "").toString().trim().toLowerCase()) {
+    case "conservative":
+    case "low":
+      return "conservative";
+    case "aggressive":
+    case "high":
+      return "aggressive";
+    default:
+      return "balanced";
+  }
+}
+
+/** Fallback buy sleeve sizing per canonical risk level. */
+export const HEURISTIC_BUY_SLEEVE: Record<
+  HeuristicRiskLevel,
+  { maxBuys: number; perNamePct: number }
+> = {
+  conservative: { maxBuys: 1, perNamePct: 5 },
+  balanced: { maxBuys: 2, perNamePct: 8 },
+  aggressive: { maxBuys: 3, perNamePct: 10 },
+};
+
 export function buildHeuristicBuys(
   holdings: HeuristicHolding[],
   features: HeuristicFeature[],
   opts: {
     cashValue: number;
-    riskLevel?: "low" | "balanced" | "high" | string | null;
+    riskLevel?: HeuristicRiskLevelInput;
     algoRegime?: AlgoRegimeSnapshot | null;
   },
 ): Array<{ symbol: string; side: "buy"; percent: number; reason: string }> {
@@ -179,8 +224,8 @@ export function buildHeuristicBuys(
   if (scored.length === 0) return [];
   scored.sort((a, b) => b.score - a.score);
 
-  const maxBuys = opts.riskLevel === "low" ? 1 : opts.riskLevel === "high" ? 3 : 2;
-  const perNamePct = opts.riskLevel === "low" ? 5 : opts.riskLevel === "high" ? 10 : 8;
+  const { maxBuys, perNamePct } =
+    HEURISTIC_BUY_SLEEVE[normalizeHeuristicRiskLevel(opts.riskLevel)];
   return scored.slice(0, maxBuys).map((s) => ({
     symbol: s.symbol,
     side: "buy" as const,
@@ -239,7 +284,7 @@ export function buildHeuristicDecision(args: {
   reason: string; // why AI was unavailable
   algoRegime?: AlgoRegimeSnapshot | null;
   cashValue?: number;
-  riskLevel?: "low" | "balanced" | "high" | string | null;
+  riskLevel?: HeuristicRiskLevelInput;
 }): HeuristicDecision {
   const maxSells = args.algoRegime?.tier === "extreme" ? 6
     : args.algoRegime?.tier === "elevated" ? 4
