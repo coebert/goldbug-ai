@@ -356,7 +356,22 @@ async function runHourlyCycleInner(
 
     const runTickFor = async (p: (typeof portfolios)[number]) => {
       const tickT0 = tel.tickStart(p.id, String(p.mode));
+      // Per-portfolio timing + name so the admin UI can show exactly what
+      // happened to each portfolio without a second round-trip.
+      const startedAtMs = Date.now();
+      const startedIso = new Date(startedAtMs).toISOString();
+      const push = (row: HourlyRunResult["results"][number]) => {
+        const finished = Date.now();
+        results.push({
+          ...row,
+          name: p.name ?? null,
+          started_at: startedIso,
+          finished_at: new Date(finished).toISOString(),
+          duration_ms: finished - startedAtMs,
+        });
+      };
       try {
+
         const elapsed = Date.now() - runStartedAt;
         if (budgetGate.shouldSkip(p.id, elapsed, Date.now())) {
           bumpBudgetExceeded();
