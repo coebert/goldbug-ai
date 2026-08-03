@@ -4,6 +4,11 @@
 // run cannot permanently block future runs.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  clearContention,
+  noteContention,
+  shouldForceRecover,
+} from "@/lib/run-lock-recovery";
 
 export type LockAcquired = {
   acquired: true;
@@ -38,6 +43,7 @@ export async function acquireRunLock(
     .maybeSingle();
 
   if (ins.data) {
+    clearContention(name);
     return {
       acquired: true,
       owner,
@@ -61,6 +67,7 @@ export async function acquireRunLock(
       .select("owner, acquired_at")
       .maybeSingle();
     if (retry.data) {
+      clearContention(name);
       return {
         acquired: true,
         owner,
@@ -74,7 +81,17 @@ export async function acquireRunLock(
   const acquiredAt = cur.data.acquired_at as string;
   const ageMs = Date.now() - new Date(acquiredAt).getTime();
 
-  if (ageMs > staleMs) {
+  // Record this contention. If the holder is alive it heartbeats `acquired_at`
+  // forward, which resets the observation window and makes recovery impossible.
+  const contention = noteContention({
+    name,
+    acquiredAt,
+    heldBy: (cur.data.owner as string | null) ?? null,
+    observedAt: Date.now(),
+  });
+  const recovery = shouldForceRecover(contention, { now: Date.now() });
+
+  if (ageMs > staleMs || recovery.recover) {
     // Evict stale lock and claim it. Use delete-then-insert (rather than an
     // in-place UPDATE) so a crashed worker whose row somehow survived can
     // never wedge future runs. The delete is scoped by (name, acquired_at)
@@ -94,7 +111,10 @@ export async function acquireRunLock(
         .select("owner, acquired_at")
         .maybeSingle();
       if (claim.data) {
-        console.warn(`run-lock: evicted stale "${name}" (age ${Math.round(ageMs / 1000)}s, prev owner ${cur.data.owner ?? "unknown"})`);
+        console.warn(
+          `run-lock: evicted stale "${name}" (age ${Math.round(ageMs / 1000)}s, prev owner ${cur.data.owner ?? "unknown"}, trigger ${recovery.recover ? `repeated-contention x${recovery.observations}` : "age"})`,
+        );
+        clearContention(name);
         return {
           acquired: true,
           owner,
@@ -133,6 +153,7 @@ export async function renewRunLock(name: string, owner: string): Promise<void> {
 }
 
 export async function releaseRunLock(name: string, owner: string): Promise<void> {
+  clearContention(name);
   try {
     await supabaseAdmin.from("run_locks").delete().eq("name", name).eq("owner", owner);
   } catch (e) {
