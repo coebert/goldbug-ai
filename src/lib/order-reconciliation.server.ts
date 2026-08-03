@@ -15,6 +15,7 @@ import { asJson } from "@/lib/_server/db-json";
 import { logReconcileEvent, type ReconcileReasonCode } from "./reconcile-event-log.server";
 import { decideSimFill } from "./sim-fill-rules";
 import { getMarketStatusForSymbol, inferVenue, marketHadOpenPeriod } from "./market-hours";
+import { resolveFillRecord, type FillPriceCandidate } from "./fill-record";
 
 export type OrderReconcileOutcome =
   | "filled"
