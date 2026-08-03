@@ -1,7 +1,9 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { withRunMetrics, snapshot, bumpBudgetExceeded, bumpPortfolio } from "@/lib/run-metrics.server";
+import { createRunTelemetry, describeSelection, type RunTelemetrySnapshot } from "@/lib/run-telemetry";
 
 export type RunMetricsSnapshot = ReturnType<typeof snapshot>;
+
 
 export type HourlyRunResult = {
   success: true;
