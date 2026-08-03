@@ -377,7 +377,7 @@ async function runHourlyCycleInner(
           bumpBudgetExceeded();
           const reason = `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up`;
           tel.tickSkipped(p.id, String(p.mode), reason);
-          results.push({
+          push({
             id: p.id,
             mode: p.mode,
             ok: true,
@@ -419,7 +419,7 @@ async function runHourlyCycleInner(
         if (!forceClear && tradeableSymbols.length === 0 && excludedSymbols.length > 0) {
           const reason = "all venues closed — AI tick skipped to save credits (pass force:true to override)";
           tel.tickSkipped(p.id, String(p.mode), reason);
-          results.push({
+          push({
             id: p.id,
             mode: p.mode,
             ok: true,
@@ -446,7 +446,7 @@ async function runHourlyCycleInner(
               ? `already ticked at ${recent.data.created_at} — pass force:true to override`
               : "already ticked this hour";
             tel.tickSkipped(p.id, String(p.mode), label);
-            results.push({
+            push({
               id: p.id,
               mode: p.mode,
               ok: true,
@@ -461,7 +461,7 @@ async function runHourlyCycleInner(
         const r = await runDailyTick(p.id, today, { skipNews: opts.skipNewsInTicks ?? true });
         bumpPortfolio("ok");
         tel.tickEnd(p.id, String(p.mode), tickT0, "ok");
-        results.push({
+        push({
           id: p.id,
           mode: p.mode,
           ok: true,
@@ -535,7 +535,7 @@ async function runHourlyCycleInner(
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
         bumpPortfolio("error");
         tel.tickEnd(p.id, String(p.mode), tickT0, "error", msg);
-        results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
+        push({ id: p.id, mode: p.mode, ok: false, error: msg });
       }
     };
 
