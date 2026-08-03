@@ -25,15 +25,29 @@ export type HourlyRunResult = {
     error?: string;
     value?: number;
     skipped?: string;
+    /** Portfolio display name, so the admin UI needn't join on ids. */
+    name?: string | null;
+    /** ISO time this portfolio entered the tick loop. */
+    started_at?: string;
+    /** ISO time this portfolio left the tick loop (ticked or skipped). */
+    finished_at?: string;
+    /** Wall-clock ms spent on this portfolio. */
+    duration_ms?: number;
     /** Symbols whose venue was open at gate time (candidates AI could size). */
     tradeable_symbols?: string[];
     /** Symbols dropped by the market-hours gate, with venue + phase reason. */
     excluded_symbols?: Array<{ symbol: string; venue: string; phase: string }>;
   }>;
+  /**
+   * Per-portfolio run status for EVERY known portfolio — including ones left
+   * untouched by a scoped manual run — plus last-run timestamps before/after.
+   */
+  portfolio_status: import("@/lib/run-portfolio-status").RunPortfolioStatus[];
   metrics: RunMetricsSnapshot;
   /** Structured timings: pre-flight cost, selection, per-tick, deadline usage. */
   telemetry: RunTelemetrySnapshot;
 };
+
 
 
 export class RunInProgressError extends Error {
