@@ -561,9 +561,47 @@ async function runHourlyCycleInner(
       );
     }
 
-
+    // Per-portfolio status board. Covers EVERY known portfolio, so a scoped
+    // manual run can prove that unselected profiles were left untouched, and
+    // carries last-run timestamps from before and after this run.
+    const { buildPortfolioRunStatuses } = await import("@/lib/run-portfolio-status");
+    const previousRunAt: Record<string, string | null> = {};
+    for (const [pid, ms] of lastDecisionAt) previousRunAt[pid] = new Date(ms).toISOString();
+    const lastRunAt: Record<string, string | null> = { ...previousRunAt };
+    try {
+      const ids = (allPortfolios ?? []).map((p) => p.id);
+      if (ids.length) {
+        const { data: freshRows } = await supabaseAdmin
+          .from("decisions")
+          .select("portfolio_id, created_at")
+          .in("portfolio_id", ids)
+          .order("created_at", { ascending: false })
+          .limit(500);
+        for (const r of freshRows ?? []) {
+          const pid = r.portfolio_id as string;
+          if (!(pid in lastRunAt) || lastRunAt[pid] === null || (r.created_at as string) > (lastRunAt[pid] as string)) {
+            lastRunAt[pid] = r.created_at as string;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("hourly-run: post-run last-decision lookup failed", e);
+    }
+    const portfolioStatus = buildPortfolioRunStatuses({
+      portfolios: (allPortfolios ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        mode: String(p.mode),
+        live_paused: p.live_paused,
+      })),
+      requestedIds: opts.portfolioIds,
+      results,
+      previousRunAt,
+      lastRunAt,
+    });
 
     const metricsSnap = snapshot(metrics);
+
     const telemetry = tel.finish({
       portfolios_total: portfolios.length,
       skipped_paused: skippedPaused,
