@@ -89,13 +89,16 @@ function HeadlineBlock({
 }
 
 describe("portfolio card headline — layout contract (source-level)", () => {
-  it("row 2 uses a responsive two-column grid that survives mobile widths", () => {
-    // The row that hosts the sparkline + headline MUST use a two-column
-    // grid on mobile so the £ headline never wraps under or clips the
-    // sparkline. Rule from responsive-layout-patterns.
+  it("row 2 stacks on mobile and becomes a two-column grid from sm up", () => {
+    // The row hosting the sparkline + headline stacks to one column on
+    // phones (so the £ headline gets full width instead of being squeezed
+    // beside the sparkline) and switches to sparkline | headline from the
+    // sm breakpoint, bottom-aligned. Rule from responsive-layout-patterns.
     expect(SOURCE).toMatch(
-      /grid\s+grid-cols-\[minmax\(0,1fr\)_auto\]\s+items-end\s+gap-3/,
+      /grid\s+grid-cols-1\s+gap-3[\s\S]{0,120}?sm:grid-cols-\[minmax\(0,1fr\)_auto\]\s+sm:items-end/,
     );
+  });
+
     // Sparkline column must be min-w-0 to let text/svg shrink.
     expect(SOURCE).toMatch(/<div className="min-w-0">\s*<div className="flex items-center gap-2">/);
     // Headline column must be shrink-0 + text-right so the £ number
