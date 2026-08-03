@@ -4,6 +4,7 @@ import { getFxIntentPnl } from "@/lib/fx-intent-pnl.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { POLL } from "@/lib/query-keys";
 
 interface Props {
   portfolioId: string;
@@ -41,7 +42,7 @@ export function FxIntentPnlCard({ portfolioId, active = true }: Props) {
     queryFn: () => fetchPnl({ data: { portfolioId, sinceDays: 30 } }),
     enabled: active,
     staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
   });
 
   const data = query.data;

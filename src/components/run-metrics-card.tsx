@@ -35,6 +35,7 @@ import {
   LEGEND_STYLE,
   TICK_LINE,
 } from "@/lib/chart-palette";
+import { POLL } from "@/lib/query-keys";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -58,7 +59,7 @@ export function RunMetricsCard() {
   const q = useQuery({
     queryKey: ["run-metrics-history", hours],
     queryFn: () => fetchMetrics({ data: { hours } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const rows: RunMetricRow[] = q.data ?? [];

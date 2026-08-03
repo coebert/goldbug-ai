@@ -17,6 +17,7 @@ import {
   listMyPushSubscriptions,
   sendTestPush,
 } from "@/lib/push.functions";
+import { POLL } from "@/lib/query-keys";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -71,7 +72,7 @@ export function PushNotificationsCard() {
   const subsQ = useQuery({
     queryKey: ["push-subs"],
     queryFn: () => listSubs(),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const enable = useMutation({

@@ -18,7 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Radio, RefreshCw, ShieldOff, Power, PauseCircle, PlayCircle, History, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Send, Clock, Ban, Zap, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { Explain } from "@/components/explain";
-import { qk } from "@/lib/query-keys";
+import { qk, POLL } from "@/lib/query-keys";
 
 export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const qc = useQueryClient();
@@ -53,7 +53,7 @@ export function LiveTradingCard({ portfolioId }: { portfolioId: string }) {
   const alertQ = useQuery({
     queryKey: qk.live.tradeAlert(portfolioId),
     queryFn: () => tradeAlertFn({ data: { portfolioId, windowRuns: 5 } }),
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: POLL.SLOW,
   });
 
   const refresh = () => {

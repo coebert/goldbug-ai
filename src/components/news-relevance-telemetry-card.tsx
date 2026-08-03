@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Activity, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { getRelevanceScoringTelemetry } from "@/lib/news-relevance-telemetry.functions";
 import { describeFailureReason, type RelevanceFailureReason } from "@/lib/news-relevance-telemetry";
+import { POLL } from "@/lib/query-keys";
 
 /**
  * Diagnostics strip for the Gemini relevance ranker: batch latency, batch
@@ -13,7 +14,7 @@ export function NewsRelevanceTelemetryCard() {
   const q = useQuery({
     queryKey: ["news-relevance-telemetry"],
     queryFn: () => read({ data: { limit: 8 } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const runs = q.data?.runs ?? [];

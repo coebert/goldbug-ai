@@ -28,7 +28,7 @@ import {
   type MarketStatus,
 } from "@/lib/market-hours";
 import { toast } from "sonner";
-import { qk } from "@/lib/query-keys";
+import { qk, POLL } from "@/lib/query-keys";
 
 const RANGES = [
   { label: "24h", hours: 24 },
@@ -70,7 +70,7 @@ export function OrderReconciliationCard({ portfolioId }: { portfolioId?: string 
   const q = useQuery({
     queryKey: ["order-recon-view", hours, portfolioId ?? null],
     queryFn: () => fetchRows({ data: { hours, portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const backfill = useMutation({

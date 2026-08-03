@@ -32,6 +32,7 @@ import { StartingCashIntegrityCard } from "@/components/starting-cash-integrity-
 import { CashSyncReconciliationCard } from "@/components/cash-sync-reconciliation-card";
 import { PriceScalingAuditCard } from "@/components/price-scaling-audit-card";
 import { CreditBudgetCard } from "@/components/credit-budget-card";
+import { POLL } from "@/lib/query-keys";
 
 
 
@@ -235,7 +236,7 @@ function AdminPage() {
   const q = useQuery({
     queryKey: ["admin-health"],
     queryFn: () => fetchHealth(),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const portfoliosQ = useQuery({

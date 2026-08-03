@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Layers } from "lucide-react";
 import { formatUkTime } from "@/lib/uk-time";
+import { POLL } from "@/lib/query-keys";
 
 interface Props {
   portfolioId: string;
@@ -25,7 +26,7 @@ export function FxTradeDrilldownCard({ portfolioId, active = true }: Props) {
     queryFn: () => fetchFn({ data: { portfolioId, limit: 10 } }),
     enabled: active,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
   const data = q.data;
 

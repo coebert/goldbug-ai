@@ -4,6 +4,7 @@ import { simulateRiskGuardrails } from "@/lib/risk-simulator.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sliders } from "lucide-react";
+import { POLL } from "@/lib/query-keys";
 
 interface Props {
   portfolioId: string;
@@ -42,7 +43,7 @@ export function RiskSimulatorCard({ portfolioId, active = true }: Props) {
     queryFn: () => run({ data: { portfolioId } }),
     enabled: active,
     staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
   });
 
   const data = query.data;

@@ -4,6 +4,7 @@ import { Bell } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { listNotifications } from "@/lib/notifications.functions";
 import { NotificationsPanel } from "@/components/notifications-panel";
+import { POLL } from "@/lib/query-keys";
 
 const CATEGORY = "pending_slices";
 
@@ -12,7 +13,7 @@ export function NotificationsBell({ className = "" }: { className?: string }) {
   const q = useQuery({
     queryKey: ["notifications", CATEGORY, "unread-count"],
     queryFn: () => list({ data: { category: CATEGORY, unreadOnly: true, limit: 1 } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
     staleTime: 30_000,
   });
   const unread = q.data?.unreadCount ?? 0;

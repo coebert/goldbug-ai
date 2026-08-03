@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { formatUkDate, formatUkTime } from "@/lib/uk-time";
 import { cn } from "@/lib/utils";
+import { POLL } from "@/lib/query-keys";
 
 interface Props {
   portfolioId: string;
@@ -136,7 +137,7 @@ export function TodaysDecisionSummaryCard({ portfolioId, currency }: Props) {
     queryKey: ["todays-decision-summary", portfolioId],
     queryFn: () => fetchSummary({ data: { portfolioId } }),
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
   });
 
   const summary: DecisionSummary | undefined = query.data;
