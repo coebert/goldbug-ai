@@ -25,6 +25,7 @@ import { findSymbol } from "@/lib/universe.server";
 import { engineSymbolKey, priceSymbolVariants } from "@/lib/price-symbol";
 import { holdingAvgCostBase } from "@/lib/market-price-units";
 import { isSymbolBlocked } from "@/lib/broker-instrument-blocks";
+import { hedgeCandidatesFor, selectHedgeInstrument } from "./hedge-instrument-fallback";
 
 import type { ExecutedTrade } from "@/lib/trading-engine.server";
 
