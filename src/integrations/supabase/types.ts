@@ -2412,14 +2412,18 @@ export type Database = {
       run_metrics: {
         Row: {
           budget_exceeded_count: number
+          budget_ms: number | null
           created_at: string
           duration_ms: number
           error: string | null
           id: string
           news_headlines: number
+          phases: Json | null
           portfolios_error: number
           portfolios_ok: number
           portfolios_total: number
+          preflight_budget_pct: number | null
+          preflight_ms: number | null
           price_errors: number
           prices_refreshed: number
           saxo_calls_error: number
@@ -2431,14 +2435,18 @@ export type Database = {
         }
         Insert: {
           budget_exceeded_count?: number
+          budget_ms?: number | null
           created_at?: string
           duration_ms: number
           error?: string | null
           id?: string
           news_headlines?: number
+          phases?: Json | null
           portfolios_error?: number
           portfolios_ok?: number
           portfolios_total?: number
+          preflight_budget_pct?: number | null
+          preflight_ms?: number | null
           price_errors?: number
           prices_refreshed?: number
           saxo_calls_error?: number
@@ -2450,14 +2458,18 @@ export type Database = {
         }
         Update: {
           budget_exceeded_count?: number
+          budget_ms?: number | null
           created_at?: string
           duration_ms?: number
           error?: string | null
           id?: string
           news_headlines?: number
+          phases?: Json | null
           portfolios_error?: number
           portfolios_ok?: number
           portfolios_total?: number
+          preflight_budget_pct?: number | null
+          preflight_ms?: number | null
           price_errors?: number
           prices_refreshed?: number
           saxo_calls_error?: number

@@ -1,0 +1,5 @@
+ALTER TABLE public.run_metrics
+  ADD COLUMN IF NOT EXISTS preflight_ms INTEGER,
+  ADD COLUMN IF NOT EXISTS preflight_budget_pct NUMERIC,
+  ADD COLUMN IF NOT EXISTS budget_ms INTEGER,
+  ADD COLUMN IF NOT EXISTS phases JSONB;
