@@ -225,6 +225,8 @@ function AdminPage() {
   const fetchPortfolios = useServerFn(listPortfolios);
   const [tick, setTick] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Force clear: override the engine's 10-minute "already ticked" skip window.
+  const [forceTick, setForceTick] = useState(false);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(t);
