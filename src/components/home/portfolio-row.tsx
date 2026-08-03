@@ -374,7 +374,7 @@ export function PortfolioRow({
               ))}
             </div>
           </div>
-          <div className="min-w-0 text-left sm:shrink-0 sm:text-right">
+          <div className="shrink-0 text-right">
             <TooltipProvider delayDuration={150}>
               <div className="flex items-center justify-start gap-1.5 sm:justify-end text-[10px] uppercase tracking-wide text-muted-foreground">
                 Total equity
