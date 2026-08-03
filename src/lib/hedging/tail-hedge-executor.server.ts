@@ -38,10 +38,14 @@ export function defaultHedgeSymbolFor(currency: string): string {
   return "SGLN.L";
 }
 
-/** Quantities below this are dust — not worth a ticket, and not a blocker. */
-const DUST_QTY = 1e-8;
-/** Smallest notional worth booking as a hedge leg. */
-const MIN_TICKET_NOTIONAL = 1;
+import {
+  sizeHedgeBuy,
+  sizeHedgeSell,
+  HEDGE_DUST_QTY as DUST_QTY,
+  HEDGE_MIN_TICKET_NOTIONAL as MIN_TICKET_NOTIONAL,
+} from "./tail-hedge-sizing";
+
+
 
 /**
  * Look a holding up tolerantly.
