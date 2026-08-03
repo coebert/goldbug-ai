@@ -300,17 +300,24 @@ describe("Phase 6 backtest ↔ executor: edge-case parity", () => {
     });
   });
 
-  it("tiny cash + expensive hedge defers with the same 'insufficient_cash' bucket", () => {
-    // NAV=50, cape=40 risk_on → target=1.50, delta ≈ 1.50, but price=10:
-    // spend = min(1.50, 50*(1-0.01)) = 1.50 < 10 → both defer.
+  it("tiny cash + expensive hedge books a fractional clip in both paths", () => {
+    // NAV=50, cape=40 risk_on → target=1.50 vs a $10 share. Fractional books
+    // (backtest + paper executor) buy 0.15 units; a whole-share venue defers
+    // with 'insufficient_cash'. Both paths must agree.
     const cfg = zeroCostCfg({ initialCash: 50 });
     const days: DayInput[] = [
       { date: "2024-01-01", price: 10 },
       { date: "2024-01-02", price: 10 },
       { date: "2024-01-03", price: 10 },
     ];
-    assertParity(days, cfg, { requiredBuckets: ["insufficient_cash"] });
+    assertParity(days, cfg, { minFills: 1 });
+    expect(
+      sizeHedgeBuy({
+        deltaNotional: 1.5, cash: 50, price: 10, bufferPct: BUFFER, wholeShares: true,
+      }).ok,
+    ).toBe(false);
   });
+
 
   it("sub-threshold delta after a small rebalance is a shared no-op ('sub_threshold' or 'hold')", () => {
     // Cape at floor → 1% NAV target with baseline pct; tiny price wobble
