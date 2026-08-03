@@ -70,7 +70,10 @@ function authoriseSpend(args: {
     clusterCap: args.clusterCap ?? 1,
   });
   const target = cluster.allowed_weight * args.nav;
-  return Math.max(0, Math.min(aggressiveBuySpend(target, agg), args.cash));
+  // The dial may scale a target *up*; re-clamp against the vol/cluster
+  // headroom so an aggressive dial can never re-inflate past the cap.
+  const dialed = Math.min(aggressiveBuySpend(target, agg), target);
+  return Math.max(0, Math.min(dialed, args.cash));
 }
 
 /** Turn an authorised spend into a ticket at the quoted price. */
