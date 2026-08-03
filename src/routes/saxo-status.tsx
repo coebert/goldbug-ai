@@ -9,6 +9,7 @@ import { PageLoading } from "@/components/page-loading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BrokerSuitabilityBlocksCard } from "@/components/broker-suitability-blocks-card";
 import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, RefreshCw, DownloadCloud } from "lucide-react";
 
 export const Route = createFileRoute("/saxo-status")({
@@ -418,6 +419,8 @@ function SaxoStatusPage() {
             />
           </div>
         )}
+
+        <BrokerSuitabilityBlocksCard />
 
         <Card>
           <CardHeader>
