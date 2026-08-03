@@ -143,7 +143,14 @@ async function runHourlyCycleInner(
 
     if (error) throw new Error(error.message);
 
-    const portfolios = (allPortfolios ?? []).filter(
+    // Optional manual scoping: run only the selected portfolios so a targeted
+    // run isn't spent on unrelated profiles.
+    const selection = (opts.portfolioIds ?? []).filter((id) => typeof id === "string" && id);
+    const selected = selection.length
+      ? (allPortfolios ?? []).filter((p) => selection.includes(p.id))
+      : (allPortfolios ?? []);
+
+    const portfolios = selected.filter(
       (p) => !(p.mode !== "paper" && p.live_paused),
     );
     // Order: real money first, then STALEST first. Without the staleness
