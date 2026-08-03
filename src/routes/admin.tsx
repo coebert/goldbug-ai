@@ -426,6 +426,52 @@ function AdminPage() {
               <AlertDescription>{(manual.error as Error).message}</AlertDescription>
             </Alert>
           )}
+          {manual.isSuccess && manual.data?.telemetry && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-xs space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">Run diagnostics</span>
+                <code className="text-muted-foreground">{manual.data.telemetry.run_id}</code>
+                {manual.data.telemetry.deadline_exceeded ? (
+                  <Badge variant="destructive">
+                    Deadline exceeded by {(manual.data.telemetry.overrun_ms / 1000).toFixed(1)}s
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">Within deadline</Badge>
+                )}
+              </div>
+              <div className="text-muted-foreground">
+                Duration {(manual.data.telemetry.duration_ms / 1000).toFixed(1)}s of{" "}
+                {(manual.data.telemetry.budget_ms / 1000).toFixed(0)}s budget · pre-flight{" "}
+                {(manual.data.telemetry.preflight_ms / 1000).toFixed(1)}s (
+                {manual.data.telemetry.preflight_budget_pct}% of budget
+                {manual.data.telemetry.preflight_refresh ? "" : ", refreshes disabled"})
+              </div>
+              <div className="text-muted-foreground">
+                Phases:{" "}
+                {manual.data.telemetry.phases
+                  .map((p) => `${p.phase} ${p.skipped ? "skipped" : `${(p.ms / 1000).toFixed(1)}s`}`)
+                  .join(" · ")}
+              </div>
+              {manual.data.telemetry.selection && (
+                <div className="text-muted-foreground">
+                  Selection:{" "}
+                  {manual.data.telemetry.selection.scoped
+                    ? `${manual.data.telemetry.selection.matched.length} of ${manual.data.telemetry.selection.requested_count} requested matched`
+                    : "all eligible portfolios"}
+                  {manual.data.telemetry.selection.unknown_ids.length > 0 &&
+                    ` · unknown ids: ${manual.data.telemetry.selection.unknown_ids.join(", ")}`}
+                  {manual.data.telemetry.selection.paused_excluded.length > 0 &&
+                    ` · paused excluded: ${manual.data.telemetry.selection.paused_excluded.length}`}
+                </div>
+              )}
+              <div className="text-muted-foreground">
+                Ticked {manual.data.telemetry.ticked.length} · skipped for budget{" "}
+                {manual.data.telemetry.skipped_budget.length}
+              </div>
+            </div>
+          )}
+
+
 
         </CardContent>
       </Card>

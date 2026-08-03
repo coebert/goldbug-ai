@@ -21,7 +21,29 @@ type ManualRunResult = {
   portfolios: number;
   skipped_paused: number;
   results: Array<{ id: string; mode: string; ok: boolean; error?: string; skipped?: string; value?: number }>;
+  /** Deadline / pre-flight / selection diagnostics for this run. */
+  telemetry: {
+    run_id: string;
+    budget_ms: number;
+    duration_ms: number;
+    deadline_exceeded: boolean;
+    overrun_ms: number;
+    preflight_ms: number;
+    preflight_budget_pct: number;
+    preflight_refresh: boolean;
+    phases: Array<{ phase: string; ms: number; skipped: boolean; note?: string }>;
+    selection: {
+      scoped: boolean;
+      requested_count: number;
+      matched: string[];
+      unknown_ids: string[];
+      paused_excluded: string[];
+    } | null;
+    ticked: string[];
+    skipped_budget: string[];
+  };
 };
+
 
 export const triggerHourlyRunNow = createServerFn({ method: "POST" })
   .middleware([requireAal2])
@@ -83,5 +105,28 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       portfolios: result.portfolios,
       skipped_paused: result.skipped_paused,
       results: result.results,
+      telemetry: {
+        run_id: result.telemetry.run_id,
+        budget_ms: result.telemetry.budget_ms,
+        duration_ms: result.telemetry.duration_ms,
+        deadline_exceeded: result.telemetry.deadline_exceeded,
+        overrun_ms: result.telemetry.overrun_ms,
+        preflight_ms: result.telemetry.preflight_ms,
+        preflight_budget_pct: result.telemetry.preflight_budget_pct,
+        preflight_refresh: result.telemetry.preflight_refresh,
+        phases: result.telemetry.phases,
+        selection: result.telemetry.selection
+          ? {
+              scoped: result.telemetry.selection.scoped,
+              requested_count: result.telemetry.selection.requested_count,
+              matched: result.telemetry.selection.matched,
+              unknown_ids: result.telemetry.selection.unknown_ids,
+              paused_excluded: result.telemetry.selection.paused_excluded,
+            }
+          : null,
+        ticked: result.telemetry.ticked,
+        skipped_budget: result.telemetry.skipped_budget,
+      },
+
     };
   });

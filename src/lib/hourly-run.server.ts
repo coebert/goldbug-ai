@@ -1,7 +1,9 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { withRunMetrics, snapshot, bumpBudgetExceeded, bumpPortfolio } from "@/lib/run-metrics.server";
+import { createRunTelemetry, describeSelection, type RunTelemetrySnapshot } from "@/lib/run-telemetry";
 
 export type RunMetricsSnapshot = ReturnType<typeof snapshot>;
+
 
 export type HourlyRunResult = {
   success: true;
@@ -29,7 +31,10 @@ export type HourlyRunResult = {
     excluded_symbols?: Array<{ symbol: string; venue: string; phase: string }>;
   }>;
   metrics: RunMetricsSnapshot;
+  /** Structured timings: pre-flight cost, selection, per-tick, deadline usage. */
+  telemetry: RunTelemetrySnapshot;
 };
+
 
 export class RunInProgressError extends Error {
   code = "run_in_progress" as const;
@@ -75,10 +80,19 @@ async function runHourlyCycleInner(
   const runStartedAt = Date.now();
   const RUN_BUDGET_MS = Math.max(8_000, Math.min(opts.timeBudgetMs ?? 24_000, 115_000));
   const runPreflightRefresh = opts.preflightRefresh ?? RUN_BUDGET_MS > 30_000;
+  // Structured telemetry: every record carries the same run_id so one manual
+  // run can be reconstructed from the logs with a single grep.
+  const tel = createRunTelemetry({
+    triggeredBy: opts.triggeredBy,
+    force: opts.force,
+    budgetMs: RUN_BUDGET_MS,
+    preflightRefresh: runPreflightRefresh,
+  });
   const { acquireRunLock } = await import("@/lib/run-lock.server");
   const { runDailyTick } = await import("@/lib/trading-engine.server");
   const { filterUniverse } = await import("@/lib/universe.server");
   const { getMarketStatusForSymbol } = await import("@/lib/market-hours");
+
 
   const manualTrigger = opts.triggeredBy === "manual";
   const forceClear = opts.force === true;
@@ -153,6 +167,10 @@ async function runHourlyCycleInner(
     const portfolios = selected.filter(
       (p) => !(p.mode !== "paper" && p.live_paused),
     );
+    // Emitted before any portfolio is touched: which ids were requested,
+    // which matched, which were unknown, and which were dropped as paused.
+    tel.recordSelection(describeSelection(opts.portfolioIds, allPortfolios ?? []));
+
     // Order: real money first, then STALEST first. Without the staleness
     // ordering the same portfolio always won the fixed mode ordering and the
     // rest were permanently starved by the run's time budget.
@@ -191,6 +209,7 @@ async function runHourlyCycleInner(
 
 
     const saxoRefresh: Record<string, { ok: boolean; error?: string; skipped?: string }> = {};
+    const saxoT0 = Date.now();
     if (runPreflightRefresh) {
       try {
         const { forceRefreshTokens, getOAuthStatus } = await import("@/lib/brokers/saxo-oauth.server");
@@ -231,12 +250,15 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: saxo refresh module load failed", e);
       }
+      tel.recordPhase("saxo_refresh", Date.now() - saxoT0);
     } else {
       saxoRefresh.live = { ok: true, skipped: "bounded run — broker access refreshes inside live tick" };
       saxoRefresh.sim = { ok: true, skipped: "bounded run — broker access refreshes inside live tick" };
+      tel.recordPhase("saxo_refresh", 0, true, "preflight disabled for bounded run");
     }
 
     let newsCount = 0;
+    const newsT0 = Date.now();
     if (runPreflightRefresh) {
       try {
         const { invalidateContextCache } = await import("@/lib/market-context-cache.server");
@@ -249,9 +271,13 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: news cache count failed", e);
       }
+      tel.recordPhase("news", Date.now() - newsT0, false, `${newsCount} headlines`);
+    } else {
+      tel.recordPhase("news", 0, true, "preflight disabled for bounded run");
     }
 
     let regimeInfo: unknown = null;
+    const regimeT0 = Date.now();
     if (runPreflightRefresh) {
       try {
         const { detectAndPersistRegime } = await import("@/lib/regime-detector.server");
@@ -259,8 +285,12 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: regime detection failed", e);
       }
+      tel.recordPhase("regime", Date.now() - regimeT0);
+    } else {
+      tel.recordPhase("regime", 0, true, "preflight disabled for bounded run");
     }
 
+    const symbolsT0 = Date.now();
     const symbolSet = new Set<string>();
     for (const p of portfolios) {
       try {
@@ -281,8 +311,10 @@ async function runHourlyCycleInner(
           )
       : { data: [] as Array<{ symbol: string }> };
     for (const h of heldRows ?? []) symbolSet.add(h.symbol);
+    tel.recordPhase("symbols", Date.now() - symbolsT0, false, `${symbolSet.size} symbols`);
 
     let priceRefresh = { refreshed: 0, errors: 0 };
+    const pricesT0 = Date.now();
     if (runPreflightRefresh && symbolSet.size > 0) {
       try {
         const { refreshLatestCandles } = await import("@/lib/market-data.server");
@@ -290,7 +322,17 @@ async function runHourlyCycleInner(
       } catch (e) {
         console.error("hourly-run: price refresh failed", e);
       }
+      tel.recordPhase(
+        "prices",
+        Date.now() - pricesT0,
+        false,
+        `${priceRefresh.refreshed} refreshed / ${priceRefresh.errors} errors`,
+      );
+    } else {
+      tel.recordPhase("prices", 0, true, runPreflightRefresh ? "no symbols" : "preflight disabled for bounded run");
     }
+
+
 
     const hourStartUtc = new Date();
     hourStartUtc.setUTCMinutes(0, 0, 0);
@@ -299,18 +341,22 @@ async function runHourlyCycleInner(
     const results: HourlyRunResult["results"] = [];
 
     for (const p of portfolios) {
+      const tickT0 = tel.tickStart(p.id, String(p.mode));
       try {
         const elapsed = Date.now() - runStartedAt;
         if (budgetGate.shouldSkip(p.id, elapsed, Date.now())) {
           bumpBudgetExceeded();
+          const reason = `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up`;
+          tel.tickSkipped(p.id, String(p.mode), reason);
           results.push({
             id: p.id,
             mode: p.mode,
             ok: true,
-            skipped: `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up`,
+            skipped: reason,
           });
           continue;
         }
+
 
 
 
@@ -342,16 +388,19 @@ async function runHourlyCycleInner(
         // portfolio's universe is currently closed. Crypto/FX are always
         // "open" so any portfolio that includes them will still tick.
         if (!forceClear && tradeableSymbols.length === 0 && excludedSymbols.length > 0) {
+          const reason = "all venues closed — AI tick skipped to save credits (pass force:true to override)";
+          tel.tickSkipped(p.id, String(p.mode), reason);
           results.push({
             id: p.id,
             mode: p.mode,
             ok: true,
-            skipped: "all venues closed — AI tick skipped to save credits (pass force:true to override)",
+            skipped: reason,
             tradeable_symbols: tradeableSymbols,
             excluded_symbols: excludedSymbols,
           });
           continue;
         }
+
 
         const sinceIso = manualTrigger ? recentWindowIso : hourStartIso;
         if (!(manualTrigger && forceClear)) {
@@ -367,6 +416,7 @@ async function runHourlyCycleInner(
             const label = manualTrigger
               ? `already ticked at ${recent.data.created_at} — pass force:true to override`
               : "already ticked this hour";
+            tel.tickSkipped(p.id, String(p.mode), label);
             results.push({
               id: p.id,
               mode: p.mode,
@@ -381,6 +431,7 @@ async function runHourlyCycleInner(
 
         const r = await runDailyTick(p.id, today, { skipNews: opts.skipNewsInTicks ?? true });
         bumpPortfolio("ok");
+        tel.tickEnd(p.id, String(p.mode), tickT0, "ok");
         results.push({
           id: p.id,
           mode: p.mode,
@@ -389,6 +440,7 @@ async function runHourlyCycleInner(
           tradeable_symbols: tradeableSymbols,
           excluded_symbols: excludedSymbols,
         });
+
 
         // Post-tick order-status reconciliation for live portfolios.
         // Without this, orders written as `submitted` at POST time never
@@ -453,11 +505,19 @@ async function runHourlyCycleInner(
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`hourly-run: portfolio ${p.id} failed`, msg);
         bumpPortfolio("error");
+        tel.tickEnd(p.id, String(p.mode), tickT0, "error", msg);
         results.push({ id: p.id, mode: p.mode, ok: false, error: msg });
       }
     }
 
     const metricsSnap = snapshot(metrics);
+    const telemetry = tel.finish({
+      portfolios_total: portfolios.length,
+      skipped_paused: skippedPaused,
+      news_headlines: newsCount,
+      prices_refreshed: priceRefresh.refreshed,
+      price_errors: priceRefresh.errors,
+    });
     try {
       await supabaseAdmin.from("run_metrics").insert({
         triggered_by: manualTrigger ? "manual" : "cron",
@@ -494,7 +554,11 @@ async function runHourlyCycleInner(
       triggered_by: manualTrigger ? "manual" : "cron",
       results,
       metrics: metricsSnap,
+      telemetry,
     };
+  } catch (err) {
+    tel.failed(err);
+    throw err;
   } finally {
     clearInterval(heartbeat);
     await lock.release();
