@@ -45,8 +45,8 @@ export function CashReconciliationLogCard({ portfolioId }: { portfolioId: string
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-2">
-        <div>
+      <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between">
+        <div className="min-w-0">
           <CardTitle>Broker cash reconciliation log</CardTitle>
           <CardDescription>
             Per-run audit of CASH_SYNC decisions: mode, currency match, and whether starting cash was adjusted.

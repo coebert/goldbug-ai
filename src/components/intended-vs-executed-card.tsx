@@ -48,15 +48,15 @@ export function IntendedVsExecutedCard({ portfolioId }: Props) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
-        <div>
+      <CardHeader className="flex flex-col items-start gap-3 pb-3 sm:flex-row sm:justify-between">
+        <div className="min-w-0">
           <CardTitle className="text-base">Intended vs executed trades</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
             Rate at which AI trade intents reach the broker and fill. A drop
             here is the earliest signal of the executor stalling.
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {WINDOWS.map((w) => (
             <Button
               key={w.value}
@@ -75,7 +75,7 @@ export function IntendedVsExecutedCard({ portfolioId }: Props) {
         {q.error && <p className="text-sm text-destructive">{(q.error as Error).message}</p>}
         {data && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
               <Tile label="Intended orders" value={String(data.intended)} />
               <Tile
                 label="Executed rate"

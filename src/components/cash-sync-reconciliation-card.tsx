@@ -110,7 +110,7 @@ export function CashSyncReconciliationCard() {
       </CardHeader>
       <CardContent className="space-y-3">
         {data && (
-          <div className="grid grid-cols-4 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
             <Tile label="Syncs" value={String(data.totals.total)} />
             <Tile label="Booked" value={String(data.totals.adjusted)} tone="emerald" />
             <Tile label="Blocked" value={String(data.totals.blocked)} tone="amber" />

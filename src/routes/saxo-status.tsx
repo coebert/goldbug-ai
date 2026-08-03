@@ -178,8 +178,8 @@ function EnvCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <div>
+      <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <CardTitle className="text-lg">Saxo {label}</CardTitle>
           <div className="mt-1 text-xs text-muted-foreground">
             {env === "live"
@@ -239,7 +239,7 @@ function EnvCard({
               <span className="font-medium text-foreground">Latest broker snapshot</span>
               <span className="text-muted-foreground">{fmtDateTime(lastSync.fetchedAt)}</span>
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-3">
               <div>
                 <div className="text-[10px] uppercase text-muted-foreground">Total value</div>
                 <div className="font-mono">{fmtMoney(lastSync.totalValue, lastSync.currency)}</div>
@@ -359,9 +359,9 @@ function SaxoStatusPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="min-h-dvh overflow-x-hidden bg-background">
       <AppHeader email={session.user.email} />
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+      <main className="mx-auto w-full min-w-0 max-w-5xl space-y-6 px-4 py-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Saxo Connection Status</h1>

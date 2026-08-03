@@ -149,9 +149,9 @@ function TradesPage() {
   }, [rows]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <AppHeader email={email} />
-      <main className="mx-auto max-w-6xl px-4 py-6 space-y-4">
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -464,7 +464,7 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
         <div>
           <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Position impact</h4>
           <div className="rounded-md border border-border bg-background px-2.5 py-2 text-xs">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <ImpactCell label="Before" value={priorQty != null ? fmtNum(priorQty, 0) : "—"} />
               <ImpactCell
                 label={buy ? "Bought" : "Sold"}
@@ -473,7 +473,7 @@ function TradeCard({ row, highlight = false }: { row: TradeRow; highlight?: bool
               />
               <ImpactCell label="After" value={fmtNum(nowQty, 0)} />
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+            <div className="mt-2 grid grid-cols-1 gap-2 border-t border-border pt-2 text-[11px] text-muted-foreground sm:grid-cols-2">
               <div>Avg cost now: <span className="text-foreground">{row.holding ? fmtNum(row.holding.avg_cost) : "—"}</span></div>
               <div>Fill notional: <span className="text-foreground">{row.notional != null ? fmtNum(row.notional) : "—"}</span></div>
               <div>Fees: <span className="text-foreground">{fmtNum(row.fills.reduce((s, f) => s + f.fee, 0))}</span></div>
