@@ -54,6 +54,9 @@ function BrokerBlocksPage() {
 
         <TradeReconciliationReportCard days={14} />
 
+        <HoldingsFillsReconCard />
+
+
         <BrokerBlockAuditLogCard />
 
         <Card>
