@@ -28,7 +28,7 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
   .inputValidator((data: { force?: boolean; portfolioIds?: string[] } | undefined) => ({
     force: data?.force === true,
     portfolioIds: Array.isArray(data?.portfolioIds)
-      ? data!.portfolioIds.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50)
+      ? data.portfolioIds.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 50)
       : [],
   }))
   .handler(async ({ data }): Promise<ManualRunResult> => {
@@ -64,6 +64,10 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
       force: data.force,
       timeBudgetMs: 55_000,
       skipNewsInTicks: true,
+      // Manual runs are request-bound. Broad refreshes are already performed
+      // by their dedicated schedules and previously consumed most of this
+      // request's lifetime before any selected portfolio could run.
+      preflightRefresh: false,
       portfolioIds: data.portfolioIds,
     });
 
