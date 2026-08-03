@@ -416,6 +416,7 @@ async function runHourlyCycleInner(
             const label = manualTrigger
               ? `already ticked at ${recent.data.created_at} — pass force:true to override`
               : "already ticked this hour";
+            tel.tickSkipped(p.id, String(p.mode), label);
             results.push({
               id: p.id,
               mode: p.mode,
@@ -430,6 +431,7 @@ async function runHourlyCycleInner(
 
         const r = await runDailyTick(p.id, today, { skipNews: opts.skipNewsInTicks ?? true });
         bumpPortfolio("ok");
+        tel.tickEnd(p.id, String(p.mode), tickT0, "ok");
         results.push({
           id: p.id,
           mode: p.mode,
@@ -438,6 +440,7 @@ async function runHourlyCycleInner(
           tradeable_symbols: tradeableSymbols,
           excluded_symbols: excludedSymbols,
         });
+
 
         // Post-tick order-status reconciliation for live portfolios.
         // Without this, orders written as `submitted` at POST time never
