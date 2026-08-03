@@ -30,6 +30,7 @@ import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$
 import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id.analytics'
 import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
 import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/api/public/algo-regime-autotune-cron'
+import { Route as ApiBrokerBlocksClearRouteImport } from './routes/api/broker-blocks/clear'
 import { Route as ApiPublicSaxoCallbackRouteImport } from './routes/api/public/saxo/callback'
 import { Route as ApiPublicHooksValuationDriftRouteImport } from './routes/api/public/hooks/valuation-drift'
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
@@ -155,6 +156,11 @@ const ApiPublicAlgoRegimeAutotuneCronRoute =
     path: '/api/public/algo-regime-autotune-cron',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiBrokerBlocksClearRoute = ApiBrokerBlocksClearRouteImport.update({
+  id: '/api/broker-blocks/clear',
+  path: '/api/broker-blocks/clear',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSaxoCallbackRoute = ApiPublicSaxoCallbackRouteImport.update({
   id: '/api/public/saxo/callback',
   path: '/api/public/saxo/callback',
@@ -277,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
+  '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
@@ -318,6 +325,7 @@ export interface FileRoutesByTo {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
+  '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
@@ -360,6 +368,7 @@ export interface FileRoutesById {
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
+  '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/walk-forward/$id'
+    | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
@@ -444,6 +454,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/walk-forward/$id'
+    | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/long-horizon/$id'
     | '/portfolio/$id'
     | '/walk-forward/$id'
+    | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
     | '/portfolio/$id/analytics'
@@ -527,6 +539,7 @@ export interface RootRouteChildren {
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   WalkForwardIdRoute: typeof WalkForwardIdRoute
+  ApiBrokerBlocksClearRoute: typeof ApiBrokerBlocksClearRoute
   ApiPublicAlgoRegimeAutotuneCronRoute: typeof ApiPublicAlgoRegimeAutotuneCronRoute
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
   ApiPublicHooksAiGatewayHealthRoute: typeof ApiPublicHooksAiGatewayHealthRoute
@@ -698,6 +711,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAlgoRegimeAutotuneCronRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/broker-blocks/clear': {
+      id: '/api/broker-blocks/clear'
+      path: '/api/broker-blocks/clear'
+      fullPath: '/api/broker-blocks/clear'
+      preLoaderRoute: typeof ApiBrokerBlocksClearRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/saxo/callback': {
       id: '/api/public/saxo/callback'
       path: '/api/public/saxo/callback'
@@ -861,6 +881,7 @@ const rootRouteChildren: RootRouteChildren = {
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   WalkForwardIdRoute: WalkForwardIdRoute,
+  ApiBrokerBlocksClearRoute: ApiBrokerBlocksClearRoute,
   ApiPublicAlgoRegimeAutotuneCronRoute: ApiPublicAlgoRegimeAutotuneCronRoute,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
   ApiPublicHooksAiGatewayHealthRoute: ApiPublicHooksAiGatewayHealthRoute,
