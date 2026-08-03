@@ -178,15 +178,13 @@ async function runHourlyCycleInner(
     portfolios.length = 0;
     portfolios.push(...ordered);
     const skippedPaused = selected.length - portfolios.length;
-    // Starvation guard: a portfolio that hasn't produced a decision recently
-    // may bypass the time budget, so every portfolio makes progress even when
-    // earlier ticks consume the whole budget. A manual run is explicit user
-    // intent: let every stale portfolio through (30-minute threshold) instead
-    // of the single 6h override cron uses.
+    // Starvation guard: cron may admit one stale portfolio past its soft
+    // budget so accounts rotate across scheduled cycles. Manual runs are
+    // request-bound and must never bypass the deadline: doing so caused the
+    // worker to terminate a multi-portfolio request and leave a stale lock.
     const isManual = opts.triggeredBy === "manual";
     const budgetGate = createBudgetGate(RUN_BUDGET_MS, lastDecisionAt, {
-      starvedMs: isManual ? 30 * 60 * 1000 : undefined,
-      overrides: isManual ? Math.max(1, portfolios.length) : 1,
+      overrides: isManual ? 0 : 1,
     });
 
 
