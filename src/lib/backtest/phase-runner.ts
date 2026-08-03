@@ -24,6 +24,8 @@ import {
   sizeAgainstClusterCap,
 } from "@/lib/sizing/correlation-cluster";
 import { computeTailHedge } from "@/lib/hedging/tail-hedge";
+import { sizeHedgeBuy, sizeHedgeSell } from "@/lib/hedging/tail-hedge-sizing";
+
 
 export type DailyBar = { date: string } & Bar;
 
