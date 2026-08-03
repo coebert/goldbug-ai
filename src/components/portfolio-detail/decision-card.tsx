@@ -3,12 +3,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Newspaper } from "lucide-react";
 import { JargonText } from "@/components/jargon-text";
 import { getCurrentRegime } from "@/lib/regime.functions";
 import type { ConfidenceRegime } from "@/lib/order-confidence";
 import { OrderPanel } from "./order-panel";
-import { normalizeWeights } from "./signal-visuals";
+import { normalizeWeights, SignalBadges } from "./signal-visuals";
 import type { DecisionRaw, SignalWeights } from "./types";
 
 export function DecisionCard({

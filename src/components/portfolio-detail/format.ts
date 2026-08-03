@@ -27,7 +27,7 @@ export function keywordMatch(text: string, symbol: string, name: string) {
  * overlaps neighbouring cards, so anything past 1e6 collapses to exponential
  * notation.
  */
-export export function formatMetricValue(
+export function formatMetricValue(
   v: number | null | undefined,
   signed: boolean,
   suffix: string,
