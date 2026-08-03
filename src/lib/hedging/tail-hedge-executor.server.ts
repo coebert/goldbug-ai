@@ -302,7 +302,7 @@ export function applyTailHedgeToPaperPortfolio(
   const priceNote = priceSource === "avg_cost" ? " [sized off cost basis — no live quote]" : "";
   const trade: ExecutedTrade = {
     symbol, side: "sell", quantity: qty, price, value: qty * price,
-    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${priceNote}${routingNote}`,
+    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${priceNote}${fallbackNote}${routingNote}`,
   };
   return {
     applied: true, workingCash, symbol, qty, notional: qty * price,
