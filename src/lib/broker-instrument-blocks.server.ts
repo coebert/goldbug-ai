@@ -202,23 +202,52 @@ export async function loadActiveBrokerBlocks(
   }));
 }
 
-/** Clear an active block so the symbol re-enters the live universe. */
+/** Look up a single active block row (ownership check for clear flows). */
+export async function findActiveBrokerBlock(args: {
+  userId: string;
+  symbolKey: string;
+  broker?: string;
+}): Promise<{ symbol: string; symbolKey: string; ownerId: string } | null> {
+  const key = blockSymbolKey(args.symbolKey);
+  const { data, error } = await supabaseAdmin
+    .from("broker_instrument_blocks")
+    .select("symbol, symbol_key, user_id")
+    .eq("user_id", args.userId)
+    .eq("broker", args.broker ?? "saxo")
+    .eq("symbol_key", key)
+    .is("cleared_at", null)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    symbol: data.symbol as string,
+    symbolKey: data.symbol_key as string,
+    ownerId: data.user_id as string,
+  };
+}
+
+/**
+ * Clear an active block so the symbol re-enters the live universe.
+ * Returns the number of rows actually cleared (0 when nothing matched), so
+ * callers can distinguish "unblocked" from "there was nothing to unblock".
+ */
 export async function clearBrokerBlock(args: {
   userId: string;
   symbolKey: string;
   broker?: string;
-}): Promise<boolean> {
+}): Promise<number> {
   const key = blockSymbolKey(args.symbolKey);
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("broker_instrument_blocks")
     .update({ cleared_at: new Date().toISOString() })
     .eq("user_id", args.userId)
     .eq("broker", args.broker ?? "saxo")
     .eq("symbol_key", key)
-    .is("cleared_at", null);
+    .is("cleared_at", null)
+    .select("id");
   if (error) {
     console.warn("[broker-blocks] clear failed:", error.message);
-    return false;
+    return 0;
   }
-  return true;
+  return data?.length ?? 0;
 }
+
