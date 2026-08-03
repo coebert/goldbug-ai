@@ -340,7 +340,7 @@ async function runHourlyCycleInner(
     const recentWindowIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const results: HourlyRunResult["results"] = [];
 
-    for (const p of portfolios) {
+    const runTickFor = async (p: (typeof portfolios)[number]) => {
       const tickT0 = tel.tickStart(p.id, String(p.mode));
       try {
         const elapsed = Date.now() - runStartedAt;
