@@ -100,9 +100,11 @@ describe("portfolio card headline — layout contract (source-level)", () => {
 
     // Sparkline column must be min-w-0 to let text/svg shrink.
     expect(SOURCE).toMatch(/<div className="min-w-0">\s*<div className="flex items-center gap-2">/);
-    // Headline column must be shrink-0 + text-right so the £ number
-    // stays glued to the right edge on every breakpoint.
-    expect(SOURCE).toMatch(/<div className="shrink-0 text-right">/);
+    // Headline column is left-aligned while stacked, then shrink-0 +
+    // right-aligned from sm up so the £ number stays glued to the right
+    // edge of the two-column row on tablet/desktop.
+    expect(SOURCE).toMatch(/<div className="min-w-0 text-left sm:shrink-0 sm:text-right">/);
+
   });
 
 
