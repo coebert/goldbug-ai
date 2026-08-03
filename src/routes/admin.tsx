@@ -282,6 +282,7 @@ function AdminPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
+          <Link to="/broker-blocks" className="text-sm text-muted-foreground hover:text-foreground">Blocked instruments</Link>
           <Button variant="outline" size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
             <RefreshCw className={`mr-2 h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
             Refresh
