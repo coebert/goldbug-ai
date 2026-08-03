@@ -27,6 +27,9 @@ export async function recordBrokerRejection(args: {
   symbol: string;
   rejectReason: string | null | undefined;
   errorCode?: string | null;
+  orderId?: string | null;
+  side?: string | null;
+  quantity?: number | null;
 }): Promise<{ blocked: boolean; reason: BrokerBlockReason | null }> {
   const cls = classifyBrokerBlock(args.rejectReason, args.errorCode);
   if (!cls.block || !cls.reason) return { blocked: false, reason: null };
@@ -43,11 +46,14 @@ export async function recordBrokerRejection(args: {
     .eq("symbol_key", symbolKey)
     .maybeSingle();
 
+  const firstBlock = !existing.data?.id;
+  const hitCount = firstBlock ? 1 : Number(existing.data?.hit_count ?? 0) + 1;
+
   if (existing.data?.id) {
     await supabaseAdmin
       .from("broker_instrument_blocks")
       .update({
-        hit_count: Number(existing.data.hit_count ?? 0) + 1,
+        hit_count: hitCount,
         last_seen_at: nowIso,
         cleared_at: null,
         reason: cls.reason,
@@ -71,10 +77,103 @@ export async function recordBrokerRejection(args: {
     });
   }
 
+  const recommendedAction = recommendedActionFor(cls.reason);
+
+  // Detailed, append-only audit trail: one row per rejection occurrence.
+  const audit = await supabaseAdmin.from("broker_block_events").insert({
+    user_id: args.userId,
+    portfolio_id: args.portfolioId ?? null,
+    broker,
+    symbol: args.symbol,
+    symbol_key: symbolKey,
+    reason: cls.reason,
+    detail: cls.detail,
+    reject_reason: (args.rejectReason ?? "").slice(0, 1000),
+    error_code: args.errorCode ?? null,
+    order_id: args.orderId ?? null,
+    side: args.side ?? null,
+    quantity: args.quantity ?? null,
+    recommended_action: recommendedAction,
+    first_block: firstBlock,
+    hit_count: hitCount,
+  });
+  if (audit.error) {
+    console.warn("[broker-blocks] audit insert failed:", audit.error.message);
+  }
+
+  const { notifyBrokerBlock } = await import("./broker-block-notify.server");
+  notifyBrokerBlock({
+    userId: args.userId,
+    portfolioId: args.portfolioId ?? null,
+    broker,
+    symbol: args.symbol,
+    symbolKey,
+    reason: cls.reason,
+    detail: cls.detail,
+    rejectReason: args.rejectReason ?? null,
+    orderId: args.orderId ?? null,
+    firstBlock,
+    hitCount,
+  });
+
   console.info(
-    `[broker-blocks] ${broker} blocked ${args.symbol} (${cls.reason}): ${cls.detail}`,
+    `[broker-blocks] ${broker} blocked ${args.symbol} (${cls.reason}): ${cls.detail} — ${recommendedAction}`,
   );
   return { blocked: true, reason: cls.reason };
+}
+
+export type BrokerBlockEvent = {
+  id: string;
+  createdAt: string;
+  broker: string;
+  symbol: string;
+  symbolKey: string;
+  reason: string;
+  detail: string | null;
+  rejectReason: string | null;
+  errorCode: string | null;
+  orderId: string | null;
+  side: string | null;
+  quantity: number | null;
+  recommendedAction: string;
+  firstBlock: boolean;
+  hitCount: number;
+};
+
+/** Most recent rejection events (audit log) for a user. */
+export async function loadBrokerBlockEvents(
+  userId: string,
+  limit = 50,
+): Promise<BrokerBlockEvent[]> {
+  const { data, error } = await supabaseAdmin
+    .from("broker_block_events")
+    .select(
+      "id, created_at, broker, symbol, symbol_key, reason, detail, reject_reason, error_code, order_id, side, quantity, recommended_action, first_block, hit_count",
+    )
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(Math.max(limit, 1), 200));
+  if (error) {
+    console.warn("[broker-blocks] event load failed:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    createdAt: r.created_at as string,
+    broker: r.broker as string,
+    symbol: r.symbol as string,
+    symbolKey: r.symbol_key as string,
+    reason: r.reason as string,
+    detail: (r.detail as string | null) ?? null,
+    rejectReason: (r.reject_reason as string | null) ?? null,
+    errorCode: (r.error_code as string | null) ?? null,
+    orderId: (r.order_id as string | null) ?? null,
+    side: (r.side as string | null) ?? null,
+    quantity: r.quantity == null ? null : Number(r.quantity),
+    recommendedAction: r.recommended_action as string,
+    firstBlock: Boolean(r.first_block),
+    hitCount: Number(r.hit_count ?? 1),
+  }));
 }
 
 /** All active (not cleared) blocks for a user. */
