@@ -1062,6 +1062,71 @@ export type Database = {
         }
         Relationships: []
       }
+      hedge_fallback_events: {
+        Row: {
+          applied: boolean
+          applied_notional: number
+          candidates: Json
+          chosen_symbol: string | null
+          created_at: string
+          currency: string
+          decision_id: string | null
+          id: string
+          portfolio_id: string
+          primary_symbol: string
+          reason_code: string
+          reason_detail: string
+          run_date: string
+          side: string
+          target_notional: number
+          user_id: string
+        }
+        Insert: {
+          applied?: boolean
+          applied_notional?: number
+          candidates?: Json
+          chosen_symbol?: string | null
+          created_at?: string
+          currency?: string
+          decision_id?: string | null
+          id?: string
+          portfolio_id: string
+          primary_symbol: string
+          reason_code: string
+          reason_detail: string
+          run_date: string
+          side: string
+          target_notional?: number
+          user_id: string
+        }
+        Update: {
+          applied?: boolean
+          applied_notional?: number
+          candidates?: Json
+          chosen_symbol?: string | null
+          created_at?: string
+          currency?: string
+          decision_id?: string | null
+          id?: string
+          portfolio_id?: string
+          primary_symbol?: string
+          reason_code?: string
+          reason_detail?: string
+          run_date?: string
+          side?: string
+          target_notional?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hedge_fallback_events_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holdings: {
         Row: {
           asset_class: Database["public"]["Enums"]["asset_class"]
