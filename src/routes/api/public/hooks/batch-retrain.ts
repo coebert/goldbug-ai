@@ -39,6 +39,8 @@ export const Route = createFileRoute("/api/public/hooks/batch-retrain")({
 
         const lock = await acquireRunLock("batch-retrain", {
           owner: forcedUserId ? "manual" : "cron",
+          // TTL so a terminated request cannot leave the lock behind.
+          ttlMs: 5 * 60_000,
         });
         if (!lock.acquired) {
           return new Response(
