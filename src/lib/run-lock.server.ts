@@ -4,6 +4,11 @@
 // run cannot permanently block future runs.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  clearContention,
+  noteContention,
+  shouldForceRecover,
+} from "@/lib/run-lock-recovery";
 
 export type LockAcquired = {
   acquired: true;
