@@ -134,20 +134,13 @@ export function RiskCurveComparisonCard({
                   <CartesianGrid {...GRID_PROPS} />
                   <XAxis
                     dataKey="date"
-                    tick={AXIS_TICK}
+                    {...AXIS_PROPS}
                     minTickGap={40}
                     tickMargin={6}
                     tickFormatter={(d: string) => String(d).slice(0, 7)}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
                   />
-                  <YAxis
-                    tick={AXIS_TICK}
-                    width={56}
-                    domain={["auto", "auto"]}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
-                  />
+                  <YAxis {...AXIS_PROPS} width={56} domain={["auto", "auto"]} />
+
                   <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} />
 
                   {result.legs.map((leg) => (
