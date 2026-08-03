@@ -167,7 +167,7 @@ export function PortfolioRow({
   return (
     <Card>
       <CardContent className="p-4 sm:p-5">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Link

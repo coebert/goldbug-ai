@@ -223,8 +223,8 @@ function Home() {
 
 
   return (
-    <div className="min-h-dvh bg-surface-1">
-      <AppHeader email={session.user.email} />
+    <div className="min-h-dvh overflow-x-hidden bg-surface-1">
+      <AppHeader email={session?.user.email} />
       <HomeCoachMarks />
       <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
         {/* Page heading + density control */}
@@ -271,7 +271,7 @@ function Home() {
 
         {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             {equityQ.isLoading && !equityQ.data ? (
               <TodayHeroSkeleton />
             ) : (
@@ -282,14 +282,14 @@ function Home() {
               />
             )}
           </div>
-          <NextActionCard action={nextAction} />
+          <NextActionCard action={nextAction} className="min-w-0" />
         </div>
 
         <NewHereBanner />
 
         {/* Portfolios — real money first, practice money folded away */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="space-y-3">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-3">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-display text-lg font-semibold tracking-tight">Real money</h2>
               <span className="text-xs text-muted-foreground">
@@ -334,7 +334,7 @@ function Home() {
               </div>
             )}
           </div>
-          <div id="create-portfolio" className="scroll-mt-24">
+          <div id="create-portfolio" className="min-w-0 scroll-mt-24">
             <CreatePortfolioCard />
           </div>
         </div>
