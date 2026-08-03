@@ -123,6 +123,9 @@ export class SaxoAdapter implements BrokerAdapter {
       maxAttempts?: number;
       // Cap for Retry-After honouring, in ms. Defaults to 5s.
       retryCapMs?: number;
+      // Zod schema validating the response body at the broker boundary.
+      // Mismatches are logged, never thrown (see `parseSaxo`).
+      schema?: ZodTypeAny;
     },
   ): Promise<T> {
     const url = this.url(path, opts?.query);
@@ -180,6 +183,7 @@ export class SaxoAdapter implements BrokerAdapter {
         method, path, status, request: opts?.body ?? opts?.query ?? null, response,
       });
       bumpSaxo("ok", retries429);
+      if (opts?.schema) return parseSaxo(opts.schema, response, { method, path }) as T;
       return response as T;
     } catch (err) {
       if (status == null) {
