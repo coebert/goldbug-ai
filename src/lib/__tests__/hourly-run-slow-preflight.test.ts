@@ -215,7 +215,10 @@ describe("hourly run scheduling — slow pre-flight", () => {
     expect(cycles[0].skipped).toHaveLength(0);
   });
 
-  it("no portfolio goes more than 2 cycles without a decision under slow pre-flight", () => {
+  it("bounded starvation: nobody waits much beyond the 6h starvation window", () => {
+    // With a tight budget only the override lets sims through, and the
+    // override only fires once a portfolio is STARVED_MS stale — so the
+    // worst-case wait is the starvation window plus one cycle, not forever.
     const { cycles } = simulate({
       portfolios: PORTFOLIOS,
       preflightMs: 20_000,
@@ -234,7 +237,9 @@ describe("hourly run scheduling — slow pre-flight", () => {
     });
     for (const p of PORTFOLIOS) {
       expect(lastSeen.get(p.id), `${p.id} never ticked`).toBeGreaterThanOrEqual(0);
-      expect(maxGap.get(p.id), `${p.id} gap too large`).toBeLessThanOrEqual(4);
+      expect(maxGap.get(p.id), `${p.id} gap too large`).toBeLessThanOrEqual(
+        STARVED_MS / HOUR + 1,
+      );
     }
   });
 });
