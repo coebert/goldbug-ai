@@ -223,7 +223,15 @@ export function NewsReel() {
   // Topic per headline (derived — `news_cache` has no topic column).
   const topicById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const it of allItems) m.set(it.id, classifyNewsTopic(it as any));
+    for (const it of allItems) m.set(
+        it.id,
+        classifyNewsTopic({
+          headline: it.headline,
+          excerpt: "excerpt" in it ? (it as { excerpt?: string | null }).excerpt : null,
+          summary: "summary" in it ? (it as { summary?: string | null }).summary : null,
+          source: it.source,
+        }),
+      );
     return m;
   }, [allItems]);
 
