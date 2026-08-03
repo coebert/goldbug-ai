@@ -354,7 +354,7 @@ async function runHourlyCycleInner(
             ok: true,
             skipped: reason,
           });
-          continue;
+          return;
         }
 
 
@@ -398,7 +398,7 @@ async function runHourlyCycleInner(
             tradeable_symbols: tradeableSymbols,
             excluded_symbols: excludedSymbols,
           });
-          continue;
+          return;
         }
 
 
@@ -425,7 +425,7 @@ async function runHourlyCycleInner(
               tradeable_symbols: tradeableSymbols,
               excluded_symbols: excludedSymbols,
             });
-            continue;
+            return;
           }
         }
 
