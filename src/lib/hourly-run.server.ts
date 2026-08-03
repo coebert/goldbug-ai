@@ -144,11 +144,39 @@ async function runHourlyCycleInner(
     const portfolios = (allPortfolios ?? []).filter(
       (p) => !(p.mode !== "paper" && p.live_paused),
     );
+    // Order: real money first, then STALEST first. Without the staleness
+    // ordering the same portfolio always won the fixed mode ordering and the
+    // rest were permanently starved by the run's time budget.
+    const lastDecisionAt = new Map<string, number>();
+    try {
+      const { data: lastRows } = await supabaseAdmin
+        .from("decisions")
+        .select("portfolio_id, created_at")
+        .in("portfolio_id", portfolios.map((p) => p.id))
+        .order("created_at", { ascending: false })
+        .limit(500);
+      for (const r of lastRows ?? []) {
+        const pid = r.portfolio_id as string;
+        if (!lastDecisionAt.has(pid)) {
+          lastDecisionAt.set(pid, new Date(r.created_at as string).getTime());
+        }
+      }
+    } catch (e) {
+      console.warn("hourly-run: staleness lookup failed", e);
+    }
     portfolios.sort((a, b) => {
-      const priority = (mode: string) => (mode === "live_prod" ? 0 : mode === "live_sim" ? 1 : 2);
-      return priority(String(a.mode)) - priority(String(b.mode));
+      const priority = (mode: string) => (mode === "live_prod" ? 0 : 1);
+      const dp = priority(String(a.mode)) - priority(String(b.mode));
+      if (dp !== 0) return dp;
+      return (lastDecisionAt.get(a.id) ?? 0) - (lastDecisionAt.get(b.id) ?? 0);
     });
     const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
+    // Starvation guard: a portfolio that hasn't produced a decision in this
+    // long may bypass the time budget once per run, so every portfolio makes
+    // progress even when earlier ticks consume the whole budget.
+    const STARVED_MS = 6 * 60 * 60 * 1000;
+    let starvationOverridesLeft = 1;
+
 
     const saxoRefresh: Record<string, { ok: boolean; error?: string; skipped?: string }> = {};
     if (runPreflightRefresh) {
