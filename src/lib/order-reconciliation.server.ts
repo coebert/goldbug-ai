@@ -103,9 +103,14 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  // `instrument_ccy` and `limit_price` are what stop a fill being booked
+  // as "0 GBP": the order already knows its currency and the price it was
+  // sized against, so neither has to be guessed at reconcile time.
   const openOrders = await supabaseAdmin
     .from("live_orders")
-    .select("id, symbol, side, quantity, order_type, status, broker_order_id, submitted_at, created_at")
+    .select(
+      "id, symbol, side, quantity, order_type, status, broker_order_id, submitted_at, created_at, instrument_ccy, limit_price",
+    )
     .eq("portfolio_id", portfolioId)
     .in("status", statuses)
     .gte("created_at", sinceIso)
@@ -113,6 +118,15 @@ export async function reconcileOrderStatusesForPortfolio(params: {
 
   if (openOrders.error) throw new Error(`load live_orders failed: ${openOrders.error.message}`);
   const rows = openOrders.data ?? [];
+
+  // Portfolio base currency — last-resort fallback for the fill currency.
+  const portfolioRow = await supabaseAdmin
+    .from("portfolios")
+    .select("currency")
+    .eq("id", portfolioId)
+    .maybeSingle();
+  const portfolioCurrency = (portfolioRow.data?.currency as string | null) ?? "GBP";
+
 
   // Fetch the whole working-order list once — cheaper than one call per order.
   let working: Awaited<ReturnType<SaxoAdapter["listWorkingOrders"]>> = [];
