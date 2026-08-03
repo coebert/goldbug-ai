@@ -3062,7 +3062,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 export async function snapshotPortfolio(portfolioId: string, asOf: string) {
   const { data: portfolio } = await supabaseAdmin
     .from("portfolios")
-    .select("current_cash, currency")
+    .select("current_cash, currency, broker_account_id")
     .eq("id", portfolioId)
     .single();
   if (!portfolio) return;
