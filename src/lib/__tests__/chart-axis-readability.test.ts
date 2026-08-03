@@ -144,9 +144,12 @@ describe("chart gridline and axis-line styling", () => {
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<(?:X|Y)Axis\b[\s\S]*?\/>/g) ?? []) {
         if (/\bhide\b/.test(tag)) continue;
+        // `{...AXIS_PROPS}` carries tick, axisLine and tickLine in one spread.
+        if (tag.includes("{...AXIS_PROPS}")) continue;
         if (!/axisLine=/.test(tag)) offenders.push(`${p.replace(SRC, "src")}: missing axisLine`);
         if (!/tickLine=/.test(tag)) offenders.push(`${p.replace(SRC, "src")}: missing tickLine`);
       }
+
     }
     expect([...new Set(offenders)]).toEqual([]);
   });
