@@ -25,6 +25,7 @@ import { findSymbol } from "@/lib/universe.server";
 import { engineSymbolKey, priceSymbolVariants } from "@/lib/price-symbol";
 import { holdingAvgCostBase } from "@/lib/market-price-units";
 import { isSymbolBlocked } from "@/lib/broker-instrument-blocks";
+import { hedgeCandidatesFor, selectHedgeInstrument } from "./hedge-instrument-fallback";
 
 import type { ExecutedTrade } from "@/lib/trading-engine.server";
 
@@ -137,22 +138,46 @@ export function applyTailHedgeToPaperPortfolio(
     return { ...base, reason: `hold: ${decision.reason}` };
   }
 
-  const symbol = (input.hedgeSymbol && input.hedgeSymbol.trim())
-    || defaultHedgeSymbolFor(portfolioCurrency);
+  // Instrument selection with fallback: if the default gold wrapper is blocked
+  // by the broker (Saxo ETC suitability) we hedge with an equivalent gold
+  // ETC/ETF instead of dropping the hedge entirely. An explicit per-portfolio
+  // `hedgeSymbol` override is honoured verbatim — the caller picked that
+  // instrument deliberately, so we never silently substitute for it.
+  const blocked = input.blockedSymbols ?? [];
+  const override = (input.hedgeSymbol ?? "").trim();
+  const primary = override || defaultHedgeSymbolFor(portfolioCurrency);
+  const candidates = override ? [override] : hedgeCandidatesFor(portfolioCurrency);
+  const selection = selectHedgeInstrument({
+    candidates,
+    side: decision.action === "buy" ? "buy" : "sell",
+    eligibility: {
+      isKnown: (s: string) => findSymbol(s) != null,
+      hasPrice: (s: string) => findPrice(priceMap, s) != null,
+      isBlocked: (s: string) => blocked.length > 0 && isSymbolBlocked(s, blocked),
+      isHeld: (s: string) => {
+        const h = findHolding(holdingsByS, s);
+        return h != null && Number(h.holding.quantity) > DUST_QTY;
+      },
+    },
+  });
+
+  // No substitute qualified. Fall through on the primary so the existing,
+  // more specific diagnostics ("no price for X", "no X to unwind",
+  // "insufficient cash") still apply — unless the primary itself is blocked,
+  // where buying is genuinely pointless.
+  const symbol = selection.symbol ?? primary;
   const meta = findSymbol(symbol);
   if (!meta) return { ...base, reason: `unknown hedge symbol ${symbol}` };
 
-  // Broker refuses this instrument on this account (suitability/permissions).
-  // Buying is pointless — every order would be rejected — but keep sells open.
   if (
     decision.action === "buy" &&
-    (input.blockedSymbols?.length ?? 0) > 0 &&
-    isSymbolBlocked(symbol, input.blockedSymbols!)
+    blocked.length > 0 &&
+    isSymbolBlocked(symbol, blocked)
   ) {
     return {
       ...base,
       symbol,
-      reason: `hedge buy skipped: broker blocks ${symbol} on this account (suitability/permissions)`,
+      reason: `hedge buy skipped: broker blocks ${symbol} on this account (suitability/permissions) and no eligible gold substitute is available`,
     };
   }
 
@@ -176,6 +201,7 @@ export function applyTailHedgeToPaperPortfolio(
   if (price == null || price <= 0) {
     return { ...base, symbol, reason: `no price for ${symbol}` };
   }
+  const fallbackNote = selection.note;
 
   const executedAt = new Date().toISOString();
 
@@ -238,7 +264,7 @@ export function applyTailHedgeToPaperPortfolio(
     const partialNote = partial ? " [partial: cash-capped]" : "";
     const trade: ExecutedTrade = {
       symbol, side: "buy", quantity: qty, price, value: qty * price,
-      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${routingNote}`,
+      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${fallbackNote}${routingNote}`,
     };
     return {
       applied: true, workingCash, symbol, qty, notional: qty * price,
@@ -288,7 +314,7 @@ export function applyTailHedgeToPaperPortfolio(
   const priceNote = priceSource === "avg_cost" ? " [sized off cost basis — no live quote]" : "";
   const trade: ExecutedTrade = {
     symbol, side: "sell", quantity: qty, price, value: qty * price,
-    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${priceNote}${routingNote}`,
+    reason: `tail_hedge sell → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${priceNote}${fallbackNote}${routingNote}`,
   };
   return {
     applied: true, workingCash, symbol, qty, notional: qty * price,
