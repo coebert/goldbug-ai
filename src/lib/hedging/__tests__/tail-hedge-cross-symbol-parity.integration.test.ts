@@ -241,7 +241,10 @@ describe("Phase 6 backtest ↔ executor: parity across configurable hedge symbol
       );
     });
 
-    it("tiny cash + expensive hedge defers with 'insufficient_cash'", () => {
+    it("tiny cash + expensive hedge: sub-share budget books fractionally in both paths", () => {
+      // NAV=50 → delta ≈ 1.50 vs a $10 share. Fractional books (backtest and
+      // paper) buy 0.15 units; the whole-share venue defers. Both paths must
+      // agree, which is what parity asserts here.
       assertParity(
         [
           { date: "2024-01-01", price: 10 },
@@ -249,9 +252,15 @@ describe("Phase 6 backtest ↔ executor: parity across configurable hedge symbol
           { date: "2024-01-03", price: 10 },
         ],
         cfg({ initialCash: 50 }),
-        { requiredBuckets: ["insufficient_cash"] },
+        { minFills: 1 },
       );
+      expect(
+        sizeHedgeBuy({
+          deltaNotional: 1.5, cash: 50, price: 10, bufferPct: BUFFER, wholeShares: true,
+        }).ok,
+      ).toBe(false);
     });
+
 
     it("post-initial-buy stability triggers 'hold' rebalance threshold", () => {
       assertParity(
