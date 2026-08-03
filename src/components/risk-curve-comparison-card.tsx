@@ -29,6 +29,14 @@ import { LineChart as LineChartIcon } from "lucide-react";
 import { toast } from "sonner";
 import { runRiskSweepFn } from "@/lib/risk-sweep.functions";
 import type { RiskSweepResult } from "@/lib/risk-sweep.server";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  GRID_PROPS,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+} from "@/lib/chart-palette";
+
 
 const LEVEL_COLORS: Record<number, string> = {
   1: "var(--chart-5)",
