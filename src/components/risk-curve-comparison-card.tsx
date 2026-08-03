@@ -146,7 +146,12 @@ export function RiskCurveComparisonCard({
                   />
                   <YAxis {...AXIS_PROPS} width={56} domain={["auto", "auto"]} />
 
-                  <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} />
+                  <Tooltip
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                  />
+
 
                   {result.legs.map((leg) => (
                     <Line
