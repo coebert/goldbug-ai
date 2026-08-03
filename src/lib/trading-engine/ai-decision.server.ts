@@ -256,7 +256,7 @@ If no action is warranted, return an empty orders array.`;
       `AI decision unavailable — falling back to heuristic (${parseFail ? "parse" : "gateway"}: ${msg.slice(0, 160)})`,
     );
     try {
-      const { buildHeuristicDecision } = await import("./heuristic-decision");
+      const { buildHeuristicDecision } = await import("../heuristic-decision");
       const heuristic = buildHeuristicDecision({
         holdings: args.holdings.map((h) => ({
           symbol: h.symbol,

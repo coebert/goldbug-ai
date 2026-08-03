@@ -47,7 +47,7 @@ export export type ExecutedTrade = {
   instrument_ccy?: string;
   // Sizing telemetry — populated for commodity trades so the decision/executed
   // rows expose the same slippage/liquidity numbers the sizer used.
-  liquidity?: import("./commodity-liquidity-metrics").CommodityTradeLiquidity;
+  liquidity?: import("../commodity-liquidity-metrics").CommodityTradeLiquidity;
   // Phase 6 — execution alpha telemetry.
   slice_plan?: { childCount: number; childNotional: number; advParticipationPct: number | null; reason: string };
   tod?: { multiplier: number; allow: boolean; reason: string };
