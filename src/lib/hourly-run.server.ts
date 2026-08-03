@@ -169,10 +169,17 @@ async function runHourlyCycleInner(
     portfolios.length = 0;
     portfolios.push(...ordered);
     const skippedPaused = (allPortfolios ?? []).length - portfolios.length;
-    // Starvation guard: a portfolio that hasn't produced a decision in 6h may
-    // bypass the time budget once per run, so every portfolio makes progress
-    // even when earlier ticks consume the whole budget.
-    const budgetGate = createBudgetGate(RUN_BUDGET_MS, lastDecisionAt);
+    // Starvation guard: a portfolio that hasn't produced a decision recently
+    // may bypass the time budget, so every portfolio makes progress even when
+    // earlier ticks consume the whole budget. A manual run is explicit user
+    // intent: let every stale portfolio through (30-minute threshold) instead
+    // of the single 6h override cron uses.
+    const isManual = opts.triggeredBy === "manual";
+    const budgetGate = createBudgetGate(RUN_BUDGET_MS, lastDecisionAt, {
+      starvedMs: isManual ? 30 * 60 * 1000 : undefined,
+      overrides: isManual ? Math.max(1, portfolios.length) : 1,
+    });
+
 
 
 
