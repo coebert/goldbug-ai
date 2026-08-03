@@ -21,9 +21,9 @@ const { generateText, NoObjectGeneratedError, calls } = vi.hoisted(() => {
       return e instanceof NoObjectGeneratedError;
     }
   }
-  const generateText = vi.fn(async (a: Any) => {
+  const generateText = vi.fn(async (a: Any): Promise<{ output: Any }> => {
     calls.push({ system: String(a.system), prompt: String(a.prompt) });
-    return { output: { briefing: "b", rationale: "r", orders: [] } };
+    return { output: { briefing: "b", rationale: "r", orders: [] as Any[] } };
   });
   return { generateText, NoObjectGeneratedError, calls };
 });
@@ -117,7 +117,7 @@ function baseArgs(over: Partial<Parameters<typeof callAiForDecision>[0]> = {}) {
 beforeEach(() => {
   calls.length = 0;
   generateText.mockClear();
-  generateText.mockImplementation(async (a: Any) => {
+  generateText.mockImplementation(async (a: Any): Promise<{ output: Any }> => {
     calls.push({ system: String(a.system), prompt: String(a.prompt) });
     return { output: { briefing: "b", rationale: "r", orders: [] } };
   });
