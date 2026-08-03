@@ -83,6 +83,22 @@ function ticket(spend: number, price: number): SimDecision[] {
 
 const start = (cash: number): SimState => ({ cash, holdings: [] });
 
+/** Invariant check bound to the simulator's argument shape. */
+function checkInvariants(
+  initial: SimState,
+  decisions: SimDecision[],
+  res: ReturnType<typeof simulateBrokerExecution>,
+  markPrices?: Record<string, number>,
+): void {
+  assertExecutionInvariants({
+    initial,
+    decisions,
+    snapshots: res.snapshots,
+    rejections: res.rejections,
+    markPrices,
+  });
+}
+
 describe("worst-case frictions — authorised spend is never exceeded", () => {
   it("charges fees and slippage inside the budget rather than on top of it", () => {
     const spend = authoriseSpend({
@@ -100,7 +116,7 @@ describe("worst-case frictions — authorised spend is never exceeded", () => {
     expect(snap.fillQuantity).toBeLessThanOrEqual(spend / 100 + 1e-9);
     expect(snap.partial).toBe(true);
     expect(snap.truncationReason).toBe("cash");
-    assertExecutionInvariants(start(spend), res);
+    checkInvariants(start(spend), ticket(spend, 100), res);
   });
 
   it("keeps the realised position inside the per-name NAV cap for every risk level", () => {
@@ -116,7 +132,7 @@ describe("worst-case frictions — authorised spend is never exceeded", () => {
       const notional = snap ? snap.fillQuantity * 100 : 0;
       expect(notional).toBeLessThanOrEqual(PER_NAME_CAP * NAV + 1e-6);
       expect(res.finalState.cash).toBeGreaterThanOrEqual(0);
-      assertExecutionInvariants(start(NAV), res);
+      checkInvariants(start(NAV), ticket(spend, 100), res, { AAA: 100 });
     }
   });
 
@@ -133,7 +149,7 @@ describe("worst-case frictions — authorised spend is never exceeded", () => {
     });
     const snap = res.snapshots[0];
     expect(snap.fillQuantity * 50).toBeLessThanOrEqual(0.05 * NAV + 1e-6);
-    assertExecutionInvariants(start(NAV), res);
+    checkInvariants(start(NAV), ticket(spend, 50), res, { AAA: 50 });
   });
 
   it("rejects rather than borrows when the minimum commission alone exceeds cash", () => {
@@ -158,7 +174,12 @@ describe("worst-case frictions — authorised spend is never exceeded", () => {
     expect(res.finalState.cash).toBeGreaterThanOrEqual(0);
     // Sold below the quote: slippage + impact are adverse on the sell side.
     expect(res.snapshots[0].fillPrice).toBeLessThan(100);
-    assertExecutionInvariants(held, res);
+    checkInvariants(
+      { cash: 0, holdings: [{ symbol: "AAA", quantity: 3, avgCost: 100 }] },
+      [{ id: "s1", symbol: "AAA", side: "SELL", quantity: 10, price: 100 }],
+      res,
+      { AAA: 100 },
+    );
   });
 });
 
@@ -192,7 +213,7 @@ describe("worst-case frictions — fuzz", () => {
             frictions,
             markPrices: { AAA: price },
           });
-          assertExecutionInvariants(state, res);
+          checkInvariants(state, ticket(spend, price), res, { AAA: price });
           for (const s of res.snapshots) {
             expect(Number.isFinite(s.fillQuantity)).toBe(true);
             expect(Number.isFinite(s.fee)).toBe(true);
