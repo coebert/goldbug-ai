@@ -101,33 +101,33 @@ async function runHourlyCycleInner(
     await supabaseAdmin.from("run_locks").delete().eq("name", "hourly-run");
   }
 
-  // Defensive stale sweep: if a previous run's worker isolate died before
-  // the try/finally could release the lock, the row can wedge every future
-  // cron tick. Unconditionally drop any hourly-run row older than the
-  // staleness window so acquireRunLock always starts from a clean slate.
-  // Short window: a run whose isolate died must not wedge the next cron tick
-  // for minutes. Healthy runs heartbeat the lock (see below), so they are
-  // never evicted while alive.
+  // TTL cleanup: every lock row carries an absolute `expires_at`. If a
+  // previous run's worker isolate died (manual run hitting the request
+  // deadline is the common case) the release never ran, but the row expires
+  // on its own and is swept here before we try to acquire. Healthy runs push
+  // the deadline forward on each heartbeat, so they are never swept alive.
   const STALE_MS = 90 * 1000;
-  try {
-    const cutoff = new Date(Date.now() - STALE_MS).toISOString();
-    const swept = await supabaseAdmin
-      .from("run_locks")
-      .delete()
-      .eq("name", "hourly-run")
-      .lt("acquired_at", cutoff)
-      .select("owner, acquired_at");
-    if (swept.data && swept.data.length > 0) {
-      console.warn("hourly-run: swept stale run_locks row", swept.data[0]);
-    }
-  } catch (e) {
-    console.error("hourly-run: stale-lock sweep failed", e);
+  const { sweepExpiredRunLocks } = await import("@/lib/run-lock.server");
+  const removed = await sweepExpiredRunLocks({
+    name: "hourly-run",
+    fallbackTtlMs: STALE_MS,
+  });
+  if (removed > 0) {
+    console.warn(`hourly-run: TTL sweep removed ${removed} expired run_locks row(s)`);
   }
+
+  // The lock must outlive the run's own time budget (plus post-loop work such
+  // as metrics persistence), and must expire soon after a timeout so the next
+  // trigger is not blocked.
+  const { lockTtlMsForBudget } = await import("@/lib/run-lock-ttl");
+  const LOCK_TTL_MS = lockTtlMsForBudget(RUN_BUDGET_MS);
 
   const lock = await acquireRunLock("hourly-run", {
     owner: manualTrigger ? "manual" : "cron",
     staleMs: STALE_MS,
+    ttlMs: LOCK_TTL_MS,
   });
+
 
   if (!lock.acquired) {
     throw new RunInProgressError(

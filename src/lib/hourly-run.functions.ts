@@ -61,15 +61,26 @@ export const triggerHourlyRunNow = createServerFn({ method: "POST" })
     // rather than getting lost in the background task.
     if (!data.force) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { isExpired } = await import("@/lib/run-lock-ttl");
       const { data: existing } = await supabaseAdmin
         .from("run_locks")
-        .select("owner, acquired_at")
+        .select("owner, acquired_at, expires_at")
         .eq("name", "hourly-run")
         .maybeSingle();
       if (existing) {
         const ageMs = Date.now() - new Date(existing.acquired_at as string).getTime();
-        // Match the runHourlyCycle staleness threshold (90s).
-        if (ageMs < 90 * 1000) {
+        // A lock past its TTL is garbage — runHourlyCycle will sweep it, so
+        // don't surface a bogus "already running" error to the UI.
+        const expired = isExpired(
+          {
+            acquired_at: existing.acquired_at as string,
+            expires_at: (existing as { expires_at?: string | null }).expires_at ?? null,
+          },
+          Date.now(),
+          90 * 1000,
+        );
+        if (!expired && ageMs < 90 * 1000) {
+
           const err = new Error(
             `An hourly run is already in progress (started by ${existing.owner ?? "unknown"} ${Math.round(ageMs / 1000)}s ago). Use "Force clear lock & run" if it is stuck.`,
           ) as Error & { code?: string; heldBy?: string | null; ageMs?: number | null };

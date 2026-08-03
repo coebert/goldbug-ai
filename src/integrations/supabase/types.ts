@@ -2391,16 +2391,19 @@ export type Database = {
       run_locks: {
         Row: {
           acquired_at: string
+          expires_at: string | null
           name: string
           owner: string | null
         }
         Insert: {
           acquired_at?: string
+          expires_at?: string | null
           name: string
           owner?: string | null
         }
         Update: {
           acquired_at?: string
+          expires_at?: string | null
           name?: string
           owner?: string | null
         }
@@ -3151,6 +3154,7 @@ export type Database = {
         Returns: boolean
       }
       purge_expired_idempotency_keys: { Args: never; Returns: number }
+      sweep_expired_run_locks: { Args: never; Returns: number }
     }
     Enums: {
       algo_regime_tune_status:
