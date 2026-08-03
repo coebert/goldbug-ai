@@ -348,13 +348,15 @@ function AdminPage() {
     }, plan.delayMs);
   }
 
-  function startManualRun(vars: { force?: boolean; portfolioIds?: string[] } = {}) {
+  function startManualRun(vars: { force?: boolean; forceTick?: boolean; portfolioIds?: string[] } = {}) {
     if (retryTimer.current) clearTimeout(retryTimer.current);
     attemptRef.current = 1;
     startedAtRef.current = Date.now();
     requestedRef.current = vars.portfolioIds ?? [];
     setRetryState(null);
-    manual.mutate(vars);
+    // The Force clear toggle applies to the operator-initiated attempt only;
+    // automatic retries never override the guard.
+    manual.mutate({ ...vars, forceTick: vars.forceTick ?? forceTick });
   }
 
 
