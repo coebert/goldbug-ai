@@ -555,6 +555,15 @@ function AdminPage() {
             <RunPortfolioStatusTable rows={manual.data.portfolio_status} />
           )}
 
+          {retryState && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-500">
+              Auto-retry {retryState.attempt} of 3 queued
+              {retryState.pending > 0 ? ` for ${retryState.pending} portfolio(s)` : ""} — {retryState.reason}
+              {" "}The per-run deadline is unchanged; retries are extra bounded attempts.
+            </div>
+
+          )}
+
 
 
 
