@@ -441,7 +441,7 @@ async function runHourlyCycleInner(
 
 
         const sinceIso = manualTrigger ? recentWindowIso : hourStartIso;
-        if (!(manualTrigger && forceClear)) {
+        if (!(manualTrigger && overrideTickWindow)) {
           const recent = await supabaseAdmin
             .from("decisions")
             .select("id, created_at")
