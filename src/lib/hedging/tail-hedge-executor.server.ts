@@ -252,7 +252,7 @@ export function applyTailHedgeToPaperPortfolio(
     const partialNote = partial ? " [partial: cash-capped]" : "";
     const trade: ExecutedTrade = {
       symbol, side: "buy", quantity: qty, price, value: qty * price,
-      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${routingNote}`,
+      reason: `tail_hedge buy → target ${(decision.targetPctNav * 100).toFixed(2)}% NAV (${decision.reason})${partialNote}${fallbackNote}${routingNote}`,
     };
     return {
       applied: true, workingCash, symbol, qty, notional: qty * price,
