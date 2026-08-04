@@ -150,6 +150,7 @@ export function DailyEquityChangesCard({
       // accounts for netFlow (identity by construction is fine — the
       // real check is the pure-flow-day and pct-derivation branches).
       rawDelta: r.pnl + r.netFlow,
+      state: stateByDate.get(String(r.date).slice(0, 10)) ?? ("settled" as SettlementState),
     }));
     // 4-dp rounding on pct means ~5e-5 pp of slack vs the exact
     // pnl/prev ratio; give the assertion matching tolerance.
@@ -157,7 +158,7 @@ export function DailyEquityChangesCard({
       pctTolerance: 1e-4,
     });
     return data;
-  }, [rows]);
+  }, [rows, stateByDate]);
 
   return (
     <Card data-testid="daily-equity-changes-card">
@@ -168,7 +169,8 @@ export function DailyEquityChangesCard({
           </CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
             Trading-only day-over-day % change. Deposits, withdrawals and account re-baselining days
-            are excluded.
+            are excluded. Stats count settled closes only; today's intraday mark and any
+            reconstructed days are drawn faded and left out.
           </p>
         </div>
         <div
@@ -199,8 +201,8 @@ export function DailyEquityChangesCard({
         ) : (
           <>
             <div className="mb-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <Stat label="Up days" value={`${stats!.up}`} tone="pos" />
-              <Stat label="Down days" value={`${stats!.down}`} tone="neg" />
+              <Stat label="Up days (settled)" value={`${stats!.up}`} tone="pos" />
+              <Stat label="Down days (settled)" value={`${stats!.down}`} tone="neg" />
               <Stat
                 label="Best"
                 value={`${stats!.best.pct >= 0 ? "+" : ""}${stats!.best.pct.toFixed(2)}%`}
@@ -270,6 +272,13 @@ export function DailyEquityChangesCard({
                               Flow {formatMoney(d.netFlow, currency, 2)} (excluded)
                             </div>
                           ) : null}
+                          {d.state !== "settled" ? (
+                            <div className="mt-1 text-muted-foreground">
+                              {d.state === "intraday"
+                                ? "Intraday mark — not a settled close, excluded from the stats above."
+                                : "Reconstructed day — rebuilt from the ledger, excluded from the stats above."}
+                            </div>
+                          ) : null}
                           {d.basisReset ? (
                             <div className="mt-1 text-muted-foreground">
                               Account re-baselined by a cash transfer — trading P&amp;L isn't
@@ -282,12 +291,25 @@ export function DailyEquityChangesCard({
                   />
                   <Bar dataKey="pct" radius={[3, 3, 0, 0]}>
                     {chartData.map((d) => (
-                      <Cell key={d.date} fill={d.pct >= 0 ? POS : NEG} />
+                      <Cell
+                        key={d.date}
+                        fill={d.pct >= 0 ? POS : NEG}
+                        fillOpacity={d.state === "settled" ? 1 : 0.4}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            {provisionalCount > 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {provisionalCount} of {rows.length} day{rows.length === 1 ? "" : "s"} shown
+                {" "}
+                {provisionalCount === 1 ? "is" : "are"} not settled closes (faded bars) and
+                {" "}
+                {provisionalCount === 1 ? "is" : "are"} excluded from the day stats.
+              </p>
+            )}
           </>
         )}
       </CardContent>
