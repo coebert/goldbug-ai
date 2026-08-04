@@ -84,6 +84,26 @@
   --color-surface-3: var(--surface-3);
   --color-surface-sunken: var(--surface-sunken);
 
+  /* Saxo chart system. Every chart reads these instead of re-deriving
+   * colours, so retuning the house style is a single-file edit here.
+   * Numeric geometry (radii, stroke widths, gradient opacities) lives in
+   * src/lib/saxo-chart.ts because SVG attributes cannot resolve var(). */
+  --color-saxo-up: var(--saxo-up);
+  --color-saxo-down: var(--saxo-down);
+  --color-saxo-grid: var(--saxo-grid);
+  --color-saxo-axis: var(--saxo-axis);
+  --color-saxo-crosshair: var(--saxo-crosshair);
+  --color-saxo-crosshair-soft: var(--saxo-crosshair-soft);
+  --color-saxo-reference: var(--saxo-reference);
+  --color-saxo-marker-ring: var(--saxo-marker-ring);
+  --color-saxo-tooltip: var(--saxo-tooltip);
+  --color-saxo-tooltip-foreground: var(--saxo-tooltip-foreground);
+  --color-saxo-tooltip-border: var(--saxo-tooltip-border);
+
+  /* Chart typography: tick labels and tooltip body. */
+  --text-saxo-tick: var(--saxo-tick-size);
+  --text-saxo-tooltip: var(--saxo-tooltip-size);
+
   /* Typography scale. --font-display is a tighter face reserved for
    * numeric headlines (equity, PnL, next-run). --font-sans covers
    * everything else. Both families are loaded via <link> in
@@ -155,6 +175,23 @@
   --surface-2: oklch(0.216 0.022 257);
   --surface-3: oklch(0.281 0.031 253);
   --surface-sunken: oklch(0.144 0.012 258);
+
+  /* Saxo chart palette. Up/down are aliases of the semantic status hues so
+   * a green/red retune stays in one place; the greys are foreground mixes so
+   * they track the theme instead of being fixed slate values. */
+  --saxo-up: var(--success);
+  --saxo-down: var(--destructive);
+  --saxo-grid: color-mix(in oklab, var(--foreground) 14%, transparent);
+  --saxo-axis: var(--muted-foreground);
+  --saxo-crosshair: color-mix(in oklab, var(--foreground) 45%, transparent);
+  --saxo-crosshair-soft: color-mix(in oklab, var(--foreground) 22%, transparent);
+  --saxo-reference: color-mix(in oklab, var(--foreground) 45%, transparent);
+  --saxo-marker-ring: var(--background);
+  --saxo-tooltip: var(--popover);
+  --saxo-tooltip-foreground: var(--popover-foreground);
+  --saxo-tooltip-border: var(--border);
+  --saxo-tick-size: 11px;
+  --saxo-tooltip-size: 12px;
 }
 
 .dark {
