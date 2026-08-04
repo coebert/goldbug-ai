@@ -101,6 +101,21 @@ ${r.transitioned ? "Because the regime just shifted, explicitly reassess existin
       ? `LOSS COOLDOWN active for: ${args.cooling.join(", ")}. Any BUY on these will be automatically halved by guardrails; consider skipping.`
       : "";
 
+  // Asset-class playbooks are ~1.3k tokens each and are dead weight when the
+  // portfolio holds nothing in that class and today's candidate list contains
+  // none either — a stock/ETF-only tick can never act on them. Class limits
+  // are checked too, so a class the portfolio is allowed to enter keeps its
+  // playbook even before the first position exists.
+  const activeClasses = activeAssetClasses(
+    args.features as unknown as readonly unknown[],
+    args.holdings as unknown as ReadonlyArray<{ symbol?: string; asset_class?: string | null }>,
+  );
+  const classAllowed = (cls: string) =>
+    activeClasses.has(cls) || Number((cfg.asset_class_limits as Record<string, number>)[cls] ?? 0) > 0;
+  const commodityBlock = classAllowed("commodity") ? COMMODITY_PLAYBOOK : "";
+  const cryptoBlock = classAllowed("crypto") ? CRYPTO_PLAYBOOK : "";
+
+
   const system = `You are a disciplined portfolio manager running a ${args.portfolio.currency} ${args.portfolio.starting_cash} paper-trading account.
 HARD RULES YOU MUST NEVER BREAK:
 - No borrowing, no margin, no shorting, no leverage, no derivatives.
