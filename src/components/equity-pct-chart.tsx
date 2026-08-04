@@ -290,8 +290,15 @@ export function EquityPctChart({
   ]);
 
 
-  const { data, domain, deltaDomain, last } = useMemo(() => {
+  const { data, domain, deltaDomain, last, settlement, lastSettledPct } = useMemo(() => {
     const base = Number(startingCash);
+    const stateByDay = new Map<string, SettlementState>();
+    for (const e of equity) {
+      stateByDay.set(
+        ukDayKey(`${String(e.snapshot_date).slice(0, 10)}T12:00:00Z`),
+        classifySnapshot({ snapshot_date: String(e.snapshot_date), source: e.source ?? null }),
+      );
+    }
     const raw: Array<{ at: string; value: number }> =
       resolution === "hourly"
         ? hourlyPoints.map((p) => ({ at: p.at, value: Number(p.total_value) }))
@@ -318,12 +325,29 @@ export function EquityPctChart({
         : [];
 
     const withDelta = addDeltas(rows, deposits);
+    // Hourly points are all intraday marks by construction; the settled/
+    // provisional split only means something on the daily close series.
+    const states: SettlementState[] =
+      resolution === "hourly"
+        ? withDelta.map(() => "intraday" as const)
+        : withDelta.map(
+            (r) => stateByDay.get(ukDayKey(String(r.at))) ?? ("settled" as SettlementState),
+          );
+    const split = splitSettledSeries(withDelta, states);
     const vals = withDelta.map((r) => r.pct);
+    const lastSettledIdx = states.lastIndexOf("settled");
     return {
-      data: withDelta,
+      data: split,
       domain: pctDomain(vals),
       deltaDomain: deltaDomainFor(withDelta.map((r) => r.deltaPct)),
       last: vals.length ? vals[vals.length - 1] : 0,
+      lastSettledPct: lastSettledIdx >= 0 ? vals[lastSettledIdx] : null,
+      settlement: summariseSettlement(
+        equity.map((e) => ({
+          snapshot_date: String(e.snapshot_date),
+          source: e.source ?? null,
+        })),
+      ),
     };
   }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate]);
 
