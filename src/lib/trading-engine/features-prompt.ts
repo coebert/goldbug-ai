@@ -14,6 +14,7 @@
 
 /** Round to a fixed number of decimals and strip trailing zeros. */
 function n(value: unknown, decimals = 2): string {
+  if (value === null || value === undefined || value === "") return "-";
   const x = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(x)) return "-";
   const r = Number(x.toFixed(decimals));
@@ -22,6 +23,7 @@ function n(value: unknown, decimals = 2): string {
 
 /** Large counts (average daily volume) as 1.2M / 340k, not 1234567.891. */
 function compactCount(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "-";
   const x = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(x)) return "-";
   const a = Math.abs(x);
@@ -84,8 +86,8 @@ const COLUMNS = [
   "sma20",
   "sma50",
   "rsi14",
-  "chg5d%",
-  "chg30d%",
+  "chg5d",
+  "chg30d",
   "vol20d",
   "macd_h",
   "x", // macd cross: B=bullish, R=bearish, n=none
@@ -121,8 +123,8 @@ export function formatCandidateTable(features: readonly unknown[]): string {
       n(f["sma20"], 4),
       n(f["sma50"], 4),
       n(f["rsi14"], 1),
-      n(f["change5d"], 2),
-      n(f["change30d"], 2),
+      n(f["change5d"], 4),
+      n(f["change30d"], 4),
       n(f["vol20d"], 4),
       n(f["macd_hist"], 4),
       cross,
@@ -141,7 +143,7 @@ export function formatCandidateTable(features: readonly unknown[]): string {
 
   return `Candidate assets — one row per symbol, fields separated by " | ", sub-blocks by " || ". Values rounded; "-" = not available.
 Columns: ${COLUMNS.join(" | ")}
-  x = MACD cross this bar (B bullish / R bearish / n none); wk_up = weekly trend up (Y/n); cool = loss-cooldown active (Y/n); adv20 = 20d average daily volume.
+  x = MACD cross this bar (B bullish / R bearish / n none); wk_up = weekly trend up (Y/n); cool = loss-cooldown active (Y/n); chg5d/chg30d are fractional returns (0.05 = +5%); adv20 = 20d average daily volume.
   news = <weighted LLM sentiment>/<contributors today> t<today> a3/a7<3d & 7d averages> d3/d7<deltas vs baseline> ac<acceleration> c7<7d contributors>.
   events = s<directional event score -1..1> p<event pressure 0..1> nx<event count> hard<dated hard catalyst Y/n> <top event kinds>.
   rank = #<cross-sectional rank>/<universe size> p<percentile> c<composite z> mom/qua/lvol/trd<factor z-scores>.
