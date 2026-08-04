@@ -19,6 +19,7 @@ import {
   summariseSettlement,
   type SettlementState,
 } from "@/lib/snapshot-settlement";
+import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";
 
 import {
   Area,
