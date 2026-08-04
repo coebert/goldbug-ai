@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
   ReferenceLine,
   ResponsiveContainer,
@@ -24,7 +25,13 @@ import {
 } from "@/lib/daily-equity-changes";
 import { formatMoney } from "@/lib/format-money";
 import { classifySnapshot, type SettlementState } from "@/lib/snapshot-settlement";
-import { AXIS_LINE, AXIS_TICK, CHART_ROLE, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import { CHART_ROLE } from "@/lib/chart-palette";
+import {
+  SAXO_AXIS,
+  SAXO_GRID,
+  SAXO_REFERENCE_LINE,
+  fadeStops,
+} from "@/lib/saxo-chart";
 
 type Range = "7d" | "30d" | "90d" | "ytd" | "all";
 
@@ -229,22 +236,39 @@ export function DailyEquityChangesCard({
               </span>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
+                  {/* Saxo visual system: gradient-filled bars that flip hue
+                      at the zero line, faint horizontal-only gridlines and
+                      sparse edge labels. */}
+                  <defs>
+                    <linearGradient id="dec-pos" x1="0" y1="0" x2="0" y2="1">
+                      {fadeStops(POS).map((st) => (
+                        <stop key={`p${st.offset}`} {...st} stopOpacity={Number(st.stopOpacity) + 0.5} />
+                      ))}
+                    </linearGradient>
+                    <linearGradient id="dec-neg" x1="0" y1="1" x2="0" y2="0">
+                      {fadeStops(NEG).map((st) => (
+                        <stop key={`n${st.offset}`} {...st} stopOpacity={Number(st.stopOpacity) + 0.5} />
+                      ))}
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid {...SAXO_GRID} />
                   <XAxis
+                    {...SAXO_AXIS}
                     dataKey="label"
-                    tick={AXIS_TICK}
-                    interval="preserveStartEnd"
-                    minTickGap={16}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
+                    ticks={
+                      chartData.length > 1
+                        ? [chartData[0].label, chartData[chartData.length - 1].label]
+                        : chartData.map((d) => d.label)
+                    }
+                    interval={0}
                   />
                   <YAxis
-                    tick={AXIS_TICK}
+                    {...SAXO_AXIS}
+                    tickCount={4}
                     tickFormatter={(v: number) => `${v.toFixed(1)}%`}
-                    width={64}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
+                    width={52}
                   />
-                  <ReferenceLine {...REFERENCE_LINE} y={0} />
+                  <ReferenceLine {...SAXO_REFERENCE_LINE} y={0} />
                   <Tooltip
                     cursor={{ fill: "color-mix(in oklab, var(--muted) 30%, transparent)" }}
                     content={({ active, payload }) => {
@@ -293,7 +317,9 @@ export function DailyEquityChangesCard({
                     {chartData.map((d) => (
                       <Cell
                         key={d.date}
-                        fill={d.pct >= 0 ? POS : NEG}
+                        fill={d.pct >= 0 ? "url(#dec-pos)" : "url(#dec-neg)"}
+                        stroke={d.pct >= 0 ? POS : NEG}
+                        strokeWidth={1}
                         fillOpacity={d.state === "settled" ? 1 : 0.4}
                       />
                     ))}
