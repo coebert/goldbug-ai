@@ -270,10 +270,13 @@ export function cashOn(
     if (day(f.filled_at) <= date) continue;
     const qty = num(f.quantity);
     if (!(qty > 0)) continue;
-    const raw = num(f.fill_price, Number.NaN);
-    if (!Number.isFinite(raw) || raw <= 0) return null;
-    const px = normalizeLseDisplayPriceToBase(f.symbol, raw);
-    if (!(px > 0)) return null;
+    // `live_fills.fill_price` is stored in the instrument's settlement
+    // currency (the legacy GBX rows were rescaled), so it must NOT go through
+    // the LSE pence rule again — that would shrink every London leg 100x and
+    // leave the rolled-back balance far too small.
+    const px = num(f.fill_price, Number.NaN);
+    if (!Number.isFinite(px) || px <= 0) return null;
+
     const ccy = instrumentCcyFor(String(f.symbol ?? ""), null).toUpperCase();
     const rate = fx.get(ccy);
     const notional = qty * px * (Number.isFinite(rate) && (rate ?? 0) > 0 ? rate! : 1);
