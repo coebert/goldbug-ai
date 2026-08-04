@@ -498,7 +498,15 @@ export function EquityPctChart({
                         resolution === "hourly" ? "vs prev hour" : "vs prev day",
                       ];
                     }
-                    return [`${Number(v).toFixed(2)}%`, "vs capital"];
+                    const state = (item?.payload?.state ?? "settled") as SettlementState;
+                    return [
+                      `${Number(v).toFixed(2)}%`,
+                      state === "settled"
+                        ? "vs capital (settled close)"
+                        : state === "intraday"
+                          ? "vs capital (intraday, provisional)"
+                          : "vs capital (reconstructed)",
+                    ];
                   }}
                 />
                 <Bar
@@ -512,6 +520,9 @@ export function EquityPctChart({
                   {data.map((d, i) => (
                     <Cell
                       key={i}
+                      // Provisional days are washed out so an unsettled bar is
+                      // never read as a confirmed daily move.
+                      fillOpacity={d.state === "settled" ? 1 : 0.45}
                       fill={
                         d.deltaPct >= 0
                           ? "color-mix(in oklab, var(--success) 45%, transparent)"
@@ -523,16 +534,70 @@ export function EquityPctChart({
                 <Line
                   yAxisId="pct"
                   type="monotone"
-                  dataKey="pct"
+                  dataKey="pctSettled"
+                  name="settled"
                   stroke={color}
                   strokeWidth={2}
                   dot={false}
+                  connectNulls
+                  isAnimationActive={false}
+                />
+                <Line
+                  yAxisId="pct"
+                  type="monotone"
+                  dataKey="pctProvisional"
+                  name="provisional"
+                  stroke={color}
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  dot={false}
+                  connectNulls
                   isAnimationActive={false}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           )}
         </ChartFrame>
+
+        {/* Settled vs provisional key. Without it the tail of the curve — a
+            still-moving intraday mark, or a gap-filled day — looks exactly
+            like a confirmed close, which is what made ledger reconciliation
+            ambiguous. */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-0.5 w-4 rounded bg-foreground/70" aria-hidden />
+            Settled close
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span
+              className="inline-block h-0 w-4 border-t-2 border-dashed border-foreground/70"
+              aria-hidden
+            />
+            {resolution === "hourly" ? "Intraday marks" : "Provisional (not settled)"}
+          </span>
+          {resolution === "daily" && settlement.latestIsProvisional && (
+            <span>
+              {settlement.provisionalDate
+                ? `${formatUkAxisDay(`${settlement.provisionalDate}T00:00:00Z`)} is an intraday mark`
+                : "Latest point is not a settled close"}
+              {settlement.lastSettledDate
+                ? ` · last settled close ${formatUkAxisDay(`${settlement.lastSettledDate}T00:00:00Z`)}${
+                    lastSettledPct != null
+                      ? ` at ${lastSettledPct >= 0 ? "+" : ""}${lastSettledPct.toFixed(2)}%`
+                      : ""
+                  }`
+                : ""}
+              {" — "}
+              {SETTLEMENT_HINT.intraday}
+            </span>
+          )}
+          {resolution === "daily" && settlement.reconstructed > 0 && (
+            <span>
+              {settlement.reconstructed} reconstructed day
+              {settlement.reconstructed === 1 ? "" : "s"} in this series
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
