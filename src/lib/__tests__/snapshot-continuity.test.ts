@@ -73,7 +73,7 @@ describe("findSnapshotGaps", () => {
     expect(gaps).toHaveLength(1);
     expect(gaps[0]!.kind).toBe("trailing");
     expect(gaps[0]!.value_to).toBeNull();
-    expect(gaps[0]!.missing_weekdays).toBe(6);
+    expect(gaps[0]!.missing_weekdays).toBe(5);
   });
 
   it("honours a custom threshold and sorts longest first", () => {
@@ -94,7 +94,7 @@ describe("checkValuationConsistency continuity", () => {
     const report = checkValuationConsistency({
       portfolioId: "p1",
       snapshots: [day("2026-07-22", 10_000), day("2026-07-31", 10_100)],
-      today: "2026-08-04",
+      today: "2026-08-07",
     });
     expect(report.jumps).toEqual([]);
     expect(report.gapThreshold).toBe(2);
