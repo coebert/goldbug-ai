@@ -25,7 +25,7 @@ const fills: RevalueFill[] = [
   },
 ];
 
-const prices = new Map([["HSBA.L", new Map([["2026-07-28", 15], ["2026-07-30", 16]])]]);
+const prices = new Map([["HSBA.L", new Map([["2026-07-28", 1500], ["2026-07-30", 1600]])]]);
 
 describe("historical revaluation trusts the fills ledger over a re-synced opened_at", () => {
   it("keeps a position on days after its first fill but before opened_at", () => {
