@@ -16,12 +16,11 @@ import { CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 import {
   SAXO_AXIS,
   SAXO_GRID,
-  SAXO_TOOLTIP_CURSOR,
   edgeTicks,
   fadeStops,
-  saxoActiveDot,
   saxoDot,
 } from "@/lib/saxo-chart";
+import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";
 import {
   Area,
   CartesianGrid,
@@ -319,7 +318,7 @@ function ModeChart({
                     allowDataOverflow
                   />
                   <Tooltip
-                    cursor={SAXO_TOOLTIP_CURSOR}
+                    cursor={<SaxoCrosshair />}
 
                     wrapperStyle={{ zIndex: 40, maxWidth: "min(85vw, 320px)" }}
                     content={({ active, payload, label }) => {
@@ -367,7 +366,7 @@ function ModeChart({
                     strokeWidth={2}
                     fill={`url(#area-${totalKey})`}
                     dot={saxoDot(color, series.length)}
-                    activeDot={saxoActiveDot(color)}
+                    activeDot={<SaxoActiveDot color={color} />}
                     isAnimationActive={false}
                   />
 

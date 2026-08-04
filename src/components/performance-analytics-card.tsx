@@ -11,13 +11,12 @@ import {
   SAXO_GRID,
   SAXO_REFERENCE_LINE,
   SAXO_TOOLTIP_CONTENT,
-  SAXO_TOOLTIP_CURSOR,
   SAXO_TOOLTIP_LABEL,
   edgeTicks,
   fadeStops,
-  saxoActiveDot,
   saxoDot,
 } from "@/lib/saxo-chart";
+import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -133,7 +132,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     width={64}
                   />
                   <Tooltip
-                    cursor={SAXO_TOOLTIP_CURSOR}
+                    cursor={<SaxoCrosshair />}
                     formatter={(v: number) => fmtCcyPrecise.format(v)}
                     labelClassName="text-xs"
                     contentStyle={SAXO_TOOLTIP_CONTENT}
@@ -145,7 +144,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     stroke="var(--primary)"
                     fill="url(#eqFill)"
                     dot={saxoDot("var(--primary)", data.equityCurve.length)}
-                    activeDot={saxoActiveDot("var(--primary)")}
+                    activeDot={<SaxoActiveDot color="var(--primary)" />}
                     strokeWidth={2}
                     isAnimationActive={false}
                   />
@@ -180,7 +179,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     width={52}
                   />
                   <Tooltip
-                    cursor={SAXO_TOOLTIP_CURSOR}
+                    cursor={<SaxoCrosshair />}
                     formatter={(v: number) => `${v.toFixed(2)}%`}
                     labelClassName="text-xs"
                     contentStyle={SAXO_TOOLTIP_CONTENT}
@@ -193,7 +192,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     stroke="var(--destructive)"
                     fill="url(#ddFill)"
                     dot={saxoDot("var(--destructive)", data.drawdownCurve.length)}
-                    activeDot={saxoActiveDot("var(--destructive)")}
+                    activeDot={<SaxoActiveDot color="var(--destructive)" />}
                     isAnimationActive={false}
                   />
                 </AreaChart>

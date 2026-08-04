@@ -19,6 +19,7 @@ import {
   summariseSettlement,
   type SettlementState,
 } from "@/lib/snapshot-settlement";
+import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";
 
 import {
   Area,
@@ -523,7 +524,7 @@ export function EquityPctChart({
                 <YAxis yAxisId="delta" orientation="right" domain={deltaDomain} hide />
                 <ReferenceLine yAxisId="pct" {...REFERENCE_LINE} strokeDasharray="0" y={0} />
                 <Tooltip
-                  cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                  cursor={<SaxoCrosshair />}
                   contentStyle={{
                     fontSize: 12,
                     background: "var(--popover)",
@@ -568,7 +569,7 @@ export function EquityPctChart({
                   stroke={`url(#${gradientId}-stroke)`}
                   strokeWidth={2}
                   dot={showDots ? { r: 2, fill: color, strokeWidth: 0 } : false}
-                  activeDot={{ r: 3.5, fill: color, stroke: "var(--background)", strokeWidth: 1.5 }}
+                  activeDot={<SaxoActiveDot color={color} />}
                   connectNulls
                   isAnimationActive={false}
                 />
@@ -581,7 +582,7 @@ export function EquityPctChart({
                   strokeWidth={2}
                   strokeDasharray="4 3"
                   dot={showDots ? { r: 2, fill: color, strokeWidth: 0 } : false}
-                  activeDot={{ r: 3.5, fill: color, stroke: "var(--background)", strokeWidth: 1.5 }}
+                  activeDot={<SaxoActiveDot color={color} />}
                   connectNulls
                   isAnimationActive={false}
                 />
