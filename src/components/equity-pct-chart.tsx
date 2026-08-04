@@ -21,9 +21,8 @@ import {
 } from "@/lib/snapshot-settlement";
 
 import {
-  Bar,
+  Area,
   CartesianGrid,
-  Cell,
   ComposedChart,
   Line,
   ReferenceLine,
@@ -400,6 +399,19 @@ export function EquityPctChart({
   // Label shape and spacing follow the span actually plotted, so an all-time
   // hourly series thins to month labels instead of colliding.
   const ticks = xAxisTicks(resolution, spanDays(data), data.length);
+  // Saxo prints only the two endpoint dates under the plot; everything else
+  // is read off the tooltip. Keeps a narrow phone axis uncluttered.
+  const edgeTicks =
+    data.length >= 2 ? [data[0].at, data[data.length - 1].at] : data.map((d) => d.at);
+  // Where y = 0 sits inside the domain, as a 0..1 fraction from the top, so
+  // the fill/stroke gradient can flip colour exactly on the zero line.
+  const zeroOffset = Math.min(
+    1,
+    Math.max(0, domain[1] / (domain[1] - domain[0] || 1)),
+  );
+  const gradientId = `eq-${resolution}-${portfolioId ?? "x"}`;
+  // Point markers only while they stay legible.
+  const showDots = data.length <= 40;
   const money = (v: number) =>
     `${v < 0 ? "−" : "+"}${new Intl.NumberFormat("en-GB", {
       style: "currency",
