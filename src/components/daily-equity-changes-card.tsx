@@ -87,14 +87,37 @@ export function DailyEquityChangesCard({
     [equity, deposits, range],
   );
 
+  // Settlement state per snapshot day. Today's row is a live mark that will
+  // keep moving, and backfilled/revalued days were never observed, so neither
+  // belongs in "up days", "best" or "worst" — those must quote settled closes
+  // only, or the stats change under you during the session.
+  const stateByDate = useMemo(() => {
+    const map = new Map<string, SettlementState>();
+    for (const e of equity) {
+      const date = String(e.snapshot_date).slice(0, 10);
+      map.set(
+        date,
+        classifySnapshot({ snapshot_date: date, source: e.source ?? null }),
+      );
+    }
+    return map;
+  }, [equity]);
+
+  const settledOnly = useMemo(
+    () => rows.filter((r) => (stateByDate.get(String(r.date).slice(0, 10)) ?? "settled") === "settled"),
+    [rows, stateByDate],
+  );
+  const provisionalCount = rows.length - settledOnly.length;
+
   const stats = useMemo(() => {
-    if (rows.length === 0) return null;
+    const source = settledOnly.length > 0 ? settledOnly : rows;
+    if (source.length === 0) return null;
     let up = 0;
     let down = 0;
     let flat = 0;
-    let best = rows[0];
-    let worst = rows[0];
-    for (const r of rows) {
+    let best = source[0];
+    let worst = source[0];
+    for (const r of source) {
       if (r.pct > 0) up++;
       else if (r.pct < 0) down++;
       else flat++;
@@ -107,10 +130,10 @@ export function DailyEquityChangesCard({
       flat,
       best,
       worst,
-      total: rows.length,
-      winRate: rows.length > 0 ? (up / rows.length) * 100 : 0,
+      total: source.length,
+      winRate: source.length > 0 ? (up / source.length) * 100 : 0,
     };
-  }, [rows]);
+  }, [rows, settledOnly]);
 
   const chartData = useMemo(() => {
     const data = rows.map((r) => ({
