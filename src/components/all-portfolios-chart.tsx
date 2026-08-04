@@ -12,15 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, RefreshCw } from "lucide-react";
+import { CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 import {
-  AXIS_LINE,
-  AXIS_TICK,
-  CHART_ROLE,
-  CHART_SEQUENCE,
-  GRID_PROPS,
-  OKABE_ITO,
-  TICK_LINE,
-} from "@/lib/chart-palette";
+  SAXO_AXIS,
+  SAXO_GRID,
+  SAXO_TOOLTIP_CURSOR,
+  edgeTicks,
+  fadeStops,
+  saxoActiveDot,
+  saxoDot,
+} from "@/lib/saxo-chart";
 import {
   Area,
   CartesianGrid,
@@ -293,36 +294,33 @@ function ModeChart({
                 >
                   <defs>
                     <linearGradient id={`area-${totalKey}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={color} stopOpacity={0} />
+                      {fadeStops(color).map((s) => (
+                        <stop key={String(s.offset)} {...s} />
+                      ))}
                     </linearGradient>
                   </defs>
-                  <CartesianGrid {...GRID_PROPS} />
+                  <CartesianGrid {...SAXO_GRID} />
                   <XAxis
+                    {...SAXO_AXIS}
                     dataKey="date"
-                    tick={AXIS_TICK}
-                    stroke={AXIS_COLOR}
-                    strokeOpacity={0.6}
-                    minTickGap={isMobile ? 56 : 40}
+                    ticks={edgeTicks(series as Array<Record<string, unknown>>, "date") as string[]}
+                    interval={0}
                     tickFormatter={(v) => (isMobile ? shortDate(String(v)) : String(v))}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
+                    padding={{ left: 2, right: 2 }}
                   />
                   <YAxis
-                    width={isMobile ? 56 : 64}
-                    tick={AXIS_TICK}
-                    stroke={AXIS_COLOR}
-                    strokeOpacity={0.6}
+                    {...SAXO_AXIS}
+                    width={isMobile ? 52 : 60}
+                    tickCount={4}
                     tickFormatter={(v) =>
                       isMobile ? `${currency}${compactNum(Number(v))}` : fmt(Number(v))
                     }
                     domain={yDomain}
                     allowDataOverflow
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
                   />
                   <Tooltip
-                    cursor={{ stroke: AXIS_COLOR, strokeOpacity: 0.4, strokeDasharray: "3 3" }}
+                    cursor={SAXO_TOOLTIP_CURSOR}
+
                     wrapperStyle={{ zIndex: 40, maxWidth: "min(85vw, 320px)" }}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
@@ -362,14 +360,17 @@ function ModeChart({
                   />
 
                   <Area
-                    type="monotone"
+                    type="linear"
                     dataKey={totalKey}
                     name={`${badgeLabel} total`}
                     stroke={color}
-                    strokeWidth={2.5}
+                    strokeWidth={2}
                     fill={`url(#area-${totalKey})`}
+                    dot={saxoDot(color, series.length)}
+                    activeDot={saxoActiveDot(color)}
                     isAnimationActive={false}
                   />
+
                   {portfolios.map((p, i) => (
                     <Line
                       key={p.id}
