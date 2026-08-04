@@ -245,6 +245,54 @@ export function valuePositionsOn(
   return round2(total);
 }
 
+/**
+ * Reconstruct the cash balance at the close of `date` by undoing every fill
+ * and funding event recorded after it, starting from a known-good anchor
+ * (normally the most recent broker-synced balance).
+ *
+ * Stored historical `cash` is frequently the *current* balance stamped onto an
+ * old row by a repair job, which makes a correctly re-marked history look like
+ * an implausible jump. Returns `null` when the ledger cannot explain the day —
+ * any priceless fill, or a balance that rolls back through zero — so callers
+ * keep the stored figure rather than invent one.
+ */
+export function cashOn(
+  anchorCash: number,
+  fills: RevalueFill[],
+  fundEvents: RevalueFundEvent[],
+  date: string,
+  fx: Map<string, number> = new Map(),
+): number | null {
+  let cash = anchorCash;
+  if (!Number.isFinite(cash)) return null;
+
+  for (const f of fills) {
+    if (day(f.filled_at) <= date) continue;
+    const qty = num(f.quantity);
+    if (!(qty > 0)) continue;
+    const raw = num(f.fill_price, Number.NaN);
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    const px = normalizeLseDisplayPriceToBase(f.symbol, raw);
+    if (!(px > 0)) return null;
+    const ccy = instrumentCcyFor(String(f.symbol ?? ""), null).toUpperCase();
+    const rate = fx.get(ccy);
+    const notional = qty * px * (Number.isFinite(rate) && (rate ?? 0) > 0 ? rate! : 1);
+    // Undo it: a later buy means we still held that cash on `date`.
+    cash += String(f.side ?? "").toLowerCase() === "sell" ? -notional : notional;
+  }
+
+  for (const e of fundEvents) {
+    if (day(e.at) <= date) continue;
+    const amount = num(e.amount, Number.NaN);
+    if (!Number.isFinite(amount)) return null;
+    cash -= amount;
+  }
+
+  if (!Number.isFinite(cash) || cash < 0) return null;
+  return round2(cash);
+}
+
+
 export function planHistoricalRevaluation({
   portfolioId,
   snapshots,
