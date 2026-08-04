@@ -95,19 +95,25 @@ describe("unbackedOpenings", () => {
     expect(only!.costBase).toBeCloseTo(46 * 46.195 * 1.17, 2);
   });
 
-  it("ignores positions with no open date, no quantity, or no cost", () => {
-    expect(
-      unbackedOpenings(
-        [
-          { symbol: "A", quantity: 10, avg_cost: 5, opened_at: null },
-          { symbol: "B", quantity: 0, avg_cost: 5, opened_at: "2026-07-01" },
-          { symbol: "C", quantity: 10, avg_cost: 0, opened_at: "2026-07-01" },
-        ],
-        [],
-        FX,
-      ),
-    ).toEqual([]);
+  it("drops zero-quantity rows but flags un-costable ones instead of ignoring them", () => {
+    const openings = unbackedOpenings(
+      [
+        { symbol: "A", quantity: 10, avg_cost: 5, opened_at: null },
+        { symbol: "B", quantity: 0, avg_cost: 5, opened_at: "2026-07-01" },
+        { symbol: "C", quantity: 10, avg_cost: 0, opened_at: "2026-07-01" },
+      ],
+      [],
+      FX,
+    );
+    // B holds nothing, so it consumed no cash and is genuinely irrelevant.
+    // A and C did consume cash we cannot quantify — silently dropping them is
+    // what let the rollback under-credit and reintroduce a jump.
+    expect(openings).toHaveLength(2);
+    expect(openings.every((o) => o.unresolved)).toBe(true);
+    expect(openings.map((o) => o.reason).sort()).toEqual(["no_cost", "no_open_date"]);
+    expect(openings.every((o) => o.costBase === 0)).toBe(true);
   });
+
 
   it("treats a position as backed as soon as one buy fill exists for any spelling", () => {
     const openings = unbackedOpenings(HOLDINGS, [
