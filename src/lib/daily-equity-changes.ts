@@ -13,6 +13,8 @@
 export type EquitySnapshotLite = {
   snapshot_date: string;
   total_value: number | string;
+  /** `equity_snapshots.source`, when selected — settled vs provisional split. */
+  source?: string | null;
 };
 
 export type DepositLite = {

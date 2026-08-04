@@ -23,6 +23,7 @@ import {
   type EquitySnapshotLite,
 } from "@/lib/daily-equity-changes";
 import { formatMoney } from "@/lib/format-money";
+import { classifySnapshot, type SettlementState } from "@/lib/snapshot-settlement";
 import { AXIS_LINE, AXIS_TICK, CHART_ROLE, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 
 type Range = "7d" | "30d" | "90d" | "ytd" | "all";
