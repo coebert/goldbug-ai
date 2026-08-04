@@ -255,6 +255,49 @@ export function valuePositionsOn(
 }
 
 /**
+ * Positions currently held that the fills ledger never bought.
+ *
+ * A linked broker account can gain positions the app did not execute (manual
+ * trades, transfers, a first sync of an account that already held stock). The
+ * cash those purchases consumed is invisible to `cashOn`, which then leaves
+ * every earlier day carrying *today's* depleted balance while showing no
+ * positions — exactly the shape that reads as an implausible jump on the day
+ * the positions appear.
+ *
+ * `avg_cost` is stored in the instrument's settlement currency (post the
+ * fill-record repair), so it is converted with FX only — never through the LSE
+ * pence rule, which would shrink a London leg 100x.
+ */
+export function unbackedOpenings(
+  holdings: RevalueHolding[],
+  fills: RevalueFill[],
+  fx: Map<string, number> = new Map(),
+): RevalueOpening[] {
+  const bought = new Set<string>();
+  for (const f of fills) {
+    if (String(f.side ?? "").toLowerCase() === "sell") continue;
+    const key = positionKey(f.symbol);
+    if (key) bought.add(key);
+  }
+
+  const out: RevalueOpening[] = [];
+  for (const h of holdings) {
+    const key = positionKey(h.symbol);
+    if (!key || bought.has(key)) continue;
+    const at = h.opened_at ? day(h.opened_at) : "";
+    const qty = num(h.quantity);
+    const cost = num(h.avg_cost);
+    if (!at || !(qty > 0) || !(cost > 0)) continue;
+    const rate = fx.get(instrumentCurrency(h).toUpperCase());
+    out.push({
+      at,
+      costBase: qty * cost * (Number.isFinite(rate) && (rate ?? 0) > 0 ? rate! : 1),
+    });
+  }
+  return out;
+}
+
+/**
  * Reconstruct the cash balance at the close of `date` by undoing every fill
  * and funding event recorded after it, starting from a known-good anchor
  * (normally the most recent broker-synced balance).
@@ -271,6 +314,7 @@ export function cashOn(
   fundEvents: RevalueFundEvent[],
   date: string,
   fx: Map<string, number> = new Map(),
+  openings: RevalueOpening[] = [],
 ): number | null {
   let cash = anchorCash;
   if (!Number.isFinite(cash)) return null;
@@ -293,6 +337,14 @@ export function cashOn(
     cash += String(f.side ?? "").toLowerCase() === "sell" ? -notional : notional;
   }
 
+  // Positions with no buy fill behind them: give their cost back to the days
+  // before they appeared, or those days read as cash-poor and position-free.
+  for (const o of openings) {
+    if (day(o.at) <= date) continue;
+    if (!Number.isFinite(o.costBase) || o.costBase <= 0) continue;
+    cash += o.costBase;
+  }
+
   for (const e of fundEvents) {
     if (day(e.at) <= date) continue;
     const amount = num(e.amount, Number.NaN);
@@ -303,6 +355,7 @@ export function cashOn(
   if (!Number.isFinite(cash) || cash < 0) return null;
   return round2(cash);
 }
+
 
 
 export function planHistoricalRevaluation({
