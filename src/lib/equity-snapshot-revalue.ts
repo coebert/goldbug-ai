@@ -652,6 +652,8 @@ export function planHistoricalRevaluation({
       previous_holdings_value: round2(previousHoldings),
       previous_total_value: Number.isFinite(storedTotal) ? round2(storedTotal) : 0,
       ratio: holdingsValue > 0 ? round2(previousHoldings / holdingsValue) : null,
+      ...(synthetic.has(date) ? { inserted: true } : {}),
+
     });
   }
 
