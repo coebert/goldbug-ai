@@ -466,31 +466,52 @@ export function EquityPctChart({
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 6, right: 12, bottom: 6, left: 4 }}>
-                <CartesianGrid {...GRID_PROPS} />
+              <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+                {/*
+                  Saxo-style presentation: one calm gradient-filled curve.
+                  The gradient is split at the zero line so the area reads
+                  green while the portfolio is above contributed capital and
+                  red below it, without ever recolouring the axis itself.
+                */}
+                <defs>
+                  <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset={0} stopColor="var(--success)" stopOpacity={0.45} />
+                    <stop offset={zeroOffset} stopColor="var(--success)" stopOpacity={0.02} />
+                    <stop offset={zeroOffset} stopColor="var(--destructive)" stopOpacity={0.02} />
+                    <stop offset={1} stopColor="var(--destructive)" stopOpacity={0.4} />
+                  </linearGradient>
+                  <linearGradient id={`${gradientId}-stroke`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset={zeroOffset} stopColor="var(--success)" />
+                    <stop offset={zeroOffset} stopColor="var(--destructive)" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid {...GRID_PROPS} strokeDasharray="0" vertical={false} />
                 <XAxis
                   dataKey="at"
-                  tick={AXIS_TICK}
-                  minTickGap={ticks.minTickGap}
-                  tickMargin={6}
-                  interval="preserveStartEnd"
+                  tick={{ ...AXIS_TICK, fontSize: 11, fill: "var(--muted-foreground)" }}
+                  ticks={edgeTicks}
+                  tickMargin={8}
+                  interval={0}
                   tickFormatter={(v) => ticks.format(String(v))}
-                  axisLine={AXIS_LINE}
-                  tickLine={TICK_LINE}
+                  axisLine={false}
+                  tickLine={false}
+                  padding={{ left: 2, right: 2 }}
                 />
                 <YAxis
                   yAxisId="pct"
-                  width={64}
-                  tickMargin={4}
+                  width={46}
+                  tickMargin={6}
+                  tickCount={4}
                   domain={domain}
-                  tick={AXIS_TICK}
+                  tick={{ ...AXIS_TICK, fontSize: 11, fill: "var(--muted-foreground)" }}
                   tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                  axisLine={AXIS_LINE}
-                  tickLine={TICK_LINE}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis yAxisId="delta" orientation="right" domain={deltaDomain} hide />
-                <ReferenceLine yAxisId="pct" {...REFERENCE_LINE} y={0} />
+                <ReferenceLine yAxisId="pct" {...REFERENCE_LINE} strokeDasharray="0" y={0} />
                 <Tooltip
+                  cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "3 3" }}
                   contentStyle={{
                     fontSize: 12,
                     background: "var(--popover)",
@@ -500,18 +521,12 @@ export function EquityPctChart({
                   }}
                   labelStyle={{ color: "var(--muted-foreground)" }}
                   labelFormatter={(l) => (resolution === "hourly" ? fmtHour(String(l)) : fmtDay(String(l)))}
-                  formatter={(v, name, item) => {
-                    if (name === "delta") {
-                      const d = Number(v);
-                      const money_ = money(Number(item?.payload?.deltaValue ?? 0));
-                      return [
-                        `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(2)} pp · ${money_}`,
-                        resolution === "hourly" ? "vs prev hour" : "vs prev day",
-                      ];
-                    }
+                  formatter={(v, _name, item) => {
                     const state = (item?.payload?.state ?? "settled") as SettlementState;
+                    const delta = Number(item?.payload?.deltaPct ?? 0);
+                    const money_ = money(Number(item?.payload?.deltaValue ?? 0));
                     return [
-                      `${Number(v).toFixed(2)}%`,
+                      `${Number(v).toFixed(2)}% · ${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(2)} pp ${money_}`,
                       state === "settled"
                         ? "vs capital (settled close)"
                         : state === "intraday"
@@ -520,54 +535,48 @@ export function EquityPctChart({
                     ];
                   }}
                 />
-                <Bar
-                  yAxisId="delta"
-                  dataKey="deltaPct"
-                  name="delta"
-                  barSize={resolution === "hourly" ? Math.max(1, Math.min(3, Math.floor(600 / Math.max(1, data.length)))) : 6}
+                <Area
+                  yAxisId="pct"
+                  type="linear"
+                  dataKey="pct"
+                  name="area"
+                  stroke="none"
+                  fill={`url(#${gradientId}-fill)`}
+                  baseValue={0}
                   isAnimationActive={false}
-                  radius={[1, 1, 1, 1]}
-                >
-                  {data.map((d, i) => (
-                    <Cell
-                      key={i}
-                      // Provisional days are washed out so an unsettled bar is
-                      // never read as a confirmed daily move.
-                      fillOpacity={d.state === "settled" ? 1 : 0.45}
-                      fill={
-                        d.deltaPct >= 0
-                          ? "color-mix(in oklab, var(--success) 45%, transparent)"
-                          : "color-mix(in oklab, var(--destructive) 45%, transparent)"
-                      }
-                    />
-                  ))}
-                </Bar>
+                  activeDot={false}
+                  legendType="none"
+                  tooltipType="none"
+                />
                 <Line
                   yAxisId="pct"
-                  type="monotone"
+                  type="linear"
                   dataKey="pctSettled"
                   name="settled"
-                  stroke={color}
+                  stroke={`url(#${gradientId}-stroke)`}
                   strokeWidth={2}
-                  dot={false}
+                  dot={showDots ? { r: 2, fill: color, strokeWidth: 0 } : false}
+                  activeDot={{ r: 3.5, fill: color, stroke: "var(--background)", strokeWidth: 1.5 }}
                   connectNulls
                   isAnimationActive={false}
                 />
                 <Line
                   yAxisId="pct"
-                  type="monotone"
+                  type="linear"
                   dataKey="pctProvisional"
                   name="provisional"
-                  stroke={color}
+                  stroke={`url(#${gradientId}-stroke)`}
                   strokeWidth={2}
                   strokeDasharray="4 3"
-                  dot={false}
+                  dot={showDots ? { r: 2, fill: color, strokeWidth: 0 } : false}
+                  activeDot={{ r: 3.5, fill: color, stroke: "var(--background)", strokeWidth: 1.5 }}
                   connectNulls
                   isAnimationActive={false}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           )}
+
         </ChartFrame>
 
         {/* Settled vs provisional key. Without it the tail of the curve — a
