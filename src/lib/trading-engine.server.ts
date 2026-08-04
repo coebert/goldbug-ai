@@ -365,11 +365,27 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const budgetNotes = affordabilityResult.notes;
 
 
+  // Venue gate: if every candidate's venue is shut right now, nothing this
+  // tick can fill — the AI would spend a full prompt only to have execution
+  // queue or drop the orders. Mechanical exits (stop-loss, take-profit, ATR
+  // trailing, time exits) run below regardless, so risk cover is unchanged.
+  const allVenuesClosed = await (async () => {
+    if (candidateSymbols.length === 0) return false;
+    const { getMarketStatusForSymbol } = await import("./market-hours");
+    return candidateSymbols.every((c) => !getMarketStatusForSymbol(c.symbol).isOpen);
+  })();
+  if (allVenuesClosed) {
+    srvLog.info(
+      `[trading-engine] venue gate: all ${candidateSymbols.length} candidate venues closed — skipping AI decision this tick`,
+    );
+  }
+
   // Circuit breaker: evaluate BEFORE spending on the AI call. If tripped,
   // we still run auto-liquidation stops but skip the AI + any new buys.
   const priorCircuit = parseCircuit(portfolio.circuit_breaker);
   const circuit = await evaluateBreaker(portfolioId, asOf, priorCircuit).catch(() => priorCircuit);
   const breakerTripped = circuit.paused;
+
 
   const universeKey = candidateSymbols.map((c) => c.symbol).sort().join(",");
   // Clone: features are per-portfolio-mutated below (news_score, cooling, rank_info),
@@ -699,7 +715,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     return formatAlgoRegimePromptBlock(algoRegime);
   })();
 
-  // If circuit breaker is tripped, skip the AI call entirely.
+  // If the circuit breaker is tripped, or every candidate venue is closed,
+  // skip the AI call entirely.
 
   const decision: DecisionOutput = breakerTripped
     ? {
@@ -707,7 +724,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
         orders: [],
       }
+    : allVenuesClosed
+    ? {
+        briefing:
+          "All candidate venues are closed right now, so no new orders were considered this run.",
+        rationale:
+          "Markets shut — automated exits (stop-loss, take-profit, trailing stops) stay armed and the next open will get a full review.",
+        orders: [],
+      }
     : await callAiForDecision({
+
         portfolio,
         holdings: holdings ?? [],
         cashValue: cash,

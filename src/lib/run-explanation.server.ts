@@ -154,12 +154,30 @@ Deterministic fallback (rewrite this in warmer, clearer language, keeping every 
 "${fallback}"`;
 }
 
+/**
+ * True when the run had literally nothing to narrate: no proposed orders, no
+ * executions or rejections, no halts, and nothing dropped or blocked. The
+ * deterministic sentence already says everything an LLM could, so paying for
+ * a model call here buys nothing — and these runs are the majority overnight.
+ */
+export function isNoOpRun(input: RunExplanationInput): boolean {
+  return (
+    (input.proposedOrders?.length ?? 0) === 0 &&
+    (input.executed?.length ?? 0) === 0 &&
+    (input.halts?.length ?? 0) === 0 &&
+    (input.droppedForCash?.length ?? 0) === 0 &&
+    (input.brokerBlocked?.length ?? 0) === 0
+  );
+}
+
 export async function generateRunExplanation(input: RunExplanationInput): Promise<RunExplanation> {
   const category = classify(input);
   const fallback = buildDeterministic(input, category);
 
   const key = process.env.LOVABLE_API_KEY;
   if (!key) return { text: fallback, model: null, category };
+  if (isNoOpRun(input)) return { text: fallback, model: null, category };
+
 
   try {
     const gateway = createLovableAiGatewayProvider(key);

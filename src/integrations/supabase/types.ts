@@ -1927,6 +1927,36 @@ export type Database = {
         }
         Relationships: []
       }
+      order_explanations: {
+        Row: {
+          created_at: string
+          decision_id: string
+          explanation: string
+          id: string
+          model: string | null
+          order_key: string
+          prompt_hash: string
+        }
+        Insert: {
+          created_at?: string
+          decision_id: string
+          explanation: string
+          id?: string
+          model?: string | null
+          order_key: string
+          prompt_hash: string
+        }
+        Update: {
+          created_at?: string
+          decision_id?: string
+          explanation?: string
+          id?: string
+          model?: string | null
+          order_key?: string
+          prompt_hash?: string
+        }
+        Relationships: []
+      }
       order_reconcile_events: {
         Row: {
           age_ms: number | null
