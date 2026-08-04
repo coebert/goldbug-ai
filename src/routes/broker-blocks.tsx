@@ -4,6 +4,8 @@ import { BrokerSuitabilityBlocksCard } from "@/components/broker-suitability-blo
 import { BrokerBlockAuditLogCard } from "@/components/broker-block-audit-log-card";
 import { TradeReconciliationReportCard } from "@/components/trade-reconciliation-report-card";
 import { HoldingsFillsReconCard } from "@/components/holdings-fills-recon-card";
+import { DataQualityReportCard } from "@/components/data-quality-report-card";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/broker-blocks")({
@@ -55,6 +57,9 @@ function BrokerBlocksPage() {
         <TradeReconciliationReportCard days={14} />
 
         <HoldingsFillsReconCard />
+
+        <DataQualityReportCard />
+
 
 
         <BrokerBlockAuditLogCard />
