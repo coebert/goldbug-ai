@@ -7,17 +7,19 @@ import { Badge } from "@/components/ui/badge";
 import { getPerformanceAnalytics } from "@/lib/performance-analytics.functions";
 import type { AttributionSlice } from "@/lib/performance-analytics.server";
 import {
-  AXIS_LINE,
-  AXIS_TICK,
-  GRID_PROPS,
-  REFERENCE_LINE,
-  TICK_LINE,
-  TOOLTIP_CONTENT_STYLE,
-} from "@/lib/chart-palette";
+  SAXO_AXIS,
+  SAXO_GRID,
+  SAXO_REFERENCE_LINE,
+  SAXO_TOOLTIP_CONTENT,
+  SAXO_TOOLTIP_CURSOR,
+  SAXO_TOOLTIP_LABEL,
+  edgeTicks,
+  fadeStops,
+  saxoActiveDot,
+  saxoDot,
+} from "@/lib/saxo-chart";
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
   AreaChart,
   Area,
   BarChart,
