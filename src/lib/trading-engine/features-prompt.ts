@@ -78,6 +78,7 @@ function rankCell(f: AnyFeature): string {
 
 const COLUMNS = [
   "symbol",
+  "name",
   "class",
   "price",
   "sma20",
@@ -114,6 +115,7 @@ export function formatCandidateTable(features: readonly unknown[]): string {
       f["macd_bull_cross"] === true ? "B" : f["macd_bear_cross"] === true ? "R" : "n";
     const cells = [
       String(f["symbol"] ?? "?"),
+      String(f["name"] ?? "-"),
       String(f["asset_class"] ?? "-"),
       n(f["price"], 4),
       n(f["sma20"], 4),
