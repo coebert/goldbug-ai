@@ -7,8 +7,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildPriceUnitAudit } from "./price-unit-audit.server";
 import type { PriceUnitAudit } from "./price-unit-audit";
+import { ukDayKey } from "./uk-time";
 import {
   checkValuationConsistency,
+  DEFAULT_GAP_WEEKDAYS,
   DEFAULT_JUMP_FACTOR,
   type ConsistencySnapshot,
   type ValuationConsistencyReport,
@@ -22,9 +24,11 @@ const MAX_AUDITED_DAYS = 3;
 export async function runValuationConsistencyCheck(
   supabase: SupabaseClient,
   portfolioId: string,
-  options: { jumpFactor?: number; lookbackDays?: number } = {},
+  options: { jumpFactor?: number; lookbackDays?: number; gapWeekdays?: number } = {},
 ): Promise<ValuationConsistencyResult> {
   const jumpFactor = options.jumpFactor ?? DEFAULT_JUMP_FACTOR;
+  const gapWeekdays = options.gapWeekdays ?? DEFAULT_GAP_WEEKDAYS;
+  const today = ukDayKey(new Date());
   const lookback = options.lookbackDays ?? 180;
   const since = new Date(Date.now() - lookback * 86_400_000).toISOString().slice(0, 10);
 
@@ -49,6 +53,8 @@ export async function runValuationConsistencyCheck(
       threshold: jumpFactor,
       jumps: [],
       worst: null,
+      gaps: [],
+      gapThreshold: gapWeekdays,
       error: "portfolio not found",
     };
   }
@@ -59,7 +65,10 @@ export async function runValuationConsistencyCheck(
     snapshots,
     baseCcy: base,
     jumpFactor,
+    gapWeekdays,
+    today,
   });
+  // Continuity faults are reported even when every ratio is plausible.
   if (firstPass.jumps.length === 0) return firstPass;
 
   const days = [...firstPass.jumps]
@@ -82,5 +91,7 @@ export async function runValuationConsistencyCheck(
     audits,
     baseCcy: base,
     jumpFactor,
+    gapWeekdays,
+    today,
   });
 }
