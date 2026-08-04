@@ -48,8 +48,8 @@ export function SaxoCrosshair(props: CursorProps) {
           directly instead of eyeballed between gridlines. */}
       {activeCoordinate && Number.isFinite(activeCoordinate.y) ? (
         <line
-          x1={(points?.[0]?.x ?? x) - 10_000}
-          x2={(points?.[0]?.x ?? x) + 10_000}
+          x1={x - 10_000}
+          x2={x + 10_000}
           y1={activeCoordinate.y}
           y2={activeCoordinate.y}
           stroke="color-mix(in oklab, var(--foreground) 22%, transparent)"
