@@ -524,7 +524,7 @@ export function EquityPctChart({
                 <YAxis yAxisId="delta" orientation="right" domain={deltaDomain} hide />
                 <ReferenceLine yAxisId="pct" {...REFERENCE_LINE} strokeDasharray="0" y={0} />
                 <Tooltip
-                  cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                  cursor={<SaxoCrosshair />}
                   contentStyle={{
                     fontSize: 12,
                     background: "var(--popover)",
