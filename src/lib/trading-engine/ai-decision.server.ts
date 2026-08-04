@@ -16,6 +16,7 @@ import {
 } from "../universe.server";
 import { regimeDescription, humanRegime, type PersistedRegime } from "../regime-detector.server";
 import { DecisionSchema, type DecisionOutput, type Portfolio, type Holding } from "./types";
+import { formatCandidateTable, activeAssetClasses } from "./features-prompt";
 import type { buildCandidateFeatures } from "./candidate-features.server";
 
 export async function callAiForDecision(args: {
