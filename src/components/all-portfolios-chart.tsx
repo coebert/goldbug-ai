@@ -12,15 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, RefreshCw } from "lucide-react";
+import { CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 import {
-  AXIS_LINE,
-  AXIS_TICK,
-  CHART_ROLE,
-  CHART_SEQUENCE,
-  GRID_PROPS,
-  OKABE_ITO,
-  TICK_LINE,
-} from "@/lib/chart-palette";
+  SAXO_AXIS,
+  SAXO_GRID,
+  SAXO_TOOLTIP_CURSOR,
+  edgeTicks,
+  fadeStops,
+  saxoActiveDot,
+  saxoDot,
+} from "@/lib/saxo-chart";
 import {
   Area,
   CartesianGrid,
