@@ -283,12 +283,109 @@ const SOURCE_TEXT: Record<SuspectedUnitSource, string> = {
   unknown: "an unidentified pricing step",
 };
 
+
+/**
+ * Default continuity threshold: a hole of 2+ missing weekdays is flagged.
+ * One missing weekday is a normal venue holiday and stays quiet.
+ */
+export const DEFAULT_GAP_WEEKDAYS = 2;
+
+function toUtcDate(iso: string): number {
+  return Date.parse(`${iso}T00:00:00Z`);
+}
+
+function isoAddDays(iso: string, days: number): string {
+  return new Date(toUtcDate(iso) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+function dayDiff(fromIso: string, toIso: string): number {
+  return Math.round((toUtcDate(toIso) - toUtcDate(fromIso)) / 86_400_000);
+}
+
+/** Weekdays strictly between two ISO dates. */
+function weekdaysBetween(fromIso: string, toIso: string): number {
+  let count = 0;
+  for (let d = 1; d < dayDiff(fromIso, toIso); d += 1) {
+    const dow = new Date(toUtcDate(isoAddDays(fromIso, d))).getUTCDay();
+    if (dow !== 0 && dow !== 6) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Continuity check: find stretches with no stored snapshot. Runs independently
+ * of the jump check — a gap can be perfectly smooth on both sides.
+ */
+export function findSnapshotGaps({
+  snapshots,
+  minWeekdays = DEFAULT_GAP_WEEKDAYS,
+  today,
+  baseCcy = "GBP",
+}: {
+  snapshots: { date: string; total: number }[];
+  minWeekdays?: number;
+  /** ISO day used to detect a stale tail; omit to skip the trailing check. */
+  today?: string;
+  baseCcy?: string;
+}): SnapshotGap[] {
+  const gaps: SnapshotGap[] = [];
+  const ccy = baseCcy.toUpperCase();
+  const threshold = Math.max(1, Math.floor(minWeekdays));
+
+  const push = (
+    from: { date: string; total: number },
+    toDate: string,
+    toValue: number | null,
+    kind: "interior" | "trailing",
+  ) => {
+    const missingWeekdays = weekdaysBetween(from.date, toDate);
+    if (missingWeekdays < threshold) return;
+    const missingDays = Math.max(0, dayDiff(from.date, toDate) - 1);
+    const explanation =
+      kind === "trailing"
+        ? `No snapshot since ${from.date} — ${missingWeekdays} trading day${
+            missingWeekdays === 1 ? "" : "s"
+          } missing up to ${toDate}. The tile is showing stale history.`
+        : `No snapshots between ${from.date} and ${toDate} — ${missingWeekdays} trading day${
+            missingWeekdays === 1 ? "" : "s"
+          } missing (${round(from.total, 2)} → ${
+            toValue == null ? "?" : round(toValue, 2)
+          } ${ccy}). The chart draws a straight line across that stretch.`;
+
+    gaps.push({
+      from: from.date,
+      to: toDate,
+      missing_days: missingDays,
+      missing_weekdays: missingWeekdays,
+      kind,
+      value_from: round(from.total, 2),
+      value_to: toValue == null ? null : round(toValue, 2),
+      explanation,
+    });
+  };
+
+  for (let i = 1; i < snapshots.length; i += 1) {
+    const prev = snapshots[i - 1]!;
+    const curr = snapshots[i]!;
+    push(prev, curr.date, curr.total, "interior");
+  }
+
+  const last = snapshots[snapshots.length - 1];
+  if (last && today && dayDiff(last.date, today) > 0) {
+    push(last, today, null, "trailing");
+  }
+
+  return gaps.sort((a, b) => b.missing_weekdays - a.missing_weekdays);
+}
+
 export function checkValuationConsistency({
   portfolioId,
   snapshots,
   audits = {},
   baseCcy = "GBP",
   jumpFactor = DEFAULT_JUMP_FACTOR,
+  gapWeekdays = DEFAULT_GAP_WEEKDAYS,
+  today,
 }: {
   portfolioId: string;
   snapshots: ConsistencySnapshot[];
@@ -296,6 +393,10 @@ export function checkValuationConsistency({
   audits?: Record<string, PriceUnitAudit | null | undefined>;
   baseCcy?: string;
   jumpFactor?: number;
+  /** Missing-weekday count that trips the continuity check. */
+  gapWeekdays?: number;
+  /** ISO today, for the stale-tail check. */
+  today?: string;
 }): ValuationConsistencyReport {
   const threshold = Math.max(1.0001, jumpFactor);
   const ordered = [...snapshots]
