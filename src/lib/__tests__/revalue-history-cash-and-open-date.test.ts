@@ -29,7 +29,7 @@ const prices = new Map([["HSBA.L", new Map([["2026-07-28", 1500], ["2026-07-30",
 
 describe("historical revaluation trusts the fills ledger over a re-synced opened_at", () => {
   it("keeps a position on days after its first fill but before opened_at", () => {
-    expect(positionsOn(holdings, fills, "2026-07-30").get("HSBA.L")?.quantity).toBe(100);
+    expect([...positionsOn(holdings, fills, "2026-07-30").values()][0]?.quantity).toBe(100);
   });
 
   it("still excludes days before the first fill", () => {
@@ -38,7 +38,7 @@ describe("historical revaluation trusts the fills ledger over a re-synced opened
 
   it("falls back to opened_at when the ledger has no fill for the leg", () => {
     expect(positionsOn(holdings, [], "2026-07-30").size).toBe(0);
-    expect(positionsOn(holdings, [], "2026-08-02").get("HSBA.L")?.quantity).toBe(100);
+    expect([...positionsOn(holdings, [], "2026-08-02").values()][0]?.quantity).toBe(100);
   });
 });
 
