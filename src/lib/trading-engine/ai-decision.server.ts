@@ -194,8 +194,7 @@ ${budgetBlock}
 
 ${args.fxUserBlock ?? ""}
 
-Candidate assets (extended technicals, sentiment, cooldown flag):
-${JSON.stringify(args.features, null, 2)}
+${formatCandidateTable(args.features as unknown as readonly unknown[])}
 
 Recent headlines (sentiment -1 bearish .. +1 bullish, LLM-scored):
 ${args.news
