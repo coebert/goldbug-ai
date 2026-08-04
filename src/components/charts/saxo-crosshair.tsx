@@ -12,6 +12,8 @@
  *   <Area activeDot={<SaxoActiveDot color="var(--primary)" />} ... />
  */
 
+import { SAXO_COLOR, SAXO_METRIC } from "@/lib/saxo-chart";
+
 type CursorProps = {
   /** Recharts passes the two endpoints of the cursor line. */
   points?: Array<{ x: number; y: number }>;
@@ -40,8 +42,8 @@ export function SaxoCrosshair(props: CursorProps) {
         x2={x}
         y1={y1}
         y2={y2}
-        stroke="color-mix(in oklab, var(--foreground) 45%, transparent)"
-        strokeWidth={1}
+        stroke={SAXO_COLOR.crosshair}
+        strokeWidth={SAXO_METRIC.hairlineWidth}
         strokeDasharray="3 3"
       />
       {/* Horizontal rule at the hovered value, so the y-axis can be read off
@@ -52,8 +54,8 @@ export function SaxoCrosshair(props: CursorProps) {
           x2={x + 10_000}
           y1={activeCoordinate.y}
           y2={activeCoordinate.y}
-          stroke="color-mix(in oklab, var(--foreground) 22%, transparent)"
-          strokeWidth={1}
+          stroke={SAXO_COLOR.crosshairSoft}
+          strokeWidth={SAXO_METRIC.hairlineWidth}
           strokeDasharray="2 4"
         />
       ) : null}
@@ -75,14 +77,20 @@ export function SaxoActiveDot({ cx, cy, color, stroke }: ActiveDotProps) {
   const fill = color ?? stroke ?? "var(--primary)";
   return (
     <g pointerEvents="none">
-      <circle cx={cx} cy={cy} r={7} fill={fill} opacity={0.18} />
       <circle
         cx={cx}
         cy={cy}
-        r={3.5}
+        r={SAXO_METRIC.haloRadius}
         fill={fill}
-        stroke="var(--background)"
-        strokeWidth={1.5}
+        opacity={SAXO_METRIC.haloOpacity}
+      />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={SAXO_METRIC.activeDotRadius}
+        fill={fill}
+        stroke={SAXO_COLOR.markerRing}
+        strokeWidth={SAXO_METRIC.activeDotRingWidth}
       />
     </g>
   );
