@@ -360,14 +360,17 @@ function ModeChart({
                   />
 
                   <Area
-                    type="monotone"
+                    type="linear"
                     dataKey={totalKey}
                     name={`${badgeLabel} total`}
                     stroke={color}
-                    strokeWidth={2.5}
+                    strokeWidth={2}
                     fill={`url(#area-${totalKey})`}
+                    dot={saxoDot(color, series.length)}
+                    activeDot={saxoActiveDot(color)}
                     isAnimationActive={false}
                   />
+
                   {portfolios.map((p, i) => (
                     <Line
                       key={p.id}
