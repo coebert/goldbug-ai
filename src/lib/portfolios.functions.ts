@@ -9,7 +9,12 @@ import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
-import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
+import {
+  clipToInception,
+  firstHoldingsDate,
+  portfolioInceptionDate,
+  seriesStartDate,
+} from "./portfolio-inception";
 import { deletePortfolioWithCleanup } from "./portfolio-delete-cleanup";
 import { reanchorInferredInflow, trustedPreviousStarting } from "./infer-cash-flow";
 
