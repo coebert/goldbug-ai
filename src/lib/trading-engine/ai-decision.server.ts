@@ -159,9 +159,9 @@ ${HISTORICAL_PLAYBOOK}
 
 ${HEDGE_FUND_PLAYBOOK}
 
-${COMMODITY_PLAYBOOK}
+${commodityBlock}
 
-${CRYPTO_PLAYBOOK}
+${cryptoBlock}
 
 ${args.cryptoSignalsBlock ?? ""}
 
