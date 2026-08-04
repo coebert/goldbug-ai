@@ -67,8 +67,13 @@ export async function revalueHistoricalSnapshots(
     dryRun,
   };
 
-  const [{ data: portfolio }, { data: snapshotRows }, { data: holdingRows }, { data: fillRows }] =
-    await Promise.all([
+  const [
+    { data: portfolio },
+    { data: snapshotRows },
+    { data: holdingRows },
+    { data: fillRows },
+    { data: fundRows },
+  ] = await Promise.all([
       supabase
         .from("portfolios")
         .select("id, created_at, live_activated_at, currency")
@@ -86,9 +91,14 @@ export async function revalueHistoricalSnapshots(
         .gt("quantity", 0),
       supabase
         .from("live_fills")
-        .select("symbol, side, quantity, filled_at")
+        .select("symbol, side, quantity, fill_price, filled_at")
         .eq("portfolio_id", portfolioId)
         .order("filled_at", { ascending: true }),
+      supabase
+        .from("sim_fund_events")
+        .select("amount, created_at")
+        .eq("portfolio_id", portfolioId)
+        .order("created_at", { ascending: true }),
     ]);
 
   if (!portfolio) return { ...empty, error: "portfolio not found" };
@@ -97,6 +107,10 @@ export async function revalueHistoricalSnapshots(
   if (snapshots.length === 0) return empty;
   const holdings = (holdingRows ?? []) as RevalueHolding[];
   const fills = (fillRows ?? []) as RevalueFill[];
+  const fundEvents = ((fundRows ?? []) as Array<{ amount: number | string | null; created_at: string }>).map(
+    (r) => ({ at: r.created_at, amount: r.amount }),
+  );
+
 
   const inception = portfolioInceptionDate({
     created_at: (portfolio as { created_at?: string | null }).created_at ?? null,
