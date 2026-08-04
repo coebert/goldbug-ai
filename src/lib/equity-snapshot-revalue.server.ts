@@ -55,7 +55,7 @@ async function loadPriceHistory(
 export async function revalueHistoricalSnapshots(
   supabase: SupabaseClient,
   portfolioId: string,
-  options: { dryRun?: boolean; today?: string } = {},
+  options: { dryRun?: boolean; today?: string; fillGaps?: boolean } = {},
 ): Promise<RevalueRunResult> {
   const dryRun = options.dryRun === true;
   const empty: RevalueRunResult = {
@@ -116,7 +116,13 @@ export async function revalueHistoricalSnapshots(
     created_at: (portfolio as { created_at?: string | null }).created_at ?? null,
     live_activated_at: (portfolio as { live_activated_at?: string | null }).live_activated_at ?? null,
   });
-  const since = String(snapshots[0]!.snapshot_date).slice(0, 10);
+  // Gap fill reaches back to inception, which can predate the earliest stored
+  // row, so closes must be loaded from whichever is earlier.
+  const firstStored = String(snapshots[0]!.snapshot_date).slice(0, 10);
+  const since =
+    options.fillGaps && inception && inception.slice(0, 10) < firstStored
+      ? inception.slice(0, 10)
+      : firstStored;
   const prices = await loadPriceHistory(
     supabase,
     holdings.map((h) => String(h.symbol)).concat(fills.map((f) => String(f.symbol))),
@@ -160,6 +166,7 @@ export async function revalueHistoricalSnapshots(
     baseCcy: base,
 
     fundEvents,
+    fillGaps: options.fillGaps === true,
     today: options.today ?? new Date().toISOString().slice(0, 10),
   });
 
