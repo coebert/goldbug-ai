@@ -517,23 +517,49 @@ export function planHistoricalRevaluation({
   fundEvents?: RevalueFundEvent[];
   /** Portfolio base currency; legs in it need no FX rate to be trusted. */
   baseCcy?: string | null;
+  /**
+   * Reconstruct days that have no stored row at all, between inception and the
+   * newest stored row. A gap breaks the chart series: the line jumps straight
+   * from inception to the first surviving snapshot, so a week of real trading
+   * simply vanishes. The reconstructed days use exactly the same position
+   * rollback and cash rollback as a stored day, and are skipped whenever the
+   * ledger cannot explain them.
+   */
+  fillGaps?: boolean;
 
 }): RevalueReport {
   const rows: RevaluedSnapshot[] = [];
   const skipped: SkippedSnapshot[] = [];
-  const sorted = [...snapshots]
+  const stored = [...snapshots]
     .map((s) => ({ ...s, snapshot_date: day(s.snapshot_date) }))
     .filter((s) => !inception || s.snapshot_date >= day(inception))
     .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
 
-  // Anchor for historical cash: the newest stored balance, which is the one a
-  // broker sync actually refreshed.
-  const anchor = sorted.length > 0 ? sorted[sorted.length - 1]! : null;
+  const present = new Set(stored.map((s) => s.snapshot_date));
+  const synthetic = new Set<string>();
+  const sorted = [...stored];
+  if (fillGaps && stored.length > 0) {
+    const from = inception ? day(inception) : stored[0]!.snapshot_date;
+    const to = stored[stored.length - 1]!.snapshot_date;
+    for (const d of enumerateDays(from, to)) {
+      if (present.has(d)) continue;
+      synthetic.add(d);
+      sorted.push({ snapshot_date: d, cash: null, holdings_value: null, total_value: null });
+    }
+    sorted.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+  }
+
+  // Anchor for historical cash: the newest *stored* balance, which is the one
+  // a broker sync actually refreshed. A reconstructed day must never become
+  // the anchor for the days before it.
+  const anchor = stored.length > 0 ? stored[stored.length - 1]! : null;
   const anchorCash = anchor ? num(anchor.cash, Number.NaN) : Number.NaN;
   const anchorDate = anchor?.snapshot_date ?? "";
   // Broker-imported positions carry no fill, so their cost has to be handed
   // back to the days before they appeared.
   const openings = unbackedOpenings(holdings, fills, fx, baseCcy);
+
+
 
 
   for (const snap of sorted) {
