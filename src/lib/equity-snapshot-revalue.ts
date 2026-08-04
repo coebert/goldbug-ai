@@ -165,18 +165,37 @@ export function positionsOn(
   date: string,
 ): Map<string, { quantity: number; holding: RevalueHolding }> {
   const book = new Map<string, { quantity: number; holding: RevalueHolding }>();
+
+  // `holdings.opened_at` is only trustworthy when nothing earlier is recorded
+  // in the ledger: a broker re-sync rewrites the row and stamps *today*, which
+  // would otherwise erase every day before the sync (holdings vanish, the tile
+  // collapses to cash, and the next day reads as an implausible jump).
+  const firstFill = new Map<string, string>();
+  for (const f of fills) {
+    const key = positionKey(f.symbol);
+    const d = day(f.filled_at);
+    if (!key || !d) continue;
+    const prev = firstFill.get(key);
+    if (!prev || d < prev) firstFill.set(key, d);
+  }
+
   for (const h of holdings) {
     const key = positionKey(h.symbol);
     if (!key) continue;
     // A position cannot exist before it was opened, even when the fills ledger
     // is incomplete for that leg (older sim trades predate `live_fills`).
-    if (h.opened_at && day(h.opened_at) > date) continue;
+    const stamped = h.opened_at ? day(h.opened_at) : null;
+    const ledger = firstFill.get(key) ?? null;
+    const openedOn =
+      stamped && ledger ? (ledger < stamped ? ledger : stamped) : (ledger ?? stamped);
+    if (openedOn && openedOn > date) continue;
     const prev = book.get(key);
     book.set(key, {
       quantity: (prev?.quantity ?? 0) + num(h.quantity),
       holding: prev?.holding ?? h,
     });
   }
+
   for (const f of fills) {
     if (day(f.filled_at) <= date) continue;
     const key = positionKey(f.symbol);
