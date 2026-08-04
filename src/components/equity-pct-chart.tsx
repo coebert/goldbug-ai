@@ -13,6 +13,12 @@ import {
 } from "@/lib/uk-time";
 import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
+import {
+  classifySnapshot,
+  SETTLEMENT_HINT,
+  summariseSettlement,
+  type SettlementState,
+} from "@/lib/snapshot-settlement";
 
 import {
   Bar,
