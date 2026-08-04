@@ -106,38 +106,48 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
 
             <ChartBlock title="Equity curve">
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart
+                <AreaChart
                   data={data.equityCurve}
                   margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
                 >
-                  <CartesianGrid {...GRID_PROPS} />
+                  <defs>
+                    <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+                      {fadeStops("var(--primary)").map((st) => (
+                        <stop key={String(st.offset)} {...st} />
+                      ))}
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid {...SAXO_GRID} />
                   <XAxis
+                    {...SAXO_AXIS}
                     dataKey="date"
-                    tick={AXIS_TICK}
-                    minTickGap={40}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
+                    ticks={edgeTicks(data.equityCurve as Array<Record<string, unknown>>, "date") as string[]}
+                    interval={0}
                   />
                   <YAxis
-                    tick={AXIS_TICK}
+                    {...SAXO_AXIS}
+                    tickCount={4}
                     tickFormatter={(v: number) => fmtCcy.format(v)}
-                    width={70}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
+                    width={64}
                   />
                   <Tooltip
+                    cursor={SAXO_TOOLTIP_CURSOR}
                     formatter={(v: number) => fmtCcyPrecise.format(v)}
                     labelClassName="text-xs"
-                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    contentStyle={SAXO_TOOLTIP_CONTENT}
+                    labelStyle={SAXO_TOOLTIP_LABEL}
                   />
-                  <Line
-                    type="monotone"
+                  <Area
+                    type="linear"
                     dataKey="equity"
                     stroke="var(--primary)"
-                    dot={false}
+                    fill="url(#eqFill)"
+                    dot={saxoDot("var(--primary)", data.equityCurve.length)}
+                    activeDot={saxoActiveDot("var(--primary)")}
                     strokeWidth={2}
+                    isAnimationActive={false}
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             </ChartBlock>
 
@@ -148,37 +158,41 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
                 >
                   <defs>
-                    <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--destructive)" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0.05} />
+                    <linearGradient id="ddFill" x1="0" y1="1" x2="0" y2="0">
+                      {fadeStops("var(--destructive)").map((st) => (
+                        <stop key={String(st.offset)} {...st} />
+                      ))}
                     </linearGradient>
                   </defs>
-                  <CartesianGrid {...GRID_PROPS} />
+                  <CartesianGrid {...SAXO_GRID} />
                   <XAxis
+                    {...SAXO_AXIS}
                     dataKey="date"
-                    tick={AXIS_TICK}
-                    minTickGap={40}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
+                    ticks={edgeTicks(data.drawdownCurve as Array<Record<string, unknown>>, "date") as string[]}
+                    interval={0}
                   />
                   <YAxis
-                    tick={AXIS_TICK}
+                    {...SAXO_AXIS}
+                    tickCount={4}
                     tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                    width={64}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
+                    width={52}
                   />
                   <Tooltip
+                    cursor={SAXO_TOOLTIP_CURSOR}
                     formatter={(v: number) => `${v.toFixed(2)}%`}
                     labelClassName="text-xs"
-                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    contentStyle={SAXO_TOOLTIP_CONTENT}
+                    labelStyle={SAXO_TOOLTIP_LABEL}
                   />
-                  <ReferenceLine {...REFERENCE_LINE} y={0} />
+                  <ReferenceLine {...SAXO_REFERENCE_LINE} y={0} />
                   <Area
-                    type="monotone"
+                    type="linear"
                     dataKey="drawdownPct"
                     stroke="var(--destructive)"
                     fill="url(#ddFill)"
+                    dot={saxoDot("var(--destructive)", data.drawdownCurve.length)}
+                    activeDot={saxoActiveDot("var(--destructive)")}
+                    isAnimationActive={false}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -279,33 +293,34 @@ function AttributionBlock({
               layout="vertical"
               margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
             >
-              <CartesianGrid {...GRID_PROPS} horizontal={false} />
-              <XAxis
-                type="number"
-                tick={AXIS_TICK}
-                tickFormatter={(v: number) => fmt.format(v)}
-                axisLine={AXIS_LINE}
-                tickLine={TICK_LINE}
-              />
-              <YAxis
-                type="category"
-                dataKey="label"
-                tick={AXIS_TICK}
-                width={110}
-                axisLine={AXIS_LINE}
-                tickLine={TICK_LINE}
-              />
+              <defs>
+                <linearGradient id="attrPos" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.85} />
+                </linearGradient>
+                <linearGradient id="attrNeg" x1="1" y1="0" x2="0" y2="0">
+                  <stop offset="0%" stopColor="var(--destructive)" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0.85} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid {...SAXO_GRID} vertical horizontal={false} />
+              <XAxis {...SAXO_AXIS} type="number" tickCount={4} tickFormatter={(v: number) => fmt.format(v)} />
+              <YAxis {...SAXO_AXIS} type="category" dataKey="label" width={110} />
               <Tooltip
+                cursor={{ fill: "color-mix(in oklab, var(--muted) 30%, transparent)" }}
                 formatter={(v: number) => fmt.format(v)}
                 labelClassName="text-xs"
-                contentStyle={TOOLTIP_CONTENT_STYLE}
+                contentStyle={SAXO_TOOLTIP_CONTENT}
+                labelStyle={SAXO_TOOLTIP_LABEL}
               />
-              <ReferenceLine {...REFERENCE_LINE} x={0} />
+              <ReferenceLine {...SAXO_REFERENCE_LINE} x={0} />
               <Bar dataKey="realizedPnl" radius={[0, 4, 4, 0]}>
                 {chartData.map((s) => (
                   <Cell
                     key={s.key}
-                    fill={s.realizedPnl >= 0 ? "var(--primary)" : "var(--destructive)"}
+                    fill={s.realizedPnl >= 0 ? "url(#attrPos)" : "url(#attrNeg)"}
+                    stroke={s.realizedPnl >= 0 ? "var(--primary)" : "var(--destructive)"}
+                    strokeWidth={1}
                   />
                 ))}
               </Bar>
