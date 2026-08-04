@@ -394,6 +394,9 @@ export function planHistoricalRevaluation({
   const anchor = sorted.length > 0 ? sorted[sorted.length - 1]! : null;
   const anchorCash = anchor ? num(anchor.cash, Number.NaN) : Number.NaN;
   const anchorDate = anchor?.snapshot_date ?? "";
+  // Broker-imported positions carry no fill, so their cost has to be handed
+  // back to the days before they appeared.
+  const openings = unbackedOpenings(holdings, fills, fx);
 
   for (const snap of sorted) {
     const date = snap.snapshot_date;
@@ -419,7 +422,7 @@ export function planHistoricalRevaluation({
     // reconstructed.
     const rolledCash =
       Number.isFinite(anchorCash) && date < anchorDate
-        ? cashOn(anchorCash, fills, fundEvents, date, fx)
+        ? cashOn(anchorCash, fills, fundEvents, date, fx, openings)
         : null;
     const cash = rolledCash ?? storedCash;
     const previousHoldings = Number.isFinite(rawHoldings)
@@ -432,8 +435,15 @@ export function planHistoricalRevaluation({
 
     // The ledger cannot explain a day that held value we can no longer
     // reconstruct (positions closed before `live_fills` existed). Writing a
-    // zero there would erase real history, so leave it and report it.
-    if (book.size === 0 && round2(previousHoldings) > 0) {
+    // zero there would erase real history, so leave it and report it — but
+    // only when the unexplained stub is material: a rounding-scale residue
+    // must not block a day whose cash we *can* reconstruct.
+    const materialResidue =
+      Number.isFinite(storedTotal) && storedTotal > 0
+        ? previousHoldings / storedTotal > 0.01
+        : previousHoldings > 0;
+    if (book.size === 0 && round2(previousHoldings) > 0 && materialResidue) {
+
       skipped.push({ snapshot_date: date, reason: "unattributable_history" });
       continue;
     }
