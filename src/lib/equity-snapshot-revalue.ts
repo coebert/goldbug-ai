@@ -38,9 +38,15 @@ export type RevalueFill = {
   symbol: string;
   side: string;
   quantity: number | string | null;
+  /** Execution price in raw quote units (GBX for LSE listings). */
+  fill_price?: number | string | null;
   /** ISO timestamp or date of execution. */
   filled_at: string;
 };
+
+/** An external deposit/withdrawal: positive credits the account. */
+export type RevalueFundEvent = { at: string; amount: number | string | null };
+
 
 export type RevalueSnapshot = {
   snapshot_date: string;
@@ -165,18 +171,37 @@ export function positionsOn(
   date: string,
 ): Map<string, { quantity: number; holding: RevalueHolding }> {
   const book = new Map<string, { quantity: number; holding: RevalueHolding }>();
+
+  // `holdings.opened_at` is only trustworthy when nothing earlier is recorded
+  // in the ledger: a broker re-sync rewrites the row and stamps *today*, which
+  // would otherwise erase every day before the sync (holdings vanish, the tile
+  // collapses to cash, and the next day reads as an implausible jump).
+  const firstFill = new Map<string, string>();
+  for (const f of fills) {
+    const key = positionKey(f.symbol);
+    const d = day(f.filled_at);
+    if (!key || !d) continue;
+    const prev = firstFill.get(key);
+    if (!prev || d < prev) firstFill.set(key, d);
+  }
+
   for (const h of holdings) {
     const key = positionKey(h.symbol);
     if (!key) continue;
     // A position cannot exist before it was opened, even when the fills ledger
     // is incomplete for that leg (older sim trades predate `live_fills`).
-    if (h.opened_at && day(h.opened_at) > date) continue;
+    const stamped = h.opened_at ? day(h.opened_at) : null;
+    const ledger = firstFill.get(key) ?? null;
+    const openedOn =
+      stamped && ledger ? (ledger < stamped ? ledger : stamped) : (ledger ?? stamped);
+    if (openedOn && openedOn > date) continue;
     const prev = book.get(key);
     book.set(key, {
       quantity: (prev?.quantity ?? 0) + num(h.quantity),
       holding: prev?.holding ?? h,
     });
   }
+
   for (const f of fills) {
     if (day(f.filled_at) <= date) continue;
     const key = positionKey(f.symbol);
@@ -220,6 +245,57 @@ export function valuePositionsOn(
   return round2(total);
 }
 
+/**
+ * Reconstruct the cash balance at the close of `date` by undoing every fill
+ * and funding event recorded after it, starting from a known-good anchor
+ * (normally the most recent broker-synced balance).
+ *
+ * Stored historical `cash` is frequently the *current* balance stamped onto an
+ * old row by a repair job, which makes a correctly re-marked history look like
+ * an implausible jump. Returns `null` when the ledger cannot explain the day —
+ * any priceless fill, or a balance that rolls back through zero — so callers
+ * keep the stored figure rather than invent one.
+ */
+export function cashOn(
+  anchorCash: number,
+  fills: RevalueFill[],
+  fundEvents: RevalueFundEvent[],
+  date: string,
+  fx: Map<string, number> = new Map(),
+): number | null {
+  let cash = anchorCash;
+  if (!Number.isFinite(cash)) return null;
+
+  for (const f of fills) {
+    if (day(f.filled_at) <= date) continue;
+    const qty = num(f.quantity);
+    if (!(qty > 0)) continue;
+    // `live_fills.fill_price` is stored in the instrument's settlement
+    // currency (the legacy GBX rows were rescaled), so it must NOT go through
+    // the LSE pence rule again — that would shrink every London leg 100x and
+    // leave the rolled-back balance far too small.
+    const px = num(f.fill_price, Number.NaN);
+    if (!Number.isFinite(px) || px <= 0) return null;
+
+    const ccy = instrumentCcyFor(String(f.symbol ?? ""), null).toUpperCase();
+    const rate = fx.get(ccy);
+    const notional = qty * px * (Number.isFinite(rate) && (rate ?? 0) > 0 ? rate! : 1);
+    // Undo it: a later buy means we still held that cash on `date`.
+    cash += String(f.side ?? "").toLowerCase() === "sell" ? -notional : notional;
+  }
+
+  for (const e of fundEvents) {
+    if (day(e.at) <= date) continue;
+    const amount = num(e.amount, Number.NaN);
+    if (!Number.isFinite(amount)) return null;
+    cash -= amount;
+  }
+
+  if (!Number.isFinite(cash) || cash < 0) return null;
+  return round2(cash);
+}
+
+
 export function planHistoricalRevaluation({
   portfolioId,
   snapshots,
@@ -229,6 +305,7 @@ export function planHistoricalRevaluation({
   inception,
   today,
   fx = new Map<string, number>(),
+  fundEvents = [],
 }: {
   portfolioId: string;
   snapshots: RevalueSnapshot[];
@@ -240,6 +317,8 @@ export function planHistoricalRevaluation({
   today?: string | null;
   /** Instrument currency → portfolio base currency multipliers. */
   fx?: Map<string, number>;
+  /** External deposits/withdrawals, used to roll historical cash back. */
+  fundEvents?: RevalueFundEvent[];
 }): RevalueReport {
   const rows: RevaluedSnapshot[] = [];
   const skipped: SkippedSnapshot[] = [];
@@ -247,6 +326,12 @@ export function planHistoricalRevaluation({
     .map((s) => ({ ...s, snapshot_date: day(s.snapshot_date) }))
     .filter((s) => !inception || s.snapshot_date >= day(inception))
     .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+
+  // Anchor for historical cash: the newest stored balance, which is the one a
+  // broker sync actually refreshed.
+  const anchor = sorted.length > 0 ? sorted[sorted.length - 1]! : null;
+  const anchorCash = anchor ? num(anchor.cash, Number.NaN) : Number.NaN;
+  const anchorDate = anchor?.snapshot_date ?? "";
 
   for (const snap of sorted) {
     const date = snap.snapshot_date;
@@ -262,17 +347,26 @@ export function planHistoricalRevaluation({
     const storedTotal = num(snap.total_value, Number.NaN);
     const rawCash = num(snap.cash, Number.NaN);
     const rawHoldings = num(snap.holdings_value, Number.NaN);
-    const cash = Number.isFinite(rawCash)
+    const storedCash = Number.isFinite(rawCash)
       ? rawCash
       : Number.isFinite(rawHoldings) && Number.isFinite(storedTotal)
         ? storedTotal - rawHoldings
         : 0;
+    // Repair jobs stamp today's balance onto old rows, so prefer the balance
+    // the ledger implies; fall back to the stored figure when it can't be
+    // reconstructed.
+    const rolledCash =
+      Number.isFinite(anchorCash) && date < anchorDate
+        ? cashOn(anchorCash, fills, fundEvents, date, fx)
+        : null;
+    const cash = rolledCash ?? storedCash;
     const previousHoldings = Number.isFinite(rawHoldings)
       ? rawHoldings
       : Number.isFinite(storedTotal)
-        ? storedTotal - cash
+        ? storedTotal - storedCash
         : 0;
     const total = round2(cash + holdingsValue);
+
 
     // The ledger cannot explain a day that held value we can no longer
     // reconstruct (positions closed before `live_fills` existed). Writing a

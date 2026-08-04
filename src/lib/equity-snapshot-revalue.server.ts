@@ -67,8 +67,13 @@ export async function revalueHistoricalSnapshots(
     dryRun,
   };
 
-  const [{ data: portfolio }, { data: snapshotRows }, { data: holdingRows }, { data: fillRows }] =
-    await Promise.all([
+  const [
+    { data: portfolio },
+    { data: snapshotRows },
+    { data: holdingRows },
+    { data: fillRows },
+    { data: fundRows },
+  ] = await Promise.all([
       supabase
         .from("portfolios")
         .select("id, created_at, live_activated_at, currency")
@@ -86,9 +91,14 @@ export async function revalueHistoricalSnapshots(
         .gt("quantity", 0),
       supabase
         .from("live_fills")
-        .select("symbol, side, quantity, filled_at")
+        .select("symbol, side, quantity, fill_price, filled_at")
         .eq("portfolio_id", portfolioId)
         .order("filled_at", { ascending: true }),
+      supabase
+        .from("sim_fund_events")
+        .select("amount, created_at")
+        .eq("portfolio_id", portfolioId)
+        .order("created_at", { ascending: true }),
     ]);
 
   if (!portfolio) return { ...empty, error: "portfolio not found" };
@@ -97,6 +107,10 @@ export async function revalueHistoricalSnapshots(
   if (snapshots.length === 0) return empty;
   const holdings = (holdingRows ?? []) as RevalueHolding[];
   const fills = (fillRows ?? []) as RevalueFill[];
+  const fundEvents = ((fundRows ?? []) as Array<{ amount: number | string | null; created_at: string }>).map(
+    (r) => ({ at: r.created_at, amount: r.amount }),
+  );
+
 
   const inception = portfolioInceptionDate({
     created_at: (portfolio as { created_at?: string | null }).created_at ?? null,
@@ -111,10 +125,18 @@ export async function revalueHistoricalSnapshots(
 
   // Positions settle in their listing currency; the snapshot is denominated in
   // the portfolio's base currency, so convert once per distinct currency.
+  // Historical days can hold legs that are no longer in `holdings` (a position
+  // opened and closed inside the window), so the fills ledger has to seed the
+  // currency set too — otherwise that leg silently converts at 1.0.
   const base = String((portfolio as { currency?: string | null }).currency ?? "GBP").toUpperCase();
   const fx = new Map<string, number>();
   const { getFxRate } = await import("./fx.server");
-  for (const ccy of new Set(holdings.map((h) => instrumentCurrency(h).toUpperCase()))) {
+  const currencies = new Set<string>([
+    ...holdings.map((h) => instrumentCurrency(h).toUpperCase()),
+    ...fills.map((f) => instrumentCurrency({ symbol: String(f.symbol), quantity: 0 }).toUpperCase()),
+  ]);
+  for (const ccy of currencies) {
+
     if (ccy === base) {
       fx.set(ccy, 1);
       continue;
@@ -135,6 +157,7 @@ export async function revalueHistoricalSnapshots(
     prices,
     inception,
     fx,
+    fundEvents,
     today: options.today ?? new Date().toISOString().slice(0, 10),
   });
 

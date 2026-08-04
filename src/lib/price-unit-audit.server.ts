@@ -98,7 +98,15 @@ export async function buildPriceUnitAudit(
 
   const fx = new Map<string, number>();
   const { getFxRate } = await import("./fx.server");
-  for (const ccy of new Set(holdings.map((h) => instrumentCurrency(h).toUpperCase()))) {
+  // Fill-only legs (opened and closed inside the audited window) are not in
+  // `holdings`, so seed the currency set from the ledger as well. Without it
+  // the audit reports "no rate found — 1.0 assumed" for e.g. a closed USD leg.
+  const currencies = new Set<string>([
+    ...holdings.map((h) => instrumentCurrency(h).toUpperCase()),
+    ...fills.map((f) => instrumentCurrency({ symbol: String(f.symbol), quantity: 0 }).toUpperCase()),
+  ]);
+  for (const ccy of currencies) {
+
     if (ccy === base) {
       fx.set(ccy, 1);
       continue;
