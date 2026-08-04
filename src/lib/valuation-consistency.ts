@@ -103,6 +103,29 @@ export type FxLeg = {
 };
 
 
+/**
+ * A stretch of the series with no stored snapshot. A gap is invisible to the
+ * jump check — the two rows either side can sit a fortnight apart and still
+ * differ by 1%, so the ratio test passes while the chart draws a straight
+ * line across missing history.
+ */
+export type SnapshotGap = {
+  /** Last day that has a snapshot before the hole. */
+  from: string;
+  /** First day that has a snapshot after the hole (or today, when trailing). */
+  to: string;
+  /** Calendar days between the two, inclusive of neither endpoint. */
+  missing_days: number;
+  /** Of those, how many are weekdays — the days a venue could have marked. */
+  missing_weekdays: number;
+  /** "interior" sits between two stored rows; "trailing" runs up to today. */
+  kind: "interior" | "trailing";
+  /** Value either side, so the UI can show what the straight line spans. */
+  value_from: number;
+  value_to: number | null;
+  explanation: string;
+};
+
 export type ValuationConsistencyReport = {
   portfolio_id: string;
   base_ccy: string;
@@ -111,7 +134,12 @@ export type ValuationConsistencyReport = {
   jumps: ValuationJump[];
   /** Largest-ratio jump, or null when the series looks sane. */
   worst: ValuationJump | null;
+  /** Missing stretches of history, longest first. */
+  gaps: SnapshotGap[];
+  /** Weekday gap size that trips the continuity check. */
+  gapThreshold: number;
 };
+
 
 function num(value: number | string | null | undefined, fallback = 0): number {
   const parsed = Number(value);
