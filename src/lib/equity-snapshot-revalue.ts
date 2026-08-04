@@ -487,8 +487,25 @@ export function cashOn(
   return round2(cash);
 }
 
-
-
+/**
+ * Every calendar day from `from` to `to`, inclusive. Bounded so a malformed
+ * date can never spin: a reconstruction window wider than ~10 years is a bug,
+ * not a request.
+ */
+export function enumerateDays(from: string, to: string): string[] {
+  const start = parseDay(from);
+  const end = parseDay(to);
+  if (!start || !end || start > end) return [];
+  const out: string[] = [];
+  const cursor = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime())) return [];
+  while (cursor <= last && out.length < 4000) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}
 
 export function planHistoricalRevaluation({
   portfolioId,
@@ -501,6 +518,9 @@ export function planHistoricalRevaluation({
   fx = new Map<string, number>(),
   fundEvents = [],
   baseCcy = null,
+  fillGaps = false,
+
+
 
 }: {
   portfolioId: string;
