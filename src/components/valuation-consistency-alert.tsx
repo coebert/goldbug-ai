@@ -42,17 +42,29 @@ export function ValuationConsistencyAlert({
   // Deposits/withdrawals move the tile legitimately — those days are recorded
   // in the report for the audit trail but are not pricing faults.
   const jumps = (data?.jumps ?? []).filter((j) => !j.benign);
-  if (jumps.length === 0) return null;
+  const gaps = data?.gaps ?? [];
+  if (jumps.length === 0 && gaps.length === 0) return null;
+
+  const tone = jumps.length > 0 ? "destructive" : "amber";
 
   return (
     <div
-      className={`rounded-xl border border-destructive/50 bg-destructive/10 p-4 ${className ?? ""}`}
+      className={`rounded-xl border p-4 ${
+        tone === "destructive"
+          ? "border-destructive/50 bg-destructive/10"
+          : "border-warning/50 bg-warning/10"
+      } ${className ?? ""}`}
       data-testid="valuation-consistency-alert"
       role="alert"
     >
       <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+        <AlertTriangle
+          className={`mt-0.5 h-5 w-5 shrink-0 ${
+            tone === "destructive" ? "text-destructive" : "text-warning"
+          }`}
+        />
         <div className="min-w-0 space-y-3">
+          {jumps.length > 0 ? (
           <div>
             <p className="text-sm font-semibold text-destructive">
               Implausible value {jumps.length === 1 ? "jump" : "jumps"} detected
@@ -63,7 +75,9 @@ export function ValuationConsistencyAlert({
               fault, not a market move.
             </p>
           </div>
+          ) : null}
 
+          {jumps.length > 0 ? (
           <ul className="space-y-3">
             {jumps.slice(0, 5).map((jump) => (
               <li key={`${jump.previous_date}-${jump.date}`} className="space-y-1">
@@ -119,6 +133,41 @@ export function ValuationConsistencyAlert({
               </li>
             ))}
           </ul>
+          ) : null}
+
+          {gaps.length > 0 ? (
+            <div className="space-y-2" data-testid="snapshot-continuity-gaps">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Missing snapshot {gaps.length === 1 ? "day" : "days"} detected
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {gaps.length} gap{gaps.length === 1 ? "" : "s"} of{" "}
+                  {fmt(data?.gapThreshold ?? 2, 0)}+ trading days. Values either side can look
+                  plausible, so the jump check stays quiet while the chart interpolates.
+                </p>
+              </div>
+              <ul className="space-y-1">
+                {gaps.slice(0, 5).map((gap) => (
+                  <li key={`${gap.from}-${gap.to}`} className="space-y-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs text-foreground">
+                        {gap.from} → {gap.to}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {gap.missing_weekdays} trading{" "}
+                        {gap.missing_weekdays === 1 ? "day" : "days"} missing
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {gap.kind === "trailing" ? "Stale tail" : "Interior gap"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{gap.explanation}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <p className="text-[11px] text-muted-foreground">
             Use the price-unit audit trail below to see the full arithmetic for the affected day,
