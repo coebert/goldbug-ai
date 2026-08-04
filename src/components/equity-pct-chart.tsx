@@ -226,7 +226,12 @@ export function EquityPctChart({
   className,
 }: {
   portfolioId?: string;
-  equity: Array<{ snapshot_date: string; total_value: number | string }>;
+  equity: Array<{
+    snapshot_date: string;
+    total_value: number | string;
+    /** `equity_snapshots.source`, when available — drives the settled/provisional split. */
+    source?: string | null;
+  }>;
   /** Baseline pot with later deposits stripped out (`baselineStartingCash`). */
   startingCash: number;
   deposits?: Array<{ date: string; amount: number }>;
