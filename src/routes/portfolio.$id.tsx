@@ -954,7 +954,7 @@ function PortfolioPage() {
             <EquityPctChart
               className="mb-4"
               portfolioId={id}
-              equity={equity as { snapshot_date: string; total_value: number }[]}
+              equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
               startingCash={baselineStartingCash}
               deposits={depositEvents}
               inceptionDate={q.data?.inceptionDate ?? null}
@@ -1131,7 +1131,7 @@ function PortfolioPage() {
                     <PerformanceDashboardCard
                       startingCash={baselineStartingCash}
                       currency={String(p.currency ?? "GBP")}
-                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
                       trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
                       deposits={depositEvents}
                     />
@@ -1142,7 +1142,7 @@ function PortfolioPage() {
                     <VanguardBenchmarkCard
                       startingCash={baselineStartingCash}
                       currency={String(p.currency ?? "GBP")}
-                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
                       deposits={depositEvents}
                       riskLevel={p.risk_level}
                     />
@@ -1157,7 +1157,7 @@ function PortfolioPage() {
                 {p && (
                   <div className="mb-4">
                     <EquityChangeBreakdownCard
-                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
                       deposits={depositEvents}
                       currency={String(p.currency ?? "GBP")}
                     />
@@ -1166,7 +1166,7 @@ function PortfolioPage() {
                 {p && (
                   <div className="mb-4">
                     <DailyEquityChangesCard
-                      equity={equity as { snapshot_date: string; total_value: number }[]}
+                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
                       deposits={depositEvents}
                       currency={String(p.currency ?? "GBP")}
                     />
