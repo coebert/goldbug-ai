@@ -59,6 +59,9 @@ export type RevalueFundEvent = { at: string; amount: number | string | null };
  */
 export type RevalueOpening = {
   at: string;
+  /** Position key this opening belongs to, so a day that already counts the
+   *  position in its book can refuse the cash credit. */
+  key?: string;
   costBase: number;
   /** Quantity of the position the fills ledger does not account for. */
   unbackedQuantity?: number;
@@ -378,19 +381,19 @@ export function unbackedOpenings(
 
     const cost = num(h.avg_cost);
     if (!at) {
-      out.push({ at: "", costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_open_date" });
+      out.push({ at: "", key, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_open_date" });
       continue;
     }
     if (!(cost > 0)) {
-      out.push({ at, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_cost" });
+      out.push({ at, key, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_cost" });
       continue;
     }
     const rate = resolveRate(fx, instrumentCurrency(h), baseCcy);
     if (rate == null) {
-      out.push({ at, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_fx" });
+      out.push({ at, key, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_fx" });
       continue;
     }
-    out.push({ at, costBase: unbackedQty * cost * rate, unbackedQuantity: unbackedQty });
+    out.push({ at, key, costBase: unbackedQty * cost * rate, unbackedQuantity: unbackedQty });
   }
 
   return out;
@@ -604,9 +607,14 @@ export function planHistoricalRevaluation({
     // Repair jobs stamp today's balance onto old rows, so prefer the balance
     // the ledger implies; fall back to the stored figure when it can't be
     // reconstructed.
+    // An opening only hands its cost back to days that do NOT already carry
+    // the position. When a later sell leaves a stale `holdings` row looking
+    // unbacked, crediting its cost on a day whose book still values the
+    // position counts the same money twice and inflates the whole gap.
+    const dayOpenings = openings.filter((o) => !o.key || !book.has(o.key));
     const rolledCash =
       Number.isFinite(anchorCash) && date < anchorDate
-        ? cashOn(anchorCash, fills, fundEvents, date, fx, openings, {
+        ? cashOn(anchorCash, fills, fundEvents, date, fx, dayOpenings, {
             anchorDate,
             baseCcy,
           })
