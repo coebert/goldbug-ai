@@ -25,7 +25,7 @@ type CursorProps = {
 export function SaxoCrosshair(props: CursorProps) {
   const { points, height, top, activeCoordinate } = props;
   const x = points?.[0]?.x ?? activeCoordinate?.x;
-  if (!Number.isFinite(x)) return null;
+  if (x === undefined || !Number.isFinite(x)) return null;
 
   const y1 = Number.isFinite(top) ? (top as number) : (points?.[0]?.y ?? 0);
   const y2 = Number.isFinite(height)
