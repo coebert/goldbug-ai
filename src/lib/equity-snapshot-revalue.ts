@@ -86,7 +86,10 @@ export type RevaluedSnapshot = {
   previous_total_value: number;
   /** Ratio of old to new holdings value — ~100 flags a GBX/GBP unit bug. */
   ratio: number | null;
+  /** True when no row existed for this day and one was reconstructed. */
+  inserted?: boolean;
 };
+
 
 export type SkippedSnapshot = {
   snapshot_date: string;
