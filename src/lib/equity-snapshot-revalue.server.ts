@@ -111,10 +111,18 @@ export async function revalueHistoricalSnapshots(
 
   // Positions settle in their listing currency; the snapshot is denominated in
   // the portfolio's base currency, so convert once per distinct currency.
+  // Historical days can hold legs that are no longer in `holdings` (a position
+  // opened and closed inside the window), so the fills ledger has to seed the
+  // currency set too — otherwise that leg silently converts at 1.0.
   const base = String((portfolio as { currency?: string | null }).currency ?? "GBP").toUpperCase();
   const fx = new Map<string, number>();
   const { getFxRate } = await import("./fx.server");
-  for (const ccy of new Set(holdings.map((h) => instrumentCurrency(h).toUpperCase()))) {
+  const currencies = new Set<string>([
+    ...holdings.map((h) => instrumentCurrency(h).toUpperCase()),
+    ...fills.map((f) => instrumentCurrency({ symbol: String(f.symbol), quantity: 0 }).toUpperCase()),
+  ]);
+  for (const ccy of currencies) {
+
     if (ccy === base) {
       fx.set(ccy, 1);
       continue;
