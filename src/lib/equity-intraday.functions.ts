@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
+import {
+  clipToInception,
+  firstHoldingsDate,
+  portfolioInceptionDate,
+  seriesStartDate,
+} from "./portfolio-inception";
 
 /**
  * Hourly equity points for one portfolio. RLS scopes rows to the owner, so no
@@ -43,8 +48,16 @@ export const getIntradayEquity = createServerFn({ method: "GET" })
       String((r as { bucket_hour?: unknown }).bucket_hour ?? ""),
     );
 
+    const { data: firstHold } = await context.supabase
+      .from("holdings")
+      .select("opened_at, created_at")
+      .eq("portfolio_id", data.portfolio_id);
+    const firstHoldings = firstHoldingsDate((firstHold ?? []) as never);
+
     return {
       inceptionDate: inception,
+      firstHoldingsDate: firstHoldings,
+      seriesStartDate: seriesStartDate(inception, firstHoldings),
       points: clipped.map((r) => ({
         at: String(r.bucket_hour),
         total_value: Number(r.total_value),

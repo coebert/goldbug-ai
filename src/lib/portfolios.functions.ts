@@ -9,7 +9,12 @@ import { requireAal2 } from "@/lib/_server/require-aal2";
 import { z } from "zod";
 import { buildAllPortfoliosEquity } from "./all-portfolios-equity";
 import { backfillMissingEquitySnapshots } from "./equity-snapshot-backfill.server";
-import { clipToInception, portfolioInceptionDate } from "./portfolio-inception";
+import {
+  clipToInception,
+  firstHoldingsDate,
+  portfolioInceptionDate,
+  seriesStartDate,
+} from "./portfolio-inception";
 import { deletePortfolioWithCleanup } from "./portfolio-delete-cleanup";
 import { reanchorInferredInflow, trustedPreviousStarting } from "./infer-cash-flow";
 
@@ -421,6 +426,14 @@ export const getPortfolio = createServerFn({ method: "GET" })
       String((r as { snapshot_date?: unknown }).snapshot_date ?? ""),
     );
 
+    // The honest start of the series: the first day a position actually
+    // existed (backtest/broker-imported accounts can be created earlier).
+    const firstHoldings = firstHoldingsDate(
+      (holdings ?? []) as never,
+      (trades ?? []) as never,
+    );
+    const seriesStart = seriesStartDate(inceptionDate, firstHoldings);
+
     return {
       portfolio,
       holdings: holdings ?? [],
@@ -428,6 +441,8 @@ export const getPortfolio = createServerFn({ method: "GET" })
       decisions: decisions ?? [],
       equity: clippedEquity,
       inceptionDate,
+      firstHoldingsDate: firstHoldings,
+      seriesStartDate: seriesStart,
       deposits,
       // starting_cash with any already-absorbed deposits stripped out, so
       // `baselineStartingCash + deposits === starting_cash`.

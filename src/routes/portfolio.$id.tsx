@@ -958,6 +958,7 @@ function PortfolioPage() {
               startingCash={baselineStartingCash}
               deposits={depositEvents}
               inceptionDate={q.data?.inceptionDate ?? null}
+              seriesStartDate={q.data?.seriesStartDate ?? null}
             />
 
             <div className="mt-2 flex justify-end">

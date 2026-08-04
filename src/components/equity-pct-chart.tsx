@@ -221,6 +221,7 @@ export function EquityPctChart({
   startingCash,
   deposits = [],
   inceptionDate = null,
+  seriesStartDate = null,
   currency = "GBP",
   className,
 }: {
@@ -231,6 +232,8 @@ export function EquityPctChart({
   deposits?: Array<{ date: string; amount: number }>;
   /** `YYYY-MM-DD` the portfolio went live; earlier points are not plotted. */
   inceptionDate?: string | null;
+  /** `YYYY-MM-DD` the series is labelled as starting: first real holdings day. */
+  seriesStartDate?: string | null;
   currency?: string;
   className?: string;
 }) {
@@ -341,6 +344,7 @@ export function EquityPctChart({
           <span className="text-xs font-medium text-muted-foreground">
             Equity change vs invested capital
             {resolution === "hourly" ? ` · times ${ukZoneAbbr()}` : ""}
+            {seriesStartDate ? ` · from ${formatUkAxisDay(`${seriesStartDate}T00:00:00Z`)}` : ""}
           </span>
           <div className="flex items-center gap-2">
             {portfolioId && (
