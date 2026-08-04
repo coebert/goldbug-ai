@@ -51,8 +51,21 @@ export type RevalueFundEvent = { at: string; amount: number | string | null };
  * A position that appeared in `holdings` without any buy fill behind it —
  * typically a broker sync importing positions the app never executed. Its
  * cost is the only record of the cash that left the account when it opened.
+ *
+ * `unresolved` marks an opening whose cash cost cannot be trusted (no open
+ * date, no usable cost, or an instrument currency with no FX rate). Rolling
+ * cash back past one of those would invent a balance, so `cashOn` refuses the
+ * whole day instead.
  */
-export type RevalueOpening = { at: string; costBase: number };
+export type RevalueOpening = {
+  at: string;
+  costBase: number;
+  /** Quantity of the position the fills ledger does not account for. */
+  unbackedQuantity?: number;
+  unresolved?: boolean;
+  reason?: "no_open_date" | "no_cost" | "no_fx";
+};
+
 
 
 
@@ -99,6 +112,45 @@ function round2(value: number): number {
 function day(value: string): string {
   return String(value ?? "").slice(0, 10);
 }
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Calendar day of a timestamp, or `null` when it is missing or malformed.
+ *
+ * Ledger rows occasionally carry an empty, partial, or non-ISO `filled_at`
+ * (an out-of-order import, a hand-repaired row). `day()` would turn those into
+ * `""`, which sorts before every date and therefore silently reads as "already
+ * settled" — the fill then vanishes from every rollback instead of being
+ * flagged. Callers that reconstruct cash must treat this as unattributable.
+ */
+export function parseDay(value: string | null | undefined): string | null {
+  const d = String(value ?? "").trim().slice(0, 10);
+  return ISO_DAY.test(d) ? d : null;
+}
+
+/**
+ * Multiplier from `ccy` into the portfolio's base currency.
+ *
+ * Returns `null` when the currency is genuinely unknown, so cash rollbacks can
+ * refuse the day rather than silently applying 1.0 and mixing a USD leg into a
+ * GBP balance. An empty map means "no FX supplied at all" (single-currency
+ * callers and older tests), which stays 1.0.
+ */
+export function resolveRate(
+  fx: Map<string, number>,
+  ccy: string,
+  baseCcy?: string | null,
+): number | null {
+  const code = String(ccy ?? "").toUpperCase();
+  const base = String(baseCcy ?? "").toUpperCase();
+  if (base && code === base) return 1;
+  const rate = fx.get(code);
+  if (Number.isFinite(rate) && (rate ?? 0) > 0) return rate!;
+  if (fx.size === 0) return 1;
+  return null;
+}
+
 
 const MIC_TO_YAHOO: Record<string, string> = {
   xlon: "L", xetr: "DE", xpar: "PA", xams: "AS", xmil: "MI",
@@ -188,7 +240,7 @@ export function positionsOn(
   const firstFill = new Map<string, string>();
   for (const f of fills) {
     const key = positionKey(f.symbol);
-    const d = day(f.filled_at);
+    const d = parseDay(f.filled_at);
     if (!key || !d) continue;
     const prev = firstFill.get(key);
     if (!prev || d < prev) firstFill.set(key, d);
@@ -199,7 +251,7 @@ export function positionsOn(
     if (!key) continue;
     // A position cannot exist before it was opened, even when the fills ledger
     // is incomplete for that leg (older sim trades predate `live_fills`).
-    const stamped = h.opened_at ? day(h.opened_at) : null;
+    const stamped = parseDay(h.opened_at);
     const ledger = firstFill.get(key) ?? null;
     const openedOn =
       stamped && ledger ? (ledger < stamped ? ledger : stamped) : (ledger ?? stamped);
@@ -212,7 +264,11 @@ export function positionsOn(
   }
 
   for (const f of fills) {
-    if (day(f.filled_at) <= date) continue;
+    // Undated fills cannot be placed on either side of `date`; leaving the
+    // book untouched keeps the position count stable (cash reconstruction
+    // separately refuses the day).
+    const d = parseDay(f.filled_at);
+    if (!d || d <= date) continue;
     const key = positionKey(f.symbol);
     if (!key) continue;
     const qty = num(f.quantity);
@@ -223,6 +279,7 @@ export function positionsOn(
     if (entry) entry.quantity -= signed;
     else book.set(key, { quantity: -signed, holding: { symbol: f.symbol, quantity: 0 } });
   }
+
   for (const [key, entry] of book) {
     if (!(entry.quantity > 1e-9)) book.delete(key);
   }
@@ -255,7 +312,7 @@ export function valuePositionsOn(
 }
 
 /**
- * Positions currently held that the fills ledger never bought.
+ * The part of each held position that the fills ledger cannot account for.
  *
  * A linked broker account can gain positions the app did not execute (manual
  * trades, transfers, a first sync of an account that already held stock). The
@@ -264,36 +321,75 @@ export function valuePositionsOn(
  * positions — exactly the shape that reads as an implausible jump on the day
  * the positions appear.
  *
+ * Backing is measured in **quantity**, not presence: a leg whose ledger holds
+ * one 120-share buy against 704 shares held is 584 shares unbacked, and only
+ * that residual's cost is handed back. Treating any single buy fill as full
+ * backing under-credits the rollback and reintroduces the jump.
+ *
  * `avg_cost` is stored in the instrument's settlement currency (post the
  * fill-record repair), so it is converted with FX only — never through the LSE
- * pence rule, which would shrink a London leg 100x.
+ * pence rule, which would shrink a London leg 100x. A leg whose currency has
+ * no rate, whose cost is missing, or whose open date is unusable is emitted as
+ * `unresolved` so `cashOn` can refuse the day rather than guess.
  */
 export function unbackedOpenings(
   holdings: RevalueHolding[],
   fills: RevalueFill[],
   fx: Map<string, number> = new Map(),
+  baseCcy?: string | null,
 ): RevalueOpening[] {
-  const bought = new Set<string>();
+  // Net signed quantity per position: sells consume backing just as buys
+  // create it, so a bought-then-sold-then-resynced leg is unbacked again.
+  const backed = new Map<string, number>();
   for (const f of fills) {
-    if (String(f.side ?? "").toLowerCase() === "sell") continue;
     const key = positionKey(f.symbol);
-    if (key) bought.add(key);
+    if (!key) continue;
+    const qty = num(f.quantity);
+    if (!(qty > 0)) continue;
+    const signed = String(f.side ?? "").toLowerCase() === "sell" ? -qty : qty;
+    backed.set(key, (backed.get(key) ?? 0) + signed);
   }
 
+  // Several rows can share one position key (`ISF.L` and `ISF:xlon`); the
+  // ledger backs the combined leg, so consume backing across them in open
+  // order and let the earliest row absorb it first.
+  const rows = holdings
+    .map((h) => ({ h, key: positionKey(h.symbol), at: parseDay(h.opened_at) }))
+    .filter((r) => r.key !== "")
+    .sort((a, b) => (a.at ?? "9999-12-31").localeCompare(b.at ?? "9999-12-31"));
+
+  const remaining = new Map(backed);
   const out: RevalueOpening[] = [];
-  for (const h of holdings) {
-    const key = positionKey(h.symbol);
-    if (!key || bought.has(key)) continue;
-    const at = h.opened_at ? day(h.opened_at) : "";
+
+  for (const { h, key, at } of rows) {
     const qty = num(h.quantity);
+    if (!(qty > 0)) continue;
+
+    const avail = Math.max(0, remaining.get(key) ?? 0);
+    const consumed = Math.min(qty, avail);
+    remaining.set(key, avail - consumed);
+    const unbackedQty = qty - consumed;
+    // Sub-share residues are rounding noise from fractional sim fills, not a
+    // real broker import; crediting them back would only add jitter.
+    if (!(unbackedQty > 1e-6)) continue;
+
     const cost = num(h.avg_cost);
-    if (!at || !(qty > 0) || !(cost > 0)) continue;
-    const rate = fx.get(instrumentCurrency(h).toUpperCase());
-    out.push({
-      at,
-      costBase: qty * cost * (Number.isFinite(rate) && (rate ?? 0) > 0 ? rate! : 1),
-    });
+    if (!at) {
+      out.push({ at: "", costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_open_date" });
+      continue;
+    }
+    if (!(cost > 0)) {
+      out.push({ at, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_cost" });
+      continue;
+    }
+    const rate = resolveRate(fx, instrumentCurrency(h), baseCcy);
+    if (rate == null) {
+      out.push({ at, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_fx" });
+      continue;
+    }
+    out.push({ at, costBase: unbackedQty * cost * rate, unbackedQuantity: unbackedQty });
   }
+
   return out;
 }
 
@@ -304,9 +400,18 @@ export function unbackedOpenings(
  *
  * Stored historical `cash` is frequently the *current* balance stamped onto an
  * old row by a repair job, which makes a correctly re-marked history look like
- * an implausible jump. Returns `null` when the ledger cannot explain the day —
- * any priceless fill, or a balance that rolls back through zero — so callers
- * keep the stored figure rather than invent one.
+ * an implausible jump. Returns `null` when the ledger cannot explain the day,
+ * so callers keep the stored figure rather than invent one:
+ *
+ *  - a fill with no price, no quantity, or a malformed/missing timestamp;
+ *  - a leg in a currency with no FX rate (mixing USD into a GBP balance);
+ *  - an `unresolved` opening (cost, date, or FX unknown);
+ *  - a funding event with a malformed timestamp or amount;
+ *  - a balance that rolls back through zero.
+ *
+ * Anything dated after `anchorDate` is ignored rather than undone: the anchor
+ * balance predates it, so rolling it back would double-count. This is what
+ * keeps an out-of-order or future-stamped fill from shifting the whole series.
  */
 export function cashOn(
   anchorCash: number,
@@ -315,14 +420,23 @@ export function cashOn(
   date: string,
   fx: Map<string, number> = new Map(),
   openings: RevalueOpening[] = [],
+  options: { anchorDate?: string | null; baseCcy?: string | null } = {},
 ): number | null {
   let cash = anchorCash;
   if (!Number.isFinite(cash)) return null;
+  const on = parseDay(date);
+  if (!on) return null;
+  const anchorDay = parseDay(options.anchorDate);
+  const after = (d: string) => d > on && (!anchorDay || d <= anchorDay);
 
   for (const f of fills) {
-    if (day(f.filled_at) <= date) continue;
-    const qty = num(f.quantity);
-    if (!(qty > 0)) continue;
+    const d = parseDay(f.filled_at);
+    // A fill we cannot place in time cannot be undone — and silently treating
+    // it as historical would drop real cash movement from every day.
+    if (!d) return null;
+    if (!after(d)) continue;
+    const qty = num(f.quantity, Number.NaN);
+    if (!Number.isFinite(qty) || qty <= 0) return null;
     // `live_fills.fill_price` is stored in the instrument's settlement
     // currency (the legacy GBX rows were rescaled), so it must NOT go through
     // the LSE pence rule again — that would shrink every London leg 100x and
@@ -330,9 +444,11 @@ export function cashOn(
     const px = num(f.fill_price, Number.NaN);
     if (!Number.isFinite(px) || px <= 0) return null;
 
-    const ccy = instrumentCcyFor(String(f.symbol ?? ""), null).toUpperCase();
-    const rate = fx.get(ccy);
-    const notional = qty * px * (Number.isFinite(rate) && (rate ?? 0) > 0 ? rate! : 1);
+    const ccy = instrumentCcyFor(String(f.symbol ?? ""), null);
+    const rate = resolveRate(fx, ccy, options.baseCcy);
+    if (rate == null) return null;
+    const notional = qty * px * rate;
+    if (!Number.isFinite(notional)) return null;
     // Undo it: a later buy means we still held that cash on `date`.
     cash += String(f.side ?? "").toLowerCase() === "sell" ? -notional : notional;
   }
@@ -340,13 +456,25 @@ export function cashOn(
   // Positions with no buy fill behind them: give their cost back to the days
   // before they appeared, or those days read as cash-poor and position-free.
   for (const o of openings) {
-    if (day(o.at) <= date) continue;
+    const d = parseDay(o.at);
+    if (o.unresolved) {
+      // Undateable: it could have consumed cash at any point in the window, so
+      // no day can be trusted. Otherwise it only spoils the days *before* it
+      // opened; days on/after it, and days past the anchor, stay reconstructible.
+      if (!d) return null;
+      if (after(d)) return null;
+      continue;
+    }
+    if (!d || !after(d)) continue;
     if (!Number.isFinite(o.costBase) || o.costBase <= 0) continue;
     cash += o.costBase;
   }
 
+
   for (const e of fundEvents) {
-    if (day(e.at) <= date) continue;
+    const d = parseDay(e.at);
+    if (!d) return null;
+    if (!after(d)) continue;
     const amount = num(e.amount, Number.NaN);
     if (!Number.isFinite(amount)) return null;
     cash -= amount;
@@ -355,6 +483,7 @@ export function cashOn(
   if (!Number.isFinite(cash) || cash < 0) return null;
   return round2(cash);
 }
+
 
 
 
@@ -368,6 +497,8 @@ export function planHistoricalRevaluation({
   today,
   fx = new Map<string, number>(),
   fundEvents = [],
+  baseCcy = null,
+
 }: {
   portfolioId: string;
   snapshots: RevalueSnapshot[];
@@ -381,6 +512,9 @@ export function planHistoricalRevaluation({
   fx?: Map<string, number>;
   /** External deposits/withdrawals, used to roll historical cash back. */
   fundEvents?: RevalueFundEvent[];
+  /** Portfolio base currency; legs in it need no FX rate to be trusted. */
+  baseCcy?: string | null;
+
 }): RevalueReport {
   const rows: RevaluedSnapshot[] = [];
   const skipped: SkippedSnapshot[] = [];
@@ -396,7 +530,8 @@ export function planHistoricalRevaluation({
   const anchorDate = anchor?.snapshot_date ?? "";
   // Broker-imported positions carry no fill, so their cost has to be handed
   // back to the days before they appeared.
-  const openings = unbackedOpenings(holdings, fills, fx);
+  const openings = unbackedOpenings(holdings, fills, fx, baseCcy);
+
 
   for (const snap of sorted) {
     const date = snap.snapshot_date;
@@ -422,8 +557,12 @@ export function planHistoricalRevaluation({
     // reconstructed.
     const rolledCash =
       Number.isFinite(anchorCash) && date < anchorDate
-        ? cashOn(anchorCash, fills, fundEvents, date, fx, openings)
+        ? cashOn(anchorCash, fills, fundEvents, date, fx, openings, {
+            anchorDate,
+            baseCcy,
+          })
         : null;
+
     const cash = rolledCash ?? storedCash;
     const previousHoldings = Number.isFinite(rawHoldings)
       ? rawHoldings
