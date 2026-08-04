@@ -16,10 +16,8 @@ import { CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 import {
   SAXO_AXIS,
   SAXO_GRID,
-  SAXO_TOOLTIP_CURSOR,
   edgeTicks,
   fadeStops,
-  saxoActiveDot,
   saxoDot,
 } from "@/lib/saxo-chart";
 import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";

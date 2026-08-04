@@ -11,11 +11,9 @@ import {
   SAXO_GRID,
   SAXO_REFERENCE_LINE,
   SAXO_TOOLTIP_CONTENT,
-  SAXO_TOOLTIP_CURSOR,
   SAXO_TOOLTIP_LABEL,
   edgeTicks,
   fadeStops,
-  saxoActiveDot,
   saxoDot,
 } from "@/lib/saxo-chart";
 import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";
