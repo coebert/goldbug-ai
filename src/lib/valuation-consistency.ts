@@ -491,5 +491,12 @@ export function checkValuationConsistency({
     threshold,
     jumps,
     worst: scored[0] ?? null,
+    gaps: findSnapshotGaps({
+      snapshots: ordered.map((s) => ({ date: s.date, total: s.total })),
+      minWeekdays: gapWeekdays,
+      today,
+      baseCcy,
+    }),
+    gapThreshold: Math.max(1, Math.floor(gapWeekdays)),
   };
 }
