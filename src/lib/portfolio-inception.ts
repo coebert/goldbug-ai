@@ -51,3 +51,36 @@ export function clipToInception<T>(
   if (kept.length === 0 && rows.length > 0) return [...rows];
   return kept;
 }
+
+/**
+ * First day the portfolio actually held something: the earliest holding open
+ * date or executed trade, whichever is earlier. Backtest and broker-imported
+ * accounts (e.g. "High risk sim") can carry rows created before any position
+ * existed, so this is the honest start of the performance series.
+ */
+export function firstHoldingsDate(
+  holdings: ReadonlyArray<{ opened_at?: unknown; created_at?: unknown }> | null | undefined,
+  trades?: ReadonlyArray<{ executed_at?: unknown }> | null,
+): string | null {
+  let earliest: string | null = null;
+  const take = (v: unknown) => {
+    const d = toDay(v);
+    if (d && (earliest === null || d < earliest)) earliest = d;
+  };
+  for (const h of holdings ?? []) take(h.opened_at ?? h.created_at);
+  for (const t of trades ?? []) take(t.executed_at);
+  return earliest;
+}
+
+/**
+ * The date the chart/series should say it starts: the first real holdings day
+ * when it is known and not earlier than inception, else inception.
+ */
+export function seriesStartDate(
+  inception: string | null,
+  firstHoldings: string | null,
+): string | null {
+  if (!firstHoldings) return inception;
+  if (!inception) return firstHoldings;
+  return firstHoldings > inception ? firstHoldings : inception;
+}
