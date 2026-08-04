@@ -569,7 +569,7 @@ export function EquityPctChart({
                   stroke={`url(#${gradientId}-stroke)`}
                   strokeWidth={2}
                   dot={showDots ? { r: 2, fill: color, strokeWidth: 0 } : false}
-                  activeDot={{ r: 3.5, fill: color, stroke: "var(--background)", strokeWidth: 1.5 }}
+                  activeDot={<SaxoActiveDot color={color} />}
                   connectNulls
                   isAnimationActive={false}
                 />
