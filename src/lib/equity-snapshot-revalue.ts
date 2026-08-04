@@ -47,6 +47,15 @@ export type RevalueFill = {
 /** An external deposit/withdrawal: positive credits the account. */
 export type RevalueFundEvent = { at: string; amount: number | string | null };
 
+/**
+ * A position that appeared in `holdings` without any buy fill behind it —
+ * typically a broker sync importing positions the app never executed. Its
+ * cost is the only record of the cash that left the account when it opened.
+ */
+export type RevalueOpening = { at: string; costBase: number };
+
+
+
 
 export type RevalueSnapshot = {
   snapshot_date: string;
