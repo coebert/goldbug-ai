@@ -38,9 +38,15 @@ export type RevalueFill = {
   symbol: string;
   side: string;
   quantity: number | string | null;
+  /** Execution price in raw quote units (GBX for LSE listings). */
+  fill_price?: number | string | null;
   /** ISO timestamp or date of execution. */
   filled_at: string;
 };
+
+/** An external deposit/withdrawal: positive credits the account. */
+export type RevalueFundEvent = { at: string; amount: number | string | null };
+
 
 export type RevalueSnapshot = {
   snapshot_date: string;
