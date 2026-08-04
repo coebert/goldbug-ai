@@ -13,6 +13,12 @@ import {
 } from "@/lib/uk-time";
 import { getIntradayEquity } from "@/lib/equity-intraday.functions";
 import { backfillIntradayEquity } from "@/lib/equity-intraday-backfill.functions";
+import {
+  classifySnapshot,
+  SETTLEMENT_HINT,
+  summariseSettlement,
+  type SettlementState,
+} from "@/lib/snapshot-settlement";
 
 import {
   Bar,
@@ -210,6 +216,41 @@ export function deltaDomainFor(values: number[]): [number, number] {
   return [-span, span];
 }
 
+export type SettledPoint = DeltaPoint & {
+  state: SettlementState;
+  /** Solid-line series: settled closes only. */
+  pctSettled: number | null;
+  /** Dashed-line series: the provisional tail (today's intraday mark, gap fills). */
+  pctProvisional: number | null;
+};
+
+/**
+ * Split the plotted series into a solid settled line and a dashed provisional
+ * one, so the curve can never imply that today's moving mark-to-market carries
+ * the same authority as a settled close.
+ *
+ * The last settled point is duplicated into the provisional series so the two
+ * lines join instead of leaving a visual gap.
+ */
+export function splitSettledSeries(
+  rows: DeltaPoint[],
+  states: SettlementState[],
+): SettledPoint[] {
+  const lastSettled = states.lastIndexOf("settled");
+  return rows.map((r, i) => {
+    const state = states[i] ?? "settled";
+    const settled = state === "settled";
+    return {
+      ...r,
+      state,
+      pctSettled: settled ? r.pct : null,
+      pctProvisional: !settled || i === lastSettled ? r.pct : null,
+    };
+  });
+}
+
+
+
 /**
  * Percentage change in equity versus the capital invested at the time.
  * Zero on the y-axis is the money put in, so the line only goes negative when
@@ -226,7 +267,12 @@ export function EquityPctChart({
   className,
 }: {
   portfolioId?: string;
-  equity: Array<{ snapshot_date: string; total_value: number | string }>;
+  equity: Array<{
+    snapshot_date: string;
+    total_value: number | string;
+    /** `equity_snapshots.source`, when available — drives the settled/provisional split. */
+    source?: string | null;
+  }>;
   /** Baseline pot with later deposits stripped out (`baselineStartingCash`). */
   startingCash: number;
   deposits?: Array<{ date: string; amount: number }>;
@@ -285,8 +331,15 @@ export function EquityPctChart({
   ]);
 
 
-  const { data, domain, deltaDomain, last } = useMemo(() => {
+  const { data, domain, deltaDomain, last, settlement, lastSettledPct } = useMemo(() => {
     const base = Number(startingCash);
+    const stateByDay = new Map<string, SettlementState>();
+    for (const e of equity) {
+      stateByDay.set(
+        ukDayKey(`${String(e.snapshot_date).slice(0, 10)}T12:00:00Z`),
+        classifySnapshot({ snapshot_date: String(e.snapshot_date), source: e.source ?? null }),
+      );
+    }
     const raw: Array<{ at: string; value: number }> =
       resolution === "hourly"
         ? hourlyPoints.map((p) => ({ at: p.at, value: Number(p.total_value) }))
@@ -313,12 +366,29 @@ export function EquityPctChart({
         : [];
 
     const withDelta = addDeltas(rows, deposits);
+    // Hourly points are all intraday marks by construction; the settled/
+    // provisional split only means something on the daily close series.
+    const states: SettlementState[] =
+      resolution === "hourly"
+        ? withDelta.map(() => "intraday" as const)
+        : withDelta.map(
+            (r) => stateByDay.get(ukDayKey(String(r.at))) ?? ("settled" as SettlementState),
+          );
+    const split = splitSettledSeries(withDelta, states);
     const vals = withDelta.map((r) => r.pct);
+    const lastSettledIdx = states.lastIndexOf("settled");
     return {
-      data: withDelta,
+      data: split,
       domain: pctDomain(vals),
       deltaDomain: deltaDomainFor(withDelta.map((r) => r.deltaPct)),
       last: vals.length ? vals[vals.length - 1] : 0,
+      lastSettledPct: lastSettledIdx >= 0 ? vals[lastSettledIdx] : null,
+      settlement: summariseSettlement(
+        equity.map((e) => ({
+          snapshot_date: String(e.snapshot_date),
+          source: e.source ?? null,
+        })),
+      ),
     };
   }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate]);
 
@@ -365,11 +435,22 @@ export function EquityPctChart({
                 ))}
               </div>
             )}
-            <span
-              className={`text-sm font-semibold tabular-nums ${up ? "text-primary" : "text-destructive"}`}
-            >
-              {up ? "+" : ""}
-              {last.toFixed(2)}%
+            <span className="flex flex-col items-end leading-tight">
+              <span
+                className={`text-sm font-semibold tabular-nums ${up ? "text-primary" : "text-destructive"}`}
+              >
+                {up ? "+" : ""}
+                {last.toFixed(2)}%
+                {resolution === "daily" && settlement.latestIsProvisional ? "*" : ""}
+              </span>
+              {resolution === "daily" && settlement.latestIsProvisional && (
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  *provisional
+                  {lastSettledPct != null
+                    ? ` · settled ${lastSettledPct >= 0 ? "+" : ""}${lastSettledPct.toFixed(2)}%`
+                    : ""}
+                </span>
+              )}
             </span>
           </div>
         </div>
@@ -428,7 +509,15 @@ export function EquityPctChart({
                         resolution === "hourly" ? "vs prev hour" : "vs prev day",
                       ];
                     }
-                    return [`${Number(v).toFixed(2)}%`, "vs capital"];
+                    const state = (item?.payload?.state ?? "settled") as SettlementState;
+                    return [
+                      `${Number(v).toFixed(2)}%`,
+                      state === "settled"
+                        ? "vs capital (settled close)"
+                        : state === "intraday"
+                          ? "vs capital (intraday, provisional)"
+                          : "vs capital (reconstructed)",
+                    ];
                   }}
                 />
                 <Bar
@@ -442,6 +531,9 @@ export function EquityPctChart({
                   {data.map((d, i) => (
                     <Cell
                       key={i}
+                      // Provisional days are washed out so an unsettled bar is
+                      // never read as a confirmed daily move.
+                      fillOpacity={d.state === "settled" ? 1 : 0.45}
                       fill={
                         d.deltaPct >= 0
                           ? "color-mix(in oklab, var(--success) 45%, transparent)"
@@ -453,16 +545,70 @@ export function EquityPctChart({
                 <Line
                   yAxisId="pct"
                   type="monotone"
-                  dataKey="pct"
+                  dataKey="pctSettled"
+                  name="settled"
                   stroke={color}
                   strokeWidth={2}
                   dot={false}
+                  connectNulls
+                  isAnimationActive={false}
+                />
+                <Line
+                  yAxisId="pct"
+                  type="monotone"
+                  dataKey="pctProvisional"
+                  name="provisional"
+                  stroke={color}
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  dot={false}
+                  connectNulls
                   isAnimationActive={false}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           )}
         </ChartFrame>
+
+        {/* Settled vs provisional key. Without it the tail of the curve — a
+            still-moving intraday mark, or a gap-filled day — looks exactly
+            like a confirmed close, which is what made ledger reconciliation
+            ambiguous. */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-0.5 w-4 rounded bg-foreground/70" aria-hidden />
+            Settled close
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span
+              className="inline-block h-0 w-4 border-t-2 border-dashed border-foreground/70"
+              aria-hidden
+            />
+            {resolution === "hourly" ? "Intraday marks" : "Provisional (not settled)"}
+          </span>
+          {resolution === "daily" && settlement.latestIsProvisional && (
+            <span>
+              {settlement.provisionalDate
+                ? `${formatUkAxisDay(`${settlement.provisionalDate}T00:00:00Z`)} is an intraday mark`
+                : "Latest point is not a settled close"}
+              {settlement.lastSettledDate
+                ? ` · last settled close ${formatUkAxisDay(`${settlement.lastSettledDate}T00:00:00Z`)}${
+                    lastSettledPct != null
+                      ? ` at ${lastSettledPct >= 0 ? "+" : ""}${lastSettledPct.toFixed(2)}%`
+                      : ""
+                  }`
+                : ""}
+              {" — "}
+              {SETTLEMENT_HINT.intraday}
+            </span>
+          )}
+          {resolution === "daily" && settlement.reconstructed > 0 && (
+            <span>
+              {settlement.reconstructed} reconstructed day
+              {settlement.reconstructed === 1 ? "" : "s"} in this series
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

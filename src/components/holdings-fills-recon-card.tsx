@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getHoldingsFillsRecon } from "@/lib/holdings-fills-recon.functions";
 import type { MismatchKind } from "@/lib/holdings-fills-recon";
+import { SnapshotSettlementBadge } from "@/components/snapshot-settlement-badge";
 
 const KIND_LABEL: Record<Exclude<MismatchKind, "ok">, string> = {
   phantom_short: "Phantom short",
@@ -20,9 +21,14 @@ function qty(n: number): string {
 export function HoldingsFillsReconCard({
   portfolioId,
   className,
+  /** Newest equity snapshot this reconciliation is being read alongside. */
+  latestSnapshotDate = null,
+  latestSnapshotSource = null,
 }: {
   portfolioId?: string;
   className?: string;
+  latestSnapshotDate?: string | null;
+  latestSnapshotSource?: string | null;
 }) {
   const load = useServerFn(getHoldingsFillsRecon);
   const q = useQuery({
@@ -42,14 +48,29 @@ export function HoldingsFillsReconCard({
           <ScaleIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 break-words">Ledger vs holdings check</span>
         </CardTitle>
-        {report && (
-          <Badge variant="outline" className="w-fit shrink-0">
-            {report.checked} position{report.checked === 1 ? "" : "s"} checked
-          </Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {latestSnapshotDate && (
+            <SnapshotSettlementBadge
+              snapshotDate={latestSnapshotDate}
+              source={latestSnapshotSource}
+            />
+          )}
+          {report && (
+            <Badge variant="outline" className="w-fit shrink-0">
+              {report.checked} position{report.checked === 1 ? "" : "s"} checked
+            </Badge>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-3">
+        {/* Quantities always replay against the live ledger, but equity figures
+            read next to them may not be final: a row dated today is an
+            intraday mark, not a settled close. */}
+        <p className="text-xs text-muted-foreground">
+          Quantities replay from the fills ledger. Equity rows dated today are intraday marks, not
+          settled closes — only settled days are quoted in performance stats.
+        </p>
         {q.isLoading && (
           <p className="text-sm text-muted-foreground">Replaying the fills ledger…</p>
         )}
