@@ -435,11 +435,22 @@ export function EquityPctChart({
                 ))}
               </div>
             )}
-            <span
-              className={`text-sm font-semibold tabular-nums ${up ? "text-primary" : "text-destructive"}`}
-            >
-              {up ? "+" : ""}
-              {last.toFixed(2)}%
+            <span className="flex flex-col items-end leading-tight">
+              <span
+                className={`text-sm font-semibold tabular-nums ${up ? "text-primary" : "text-destructive"}`}
+              >
+                {up ? "+" : ""}
+                {last.toFixed(2)}%
+                {resolution === "daily" && settlement.latestIsProvisional ? "*" : ""}
+              </span>
+              {resolution === "daily" && settlement.latestIsProvisional && (
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  *provisional
+                  {lastSettledPct != null
+                    ? ` · settled ${lastSettledPct >= 0 ? "+" : ""}${lastSettledPct.toFixed(2)}%`
+                    : ""}
+                </span>
+              )}
             </span>
           </div>
         </div>
