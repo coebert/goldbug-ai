@@ -48,7 +48,8 @@ const baseArgs = {
   prices,
   inception: "2026-07-04",
   today: "2026-07-09",
-  fx: new Map([["GBP", 1]]),
+  // `AAA` has no venue suffix, so the ccy rules read it as a US listing.
+  fx: new Map([["GBP", 1], ["USD", 1]]),
   baseCcy: "GBP",
 };
 
