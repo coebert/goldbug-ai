@@ -216,6 +216,41 @@ export function deltaDomainFor(values: number[]): [number, number] {
   return [-span, span];
 }
 
+export type SettledPoint = DeltaPoint & {
+  state: SettlementState;
+  /** Solid-line series: settled closes only. */
+  pctSettled: number | null;
+  /** Dashed-line series: the provisional tail (today's intraday mark, gap fills). */
+  pctProvisional: number | null;
+};
+
+/**
+ * Split the plotted series into a solid settled line and a dashed provisional
+ * one, so the curve can never imply that today's moving mark-to-market carries
+ * the same authority as a settled close.
+ *
+ * The last settled point is duplicated into the provisional series so the two
+ * lines join instead of leaving a visual gap.
+ */
+export function splitSettledSeries(
+  rows: DeltaPoint[],
+  states: SettlementState[],
+): SettledPoint[] {
+  const lastSettled = states.lastIndexOf("settled");
+  return rows.map((r, i) => {
+    const state = states[i] ?? "settled";
+    const settled = state === "settled";
+    return {
+      ...r,
+      state,
+      pctSettled: settled ? r.pct : null,
+      pctProvisional: !settled || i === lastSettled ? r.pct : null,
+    };
+  });
+}
+
+
+
 /**
  * Percentage change in equity versus the capital invested at the time.
  * Zero on the y-axis is the money put in, so the line only goes negative when
