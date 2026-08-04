@@ -59,6 +59,9 @@ export type RevalueFundEvent = { at: string; amount: number | string | null };
  */
 export type RevalueOpening = {
   at: string;
+  /** Position key this opening belongs to, so a day that already counts the
+   *  position in its book can refuse the cash credit. */
+  key?: string;
   costBase: number;
   /** Quantity of the position the fills ledger does not account for. */
   unbackedQuantity?: number;
@@ -86,7 +89,10 @@ export type RevaluedSnapshot = {
   previous_total_value: number;
   /** Ratio of old to new holdings value — ~100 flags a GBX/GBP unit bug. */
   ratio: number | null;
+  /** True when no row existed for this day and one was reconstructed. */
+  inserted?: boolean;
 };
+
 
 export type SkippedSnapshot = {
   snapshot_date: string;
@@ -375,19 +381,19 @@ export function unbackedOpenings(
 
     const cost = num(h.avg_cost);
     if (!at) {
-      out.push({ at: "", costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_open_date" });
+      out.push({ at: "", key, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_open_date" });
       continue;
     }
     if (!(cost > 0)) {
-      out.push({ at, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_cost" });
+      out.push({ at, key, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_cost" });
       continue;
     }
     const rate = resolveRate(fx, instrumentCurrency(h), baseCcy);
     if (rate == null) {
-      out.push({ at, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_fx" });
+      out.push({ at, key, costBase: 0, unbackedQuantity: unbackedQty, unresolved: true, reason: "no_fx" });
       continue;
     }
-    out.push({ at, costBase: unbackedQty * cost * rate, unbackedQuantity: unbackedQty });
+    out.push({ at, key, costBase: unbackedQty * cost * rate, unbackedQuantity: unbackedQty });
   }
 
   return out;
@@ -484,8 +490,25 @@ export function cashOn(
   return round2(cash);
 }
 
-
-
+/**
+ * Every calendar day from `from` to `to`, inclusive. Bounded so a malformed
+ * date can never spin: a reconstruction window wider than ~10 years is a bug,
+ * not a request.
+ */
+export function enumerateDays(from: string, to: string): string[] {
+  const start = parseDay(from);
+  const end = parseDay(to);
+  if (!start || !end || start > end) return [];
+  const out: string[] = [];
+  const cursor = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime())) return [];
+  while (cursor <= last && out.length < 4000) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}
 
 export function planHistoricalRevaluation({
   portfolioId,
@@ -498,6 +521,9 @@ export function planHistoricalRevaluation({
   fx = new Map<string, number>(),
   fundEvents = [],
   baseCcy = null,
+  fillGaps = false,
+
+
 
 }: {
   portfolioId: string;
@@ -514,23 +540,49 @@ export function planHistoricalRevaluation({
   fundEvents?: RevalueFundEvent[];
   /** Portfolio base currency; legs in it need no FX rate to be trusted. */
   baseCcy?: string | null;
+  /**
+   * Reconstruct days that have no stored row at all, between inception and the
+   * newest stored row. A gap breaks the chart series: the line jumps straight
+   * from inception to the first surviving snapshot, so a week of real trading
+   * simply vanishes. The reconstructed days use exactly the same position
+   * rollback and cash rollback as a stored day, and are skipped whenever the
+   * ledger cannot explain them.
+   */
+  fillGaps?: boolean;
 
 }): RevalueReport {
   const rows: RevaluedSnapshot[] = [];
   const skipped: SkippedSnapshot[] = [];
-  const sorted = [...snapshots]
+  const stored = [...snapshots]
     .map((s) => ({ ...s, snapshot_date: day(s.snapshot_date) }))
     .filter((s) => !inception || s.snapshot_date >= day(inception))
     .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
 
-  // Anchor for historical cash: the newest stored balance, which is the one a
-  // broker sync actually refreshed.
-  const anchor = sorted.length > 0 ? sorted[sorted.length - 1]! : null;
+  const present = new Set(stored.map((s) => s.snapshot_date));
+  const synthetic = new Set<string>();
+  const sorted = [...stored];
+  if (fillGaps && stored.length > 0) {
+    const from = inception ? day(inception) : stored[0]!.snapshot_date;
+    const to = stored[stored.length - 1]!.snapshot_date;
+    for (const d of enumerateDays(from, to)) {
+      if (present.has(d)) continue;
+      synthetic.add(d);
+      sorted.push({ snapshot_date: d, cash: null, holdings_value: null, total_value: null });
+    }
+    sorted.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+  }
+
+  // Anchor for historical cash: the newest *stored* balance, which is the one
+  // a broker sync actually refreshed. A reconstructed day must never become
+  // the anchor for the days before it.
+  const anchor = stored.length > 0 ? stored[stored.length - 1]! : null;
   const anchorCash = anchor ? num(anchor.cash, Number.NaN) : Number.NaN;
   const anchorDate = anchor?.snapshot_date ?? "";
   // Broker-imported positions carry no fill, so their cost has to be handed
   // back to the days before they appeared.
   const openings = unbackedOpenings(holdings, fills, fx, baseCcy);
+
+
 
 
   for (const snap of sorted) {
@@ -555,9 +607,14 @@ export function planHistoricalRevaluation({
     // Repair jobs stamp today's balance onto old rows, so prefer the balance
     // the ledger implies; fall back to the stored figure when it can't be
     // reconstructed.
+    // An opening only hands its cost back to days that do NOT already carry
+    // the position. When a later sell leaves a stale `holdings` row looking
+    // unbacked, crediting its cost on a day whose book still values the
+    // position counts the same money twice and inflates the whole gap.
+    const dayOpenings = openings.filter((o) => !o.key || !book.has(o.key));
     const rolledCash =
       Number.isFinite(anchorCash) && date < anchorDate
-        ? cashOn(anchorCash, fills, fundEvents, date, fx, openings, {
+        ? cashOn(anchorCash, fills, fundEvents, date, fx, dayOpenings, {
             anchorDate,
             baseCcy,
           })
@@ -603,6 +660,8 @@ export function planHistoricalRevaluation({
       previous_holdings_value: round2(previousHoldings),
       previous_total_value: Number.isFinite(storedTotal) ? round2(storedTotal) : 0,
       ratio: holdingsValue > 0 ? round2(previousHoldings / holdingsValue) : null,
+      ...(synthetic.has(date) ? { inserted: true } : {}),
+
     });
   }
 

@@ -7,7 +7,13 @@ export const revalueSnapshotHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
-      .object({ portfolioId: z.string().uuid(), dryRun: z.boolean().optional() })
+      .object({
+        portfolioId: z.string().uuid(),
+        dryRun: z.boolean().optional(),
+        // Reconstruct days that have no stored snapshot at all, so a gap in
+        // the ledger doesn't leave a straight line across the chart.
+        fillGaps: z.boolean().optional(),
+      })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }): Promise<RevalueRunResult> => {
@@ -16,6 +22,7 @@ export const revalueSnapshotHistory = createServerFn({ method: "POST" })
     );
     return revalueHistoricalSnapshots(context.supabase, data.portfolioId, {
       dryRun: data.dryRun,
+      fillGaps: data.fillGaps,
     });
   });
 
