@@ -110,9 +110,55 @@ ${weights ? `Top drivers the AI weighted most heavily:\n${weights}` : ""}
 ${news ? `\nHeadlines the AI considered:\n${news}` : ""}`;
 }
 
+export type ExplanationCacheClient = {
+  from: (table: string) => any;
+};
+
+/** Stable short hash of the prompt, so a changed prompt invalidates the cache. */
+async function hashPrompt(prompt: string): Promise<string> {
+  const bytes = new TextEncoder().encode(prompt);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .slice(0, 12)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * Explanations are deterministic per (decision, order, prompt): the underlying
+ * order never changes once written. Without a cache every click of "explain"
+ * — and every page reload — bought a fresh Gemini call. We persist the first
+ * result and serve it back for free afterwards.
+ */
 export async function runExplainOrder(
   data: ExplainOrderInput,
+  db?: ExplanationCacheClient,
 ): Promise<ExplainOrderOutput> {
+  const prompt = buildExplainPrompt(data);
+  const promptHash = await hashPrompt(prompt);
+
+  if (db) {
+    try {
+      const { data: hit } = await db
+        .from("order_explanations")
+        .select("explanation, model")
+        .eq("decision_id", data.decisionId)
+        .eq("order_key", data.orderKey)
+        .eq("prompt_hash", promptHash)
+        .maybeSingle();
+      if (hit?.explanation) {
+        return {
+          decisionId: data.decisionId,
+          orderKey: data.orderKey,
+          explanation: hit.explanation as string,
+          model: (hit.model as string | null) ?? "cache",
+        };
+      }
+    } catch (err) {
+      console.warn("order explanation cache read failed", err);
+    }
+  }
+
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("Missing LOVABLE_API_KEY");
 
@@ -121,16 +167,31 @@ export async function runExplainOrder(
 
   const { text } = await generateText({
     model: gateway(model),
-    prompt: buildExplainPrompt(data),
+    prompt,
   });
 
   const cleaned = (text ?? "").replace(/^[\s>*_-]+|[\s]+$/g, "").slice(0, 600);
+  const explanation =
+    cleaned || "Could not generate a plain-English summary for this order.";
+
+  if (db && cleaned) {
+    try {
+      await db.from("order_explanations").insert({
+        decision_id: data.decisionId,
+        order_key: data.orderKey,
+        prompt_hash: promptHash,
+        explanation,
+        model,
+      });
+    } catch (err) {
+      console.warn("order explanation cache write failed", err);
+    }
+  }
 
   return {
     decisionId: data.decisionId,
     orderKey: data.orderKey,
-    explanation:
-      cleaned || "Could not generate a plain-English summary for this order.",
+    explanation,
     model,
   };
 }

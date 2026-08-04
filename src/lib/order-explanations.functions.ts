@@ -13,4 +13,4 @@ export type { ExplainOrderInput, ExplainOrderOutput };
 export const explainDecisionOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ExplainInputSchema.parse(input))
-  .handler(async ({ data }) => runExplainOrder(data));
+  .handler(async ({ data, context }) => runExplainOrder(data, context.supabase));
