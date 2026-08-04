@@ -715,7 +715,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     return formatAlgoRegimePromptBlock(algoRegime);
   })();
 
-  // If circuit breaker is tripped, skip the AI call entirely.
+  // If the circuit breaker is tripped, or every candidate venue is closed,
+  // skip the AI call entirely.
 
   const decision: DecisionOutput = breakerTripped
     ? {
@@ -723,7 +724,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         rationale: "Trading is auto-paused. Review diagnostics or resume manually.",
         orders: [],
       }
+    : allVenuesClosed
+    ? {
+        briefing:
+          "All candidate venues are closed right now, so no new orders were considered this run.",
+        rationale:
+          "Markets shut — automated exits (stop-loss, take-profit, trailing stops) stay armed and the next open will get a full review.",
+        orders: [],
+      }
     : await callAiForDecision({
+
         portfolio,
         holdings: holdings ?? [],
         cashValue: cash,
