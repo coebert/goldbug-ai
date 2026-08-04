@@ -47,6 +47,15 @@ export type RevalueFill = {
 /** An external deposit/withdrawal: positive credits the account. */
 export type RevalueFundEvent = { at: string; amount: number | string | null };
 
+/**
+ * A position that appeared in `holdings` without any buy fill behind it —
+ * typically a broker sync importing positions the app never executed. Its
+ * cost is the only record of the cash that left the account when it opened.
+ */
+export type RevalueOpening = { at: string; costBase: number };
+
+
+
 
 export type RevalueSnapshot = {
   snapshot_date: string;
@@ -246,6 +255,49 @@ export function valuePositionsOn(
 }
 
 /**
+ * Positions currently held that the fills ledger never bought.
+ *
+ * A linked broker account can gain positions the app did not execute (manual
+ * trades, transfers, a first sync of an account that already held stock). The
+ * cash those purchases consumed is invisible to `cashOn`, which then leaves
+ * every earlier day carrying *today's* depleted balance while showing no
+ * positions — exactly the shape that reads as an implausible jump on the day
+ * the positions appear.
+ *
+ * `avg_cost` is stored in the instrument's settlement currency (post the
+ * fill-record repair), so it is converted with FX only — never through the LSE
+ * pence rule, which would shrink a London leg 100x.
+ */
+export function unbackedOpenings(
+  holdings: RevalueHolding[],
+  fills: RevalueFill[],
+  fx: Map<string, number> = new Map(),
+): RevalueOpening[] {
+  const bought = new Set<string>();
+  for (const f of fills) {
+    if (String(f.side ?? "").toLowerCase() === "sell") continue;
+    const key = positionKey(f.symbol);
+    if (key) bought.add(key);
+  }
+
+  const out: RevalueOpening[] = [];
+  for (const h of holdings) {
+    const key = positionKey(h.symbol);
+    if (!key || bought.has(key)) continue;
+    const at = h.opened_at ? day(h.opened_at) : "";
+    const qty = num(h.quantity);
+    const cost = num(h.avg_cost);
+    if (!at || !(qty > 0) || !(cost > 0)) continue;
+    const rate = fx.get(instrumentCurrency(h).toUpperCase());
+    out.push({
+      at,
+      costBase: qty * cost * (Number.isFinite(rate) && (rate ?? 0) > 0 ? rate! : 1),
+    });
+  }
+  return out;
+}
+
+/**
  * Reconstruct the cash balance at the close of `date` by undoing every fill
  * and funding event recorded after it, starting from a known-good anchor
  * (normally the most recent broker-synced balance).
@@ -262,6 +314,7 @@ export function cashOn(
   fundEvents: RevalueFundEvent[],
   date: string,
   fx: Map<string, number> = new Map(),
+  openings: RevalueOpening[] = [],
 ): number | null {
   let cash = anchorCash;
   if (!Number.isFinite(cash)) return null;
@@ -284,6 +337,14 @@ export function cashOn(
     cash += String(f.side ?? "").toLowerCase() === "sell" ? -notional : notional;
   }
 
+  // Positions with no buy fill behind them: give their cost back to the days
+  // before they appeared, or those days read as cash-poor and position-free.
+  for (const o of openings) {
+    if (day(o.at) <= date) continue;
+    if (!Number.isFinite(o.costBase) || o.costBase <= 0) continue;
+    cash += o.costBase;
+  }
+
   for (const e of fundEvents) {
     if (day(e.at) <= date) continue;
     const amount = num(e.amount, Number.NaN);
@@ -294,6 +355,7 @@ export function cashOn(
   if (!Number.isFinite(cash) || cash < 0) return null;
   return round2(cash);
 }
+
 
 
 export function planHistoricalRevaluation({
@@ -332,6 +394,9 @@ export function planHistoricalRevaluation({
   const anchor = sorted.length > 0 ? sorted[sorted.length - 1]! : null;
   const anchorCash = anchor ? num(anchor.cash, Number.NaN) : Number.NaN;
   const anchorDate = anchor?.snapshot_date ?? "";
+  // Broker-imported positions carry no fill, so their cost has to be handed
+  // back to the days before they appeared.
+  const openings = unbackedOpenings(holdings, fills, fx);
 
   for (const snap of sorted) {
     const date = snap.snapshot_date;
@@ -357,7 +422,7 @@ export function planHistoricalRevaluation({
     // reconstructed.
     const rolledCash =
       Number.isFinite(anchorCash) && date < anchorDate
-        ? cashOn(anchorCash, fills, fundEvents, date, fx)
+        ? cashOn(anchorCash, fills, fundEvents, date, fx, openings)
         : null;
     const cash = rolledCash ?? storedCash;
     const previousHoldings = Number.isFinite(rawHoldings)
@@ -370,8 +435,15 @@ export function planHistoricalRevaluation({
 
     // The ledger cannot explain a day that held value we can no longer
     // reconstruct (positions closed before `live_fills` existed). Writing a
-    // zero there would erase real history, so leave it and report it.
-    if (book.size === 0 && round2(previousHoldings) > 0) {
+    // zero there would erase real history, so leave it and report it — but
+    // only when the unexplained stub is material: a rounding-scale residue
+    // must not block a day whose cash we *can* reconstruct.
+    const materialResidue =
+      Number.isFinite(storedTotal) && storedTotal > 0
+        ? previousHoldings / storedTotal > 0.01
+        : previousHoldings > 0;
+    if (book.size === 0 && round2(previousHoldings) > 0 && materialResidue) {
+
       skipped.push({ snapshot_date: date, reason: "unattributable_history" });
       continue;
     }
