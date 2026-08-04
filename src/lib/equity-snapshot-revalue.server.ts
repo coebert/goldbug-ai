@@ -157,6 +157,7 @@ export async function revalueHistoricalSnapshots(
     prices,
     inception,
     fx,
+    fundEvents,
     today: options.today ?? new Date().toISOString().slice(0, 10),
   });
 
