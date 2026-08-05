@@ -395,7 +395,23 @@ async function runHourlyCycleInner(
           if (!vr.refreshed) {
             srvLog.warn("hourly-run: live valuation refresh skipped", p.id, vr.reason);
           }
+
+          // Independent check: does the app's stored equity still agree with
+          // Saxo's account total? Logged to live_reconciliation every run and
+          // escalated to a notification once the gap crosses the threshold.
+          const { reconcileLiveEquityAgainstBroker } = await import(
+            "@/lib/live-equity-reconcile.server"
+          );
+          const rec = await reconcileLiveEquityAgainstBroker(p.id, p.user_id as string);
+          if (rec.checked && rec.drift.severity !== "ok") {
+            srvLog.warn(
+              `hourly-run: equity drift ${rec.drift.severity}`,
+              p.id,
+              rec.drift.note,
+            );
+          }
         }
+
 
         const elapsed = Date.now() - runStartedAt;
 
