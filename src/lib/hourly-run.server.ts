@@ -383,8 +383,22 @@ async function runHourlyCycleInner(
         });
       };
       try {
+        // Mark live portfolios to market on EVERY run, before any gate.
+        // Skipped ticks (closed venues, budget, already-ticked) used to leave
+        // the app's equity frozen while Saxo moved on; this keeps holdings,
+        // today's snapshot and the hourly equity point in step regardless.
+        if ((p.mode === "live_sim" || p.mode === "live_prod") && p.user_id) {
+          const { refreshLiveValuation } = await import(
+            "@/lib/live-valuation-refresh.server"
+          );
+          const vr = await refreshLiveValuation(p.id, p.user_id as string);
+          if (!vr.refreshed) {
+            srvLog.warn("hourly-run: live valuation refresh skipped", p.id, vr.reason);
+          }
+        }
 
         const elapsed = Date.now() - runStartedAt;
+
         if (budgetGate.shouldSkip(p.id, elapsed, Date.now())) {
           bumpBudgetExceeded();
           const reason = `budget-exceeded (elapsed ${(elapsed / 1000).toFixed(0)}s) — next tick will pick this up`;
