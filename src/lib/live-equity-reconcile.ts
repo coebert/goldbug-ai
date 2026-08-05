@@ -30,8 +30,8 @@ export function classifyEquityDrift(input: {
   brokerTotal: number | null | undefined;
   currency?: string;
 }): EquityDrift {
-  const app = Number(input.appTotal);
-  const broker = Number(input.brokerTotal);
+  const app = input.appTotal == null ? Number.NaN : Number(input.appTotal);
+  const broker = input.brokerTotal == null ? Number.NaN : Number(input.brokerTotal);
   const ccy = input.currency ?? "";
 
   if (!Number.isFinite(app) || !Number.isFinite(broker) || broker <= 0) {
