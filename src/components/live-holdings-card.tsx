@@ -279,7 +279,10 @@ export function LiveHoldingsCard({
               {rows.length} {rows.length === 1 ? "position" : "positions"}
             </Badge>
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isAnyLive && portfolioId && (
+              <ValuationFreshnessBadge portfolioId={portfolioId} />
+            )}
             {isLive && (
               <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
                 Real cash
