@@ -1679,6 +1679,19 @@ export async function routeOrdersToBroker(params: {
     }
   }
 
+  // Anything that actually reached the broker changes positions/cash, so
+  // kick off an immediate re-valuation instead of waiting for the next tick.
+  if (results.some((r) => !r.skipped && r.brokerOrderId)) {
+    const { triggerLiveValuationRefresh } = await import(
+      "@/lib/live-valuation-trigger.server"
+    );
+    triggerLiveValuationRefresh({
+      portfolioId: portfolio.id,
+      userId,
+      reason: "broker-order-routed",
+    });
+  }
+
   return results;
 }
 

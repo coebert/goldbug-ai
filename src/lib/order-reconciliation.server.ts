@@ -830,5 +830,19 @@ export async function reconcileOrderStatusesForPortfolio(params: {
     }),
   });
 
+  // A fill/partial/cancel means the broker's positions or cash just moved.
+  // Re-value immediately rather than letting the app sit stale until the
+  // next hourly tick.
+  if (summary.filled > 0 || summary.partial > 0 || summary.cancelled > 0) {
+    const { triggerLiveValuationRefresh } = await import(
+      "@/lib/live-valuation-trigger.server"
+    );
+    triggerLiveValuationRefresh({
+      portfolioId,
+      userId,
+      reason: `order-recon:${source}`,
+    });
+  }
+
   return summary;
 }
