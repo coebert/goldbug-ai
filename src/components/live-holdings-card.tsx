@@ -26,6 +26,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { reconcilePortfolio } from "@/lib/live.functions";
 import { toast } from "sonner";
 import { qk } from "@/lib/query-keys";
+import { ValuationFreshnessBadge } from "@/components/valuation-freshness-badge";
 
 
 
@@ -279,7 +280,10 @@ export function LiveHoldingsCard({
               {rows.length} {rows.length === 1 ? "position" : "positions"}
             </Badge>
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isAnyLive && portfolioId && (
+              <ValuationFreshnessBadge portfolioId={portfolioId} />
+            )}
             {isLive && (
               <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
                 Real cash
