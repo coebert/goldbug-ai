@@ -282,3 +282,76 @@ export function formatBreakeven(r: BreakevenResult): string {
   const bpsPart = r.roundTripBps === null ? "" : ` (~${r.roundTripBps.toFixed(0)} bps round trip)`;
   return `breakeven at ${(r.scale! * 100).toFixed(0)}% of baseline cost${bpsPart}`;
 }
+
+/**
+ * Baseline frictions for one series, i.e. the baseline model with the
+ * series' own slippage and minimum-fee overrides applied. Using this for
+ * the bps read-out keeps the breakeven answer honest when the sweep
+ * varied execution costs independently of the commission scale.
+ */
+export function seriesBaseFrictions(base: Frictions, sample: CostScenario | undefined): Frictions {
+  if (!sample) return base;
+  let f = base;
+  if (sample.slippage) f = applySlippage(f, sample.slippage);
+  if (sample.minCommission !== undefined) f = applyMinCommission(f, sample.minCommission);
+  return f;
+}
+
+export type BreakevenGroup = {
+  ticket: TicketSpec;
+  style: string;
+  riskLevel: string;
+  slippageLabel: string;
+  minCommission: number | null;
+  ticketValue: number;
+  baselineRoundTripBps: number;
+  vsZero: BreakevenResult;
+  vsBenchmark: BreakevenResult;
+};
+
+/**
+ * Breakeven per (risk, style, ticket, slippage, minimum fee) series — the
+ * cells within a group differ only by commission scale, which is what
+ * `findBreakevenScale` interpolates over.
+ */
+export function breakevenGrid(
+  cells: SweepCell[],
+  opts: { baseFrictions: Frictions; startingCash: number },
+): BreakevenGroup[] {
+  const groups = new Map<string, SweepCell[]>();
+  for (const c of cells) {
+    const key = [
+      c.riskLevel,
+      c.style,
+      c.ticket.label,
+      c.scenario.slippage?.label ?? "-",
+      c.scenario.minCommission ?? "-",
+    ].join("|");
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(c);
+    else groups.set(key, [c]);
+  }
+
+  const out: BreakevenGroup[] = [];
+  for (const series of groups.values()) {
+    const first = series[0]!;
+    const tv = ticketValue(opts.startingCash, first.ticket);
+    const seriesBase = seriesBaseFrictions(opts.baseFrictions, first.scenario);
+    out.push({
+      ticket: first.ticket,
+      style: first.style,
+      riskLevel: first.riskLevel,
+      slippageLabel: first.scenario.slippage?.label ?? "baseline",
+      minCommission: first.scenario.minCommission ?? null,
+      ticketValue: tv,
+      baselineRoundTripBps: roundTripCostBps(seriesBase, tv),
+      vsZero: findBreakevenScale(series, { baseFrictions: seriesBase, ticketValue: tv }),
+      vsBenchmark: findBreakevenScale(series, {
+        target: "benchmark",
+        baseFrictions: seriesBase,
+        ticketValue: tv,
+      }),
+    });
+  }
+  return out;
+}
