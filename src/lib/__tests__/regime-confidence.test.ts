@@ -43,7 +43,11 @@ describe("classifyRegimeBars — sideways coverage", () => {
     // ~4%/yr over a year — positive, but inside the ±6% chop band.
     const bars = classifyRegimeBars(ramp(252, 100, 104));
     expect(bars.at(-1)!.label).toBe("sideways");
-    expect(bars.at(-1)!.reason).toContain("band");
+    expect(bars.at(-1)!.reason).toMatch(/band|range/);
+    // A tighter band still lets a genuine trend through.
+    expect(classifyRegimeBars(ramp(252, 100, 104), { bullAnnualPct: 2, sidewaysRangePct: 0.2 }).at(-1)!.label)
+      .toBe("bull");
+
   });
 
   it("refuses a directional label when the path has no trend structure", () => {
