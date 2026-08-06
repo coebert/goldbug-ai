@@ -168,9 +168,12 @@ for (const w of windows) {
   results.push(row);
   console.log(
     `  #${String(w.index).padStart(2)} ${row.from} → ${row.to}  ${row.regime.padEnd(8)} ` +
+      `conf ${Math.round(regime.confidence * 100).toString().padStart(3)}%` +
+      `${regime.demoted ? "*" : " "} ` +
       `CAGR ${row.netCagrPct.toFixed(1).padStart(7)}%  maxDD ${row.maxDrawdownPct.toFixed(1).padStart(6)}%  ` +
       `bench ${row.benchmarkCagrPct.toFixed(1).padStart(7)}%  trades/yr ${row.tradesPerYear.toFixed(0)}`,
   );
+
 }
 
 const report = buildRegimeReport(results, gate);
