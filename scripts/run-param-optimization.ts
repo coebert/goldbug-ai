@@ -197,12 +197,45 @@ const foldBars = Array.from({ length: folds }, (_, i) =>
 ).filter((b) => b.length >= 60);
 console.log(`Walk-forward: ${foldBars.length} folds of ~${foldSize} bars.`);
 
+// Cost grid the candidates are scored across. With no cost flags this is a
+// single baseline scenario, i.e. the previous behaviour exactly.
+const liquidityProfile = buildLiquidityProfile(histories);
+const scenarios: CostScenario[] = buildCostGrid(FRICTIONS, {
+  scales: [1],
+  slippage: slippageSpecs,
+  minCommission: minFees,
+  liquidity: liquiditySpecs,
+  liquidityProfile,
+});
+const costBpsByScenario: Record<string, number> = {};
+for (const sc of scenarios) costBpsByScenario[scenarioKey(sc)] = scenarioCostBps(sc);
+const gridVaried = scenarios.length > 1;
+if (gridVaried) {
+  console.log(
+    `Cost grid: ${slippageSpecs.length || 1} slippage x ${minFees.length || 1} min-fee x ` +
+      `${liquiditySpecs.length || 1} liquidity = ${scenarios.length} scenarios · ` +
+      `score = ${describeCostScoreMode(costScoreMode, costTailShare)}`,
+  );
+  for (const sc of scenarios) {
+    console.log(`  ${sc.label.padEnd(44)} ${costBpsByScenario[scenarioKey(sc)]!.toFixed(1)}bps/side`);
+  }
+}
+
 const candidates = sampleGrid(AXES, limit, seed);
-console.log(`Evaluating ${candidates.length} candidates × ${foldBars.length} folds…\n`);
+console.log(
+  `Evaluating ${candidates.length} candidates × ${foldBars.length} folds` +
+    (gridVaried ? ` × ${scenarios.length} cost scenarios` : "") +
+    `…\n`,
+);
 
 const baseCfg = parseRiskConfig({ trading_style: style } as never);
 
-type Evaluated = { params: (typeof candidates)[number]; metrics: CandidateMetrics };
+type Evaluated = {
+  params: (typeof candidates)[number];
+  metrics: CandidateMetrics;
+  robustness: CostRobustness;
+  perScenario: ScenarioRun[];
+};
 const evaluated: Evaluated[] = [];
 const curves = new Map<string, EquityPoint[]>();
 const tradeLogs = new Map<string, StyleTradeRow[]>();
@@ -217,35 +250,56 @@ for (const rl of riskLevels) {
 
   for (const [i, params] of candidates.entries()) {
     const { cfg, sleeve } = applyParams(baseCfg, baseSleeve, params);
-    const perFold: CandidateMetrics[] = [];
+    const perScenario: ScenarioRun[] = [];
     const foldCurves: EquityPoint[][] = [];
     let firstLog: StyleTradeRow[] = [];
-    for (const bars of foldBars) {
-      const m = await runStyleBacktest({
-        cfg,
-        bars,
-        riskLevel: rl,
-        startingCash,
-        feePerTrade: 0,
-        sleeve,
-        simulator: { frictions: FRICTIONS },
+    for (const sc of scenarios) {
+      const perFold: CandidateMetrics[] = [];
+      for (const bars of foldBars) {
+        const m = await runStyleBacktest({
+          cfg,
+          bars,
+          riskLevel: rl,
+          startingCash,
+          feePerTrade: 0,
+          sleeve,
+          simulator: { frictions: sc.frictions },
+        });
+        perFold.push({
+          cagrPct: m.cagrPct,
+          totalReturnPct: m.totalReturnPct,
+          maxDrawdownPct: m.maxDrawdownPct,
+          sharpe: m.sharpe,
+          trades: m.trades,
+          tradesPerYear: m.tradesPerYear,
+          feeDragPct: m.feeDragPct,
+          finalCashPct: m.finalCashPct,
+          ...(m.audit ? { audit: m.audit } : {}),
+        });
+        // Curves and trade logs come from the baseline (first) scenario so the
+        // charts stay comparable when the grid is varied.
+        if (sc === scenarios[0]) {
+          foldCurves.push(m.equityCurve);
+          if (firstLog.length === 0) firstLog = m.tradeLog;
+        }
+      }
+      perScenario.push({
+        scenario: scenarioKey(sc),
+        label: sc.label,
+        scale: costBpsByScenario[scenarioKey(sc)]!,
+        metrics: averageMetrics(perFold),
       });
-      perFold.push({
-        cagrPct: m.cagrPct,
-        totalReturnPct: m.totalReturnPct,
-        maxDrawdownPct: m.maxDrawdownPct,
-        sharpe: m.sharpe,
-        trades: m.trades,
-        tradesPerYear: m.tradesPerYear,
-        feeDragPct: m.feeDragPct,
-        finalCashPct: m.finalCashPct,
-        ...(m.audit ? { audit: m.audit } : {}),
-      });
-      foldCurves.push(m.equityCurve);
-      if (firstLog.length === 0) firstLog = m.tradeLog;
     }
-    const metrics = averageMetrics(perFold);
-    rows.push({ params, metrics });
+    const metrics = aggregateScenarioMetrics(perScenario, {
+      mode: costScoreMode,
+      tailShare: costTailShare,
+    });
+    const robustness = costRobustness(perScenario, {
+      minCagrPct: minViableCagr,
+      costBpsByScenario,
+    });
+    rows.push({ params, metrics, robustness, perScenario });
+
     if (rl === riskLevel) {
       evaluated.push({ params, metrics });
       const key = formatParams(params);
