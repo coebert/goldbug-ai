@@ -263,6 +263,13 @@ export type RiskConfig = {
   // currency. Cap-only: it can only shrink a proposed buy, never force one,
   // and never permits borrowing.
   fx_currency_limits: Partial<Record<string, number>>;
+  // Trading style. "position" keeps the historical multi-month behaviour;
+  // "swing" rebases the exit/holding-period defaults for a days-to-weeks
+  // horizon (see src/lib/trading-style.ts). Explicit per-field overrides
+  // stored on risk_config always win over the style base.
+  trading_style: "position" | "swing";
+  /** Swing only: minimum sessions to hold before a discretionary sell. */
+  swing_min_hold_days: number;
 };
 
 
