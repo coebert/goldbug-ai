@@ -844,6 +844,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         alphaPriors,
         cryptoSignalsBlock: cryptoDecision?.block ?? null,
         algoRegimeBlock,
+        cashPolicyBlock: cashPolicy.enabled
+          ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
+          : null,
+
       });
 
 
