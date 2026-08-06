@@ -133,6 +133,8 @@ ${fxCcyLimitsStr ? `- Non-base currency exposure caps (base=${args.portfolio.cur
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
 
+${tradingStylePrompt(cfg)}
+
 ${regimeBlock}
 
 ${args.crossAsset}
