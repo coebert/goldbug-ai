@@ -1625,6 +1625,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         { label: "dd", mult: ddSizing.size_multiplier },
         { label: "sector", mult: secMult.mult },
         { label: "event", mult: evPenalty },
+        fundGate.mult < 1 ? { label: "financials", mult: fundGate.mult } : null,
+
       ]);
       if (haircuts.mult < 1) {
         spend *= haircuts.mult;
