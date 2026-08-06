@@ -138,6 +138,12 @@ import {
 
 import { computeRebalanceTrims } from "./rebalance-bands.server";
 import { refreshSectorScores, sectorSizeMultiplier, symbolSector } from "./sector-rotation.server";
+import {
+  classifySectorCycle,
+  sectorCycleFor,
+  sectorPhaseMultiplier,
+  formatSectorCycleBlock,
+} from "./sector-cycle";
 import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
 import {
@@ -731,6 +737,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
   const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
 
+  // Sector cycle: classify every sector as growing / stagnating / shrinking
+  // from its 30d vs 90d momentum relative to the cross-sector median. Feeds
+  // both the AI prompt and the deterministic sizing layer below.
+  const sectorCycle = classifySectorCycle(
+    (sectorScores ?? []).map((s) => ({
+      sector: s.sector,
+      etf: s.etf,
+      momentum_30d: s.momentum_30d,
+      momentum_90d: s.momentum_90d,
+      score: s.score,
+      rank: s.rank,
+    })),
+  );
+  const sectorCycleBlock = formatSectorCycleBlock(sectorCycle);
+
   // Measured trading edge (rolling signal_performance) — feeds Kelly sizing
   // instead of the old hardcoded 2% assumption. Falls back to the prior when
   // there is not enough measurement yet.
@@ -843,6 +864,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxSystemBlock: fxContext?.block ?? null,
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
+        sectorCycleBlock,
         cryptoSignalsBlock: cryptoDecision?.block ?? null,
         algoRegimeBlock,
         cashPolicyBlock: cashPolicy.enabled
@@ -1614,7 +1636,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         ensembleScore: ensemble?.score ?? null,
       });
 
-      const secMult = sectorSizeMultiplier(symbolSector(meta.symbol), sectorScores);
+      const symSector = symbolSector(meta.symbol);
+      const secMult = sectorSizeMultiplier(symSector, sectorScores);
+      // Cycle phase (growing / stagnating / shrinking) — cuts stack into the
+      // haircuts below; the growth boost is applied separately since
+      // combineHaircuts ignores multipliers >= 1. Hard caps still bind later.
+      const cycleRow = sectorCycleFor(sectorCycle, symSector);
+      const phaseMult = sectorPhaseMultiplier(cycleRow, order.side);
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
 
       const haircuts = combineHaircuts([
@@ -1624,6 +1652,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         { label: `fear${fearIndex.score.toFixed(0)}`, mult: fearIndex.sizeMultiplier },
         { label: "dd", mult: ddSizing.size_multiplier },
         { label: "sector", mult: secMult.mult },
+        phaseMult.mult < 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
         { label: "event", mult: evPenalty },
         fundGate.mult < 1 ? { label: "financials", mult: fundGate.mult } : null,
 
@@ -1634,6 +1663,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         if (systematic.note) sizingNotes.push(systematic.note);
         if (haircuts.floored) sizingNotes.push("haircut floor applied");
       }
+      if (phaseMult.mult > 1) {
+        spend *= phaseMult.mult;
+      }
+      if (phaseMult.note) sizingNotes.push(phaseMult.note);
       if (fundGate.note) sizingNotes.push(fundGate.note);
 
 

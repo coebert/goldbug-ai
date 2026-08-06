@@ -52,6 +52,8 @@ export async function callAiForDecision(args: {
   alphaPriors?: string | null;
   cryptoSignalsBlock?: string | null;
   algoRegimeBlock?: string | null;
+  /** Sector cycle: which sectors are growing / stagnating / shrinking. */
+  sectorCycleBlock?: string | null;
   /** Explicit target-exposure block from the cash-allocation policy. */
   cashPolicyBlock?: string | null;
 
@@ -160,6 +162,7 @@ ${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 ${args.alphaPriors ?? ""}
 ${args.algoRegimeBlock ?? ""}
+${args.sectorCycleBlock ?? ""}
 
 ${args.cashPolicyBlock ?? ""}
 
