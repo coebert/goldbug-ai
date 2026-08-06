@@ -55,6 +55,27 @@ export type RegimeThresholds = {
   bearAnnualPct: number;
   /** Drawdown from the running peak that forces a bear label, in % (default 15). */
   bearDrawdownPct: number;
+  /**
+   * Annualised trend inside ±this band is chop regardless of sign, in %
+   * (default 6). Stops a drifting-but-directionless tape being called bull.
+   */
+  sidewaysBandPct: number;
+  /**
+   * Peak-to-trough range of the trailing window below which the tape is
+   * range-bound, in % of the window mean (default 8).
+   */
+  sidewaysRangePct: number;
+  /**
+   * Minimum R² of a log-linear fit over the trailing window before a
+   * directional label is allowed (default 0.35). A high return with a
+   * scattered path is chop, not a trend.
+   */
+  minTrendR2: number;
+  /**
+   * Drawdown depth that on its own marks a soft bear / distribution tape
+   * when the trend read is not yet negative, in % (default 8).
+   */
+  sidewaysMaxDrawdownPct: number;
   /** Bars per year used to annualise (default 252). */
   barsPerYear: number;
 };
@@ -64,6 +85,10 @@ export const DEFAULT_REGIME_THRESHOLDS: RegimeThresholds = {
   bullAnnualPct: 10,
   bearAnnualPct: -10,
   bearDrawdownPct: 15,
+  sidewaysBandPct: 6,
+  sidewaysRangePct: 8,
+  minTrendR2: 0.35,
+  sidewaysMaxDrawdownPct: 8,
   barsPerYear: 252,
 };
 
@@ -76,35 +101,166 @@ export function annualisedPct(startValue: number, endValue: number, bars: number
 }
 
 /**
- * Per-bar regime label. A deep drawdown from the running peak overrides the
- * trend read — a bounce inside a 25% drawdown is still a bear tape.
+ * R² of a least-squares fit of log(value) against bar number. 1 = a perfectly
+ * smooth trend, 0 = a path with no linear structure at all (chop).
  */
-export function classifyRegimes(
+export function trendR2(values: readonly number[]): number {
+  const ys: number[] = [];
+  for (const v of values) if (v > 0) ys.push(Math.log(v));
+  const n = ys.length;
+  if (n < 3) return 0;
+  const meanX = (n - 1) / 2;
+  const meanY = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = i - meanX;
+    const dy = ys[i]! - meanY;
+    sxy += dx * dy;
+    sxx += dx * dx;
+    syy += dy * dy;
+  }
+  if (!(sxx > 0) || !(syy > 0)) return 0;
+  const r2 = (sxy * sxy) / (sxx * syy);
+  return Math.min(1, Math.max(0, r2));
+}
+
+/** Peak-to-trough range of a window as a % of its mean level. */
+export function rangeWidthPct(values: readonly number[]): number {
+  const xs = values.filter((v) => v > 0);
+  if (xs.length < 2) return 0;
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  if (!(mean > 0)) return 0;
+  return ((Math.max(...xs) - Math.min(...xs)) / mean) * 100;
+}
+
+const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+
+/** Per-bar classification with the evidence behind it. */
+export type RegimeBar = {
+  index: number;
+  date: string;
+  label: RegimeLabel;
+  /** 0..1 — how strongly the evidence supports the label. */
+  confidence: number;
+  /** Annualised trailing return, in %. */
+  trendPct: number;
+  /** R² of the trailing log-linear fit. */
+  r2: number;
+  /** Drawdown from the running peak, in % (<= 0). */
+  drawdownPct: number;
+  /** Trailing peak-to-trough range, in % of the window mean. */
+  rangePct: number;
+  /** Short human reason, useful when eyeballing coverage. */
+  reason: string;
+};
+
+/**
+ * Per-bar regime label plus confidence.
+ *
+ * Order of evidence:
+ *   1. A deep drawdown from the running peak is bear whatever the trend says —
+ *      a bounce inside a 20% drawdown is still a bear tape.
+ *   2. A narrow trailing range, or a trend inside the ±`sidewaysBandPct` band,
+ *      is sideways. This is the coverage fix: previously any drift at all fell
+ *      through to bull/bear because there was no explicit chop test.
+ *   3. A directional trend only earns bull/bear if the path is actually
+ *      trending (R² >= `minTrendR2`); otherwise it is chop with a tilt.
+ *   4. Everything else is sideways, with a soft-bear tilt in confidence when
+ *      the tape is grinding below its peak by more than
+ *      `sidewaysMaxDrawdownPct`.
+ */
+export function classifyRegimeBars(
   index: readonly IndexPoint[],
   thresholds: Partial<RegimeThresholds> = {},
-): RegimeLabel[] {
+): RegimeBar[] {
   const t = { ...DEFAULT_REGIME_THRESHOLDS, ...thresholds };
   if (t.lookback < 1) throw new Error("classifyRegimes: lookback must be >= 1");
   if (t.bearAnnualPct >= t.bullAnnualPct) {
     throw new Error("classifyRegimes: bearAnnualPct must be below bullAnnualPct");
   }
-  const out: RegimeLabel[] = [];
+  if (t.sidewaysBandPct < 0) throw new Error("classifyRegimes: sidewaysBandPct must be >= 0");
+  if (t.minTrendR2 < 0 || t.minTrendR2 > 1) {
+    throw new Error("classifyRegimes: minTrendR2 must be between 0 and 1");
+  }
+
+  const out: RegimeBar[] = [];
   let peak = index[0]?.value ?? 0;
   for (let i = 0; i < index.length; i++) {
     const value = index[i]!.value;
     if (value > peak) peak = value;
     const drawdownPct = peak > 0 ? ((value - peak) / peak) * 100 : 0;
     const back = Math.min(i, t.lookback);
+    const window = index.slice(i - back, i + 1).map((p) => p.value);
     const startValue = index[i - back]?.value ?? value;
-    const trend = back > 0 ? annualisedPct(startValue, value, back, t.barsPerYear) : 0;
+    const trendPct = back > 0 ? annualisedPct(startValue, value, back, t.barsPerYear) : 0;
+    const r2 = trendR2(window);
+    const rangePct = rangeWidthPct(window);
 
-    if (drawdownPct <= -t.bearDrawdownPct) out.push("bear");
-    else if (trend >= t.bullAnnualPct) out.push("bull");
-    else if (trend <= t.bearAnnualPct) out.push("bear");
-    else out.push("sideways");
+    let label: RegimeLabel;
+    let confidence: number;
+    let reason: string;
+
+    const bandwidth = Math.max(1, t.sidewaysBandPct);
+
+    if (drawdownPct <= -t.bearDrawdownPct) {
+      label = "bear";
+      // Deeper than the trigger ⇒ more certain; twice the trigger pins it at 1.
+      confidence = clamp01(0.6 + 0.4 * ((-drawdownPct - t.bearDrawdownPct) / t.bearDrawdownPct));
+      reason = `drawdown ${drawdownPct.toFixed(1)}%`;
+    } else if (rangePct <= t.sidewaysRangePct && back >= 3) {
+      label = "sideways";
+      confidence = clamp01(0.6 + 0.4 * (1 - rangePct / Math.max(1e-9, t.sidewaysRangePct)));
+      reason = `range ${rangePct.toFixed(1)}%`;
+    } else if (Math.abs(trendPct) <= t.sidewaysBandPct) {
+      label = "sideways";
+      confidence = clamp01(0.5 + 0.5 * (1 - Math.abs(trendPct) / bandwidth));
+      reason = `trend ${trendPct.toFixed(1)}% inside ±${t.sidewaysBandPct}% band`;
+    } else if (trendPct >= t.bullAnnualPct && r2 >= t.minTrendR2) {
+      label = "bull";
+      const strength = clamp01((trendPct - t.bullAnnualPct) / Math.max(1, Math.abs(t.bullAnnualPct)));
+      confidence = clamp01(0.45 + 0.3 * strength + 0.25 * r2);
+      reason = `trend +${trendPct.toFixed(1)}%, R² ${r2.toFixed(2)}`;
+    } else if (trendPct <= t.bearAnnualPct && r2 >= t.minTrendR2) {
+      label = "bear";
+      const strength = clamp01((t.bearAnnualPct - trendPct) / Math.max(1, Math.abs(t.bearAnnualPct)));
+      confidence = clamp01(0.45 + 0.3 * strength + 0.25 * r2);
+      reason = `trend ${trendPct.toFixed(1)}%, R² ${r2.toFixed(2)}`;
+    } else {
+      label = "sideways";
+      // Directional in return but not in path: chop with a tilt. Weak
+      // confidence, weaker still when it is grinding below the peak.
+      const grinding = drawdownPct <= -t.sidewaysMaxDrawdownPct;
+      confidence = clamp01((grinding ? 0.35 : 0.5) + 0.3 * (1 - r2));
+      reason = grinding
+        ? `choppy below peak (${drawdownPct.toFixed(1)}%), R² ${r2.toFixed(2)}`
+        : `trend ${trendPct.toFixed(1)}% but R² only ${r2.toFixed(2)}`;
+    }
+
+    out.push({
+      index: i,
+      date: index[i]!.date,
+      label,
+      confidence,
+      trendPct,
+      r2,
+      drawdownPct,
+      rangePct,
+      reason,
+    });
   }
   return out;
 }
+
+/** Per-bar regime labels only — the thin wrapper around `classifyRegimeBars`. */
+export function classifyRegimes(
+  index: readonly IndexPoint[],
+  thresholds: Partial<RegimeThresholds> = {},
+): RegimeLabel[] {
+  return classifyRegimeBars(index, thresholds).map((b) => b.label);
+}
+
 
 export type RegimeSegment = {
   label: RegimeLabel;
