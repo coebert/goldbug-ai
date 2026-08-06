@@ -4,6 +4,8 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { PerformanceAnalyticsCard } from "@/components/performance-analytics-card";
 import { IntendedVsExecutedCard } from "@/components/intended-vs-executed-card";
+import { SectorExposureChart } from "@/components/sector-exposure-chart";
+
 
 import { ExecutionQualityCard } from "@/components/execution-quality-card";
 import { AlgoRegimeHistoryCard } from "@/components/algo-regime-history-card";
@@ -46,6 +48,8 @@ function AnalyticsPage() {
         <h1 className="text-xl font-semibold">Performance analytics</h1>
         <PerformanceAnalyticsCard portfolioId={id} />
         <IntendedVsExecutedCard portfolioId={id} />
+        <SectorExposureChart portfolioId={id} />
+
 
         <ExecutionQualityCard portfolioId={id} />
         <AlgoRegimeHistoryCard portfolioId={id} />
