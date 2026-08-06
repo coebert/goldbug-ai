@@ -28,6 +28,7 @@ import { COMMODITY_GROUPS, type CommodityGroup } from "@/lib/commodity-groups";
 import {
   RISK_PRESETS,
   RISK_DIAL_DEFAULTS,
+  SWING_DIAL_OVERRIDES,
   type RiskDialConfig,
   type DialAssetClass,
 } from "@/lib/risk-presets";
