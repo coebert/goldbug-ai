@@ -195,10 +195,8 @@ for (const { window: w, regime } of windows) {
   const oosCurve = m.equityCurve.slice(w.testStart - w.trainStart);
   if (oosCurve.length < 2) continue;
 
-  const regime = dominantRegimeWeighted(regimeBars, w.testStart, w.testEnd, {
-    minDirectionalShare: Number(arg("min-share", "0.45")),
-    minConfidence: Number(arg("min-conf", "0.5")),
   });
+
   const benchStart = index[w.testStart]!.value;
   const benchEnd = index[w.testEnd - 1]!.value;
   const years = (w.testEnd - w.testStart) / 252;
