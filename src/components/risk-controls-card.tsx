@@ -40,6 +40,7 @@ import {
 } from "@/lib/risk-aggressiveness";
 import { qk } from "@/lib/query-keys";
 import { TradingModeBadge } from "@/components/trading-mode-badge";
+import { writeCachedTradingMode } from "@/lib/trading-mode-store";
 
 // The dial config lives in `@/lib/risk-presets` so the server-side sweep and
 // the live engine read exactly the same table this card writes.
