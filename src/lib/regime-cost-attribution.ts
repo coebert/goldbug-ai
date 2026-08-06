@@ -35,7 +35,19 @@ import {
   type FeeDragBreakdown,
   type FeeDragFrictions,
 } from "@/lib/fee-drag-objective";
-import { REGIMES, median, type RegimeLabel } from "@/lib/regime-walk-forward";
+import type { RegimeLabel } from "@/lib/regime-walk-forward";
+
+// Deliberately type-only above, with the two tiny helpers duplicated below:
+// `regime-walk-forward` imports this module at runtime to build its cost
+// table, so importing values back out of it would create an ESM cycle.
+const REGIME_ORDER: readonly RegimeLabel[] = ["bull", "bear", "sideways"] as const;
+
+function median(values: readonly number[]): number {
+  const xs = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  if (xs.length === 0) return 0;
+  const mid = xs.length >> 1;
+  return xs.length % 2 ? xs[mid]! : (xs[mid - 1]! + xs[mid]!) / 2;
+}
 
 /** Which half of a walk-forward window a cost belongs to. */
 export type CostPhase = "train" | "test";
@@ -341,7 +353,7 @@ export function summariseRegimeCosts(
 export function buildRegimeCostReport(
   rows: readonly CostWindowRow[],
 ): RegimeCostSummary[] {
-  return REGIMES.map((r) => summariseRegimeCosts(r, rows));
+  return REGIME_ORDER.map((r) => summariseRegimeCosts(r, rows));
 }
 
 // ---------------------------------------------------------------- output
