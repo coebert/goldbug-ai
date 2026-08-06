@@ -238,7 +238,7 @@ console.log("\nBreakeven cost level (share of baseline Saxo-like costs):");
 for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCash })) {
   console.log(
     `  ${g.riskLevel.padEnd(8)} ${g.style.padEnd(8)} ${g.ticket.label.padEnd(9)} ` +
-      `slip ${g.slippageLabel.padEnd(14)} min £${String(g.minCommission ?? "-").padStart(3)}  ` +
+      `slip ${(g.liquidityLabel ? `${g.slippageLabel}/${g.liquidityLabel}` : g.slippageLabel).padEnd(24)} min £${String(g.minCommission ?? "-").padStart(3)}  ` +
       `ticket £${g.ticketValue.toFixed(0).padStart(5)}  baseline ${g.baselineRoundTripBps.toFixed(0).padStart(4)}bps  ` +
       `vs zero: ${formatBreakeven(g.vsZero)}  |  vs B&H: ${formatBreakeven(g.vsBenchmark)}`,
   );
@@ -246,7 +246,7 @@ for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCa
     g.riskLevel,
     g.style,
     g.ticket.label,
-    g.slippageLabel,
+    g.liquidityLabel ? `${g.slippageLabel} · ${g.liquidityLabel}` : g.slippageLabel,
     g.minCommission === null ? "-" : `£${g.minCommission}`,
     `£${g.ticketValue.toFixed(0)}`,
     `${g.baselineRoundTripBps.toFixed(0)}`,
