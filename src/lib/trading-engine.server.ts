@@ -131,6 +131,11 @@ import {
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { cached } from "./market-context-cache.server";
 import { computePortfolioDrawdownSizing, grossExposureLimit } from "./portfolio-drawdown.server";
+import {
+  resolveCashAllocationPolicy,
+  formatCashAllocationBlock,
+} from "./cash-allocation-policy";
+
 import { computeRebalanceTrims } from "./rebalance-bands.server";
 import { refreshSectorScores, sectorSizeMultiplier, symbolSector } from "./sector-rotation.server";
 import { updateSignalPerformance } from "./signal-decay.server";
@@ -662,9 +667,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const cfg = swingGate.cfg;
   // Risk dial (1..5) → position sizing + per-side trade aggressiveness.
   const aggression = resolveAggressiveness(portfolio.risk_config);
-  const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
+  const configuredCashFloorPct = effectiveCashFloorPct(cfg, portfolio.risk_level);
+
+  // EXPLICIT CASH-ALLOCATION POLICY — the engine's only exposure FLOOR.
+  // Every other sizing rule is a ceiling or a haircut, which in a quiet bull
+  // tape used to compound into a nearly flat book. The policy sets a target
+  // invested % for the regime, de-risked by the drawdown budget, and returns
+  // both the cash floor to use and a scale for proposed buys.
+  const cashPolicy = resolveCashAllocationPolicy({
+    regime: effectiveRegime.regime,
+    riskLevel: portfolio.risk_level,
+    totalValue,
+    holdingsValue,
+    cashFloorPct: configuredCashFloorPct,
+    portfolioDrawdownPct: ddSizing.drawdown_pct,
+    maxDrawdownHaltPct: cfg.max_drawdown_halt_pct,
+    indexDrawdownPct: effectiveRegime.signals.spy_drawdown_pct,
+    targetOverridePct: cfg.target_invested_pct,
+    enabled: cfg.cash_policy_enabled,
+  });
+  const cashFloorPctEff = cashPolicy.enabled
+    ? cashPolicy.effectiveCashFloorPct
+    : configuredCashFloorPct;
   const cashFloor = totalValue * cashFloorPctEff;
+  srvLog.info(`[cash-policy] ${portfolio.id}: ${cashPolicy.note}`);
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
+
 
 
   // Learned drawdown sizing: the 20-year study measured the forward return
@@ -816,6 +844,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         alphaPriors,
         cryptoSignalsBlock: cryptoDecision?.block ?? null,
         algoRegimeBlock,
+        cashPolicyBlock: cashPolicy.enabled
+          ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
+          : null,
+
       });
 
 
@@ -1610,6 +1642,48 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           sizingNotes.push(`gross≤${(gross.target_pct * 100).toFixed(0)}%`);
         }
       }
+
+      // Explicit cash-allocation policy, re-evaluated against live exposure so
+      // the target band holds across a multi-order tick. It can scale a buy UP
+      // when the book is under-deployed for the regime, throttles it inside the
+      // band, and blocks new risk above the ceiling.
+      const livePolicy = resolveCashAllocationPolicy({
+        regime: effectiveRegime.regime,
+        riskLevel: portfolio.risk_level,
+        totalValue,
+        holdingsValue: currentHoldingsValue,
+        cashFloorPct: configuredCashFloorPct,
+        portfolioDrawdownPct: ddSizing.drawdown_pct,
+        maxDrawdownHaltPct: cfg.max_drawdown_halt_pct,
+        indexDrawdownPct: effectiveRegime.signals.spy_drawdown_pct,
+        targetOverridePct: cfg.target_invested_pct,
+        enabled: cfg.cash_policy_enabled,
+      });
+      if (livePolicy.enabled) {
+        if (livePolicy.deployableValue <= 0) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `cash policy: invested ${(livePolicy.investedPct * 100).toFixed(0)}% at/above the ${(livePolicy.maxInvestedPct * 100).toFixed(0)}% ceiling for ${effectiveRegime.regime}`,
+          });
+          continue;
+        }
+        if (livePolicy.deploymentScale !== 1) {
+          spend *= livePolicy.deploymentScale;
+          sizingNotes.push(
+            `cash-policy ${livePolicy.state} ×${livePolicy.deploymentScale.toFixed(2)} (target ${(livePolicy.targetInvestedPct * 100).toFixed(0)}% invested)`,
+          );
+        }
+        if (spend > livePolicy.deployableValue) {
+          spend = livePolicy.deployableValue;
+          sizingNotes.push(`invested≤${(livePolicy.maxInvestedPct * 100).toFixed(0)}%`);
+        }
+        // A deployment boost may never spend cash we do not have, and never
+        // eats into the (already policy-adjusted) cash floor.
+        spend = Math.min(spend, Math.max(0, workingCash - cashFloor));
+
+      }
+
 
 
       // Enforce per-symbol position cap
@@ -2436,6 +2510,22 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         cash_floor_pct: cashFloorPctEff,
         max_new_positions_per_day: risk.maxNewPositionsPerDay,
         cash_floor_value: cashFloor,
+        cash_policy: {
+          enabled: cashPolicy.enabled,
+          regime: cashPolicy.regime,
+          invested_pct: cashPolicy.investedPct,
+          min_invested_pct: cashPolicy.minInvestedPct,
+          target_invested_pct: cashPolicy.targetInvestedPct,
+          max_invested_pct: cashPolicy.maxInvestedPct,
+          state: cashPolicy.state,
+          deployment_scale: cashPolicy.deploymentScale,
+          deployable_value: cashPolicy.deployableValue,
+          trim_value: cashPolicy.trimValue,
+          drawdown_taper: cashPolicy.drawdownTaper,
+          configured_cash_floor_pct: configuredCashFloorPct,
+          note: cashPolicy.note,
+        },
+
         max_position_value: maxPosVal,
         starting_total_value: totalValue,
         starting_cash: cash,

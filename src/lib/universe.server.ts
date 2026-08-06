@@ -271,6 +271,14 @@ export type RiskConfig = {
   trading_style: "position" | "swing";
   /** Swing only: minimum sessions to hold before a discretionary sell. */
   swing_min_hold_days: number;
+  // Explicit cash-allocation policy (see src/lib/cash-allocation-policy.ts).
+  // When enabled, a regime-derived TARGET invested % keeps the book from
+  // drifting nearly flat in bull tapes, and caps it in defensive regimes.
+  // Always subordinate to the drawdown budget and the per-symbol caps.
+  cash_policy_enabled: boolean;
+  /** Optional user target invested share of NAV (0..1). null = regime table. */
+  target_invested_pct: number | null;
+
 };
 
 
@@ -349,6 +357,9 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   fx_currency_limits: {},
   trading_style: "position",
   swing_min_hold_days: 2,
+  cash_policy_enabled: true,
+  target_invested_pct: null,
+
 
 };
 
@@ -475,6 +486,15 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   out.trading_style = style;
   num("swing_min_hold_days", 0, 30);
   bool("alpha_bonus_enabled");
+  bool("cash_policy_enabled");
+  // Explicit `null` clears the user target and reverts to the regime table.
+  if (r.target_invested_pct === null) {
+    out.target_invested_pct = null;
+  } else if (r.target_invested_pct !== undefined) {
+    const n = Number(r.target_invested_pct);
+    out.target_invested_pct = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+  }
+
   num("alpha_bonus_cap", 1, 3);
   bool("risk_parity_enabled");
   num("risk_parity_nav_cap", 0.01, 1);

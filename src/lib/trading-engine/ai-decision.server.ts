@@ -52,6 +52,9 @@ export async function callAiForDecision(args: {
   alphaPriors?: string | null;
   cryptoSignalsBlock?: string | null;
   algoRegimeBlock?: string | null;
+  /** Explicit target-exposure block from the cash-allocation policy. */
+  cashPolicyBlock?: string | null;
+
 
 
 
@@ -157,6 +160,9 @@ ${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 ${args.alphaPriors ?? ""}
 ${args.algoRegimeBlock ?? ""}
+
+${args.cashPolicyBlock ?? ""}
+
 
 ${HISTORICAL_PLAYBOOK}
 
