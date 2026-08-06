@@ -909,6 +909,14 @@ export function summariseRegime(
 
 export type RegimeReport = {
   summaries: RegimeSummary[];
+  /**
+   * Per-regime decomposition of what trading cost, split train vs
+   * out-of-sample and by axis, so a failing regime can be diagnosed as a
+   * cost problem (and which cost) rather than only as a signal problem.
+   * Regimes with no windows appear with zeroed entries, mirroring
+   * `summaries` so the two tables line up row for row.
+   */
+  costs: RegimeCostSummary[];
   /** Regimes with at least one out-of-sample window. */
   covered: RegimeLabel[];
   /** Regimes that failed the gate. */
@@ -933,10 +941,26 @@ export function buildRegimeReport(
   const worstDrawdownPct = results.length
     ? Math.min(...results.map((r) => -Math.abs(r.maxDrawdownPct)))
     : 0;
+  // Only windows carrying an attribution can be decomposed; the rest are
+  // simply absent from the cost table rather than counted as zero-cost.
+  const costs = buildRegimeCostReport(
+    results
+      .filter((r): r is WindowResult & { costs: WindowCosts } => r.costs !== undefined)
+      .map((r) => ({ regime: r.regime, netCagrPct: r.netCagrPct, costs: r.costs })),
+  );
   const verdict: RegimeReport["verdict"] =
     failed.length === 0 ? "stable" : failed.length < scored.length ? "regime-dependent" : "unstable";
-  return { summaries, covered, failed, cagrDispersionPct: dispersion, worstDrawdownPct, verdict };
+  return {
+    summaries,
+    costs,
+    covered,
+    failed,
+    cagrDispersionPct: dispersion,
+    worstDrawdownPct,
+    verdict,
+  };
 }
+
 
 // ---------------------------------------------------------------- output
 
