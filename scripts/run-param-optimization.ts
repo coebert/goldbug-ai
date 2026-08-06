@@ -338,17 +338,21 @@ const panels: ReportPanel[] = [
     series: [],
     table: {
       columns: ["rank", "CAGR %", "DD %", "sharpe", "turnover/yr", "fees %", "cash %", "status", "params"],
-      rows: ranked.slice(0, 15).map((r, i) => [
-        String(i + 1),
-        r.metrics.cagrPct.toFixed(2),
-        r.metrics.maxDrawdownPct.toFixed(1),
-        r.metrics.sharpe.toFixed(2),
-        r.metrics.tradesPerYear.toFixed(0),
-        r.metrics.feeDragPct.toFixed(1),
-        r.metrics.finalCashPct.toFixed(0),
-        r.check.disqualified ? "disqualified" : r.check.feasible ? "ok" : r.check.violations.join("; "),
-        formatParams(r.params),
-      ]),
+      rows: ranked.slice(0, 40).map((r, i) => ({
+        tags: paramTags(r.params, riskLevel),
+        cells: [
+          String(i + 1),
+          r.metrics.cagrPct.toFixed(2),
+          r.metrics.maxDrawdownPct.toFixed(1),
+          r.metrics.sharpe.toFixed(2),
+          r.metrics.tradesPerYear.toFixed(0),
+          r.metrics.feeDragPct.toFixed(1),
+          r.metrics.finalCashPct.toFixed(0),
+          r.check.disqualified ? "disqualified" : r.check.feasible ? "ok" : r.check.violations.join("; "),
+          formatParams(r.params),
+        ],
+      })),
+
     },
   },
   {
