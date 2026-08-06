@@ -8,6 +8,13 @@
 // Pure and client-safe — no recharts, no DOM. The rendering shapes live in
 // `src/components/charts/trade-markers.tsx`.
 
+import {
+  computeCommission,
+  type CommissionBreakdown,
+  type CommissionInput,
+  type CommissionModel,
+} from "./commission-model";
+
 export type MarkerTrade = {
   symbol: string;
   side: "buy" | "sell";
