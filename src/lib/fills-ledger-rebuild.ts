@@ -46,14 +46,21 @@ export function closeOnOrBefore(
  * Price a fill in portfolio base units. Falls back to the cached close for the
  * fill date when the broker gave us no price. Returns 0 when nothing is known,
  * so callers can drop the row rather than write a bogus notional.
+ *
+ * `fill_price` is stored in the instrument's settlement currency — both write
+ * paths now run through `resolveFillRecord`, and the fill-unit backfill has
+ * re-normalised the history. Folding it again here would divide correct
+ * pounds by 100, so only the raw `price_cache` fallback is normalised.
  */
 export function resolveFillPrice(fill: FillLite, closes: CloseLookup): number {
   const raw = Number(fill.fill_price ?? 0);
+  if (Number.isFinite(raw) && raw > 0) return raw;
   const day = (fill.filled_at ?? "").slice(0, 10);
-  const source = Number.isFinite(raw) && raw > 0 ? raw : (closeOnOrBefore(closes, fill.symbol, day) ?? 0);
-  if (!(source > 0)) return 0;
-  return normalizeMarketPriceForTrading(fill.symbol, source);
+  const close = closeOnOrBefore(closes, fill.symbol, day) ?? 0;
+  if (!(close > 0)) return 0;
+  return normalizeMarketPriceForTrading(fill.symbol, close);
 }
+
 
 export type LedgerPosition = { symbol: string; quantity: number; avgCost: number };
 

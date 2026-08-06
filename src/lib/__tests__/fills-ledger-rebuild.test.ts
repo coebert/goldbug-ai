@@ -34,13 +34,20 @@ describe("resolveFillPrice", () => {
     expect(resolveFillPrice(fill({ symbol: "V", quantity: 234 }), closes)).toBeCloseTo(362.53, 6);
   });
 
-  it("folds LSE quotes from GBX to GBP for both recorded and cached prices", () => {
-    expect(resolveFillPrice(fill({ symbol: "SGLN.L", fill_price: 5872.31 }), closes)).toBeCloseTo(
+  it("trusts the stored fill price as-is — it is already in base units", () => {
+    // Both write paths resolve through `resolveFillRecord`, and the
+    // fill-unit backfill re-normalised the history, so folding here would
+    // divide correct pounds by 100 a second time.
+    expect(resolveFillPrice(fill({ symbol: "SGLN.L", fill_price: 58.7231 }), closes)).toBeCloseTo(
       58.7231,
       6,
     );
+  });
+
+  it("folds the cached-close fallback from GBX to GBP", () => {
     expect(resolveFillPrice(fill({ symbol: "SGLN.L" }), closes)).toBeCloseTo(59.4, 6);
   });
+
 
   it("returns 0 when neither a fill price nor a cached close exists", () => {
     expect(resolveFillPrice(fill({ symbol: "JNJ" }), closes)).toBe(0);
