@@ -229,7 +229,7 @@ describe("calibrateRegimeConfidence", () => {
     for (const bin of res.after.bins) {
       if (!bin.n || bin.accuracy === null || bin.meanStated === null) continue;
       // After calibration each bucket's stated level tracks its hit-rate.
-      expect(Math.abs(bin.accuracy - bin.meanStated)).toBeLessThan 0.2;
+      expect(Math.abs(bin.accuracy - bin.meanStated)).toBeLessThan(0.2);
     }
   });
 
