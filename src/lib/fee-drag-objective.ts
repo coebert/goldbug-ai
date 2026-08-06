@@ -142,6 +142,60 @@ export function avoidableDragPct(b: FeeDragBreakdown, years?: number): number {
   return annualiseFeeDragPct(b.minFeePct + b.slippagePct, years);
 }
 
+/** One executed fill, as the drag estimator needs it. */
+export type FeeDragFill = { notional: number; fee: number; side: "BUY" | "SELL" };
+
+/** The friction knobs the estimator can attribute drag to. */
+export type FeeDragFrictions = {
+  commissionBps?: number;
+  minCommission?: number;
+  slippageBps?: number;
+  buyTaxBps?: number;
+};
+
+/**
+ * Split realised trading costs into commission / minimum-fee / slippage /
+ * other, as % of starting equity.
+ *
+ * The simulator books commission and tax into `fee` and folds slippage into
+ * the fill price, so slippage has to be reconstructed from the configured
+ * rate. The minimum-fee component is whatever the booked commission exceeded
+ * the pure bps rate by — i.e. the part a bigger ticket would have absorbed
+ * for free, which is the single most actionable cost axis for a small account.
+ */
+export function estimateFeeDrag(
+  fills: readonly FeeDragFill[],
+  frictions: FeeDragFrictions | undefined,
+  startingCash: number,
+): FeeDragBreakdown {
+  if (!(startingCash > 0)) return EMPTY_FEE_DRAG;
+  const commissionRate = (frictions?.commissionBps ?? 0) / 10_000;
+  const slipRate = (frictions?.slippageBps ?? 0) / 10_000;
+  const taxRate = (frictions?.buyTaxBps ?? 0) / 10_000;
+
+  let commission = 0;
+  let minFee = 0;
+  let slippage = 0;
+  let other = 0;
+  for (const f of fills) {
+    const notional = Math.abs(f.notional);
+    const tax = f.side === "BUY" ? notional * taxRate : 0;
+    const booked = Math.max(0, f.fee - tax);
+    const ratePart = Math.min(booked, notional * commissionRate);
+    commission += booked;
+    minFee += booked - ratePart;
+    slippage += notional * slipRate;
+    other += tax;
+  }
+  const pct = (x: number) => (x / startingCash) * 100;
+  return {
+    commissionPct: pct(commission),
+    minFeePct: pct(minFee),
+    slippagePct: pct(slippage),
+    otherPct: pct(other),
+  };
+}
+
 /** Human-readable one-liner for reports and CLI output. */
 export function formatFeeDrag(b: FeeDragBreakdown, years?: number): string {
   const a = (x: number) => annualiseFeeDragPct(x, years).toFixed(2);

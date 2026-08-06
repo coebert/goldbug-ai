@@ -24,6 +24,7 @@ import {
   feeAdjustedCagr,
   feeEfficiency,
   NET_CAGR_OBJECTIVE,
+  totalFeeDragPct,
   type FeeDragBreakdown,
   type OptimizerObjective,
 } from "./fee-drag-objective";
@@ -135,9 +136,14 @@ export type CandidateMetrics = {
   audit?: RunAudit;
 };
 
-/** Annualised fee drag for a candidate, falling back to the whole-run figure. */
+/**
+ * Annualised total fee drag for a candidate. When a breakdown is available it
+ * wins, because `feeDragPct` only counts what the simulator booked as a fee —
+ * slippage is hidden inside the fill price and would otherwise be free.
+ */
 export function annualFeeDrag(m: CandidateMetrics): number {
-  return annualiseFeeDragPct(m.feeDragPct, m.years);
+  const total = m.feeDrag ? totalFeeDragPct(m.feeDrag) : m.feeDragPct;
+  return annualiseFeeDragPct(total, m.years);
 }
 
 export type OptimizerConstraints = {
