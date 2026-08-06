@@ -558,6 +558,34 @@ export async function runStyleBacktest(args: {
   };
 
 
+  const tradeLog: StyleTradeRow[] = result.snapshots
+    .filter((s) => s.fillQuantity > 0)
+    .map((s) => ({
+      date: s.date,
+      side: s.side === "BUY" ? ("buy" as const) : ("sell" as const),
+      symbol: s.symbol,
+      quantity: s.fillQuantity,
+      price: s.fillPrice,
+      fee: s.fee || 0,
+    }));
+
+  const feeDragPct =
+    (result.snapshots.reduce((sum, s) => sum + (s.fee || 0), 0) / startingCash) * 100;
+  const feeDrag = estimateFeeDrag(
+    fillsFromTradeLog(tradeLog),
+    args.simulator?.frictions,
+    startingCash,
+  );
+  // Fee drag is the one cost the optimiser is allowed to optimise against, so
+  // the breakdown it ranks on must provably come from the fills that executed.
+  const feeDragAudit = auditFeeDrag({
+    rows: tradeLog,
+    frictions: args.simulator?.frictions,
+    startingCash,
+    reported: feeDrag,
+    reportedFeeDragPct: feeDragPct,
+  });
+
   return {
     riskLevel,
     bars: bars.length,
@@ -578,36 +606,19 @@ export async function runStyleBacktest(args: {
         ? holdBarsClosed.reduce((a, b) => a + b, 0) / holdBarsClosed.length
         : 0,
     tradesPerYear: years > 0 ? (buys + sells) / years : 0,
-    feeDragPct: (result.snapshots.reduce((sum, s) => sum + (s.fee || 0), 0) / startingCash) * 100,
+    feeDragPct,
     years,
-    feeDrag: estimateFeeDrag(
-      result.snapshots
-        .filter((s) => s.fillQuantity > 0)
-        .map((s) => ({
-          notional: s.fillQuantity * s.fillPrice,
-          fee: s.fee || 0,
-          side: s.side === "BUY" ? ("BUY" as const) : ("SELL" as const),
-        })),
-      args.simulator?.frictions,
-      startingCash,
-    ),
+    feeDrag,
+    feeDragAudit,
     finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
     exitMix,
     audit,
 
     equityCurve: equity,
-    tradeLog: result.snapshots
-      .filter((s) => s.fillQuantity > 0)
-      .map((s) => ({
-        date: s.date,
-        side: s.side === "BUY" ? ("buy" as const) : ("sell" as const),
-        symbol: s.symbol,
-        quantity: s.fillQuantity,
-        price: s.fillPrice,
-        fee: s.fee || 0,
-      })),
+    tradeLog,
   };
 }
+
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
