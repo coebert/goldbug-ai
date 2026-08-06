@@ -28,6 +28,17 @@ import { computeMaxDrawdown, computeSharpe, dailyReturns, type EquityPoint } fro
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import { buildCostReturnPanels } from "../src/lib/cost-return-chart";
 import {
+  attributeFrontierFailures,
+  attributionTableRows,
+  examplePeriodRows,
+  formatAttributionTable,
+  pairRoundTrips,
+  summariseAttribution,
+  worstCostPeriods,
+  ATTRIBUTION_COLUMNS,
+  EXAMPLE_PERIOD_COLUMNS,
+} from "../src/lib/cost-axis-attribution";
+import {
   formatRobustnessTable,
   gridWidth,
   rankRobustness,
@@ -219,6 +230,49 @@ console.log(
 console.log(formatRobustnessTable(robustness));
 console.log(`\n${summariseRobustness(robustness)}`);
 
+// ------------------------------------------------- cost-axis attribution
+// Which axis actually breaks the viability frontier: execution cost
+// (slippage/spread) or commission (rate + per-ticket minimum)?
+const attributionZero = attributeFrontierFailures(cells, {
+  baseFrictions: BASE_FRICTIONS,
+  startingCash,
+  target: "zero",
+});
+const attributionBench = attributeFrontierFailures(cells, {
+  baseFrictions: BASE_FRICTIONS,
+  startingCash,
+  target: "benchmark",
+});
+console.log("\nCost-axis attribution (vs zero return):");
+console.log(summariseAttribution(attributionZero));
+if (attributionZero.failures > 0) console.log(formatAttributionTable(attributionZero));
+console.log("\nCost-axis attribution (vs buy & hold):");
+console.log(summariseAttribution(attributionBench));
+
+// Example trade periods drawn from the worst failing cell, so the report
+// shows concrete dates where costs did the damage.
+const worstFailure = attributionZero.rows[0];
+let examples: ReturnType<typeof worstCostPeriods> = [];
+let exampleContext = "";
+if (worstFailure) {
+  const match = cells.find(
+    (c) =>
+      c.riskLevel === worstFailure.riskLevel
+      && c.style === worstFailure.style
+      && c.ticket.label === worstFailure.ticketLabel
+      && c.scenario.label === worstFailure.scenarioLabel,
+  );
+  if (match) {
+    const ckey = `${match.riskLevel}|${match.style}|${match.ticket.label}|${scenarioKey(match.scenario)}`;
+    const trips = pairRoundTrips(tradeLogs.get(ckey) ?? [], match.scenario.frictions);
+    examples = worstCostPeriods(trips, 10);
+    exampleContext =
+      `${match.riskLevel} · ${match.style} · ticket ${match.ticket.label} · ${match.scenario.label}`;
+    console.log(`\nExample cost-damaged trade periods (${exampleContext}):`);
+    for (const row of examplePeriodRows(examples)) console.log(`  ${row.join("  ")}`);
+  }
+}
+
 // ---------------------------------------------------------------- report
 const COLOURS = ["#39d98a", "#4ea1ff", "#f5a623", "#e5484d", "#a78bfa", "#9aa4b2"];
 const panels: ReportPanel[] = [];
@@ -297,6 +351,38 @@ panels.unshift({
   },
 });
 
+
+if (examples.length > 0) {
+  panels.unshift({
+    heading: "Example cost-damaged trade periods",
+    subtitle: `worst failing cell: ${exampleContext} — FIFO round trips ranked by cost damage`,
+    series: [],
+    table: {
+      columns: [...EXAMPLE_PERIOD_COLUMNS],
+      rows: examplePeriodRows(examples),
+    },
+  });
+}
+
+panels.unshift({
+  heading: "Cost-axis attribution (vs buy & hold)",
+  subtitle: summariseAttribution(attributionBench),
+  series: [],
+  table: {
+    columns: [...ATTRIBUTION_COLUMNS],
+    rows: attributionTableRows(attributionBench, 40),
+  },
+});
+
+panels.unshift({
+  heading: "Cost-axis attribution (vs zero return)",
+  subtitle: summariseAttribution(attributionZero),
+  series: [],
+  table: {
+    columns: [...ATTRIBUTION_COLUMNS],
+    rows: attributionTableRows(attributionZero, 40),
+  },
+});
 
 mkdirSync("reports", { recursive: true });
 const outPath = "reports/cost-sweep.html";
