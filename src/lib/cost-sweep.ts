@@ -148,10 +148,14 @@ export function applyMinCommission(base: Frictions, minCommission: number): Fric
 }
 
 /**
- * Full cost grid: commission scale × slippage spec × minimum fee.
- * The commission scale still multiplies every baseline term, but the
- * slippage and minimum-fee overrides are applied afterwards so those two
- * axes are exactly the values requested rather than scaled derivatives.
+ * Full cost grid: commission scale × slippage spec × minimum fee ×
+ * liquidity. The commission scale still multiplies every baseline term,
+ * but the slippage, minimum-fee and liquidity overrides are applied
+ * afterwards so those axes are exactly the values requested rather than
+ * scaled derivatives.
+ *
+ * A liquidity axis requires `liquidityProfile`; when present it replaces
+ * the flat slippage terms with the participation-aware model.
  */
 export function buildCostGrid(
   base: Frictions,
@@ -159,37 +163,54 @@ export function buildCostGrid(
     scales: number[];
     slippage?: SlippageSpec[];
     minCommission?: number[];
+    liquidity?: LiquiditySpec[];
+    liquidityProfile?: LiquidityProfile;
   },
 ): CostScenario[] {
   const slippages = opts.slippage?.length ? opts.slippage : [null];
   const minFees = opts.minCommission?.length ? opts.minCommission : [null];
+  const liquidities = opts.liquidity?.length ? opts.liquidity : [null];
+  if (opts.liquidity?.length && !opts.liquidityProfile) {
+    throw new Error("buildCostGrid: liquidity axis requires a liquidityProfile");
+  }
   const out: CostScenario[] = [];
   for (const scale of opts.scales) {
     for (const spec of slippages) {
       for (const minFee of minFees) {
-        let frictions = scaleFrictions(base, scale);
-        if (spec) frictions = applySlippage(frictions, spec);
-        if (minFee !== null) frictions = applyMinCommission(frictions, minFee);
-        const parts = [scale === 1 ? "baseline" : `${(scale * 100).toFixed(0)}% cost`];
-        if (spec) parts.push(spec.label);
-        if (minFee !== null) parts.push(`min £${minFee}`);
-        out.push({
-          label: parts.join(" · "),
-          scale,
-          frictions,
-          ...(spec ? { slippage: spec } : {}),
-          ...(minFee !== null ? { minCommission: minFee } : {}),
-        });
+        for (const liq of liquidities) {
+          let frictions = scaleFrictions(base, scale);
+          if (spec) frictions = applySlippage(frictions, spec);
+          if (minFee !== null) frictions = applyMinCommission(frictions, minFee);
+          if (liq) frictions = applyLiquidity(frictions, liq, opts.liquidityProfile!);
+          const parts = [scale === 1 ? "baseline" : `${(scale * 100).toFixed(0)}% cost`];
+          if (spec) parts.push(spec.label);
+          if (minFee !== null) parts.push(`min £${minFee}`);
+          if (liq) parts.push(liq.label);
+          out.push({
+            label: parts.join(" · "),
+            scale,
+            frictions,
+            ...(spec ? { slippage: spec } : {}),
+            ...(minFee !== null ? { minCommission: minFee } : {}),
+            ...(liq ? { liquidity: liq } : {}),
+          });
+        }
       }
     }
   }
   return out;
 }
 
-/** Stable identity for a scenario, safe as a map key across all three axes. */
+/** Stable identity for a scenario, safe as a map key across all four axes. */
 export function scenarioKey(sc: CostScenario): string {
-  return [sc.scale, sc.slippage?.label ?? "-", sc.minCommission ?? "-"].join("|");
+  return [
+    sc.scale,
+    sc.slippage?.label ?? "-",
+    sc.minCommission ?? "-",
+    sc.liquidity?.label ?? "-",
+  ].join("|");
 }
+
 
 
 /**
