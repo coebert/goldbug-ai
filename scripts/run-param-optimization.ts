@@ -537,17 +537,21 @@ panels.push(
       rows: viability.levels
         .flatMap((l) => l.flagged)
         .sort((a, b) => a.returnMarginPct - b.returnMarginPct)
-        .slice(0, 25)
-        .map((a) => [
-          a.riskLevel,
-          VERDICT_LABEL[a.verdict],
-          a.metrics.cagrPct.toFixed(2),
-          a.metrics.tradesPerYear.toFixed(0),
-          a.turnoverHeadroom === null ? "—" : a.turnoverHeadroom.toFixed(0),
-          a.returnMarginPct.toFixed(2),
-          a.reasons[0] ?? "",
-          a.id,
-        ]),
+        .slice(0, 60)
+        .map((a) => ({
+          tags: paramTags(a.params as { [k: string]: unknown }, a.riskLevel),
+          cells: [
+            a.riskLevel,
+            VERDICT_LABEL[a.verdict],
+            a.metrics.cagrPct.toFixed(2),
+            a.metrics.tradesPerYear.toFixed(0),
+            a.turnoverHeadroom === null ? "—" : a.turnoverHeadroom.toFixed(0),
+            a.returnMarginPct.toFixed(2),
+            a.reasons[0] ?? "",
+            a.id,
+          ],
+        })),
+
     },
   },
 );
