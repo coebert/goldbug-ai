@@ -131,6 +131,11 @@ import {
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { cached } from "./market-context-cache.server";
 import { computePortfolioDrawdownSizing, grossExposureLimit } from "./portfolio-drawdown.server";
+import {
+  resolveCashAllocationPolicy,
+  formatCashAllocationBlock,
+} from "./cash-allocation-policy";
+
 import { computeRebalanceTrims } from "./rebalance-bands.server";
 import { refreshSectorScores, sectorSizeMultiplier, symbolSector } from "./sector-rotation.server";
 import { updateSignalPerformance } from "./signal-decay.server";
