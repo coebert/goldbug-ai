@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   readCachedTradingMode,
+  resolveTradingMode,
   styleFromRiskConfig,
   writeCachedTradingMode,
   TRADING_MODE_EVENT,
