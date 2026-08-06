@@ -1971,7 +1971,7 @@ function PortfolioPage() {
                 )}
 
                 <div className="mt-6">
-                  <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} />
+                  <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} equity={totalValue} currency={p.currency} />
                 </div>
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -1983,7 +1983,7 @@ function PortfolioPage() {
               </TabsContent>
 
               <TabsContent value="risk" className="mt-4 space-y-4">
-                <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} />
+                <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} equity={totalValue} currency={p.currency} />
                 <RiskControlsCard
                   portfolioId={id}
                   riskConfig={p.risk_config}

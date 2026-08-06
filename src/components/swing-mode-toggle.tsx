@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Activity, Loader2, Timer } from "lucide-react";
+import { Activity, AlertTriangle, Loader2, Timer } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { updateRiskConfig } from "@/lib/trading.functions";
 import { SWING_DIAL_OVERRIDES } from "@/lib/risk-presets";
 import { qk } from "@/lib/query-keys";
+import { assessSwingViability } from "@/lib/swing-viability";
 
 /**
  * Always-visible on/off switch for swing trading.
@@ -22,9 +23,14 @@ import { qk } from "@/lib/query-keys";
 export function SwingModeToggle({
   portfolioId,
   riskConfig,
+  equity,
+  currency,
 }: {
   portfolioId: string;
   riskConfig: unknown;
+  /** Total portfolio equity — used to check swing is economically worth it. */
+  equity?: number;
+  currency?: string | null;
 }) {
   const cfg = (riskConfig ?? {}) as Record<string, unknown>;
   const serverActive = cfg["trading_style"] === "swing";
@@ -35,6 +41,18 @@ export function SwingModeToggle({
   useEffect(() => {
     setActive(serverActive);
   }, [serverActive]);
+
+  // Viability: the engine downgrades swing to position whenever a typical
+  // ticket cannot pay its own round-trip costs, so surface that here too.
+  const perSymbolPct = (() => {
+    const raw = Number(cfg["max_position_pct"] ?? cfg["per_symbol_pct"] ?? 0.2);
+    return Number.isFinite(raw) && raw > 0 ? Math.min(1, raw) : 0.2;
+  })();
+  const viability =
+    equity != null && Number.isFinite(equity) && equity > 0
+      ? assessSwingViability({ equity, perSymbolPct, currency: currency ?? "GBP" })
+      : null;
+  const blocked = viability != null && !viability.viable;
 
   const qc = useQueryClient();
   const save = useServerFn(updateRiskConfig);
@@ -94,6 +112,21 @@ export function SwingModeToggle({
               ? "Holding days to weeks: 6% stop, 12% target, 10-day time stop, 2-session minimum hold, fast re-entry."
               : "Position trading: months-long holds with wider stops and slower turnover. Turn on to trade the short horizon."}
           </p>
+          {blocked && viability && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-500">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                {active
+                  ? "Swing is switched on but the engine is running position trades: "
+                  : "Swing is not financially viable right now: "}
+                a {Math.round(viability.ticket).toLocaleString("en-GB")} {viability.currency} ticket
+                costs {viability.roundTripBps.toFixed(0)}bps per round trip against a{" "}
+                {viability.budgetBps.toFixed(0)}bps cost budget. Viable from about{" "}
+                {Math.round(viability.minViableTicket).toLocaleString("en-GB")} {viability.currency}{" "}
+                per position.
+              </span>
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span className="text-xs text-muted-foreground sm:hidden">

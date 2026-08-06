@@ -118,6 +118,7 @@ import {
   type UniverseSymbol,
 } from "./universe.server";
 import { minHoldDays } from "./trading-style";
+import { applySwingViabilityGate } from "./swing-viability";
 import {
   detectAndPersistRegime,
   regimeDescription,
@@ -643,12 +644,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   const tightened = tightenForRegime(baseCfg, portfolio.risk_level, effectiveRegime);
 
-  const cfg = tightened.cfg;
+  // SWING VIABILITY GATE — swing only stays on while a typical ticket can pay
+  // its own round-trip costs (commission floor + spread/slippage + stamp duty)
+  // out of the edge a days-to-weeks hold can realistically capture. Otherwise
+  // the engine reverts to the position profile for this tick.
+  const swingGate = applySwingViabilityGate(tightened.cfg, {
+    equity: totalValue,
+    perSymbolPct: tightened.per_symbol_effective_pct,
+    currency: (portfolio as unknown as { base_currency?: string | null }).base_currency ?? "GBP",
+  });
+  if (swingGate.downgraded) {
+    srvLog.warn(`[swing-gate] ${portfolio.id}: ${swingGate.viability?.reason ?? "downgraded"}`);
+  }
+  const cfg = swingGate.cfg;
   // Risk dial (1..5) → position sizing + per-side trade aggressiveness.
   const aggression = resolveAggressiveness(portfolio.risk_config);
   const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
   const cashFloor = totalValue * cashFloorPctEff;
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
+
 
   // Learned drawdown sizing: the 20-year study measured the forward return
   // from each depth below the index high. Deep holes historically needed a
