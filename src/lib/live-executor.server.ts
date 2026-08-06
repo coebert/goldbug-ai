@@ -9,6 +9,8 @@
 import type { BrokerOrderResult } from "@/lib/brokers/adapter";
 import { asJson } from "@/lib/_server/db-json";
 import { createHash } from "node:crypto";
+import { assessTradeViability } from "@/lib/trade-viability-gate";
+
 
 export interface ExecutedOrderLike {
   symbol: string;
