@@ -1,3 +1,5 @@
+import { sparklineDomain } from "@/lib/sparkline-scale";
+
 interface SparklineProps {
   values: number[];
   width?: number;
@@ -11,6 +13,12 @@ interface SparklineProps {
   stretch?: boolean;
   /** Optional accessible label describing the series. */
   label?: string;
+  /**
+   * Explicit y-domain. Supplied by callers that also print axis labels, so the
+   * drawn line and the printed numbers cannot disagree. Defaults to the
+   * shared padded/nice domain from `sparklineDomain`.
+   */
+  domain?: { min: number; max: number };
 }
 
 /**
@@ -24,6 +32,7 @@ export function Sparkline({
   className,
   stretch = false,
   label,
+  domain,
 }: SparklineProps) {
   const clean = values.filter((v) => Number.isFinite(v));
   if (clean.length < 2) {
@@ -35,8 +44,9 @@ export function Sparkline({
       />
     );
   }
-  const min = Math.min(...clean);
-  const max = Math.max(...clean);
+  const scale = domain ?? sparklineDomain(clean);
+  const min = scale.min;
+  const max = scale.max;
   const span = max - min || 1;
   const stepX = width / (clean.length - 1);
   const points = clean.map((v, i) => {
