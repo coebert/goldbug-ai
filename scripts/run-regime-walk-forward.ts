@@ -17,10 +17,12 @@ import {
   annualisedPct,
   benchmarkIndex,
   buildRegimeReport,
-  classifyRegimes,
+  classifyRegimeBars,
   curveCagrPct,
   curveMaxDrawdownPct,
-  dominantRegime,
+  dominantRegimeWeighted,
+  regimeCoverage,
+
   formatRegimeTable,
   formatWindowTable,
   regimeTableRows,
@@ -89,12 +91,31 @@ const tape = buildRealTape(histories, { mode, from, to });
 console.log(`Tape: ${tape.bars.length} bars, ${tape.symbols.length} symbols (mode=${mode}).`);
 
 const index = benchmarkIndex(tape.bars);
-const labels = classifyRegimes(index);
+const regimeBars = classifyRegimeBars(index, {
+  bullAnnualPct: Number(arg("bull-annual", "10")),
+  bearAnnualPct: Number(arg("bear-annual", "-10")),
+  bearDrawdownPct: Number(arg("bear-dd", "15")),
+  sidewaysBandPct: Number(arg("sideways-band", "6")),
+  sidewaysRangePct: Number(arg("sideways-range", "8")),
+  minTrendR2: Number(arg("min-r2", "0.35")),
+});
+const labels = regimeBars.map((b) => b.label);
+const coverage = regimeCoverage(regimeBars);
+console.log("\nRegime coverage (per bar):");
+for (const r of ["bull", "bear", "sideways"] as const) {
+  console.log(
+    `  ${r.padEnd(8)} ${String(coverage[r].bars).padStart(5)} bars  ` +
+      `${(coverage[r].share * 100).toFixed(1).padStart(5)}%  ` +
+      `mean confidence ${(coverage[r].meanConfidence * 100).toFixed(0)}%`,
+  );
+}
+
 const segments = segmentRegimes(index, labels);
 console.log(`\nRegime segments (${segments.length}):`);
 for (const s of segments) {
   console.log(`  ${s.label.padEnd(8)} ${s.from} → ${s.to}  (${s.bars} bars)`);
 }
+
 
 const windows = walkForwardWindows(tape.bars.length, { trainBars, testBars, step });
 if (windows.length === 0) throw new Error("history too short for the requested train/test split");
@@ -121,7 +142,10 @@ for (const w of windows) {
   const oosCurve = m.equityCurve.slice(w.testStart - w.trainStart);
   if (oosCurve.length < 2) continue;
 
-  const regime = dominantRegime(labels, w.testStart, w.testEnd);
+  const regime = dominantRegimeWeighted(regimeBars, w.testStart, w.testEnd, {
+    minDirectionalShare: Number(arg("min-share", "0.45")),
+    minConfidence: Number(arg("min-conf", "0.5")),
+  });
   const benchStart = index[w.testStart]!.value;
   const benchEnd = index[w.testEnd - 1]!.value;
   const years = (w.testEnd - w.testStart) / 252;
@@ -130,8 +154,11 @@ for (const w of windows) {
     window: w,
     regime: regime.label,
     purity: regime.purity,
+    confidence: regime.confidence,
+    demoted: regime.demoted,
     from: tape.bars[w.testStart]!.date,
     to: tape.bars[w.testEnd - 1]!.date,
+
     netCagrPct: curveCagrPct(oosCurve),
     maxDrawdownPct: curveMaxDrawdownPct(oosCurve),
     benchmarkCagrPct: annualisedPct(benchStart, benchEnd, w.testEnd - w.testStart - 1),
@@ -143,9 +170,12 @@ for (const w of windows) {
   results.push(row);
   console.log(
     `  #${String(w.index).padStart(2)} ${row.from} → ${row.to}  ${row.regime.padEnd(8)} ` +
+      `conf ${Math.round(regime.confidence * 100).toString().padStart(3)}%` +
+      `${regime.demoted ? "*" : " "} ` +
       `CAGR ${row.netCagrPct.toFixed(1).padStart(7)}%  maxDD ${row.maxDrawdownPct.toFixed(1).padStart(6)}%  ` +
       `bench ${row.benchmarkCagrPct.toFixed(1).padStart(7)}%  trades/yr ${row.tradesPerYear.toFixed(0)}`,
   );
+
 }
 
 const report = buildRegimeReport(results, gate);
