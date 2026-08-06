@@ -36,6 +36,7 @@ import {
   reentryLockoutDays,
 } from "@/lib/exits";
 import { minHoldDays, type TradingStyle } from "@/lib/trading-style";
+import { estimateFeeDrag, type FeeDragBreakdown } from "@/lib/fee-drag-objective";
 import type { PolicyOrder, StylePolicy } from "@/lib/style-policy";
 import type { RiskConfig } from "@/lib/universe.server";
 
@@ -106,6 +107,13 @@ export type StyleRunMetrics = {
   tradesPerYear: number;
   /** Total commission paid as a % of starting equity. */
   feeDragPct: number;
+  /** Run length in years — lets fee drag be compared on an annual basis. */
+  years: number;
+  /**
+   * Commission / minimum-fee / slippage split of the cost of trading, as % of
+   * starting equity. Feeds the fee-efficient optimiser objective.
+   */
+  feeDrag: FeeDragBreakdown;
   finalCashPct: number;
   exitMix: Record<string, number>;
   /**
@@ -564,6 +572,18 @@ export async function runStyleBacktest(args: {
         : 0,
     tradesPerYear: years > 0 ? (buys + sells) / years : 0,
     feeDragPct: (result.snapshots.reduce((sum, s) => sum + (s.fee || 0), 0) / startingCash) * 100,
+    years,
+    feeDrag: estimateFeeDrag(
+      result.snapshots
+        .filter((s) => s.fillQuantity > 0)
+        .map((s) => ({
+          notional: s.fillQuantity * s.fillPrice,
+          fee: s.fee || 0,
+          side: s.side === "BUY" ? ("BUY" as const) : ("SELL" as const),
+        })),
+      args.simulator?.frictions,
+      startingCash,
+    ),
     finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
     exitMix,
     audit,
