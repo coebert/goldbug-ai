@@ -5,6 +5,7 @@ import {
   renderEquityChart,
   toDrawdownPct,
   toReturnPct,
+  buildTradeMarkers,
   type ChartSeries,
 } from "@/lib/backtest-report-chart";
 
@@ -111,6 +112,60 @@ describe("backtest report charts", () => {
     expect((svg.match(/class="dot"/g) ?? []).length).toBe(1);
   });
 
+
+  it("groups fills per bar and drops fills outside the curve", () => {
+    const c = curve(100, 101, 102);
+    const m = buildTradeMarkers(c, [
+      { date: "2026-01-02", side: "buy", symbol: "AAPL", quantity: 10 },
+      { date: "2026-01-02", side: "sell", symbol: "MSFT", quantity: 4 },
+      { date: "2026-01-02", side: "buy", symbol: "NVDA", quantity: 1 },
+      { date: "2030-12-31", side: "buy", symbol: "GHOST", quantity: 1 },
+    ]);
+    expect([...m.keys()]).toEqual([1]);
+    expect(m.get(1)).toMatchObject({ buys: 2, sells: 1 });
+    expect(m.get(1)!.summary).toContain("BUY AAPL ×10");
+    expect(m.get(1)!.summary).toContain("SELL MSFT ×4");
+  });
+
+  it("caps the per-bar summary and counts the overflow", () => {
+    const c = curve(100, 101);
+    const trades = Array.from({ length: 7 }, (_, i) => ({
+      date: "2026-01-01",
+      side: "buy" as const,
+      symbol: `S${i}`,
+      quantity: 1,
+    }));
+    expect(buildTradeMarkers(c, trades).get(0)!.summary).toContain("+3 more");
+  });
+
+  it("overlays buy/sell markers on equity and drawdown charts", () => {
+    const withTrades: ChartSeries = {
+      ...series("ai · swing", [100, 110, 99]),
+      trades: [
+        { date: "2026-01-02", side: "buy", symbol: "AAPL", quantity: 3 },
+        { date: "2026-01-03", side: "sell", symbol: "AAPL", quantity: 3 },
+      ],
+    };
+    for (const svg of [
+      renderEquityChart([withTrades], "Equity"),
+      renderDrawdownChart([withTrades], "Drawdown"),
+    ]) {
+      expect(svg).toContain('class="trade buy"');
+      expect(svg).toContain('class="trade sell"');
+      expect(svg).toContain("BUY AAPL ×3");
+      expect(svg).not.toContain("NaN");
+      const payload = JSON.parse(
+        (svg.match(/data-hover="([^"]+)"/) as RegExpMatchArray)[1]!.replace(/&quot;/g, '"'),
+      );
+      expect(payload.series[0].trades[0]).toBeNull();
+      expect(payload.series[0].trades[1]).toContain("BUY AAPL");
+    }
+  });
+
+  it("omits markers entirely when a series has no fills", () => {
+    const svg = renderEquityChart([series("ai · swing", [100, 101])], "Equity");
+    expect(svg).not.toContain('class="trade');
+  });
 
   it("escapes labels so a hostile series name cannot inject markup", () => {
     const html = renderBacktestReportHtml({

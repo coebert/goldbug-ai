@@ -113,6 +113,17 @@ export type StyleRunMetrics = {
    * per-bar mean across seeds so charts line up with the metric table.
    */
   equityCurve: EquityPoint[];
+  /** Executed fills, one row per filled order, for chart overlays. */
+  tradeLog: StyleTradeRow[];
+};
+
+/** Minimal fill record used to overlay buy/sell markers on report charts. */
+export type StyleTradeRow = {
+  date: string;
+  side: "buy" | "sell";
+  symbol: string;
+  quantity: number;
+  price: number;
 };
 
 
@@ -503,6 +514,15 @@ export async function runStyleBacktest(args: {
     finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
     exitMix,
     equityCurve: equity,
+    tradeLog: result.snapshots
+      .filter((s) => s.fillQuantity > 0)
+      .map((s) => ({
+        date: s.date,
+        side: s.side === "BUY" ? ("buy" as const) : ("sell" as const),
+        symbol: s.symbol,
+        quantity: s.fillQuantity,
+        price: s.fillPrice,
+      })),
   };
 }
 
@@ -553,6 +573,9 @@ export function averageStyleRuns(runs: StyleRunMetrics[]): StyleRunMetrics {
     finalCashPct: pick((m) => m.finalCashPct),
     exitMix,
     equityCurve: averageEquityCurves(runs.map((r) => r.equityCurve)),
+    // Averaged cells show the first seed's fills — markers must line up with
+    // real bar dates, and averaging trade timing across seeds is meaningless.
+    tradeLog: runs[0]?.tradeLog ?? [],
   };
 }
 
