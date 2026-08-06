@@ -348,6 +348,12 @@ export function breakevenGrid(
     const first = series[0]!;
     const tv = ticketValue(opts.startingCash, first.ticket);
     const seriesBase = seriesBaseFrictions(opts.baseFrictions, first.scenario);
+    const fixed = {
+      ...(first.scenario.slippage ? { fixedSlippage: first.scenario.slippage } : {}),
+      ...(first.scenario.minCommission !== undefined
+        ? { fixedMinCommission: first.scenario.minCommission }
+        : {}),
+    };
     out.push({
       ticket: first.ticket,
       style: first.style,
@@ -356,11 +362,16 @@ export function breakevenGrid(
       minCommission: first.scenario.minCommission ?? null,
       ticketValue: tv,
       baselineRoundTripBps: roundTripCostBps(seriesBase, tv),
-      vsZero: findBreakevenScale(series, { baseFrictions: seriesBase, ticketValue: tv }),
+      vsZero: findBreakevenScale(series, {
+        baseFrictions: opts.baseFrictions,
+        ticketValue: tv,
+        ...fixed,
+      }),
       vsBenchmark: findBreakevenScale(series, {
         target: "benchmark",
-        baseFrictions: seriesBase,
+        baseFrictions: opts.baseFrictions,
         ticketValue: tv,
+        ...fixed,
       }),
     });
   }
