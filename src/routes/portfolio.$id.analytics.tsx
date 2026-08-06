@@ -4,6 +4,8 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { PerformanceAnalyticsCard } from "@/components/performance-analytics-card";
 import { IntendedVsExecutedCard } from "@/components/intended-vs-executed-card";
+import { SectorExposureChart } from "@/components/sector-exposure-chart";
+
 
 import { ExecutionQualityCard } from "@/components/execution-quality-card";
 import { AlgoRegimeHistoryCard } from "@/components/algo-regime-history-card";
