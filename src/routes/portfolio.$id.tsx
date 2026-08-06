@@ -1,4 +1,5 @@
 import { ChartFrame } from "@/components/chart-frame";
+import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -2161,7 +2162,9 @@ function PortfolioPage() {
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-3 py-2 font-medium">{t.symbol}</td>
+                                <td className="px-3 py-2 font-medium">
+                                  <SymbolTicker symbol={t.symbol} />
+                                </td>
                                 <td
                                   className={`px-3 py-2 ${t.side === "buy" ? "text-primary" : "text-accent"}`}
                                 >

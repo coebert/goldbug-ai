@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatUk } from "@/lib/uk-time";
+import { SymbolTicker } from "@/components/symbol-ticker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info, TrendingDown as SellIcon, RefreshCw } from "lucide-react";
@@ -539,7 +540,10 @@ export function LiveHoldingsCard({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-semibold tracking-tight">{r.symbol}</span>
+                        <SymbolTicker
+                          symbol={r.symbol}
+                          className="text-base font-semibold tracking-tight"
+                        />
                         {r.asset_class && (
                           <Badge variant="secondary" className="uppercase text-[9px] px-1.5 py-0">
                             {r.asset_class}
