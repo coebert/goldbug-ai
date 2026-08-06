@@ -27,6 +27,7 @@ import {
 import { formatUkDate, formatUkTime } from "@/lib/uk-time";
 import { cn } from "@/lib/utils";
 import { POLL } from "@/lib/query-keys";
+import { SymbolTicker } from "@/components/symbol-ticker";
 
 interface Props {
   portfolioId: string;
@@ -265,7 +266,7 @@ export function TodaysDecisionSummaryCard({ portfolioId, currency }: Props) {
                       <div key={e.symbol} className="flex flex-col gap-1.5 p-2.5 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-mono text-sm font-semibold">{e.symbol}</span>
+                            <SymbolTicker symbol={e.symbol} className="font-mono text-sm font-semibold" />
                             {actionBadge(e.action)}
                             {outcomeBadge(e.outcome)}
                             {e.blockCategory && (

@@ -2161,7 +2161,9 @@ function PortfolioPage() {
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-3 py-2 font-medium">{t.symbol}</td>
+                                <td className="px-3 py-2 font-medium">
+                                  <SymbolTicker symbol={t.symbol} />
+                                </td>
                                 <td
                                   className={`px-3 py-2 ${t.side === "buy" ? "text-primary" : "text-accent"}`}
                                 >
