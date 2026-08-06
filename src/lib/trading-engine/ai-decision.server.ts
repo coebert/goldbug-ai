@@ -173,6 +173,16 @@ ${args.fxSystemBlock ?? ""}
 ${buildDiversificationTiltBlock({ tilt: cfg.diversification_tilt, cfg })}
 
 
+COMPANY FINANCIALS — MANDATORY REVIEW BEFORE ANY EQUITY BUY:
+- The "fund" block on each candidate row carries that company's publicly disclosed financial position: reported margins and returns on capital, revenue and earnings growth, balance-sheet gearing, liquidity and free cash flow, valuation multiples, dividend cover, short interest, published analyst consensus and the next scheduled results date.
+- Never buy a stock on price action, momentum or headlines alone. Read its financials first and say in your rationale what the numbers show — cite at least one concrete figure (e.g. P/E, net margin, revenue growth, debt/equity, free cash flow) for every equity buy.
+- Treat listed RISK items as disclosed facts, not opinions. Loss-making, negative free cash flow, leverage above 2x debt/equity, uncovered dividends or a current ratio below 0.8 each require an explicit, stated reason to buy anyway, and should reduce the size you take.
+- Where fundamentals contradict the technical/sentiment signal, prefer the financials for holding-period decisions and the technicals only for timing.
+- A stretched valuation (very high P/E, PEG or EV/EBITDA versus growth) is a reason to size down or wait, not a reason to chase.
+- "cov" tells you how much the company has disclosed. Low coverage or "-" means unknown, NOT good: do not treat missing financials as clean financials, and prefer names where the numbers are visible.
+- With results due within 5 days ("nxt_results" / "results due" flag), avoid initiating a new position unless the thesis is explicitly event-driven.
+- ETFs, commodities, FX and crypto have no company accounts; "fund -" is expected there and is not a negative.
+
 Style: ${args.portfolio.risk_level} risk. Explain concisely. Prefer inaction if uncertain.
 Prefer high-conviction entries with MULTI-TIMEFRAME confirmation (daily trend AND weekly_trend_up), and be cautious when MACD or Bollinger width disagree with headline sentiment.
 ${args.variantSuffix ? `\n=== VARIANT OVERRIDE ===\n${args.variantSuffix}\n=== END VARIANT ===` : ""}`;

@@ -154,6 +154,8 @@ import type { Database } from "@/integrations/supabase/types";
 
 
 import { classesFromUniverse, buildCandidateFeatures } from "./trading-engine/candidate-features.server";
+import { loadFundamentalsScores } from "./fundamentals/cache.server";
+import type { Fundamentals, FundamentalsScore } from "./fundamentals/types";
 export { classesFromUniverse, buildCandidateFeatures } from "./trading-engine/candidate-features.server";
 import { callAiForDecision } from "./trading-engine/ai-decision.server";
 export { callAiForDecision } from "./trading-engine/ai-decision.server";
@@ -580,11 +582,33 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     })),
   );
 
+  // Published company financials — reported accounts and the ratios derived
+  // from them, the results calendar and consensus analyst estimates. Cached for
+  // 24h in `fundamentals_cache`, so this is one cheap read on most ticks. Only
+  // equity-like instruments have accounts; commodities/FX/crypto are skipped.
+  const fundamentalSymbols = features
+    .filter((f) => f.asset_class === "stock" || f.asset_class === "etf")
+    .map((f) => f.symbol);
+  const fundamentalsMap = fundamentalSymbols.length
+    ? await cached("fundamentals", `${asOf}:${fundamentalSymbols.slice().sort().join(",")}`, () =>
+        loadFundamentalsScores(fundamentalSymbols, asOf),
+      ).catch((e) => {
+        srvLog.warn("Fundamentals load failed:", e);
+        return new Map<string, { data: Fundamentals; score: FundamentalsScore }>();
+      })
+    : new Map<string, { data: Fundamentals; score: FundamentalsScore }>();
+  for (const f of features) {
+    const entry = fundamentalsMap.get(f.symbol.toUpperCase());
+    f.fundamentals = entry?.data ?? null;
+    f.fundamentals_score = entry?.score ?? null;
+  }
+
   // Cross-sectional ranking across today's universe (momentum + trend + quality + low-vol)
   const rankMap = computeCrossSectionalRanks(features);
   for (const f of features) f.rank_info = rankMap.get(f.symbol) ?? null;
 
   const coolingSymbols = features.filter((f) => f.cooling).map((f) => f.symbol);
+
 
   // Regime-linked risk tightening: bear/crisis → tighter per-symbol cap and stop-loss.
   const risk = riskProfile(portfolio.risk_level);

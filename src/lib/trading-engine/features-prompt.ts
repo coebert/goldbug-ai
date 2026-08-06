@@ -78,6 +78,64 @@ function rankCell(f: AnyFeature): string {
   }`;
 }
 
+/**
+ * Published company financials: the reported accounts, the ratios derived from
+ * them, consensus analyst estimates and the results calendar. Rendered as one
+ * compact cell so the model sees the company's finances on the same row as its
+ * price action, and never decides on technicals alone.
+ */
+function fundamentalsCell(f: AnyFeature): string {
+  const d = f["fundamentals"] as AnyFeature | null | undefined;
+  const s = f["fundamentals_score"] as AnyFeature | null | undefined;
+  if (!d && !s) return "-";
+  const parts: string[] = [];
+  if (s) {
+    const sub = (s["subscores"] as AnyFeature | undefined) ?? {};
+    parts.push(
+      `sc:${n(s["score"], 2)} cov:${Number(s["coverage"] ?? 0)}/6 val:${n(
+        sub["valuation"],
+        2,
+      )} prof:${n(sub["profitability"], 2)} grw:${n(sub["growth"], 2)} bs:${n(
+        sub["balance_sheet"],
+        2,
+      )} div:${n(sub["shareholder"], 2)} anl:${n(sub["analysts"], 2)}`,
+    );
+  }
+  if (d) {
+    parts.push(
+      `pe:${n(d["trailing_pe"], 1)} fpe:${n(d["forward_pe"], 1)} peg:${n(
+        d["peg"],
+        2,
+      )} pb:${n(d["price_to_book"], 1)} ev/eb:${n(d["ev_ebitda"], 1)} mcap:${compactCount(
+        d["market_cap"],
+      )}`,
+      `gm:${n(d["gross_margin"], 3)} om:${n(d["operating_margin"], 3)} nm:${n(
+        d["profit_margin"],
+        3,
+      )} roe:${n(d["return_on_equity"], 3)} roa:${n(d["return_on_assets"], 3)}`,
+      `revg:${n(d["revenue_growth"], 3)} epsg:${n(d["earnings_growth"], 3)} eps+1q:${n(
+        d["eps_growth_next_q"],
+        3,
+      )} eps+1y:${n(d["eps_growth_next_y"], 3)}`,
+      `de:${n(d["debt_to_equity"], 1)} cr:${n(d["current_ratio"], 2)} fcf:${compactCount(
+        d["free_cashflow"],
+      )} cash:${compactCount(d["total_cash"])} debt:${compactCount(d["total_debt"])}`,
+      `dy:${n(d["dividend_yield"], 4)} pay:${n(d["payout_ratio"], 2)} beta:${n(
+        d["beta"],
+        2,
+      )} shrt:${n(d["short_percent_float"], 3)}`,
+      `rec:${n(d["analyst_mean"], 2)}/${Number(d["analyst_count"] ?? 0)} tgt:${n(
+        d["target_mean_price"],
+        2,
+      )} nxt_results:${d["next_earnings_date"] ?? "-"} ccy:${d["financial_currency"] ?? "-"}`,
+    );
+  }
+  const flags = Array.isArray(s?.["flags"]) ? (s?.["flags"] as unknown[]) : [];
+  if (flags.length) parts.push(`RISK: ${flags.join("; ")}`);
+  return parts.join(" ");
+}
+
+
 const COLUMNS = [
   "symbol",
   "name",
@@ -138,7 +196,7 @@ export function formatCandidateTable(features: readonly unknown[]): string {
     ];
     return `${cells.join(" | ")} || news ${sentimentCell(f)} || events ${eventCell(
       f,
-    )} || rank ${rankCell(f)}`;
+    )} || rank ${rankCell(f)} || fund ${fundamentalsCell(f)}`;
   });
 
   return `Candidate assets — one row per symbol, fields separated by " | ", sub-blocks by " || ". Values rounded; "-" = not available.
@@ -146,6 +204,7 @@ Columns: ${COLUMNS.join(" | ")}
   x = MACD cross this bar (B bullish / R bearish / n none); wk_up = weekly trend up (Y/n); cool = loss-cooldown active (Y/n); chg5d/chg30d are fractional returns (0.05 = +5%); adv20 = 20d average daily volume.
   news = <weighted LLM sentiment>/<contributors today> t<today> a3/a7<3d & 7d averages> d3/d7<deltas vs baseline> ac<acceleration> c7<7d contributors>.
   events = s<directional event score -1..1> p<event pressure 0..1> nx<event count> hard<dated hard catalyst Y/n> <top event kinds>.
+  fund = PUBLISHED COMPANY FINANCIALS (reported accounts, derived ratios, consensus analyst estimates, results calendar). sc<overall -1..1> cov<pillars with data>/6 val/prof/grw/bs/div/anl<pillar scores>; pe/fpe/peg/pb/ev-eb<valuation multiples> mcap<market cap>; gm/om/nm<gross, operating, net margin> roe/roa<returns>; revg/epsg<latest reported growth> eps+1q/+1y<consensus estimates>; de<debt/equity %> cr<current ratio> fcf<free cash flow> cash/debt; dy<dividend yield> pay<payout ratio> beta shrt<short % of float>; rec<analyst consensus 1 strong buy..5 strong sell>/<analyst count> tgt<mean price target, in the listing currency> nxt_results<next scheduled results date> ccy<reporting currency of the accounts, may differ from the quote currency>. RISK lists disclosed financial red flags. "-" means the company has not published that figure (or it is not an operating company, e.g. an ETF or commodity).
   rank = #<cross-sectional rank>/<universe size> p<percentile> c<composite z> mom/qua/lvol/trd<factor z-scores>.
 ${rows.join("\n")}`;
 }

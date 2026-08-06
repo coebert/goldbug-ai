@@ -1029,6 +1029,39 @@ export type Database = {
         }
         Relationships: []
       }
+      fundamentals_cache: {
+        Row: {
+          currency: string | null
+          data: Json
+          expires_at: string
+          fetched_at: string
+          financial_currency: string | null
+          next_earnings_date: string | null
+          source: string
+          symbol: string
+        }
+        Insert: {
+          currency?: string | null
+          data: Json
+          expires_at?: string
+          fetched_at?: string
+          financial_currency?: string | null
+          next_earnings_date?: string | null
+          source?: string
+          symbol: string
+        }
+        Update: {
+          currency?: string | null
+          data?: Json
+          expires_at?: string
+          fetched_at?: string
+          financial_currency?: string | null
+          next_earnings_date?: string | null
+          source?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
       headline_translation_cache: {
         Row: {
           confidence: number | null

@@ -20,6 +20,7 @@ import type { SentimentMomentum } from "../sentiment.server";
 import type { SymbolEventFeatures } from "../market-events";
 import type { RankInfo } from "../cross-sectional-ranking.server";
 import type { UniverseSymbol } from "../universe.server";
+import type { Fundamentals, FundamentalsScore } from "../fundamentals/types";
 
 export function classesFromUniverse(u: unknown): Database["public"]["Enums"]["asset_class"][] {
   if (!Array.isArray(u)) return ["stock", "etf", "crypto", "commodity", "fx"];
@@ -62,6 +63,9 @@ export async function buildCandidateFeatures(
     cooling: boolean;
     // Cross-sectional rank across today's universe (filled in later)
     rank_info: RankInfo | null;
+    // Publicly disclosed company financials + their score (filled in later)
+    fundamentals: Fundamentals | null;
+    fundamentals_score: FundamentalsScore | null;
   }> = [];
   // One bulk `price_cache` read for the whole universe instead of one per
   // symbol per consumer — the rest of the tick then hits the in-memory memo.
@@ -99,6 +103,8 @@ export async function buildCandidateFeatures(
         event_features: null,
         cooling: false,
         rank_info: null,
+        fundamentals: null,
+        fundamentals_score: null,
       });
     }),
   );
