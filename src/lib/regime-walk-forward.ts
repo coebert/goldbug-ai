@@ -769,12 +769,22 @@ export type RegimeSummary = {
   /** Mean regime confidence across the windows in this regime, 0..1. */
   meanConfidence: number;
   medianTradesPerYear: number;
+  /**
+   * Independence-adjusted window count. Equals `windows` for disjoint slices
+   * and shrinks as overlap rises, so an overlapping run cannot fake evidence.
+   */
+  effectiveWindows: number;
+  /** Mean overlap share between consecutive windows in this regime, 0..1. */
+  overlapShare: number;
 
   /** True when every window respected the drawdown ceiling. */
   drawdownStable: boolean;
+  /** True when the regime has enough independent evidence to judge. */
+  sufficientEvidence: boolean;
   /** True when the regime is profitable and drawdown-stable throughout. */
   pass: boolean;
 };
+
 
 export function median(values: readonly number[]): number {
   const xs = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
