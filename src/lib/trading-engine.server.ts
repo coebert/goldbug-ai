@@ -751,6 +751,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     })),
   );
   const sectorCycleBlock = formatSectorCycleBlock(sectorCycle);
+  // Per-symbol sector evidence captured at sizing time so the audit trail can
+  // replay exactly which phase/momentum/multiplier applied to each decision.
+  const sectorAuditBySymbol = new Map<string, SectorDecisionAudit>();
 
   // Measured trading edge (rolling signal_performance) — feeds Kelly sizing
   // instead of the old hardcoded 2% assumption. Falls back to the prior when
