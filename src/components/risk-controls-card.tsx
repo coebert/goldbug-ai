@@ -251,6 +251,19 @@ export function RiskControlsCard({
   } | null>(null);
   const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
+  // Mirror the style when it is flipped elsewhere (e.g. the always-visible
+  // swing switch) so this card never re-saves a stale horizon.
+  const serverStyle = initial.trading_style ?? "position";
+  useEffect(() => {
+    setCfg((c) =>
+      (c.trading_style ?? "position") === serverStyle
+        ? c
+        : serverStyle === "swing"
+          ? { ...c, ...SWING_DIAL_OVERRIDES, trading_style: "swing" }
+          : { ...c, trading_style: "position" },
+    );
+  }, [serverStyle]);
+
   const applyLevel = (lvl: number) => {
     const style = cfg.trading_style ?? "position";
     const nextCfg: RiskConfig = {
