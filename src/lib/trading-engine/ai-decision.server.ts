@@ -162,6 +162,7 @@ ${args.calibrationBlock ?? ""}
 ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 ${args.alphaPriors ?? ""}
 ${args.algoRegimeBlock ?? ""}
+${args.sectorCycleBlock ?? ""}
 
 ${args.cashPolicyBlock ?? ""}
 
