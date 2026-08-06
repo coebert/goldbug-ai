@@ -194,18 +194,21 @@ function resolveWeights(partial?: Partial<RobustnessWeights>): RobustnessWeights
   ) as RobustnessWeights;
 }
 
-/** Modelled round-trip cost in bps for one cell, or null without frictions. */
+/**
+ * Modelled round-trip cost in bps for one cell. The cell's scenario already
+ * carries a fully-resolved friction model (scale × slippage × min fee), so
+ * the baseline is only consulted for terms the grid never varied.
+ */
 export function cellRoundTripBps(
   cell: SweepCell,
   opts: { baseFrictions?: Frictions; startingCash?: number },
 ): number | null {
-  if (!opts.baseFrictions || opts.startingCash === undefined) return null;
+  if (opts.startingCash === undefined) return null;
   const tv = ticketValue(opts.startingCash, cell.ticket);
-  // The cell already carries its own fully-resolved friction model; the
-  // baseline is only needed for the terms the grid did not vary.
-  const f = seriesBaseFrictions(cell.scenario.frictions, cell.scenario)
-    ?? cell.scenario.frictions;
-  void seriesBaseFrictions(opts.baseFrictions, cell.scenario);
+  if (!(tv > 0)) return null;
+  const f = opts.baseFrictions
+    ? { ...seriesBaseFrictions(opts.baseFrictions, cell.scenario), ...cell.scenario.frictions }
+    : cell.scenario.frictions;
   const bps = roundTripCostBps(f, tv);
   return Number.isFinite(bps) ? bps : null;
 }
@@ -264,7 +267,6 @@ export function scoreArm(
       0,
     );
 
-  const first = cells[0]!;
   const uniq = (vals: string[]) => {
     const set = [...new Set(vals)];
     return set.length === 1 ? set[0]! : "mixed";
@@ -288,7 +290,6 @@ export function scoreArm(
     components,
     score: Number(score.toFixed(2)),
     grade: gradeFor(score),
-    ...(first ? {} : {}),
   };
 }
 
