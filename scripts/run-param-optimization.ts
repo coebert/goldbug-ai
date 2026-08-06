@@ -492,7 +492,10 @@ const panels: ReportPanel[] = [
     heading: "Best configurations (net of realistic costs)",
     subtitle:
       `${style} · ${riskLevel} · ${foldBars.length} walk-forward folds · ` +
-      `objective: mean net CAGR · turnover ≤ ${maxTurnover}/yr · no leverage`,
+      `objective: net CAGR, ${describeCostScoreMode(costScoreMode, costTailShare)}` +
+      (gridVaried ? ` (${scenarios.length} cost scenarios)` : "") +
+      ` · turnover ≤ ${maxTurnover}/yr · no leverage`,
+
     series: [],
     table: {
       columns: ["rank", "CAGR %", "DD %", "sharpe", "turnover/yr", "fees %", "cash %", "status", "params"],
