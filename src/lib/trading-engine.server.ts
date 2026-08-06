@@ -1646,6 +1646,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       // combineHaircuts ignores multipliers >= 1. Hard caps still bind later.
       const cycleRow = sectorCycleFor(sectorCycle, symSector);
       const phaseMult = sectorPhaseMultiplier(cycleRow, order.side);
+      sectorAuditBySymbol.set(String(meta.symbol).toUpperCase(), buildSectorDecisionAudit({
+        cycle: sectorCycle,
+        sector: symSector,
+        row: cycleRow,
+        appliedMultiplier: phaseMult.mult,
+        rotationMultiplier: secMult.mult,
+        note: [cycleRow?.note, phaseMult.note, secMult.note].filter(Boolean).join(" | "),
+      }));
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
 
       const haircuts = combineHaircuts([
