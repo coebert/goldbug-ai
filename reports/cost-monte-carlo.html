@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Aegis — Monte Carlo execution-cost stress test</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b1220; --panel:#111a2b; --ink:#e6edf7; --muted:#8fa3bf; --grid:#22304a; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--ink);
+         font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:15px; margin:0 0 2px; }
+  .sub, .lead { color:var(--muted); font-size:12px; margin:0 0 10px; }
+  .panel { background:var(--panel); border:1px solid var(--grid); border-radius:12px;
+           padding:16px; margin:16px 0; }
+  .charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
+  .chart { width:100%; height:auto; overflow:visible; }
+  .line { fill:none; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
+  .grid { stroke:var(--grid); stroke-width:1; }
+  .zero { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:.7; }
+  .axis, .axis-label, .empty { fill:var(--muted); font-size:10px; }
+  .chart-title { fill:var(--ink); font-size:11px; font-weight:600; }
+  .legend { list-style:none; display:flex; flex-wrap:wrap; gap:12px; padding:0; margin:0 0 8px;
+            font-size:12px; color:var(--muted); }
+  .legend li { display:flex; align-items:center; gap:6px; }
+  .swatch { width:16px; height:0; border-top:3px solid var(--c); border-radius:2px; }
+  .swatch.dashed { border-top-style:dashed; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; font-size:12px; }
+  th, td { text-align:right; padding:4px 8px; border-bottom:1px solid var(--grid); }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:600; }
+  .chart-wrap { position:relative; margin:0; }
+  .hit { cursor:crosshair; }
+  .cross { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:.8; }
+  .dot { stroke:var(--panel); stroke-width:1.5; }
+  .trade { fill-opacity:.95; stroke:var(--panel); stroke-width:.6; }
+  .trade.sell { fill-opacity:.55; }
+  .tip-trade { grid-column:1/-1; color:var(--ink); opacity:.8; font-size:10px;
+               margin:0 0 3px 14px; white-space:normal; }
+  .chart-tip { position:absolute; pointer-events:none; z-index:2; min-width:190px;
+               background:rgba(11,18,32,.96); border:1px solid var(--grid); border-radius:8px;
+               padding:6px 8px; font-size:11px; box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  .chart-tip[hidden] { display:none; }
+  .tip-head { color:var(--muted); margin-bottom:4px; }
+  .tip-head-row { color:var(--muted); }
+  .tip-row { display:grid; grid-template-columns:10px 1fr auto auto; gap:6px; align-items:center;
+             white-space:nowrap; }
+  .tip-swatch { width:8px; height:8px; border-radius:2px; }
+  .tip-val, .tip-dd { font-variant-numeric:tabular-nums; text-align:right; min-width:56px; }
+  .tip-dd { color:var(--muted); }
+  .filters { position:sticky; top:0; z-index:3; display:flex; flex-wrap:wrap; gap:14px;
+             align-items:center; background:var(--panel); border:1px solid var(--grid);
+             border-radius:12px; padding:10px 12px; margin:12px 0; }
+  .filter-group { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .filter-label { color:var(--muted); font-size:11px; text-transform:uppercase;
+                  letter-spacing:.06em; margin-right:2px; }
+  .filter-count { margin-left:auto; color:var(--muted); font-size:11px; }
+  .chip { background:transparent; color:var(--muted); border:1px solid var(--grid);
+          border-radius:999px; padding:3px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .chip:hover { border-color:var(--muted); }
+  .chip.on { background:rgba(56,189,140,.16); border-color:#38bd8c; color:var(--ink); }
+  .chip.all { font-style:italic; }
+  section.panel[hidden], tbody tr[hidden] { display:none; }
+</style></head>
+<body>
+  <h1>Aegis — Monte Carlo execution-cost stress test</h1>
+  <p class="lead">9 symbols · 1404 bars · 12 cost worlds · seed 20260806</p>
+  
+  <section class="panel">
+  <h2>Monte Carlo cost stress — outcome distribution</h2>
+  <p class="sub">12 sampled cost worlds × 3 turnover cohorts · balanced · swing · real data 2021-01-01 → 2026-08-06</p>
+  <ul class="legend"></ul>
+  <div class="charts">
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Equity curve (% from start) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Drawdown (% from high-water mark) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+  </div>
+
+  <table><thead><tr><th>cohort</th><th>trades/yr</th><th>net CAGR p5</th><th>median</th><th>p95</th><th>CVaR5</th><th>maxDD median</th><th>maxDD p95</th><th>profitable</th><th>DD ≤ 30%</th></tr></thead><tbody><tr><td>low churn (hold 10d/gap 30d)</td><td>93</td><td>-7.9%</td><td>-4.3%</td><td>-1.5%</td><td>-8.8%</td><td>-22.9%</td><td>-10.6%</td><td>0%</td><td>100%</td></tr><tr><td>medium churn (hold 5d/gap 15d)</td><td>129</td><td>-12.1%</td><td>-6.7%</td><td>-2.4%</td><td>-13.5%</td><td>-33.2%</td><td>-15.7%</td><td>0%</td><td>100%</td></tr><tr><td>high churn (hold 2d/gap 3d)</td><td>170</td><td>-18.5%</td><td>-10.0%</td><td>-3.3%</td><td>-20.9%</td><td>-45.0%</td><td>-20.2%</td><td>0%</td><td>100%</td></tr></tbody></table>
+</section>
+<section class="panel">
+  <h2>Cost elasticity by cohort</h2>
+  <p class="sub">partial OLS slopes — how much each cost axis costs, holding the others fixed</p>
+  <ul class="legend"></ul>
+  <div class="charts">
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Equity curve (% from start) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Drawdown (% from high-water mark) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+  </div>
+
+  <table><thead><tr><th>cohort</th><th>per bp commission</th><th>per £ min fee</th><th>per bp slippage</th><th>R²</th><th>DD per bp slippage</th><th>fee drag median</th><th>dominant axis</th></tr></thead><tbody><tr><td>low churn (hold 10d/gap 30d)</td><td>-0.023pp</td><td>-1.131pp</td><td>-0.086pp</td><td>0.99</td><td>-0.377pp</td><td>28.9%</td><td>min fee</td></tr><tr><td>medium churn (hold 5d/gap 15d)</td><td>-0.061pp</td><td>-1.717pp</td><td>-0.122pp</td><td>0.99</td><td>-0.495pp</td><td>39.9%</td><td>min fee</td></tr><tr><td>high churn (hold 2d/gap 3d)</td><td>-0.126pp</td><td>-2.643pp</td><td>-0.184pp</td><td>0.99</td><td>-0.704pp</td><td>52.7%</td><td>min fee</td></tr></tbody></table>
+</section>
+<section class="panel">
+  <h2>Churn attribution</h2>
+  <p class="sub">churn dominates — costs eat the edge. Going from low churn (hold 10d/gap 30d) to high churn (hold 2d/gap 3d) adds 77 round-trips/yr and costs 5.7% points of median net CAGR (0.07% per extra trade/yr, 23.8% more fee drag). Tail drawdown widens by -9.6% points at the p95 cost world and the cost-driven CAGR spread is 2.27x wider. Dominant cost axis for the churned cohort: min fee.</p>
+  <ul class="legend"></ul>
+  <div class="charts">
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Equity curve (% from start) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Drawdown (% from high-water mark) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+  </div>
+
+  <table><thead><tr><th>metric</th><th>value</th></tr></thead><tbody><tr><td>baseline cohort</td><td>low churn (hold 10d/gap 30d)</td></tr><tr><td>churned cohort</td><td>high churn (hold 2d/gap 3d)</td></tr><tr><td>extra round-trips / yr</td><td>77</td></tr><tr><td>median net CAGR given up</td><td>5.7pp</td></tr><tr><td>per extra trade / yr</td><td>0.07pp</td></tr><tr><td>extra fee drag</td><td>23.8%</td></tr><tr><td>p95 drawdown widening</td><td>-9.6pp</td></tr><tr><td>profitable-world rate change</td><td>0pp</td></tr><tr><td>cost spread amplification</td><td>2.27x</td></tr><tr><td>verdict</td><td>churn-dominated</td></tr></tbody></table>
+</section>
+<script>
+(function () {
+  var f2 = function (v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2); };
+  document.querySelectorAll('.chart-wrap').forEach(function (wrap) {
+    var svg = wrap.querySelector('svg.chart');
+    var tip = wrap.querySelector('.chart-tip');
+    if (!svg || !tip || !svg.dataset.hover) return;
+    var data = JSON.parse(svg.dataset.hover);
+    var layer = svg.querySelector('.hover');
+    var cross = svg.querySelector('.hover .cross');
+    var dots = svg.querySelectorAll('.hover .dot');
+    if (!data.xs.length) return;
+
+    function hide() { if (layer) layer.style.display = 'none'; tip.hidden = true; }
+
+    function move(ev) {
+      var r = svg.getBoundingClientRect();
+      var vb = svg.viewBox.baseVal;
+      var ux = (ev.clientX - r.left) / r.width * (vb.width || r.width);
+      var best = 0, bestD = Infinity;
+      for (var i = 0; i < data.xs.length; i++) {
+        var d = Math.abs(data.xs[i] - ux);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      var ux2 = data.xs[best];
+      if (layer) layer.style.display = '';
+      if (cross) { cross.setAttribute('x1', ux2); cross.setAttribute('x2', ux2); }
+      var rows = '';
+      data.series.forEach(function (s, k) {
+        var dot = dots[k];
+        var py = s.px[best];
+        if (dot) {
+          if (py === null) { dot.setAttribute('cx', -99); dot.setAttribute('cy', -99); }
+          else { dot.setAttribute('cx', ux2); dot.setAttribute('cy', py); }
+        }
+        rows += '<div class="tip-row"><span class="tip-swatch" style="background:' + s.colour + '"></span>' +
+          '<span class="tip-label">' + s.label + '</span>' +
+          '<span class="tip-val">' + f2(s.equity[best]) + '%</span>' +
+          '<span class="tip-dd">' + f2(s.drawdown[best]) + '%</span></div>';
+        var tr = s.trades && s.trades[best];
+        if (tr) rows += '<div class="tip-trade">' + tr + '</div>';
+      });
+      tip.innerHTML = '<div class="tip-head">' + data.labels[best] + '</div>' +
+        '<div class="tip-row tip-head-row"><span class="tip-swatch"></span><span class="tip-label"></span>' +
+        '<span class="tip-val">equity</span><span class="tip-dd">drawdown</span></div>' + rows;
+      tip.hidden = false;
+      var px = ux2 / (vb.width || r.width) * r.width;
+      var left = Math.min(Math.max(px + 12, 4), r.width - tip.offsetWidth - 4);
+      tip.style.left = left + 'px';
+      tip.style.top = '8px';
+    }
+
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', hide);
+    svg.addEventListener('touchmove', function (e) { if (e.touches[0]) move(e.touches[0]); }, { passive: true });
+    svg.addEventListener('touchend', hide);
+  });
+})();
+</script>
+<script>
+(function () {
+  var bar = document.getElementById('report-filters');
+  if (!bar) return;
+  var state = {};
+  bar.querySelectorAll('.chip[data-value]').forEach(function (c) {
+    var k = c.dataset.key;
+    state[k] = state[k] || { mode: c.dataset.mode || 'multi', on: new Set(), all: new Set() };
+    state[k].all.add(c.dataset.value);
+    if (c.classList.contains('on')) state[k].on.add(c.dataset.value);
+  });
+  function visible(el) {
+    for (var k in state) {
+      var tag = el.dataset['f' + k.charAt(0).toUpperCase() + k.slice(1).replace(/-(.)/g, function (m, c) { return c.toUpperCase(); })];
+      if (tag == null) continue;
+      if (!state[k].on.has(tag)) return false;
+    }
+    return true;
+  }
+  function apply() {
+    var shown = 0, total = 0;
+    document.querySelectorAll('tbody tr').forEach(function (tr) {
+      total++;
+      var ok = visible(tr);
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    document.querySelectorAll('section.panel').forEach(function (p) {
+      var ok = visible(p);
+      var body = p.querySelector('tbody');
+      if (ok && body && !p.querySelector('.charts svg')) {
+        ok = Array.prototype.some.call(body.rows, function (r) { return !r.hidden; });
+      }
+      p.hidden = !ok;
+    });
+    var out = document.getElementById('filter-count');
+    if (out) out.textContent = shown === total ? total + ' rows' : shown + ' of ' + total + ' rows';
+  }
+  bar.addEventListener('click', function (e) {
+    var c = e.target.closest('.chip');
+    if (!c) return;
+    var k = c.dataset.key, s = state[k];
+    if (!s) return;
+    if (c.dataset.all) {
+      s.on = new Set(s.all);
+    } else if (s.mode === 'single') {
+      s.on = new Set([c.dataset.value]);
+    } else if (s.on.has(c.dataset.value)) {
+      if (s.on.size > 1) s.on.delete(c.dataset.value);
+    } else {
+      s.on.add(c.dataset.value);
+    }
+    bar.querySelectorAll('.chip[data-key="' + k + '"][data-value]').forEach(function (b) {
+      var on = s.on.has(b.dataset.value);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    apply();
+  });
+  apply();
+})();
+</script>
+
+</body></html>

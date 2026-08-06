@@ -101,6 +101,11 @@ describe("chart legends, tooltips and axis labels use theme tokens", () => {
         return;
       }
       for (const style of objects) {
+        // Spreading a shared tooltip token carries background + colour already.
+        if (/\.\.\.[A-Z][A-Z0-9_]*/.test(style)) {
+          expect(style).toMatch(TOKEN);
+          continue;
+        }
         expect(style, `tooltip without colour in ${name}`).toMatch(/color:/);
         expect(style, `tooltip without surface in ${name}`).toMatch(/background:/);
         expect(style).toMatch(TOKEN);

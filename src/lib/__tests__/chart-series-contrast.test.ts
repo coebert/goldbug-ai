@@ -134,7 +134,8 @@ describe("reference lines", () => {
       if (p.endsWith("event-overlay.tsx")) continue; // semantic per-event hues
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<ReferenceLine\b[\s\S]*?\/>/g) ?? []) {
-        if (!tag.includes("{...REFERENCE_LINE}")) offenders.push(`${rel(p)}: ${tag}`);
+        if (!tag.includes("{...REFERENCE_LINE}") && !tag.includes("{...SAXO_REFERENCE_LINE}"))
+          offenders.push(`${rel(p)}: ${tag}`);
       }
     }
     expect(offenders).toEqual([]);
