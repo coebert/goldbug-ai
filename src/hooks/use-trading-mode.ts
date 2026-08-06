@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  detectTradingModeDrift,
   readCachedTradingMode,
   resolveTradingMode,
   styleFromRiskConfig,
@@ -23,9 +24,17 @@ import {
 export function useTradingMode(
   portfolioId: string | undefined,
   riskConfig: unknown,
-): { style: TradingStyle; isSwing: boolean; setStyle: (s: TradingStyle) => void } {
+): {
+  style: TradingStyle;
+  isSwing: boolean;
+  setStyle: (s: TradingStyle) => void;
+  /** Set when a stale cache disagreed with the engine and was auto-corrected. */
+  drift: { from: TradingStyle; to: TradingStyle } | null;
+  dismissDrift: () => void;
+} {
   const serverStyle = styleFromRiskConfig(riskConfig);
   const [cached, setCached] = useState<TradingStyle | null>(null);
+  const [drift, setDrift] = useState<{ from: TradingStyle; to: TradingStyle } | null>(null);
 
   // Hydrate from local storage once mounted.
   useEffect(() => {
@@ -33,14 +42,18 @@ export function useTradingMode(
     setCached(readCachedTradingMode(portfolioId));
   }, [portfolioId]);
 
-  // Server value is authoritative — mirror it into the cache when it arrives.
+  // Server value is authoritative — mirror it into the cache when it arrives,
+  // and surface the correction when the cache had been claiming the opposite
+  // horizon (stale tab, aborted flip, save that failed after the local write).
   useEffect(() => {
-    if (!portfolioId || !serverStyle) return;
-    setCached(serverStyle);
-    if (readCachedTradingMode(portfolioId) !== serverStyle) {
-      writeCachedTradingMode(portfolioId, serverStyle);
-    }
-  }, [portfolioId, serverStyle]);
+    if (!portfolioId) return;
+    const stored = readCachedTradingMode(portfolioId);
+    const { drifted, engineStyle } = detectTradingModeDrift(riskConfig, stored);
+    if (!engineStyle) return;
+    if (drifted && stored) setDrift({ from: stored, to: engineStyle });
+    setCached(engineStyle);
+    if (stored !== engineStyle) writeCachedTradingMode(portfolioId, engineStyle); // auto re-sync
+  }, [portfolioId, serverStyle, riskConfig]);
 
   // Stay in step with other surfaces (same tab) and other tabs.
   useEffect(() => {
@@ -66,6 +79,15 @@ export function useTradingMode(
     [portfolioId],
   );
 
+  const setStyleAndClear = useCallback(
+    (s: TradingStyle) => {
+      setDrift(null);
+      setStyle(s);
+    },
+    [setStyle],
+  );
+  const dismissDrift = useCallback(() => setDrift(null), []);
+
   const style = resolveTradingMode(serverStyle, cached);
-  return { style, isSwing: style === "swing", setStyle };
+  return { style, isSwing: style === "swing", setStyle: setStyleAndClear, drift, dismissDrift };
 }
