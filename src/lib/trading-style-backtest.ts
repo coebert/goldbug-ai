@@ -115,7 +115,32 @@ export type StyleRunMetrics = {
   equityCurve: EquityPoint[];
   /** Executed fills, one row per filled order, for chart overlays. */
   tradeLog: StyleTradeRow[];
+  /**
+   * Leverage / borrow invariants observed during the run. Optional so older
+   * callers that build metrics by hand still typecheck; `runStyleBacktest`
+   * always populates it.
+   */
+  audit?: RunAudit;
 };
+
+/**
+ * Hard invariants an optimizer must never be allowed to "win" by breaking:
+ * no borrowing (cash < 0), no shorting (quantity < 0), no leverage
+ * (holdings worth more than equity).
+ */
+export type RunAudit = {
+  /** Lowest cash balance seen on any bar. Negative = borrowed. */
+  minCash: number;
+  /** Lowest holding quantity seen after any fill. Negative = short. */
+  minQuantity: number;
+  /** Max holdings value ÷ total equity, as a %. >100 = levered. */
+  maxGrossExposurePct: number;
+  /** Simulator rejections that indicate the rules bit, keyed by reason. */
+  rejections: Record<string, number>;
+  /** True when no borrow, short, or leverage was observed. */
+  clean: boolean;
+};
+
 
 /** Minimal fill record used to overlay buy/sell markers on report charts. */
 export type StyleTradeRow = {
@@ -490,6 +515,34 @@ export async function runStyleBacktest(args: {
   const sellSnaps = result.snapshots.filter((s) => s.side === "SELL");
   const wins = sellSnaps.filter((s) => s.realizedPnl > 0).length;
 
+  // ------------------------------------------------------- leverage audit
+  const rejectionCounts: Record<string, number> = {};
+  for (const r of result.rejections) {
+    rejectionCounts[r.reason] = (rejectionCounts[r.reason] ?? 0) + 1;
+  }
+  const minCash = Math.min(
+    startingCash,
+    ...result.equityCurve.map((p) => p.cash),
+    ...result.snapshots.map((s) => s.cash),
+  );
+  const minQuantity = Math.min(
+    0,
+    ...result.snapshots.flatMap((s) => s.holdings.map((h) => h.quantity)),
+    ...result.finalState.holdings.map((h) => h.quantity),
+  );
+  const maxGrossExposurePct = result.equityCurve.reduce(
+    (max, p) => (p.totalValue > 0 ? Math.max(max, (p.holdingsValue / p.totalValue) * 100) : max),
+    0,
+  );
+  const audit: RunAudit = {
+    minCash,
+    minQuantity,
+    maxGrossExposurePct,
+    rejections: rejectionCounts,
+    clean: minCash >= -1e-6 && minQuantity >= -1e-9 && maxGrossExposurePct <= 100 + 1e-6,
+  };
+
+
   return {
     riskLevel,
     bars: bars.length,
@@ -513,6 +566,8 @@ export async function runStyleBacktest(args: {
     feeDragPct: (result.snapshots.reduce((sum, s) => sum + (s.fee || 0), 0) / startingCash) * 100,
     finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
     exitMix,
+    audit,
+
     equityCurve: equity,
     tradeLog: result.snapshots
       .filter((s) => s.fillQuantity > 0)
