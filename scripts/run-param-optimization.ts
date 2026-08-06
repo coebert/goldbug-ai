@@ -40,6 +40,13 @@ import {
   reentryProfile,
   turnoverCostCurve,
 } from "../src/lib/turnover-attribution";
+import {
+  buildViabilityReport,
+  describeRiskLevelViability,
+  VERDICT_LABEL,
+  type ViabilityRow,
+} from "../src/lib/viability-threshold";
+
 import type { EquityPoint } from "../src/lib/backtest-metrics";
 
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
