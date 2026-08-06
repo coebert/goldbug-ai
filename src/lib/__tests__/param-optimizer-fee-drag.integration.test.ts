@@ -180,7 +180,7 @@ describe("param optimizer under the fee-drag objective (integration)", () => {
       }
       // Nothing infeasible ever outranks a feasible candidate.
       const ranked = rankResults(results);
-      const lastFeasible = ranked.findLastIndex((r) => r.check.feasible);
+      const lastFeasible = ranked.reduce((acc, r, i) => (r.check.feasible ? i : acc), -1);
       const firstInfeasible = ranked.findIndex((r) => !r.check.feasible);
       expect(firstInfeasible).toBeGreaterThan(lastFeasible);
     }
