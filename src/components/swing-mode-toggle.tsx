@@ -36,7 +36,7 @@ export function SwingModeToggle({
   // The persisted mode fills in while the portfolio query is still loading, so
   // the switch does not start "Off" and jump to "On" on every refresh.
   const { isSwing: resolved, setStyle } = useTradingMode(portfolioId, riskConfig);
-  const serverActive = cfg["trading_style"] === "swing";
+  
   const [active, setActive] = useState(resolved);
 
   // Keep the switch in sync when the portfolio refetches (or another surface
