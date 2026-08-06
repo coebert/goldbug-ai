@@ -305,8 +305,31 @@ for (const r of frontier) {
 }
 
 // ---------------------------------------------------------------- report
+// Report filter tags: every row carrying a parameter set is tagged with its
+// risk level and its per-name ticket size, so the HTML toolbar can narrow the
+// tables to one scenario without re-running the sweep.
+const ticketGbp = (params: { [k: string]: unknown }): number =>
+  Math.round(Number(params["per_name_weight"] ?? 0) * startingCash);
+const ticketValue = (params: { [k: string]: unknown }): string => String(ticketGbp(params));
+const ticketLabel = (v: number): string =>
+  v >= 1000 ? `£${(v / 1000).toFixed(1).replace(/\.0$/, "")}k` : `£${v}`;
+const paramTags = (params: { [k: string]: unknown }, rl: string) => ({
+  risk: rl,
+  ticket: ticketValue(params),
+});
+const ticketOptions = [
+  ...new Set(
+    (AXES.find((a) => a.key === "per_name_weight")?.values ?? []).map((w) =>
+      Math.round(Number(w) * startingCash),
+    ),
+  ),
+]
+  .sort((a, b) => a - b)
+  .map((v) => ({ value: String(v), label: ticketLabel(v) }));
+
 const COLOURS = ["#39d98a", "#4ea1ff", "#f5a623", "#e5484d", "#a78bfa", "#9aa4b2"];
 const panels: ReportPanel[] = [
+
   {
     heading: "Best configurations (net of realistic costs)",
     subtitle:
@@ -315,17 +338,21 @@ const panels: ReportPanel[] = [
     series: [],
     table: {
       columns: ["rank", "CAGR %", "DD %", "sharpe", "turnover/yr", "fees %", "cash %", "status", "params"],
-      rows: ranked.slice(0, 15).map((r, i) => [
-        String(i + 1),
-        r.metrics.cagrPct.toFixed(2),
-        r.metrics.maxDrawdownPct.toFixed(1),
-        r.metrics.sharpe.toFixed(2),
-        r.metrics.tradesPerYear.toFixed(0),
-        r.metrics.feeDragPct.toFixed(1),
-        r.metrics.finalCashPct.toFixed(0),
-        r.check.disqualified ? "disqualified" : r.check.feasible ? "ok" : r.check.violations.join("; "),
-        formatParams(r.params),
-      ]),
+      rows: ranked.slice(0, 40).map((r, i) => ({
+        tags: paramTags(r.params, riskLevel),
+        cells: [
+          String(i + 1),
+          r.metrics.cagrPct.toFixed(2),
+          r.metrics.maxDrawdownPct.toFixed(1),
+          r.metrics.sharpe.toFixed(2),
+          r.metrics.tradesPerYear.toFixed(0),
+          r.metrics.feeDragPct.toFixed(1),
+          r.metrics.finalCashPct.toFixed(0),
+          r.check.disqualified ? "disqualified" : r.check.feasible ? "ok" : r.check.violations.join("; "),
+          formatParams(r.params),
+        ],
+      })),
+
     },
   },
   {
@@ -348,13 +375,17 @@ const panels: ReportPanel[] = [
     series: [],
     table: {
       columns: ["turnover/yr", "CAGR %", "DD %", "fees %", "params"],
-      rows: frontier.map((r) => [
-        r.metrics.tradesPerYear.toFixed(0),
-        r.metrics.cagrPct.toFixed(2),
-        r.metrics.maxDrawdownPct.toFixed(1),
-        r.metrics.feeDragPct.toFixed(1),
-        formatParams(r.params),
-      ]),
+      rows: frontier.map((r) => ({
+        tags: paramTags(r.params, riskLevel),
+        cells: [
+          r.metrics.tradesPerYear.toFixed(0),
+          r.metrics.cagrPct.toFixed(2),
+          r.metrics.maxDrawdownPct.toFixed(1),
+          r.metrics.feeDragPct.toFixed(1),
+          formatParams(r.params),
+        ],
+      })),
+
     },
   },
 ];
@@ -462,21 +493,25 @@ panels.push(
         "viable share",
         "best viable",
       ],
-      rows: viability.levels.map((l) => [
-        l.riskLevel,
-        l.threshold.breakevenTradesPerYear === null
-          ? "—"
-          : l.threshold.breakevenTradesPerYear.toFixed(0),
-        l.threshold.source,
-        l.threshold.cagrPerTrade.toFixed(3),
-        String(l.viableCount),
-        String(l.marginalCount),
-        String(l.belowCount),
-        `${(l.viableShare * 100).toFixed(0)}%`,
-        l.bestViable
-          ? `${l.bestViable.metrics.cagrPct.toFixed(2)}% @ ${l.bestViable.metrics.tradesPerYear.toFixed(0)}/yr`
-          : "none",
-      ]),
+      rows: viability.levels.map((l) => ({
+        tags: { risk: l.riskLevel },
+        cells: [
+          l.riskLevel,
+          l.threshold.breakevenTradesPerYear === null
+            ? "—"
+            : l.threshold.breakevenTradesPerYear.toFixed(0),
+          l.threshold.source,
+          l.threshold.cagrPerTrade.toFixed(3),
+          String(l.viableCount),
+          String(l.marginalCount),
+          String(l.belowCount),
+          `${(l.viableShare * 100).toFixed(0)}%`,
+          l.bestViable
+            ? `${l.bestViable.metrics.cagrPct.toFixed(2)}% @ ${l.bestViable.metrics.tradesPerYear.toFixed(0)}/yr`
+            : "none",
+        ],
+      })),
+
     },
   },
   {
@@ -502,17 +537,21 @@ panels.push(
       rows: viability.levels
         .flatMap((l) => l.flagged)
         .sort((a, b) => a.returnMarginPct - b.returnMarginPct)
-        .slice(0, 25)
-        .map((a) => [
-          a.riskLevel,
-          VERDICT_LABEL[a.verdict],
-          a.metrics.cagrPct.toFixed(2),
-          a.metrics.tradesPerYear.toFixed(0),
-          a.turnoverHeadroom === null ? "—" : a.turnoverHeadroom.toFixed(0),
-          a.returnMarginPct.toFixed(2),
-          a.reasons[0] ?? "",
-          a.id,
-        ]),
+        .slice(0, 60)
+        .map((a) => ({
+          tags: paramTags(a.params as { [k: string]: unknown }, a.riskLevel),
+          cells: [
+            a.riskLevel,
+            VERDICT_LABEL[a.verdict],
+            a.metrics.cagrPct.toFixed(2),
+            a.metrics.tradesPerYear.toFixed(0),
+            a.turnoverHeadroom === null ? "—" : a.turnoverHeadroom.toFixed(0),
+            a.returnMarginPct.toFixed(2),
+            a.reasons[0] ?? "",
+            a.id,
+          ],
+        })),
+
     },
   },
 );
@@ -540,6 +579,15 @@ writeFileSync(
       `${symbols.length} symbols · ${tape.bars.length} bars · ${candidates.length} candidates · ` +
       `net of ${FRICTIONS.commissionBps}bps + $${FRICTIONS.minCommission} commission and ${FRICTIONS.slippageBps}bps slippage`,
     panels,
+    filters: [
+      {
+        key: "risk",
+        label: "risk level",
+        options: [...new Set([riskLevel, ...riskLevels])].map((r) => ({ value: r, label: r })),
+      },
+      { key: "ticket", label: "ticket size", options: ticketOptions },
+    ],
+
   }),
 );
 console.log("\nWrote reports/param-optimization.html");

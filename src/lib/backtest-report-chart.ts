@@ -392,6 +392,24 @@ export function renderLegend(series: readonly ChartSeries[]): string {
 
 }
 
+/**
+ * A table row. Plain string arrays still work; the tagged form lets the report
+ * filter rows client-side (e.g. by risk level or ticket-size band).
+ */
+export type ReportTableRow = string[] | { cells: string[]; tags?: Record<string, string> };
+
+/** A group of toggle chips rendered in the report toolbar. */
+export type ReportFilterGroup = {
+  /** Tag key rows/panels are matched on. */
+  key: string;
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  /** Values selected on load. Defaults to all options. */
+  selected?: string[];
+  /** "single" behaves like radio buttons. Default "multi". */
+  mode?: "single" | "multi";
+};
+
 export type ReportPanel = {
   /** e.g. "balanced risk" */
   heading: string;
@@ -406,18 +424,121 @@ export type ReportPanel = {
   /** Legend entries for pre-rendered charts, which have no ChartSeries. */
   legend?: { label: string; colour: string; dashed?: boolean }[];
   /** Optional rows appended under the charts as a small metric table. */
-  table?: { columns: string[]; rows: string[][] };
+  table?: { columns: string[]; rows: ReportTableRow[] };
+  /** Filter tags for the whole panel; the panel hides when they are unselected. */
+  tags?: Record<string, string>;
 };
+
+const rowCells = (r: ReportTableRow): string[] => (Array.isArray(r) ? r : r.cells);
+const rowTags = (r: ReportTableRow): Record<string, string> =>
+  Array.isArray(r) ? {} : (r.tags ?? {});
+
+const tagAttrs = (tags: Record<string, string>): string =>
+  Object.entries(tags)
+    .map(([k, v]) => ` data-f-${esc(k)}="${esc(v)}"`)
+    .join("");
+
+/** Toolbar markup for the filter chip groups. */
+export function renderFilterBar(groups: readonly ReportFilterGroup[]): string {
+  if (groups.length === 0) return "";
+  const bar = groups
+    .map((g) => {
+      const selected = new Set(g.selected ?? g.options.map((o) => o.value));
+      const chips = g.options
+        .map(
+          (o) =>
+            `<button type="button" class="chip${selected.has(o.value) ? " on" : ""}" ` +
+            `data-key="${esc(g.key)}" data-value="${esc(o.value)}" ` +
+            `data-mode="${esc(g.mode ?? "multi")}" aria-pressed="${selected.has(o.value)}">` +
+            `${esc(o.label)}</button>`,
+        )
+        .join("");
+      const all =
+        (g.mode ?? "multi") === "multi"
+          ? `<button type="button" class="chip all" data-key="${esc(g.key)}" data-all="1">all</button>`
+          : "";
+      return `<div class="filter-group"><span class="filter-label">${esc(g.label)}</span>${chips}${all}</div>`;
+    })
+    .join("");
+  return `<div class="filters" id="report-filters">${bar}<span class="filter-count" id="filter-count"></span></div>`;
+}
+
+/** Client-side filtering: chips toggle `data-f-*` tags on rows and panels. */
+export const FILTER_SCRIPT = `
+(function () {
+  var bar = document.getElementById('report-filters');
+  if (!bar) return;
+  var state = {};
+  bar.querySelectorAll('.chip[data-value]').forEach(function (c) {
+    var k = c.dataset.key;
+    state[k] = state[k] || { mode: c.dataset.mode || 'multi', on: new Set(), all: new Set() };
+    state[k].all.add(c.dataset.value);
+    if (c.classList.contains('on')) state[k].on.add(c.dataset.value);
+  });
+  function visible(el) {
+    for (var k in state) {
+      var tag = el.dataset['f' + k.charAt(0).toUpperCase() + k.slice(1).replace(/-(.)/g, function (m, c) { return c.toUpperCase(); })];
+      if (tag == null) continue;
+      if (!state[k].on.has(tag)) return false;
+    }
+    return true;
+  }
+  function apply() {
+    var shown = 0, total = 0;
+    document.querySelectorAll('tbody tr').forEach(function (tr) {
+      total++;
+      var ok = visible(tr);
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    document.querySelectorAll('section.panel').forEach(function (p) {
+      var ok = visible(p);
+      var body = p.querySelector('tbody');
+      if (ok && body && !p.querySelector('.charts svg')) {
+        ok = Array.prototype.some.call(body.rows, function (r) { return !r.hidden; });
+      }
+      p.hidden = !ok;
+    });
+    var out = document.getElementById('filter-count');
+    if (out) out.textContent = shown === total ? total + ' rows' : shown + ' of ' + total + ' rows';
+  }
+  bar.addEventListener('click', function (e) {
+    var c = e.target.closest('.chip');
+    if (!c) return;
+    var k = c.dataset.key, s = state[k];
+    if (!s) return;
+    if (c.dataset.all) {
+      s.on = new Set(s.all);
+    } else if (s.mode === 'single') {
+      s.on = new Set([c.dataset.value]);
+    } else if (s.on.has(c.dataset.value)) {
+      if (s.on.size > 1) s.on.delete(c.dataset.value);
+    } else {
+      s.on.add(c.dataset.value);
+    }
+    bar.querySelectorAll('.chip[data-key="' + k + '"][data-value]').forEach(function (b) {
+      var on = s.on.has(b.dataset.value);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    apply();
+  });
+  apply();
+})();
+`;
+
 
 /** Self-contained HTML report: one panel per risk level, two charts each. */
 export function renderBacktestReportHtml(args: {
   title: string;
   subtitle?: string;
   panels: readonly ReportPanel[];
+  /** Optional toggle chips (e.g. risk level, ticket-size band). */
+  filters?: readonly ReportFilterGroup[];
 }): string {
   const panels = args.panels
     .map(
-      (p) => `<section class="panel">
+      (p) => `<section class="panel"${tagAttrs(p.tags ?? {})}>
   <h2>${esc(p.heading)}</h2>
   ${p.subtitle ? `<p class="sub">${esc(p.subtitle)}</p>` : ""}
   ${renderLegend(
@@ -439,13 +560,19 @@ export function renderBacktestReportHtml(args: {
       ? `<table><thead><tr>${p.table.columns
           .map((c) => `<th>${esc(c)}</th>`)
           .join("")}</tr></thead><tbody>${p.table.rows
-          .map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`)
+          .map(
+            (r) =>
+              `<tr${tagAttrs(rowTags(r))}>${rowCells(r)
+                .map((c) => `<td>${esc(c)}</td>`)
+                .join("")}</tr>`,
+          )
           .join("")}</tbody></table>`
       : ""
   }
 </section>`,
     )
     .join("\n");
+
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"/>
@@ -494,12 +621,28 @@ export function renderBacktestReportHtml(args: {
   .tip-swatch { width:8px; height:8px; border-radius:2px; }
   .tip-val, .tip-dd { font-variant-numeric:tabular-nums; text-align:right; min-width:56px; }
   .tip-dd { color:var(--muted); }
+  .filters { position:sticky; top:0; z-index:3; display:flex; flex-wrap:wrap; gap:14px;
+             align-items:center; background:var(--panel); border:1px solid var(--grid);
+             border-radius:12px; padding:10px 12px; margin:12px 0; }
+  .filter-group { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .filter-label { color:var(--muted); font-size:11px; text-transform:uppercase;
+                  letter-spacing:.06em; margin-right:2px; }
+  .filter-count { margin-left:auto; color:var(--muted); font-size:11px; }
+  .chip { background:transparent; color:var(--muted); border:1px solid var(--grid);
+          border-radius:999px; padding:3px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .chip:hover { border-color:var(--muted); }
+  .chip.on { background:rgba(56,189,140,.16); border-color:#38bd8c; color:var(--ink); }
+  .chip.all { font-style:italic; }
+  section.panel[hidden], tbody tr[hidden] { display:none; }
 </style></head>
 <body>
   <h1>${esc(args.title)}</h1>
   ${args.subtitle ? `<p class="lead">${esc(args.subtitle)}</p>` : ""}
+  ${renderFilterBar(args.filters ?? [])}
   ${panels}
 <script>${HOVER_SCRIPT}</script>
+<script>${FILTER_SCRIPT}</script>
+
 </body></html>`;
 
 }
