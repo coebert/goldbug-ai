@@ -645,6 +645,12 @@ export function averageStyleRuns(runs: StyleRunMetrics[]): StyleRunMetrics {
     avgHoldBars: pick((m) => m.avgHoldBars),
     tradesPerYear: pick((m) => m.tradesPerYear),
     feeDragPct: pick((m) => m.feeDragPct),
+    feeDrag: {
+      commissionPct: pick((m) => m.feeDrag.commissionPct),
+      minFeePct: pick((m) => m.feeDrag.minFeePct),
+      slippagePct: pick((m) => m.feeDrag.slippagePct),
+      otherPct: pick((m) => m.feeDrag.otherPct),
+    },
     finalCashPct: pick((m) => m.finalCashPct),
     exitMix,
     equityCurve: averageEquityCurves(runs.map((r) => r.equityCurve)),
