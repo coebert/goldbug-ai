@@ -271,6 +271,14 @@ export type RiskConfig = {
   trading_style: "position" | "swing";
   /** Swing only: minimum sessions to hold before a discretionary sell. */
   swing_min_hold_days: number;
+  // Explicit cash-allocation policy (see src/lib/cash-allocation-policy.ts).
+  // When enabled, a regime-derived TARGET invested % keeps the book from
+  // drifting nearly flat in bull tapes, and caps it in defensive regimes.
+  // Always subordinate to the drawdown budget and the per-symbol caps.
+  cash_policy_enabled: boolean;
+  /** Optional user target invested share of NAV (0..1). null = regime table. */
+  target_invested_pct: number | null;
+
 };
 
 
