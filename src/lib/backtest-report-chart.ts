@@ -221,7 +221,71 @@ export const renderDrawdownChart = (series: readonly ChartSeries[], title: strin
     ...(size ? { size } : {}),
   });
 
+/** Wrap a chart SVG with the positioned tooltip element the hover script fills. */
+export const withHoverTooltip = (svg: string) =>
+  `<figure class="chart-wrap">${svg}<div class="chart-tip" hidden></div></figure>`;
+
+/** Inline script that drives crosshair + tooltip for every chart on the page. */
+export const HOVER_SCRIPT = `
+(function () {
+  var f2 = function (v) { return v === null || v === undefined ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2); };
+  document.querySelectorAll('.chart-wrap').forEach(function (wrap) {
+    var svg = wrap.querySelector('svg.chart');
+    var tip = wrap.querySelector('.chart-tip');
+    if (!svg || !tip || !svg.dataset.hover) return;
+    var data = JSON.parse(svg.dataset.hover);
+    var layer = svg.querySelector('.hover');
+    var cross = svg.querySelector('.hover .cross');
+    var dots = svg.querySelectorAll('.hover .dot');
+    if (!data.xs.length) return;
+
+    function hide() { if (layer) layer.style.display = 'none'; tip.hidden = true; }
+
+    function move(ev) {
+      var r = svg.getBoundingClientRect();
+      var vb = svg.viewBox.baseVal;
+      var ux = (ev.clientX - r.left) / r.width * (vb.width || r.width);
+      var best = 0, bestD = Infinity;
+      for (var i = 0; i < data.xs.length; i++) {
+        var d = Math.abs(data.xs[i] - ux);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      var ux2 = data.xs[best];
+      if (layer) layer.style.display = '';
+      if (cross) { cross.setAttribute('x1', ux2); cross.setAttribute('x2', ux2); }
+      var rows = '';
+      data.series.forEach(function (s, k) {
+        var dot = dots[k];
+        var py = s.px[best];
+        if (dot) {
+          if (py === null) { dot.setAttribute('cx', -99); dot.setAttribute('cy', -99); }
+          else { dot.setAttribute('cx', ux2); dot.setAttribute('cy', py); }
+        }
+        rows += '<div class="tip-row"><span class="tip-swatch" style="background:' + s.colour + '"></span>' +
+          '<span class="tip-label">' + s.label + '</span>' +
+          '<span class="tip-val">' + f2(s.equity[best]) + '%</span>' +
+          '<span class="tip-dd">' + f2(s.drawdown[best]) + '%</span></div>';
+      });
+      tip.innerHTML = '<div class="tip-head">' + data.labels[best] + '</div>' +
+        '<div class="tip-row tip-head-row"><span class="tip-swatch"></span><span class="tip-label"></span>' +
+        '<span class="tip-val">equity</span><span class="tip-dd">drawdown</span></div>' + rows;
+      tip.hidden = false;
+      var px = ux2 / (vb.width || r.width) * r.width;
+      var left = Math.min(Math.max(px + 12, 4), r.width - tip.offsetWidth - 4);
+      tip.style.left = left + 'px';
+      tip.style.top = '8px';
+    }
+
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', hide);
+    svg.addEventListener('touchmove', function (e) { if (e.touches[0]) move(e.touches[0]); }, { passive: true });
+    svg.addEventListener('touchend', hide);
+  });
+})();
+`;
+
 export function renderLegend(series: readonly ChartSeries[]): string {
+
   return `<ul class="legend">${series
     .map(
       (s) =>
