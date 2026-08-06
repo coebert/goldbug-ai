@@ -80,8 +80,8 @@ describe("backtest report charts", () => {
     expect(html.match(/<section class="panel">/g)).toHaveLength(2);
     expect(html).toContain("balanced risk");
     expect(html).toContain("<table>");
-    // Exactly one inline script: the hover/tooltip driver.
-    expect(html.match(/<script>/g)).toHaveLength(1);
+    // Two inline scripts: the hover/tooltip driver and the panel filter.
+    expect(html.match(/<script>/g)).toHaveLength(2);
     expect(html).toContain("chart-tip");
     expect(html).not.toContain("undefined");
   });

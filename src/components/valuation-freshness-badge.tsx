@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import { getLastValuationRefresh } from "@/lib/valuation-freshness.functions";
 import { formatUkDateTime } from "@/lib/uk-time";
+import { POLL } from "@/lib/query-keys";
 
 function relative(iso: string, now: number): string {
   const ms = now - Date.parse(iso);
@@ -30,7 +31,7 @@ export function ValuationFreshnessBadge({ portfolioId }: { portfolioId: string }
   const { data } = useQuery({
     queryKey: ["valuation-freshness", portfolioId],
     queryFn: () => fetchFreshness({ data: { portfolioId } }),
-    refetchInterval: 60_000,
+    refetchInterval: POLL.SEMI_LIVE,
     staleTime: 30_000,
   });
 
