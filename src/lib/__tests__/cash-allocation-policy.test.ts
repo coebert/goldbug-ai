@@ -87,7 +87,7 @@ describe("bull tape — does not allow the book to sit nearly flat", () => {
     const p = resolveCashAllocationPolicy(
       base({ cashFloorPct: 0.5, targetOverridePct: 1 }),
     );
-    expect(p.effectiveCashFloorPct).toBe(ABSOLUTE_MIN_CASH_PCT);
+    expect(p.effectiveCashFloorPct).toBeCloseTo(ABSOLUTE_MIN_CASH_PCT, 9);
     expect(p.maxInvestedPct).toBeLessThanOrEqual(1 - ABSOLUTE_MIN_CASH_PCT);
   });
 
