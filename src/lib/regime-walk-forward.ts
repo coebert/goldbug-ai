@@ -807,12 +807,19 @@ export type RegimeGate = {
   minMedianCagrPct: number;
   /** Share of windows that must be profitable (default 0.5). */
   minPositiveRate: number;
+  /**
+   * Independent-window evidence a regime needs before its verdict counts
+   * (default 0 = no requirement). Applied to `effectiveWindows`, not the raw
+   * count, so overlapping slices cannot buy a pass.
+   */
+  minEffectiveWindows: number;
 };
 
 export const DEFAULT_REGIME_GATE: RegimeGate = {
   maxDrawdownPct: 25,
   minMedianCagrPct: 0,
   minPositiveRate: 0.5,
+  minEffectiveWindows: 0,
 };
 
 /** Aggregate the out-of-sample windows that fell in one regime. */
@@ -840,8 +847,11 @@ export function summariseRegime(
       beatBenchmarkRate: 0,
       meanConfidence: 0,
       medianTradesPerYear: 0,
+      effectiveWindows: 0,
+      overlapShare: 0,
 
       drawdownStable: true,
+      sufficientEvidence: false,
       pass: false,
     };
   }
@@ -850,6 +860,10 @@ export function summariseRegime(
   const positiveRate = cagrs.filter((c) => c > 0).length / rows.length;
   const drawdownStable = dds.every((d) => Math.abs(d) <= g.maxDrawdownPct + 1e-9);
   const medianNetCagrPct = median(cagrs);
+  // Overlapping windows share bars, so `windows` overstates the evidence.
+  const slices = rows.map((r) => r.window);
+  const effectiveWindows = effectiveWindowCount(slices);
+  const sufficientEvidence = effectiveWindows >= g.minEffectiveWindows - 1e-9;
   return {
     regime,
     windows: rows.length,
@@ -868,14 +882,19 @@ export function summariseRegime(
       rows.reduce((a, r) => a + (Number.isFinite(r.confidence ?? NaN) ? r.confidence! : 0), 0)
       / rows.length,
     medianTradesPerYear: median(rows.map((r) => r.tradesPerYear)),
+    effectiveWindows,
+    overlapShare: meanWindowOverlap(slices),
 
     drawdownStable,
+    sufficientEvidence,
     pass:
       drawdownStable
+      && sufficientEvidence
       && medianNetCagrPct >= g.minMedianCagrPct - 1e-9
       && positiveRate >= g.minPositiveRate - 1e-9,
   };
 }
+
 
 export type RegimeReport = {
   summaries: RegimeSummary[];
