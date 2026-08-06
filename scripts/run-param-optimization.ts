@@ -375,13 +375,17 @@ const panels: ReportPanel[] = [
     series: [],
     table: {
       columns: ["turnover/yr", "CAGR %", "DD %", "fees %", "params"],
-      rows: frontier.map((r) => [
-        r.metrics.tradesPerYear.toFixed(0),
-        r.metrics.cagrPct.toFixed(2),
-        r.metrics.maxDrawdownPct.toFixed(1),
-        r.metrics.feeDragPct.toFixed(1),
-        formatParams(r.params),
-      ]),
+      rows: frontier.map((r) => ({
+        tags: paramTags(r.params, riskLevel),
+        cells: [
+          r.metrics.tradesPerYear.toFixed(0),
+          r.metrics.cagrPct.toFixed(2),
+          r.metrics.maxDrawdownPct.toFixed(1),
+          r.metrics.feeDragPct.toFixed(1),
+          formatParams(r.params),
+        ],
+      })),
+
     },
   },
 ];
