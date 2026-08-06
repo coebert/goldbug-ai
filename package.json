@@ -14,6 +14,7 @@
     "check:security-definer": "bun run scripts/check-security-definer.ts",
     "check:security-headers": "vitest run src/lib/_server/__tests__/security-headers.contract.test.ts",
     "verify:security": "bun run check:security-headers && bun run check:security-definer && bun run check:deps --strict",
+    "check:trading-mode": "vitest run src/components/__tests__/trading-mode-parity.test.tsx src/components/__tests__/trading-mode-drift.test.tsx src/components/__tests__/trading-mode-toggle.e2e.test.tsx src/lib/__tests__/trading-mode-surface-coverage.test.ts",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:ci": "vitest run --project ci",
