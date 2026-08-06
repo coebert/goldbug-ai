@@ -41,7 +41,7 @@ export function TradeMarkerShape(props: {
         points={points}
         fill={color}
         stroke="var(--card)"
-        strokeWidth={1}
+        strokeWidth={0.75}
         opacity={0.95}
       />
       {count > 1 && (
@@ -49,7 +49,7 @@ export function TradeMarkerShape(props: {
           x={cx + s + 2}
           y={y + (buy ? s : -s)}
           fill={color}
-          fontSize={9}
+          fontSize={8}
           fontWeight={600}
         >
           {count}
@@ -64,14 +64,14 @@ export function TradeMarkerLegend({ className }: { className?: string }) {
   return (
     <>
       <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
-        <svg width="10" height="10" aria-hidden>
-          <polygon points="5,0 0,10 10,10" fill="var(--success)" />
+        <svg width="8" height="8" aria-hidden>
+          <polygon points="4,0 0,8 8,8" fill="var(--success)" />
         </svg>
         Buy executed
       </span>
       <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
-        <svg width="10" height="10" aria-hidden>
-          <polygon points="5,10 0,0 10,0" fill="var(--destructive)" />
+        <svg width="8" height="8" aria-hidden>
+          <polygon points="4,8 0,0 8,0" fill="var(--destructive)" />
         </svg>
         Sell executed
       </span>
