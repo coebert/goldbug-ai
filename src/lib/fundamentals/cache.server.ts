@@ -5,10 +5,12 @@
 // every hour. Reads are cheap and shared across portfolios.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { srvLog } from "@/lib/_server/log";
+import { createLogger } from "@/lib/_server/log";
 import type { Fundamentals, FundamentalsScore } from "./types";
 import { scoreFundamentals } from "./score";
 import { fetchFundamentals } from "./yahoo-fundamentals.server";
+
+const log = createLogger("fundamentals");
 
 const DEFAULT_TTL_HOURS = 24;
 /** Cap concurrent provider calls so a large universe cannot stall the tick. */
@@ -28,7 +30,7 @@ async function readCache(symbols: string[]): Promise<Map<string, CacheRow>> {
     .select("symbol, data, expires_at")
     .in("symbol", symbols);
   if (error) {
-    srvLog.warn("[fundamentals] cache read failed:", error.message);
+    log.warn("cache read failed", { error: error.message });
     return out;
   }
   for (const row of (data ?? []) as unknown as CacheRow[]) {
@@ -53,7 +55,7 @@ async function writeCache(rows: Fundamentals[], ttlHours: number): Promise<void>
   const { error } = await supabaseAdmin
     .from("fundamentals_cache" as never)
     .upsert(payload as never, { onConflict: "symbol" } as never);
-  if (error) srvLog.warn("[fundamentals] cache write failed:", error.message);
+  if (error) log.warn("cache write failed", { error: error.message });
 }
 
 /** Run `worker` over `items` with bounded concurrency. */
