@@ -509,7 +509,7 @@ function maxAffordableBuyQty(
   symbol: string,
 ): number {
   const spendAt = (q: number): number => {
-    const p = effectiveFillPrice(quote, q, "BUY", f);
+    const p = effectiveFillPrice(quote, q, "BUY", f, symbol);
     const notional = q * p;
     return notional + totalFee(notional, "BUY", baseFee, f, { symbol, quantity: q });
   };
@@ -925,7 +925,7 @@ export function simulateBrokerExecution(
 
       // ---- Friction-aware BUY --------------------------------------------
       const requested = requestedAfterLiquidity;
-      const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f);
+      const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f, d.symbol);
       const requestedNotional = requested * requestedEffPrice;
       const requestedSpend =
         requestedNotional
@@ -953,7 +953,7 @@ export function simulateBrokerExecution(
         }
       }
 
-      const effPrice = effectiveFillPrice(d.price, qty, "BUY", f);
+      const effPrice = effectiveFillPrice(d.price, qty, "BUY", f, d.symbol);
       const notional = qty * effPrice;
       const totalFeePaid = totalFee(notional, "BUY", fee, f, { symbol: d.symbol, quantity: qty });
       const spend = notional + totalFeePaid;
@@ -1017,7 +1017,7 @@ export function simulateBrokerExecution(
       qty = held;
     }
     const f = options.frictions;
-    const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f);
+    const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f, d.symbol);
     const proceeds = qty * effSellPrice;
     const totalFeePaid = totalFee(proceeds, "SELL", fee, f, { symbol: d.symbol, quantity: qty });
     if (totalFeePaid > cash + proceeds) {
