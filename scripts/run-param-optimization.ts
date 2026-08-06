@@ -579,6 +579,15 @@ writeFileSync(
       `${symbols.length} symbols · ${tape.bars.length} bars · ${candidates.length} candidates · ` +
       `net of ${FRICTIONS.commissionBps}bps + $${FRICTIONS.minCommission} commission and ${FRICTIONS.slippageBps}bps slippage`,
     panels,
+    filters: [
+      {
+        key: "risk",
+        label: "risk level",
+        options: [...new Set([riskLevel, ...riskLevels])].map((r) => ({ value: r, label: r })),
+      },
+      { key: "ticket", label: "ticket size", options: ticketOptions },
+    ],
+
   }),
 );
 console.log("\nWrote reports/param-optimization.html");
