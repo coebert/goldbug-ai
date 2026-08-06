@@ -9,6 +9,8 @@
 import type { BrokerOrderResult } from "@/lib/brokers/adapter";
 import { asJson } from "@/lib/_server/db-json";
 import { createHash } from "node:crypto";
+import { assessTradeViability } from "@/lib/trade-viability-gate";
+
 
 export interface ExecutedOrderLike {
   symbol: string;
@@ -1486,6 +1488,51 @@ export async function routeOrdersToBroker(params: {
       });
       continue;
     }
+
+    // Trade-viability gate. Sizing upstream works on a *notional* budget, but
+    // whole-share rounding can drop the real ticket far below it (1 share of a
+    // £36 ETF against a £3 commission floor = 830bps one way). Re-check the
+    // post-rounding economics here — the last place that knows the true
+    // quantity — and skip BUYs whose round-trip friction (commission floor +
+    // UK stamp duty + PTM levy + half-spread) exceeds the budget. Sells are
+    // never blocked: exits must always be able to execute.
+    const viability = assessTradeViability({
+      symbol: order.symbol,
+      side: order.side,
+      quantity: qty,
+      price: order.price,
+    });
+    if (!viability.viable) {
+      results.push({
+        symbol: order.symbol,
+        side: order.side,
+        quantity: qty,
+        status: "skipped",
+        skipped: viability.reason,
+      });
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: adapter.env,
+        method: "TRADE_VIABILITY_BLOCKED",
+        path: "live_orders",
+        status: null,
+        request: asJson({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: qty,
+          price: order.price,
+          costs: viability.costs,
+          budgetBps: viability.budgetBps,
+          minViableNotional: viability.minViableNotional,
+        }),
+        error: viability.reason ?? null,
+      });
+      continue;
+    }
+
+
 
     // Insert-first: DB unique index on client_order_id is the source of truth
     // for idempotency. On unique violation (23505) we look up the winner and
