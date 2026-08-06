@@ -140,7 +140,10 @@ for (const w of windows) {
   const oosCurve = m.equityCurve.slice(w.testStart - w.trainStart);
   if (oosCurve.length < 2) continue;
 
-  const regime = dominantRegime(labels, w.testStart, w.testEnd);
+  const regime = dominantRegimeWeighted(regimeBars, w.testStart, w.testEnd, {
+    minDirectionalShare: Number(arg("min-share", "0.45")),
+    minConfidence: Number(arg("min-conf", "0.5")),
+  });
   const benchStart = index[w.testStart]!.value;
   const benchEnd = index[w.testEnd - 1]!.value;
   const years = (w.testEnd - w.testStart) / 252;
@@ -149,8 +152,11 @@ for (const w of windows) {
     window: w,
     regime: regime.label,
     purity: regime.purity,
+    confidence: regime.confidence,
+    demoted: regime.demoted,
     from: tape.bars[w.testStart]!.date,
     to: tape.bars[w.testEnd - 1]!.date,
+
     netCagrPct: curveCagrPct(oosCurve),
     maxDrawdownPct: curveMaxDrawdownPct(oosCurve),
     benchmarkCagrPct: annualisedPct(benchStart, benchEnd, w.testEnd - w.testStart - 1),
