@@ -301,7 +301,7 @@ for (const rl of riskLevels) {
     rows.push({ params, metrics, robustness, perScenario });
 
     if (rl === riskLevel) {
-      evaluated.push({ params, metrics });
+      evaluated.push({ params, metrics, robustness, perScenario });
       const key = formatParams(params);
       curves.set(key, foldCurves.flat());
       tradeLogs.set(key, firstLog);
