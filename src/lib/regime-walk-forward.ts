@@ -932,6 +932,8 @@ export function buildRegimeReport(
 export const REGIME_COLUMNS = [
   "regime",
   "windows",
+  "eff. windows",
+  "overlap",
   "median CAGR %",
   "worst CAGR %",
   "CAGR sd",
@@ -968,6 +970,8 @@ export function regimeTableRows(summaries: readonly RegimeSummary[]): string[][]
   return summaries.map((s) => [
     s.regime,
     String(s.windows),
+    f(s.effectiveWindows),
+    pctOf(s.overlapShare),
     f(s.medianNetCagrPct),
     f(s.worstNetCagrPct),
     f(s.cagrStdPct),
@@ -979,9 +983,18 @@ export function regimeTableRows(summaries: readonly RegimeSummary[]): string[][]
     f(s.medianTradesPerYear, 0),
     pctOf(s.meanConfidence),
 
-    s.windows === 0 ? "no data" : s.pass ? "pass" : s.drawdownStable ? "weak returns" : "drawdown breach",
+    s.windows === 0
+      ? "no data"
+      : !s.sufficientEvidence
+        ? "too few independent windows"
+        : s.pass
+          ? "pass"
+          : s.drawdownStable
+            ? "weak returns"
+            : "drawdown breach",
   ]);
 }
+
 
 export function windowTableRows(results: readonly WindowResult[]): string[][] {
   return results.map((r) => [
