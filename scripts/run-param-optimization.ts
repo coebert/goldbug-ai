@@ -247,7 +247,44 @@ console.log(
     `${overallReentry.roundTripsPerSymbol.toFixed(1)} round trips/symbol`,
 );
 
+// -------------------------------------------------- viability thresholds
+// Fit the turnover breakeven at each risk level and flag every configuration
+// that trades past it or fails to clear the minimum net return after costs.
+const viabilityRows: ViabilityRow[] = [];
+for (const [rl, rows] of evaluatedByRisk) {
+  const rlScored = scoreAll(rows, constraints);
+  for (const r of rlScored) {
+    viabilityRows.push({
+      id: formatParams(r.params),
+      riskLevel: rl,
+      params: r.params,
+      metrics: {
+        tradesPerYear: r.metrics.tradesPerYear,
+        cagrPct: r.metrics.cagrPct,
+        feeDragPct: r.metrics.feeDragPct,
+        maxDrawdownPct: r.metrics.maxDrawdownPct,
+        sharpe: r.metrics.sharpe,
+      },
+      check: { feasible: r.check.feasible, disqualified: r.check.disqualified },
+    });
+  }
+}
+const viability = buildViabilityReport(viabilityRows, {
+  minCagrPct: minViableCagr,
+  marginalBand: 0.1,
+});
+
+console.log(`\nViability thresholds (min net CAGR ${minViableCagr.toFixed(2)}%):`);
+for (const lvl of viability.levels) console.log(`  ${describeRiskLevelViability(lvl)}`);
+console.log(
+  `  ${viability.totalFlagged}/${viability.totalAssessed} configurations flagged` +
+    (viability.universallyBelow.length
+      ? `  ·  ${viability.universallyBelow.length} below breakeven at every risk level`
+      : ""),
+);
+
 const frontier = paretoFrontier(scored);
+
 
 console.log("\nCAGR vs turnover frontier:");
 for (const r of frontier) {
