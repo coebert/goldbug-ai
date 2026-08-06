@@ -1050,7 +1050,7 @@ export function windowTableRows(results: readonly WindowResult[]): string[][] {
   ]);
 }
 
-function pad(rows: readonly string[][], columns: readonly string[]): string {
+export function pad(rows: readonly string[][], columns: readonly string[]): string {
   const all = [[...columns], ...rows];
   const widths = columns.map((_, i) => Math.max(...all.map((r) => (r[i] ?? "").length)));
   return all.map((r) => r.map((c, i) => (c ?? "").padEnd(widths[i]!)).join("  ")).join("\n");
@@ -1059,6 +1059,12 @@ function pad(rows: readonly string[][], columns: readonly string[]): string {
 export function formatRegimeTable(summaries: readonly RegimeSummary[]): string {
   return pad(regimeTableRows(summaries), REGIME_COLUMNS);
 }
+
+/** The cost decomposition rendered with the same column padding. */
+export function formatCostTable(costs: readonly RegimeCostSummary[]): string {
+  return pad(regimeCostTableRows(costs), REGIME_COST_COLUMNS);
+}
+
 
 export function formatWindowTable(results: readonly WindowResult[]): string {
   return pad(windowTableRows(results), WINDOW_COLUMNS);
