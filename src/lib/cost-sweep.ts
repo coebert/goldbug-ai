@@ -401,6 +401,8 @@ export type BreakevenGroup = {
   riskLevel: string;
   slippageLabel: string;
   minCommission: number | null;
+  /** Liquidity assumption for the series, when the axis was swept. */
+  liquidityLabel: string | null;
   ticketValue: number;
   baselineRoundTripBps: number;
   vsZero: BreakevenResult;
@@ -424,6 +426,7 @@ export function breakevenGrid(
       c.ticket.label,
       c.scenario.slippage?.label ?? "-",
       c.scenario.minCommission ?? "-",
+      c.scenario.liquidity?.label ?? "-",
     ].join("|");
     const bucket = groups.get(key);
     if (bucket) bucket.push(c);
@@ -447,6 +450,7 @@ export function breakevenGrid(
       riskLevel: first.riskLevel,
       slippageLabel: first.scenario.slippage?.label ?? "baseline",
       minCommission: first.scenario.minCommission ?? null,
+      liquidityLabel: first.scenario.liquidity?.label ?? null,
       ticketValue: tv,
       baselineRoundTripBps: roundTripCostBps(seriesBase, tv),
       vsZero: findBreakevenScale(series, {
