@@ -80,7 +80,12 @@ export type SnapshotWriteInput = {
 
 export type SnapshotWriteResult = {
   written: boolean;
-  reason?: "invariants" | "implausible_jump" | "unsynced_positions" | "db_error";
+  reason?:
+    | "invariants"
+    | "implausible_jump"
+    | "unsynced_positions"
+    | "authoritative_exists"
+    | "db_error";
   message?: string;
   violations?: EquityInvariantViolation[];
 };
