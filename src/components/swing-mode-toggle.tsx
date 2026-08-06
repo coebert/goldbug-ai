@@ -33,14 +33,18 @@ export function SwingModeToggle({
   currency?: string | null;
 }) {
   const cfg = (riskConfig ?? {}) as Record<string, unknown>;
+  // The persisted mode fills in while the portfolio query is still loading, so
+  // the switch does not start "Off" and jump to "On" on every refresh.
+  const { isSwing: resolved, setStyle } = useTradingMode(portfolioId, riskConfig);
   const serverActive = cfg["trading_style"] === "swing";
-  const [active, setActive] = useState(serverActive);
+  const [active, setActive] = useState(resolved);
 
   // Keep the switch in sync when the portfolio refetches (or another surface
   // changes the style), but never fight an in-flight optimistic flip.
   useEffect(() => {
-    setActive(serverActive);
-  }, [serverActive]);
+    setActive(resolved);
+  }, [resolved]);
+
 
   // Viability: the engine downgrades swing to position whenever a typical
   // ticket cannot pay its own round-trip costs, so surface that here too.
