@@ -750,16 +750,12 @@ export type WindowResult = {
   /**
    * Train vs out-of-sample cost decomposition for this window. Optional so
    * hand-built rows and older callers still typecheck; the runner populates
-   * it and `buildRegimeReport` folds it into the per-regime cost table.
-   * Typed structurally to keep this module free of a cycle with
-   * `regime-cost-attribution`, which imports `RegimeLabel` from here.
+   * it and the cost report aggregates it per regime. Imported type-only, so
+   * the pairing with `regime-cost-attribution` costs no runtime cycle.
    */
-  costs?: {
-    train: { annualDragPct: number; axes: Record<string, number> };
-    test: { annualDragPct: number; axes: Record<string, number> };
-    dragDriftPct: number;
-  };
+  costs?: WindowCosts;
 };
+
 
 
 export type RegimeSummary = {
