@@ -36,6 +36,8 @@ import { resolveFillCurrency } from "./fill-record";
 /** Ratios inside this band of 100 count as a unit error, not a price move. */
 const UNIT_RATIO_LO = 25;
 const UNIT_RATIO_HI = 400;
+/** Outside this band a row is neither correct nor a clean unit error. */
+const PLAUSIBLE_RATIO = 5;
 
 export type BackfillFill = {
   id: string;
