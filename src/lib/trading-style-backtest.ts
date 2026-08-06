@@ -678,6 +678,9 @@ export function averageStyleRuns(runs: StyleRunMetrics[]): StyleRunMetrics {
       slippagePct: pick((m) => m.feeDrag.slippagePct),
       otherPct: pick((m) => m.feeDrag.otherPct),
     },
+    // The averaged cell has no single fill set behind it, so a per-fill
+    // reconciliation would be meaningless — audits live on the per-seed runs.
+    feeDragAudit: undefined,
     finalCashPct: pick((m) => m.finalCashPct),
     exitMix,
     equityCurve: averageEquityCurves(runs.map((r) => r.equityCurve)),
