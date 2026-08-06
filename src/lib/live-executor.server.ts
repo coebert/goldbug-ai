@@ -10,6 +10,7 @@ import type { BrokerOrderResult } from "@/lib/brokers/adapter";
 import { asJson } from "@/lib/_server/db-json";
 import { createHash } from "node:crypto";
 import { assessTradeViability } from "@/lib/trade-viability-gate";
+import { resolveFillRecord } from "@/lib/fill-record";
 
 
 export interface ExecutedOrderLike {
