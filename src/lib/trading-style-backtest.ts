@@ -36,6 +36,7 @@ import {
   reentryLockoutDays,
 } from "@/lib/exits";
 import { minHoldDays, type TradingStyle } from "@/lib/trading-style";
+import type { PolicyOrder, StylePolicy } from "@/lib/style-policy";
 import type { RiskConfig } from "@/lib/universe.server";
 
 export const STYLE_HORIZONS: Array<{ label: string; bars: number }> = [
@@ -116,6 +117,45 @@ export type StyleBacktestOptions = {
   seeds?: number[];
   startingCash?: number;
   feePerTrade?: number;
+  /** Decision layer per style. Defaults to the heuristic rule set. */
+  policyFor?: (style: TradingStyle) => StylePolicy;
+};
+
+/**
+ * Default decision layer: the deterministic heuristic rule set the engine
+ * falls back to when the AI is unavailable. Consulted every bar.
+ */
+export const heuristicStylePolicy: StylePolicy = {
+  name: "heuristic",
+  cadenceBars: 1,
+  decide: async (ctx) => {
+    const feats = ctx.candidates.map((c) => c.feature);
+    const holdings = ctx.holdings.map((h) => ({ symbol: h.symbol, quantity: h.quantity }));
+    const orders: PolicyOrder[] = [];
+    for (const s of buildHeuristicSells(holdings, feats)) {
+      const h = ctx.holdings.find((x) => x.symbol === s.symbol);
+      if (!h || !(h.quantity > 0) || !(s.quantity > 0)) continue;
+      orders.push({
+        symbol: s.symbol,
+        side: "sell",
+        weight: Math.min(1, s.quantity / h.quantity),
+        reason: s.reason,
+      });
+    }
+    for (const b of buildHeuristicBuys(holdings, feats, {
+      cashValue: ctx.cash,
+      riskLevel: ctx.riskLevel,
+    })) {
+      orders.push({
+        symbol: b.symbol,
+        side: "buy",
+        // Sizing is owned by the harness sleeve, not the heuristic percent.
+        weight: ctx.perNameWeight,
+        reason: b.reason,
+      });
+    }
+    return orders;
+  },
 };
 
 /** Run one (config × tape) cell and score it. */
@@ -125,8 +165,11 @@ export async function runStyleBacktest(args: {
   riskLevel: RiskLevel;
   startingCash: number;
   feePerTrade: number;
+  /** Decision layer. Defaults to the deterministic heuristic rule set. */
+  policy?: StylePolicy;
 }): Promise<Omit<StyleRunMetrics, "style" | "horizon" | "seed">> {
   const { cfg, bars, riskLevel, startingCash, feePerTrade } = args;
+  const policy = args.policy ?? heuristicStylePolicy;
 
   const positions = new Map<string, PositionState>();
   const lockedUntilBar = new Map<string, number>();
@@ -143,7 +186,7 @@ export async function runStyleBacktest(args: {
   const result = await runBacktest(
     { cash: startingCash, holdings: [] },
     bars,
-    ({ state, closes, history, barIndex }) => {
+    async ({ state, closes, history, barIndex, date }) => {
       if (barIndex < 31) return [];
       const decisions: SimDecision[] = [];
       const exiting = new Set<string>();
@@ -277,39 +320,10 @@ export async function runStyleBacktest(args: {
         }
       }
 
-      // ------------------------------------- discretionary heuristic exits
-      const discretionaryCandidates = state.holdings
-        .filter((h) => h.quantity > 0 && !exiting.has(h.symbol))
-        .map((h) => ({ symbol: h.symbol, quantity: h.quantity }));
-
-      for (const s of buildHeuristicSells(discretionaryCandidates, feats)) {
-        const pos = positions.get(s.symbol);
-        // Swing churn guard: no discretionary exit inside the min-hold window.
-        if (pos && minHold > 0 && barIndex - pos.openedBar < minHold) continue;
-        const price = closes[s.symbol];
-        if (!(price > 0) || !(s.quantity > 0)) continue;
-        decisions.push({
-          id: `${barIndex}-d-${s.symbol}`,
-          symbol: s.symbol,
-          side: "SELL",
-          quantity: s.quantity,
-          price,
-        });
-        sells++;
-        noteExit("discretionary");
-        exiting.add(s.symbol);
-        holdBarsClosed.push(pos ? barIndex - pos.openedBar : 0);
-        positions.delete(s.symbol);
-      }
-
-      // ------------------------------------------------------------ entries
-      const heldAfter = new Set(
-        state.holdings
-          .filter((h) => h.quantity > 0 && !exiting.has(h.symbol))
-          .map((h) => h.symbol),
-      );
-      // Mark-to-market equity, so position weights are portfolio weights and
-      // the book actually gets deployed instead of sitting ~95% in cash.
+      // ------------------------------------------- discretionary decisions
+      // Either the deterministic heuristic rule layer (default) or the real
+      // AI decision policy. Everything above this line — the mechanical risk
+      // engine — is identical either way, so the arms stay comparable.
       const holdingsValue = state.holdings.reduce(
         (sum, h) => sum + h.quantity * (closes[h.symbol] || h.avgCost),
         0,
@@ -319,10 +333,78 @@ export async function runStyleBacktest(args: {
       const cashFloor = equityNow * (cfg.cash_floor_pct ?? 0.05);
       let cashAvail = Math.max(0, state.cash - cashFloor);
 
-      for (const b of buildHeuristicBuys(discretionaryCandidates, feats, {
-        cashValue: state.cash,
-        riskLevel,
-      })) {
+      const dueForDecision = barIndex % Math.max(1, policy.cadenceBars) === 0;
+      const orders: PolicyOrder[] = dueForDecision
+        ? await policy.decide({
+            barIndex,
+            date,
+            cfg,
+            riskLevel,
+            cash: state.cash,
+            equity: equityNow,
+            holdings: state.holdings
+              .filter((h) => h.quantity > 0 && !exiting.has(h.symbol))
+              .map((h) => ({
+                symbol: h.symbol,
+                quantity: h.quantity,
+                avgCost: h.avgCost,
+                price: closes[h.symbol] || h.avgCost,
+                heldBars: barIndex - (positions.get(h.symbol)?.openedBar ?? barIndex),
+              })),
+            candidates: Object.entries(closes)
+              .filter(([, price]) => price > 0)
+              .map(([symbol, price]) => ({
+                symbol,
+                price,
+                feature: feats.find((f) => f.symbol === symbol) ?? {
+                  symbol,
+                  rsi14: null,
+                  change5d: null,
+                  change30d: null,
+                  macd_hist: null,
+                },
+                atrPct: atrPctFrom(history[symbol] ?? []),
+                locked: (lockedUntilBar.get(symbol) ?? -1) > barIndex,
+              })),
+            maxNames: sleeve.maxNames,
+            perNameWeight: sleeve.perNameWeight,
+          })
+        : [];
+
+      // ------------------------------------------------ discretionary exits
+      for (const s of orders.filter((o) => o.side === "sell")) {
+        const h = state.holdings.find((x) => x.symbol === s.symbol);
+        if (!h || !(h.quantity > 0) || exiting.has(s.symbol)) continue;
+        const pos = positions.get(s.symbol);
+        // Swing churn guard: no discretionary exit inside the min-hold window.
+        if (pos && minHold > 0 && barIndex - pos.openedBar < minHold) continue;
+        const price = closes[s.symbol];
+        if (!(price > 0)) continue;
+        const qty = Math.min(h.quantity, Math.max(1, Math.floor(h.quantity * s.weight)));
+        decisions.push({
+          id: `${barIndex}-d-${s.symbol}`,
+          symbol: s.symbol,
+          side: "SELL",
+          quantity: qty,
+          price,
+        });
+        sells++;
+        noteExit("discretionary");
+        if (qty >= h.quantity) {
+          exiting.add(s.symbol);
+          holdBarsClosed.push(pos ? barIndex - pos.openedBar : 0);
+          positions.delete(s.symbol);
+        }
+      }
+
+      // ------------------------------------------------------------ entries
+      const heldAfter = new Set(
+        state.holdings
+          .filter((h) => h.quantity > 0 && !exiting.has(h.symbol))
+          .map((h) => h.symbol),
+      );
+
+      for (const b of orders.filter((o) => o.side === "buy")) {
         if (heldAfter.size >= sleeve.maxNames) break;
         if (heldAfter.has(b.symbol)) continue;
         const lock = lockedUntilBar.get(b.symbol);
@@ -336,7 +418,10 @@ export async function runStyleBacktest(args: {
           cfg.volatility_sizing && atrPct > 0
             ? Math.max(0.35, Math.min(1, cfg.vol_target_pct / atrPct))
             : 1;
-        const budget = Math.min(cashAvail, equityNow * sleeve.perNameWeight * volScale);
+        // The policy's requested weight is honoured but never above the sleeve
+        // cap, so neither arm can win by simply betting bigger.
+        const weight = Math.min(b.weight, sleeve.perNameWeight);
+        const budget = Math.min(cashAvail, equityNow * weight * volScale);
         const qty = Math.floor(budget / price);
         if (qty < 1) continue;
         cashAvail -= qty * price;
@@ -357,6 +442,7 @@ export async function runStyleBacktest(args: {
           scaleOutsTaken: 0,
         });
       }
+
 
       return decisions;
     },
@@ -469,6 +555,7 @@ export async function compareTradingStyles(
         for (const style of styles) {
           const m = await runStyleBacktest({
             cfg: cfgs[style],
+            ...(options.policyFor ? { policy: options.policyFor(style) } : {}),
             bars: tape,
             riskLevel,
             startingCash,
