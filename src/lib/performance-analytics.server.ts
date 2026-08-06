@@ -192,7 +192,7 @@ export async function getPerformanceAnalytics(
       .order("snapshot_date", { ascending: true }),
     db
       .from("trades")
-      .select("symbol, side, quantity, price, trade_date, executed_at, reason")
+      .select("symbol, side, quantity, price, trade_date, executed_at, reason, instrument_ccy, asset_class")
       .eq("portfolio_id", portfolioId)
       .gte("executed_at", sinceIso)
       .order("executed_at", { ascending: true }),
@@ -326,15 +326,15 @@ export async function getPerformanceAnalytics(
     roundTrips: regimeEntries.length,
     equityCurve,
     drawdownCurve,
-    trades: trades.map((t) => ({
+    trades: trades.map((t, i) => ({
       symbol: t.symbol,
       side: t.side,
       quantity: Number(t.quantity),
       price: Number(t.price),
       trade_date: t.trade_date,
       executed_at: t.executed_at ?? null,
-      instrument_ccy: t.instrument_ccy ?? null,
-      asset_class: t.asset_class ?? null,
+      instrument_ccy: ((tradesRes.data ?? [])[i]?.instrument_ccy as string) ?? null,
+      asset_class: ((tradesRes.data ?? [])[i]?.asset_class as string) ?? null,
     })),
     regimeAttribution: rollup(regimeEntries),
     sizingAttribution: rollup(sizingEntries),
