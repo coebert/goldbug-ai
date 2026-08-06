@@ -737,6 +737,21 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
   const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
 
+  // Sector cycle: classify every sector as growing / stagnating / shrinking
+  // from its 30d vs 90d momentum relative to the cross-sector median. Feeds
+  // both the AI prompt and the deterministic sizing layer below.
+  const sectorCycle = classifySectorCycle(
+    (sectorScores ?? []).map((s) => ({
+      sector: s.sector,
+      etf: s.etf,
+      momentum_30d: s.momentum_30d,
+      momentum_90d: s.momentum_90d,
+      score: s.score,
+      rank: s.rank,
+    })),
+  );
+  const sectorCycleBlock = formatSectorCycleBlock(sectorCycle);
+
   // Measured trading edge (rolling signal_performance) — feeds Kelly sizing
   // instead of the old hardcoded 2% assumption. Falls back to the prior when
   // there is not enough measurement yet.
