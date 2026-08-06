@@ -144,4 +144,45 @@ describe("analyzePreflight", () => {
     });
     expect(r.headline).toMatch(/baseline still building/);
   });
+  it("does not flag a fast sub-second phase that doubled against a tiny baseline", () => {
+    // Regression: news at 260ms vs a 117ms median is 2.2x and scores hard, but
+    // 0.26s cannot threaten the deadline — it must not read as an anomaly.
+    const history = Array.from({ length: 10 }, (_, i) => [
+      { phase: "news" as const, ms: 110 + (i % 4) * 5 },
+    ]);
+    const r = analyzePreflight({
+      phases: [p("news", 260)],
+      history,
+      budgetMs: 55_000,
+    });
+    expect(r.phases[0].severity).toBe("ok");
+    expect(r.anomalous).toBe(false);
+    expect(r.culprit).toBeNull();
+    expect(r.headline).not.toMatch(/anomaly/i);
+    // The ratio is still reported for the dashboard, just not acted on.
+    expect(r.phases[0].ratio).toBeGreaterThan(2);
+  });
+
+  it("still flags a slow phase once the regression is absolutely meaningful", () => {
+    const history = Array.from({ length: 10 }, (_, i) => [
+      { phase: "news" as const, ms: 110 + (i % 4) * 5 },
+    ]);
+    const r = analyzePreflight({
+      phases: [p("news", 4_000)],
+      history,
+      budgetMs: 55_000,
+    });
+    expect(r.phases[0].severity).toBe("critical");
+    expect(r.culprit?.phase).toBe("news");
+  });
+
+  it("keeps absolute-ceiling and budget-share flags independent of the noise floor", () => {
+    const r = analyzePreflight({
+      phases: [p("news", 13_000)],
+      history: steadyHistory(),
+      budgetMs: 55_000,
+    });
+    expect(r.phases[0].reason).toContain("ceiling");
+    expect(r.anomalous).toBe(true);
+  });
 });
