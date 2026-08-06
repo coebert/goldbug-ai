@@ -4,7 +4,7 @@ import {
   commissionBreakevenNotional,
   SCALING_COMMISSION_MODEL,
 } from "../commission-model";
-import { simulateBroker } from "../broker-simulator";
+import { simulateBrokerExecution } from "../broker-simulator";
 
 describe("computeCommission — scaling with notional", () => {
   it("applies the min floor on tiny LSE tickets", () => {
@@ -110,11 +110,11 @@ describe("broker simulator integration", () => {
   const frictions = { commission: { model: SCALING_COMMISSION_MODEL } };
 
   it("charges the modelled commission on a BUY and never borrows", () => {
-    const res = simulateBroker({
-      startingCash: 10_000,
-      decisions: [{ id: "d1", symbol: "VOD.L", side: "BUY", quantity: 100, price: 20 }],
-      options: { frictions },
-    });
+    const res = simulateBrokerExecution(
+      { cash: 10_000, holdings: [] },
+      [{ id: "d1", symbol: "VOD.L", side: "BUY", quantity: 100, price: 20 }],
+      { frictions },
+    );
     const snap = res.snapshots[0]!;
     expect(snap.fee).toBeCloseTo(3, 10); // 2,000 notional → floor
     expect(snap.cash).toBeCloseTo(10_000 - 2_000 - 3, 8);
@@ -122,11 +122,11 @@ describe("broker simulator integration", () => {
   });
 
   it("keeps cash non-negative when buying the whole book", () => {
-    const res = simulateBroker({
-      startingCash: 1_000,
-      decisions: [{ id: "d1", symbol: "AAPL", side: "BUY", quantity: 1_000, price: 10 }],
-      options: { frictions },
-    });
+    const res = simulateBrokerExecution(
+      { cash: 1_000, holdings: [] },
+      [{ id: "d1", symbol: "AAPL", side: "BUY", quantity: 1_000, price: 10 }],
+      { frictions },
+    );
     const snap = res.snapshots[0]!;
     expect(snap.cash).toBeGreaterThanOrEqual(0);
     expect(snap.partial).toBe(true);
@@ -135,14 +135,14 @@ describe("broker simulator integration", () => {
 
   it("is deterministic across repeated runs", () => {
     const run = () =>
-      simulateBroker({
-        startingCash: 50_000,
-        decisions: [
+      simulateBrokerExecution(
+        { cash: 50_000, holdings: [] },
+        [
           { id: "d1", symbol: "VOD.L", side: "BUY", quantity: 500, price: 20 },
           { id: "d2", symbol: "VOD.L", side: "SELL", quantity: 500, price: 21 },
         ],
-        options: { frictions },
-      });
+        { frictions },
+      );
     expect(JSON.stringify(run())).toBe(JSON.stringify(run()));
   });
 });
