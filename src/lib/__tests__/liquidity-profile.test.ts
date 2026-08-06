@@ -6,7 +6,11 @@ import {
   symbolLiquidity,
 } from "@/lib/liquidity-profile";
 import { applyLiquidity, buildCostGrid, scenarioKey, scaleFrictions } from "@/lib/cost-sweep";
-import { liquidityCostBps, simulate, type SimDecision } from "@/lib/broker-simulator";
+import {
+  liquidityCostBps,
+  simulateBrokerExecution,
+  type SimDecision,
+} from "@/lib/broker-simulator";
 import type { RawDailyBar, SymbolHistory } from "@/lib/real-market-tape";
 
 function bars(n: number, price: number, volume: number | null): RawDailyBar[] {
@@ -103,9 +107,7 @@ describe("simulator with liquidity-aware frictions", () => {
     { id: "1", symbol: "THIN", side: "BUY", quantity: 100, price: 100 },
   ];
   const run = (advScale: number) =>
-    simulate({
-      startingCash: 100_000,
-      decisions,
+    simulateBrokerExecution({ cash: 100_000, holdings: [] }, decisions, {
       frictions: {
         commissionBps: 0,
         liquidity: liquidityFrictions(scaleLiquidity(profile, advScale)),
@@ -113,14 +115,14 @@ describe("simulator with liquidity-aware frictions", () => {
     });
 
   it("fills a BUY above the quote and worse in a thinner book", () => {
-    const deepBook = run(100).fills[0]!;
-    const thinBook = run(0.01).fills[0]!;
-    expect(deepBook.price).toBeGreaterThan(100);
-    expect(thinBook.price).toBeGreaterThan(deepBook.price);
+    const deepBook = run(100).snapshots[0]!;
+    const thinBook = run(0.01).snapshots[0]!;
+    expect(deepBook.fillPrice).toBeGreaterThan(100);
+    expect(thinBook.fillPrice).toBeGreaterThan(deepBook.fillPrice);
   });
 
   it("keeps the no-borrow invariant under liquidity costs", () => {
-    expect(run(0.01).finalCash).toBeGreaterThanOrEqual(0);
+    expect(run(0.01).finalState.cash).toBeGreaterThanOrEqual(0);
   });
 
   it("is deterministic", () => {
