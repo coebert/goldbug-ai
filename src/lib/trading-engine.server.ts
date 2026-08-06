@@ -143,6 +143,8 @@ import {
   sectorCycleFor,
   sectorPhaseMultiplier,
   formatSectorCycleBlock,
+  buildSectorDecisionAudit,
+  type SectorDecisionAudit,
 } from "./sector-cycle";
 import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
