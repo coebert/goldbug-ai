@@ -539,7 +539,10 @@ export type RegimeSummary = {
   positiveRate: number;
   /** Share of windows beating the benchmark. */
   beatBenchmarkRate: number;
+  /** Mean regime confidence across the windows in this regime, 0..1. */
+  meanConfidence: number;
   medianTradesPerYear: number;
+
   /** True when every window respected the drawdown ceiling. */
   drawdownStable: boolean;
   /** True when the regime is profitable and drawdown-stable throughout. */
