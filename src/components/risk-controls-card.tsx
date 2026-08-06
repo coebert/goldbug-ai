@@ -684,6 +684,72 @@ export function RiskControlsCard({
             </div>
 
 
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Trading style</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Sets the holding horizon the AI trades to. Swing rebases stops,
+                targets, time exits and re-entry rules for a days-to-weeks hold.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    {
+                      key: "position",
+                      label: "Position",
+                      blurb: "Months-long holds. Wider stops, slower turnover.",
+                    },
+                    {
+                      key: "swing",
+                      label: "Swing",
+                      blurb: "Days-to-weeks holds. Tight 6% stop, 12% target, 10-day time stop, fast re-entry.",
+                    },
+                  ] as const
+                ).map((opt) => {
+                  const active = (cfg.trading_style ?? "position") === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() =>
+                        setCfg((c) =>
+                          opt.key === "swing"
+                            ? { ...c, ...SWING_DIAL_OVERRIDES, trading_style: "swing" }
+                            : { ...c, trading_style: "position" },
+                        )
+                      }
+                      className={`rounded-md border px-3 py-2 text-left text-xs transition ${
+                        active
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-background hover:bg-muted"
+                      }`}
+                    >
+                      <div className="font-medium">{opt.label}</div>
+                      <div className="text-muted-foreground">{opt.blurb}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              {(cfg.trading_style ?? "position") === "swing" && (
+                <div className="mt-3 flex items-center gap-2">
+                  <Label className="text-xs">Minimum hold (sessions)</Label>
+                  <Input
+                    type="number"
+                    className="h-8 w-20"
+                    value={cfg.swing_min_hold_days ?? 2}
+                    onChange={(e) =>
+                      setCfg((c) => ({
+                        ...c,
+                        swing_min_hold_days: Math.max(0, Math.min(30, Math.floor(Number(e.target.value) || 0))),
+                      }))
+                    }
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    blocks discretionary exits before this age — risk exits still fire
+                  </span>
+                </div>
+              )}
+            </div>
+
 
             <div>
               <h4 className="mb-2 text-sm font-medium">Diversification tilt</h4>
