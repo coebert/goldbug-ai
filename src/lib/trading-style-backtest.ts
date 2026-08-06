@@ -12,7 +12,7 @@
 // Pure and seeded: same inputs always produce the same table.
 
 import { runBacktest, type BacktestBar } from "@/lib/backtest-runner";
-import type { SimDecision } from "@/lib/broker-simulator";
+import type { SimDecision, SimulateOptions } from "@/lib/broker-simulator";
 import { buildHeuristicBuys, buildHeuristicSells } from "@/lib/heuristic-decision";
 import {
   buildPriceTape,
@@ -173,6 +173,13 @@ export async function runStyleBacktest(args: {
   feePerTrade: number;
   /** Decision layer. Defaults to the deterministic heuristic rule set. */
   policy?: StylePolicy;
+  /**
+   * Optional execution-realism knobs (commission bps, stamp duty, slippage,
+   * per-unit impact) forwarded to the broker simulator. Omitted → the tape
+   * is traded at the close with only `feePerTrade`.
+   */
+  simulator?: SimulateOptions;
+
 }): Promise<Omit<StyleRunMetrics, "style" | "horizon" | "seed">> {
   const { cfg, bars, riskLevel, startingCash, feePerTrade } = args;
   const policy = args.policy ?? heuristicStylePolicy;
@@ -452,7 +459,7 @@ export async function runStyleBacktest(args: {
 
       return decisions;
     },
-    { defaultFee: feePerTrade },
+    { defaultFee: feePerTrade, ...(args.simulator ? { simulator: args.simulator } : {}) },
   );
 
   const equity: EquityPoint[] = result.equityCurve.map((p) => ({
@@ -467,7 +474,6 @@ export async function runStyleBacktest(args: {
   const ddAbs = Math.abs(dd.pct);
   const sellSnaps = result.snapshots.filter((s) => s.side === "SELL");
   const wins = sellSnaps.filter((s) => s.realizedPnl > 0).length;
-  const executed = result.snapshots.length;
 
   return {
     riskLevel,
@@ -489,7 +495,7 @@ export async function runStyleBacktest(args: {
         ? holdBarsClosed.reduce((a, b) => a + b, 0) / holdBarsClosed.length
         : 0,
     tradesPerYear: years > 0 ? (buys + sells) / years : 0,
-    feeDragPct: ((executed * feePerTrade) / startingCash) * 100,
+    feeDragPct: (result.snapshots.reduce((sum, s) => sum + (s.fee || 0), 0) / startingCash) * 100,
     finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
     exitMix,
     equityCurve: equity,
