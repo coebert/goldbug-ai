@@ -67,6 +67,14 @@ import {
   type CostScoreMode,
   type ScenarioRun,
 } from "../src/lib/cost-scenario-scoring";
+import {
+  summariseCostAxes,
+  renderCostAxisMatrix,
+  describeCostAxisSummary,
+  formatViableTickets,
+  formatTicket,
+  type CostCellEntry,
+} from "../src/lib/cost-axis-summary";
 
 
 import type { EquityPoint } from "../src/lib/backtest-metrics";
@@ -485,6 +493,50 @@ const ticketOptions = [
   .sort((a, b) => a - b)
   .map((v) => ({ value: String(v), label: ticketLabel(v) }));
 
+// -------------------------------------- slippage × min-fee ticket summary
+// Collapse every candidate/scenario pair onto the two headline cost axes and
+// report which ticket sizes still clear the viability bar in each cell.
+const scenarioMeta = new Map(
+  scenarios.map((sc) => [
+    scenarioKey(sc),
+    {
+      slippageLabel: sc.slippage?.label ?? "baseline",
+      slippageBps: sc.slippage
+        ? (sc.slippage.slippageBps ?? 0) + (sc.slippage.spreadBps ?? 0)
+        : FRICTIONS.slippageBps,
+      minCommission: sc.minCommission ?? FRICTIONS.minCommission,
+    },
+  ]),
+);
+const feasibleByKey = new Map(scored.map((r) => [formatParams(r.params), r.check.feasible]));
+const axisEntries: CostCellEntry[] = evaluated.flatMap((e) => {
+  const key = formatParams(e.params);
+  return e.perScenario.map((run) => {
+    const meta = scenarioMeta.get(run.scenario);
+    return {
+      slippageLabel: meta?.slippageLabel ?? run.scenario,
+      slippageBps: meta?.slippageBps ?? run.scale,
+      minCommission: meta?.minCommission ?? FRICTIONS.minCommission,
+      ticketGbp: ticketGbp(e.params),
+      cagrPct: run.metrics.cagrPct,
+      tradesPerYear: run.metrics.tradesPerYear,
+      feasible: feasibleByKey.get(key) ?? true,
+      id: key,
+    } satisfies CostCellEntry;
+  });
+});
+const costAxisSummary = axisEntries.length
+  ? summariseCostAxes(axisEntries, { minCagrPct: minViableCagr })
+  : null;
+
+if (costAxisSummary) {
+  console.log(
+    `\nViable ticket sizes by slippage × min-fee (net CAGR ≥ ${minViableCagr.toFixed(2)}%):`,
+  );
+  for (const line of renderCostAxisMatrix(costAxisSummary)) console.log(`  ${line}`);
+  console.log(`  ${describeCostAxisSummary(costAxisSummary)}`);
+}
+
 const COLOURS = ["#39d98a", "#4ea1ff", "#f5a623", "#e5484d", "#a78bfa", "#9aa4b2"];
 const panels: ReportPanel[] = [
 
@@ -616,6 +668,38 @@ if (gridVaried) {
   }
 }
 
+if (costAxisSummary) {
+  panels.push({
+    heading: "Cost axes — viable ticket sizes",
+    subtitle:
+      `one row per slippage × min-fee cell; a ticket size is viable when its best ` +
+      `configuration clears net CAGR ≥ ${minViableCagr.toFixed(2)}% · ` +
+      describeCostAxisSummary(costAxisSummary),
+    series: [],
+    table: {
+      columns: [
+        "slippage",
+        "min fee",
+        "configs",
+        "best CAGR %",
+        "median CAGR %",
+        "viable tickets",
+        "smallest viable",
+        "viable share",
+      ],
+      rows: costAxisSummary.cells.map((c) => [
+        c.slippageLabel + (c.slippageBps === null ? "" : ` (${c.slippageBps.toFixed(1)}bps)`),
+        `£${c.minCommission}`,
+        String(c.configs),
+        c.bestCagrPct.toFixed(2),
+        c.medianCagrPct.toFixed(2),
+        formatViableTickets(c, costAxisSummary.ticketSizes),
+        c.minViableTicketGbp === null ? "none" : formatTicket(c.minViableTicketGbp),
+        `${(c.viableTicketShare * 100).toFixed(0)}%`,
+      ]),
+    },
+  });
+}
 
 
 panels.push(
