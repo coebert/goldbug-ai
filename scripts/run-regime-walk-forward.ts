@@ -57,7 +57,9 @@ import {
 import {
   attributeWindowCosts,
   explainRegimeCosts,
+  regimeCostTableRows,
   summariseCostAttribution,
+  REGIME_COST_COLUMNS,
 } from "../src/lib/regime-cost-attribution";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import type { RiskLevel } from "../src/lib/risk-sim-matrix";
@@ -304,6 +306,12 @@ const panels: ReportPanel[] = [
     subtitle: summariseReport(report, gate),
     series: [],
     table: { columns: [...REGIME_COLUMNS], rows: regimeTableRows(report.summaries) },
+  },
+  {
+    heading: "Cost decomposition by regime",
+    subtitle: summariseCostAttribution(report.costs),
+    series: [],
+    table: { columns: [...REGIME_COST_COLUMNS], rows: regimeCostTableRows(report.costs) },
   },
   {
     heading: "Out-of-sample windows",
