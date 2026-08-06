@@ -215,7 +215,16 @@ export type Frictions = {
     /** Per-symbol asset class, enabling class overrides (e.g. crypto). */
     assetClassBySymbol?: Record<string, AssetClass>;
   };
+  /**
+   * Optional liquidity-aware execution-cost model. When present it
+   * REPLACES the flat `slippageBps` / `impactPerUnit` pair: the per-side
+   * cost is estimated per fill from the symbol's ADV, volatility, asset
+   * class and venue currency using the sqrt-participation impact model in
+   * `spread-slippage.ts`. Bigger tickets in thinner names pay more.
+   */
+  liquidity?: LiquidityFrictions;
 };
+
 
 export type SimulateOptions = {
   /**
