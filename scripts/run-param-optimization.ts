@@ -41,6 +41,13 @@ import {
   turnoverCostCurve,
 } from "../src/lib/turnover-attribution";
 import {
+  buildDrilldownGrid,
+  buildTurnoverPnlPanels,
+  describeScatter,
+  explainDrilldown,
+  scatterPoints,
+} from "../src/lib/turnover-pnl-scatter";
+import {
 
   buildViabilityReport,
   describeRiskLevelViability,
@@ -423,6 +430,16 @@ console.log(
     `${overallReentry.roundTripsPerSymbol.toFixed(1)} round trips/symbol`,
 );
 
+// Relate the two measured behaviours — turnover and re-entry gaps — to the net
+// outcome each run actually produced once frictions were paid.
+const pnlScatter = scatterPoints(scored, logOf, {
+  fastDays: 5,
+  labelOf: (r) => formatParams(r.params),
+});
+const pnlGrid = buildDrilldownGrid(pnlScatter);
+console.log(`\n${describeScatter(pnlGrid)}`);
+console.log(`  ${explainDrilldown(pnlGrid)}`);
+
 // -------------------------------------------------- viability thresholds
 // Fit the turnover breakeven at each risk level and flag every configuration
 // that trades past it or fails to clear the minimum net return after costs.
@@ -783,6 +800,15 @@ panels.push(
       ]),
     },
   },
+);
+
+panels.push(
+  ...buildTurnoverPnlPanels(pnlScatter, {
+    frictionNote:
+      `${FRICTIONS.commissionBps}bps + $${FRICTIONS.minCommission} commission and ` +
+      `${FRICTIONS.slippageBps}bps slippage`,
+    breakevenTradesPerYear: costCurve.breakevenTradesPerYear,
+  }),
 );
 
 panels.push(
