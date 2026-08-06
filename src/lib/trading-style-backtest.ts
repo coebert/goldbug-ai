@@ -604,6 +604,7 @@ export async function runStyleBacktest(args: {
         symbol: s.symbol,
         quantity: s.fillQuantity,
         price: s.fillPrice,
+        fee: s.fee || 0,
       })),
   };
 }
