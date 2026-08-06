@@ -162,6 +162,7 @@ export type ConstraintCheck = { feasible: boolean; violations: string[]; disqual
 export function evaluateConstraints(
   m: CandidateMetrics,
   c: OptimizerConstraints,
+  objective: OptimizerObjective = NET_CAGR_OBJECTIVE,
 ): ConstraintCheck {
   const violations: string[] = [];
   let disqualified = false;
