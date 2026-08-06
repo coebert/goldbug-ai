@@ -1,0 +1,33 @@
+# Trading-mode parity gate.
+#
+# The engine runs whatever `risk_config.trading_style` resolves to via
+# `parseTradingStyle()`. Three UI surfaces word that mode to the user (the
+# badge, the risk-controls panel summary, the swing switch). If any of them
+# drifts, a portfolio can display "Position Only" while the hourly run
+# swing-trades it — so a merge that breaks parity must fail.
+#
+# Locally the same gate runs with: bun run check:trading-mode
+name: trading-mode-parity
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Badge vs risk-panel vs engine parity, stale-cache drift detection,
+      # the toggle→refresh e2e flow, and the surface-coverage gate that fails
+      # when a new component words the mode without parity coverage.
+      - name: Trading-mode parity suite
+        run: bun run check:trading-mode
