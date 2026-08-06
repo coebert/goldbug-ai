@@ -1645,33 +1645,51 @@ export async function routeOrdersToBroker(params: {
 
 
     if (brokerRes.status === "filled" && brokerRes.filledQuantity && brokerRes.avgFillPrice) {
-      const fillCcy = routeSymToCcy.get(order.symbol) ?? portfolioCurrency;
-      await supabaseAdmin.from("live_fills").insert({
-        order_id: liveOrderId,
-        portfolio_id: portfolio.id,
-        user_id: userId,
+      // Saxo returns LSE common stocks in GBX (pence). Booking that raw
+      // number stored HSBA at 1556.20 "GBP" next to 15.52 GBP rows from the
+      // reconcile path — the same instrument in two units, which corrupts
+      // cost basis, realised PnL and every holdings/fills reconciliation.
+      // Resolve through the shared rule so both write paths agree.
+      const resolved = resolveFillRecord({
         symbol: order.symbol,
-        side: order.side,
-        quantity: brokerRes.filledQuantity,
-        fill_price: brokerRes.avgFillPrice,
-        fee: 0,
-        currency: fillCcy,
-        broker_fill_id: brokerRes.brokerOrderId || null,
-        filled_at: new Date().toISOString(),
+        candidates: [{ source: "broker_avg_fill_price", value: brokerRes.avgFillPrice, raw: true }],
+        orderCcy: routeSymToCcy.get(order.symbol) ?? null,
+        portfolioCurrency,
       });
-      const { notifyTradeFilled } = await import("./trade-fill-notify.server");
-      notifyTradeFilled({
-        userId,
-        portfolioId: portfolio.id,
-        orderId: liveOrderId,
-        symbol: order.symbol,
-        side: order.side,
-        quantity: brokerRes.filledQuantity,
-        fillPrice: brokerRes.avgFillPrice,
-        currency: fillCcy,
-        source: "live_executor",
-      });
+      if (!resolved) {
+        console.warn(
+          `[live-executor] fill_price_unavailable for ${order.symbol}; skipping live_fills insert`,
+        );
+      } else {
+        const fillCcy = resolved.currency;
+        await supabaseAdmin.from("live_fills").insert({
+          order_id: liveOrderId,
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          symbol: order.symbol,
+          side: order.side,
+          quantity: brokerRes.filledQuantity,
+          fill_price: resolved.fillPrice,
+          fee: 0,
+          currency: fillCcy,
+          broker_fill_id: brokerRes.brokerOrderId || null,
+          filled_at: new Date().toISOString(),
+        });
+        const { notifyTradeFilled } = await import("./trade-fill-notify.server");
+        notifyTradeFilled({
+          userId,
+          portfolioId: portfolio.id,
+          orderId: liveOrderId,
+          symbol: order.symbol,
+          side: order.side,
+          quantity: brokerRes.filledQuantity,
+          fillPrice: resolved.fillPrice,
+          currency: fillCcy,
+          source: "live_executor",
+        });
+      }
     }
+
 
     results.push({
       symbol: order.symbol,
