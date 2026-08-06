@@ -2821,6 +2821,31 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       features: features as unknown as Record<string, unknown>,
       regime: effectiveRegime,
       rationale: decision.rationale,
+      sectorBySymbol: Object.fromEntries(
+        [
+          ...sectorAuditBySymbol.entries(),
+          // Fill in sells/holds that never went through buy sizing so every
+          // audit row still carries the sector phase + momentum readings.
+          ...[...new Set([
+            ...executed.map((t) => String(t.symbol).toUpperCase()),
+            ...heldAfter.map((h) => String(h.symbol).toUpperCase()),
+          ])]
+            .filter((sym) => !sectorAuditBySymbol.has(sym))
+            .map((sym) => {
+              const sec = symbolSector(sym);
+              return [
+                sym,
+                buildSectorDecisionAudit({
+                  cycle: sectorCycle,
+                  sector: sec,
+                  row: sectorCycleFor(sectorCycle, sec),
+                  appliedMultiplier: 1,
+                  rotationMultiplier: null,
+                }),
+              ] as const;
+            }),
+        ],
+      ),
     });
   } catch (e) {
     srvLog.warn("ai_decision_audit skipped", portfolioId, e);
