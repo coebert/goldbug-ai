@@ -492,10 +492,30 @@ export async function runStyleBacktest(args: {
     feeDragPct: ((executed * feePerTrade) / startingCash) * 100,
     finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
     exitMix,
+    equityCurve: equity,
   };
 }
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+/**
+ * Mean equity curve across seeds, bar-by-bar. Curves are truncated to the
+ * shortest run so every averaged point has the same sample size; dates come
+ * from the first run since all seeds share the synthetic calendar.
+ */
+export function averageEquityCurves(curves: readonly EquityPoint[][]): EquityPoint[] {
+  const usable = curves.filter((c) => c.length > 0);
+  if (usable.length === 0) return [];
+  const n = Math.min(...usable.map((c) => c.length));
+  const out: EquityPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    out.push({
+      snapshot_date: usable[0]![i]!.snapshot_date,
+      total_value: mean(usable.map((c) => c[i]!.total_value)),
+    });
+  }
+  return out;
+}
 
 export function averageStyleRuns(runs: StyleRunMetrics[]): StyleRunMetrics {
   const pick = (f: (m: StyleRunMetrics) => number) => mean(runs.map(f));
@@ -522,6 +542,7 @@ export function averageStyleRuns(runs: StyleRunMetrics[]): StyleRunMetrics {
     feeDragPct: pick((m) => m.feeDragPct),
     finalCashPct: pick((m) => m.finalCashPct),
     exitMix,
+    equityCurve: averageEquityCurves(runs.map((r) => r.equityCurve)),
   };
 }
 
