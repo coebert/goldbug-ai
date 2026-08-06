@@ -506,6 +506,11 @@ export type WindowResult = {
   window: WalkForwardWindow;
   regime: RegimeLabel;
   purity: number;
+  /** Mean confidence of the winning label over the window, 0..1. */
+  confidence?: number;
+  /** True when a weak directional read was demoted to sideways. */
+  demoted?: boolean;
+
   from: string;
   to: string;
   netCagrPct: number;
