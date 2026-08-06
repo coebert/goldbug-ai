@@ -486,6 +486,15 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   out.trading_style = style;
   num("swing_min_hold_days", 0, 30);
   bool("alpha_bonus_enabled");
+  bool("cash_policy_enabled");
+  // Explicit `null` clears the user target and reverts to the regime table.
+  if (r.target_invested_pct === null) {
+    out.target_invested_pct = null;
+  } else if (r.target_invested_pct !== undefined) {
+    const n = Number(r.target_invested_pct);
+    out.target_invested_pct = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+  }
+
   num("alpha_bonus_cap", 1, 3);
   bool("risk_parity_enabled");
   num("risk_parity_nav_cap", 0.01, 1);
