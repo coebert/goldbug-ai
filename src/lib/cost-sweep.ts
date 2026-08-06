@@ -181,7 +181,15 @@ export function buildCostGrid(
           let frictions = scaleFrictions(base, scale);
           if (spec) frictions = applySlippage(frictions, spec);
           if (minFee !== null) frictions = applyMinCommission(frictions, minFee);
-          if (liq) frictions = applyLiquidity(frictions, liq, opts.liquidityProfile!);
+          if (liq) {
+            // Keep the commission scale meaningful for the liquidity model:
+            // it multiplies the modelled per-side bps, not ADV.
+            frictions = applyLiquidity(
+              frictions,
+              { ...liq, costScale: (liq.costScale ?? 1) * scale },
+              opts.liquidityProfile!,
+            );
+          }
           const parts = [scale === 1 ? "baseline" : `${(scale * 100).toFixed(0)}% cost`];
           if (spec) parts.push(spec.label);
           if (minFee !== null) parts.push(`min £${minFee}`);
