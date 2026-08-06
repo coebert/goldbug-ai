@@ -668,6 +668,38 @@ if (gridVaried) {
   }
 }
 
+if (costAxisSummary) {
+  panels.push({
+    heading: "Cost axes — viable ticket sizes",
+    subtitle:
+      `one row per slippage × min-fee cell; a ticket size is viable when its best ` +
+      `configuration clears net CAGR ≥ ${minViableCagr.toFixed(2)}% · ` +
+      describeCostAxisSummary(costAxisSummary),
+    series: [],
+    table: {
+      columns: [
+        "slippage",
+        "min fee",
+        "configs",
+        "best CAGR %",
+        "median CAGR %",
+        "viable tickets",
+        "smallest viable",
+        "viable share",
+      ],
+      rows: costAxisSummary.cells.map((c) => [
+        c.slippageLabel + (c.slippageBps === null ? "" : ` (${c.slippageBps.toFixed(1)}bps)`),
+        `£${c.minCommission}`,
+        String(c.configs),
+        c.bestCagrPct.toFixed(2),
+        c.medianCagrPct.toFixed(2),
+        formatViableTickets(c, costAxisSummary.ticketSizes),
+        c.minViableTicketGbp === null ? "none" : formatTicket(c.minViableTicketGbp),
+        `${(c.viableTicketShare * 100).toFixed(0)}%`,
+      ]),
+    },
+  });
+}
 
 
 panels.push(
