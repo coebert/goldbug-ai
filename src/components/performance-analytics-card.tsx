@@ -17,6 +17,8 @@ import {
   saxoDot,
 } from "@/lib/saxo-chart";
 import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";
+import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
+import { attachTradeMarkers, describeMarkerCell, type TradeMarkerCell } from "@/lib/chart-trade-markers";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -29,6 +31,8 @@ import {
   CartesianGrid,
   ReferenceLine,
   Cell,
+  ComposedChart,
+  Scatter,
 } from "recharts";
 
 const WINDOWS = [
@@ -60,6 +64,20 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
     () => new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 2 }),
     [currency],
   );
+
+  // Executed buys/sells snapped onto each curve so the charts show exactly
+  // when decisions happened alongside the equity and drawdown they caused.
+  const marks = data?.trades ?? [];
+  const equityCurve = useMemo(
+    () => attachTradeMarkers(data?.equityCurve ?? [], "date", "equity", marks),
+    [data?.equityCurve, marks],
+  );
+  const drawdownCurve = useMemo(
+    () => attachTradeMarkers(data?.drawdownCurve ?? [], "date", "drawdownPct", marks),
+    [data?.drawdownCurve, marks],
+  );
+  const markerTooltip = (item: { payload?: { marker?: TradeMarkerCell | null } } | undefined) =>
+    describeMarkerCell(item?.payload?.marker ?? null, (v) => fmtCcyPrecise.format(v));
 
   return (
     <Card>
@@ -107,8 +125,8 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
 
             <ChartBlock title="Equity curve">
               <ResponsiveContainer width="100%" height={220}>
-                <AreaChart
-                  data={data.equityCurve}
+                <ComposedChart
+                  data={equityCurve}
                   margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
                 >
                   <defs>
@@ -122,7 +140,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   <XAxis
                     {...SAXO_AXIS}
                     dataKey="date"
-                    ticks={edgeTicks(data.equityCurve as Array<Record<string, unknown>>, "date") as string[]}
+                    ticks={edgeTicks(equityCurve as Array<Record<string, unknown>>, "date") as string[]}
                     interval={0}
                   />
                   <YAxis
@@ -133,9 +151,16 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   />
                   <Tooltip
                     cursor={<SaxoCrosshair />}
-                    formatter={(v: number) => fmtCcyPrecise.format(v)}
+                    formatter={(v: number, name, item) => {
+                      if (name === "buys" || name === "sells") return [] as unknown as [string, string];
+                      const lines = markerTooltip(item as never);
+                      return [
+                        `${fmtCcyPrecise.format(v)}${lines.length ? `\n${lines.join("\n")}` : ""}`,
+                        "Equity",
+                      ] as [string, string];
+                    }}
                     labelClassName="text-xs"
-                    contentStyle={SAXO_TOOLTIP_CONTENT}
+                    contentStyle={{ ...SAXO_TOOLTIP_CONTENT, whiteSpace: "pre-line" }}
                     labelStyle={SAXO_TOOLTIP_LABEL}
                   />
                   <Area
@@ -143,19 +168,35 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     dataKey="equity"
                     stroke="var(--primary)"
                     fill="url(#eqFill)"
-                    dot={saxoDot("var(--primary)", data.equityCurve.length)}
+                    dot={saxoDot("var(--primary)", equityCurve.length)}
                     activeDot={<SaxoActiveDot color="var(--primary)" />}
                     strokeWidth={2}
                     isAnimationActive={false}
                   />
-                </AreaChart>
+                  <Scatter
+                    dataKey="buyMark"
+                    name="buys"
+                    isAnimationActive={false}
+                    shape={(props: unknown) => (
+                      <TradeMarkerShape {...(props as { cx?: number; cy?: number })} side="buy" />
+                    )}
+                  />
+                  <Scatter
+                    dataKey="sellMark"
+                    name="sells"
+                    isAnimationActive={false}
+                    shape={(props: unknown) => (
+                      <TradeMarkerShape {...(props as { cx?: number; cy?: number })} side="sell" />
+                    )}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </ChartBlock>
 
             <ChartBlock title="Drawdown (peak-to-trough %)">
               <ResponsiveContainer width="100%" height={180}>
-                <AreaChart
-                  data={data.drawdownCurve}
+                <ComposedChart
+                  data={drawdownCurve}
                   margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
                 >
                   <defs>
@@ -169,7 +210,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   <XAxis
                     {...SAXO_AXIS}
                     dataKey="date"
-                    ticks={edgeTicks(data.drawdownCurve as Array<Record<string, unknown>>, "date") as string[]}
+                    ticks={edgeTicks(drawdownCurve as Array<Record<string, unknown>>, "date") as string[]}
                     interval={0}
                   />
                   <YAxis
@@ -180,9 +221,16 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   />
                   <Tooltip
                     cursor={<SaxoCrosshair />}
-                    formatter={(v: number) => `${v.toFixed(2)}%`}
+                    formatter={(v: number, name, item) => {
+                      if (name === "buys" || name === "sells") return [] as unknown as [string, string];
+                      const lines = markerTooltip(item as never);
+                      return [
+                        `${v.toFixed(2)}%${lines.length ? `\n${lines.join("\n")}` : ""}`,
+                        "Drawdown",
+                      ] as [string, string];
+                    }}
                     labelClassName="text-xs"
-                    contentStyle={SAXO_TOOLTIP_CONTENT}
+                    contentStyle={{ ...SAXO_TOOLTIP_CONTENT, whiteSpace: "pre-line" }}
                     labelStyle={SAXO_TOOLTIP_LABEL}
                   />
                   <ReferenceLine {...SAXO_REFERENCE_LINE} y={0} />
@@ -191,11 +239,27 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     dataKey="drawdownPct"
                     stroke="var(--destructive)"
                     fill="url(#ddFill)"
-                    dot={saxoDot("var(--destructive)", data.drawdownCurve.length)}
+                    dot={saxoDot("var(--destructive)", drawdownCurve.length)}
                     activeDot={<SaxoActiveDot color="var(--destructive)" />}
                     isAnimationActive={false}
                   />
-                </AreaChart>
+                  <Scatter
+                    dataKey="buyMark"
+                    name="buys"
+                    isAnimationActive={false}
+                    shape={(props: unknown) => (
+                      <TradeMarkerShape {...(props as { cx?: number; cy?: number })} side="buy" />
+                    )}
+                  />
+                  <Scatter
+                    dataKey="sellMark"
+                    name="sells"
+                    isAnimationActive={false}
+                    shape={(props: unknown) => (
+                      <TradeMarkerShape {...(props as { cx?: number; cy?: number })} side="sell" />
+                    )}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </ChartBlock>
 
