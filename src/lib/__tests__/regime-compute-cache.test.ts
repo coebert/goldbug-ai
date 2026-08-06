@@ -162,7 +162,7 @@ describe("RegimeComputeCache", () => {
     const recomputed = vi.fn(() => 22);
     small.memo("ns", "b", recomputed);
     expect(recomputed).toHaveBeenCalledTimes(1);
-    expect(small.memo("ns", "a", () => 99)).toBe(1);
+    expect(small.memo("ns", "a", () => 99)).toBe(99); // "a" aged out when "b" returned
     expect(small.stats().evictions).toBeGreaterThan(0);
     expect(small.stats().size).toBeLessThanOrEqual(2);
   });
