@@ -60,7 +60,14 @@ const to = arg("to", new Date().toISOString().slice(0, 10));
 const mode = arg("mode", "total_return") as PriceMode;
 const symbols = arg("symbols", DEFAULT_SYMBOLS.join(",")).split(",").map((s) => s.trim());
 const startingCash = Number(arg("cash", "10300"));
-const riskLevel = arg("risk", "balanced") as RiskLevel;
+// `--risk balanced` optimises one level; `--risk low,balanced,high` also runs
+// the viability threshold check at every level (costs one full pass each).
+const riskLevels = arg("risk", "balanced")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean) as RiskLevel[];
+const riskLevel = riskLevels[0] ?? ("balanced" as RiskLevel);
+
 const style = arg("style", "swing") as TradingStyle;
 const folds = Number(arg("folds", "3"));
 const limit = Number(arg("limit", "96"));
