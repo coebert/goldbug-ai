@@ -601,7 +601,9 @@ export function summariseRegime(
       medianBenchmarkCagrPct: 0,
       positiveRate: 0,
       beatBenchmarkRate: 0,
+      meanConfidence: 0,
       medianTradesPerYear: 0,
+
       drawdownStable: true,
       pass: false,
     };
