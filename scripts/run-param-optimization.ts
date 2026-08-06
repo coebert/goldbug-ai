@@ -442,7 +442,83 @@ panels.push(
   },
 );
 
+panels.push(
+  {
+    heading: "Viability thresholds by risk level",
+    subtitle:
+      `breakeven = turnover at which the fitted net-CAGR line crosses the ` +
+      `${minViableCagr.toFixed(2)}% floor, after ${FRICTIONS.commissionBps}bps + ` +
+      `$${FRICTIONS.minCommission} commission and ${FRICTIONS.slippageBps}bps slippage`,
+    series: [],
+    table: {
+      columns: [
+        "risk level",
+        "breakeven /yr",
+        "source",
+        "CAGR per trade (pp)",
+        "viable",
+        "marginal",
+        "below",
+        "viable share",
+        "best viable",
+      ],
+      rows: viability.levels.map((l) => [
+        l.riskLevel,
+        l.threshold.breakevenTradesPerYear === null
+          ? "—"
+          : l.threshold.breakevenTradesPerYear.toFixed(0),
+        l.threshold.source,
+        l.threshold.cagrPerTrade.toFixed(3),
+        String(l.viableCount),
+        String(l.marginalCount),
+        String(l.belowCount),
+        `${(l.viableShare * 100).toFixed(0)}%`,
+        l.bestViable
+          ? `${l.bestViable.metrics.cagrPct.toFixed(2)}% @ ${l.bestViable.metrics.tradesPerYear.toFixed(0)}/yr`
+          : "none",
+      ]),
+    },
+  },
+  {
+    heading: "Configurations flagged below breakeven",
+    subtitle:
+      `${viability.totalFlagged} of ${viability.totalAssessed} evaluated cells are below or ` +
+      `within 10% of their risk level's breakeven` +
+      (viability.universallyBelow.length
+        ? ` · ${viability.universallyBelow.length} fail at every risk level and can be dropped from the search space`
+        : ""),
+    series: [],
+    table: {
+      columns: [
+        "risk level",
+        "verdict",
+        "CAGR %",
+        "turnover/yr",
+        "headroom /yr",
+        "return margin (pp)",
+        "reason",
+        "params",
+      ],
+      rows: viability.levels
+        .flatMap((l) => l.flagged)
+        .sort((a, b) => a.returnMarginPct - b.returnMarginPct)
+        .slice(0, 25)
+        .map((a) => [
+          a.riskLevel,
+          VERDICT_LABEL[a.verdict],
+          a.metrics.cagrPct.toFixed(2),
+          a.metrics.tradesPerYear.toFixed(0),
+          a.turnoverHeadroom === null ? "—" : a.turnoverHeadroom.toFixed(0),
+          a.returnMarginPct.toFixed(2),
+          a.reasons[0] ?? "",
+          a.id,
+        ]),
+    },
+  },
+);
+
 const topCurves = ranked.filter((r) => !r.check.disqualified).slice(0, 5);
+
 
 panels.push({
   heading: "Equity curves — top 5 configurations",
