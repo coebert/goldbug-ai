@@ -1571,6 +1571,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         continue;
       }
 
+      // PUBLISHED COMPANY FINANCIALS — mandatory check on every equity buy.
+      // The prompt asks the model to read the accounts; this enforces it.
+      const fundFeat = featureBySymbol.get(meta.symbol);
+      const fundGate = fundamentalsGate({
+        score: fundFeat?.fundamentals_score ?? null,
+        assetClass: fundFeat?.asset_class ?? null,
+        riskLevel: portfolio.risk_level,
+      });
+      if (fundGate.block) {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason,
+          rejected: `financial health: ${fundGate.block}`,
+        });
+        continue;
+      }
+
+
+
       // ---- Soft haircuts -------------------------------------------------
       // Collected, then combined ONCE with diminishing marginal severity so
       // a stack of mild headwinds cannot compound a ticket down to a few
