@@ -31,6 +31,13 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <Link
+        to="/"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to dashboard
+      </Link>
+
       <header className="space-y-1">
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <SettingsIcon className="h-6 w-6 text-primary" />
