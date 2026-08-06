@@ -40,6 +40,7 @@ import {
 } from "@/lib/risk-aggressiveness";
 import { qk } from "@/lib/query-keys";
 import { TradingModeBadge } from "@/components/trading-mode-badge";
+import { writeCachedTradingMode } from "@/lib/trading-mode-store";
 
 // The dial config lives in `@/lib/risk-presets` so the server-side sweep and
 // the live engine read exactly the same table this card writes.
@@ -298,9 +299,12 @@ export function RiskControlsCard({
           risk_config: payload,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (_r, payload) => {
+      // Mirror the saved horizon locally so the badge survives a refresh.
+      writeCachedTradingMode(portfolioId, payload.trading_style === "swing" ? "swing" : "position");
       qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
     },
+
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
@@ -364,7 +368,11 @@ export function RiskControlsCard({
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShieldCheck className="h-4 w-4 text-primary" /> Risk controls
-                <TradingModeBadge riskConfig={{ trading_style: cfg.trading_style ?? "position" }} />
+                <TradingModeBadge
+                  portfolioId={portfolioId}
+                  riskConfig={{ trading_style: cfg.trading_style ?? "position" }}
+                />
+
               </CardTitle>
               <CardDescription>
                 {(cfg.trading_style ?? "position") === "swing"

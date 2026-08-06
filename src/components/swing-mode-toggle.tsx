@@ -10,6 +10,7 @@ import { updateRiskConfig } from "@/lib/trading.functions";
 import { SWING_DIAL_OVERRIDES } from "@/lib/risk-presets";
 import { qk } from "@/lib/query-keys";
 import { assessSwingViability } from "@/lib/swing-viability";
+import { useTradingMode } from "@/hooks/use-trading-mode";
 
 /**
  * Always-visible on/off switch for swing trading.
@@ -33,14 +34,18 @@ export function SwingModeToggle({
   currency?: string | null;
 }) {
   const cfg = (riskConfig ?? {}) as Record<string, unknown>;
-  const serverActive = cfg["trading_style"] === "swing";
-  const [active, setActive] = useState(serverActive);
+  // The persisted mode fills in while the portfolio query is still loading, so
+  // the switch does not start "Off" and jump to "On" on every refresh.
+  const { isSwing: resolved, setStyle } = useTradingMode(portfolioId, riskConfig);
+  
+  const [active, setActive] = useState(resolved);
 
   // Keep the switch in sync when the portfolio refetches (or another surface
   // changes the style), but never fight an in-flight optimistic flip.
   useEffect(() => {
-    setActive(serverActive);
-  }, [serverActive]);
+    setActive(resolved);
+  }, [resolved]);
+
 
   // Viability: the engine downgrades swing to position whenever a typical
   // ticket cannot pay its own round-trip costs, so surface that here too.
@@ -67,6 +72,8 @@ export function SwingModeToggle({
         },
       }),
     onSuccess: (_r, next) => {
+      // Only persist once the server accepted the change.
+      setStyle(next ? "swing" : "position");
       qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
       toast.success(
         next
@@ -84,6 +91,7 @@ export function SwingModeToggle({
     setActive(next);
     mut.mutate(next);
   };
+
 
   return (
     <Card className={active ? "border-primary/50" : undefined}>
