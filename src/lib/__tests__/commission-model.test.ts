@@ -75,7 +75,8 @@ describe("computeCommission — per-unit and venue variation", () => {
   it("falls back to the legacy Saxo schedule for unmodelled currencies", () => {
     const c = computeCommission({ notional: 100_000, symbol: "7203.T" });
     expect(c.currency).toBe("JPY");
-    expect(c.commission).toBeCloseTo(150, 10);
+    expect(c.tier.bps).toBeCloseTo(15, 10);
+    expect(c.commission).toBeCloseTo(1500, 10); // JPY 1,500 floor still binds
   });
 });
 
