@@ -32,6 +32,8 @@ export const updateRiskConfig = createServerFn({ method: "POST" })
       atr_scaled_stop_enabled: z.boolean().optional(),
       atr_scaled_stop_floor_pct: z.number().min(0).max(0.5).optional(),
       diversification_tilt: z.enum(["off", "balanced", "strong"]).optional(),
+      trading_style: z.enum(["position", "swing"]).optional(),
+      swing_min_hold_days: z.number().int().min(0).max(30).optional(),
       risk_level: z.number().int().min(1).max(5).optional(),
       fx_currency_limits: z
         .record(z.string().regex(/^[A-Z]{3}$/), z.number().min(0).max(1))
