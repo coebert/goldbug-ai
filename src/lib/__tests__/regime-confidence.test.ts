@@ -47,10 +47,11 @@ describe("classifyRegimeBars — sideways coverage", () => {
   });
 
   it("refuses a directional label when the path has no trend structure", () => {
-    // Big swings that end well above the window start: return says bull,
-    // path says chop. R² gate must demote it.
+    // Swings that end above the window start: return says bull, path says
+    // chop, and the drawdown stays shallower than the bear override.
     const values: number[] = [];
-    for (let i = 0; i < 150; i++) values.push(100 + (i % 6 < 3 ? 22 : -18) + i * 0.02);
+    for (let i = 0; i < 150; i++) values.push(100 + (i % 6 < 3 ? 6 : -4) + i * 0.06);
+
     const bars = classifyRegimeBars(series(values));
     const last = bars.at(-1)!;
     expect(last.r2).toBeLessThan(0.35);
