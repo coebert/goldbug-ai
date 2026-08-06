@@ -196,7 +196,7 @@ export function formatCandidateTable(features: readonly unknown[]): string {
     ];
     return `${cells.join(" | ")} || news ${sentimentCell(f)} || events ${eventCell(
       f,
-    )} || rank ${rankCell(f)}`;
+    )} || rank ${rankCell(f)} || fund ${fundamentalsCell(f)}`;
   });
 
   return `Candidate assets — one row per symbol, fields separated by " | ", sub-blocks by " || ". Values rounded; "-" = not available.
@@ -204,6 +204,7 @@ Columns: ${COLUMNS.join(" | ")}
   x = MACD cross this bar (B bullish / R bearish / n none); wk_up = weekly trend up (Y/n); cool = loss-cooldown active (Y/n); chg5d/chg30d are fractional returns (0.05 = +5%); adv20 = 20d average daily volume.
   news = <weighted LLM sentiment>/<contributors today> t<today> a3/a7<3d & 7d averages> d3/d7<deltas vs baseline> ac<acceleration> c7<7d contributors>.
   events = s<directional event score -1..1> p<event pressure 0..1> nx<event count> hard<dated hard catalyst Y/n> <top event kinds>.
+  fund = PUBLISHED COMPANY FINANCIALS (reported accounts, derived ratios, consensus analyst estimates, results calendar). sc<overall -1..1> cov<pillars with data>/6 val/prof/grw/bs/div/anl<pillar scores>; pe/fpe/peg/pb/ev-eb<valuation multiples> mcap<market cap>; gm/om/nm<gross, operating, net margin> roe/roa<returns>; revg/epsg<latest reported growth> eps+1q/+1y<consensus estimates>; de<debt/equity %> cr<current ratio> fcf<free cash flow> cash/debt; dy<dividend yield> pay<payout ratio> beta shrt<short % of float>; rec<analyst consensus 1 strong buy..5 strong sell>/<analyst count> tgt<mean price target, in the listing currency> nxt_results<next scheduled results date> ccy<reporting currency of the accounts, may differ from the quote currency>. RISK lists disclosed financial red flags. "-" means the company has not published that figure (or it is not an operating company, e.g. an ETF or commodity).
   rank = #<cross-sectional rank>/<universe size> p<percentile> c<composite z> mom/qua/lvol/trd<factor z-scores>.
 ${rows.join("\n")}`;
 }
