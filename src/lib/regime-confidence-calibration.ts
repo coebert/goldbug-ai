@@ -245,8 +245,19 @@ export function fitConfidenceCalibrator(
   minSamples = MIN_CALIBRATION_SAMPLES,
 ): ConfidenceCalibrator {
   if (samples.length < Math.max(1, minSamples)) return identityCalibrator(samples.length);
-  const sorted = [...samples].sort((a, b) => a.stated - b.stated || a.index - b.index);
-  const knots = pav(sorted.map((s) => ({ x: s.stated, y: s.correct ? 1 : 0, w: 1 })));
+  // Pool identical stated values first: ties must share one block, otherwise
+  // the fit interpolates between halves of the same cohort.
+  const grouped = new Map<number, { hits: number; n: number }>();
+  for (const s of samples) {
+    const g = grouped.get(s.stated) ?? { hits: 0, n: 0 };
+    g.hits += s.correct ? 1 : 0;
+    g.n += 1;
+    grouped.set(s.stated, g);
+  }
+  const points = [...grouped.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([x, g]) => ({ x, y: g.hits / g.n, w: g.n }));
+  const knots = pav(points);
   const calibrator: ConfidenceCalibrator = {
     knots,
     n: samples.length,
