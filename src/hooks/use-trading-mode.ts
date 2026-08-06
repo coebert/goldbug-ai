@@ -65,6 +65,6 @@ export function useTradingMode(
     [portfolioId],
   );
 
-  const style = serverStyle ?? cached ?? "position";
+  const style = resolveTradingMode(serverStyle, cached);
   return { style, isSwing: style === "swing", setStyle };
 }
