@@ -39,6 +39,7 @@ import {
   resolveAggressiveness,
 } from "@/lib/risk-aggressiveness";
 import { qk } from "@/lib/query-keys";
+import { TradingModeDriftNotice } from "@/components/trading-mode-drift-notice";
 import { TradingModeBadge } from "@/components/trading-mode-badge";
 import { writeCachedTradingMode } from "@/lib/trading-mode-store";
 
@@ -386,6 +387,12 @@ export function RiskControlsCard({
                 {cfg.max_hold_days > 0 ? `max-hold ${cfg.max_hold_days}d · ` : ""}
                 {cfg.volatility_sizing ? `vol-target ${(cfg.vol_target_pct * 100).toFixed(2)}%/day` : "vol sizing off"}
               </CardDescription>
+
+              <TradingModeDriftNotice
+                portfolioId={portfolioId}
+                riskConfig={{ trading_style: initial.trading_style ?? "position" }}
+                className="mt-2"
+              />
             </div>
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
