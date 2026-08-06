@@ -85,9 +85,52 @@ const minTrades = Number(arg("min-trades", "10"));
 // Minimum net CAGR (after costs) a configuration must clear to count as viable.
 const minViableCagr = Number(arg("min-viable-cagr", "0"));
 
+// ------------------------------------------------------- cost scenarios
+// The optimiser can score each candidate across the same cost grid the sweep
+// uses (slippage × min-fee × liquidity) instead of one hard-coded friction
+// model, so configurations that only work at optimistic execution costs get
+// ranked below ones that survive the whole grid.
+//
+//   --slippage default|2,5,10,20     total per-side bps (split spread/slip)
+//   --minfee 0,3,8                   per-trade commission floor, £
+//   --liquidity default|0.25,1,4     book depth as a multiple of measured ADV
+//   --cost-score mean|worst|cvar     how the grid collapses into one score
+const slippageArg = arg("slippage", "");
+const slippageSpecs: SlippageSpec[] = !slippageArg
+  ? []
+  : slippageArg === "default"
+    ? DEFAULT_SLIPPAGE_SPECS
+    : slippageArg.split(",").map((raw) => {
+        const bps = Number(raw.trim());
+        if (!Number.isFinite(bps) || bps < 0) throw new Error(`bad --slippage value ${raw}`);
+        return { label: `${bps}bps`, slippageBps: bps / 2, spreadBps: bps / 2 };
+      });
+const minFeeArg = arg("minfee", "");
+const minFees = !minFeeArg
+  ? []
+  : minFeeArg.split(",").map((raw) => {
+      const v = Number(raw.trim());
+      if (!Number.isFinite(v) || v < 0) throw new Error(`bad --minfee value ${raw}`);
+      return v;
+    });
+const liquidityArg = arg("liquidity", "");
+const liquiditySpecs: LiquiditySpec[] = !liquidityArg
+  ? []
+  : liquidityArg === "default"
+    ? DEFAULT_LIQUIDITY_SPECS
+    : liquidityArg.split(",").map((raw) => {
+        const advScale = Number(raw.trim());
+        if (!Number.isFinite(advScale) || advScale <= 0) {
+          throw new Error(`bad --liquidity value ${raw}`);
+        }
+        return { label: `${advScale}x ADV`, advScale };
+      });
+const costScoreMode = arg("cost-score", "mean") as CostScoreMode;
+const costTailShare = Number(arg("cost-tail", "0.34"));
 
 // Realistic Saxo-like retail execution costs. The objective is CAGR *after*
-// these, so the optimiser pays for every trade it proposes.
+// these, so the optimiser pays for every trade it proposes. When cost axes
+// are supplied this is the baseline the grid is built from.
 const FRICTIONS = {
   commissionBps: 8,
   minCommission: 3,
@@ -95,6 +138,7 @@ const FRICTIONS = {
   slippageBps: 5,
   impactPerUnit: 0.0002,
 };
+
 
 // Search space: the knobs that actually move net CAGR and turnover.
 const AXES: ParamAxis[] = [
