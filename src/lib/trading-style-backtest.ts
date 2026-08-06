@@ -157,7 +157,14 @@ export type StyleTradeRow = {
   symbol: string;
   quantity: number;
   price: number;
+  /**
+   * Commission (plus tax) booked on this fill. Optional so hand-built trade
+   * logs still typecheck; `runStyleBacktest` always populates it, which is
+   * what lets cost attribution be split by date into train vs out-of-sample.
+   */
+  fee?: number;
 };
+
 
 
 export type StyleBacktestOptions = {
