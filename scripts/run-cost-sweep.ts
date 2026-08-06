@@ -15,11 +15,12 @@ import { runStyleBacktest, type StyleTradeRow } from "../src/lib/trading-style-b
 import { fetchUniverseHistory } from "../src/lib/real-market-tape.server";
 import { buildRealTape, type PriceMode } from "../src/lib/real-market-tape";
 import {
-  buildCostScenarios,
-  findBreakevenScale,
+  buildCostGrid,
+  breakevenGrid,
   formatBreakeven,
-  roundTripCostBps,
-  ticketValue,
+  scenarioKey,
+  DEFAULT_SLIPPAGE_SPECS,
+  type SlippageSpec,
   type SweepCell,
   type TicketSpec,
 } from "../src/lib/cost-sweep";
@@ -46,6 +47,23 @@ const startingCash = Number(arg("cash", "10300"));
 const riskLevels = arg("risk", "balanced").split(",") as RiskLevel[];
 const styles = arg("styles", "swing,position").split(",") as TradingStyle[];
 const scales = arg("scales", "0,0.1,0.25,0.5,0.75,1").split(",").map(Number);
+// Execution-cost axis: either named presets ("default") or explicit total
+// round-trip-per-side bps, e.g. --slippage 2,5,10,20
+const slippageArg = arg("slippage", "");
+const slippageSpecs: SlippageSpec[] = !slippageArg
+  ? []
+  : slippageArg === "default"
+    ? DEFAULT_SLIPPAGE_SPECS
+    : slippageArg.split(",").map((raw) => {
+        const bps = Number(raw.trim());
+        if (!Number.isFinite(bps) || bps < 0) throw new Error(`bad --slippage value ${raw}`);
+        // Split evenly between half-spread and adverse move so both
+        // microstructure components are represented.
+        return { label: `${bps}bps`, slippageBps: bps / 2, spreadBps: bps / 2 };
+      });
+// Minimum per-trade fee axis, e.g. --minfee 0,3,8
+const minFeeArg = arg("minfee", "");
+const minFees = !minFeeArg ? [] : minFeeArg.split(",").map(Number);
 
 // Baseline: Saxo-like retail costs on US lines.
 const BASE_FRICTIONS = {
@@ -65,7 +83,15 @@ const TICKETS: TicketSpec[] = [
   { label: "3 x 30%", maxNames: 3, perNameWeight: 0.3 },
 ];
 
-const scenarios = buildCostScenarios(BASE_FRICTIONS, scales);
+const scenarios = buildCostGrid(BASE_FRICTIONS, {
+  scales,
+  slippage: slippageSpecs,
+  minCommission: minFees,
+});
+console.log(
+  `Cost grid: ${scales.length} scale(s) x ${slippageSpecs.length || 1} slippage x ` +
+    `${minFees.length || 1} min-fee = ${scenarios.length} scenarios`,
+);
 
 console.log(`Fetching real daily history ${from} → ${to} for ${symbols.length} symbols…`);
 const histories = await fetchUniverseHistory(symbols, { from, to });
@@ -127,11 +153,12 @@ for (const riskLevel of riskLevels) {
           maxDrawdownPct: m.maxDrawdownPct,
         };
         cells.push(cell);
-        curves.set(`${riskLevel}|${style}|${ticket.label}|${scenario.scale}`, m.equityCurve);
-        tradeLogs.set(`${riskLevel}|${style}|${ticket.label}|${scenario.scale}`, m.tradeLog);
+        const ckey = `${riskLevel}|${style}|${ticket.label}|${scenarioKey(scenario)}`;
+        curves.set(ckey, m.equityCurve);
+        tradeLogs.set(ckey, m.tradeLog);
         console.log(
           `${riskLevel.padEnd(8)} ${style.padEnd(8)} ${ticket.label.padEnd(9)} ` +
-            `cost ${(scenario.scale * 100).toFixed(0).padStart(3)}%  ` +
+            `${scenario.label.padEnd(34)} ` +
             `ret ${m.totalReturnPct.toFixed(1).padStart(7)}%  ` +
             `sharpe ${m.sharpe.toFixed(2).padStart(5)}  trades ${String(m.trades).padStart(4)}  ` +
             `fees ${m.feeDragPct.toFixed(1).padStart(5)}%`,
@@ -142,38 +169,27 @@ for (const riskLevel of riskLevels) {
 }
 
 // ------------------------------------------------------------- breakeven
-type BreakRow = [string, string, string, string, string, string, string];
+type BreakRow = [string, string, string, string, string, string, string, string, string];
 const breakRows: BreakRow[] = [];
 console.log("\nBreakeven cost level (share of baseline Saxo-like costs):");
-for (const riskLevel of riskLevels) {
-  for (const style of styles) {
-    for (const ticket of TICKETS) {
-      const series = cells.filter(
-        (c) => c.riskLevel === riskLevel && c.style === style && c.ticket.label === ticket.label,
-      );
-      const tv = ticketValue(startingCash, ticket);
-      const zero = findBreakevenScale(series, { baseFrictions: BASE_FRICTIONS, ticketValue: tv });
-      const bench = findBreakevenScale(series, {
-        target: "benchmark",
-        baseFrictions: BASE_FRICTIONS,
-        ticketValue: tv,
-      });
-      console.log(
-        `  ${riskLevel.padEnd(8)} ${style.padEnd(8)} ${ticket.label.padEnd(9)} ` +
-          `ticket £${tv.toFixed(0).padStart(5)}  baseline ${roundTripCostBps(BASE_FRICTIONS, tv).toFixed(0).padStart(4)}bps  ` +
-          `vs zero: ${formatBreakeven(zero)}  |  vs B&H: ${formatBreakeven(bench)}`,
-      );
-      breakRows.push([
-        riskLevel,
-        style,
-        ticket.label,
-        `£${tv.toFixed(0)}`,
-        `${roundTripCostBps(BASE_FRICTIONS, tv).toFixed(0)}`,
-        formatBreakeven(zero),
-        formatBreakeven(bench),
-      ]);
-    }
-  }
+for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCash })) {
+  console.log(
+    `  ${g.riskLevel.padEnd(8)} ${g.style.padEnd(8)} ${g.ticket.label.padEnd(9)} ` +
+      `slip ${g.slippageLabel.padEnd(14)} min £${String(g.minCommission ?? "-").padStart(3)}  ` +
+      `ticket £${g.ticketValue.toFixed(0).padStart(5)}  baseline ${g.baselineRoundTripBps.toFixed(0).padStart(4)}bps  ` +
+      `vs zero: ${formatBreakeven(g.vsZero)}  |  vs B&H: ${formatBreakeven(g.vsBenchmark)}`,
+  );
+  breakRows.push([
+    g.riskLevel,
+    g.style,
+    g.ticket.label,
+    g.slippageLabel,
+    g.minCommission === null ? "-" : `£${g.minCommission}`,
+    `£${g.ticketValue.toFixed(0)}`,
+    `${g.baselineRoundTripBps.toFixed(0)}`,
+    formatBreakeven(g.vsZero),
+    formatBreakeven(g.vsBenchmark),
+  ]);
 }
 
 // ---------------------------------------------------------------- report
@@ -189,8 +205,8 @@ for (const riskLevel of riskLevels) {
           ...scenarios.map((sc, i) => ({
             label: sc.label,
             colour: COLOURS[i % COLOURS.length]!,
-            curve: curves.get(`${riskLevel}|${style}|${ticket.label}|${sc.scale}`) ?? [],
-            trades: tradeLogs.get(`${riskLevel}|${style}|${ticket.label}|${sc.scale}`) ?? [],
+            curve: curves.get(`${riskLevel}|${style}|${ticket.label}|${scenarioKey(sc)}`) ?? [],
+            trades: tradeLogs.get(`${riskLevel}|${style}|${ticket.label}|${scenarioKey(sc)}`) ?? [],
           })),
           { label: "buy & hold", colour: "#9aa4b2", dashed: true, curve: bh.curve },
         ],
@@ -227,7 +243,17 @@ panels.unshift({
   subtitle: "cost level at which each ticket size turns viable",
   series: [],
   table: {
-    columns: ["risk", "style", "ticket", "notional", "baseline bps", "vs zero", "vs buy & hold"],
+    columns: [
+      "risk",
+      "style",
+      "ticket",
+      "slippage",
+      "min fee",
+      "notional",
+      "baseline bps",
+      "vs zero",
+      "vs buy & hold",
+    ],
     rows: breakRows,
   },
 });
