@@ -387,18 +387,19 @@ export function RiskControlsCard({
                 {cfg.max_hold_days > 0 ? `max-hold ${cfg.max_hold_days}d · ` : ""}
                 {cfg.volatility_sizing ? `vol-target ${(cfg.vol_target_pct * 100).toFixed(2)}%/day` : "vol sizing off"}
               </CardDescription>
-
-              <TradingModeDriftNotice
-                portfolioId={portfolioId}
-                riskConfig={{ trading_style: initial.trading_style ?? "position" }}
-                className="mt-2"
-              />
             </div>
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
             />
           </CardHeader>
         </CollapsibleTrigger>
+        {/* Outside the trigger: it has its own dismiss button. */}
+        <TradingModeDriftNotice
+          portfolioId={portfolioId}
+          riskConfig={{ trading_style: initial.trading_style ?? "position" }}
+          className="mx-6 mb-4"
+        />
+
         <CollapsibleContent>
           <CardContent className="space-y-6">
             <div className="rounded-md border border-border bg-muted/30 p-4">
