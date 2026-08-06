@@ -117,10 +117,20 @@ export type CandidateMetrics = {
   sharpe: number;
   trades: number;
   tradesPerYear: number;
+  /** Total fee drag over the whole run, as % of starting equity. */
   feeDragPct: number;
   finalCashPct: number;
+  /** Run length in years, so fee drag can be annualised. */
+  years?: number;
+  /** Optional split of the drag; enables the fee-efficient objective's report. */
+  feeDrag?: FeeDragBreakdown;
   audit?: RunAudit;
 };
+
+/** Annualised fee drag for a candidate, falling back to the whole-run figure. */
+export function annualFeeDrag(m: CandidateMetrics): number {
+  return annualiseFeeDragPct(m.feeDragPct, m.years);
+}
 
 export type OptimizerConstraints = {
   /** Turnover ceiling: round-trip legs per 252 bars. */
