@@ -47,6 +47,12 @@ export interface AuditContext {
   features: Record<string, unknown> | null | undefined; // per-symbol signal snapshot
   regime?: unknown;
   rationale?: string;            // AI rationale for the whole run
+  /**
+   * Per-symbol sector evidence captured at sizing time: cycle phase
+   * (growing / stagnating / shrinking), the raw 30d/90d momentum readings and
+   * the exact sizing multiplier that was applied to the ticket.
+   */
+  sectorBySymbol?: Record<string, unknown> | null;
 }
 
 // Classify the source of a buy/sell into a coarse bucket so consumers can
@@ -132,6 +138,9 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
   const features = ctx.features ?? {};
   const regimeSlim = ctx.regime ?? null;
 
+  const sectorMap = ctx.sectorBySymbol ?? {};
+  const sectorFor = (sym: string) => sectorMap[sym] ?? null;
+
   const rows: AuditInsert[] = [];
 
   const sellSymbols = new Set<string>();
@@ -171,6 +180,7 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
       market_inputs: asJson({
         features: featureBlock,
         regime: regimeSlim,
+        sector: sectorFor(sym),
         run_rationale: ctx.rationale ?? null,
       }),
       order_id: orderId,
@@ -206,6 +216,7 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
       market_inputs: asJson({
         features: featureBlock,
         regime: regimeSlim,
+        sector: sectorFor(sym),
         run_rationale: ctx.rationale ?? null,
       }),
       order_id: null,

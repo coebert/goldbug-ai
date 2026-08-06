@@ -204,3 +204,56 @@ export function formatSectorCycleBlock(cycle: SectorCycle | null): string {
       "existing exposure there unless the name has an idiosyncratic catalyst.",
   ].join("\n");
 }
+
+/**
+ * Audit record of the sector evidence behind a single order decision.
+ * Persisted into `ai_decision_audit.market_inputs.sector` so the trade audit
+ * trail replays the phase, the raw momentum readings and the exact sizing
+ * multiplier that was applied.
+ */
+export type SectorDecisionAudit = {
+  sector: string | null;
+  etf: string | null;
+  phase: SectorPhase | "unknown";
+  strength: number | null;
+  momentum_30d: number | null;
+  momentum_90d: number | null;
+  relative_30d: number | null;
+  acceleration: number | null;
+  rank: number | null;
+  /** Cross-sector median 30d move on this tick (the market-wide component). */
+  breadth_median_30d: number | null;
+  breadth_growing: number | null;
+  /** Phase multiplier applied to the ticket size (1 = no adjustment). */
+  applied_multiplier: number;
+  /** Relative-rank multiplier from sector-rotation, when applied. */
+  rotation_multiplier: number | null;
+  note: string;
+};
+
+export function buildSectorDecisionAudit(args: {
+  cycle: SectorCycle | null;
+  sector: string | null;
+  row: SectorCycleRow | null;
+  appliedMultiplier: number;
+  rotationMultiplier?: number | null;
+  note?: string;
+}): SectorDecisionAudit {
+  const { cycle, sector, row } = args;
+  return {
+    sector: sector ?? row?.sector ?? null,
+    etf: row?.etf ?? null,
+    phase: row?.phase ?? "unknown",
+    strength: row?.strength ?? null,
+    momentum_30d: row?.momentum_30d ?? null,
+    momentum_90d: row?.momentum_90d ?? null,
+    relative_30d: row?.relative_30d ?? null,
+    acceleration: row?.acceleration ?? null,
+    rank: row?.rank ?? null,
+    breadth_median_30d: cycle?.breadth_median_30d ?? null,
+    breadth_growing: cycle?.breadth_growing ?? null,
+    applied_multiplier: Number.isFinite(args.appliedMultiplier) ? args.appliedMultiplier : 1,
+    rotation_multiplier: args.rotationMultiplier ?? null,
+    note: args.note ?? row?.note ?? (sector ? `${sector}: no cycle data` : "sector unknown"),
+  };
+}

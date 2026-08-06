@@ -143,6 +143,8 @@ import {
   sectorCycleFor,
   sectorPhaseMultiplier,
   formatSectorCycleBlock,
+  buildSectorDecisionAudit,
+  type SectorDecisionAudit,
 } from "./sector-cycle";
 import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
@@ -751,6 +753,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     })),
   );
   const sectorCycleBlock = formatSectorCycleBlock(sectorCycle);
+  // Per-symbol sector evidence captured at sizing time so the audit trail can
+  // replay exactly which phase/momentum/multiplier applied to each decision.
+  const sectorAuditBySymbol = new Map<string, SectorDecisionAudit>();
 
   // Measured trading edge (rolling signal_performance) — feeds Kelly sizing
   // instead of the old hardcoded 2% assumption. Falls back to the prior when
@@ -1643,6 +1648,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       // combineHaircuts ignores multipliers >= 1. Hard caps still bind later.
       const cycleRow = sectorCycleFor(sectorCycle, symSector);
       const phaseMult = sectorPhaseMultiplier(cycleRow, order.side);
+      sectorAuditBySymbol.set(String(meta.symbol).toUpperCase(), buildSectorDecisionAudit({
+        cycle: sectorCycle,
+        sector: symSector,
+        row: cycleRow,
+        appliedMultiplier: phaseMult.mult,
+        rotationMultiplier: secMult.mult,
+        note: [cycleRow?.note, phaseMult.note, secMult.note].filter(Boolean).join(" | "),
+      }));
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
 
       const haircuts = combineHaircuts([
@@ -2808,6 +2821,31 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       features: features as unknown as Record<string, unknown>,
       regime: effectiveRegime,
       rationale: decision.rationale,
+      sectorBySymbol: Object.fromEntries(
+        [
+          ...sectorAuditBySymbol.entries(),
+          // Fill in sells/holds that never went through buy sizing so every
+          // audit row still carries the sector phase + momentum readings.
+          ...[...new Set([
+            ...executed.map((t) => String(t.symbol).toUpperCase()),
+            ...heldAfter.map((h) => String(h.symbol).toUpperCase()),
+          ])]
+            .filter((sym) => !sectorAuditBySymbol.has(sym))
+            .map((sym) => {
+              const sec = symbolSector(sym);
+              return [
+                sym,
+                buildSectorDecisionAudit({
+                  cycle: sectorCycle,
+                  sector: sec,
+                  row: sectorCycleFor(sectorCycle, sec),
+                  appliedMultiplier: 1,
+                  rotationMultiplier: null,
+                }),
+              ] as const;
+            }),
+        ],
+      ),
     });
   } catch (e) {
     srvLog.warn("ai_decision_audit skipped", portfolioId, e);
