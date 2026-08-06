@@ -53,6 +53,13 @@ import {
   type RegimeGate,
   type WindowResult,
 } from "../src/lib/regime-walk-forward";
+import {
+  attributeWindowCosts,
+  explainRegimeCosts,
+  regimeCostTableRows,
+  summariseCostAttribution,
+  REGIME_COST_COLUMNS,
+} from "../src/lib/regime-cost-attribution";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import type { RiskLevel } from "../src/lib/risk-sim-matrix";
 import type { TradingStyle } from "../src/lib/trading-style";
@@ -199,6 +206,24 @@ for (const { window: w, regime } of windows) {
   const oosCurve = m.equityCurve.slice(w.testStart - w.trainStart);
   if (oosCurve.length < 2) continue;
 
+  // Attribute the cost of trading to axes, separately for the training slice
+  // and the scored slice, so a bad regime can be blamed on the right thing.
+  const costs = attributeWindowCosts({
+    fills: m.tradeLog.map((t) => ({
+      date: t.date,
+      notional: t.quantity * t.price,
+      fee: t.fee ?? 0,
+      side: t.side === "buy" ? ("BUY" as const) : ("SELL" as const),
+    })),
+    frictions: FRICTIONS,
+    startingCash,
+    trainFrom: tape.bars[w.trainStart]!.date,
+    testFrom: tape.bars[w.testStart]!.date,
+    testTo: tape.bars[w.testEnd - 1]!.date,
+    trainBars: w.testStart - w.trainStart,
+    testBars: w.testEnd - w.testStart,
+  });
+
 
 
   const benchStart = index[w.testStart]!.value;
@@ -221,6 +246,7 @@ for (const { window: w, regime } of windows) {
     tradesPerYear: years > 0 ? m.trades / years : m.trades,
     feeDragPct: m.feeDragPct,
     sharpe: m.sharpe,
+    costs,
   };
   results.push(row);
   console.log(
@@ -228,7 +254,9 @@ for (const { window: w, regime } of windows) {
       `conf ${Math.round(regime.confidence * 100).toString().padStart(3)}%` +
       `${regime.demoted ? "*" : " "} ` +
       `CAGR ${row.netCagrPct.toFixed(1).padStart(7)}%  maxDD ${row.maxDrawdownPct.toFixed(1).padStart(6)}%  ` +
-      `bench ${row.benchmarkCagrPct.toFixed(1).padStart(7)}%  trades/yr ${row.tradesPerYear.toFixed(0)}`,
+      `bench ${row.benchmarkCagrPct.toFixed(1).padStart(7)}%  trades/yr ${row.tradesPerYear.toFixed(0)}  ` +
+      `cost ${costs.test.annualDragPct.toFixed(1)}%/yr` +
+      `${costs.test.dominant.axis === "none" ? "" : ` (${costs.test.dominant.axis})`}`,
   );
 
 }
@@ -237,6 +265,13 @@ const report = buildRegimeReport(results, gate);
 console.log("\nPer-regime walk-forward results:");
 console.log(formatRegimeTable(report.summaries));
 console.log(`\n${summariseReport(report, gate)}`);
+
+console.log("\nCost decomposition (median per regime, IS = training slice, OOS = scored slice):");
+console.log(formatRegimeTable(report.summaries, REGIME_COST_COLUMNS, regimeCostTableRows(report.costs)));
+console.log(summariseCostAttribution(report.costs));
+for (const c of report.costs) {
+  if (c.windows > 0) console.log(`  ${explainRegimeCosts(c)}`);
+}
 
 for (const s of report.summaries) {
   if (s.windows === 0) {
