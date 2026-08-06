@@ -14,6 +14,7 @@ import {
   effectiveCashFloorPct,
   buildDiversificationTiltBlock,
 } from "../universe.server";
+import { tradingStylePrompt } from "../trading-style";
 import { regimeDescription, humanRegime, type PersistedRegime } from "../regime-detector.server";
 import { DecisionSchema, type DecisionOutput, type Portfolio, type Holding } from "./types";
 import { formatCandidateTable, activeAssetClasses } from "./features-prompt";
@@ -132,6 +133,8 @@ ${fxCcyLimitsStr ? `- Non-base currency exposure caps (base=${args.portfolio.cur
 - ${cfg.max_hold_days > 0 ? `Positions held longer than ${cfg.max_hold_days} days are auto-exited (time-based exit).` : "No time-based exit configured."}
 ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility to target ~${(cfg.vol_target_pct * 100).toFixed(2)}% daily risk per position.` : ""}
 - Only trade the provided symbols.
+
+${tradingStylePrompt(cfg)}
 
 ${regimeBlock}
 

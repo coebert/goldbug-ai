@@ -1,6 +1,7 @@
 // Curated symbol universe by asset class. Uses Yahoo Finance ticker syntax
 // (e.g. BTC-USD, GC=F, GBPUSD=X, VOD.L) which the price fetcher understands.
 import type { Database } from "@/integrations/supabase/types";
+import { parseTradingStyle, SWING_STYLE_OVERRIDES } from "./trading-style";
 
 export type AssetClass = Database["public"]["Enums"]["asset_class"];
 
@@ -263,6 +264,13 @@ export type RiskConfig = {
   // currency. Cap-only: it can only shrink a proposed buy, never force one,
   // and never permits borrowing.
   fx_currency_limits: Partial<Record<string, number>>;
+  // Trading style. "position" keeps the historical multi-month behaviour;
+  // "swing" rebases the exit/holding-period defaults for a days-to-weeks
+  // horizon (see src/lib/trading-style.ts). Explicit per-field overrides
+  // stored on risk_config always win over the style base.
+  trading_style: "position" | "swing";
+  /** Swing only: minimum sessions to hold before a discretionary sell. */
+  swing_min_hold_days: number;
 };
 
 
@@ -339,13 +347,20 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   cash_floor_pct: null,
   diversification_tilt: "off",
   fx_currency_limits: {},
+  trading_style: "position",
+  swing_min_hold_days: 2,
 
 };
 
 
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
-  const base = { ...DEFAULT_RISK_CONFIG };
+  const style = parseTradingStyle((raw as Record<string, unknown> | null)?.trading_style);
+  // The style rebases the exit/holding defaults; explicit fields below still win.
+  const base: RiskConfig =
+    style === "swing"
+      ? { ...DEFAULT_RISK_CONFIG, ...SWING_STYLE_OVERRIDES, trading_style: "swing" }
+      : { ...DEFAULT_RISK_CONFIG };
   if (!raw || typeof raw !== "object") return base;
   const r = raw as Record<string, unknown>;
   const out: RiskConfig = { ...base };
@@ -457,6 +472,8 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("reentry_atr_days_mult", 0, 5);
   num("reentry_min_days", 0, 365);
   num("reentry_max_days", 0, 365);
+  out.trading_style = style;
+  num("swing_min_hold_days", 0, 30);
   bool("alpha_bonus_enabled");
   num("alpha_bonus_cap", 1, 3);
   bool("risk_parity_enabled");

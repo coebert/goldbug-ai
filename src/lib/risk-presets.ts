@@ -33,6 +33,10 @@ export type RiskDialConfig = {
   buy_aggressiveness?: number;
   /** How much of a wanted trim is taken in one go (0.25–1.5). */
   sell_aggressiveness?: number;
+  /** "position" (months) or "swing" (days-to-weeks) trading horizon. */
+  trading_style?: "position" | "swing";
+  /** Swing only: minimum sessions held before a discretionary sell. */
+  swing_min_hold_days?: number;
 };
 
 export const RISK_DIAL_DEFAULTS: RiskDialConfig = {
@@ -51,6 +55,21 @@ export const RISK_DIAL_DEFAULTS: RiskDialConfig = {
   commodity_max_atr_pct: 0.06,
   fx_currency_limits: {},
 };
+
+/**
+ * Dial-visible fields a swing style rewrites. The rest of the swing profile
+ * (chandelier, time stop, re-entry lockout, scale-outs) is rebased serverside
+ * by `parseRiskConfig` from `SWING_STYLE_OVERRIDES`.
+ */
+export const SWING_DIAL_OVERRIDES = {
+  stop_loss_pct: 0.06,
+  take_profit_pct: 0.12,
+  atr_trailing_mult: 2,
+  max_hold_days: 20,
+  volatility_sizing: true,
+  vol_target_pct: 0.018,
+  swing_min_hold_days: 2,
+} satisfies Partial<RiskDialConfig>;
 
 export type RiskPreset = { name: string; blurb: string; cfg: RiskDialConfig };
 
