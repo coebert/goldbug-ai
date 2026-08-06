@@ -1639,6 +1639,44 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
+      // Explicit cash-allocation policy, re-evaluated against live exposure so
+      // the target band holds across a multi-order tick. It can scale a buy UP
+      // when the book is under-deployed for the regime, throttles it inside the
+      // band, and blocks new risk above the ceiling.
+      const livePolicy = resolveCashAllocationPolicy({
+        regime: effectiveRegime.regime,
+        riskLevel: portfolio.risk_level,
+        totalValue,
+        holdingsValue: currentHoldingsValue,
+        cashFloorPct: configuredCashFloorPct,
+        portfolioDrawdownPct: ddSizing.drawdown_pct,
+        maxDrawdownHaltPct: cfg.max_drawdown_halt_pct,
+        indexDrawdownPct: effectiveRegime.signals.spy_drawdown_pct,
+        targetOverridePct: cfg.target_invested_pct,
+        enabled: cfg.cash_policy_enabled,
+      });
+      if (livePolicy.enabled) {
+        if (livePolicy.deployableValue <= 0) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `cash policy: invested ${(livePolicy.investedPct * 100).toFixed(0)}% at/above the ${(livePolicy.maxInvestedPct * 100).toFixed(0)}% ceiling for ${effectiveRegime.regime}`,
+          });
+          continue;
+        }
+        if (livePolicy.deploymentScale !== 1) {
+          spend *= livePolicy.deploymentScale;
+          sizingNotes.push(
+            `cash-policy ${livePolicy.state} ×${livePolicy.deploymentScale.toFixed(2)} (target ${(livePolicy.targetInvestedPct * 100).toFixed(0)}% invested)`,
+          );
+        }
+        if (spend > livePolicy.deployableValue) {
+          spend = livePolicy.deployableValue;
+          sizingNotes.push(`invested≤${(livePolicy.maxInvestedPct * 100).toFixed(0)}%`);
+        }
+      }
+
+
 
       // Enforce per-symbol position cap
       const existingVal = holdingsByS.get(meta.symbol)
