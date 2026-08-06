@@ -6,13 +6,69 @@
  */
 import type { EquityPoint } from "@/lib/backtest-metrics";
 
+/** One executed fill, keyed by the bar date it settled on. */
+export type ChartTrade = {
+  date: string;
+  side: "buy" | "sell";
+  symbol?: string;
+  quantity?: number;
+  price?: number;
+};
+
+/** Per-bar aggregate of the fills that happened on that bar. */
+export type BarTrades = {
+  buys: number;
+  sells: number;
+  /** Short human summary, e.g. "BUY AAPL ×10, SELL MSFT ×4". */
+  summary: string;
+};
+
 export type ChartSeries = {
   label: string;
   colour: string;
   /** Dashed rendering — used to distinguish the control (heuristic) layer. */
   dashed?: boolean;
   curve: readonly EquityPoint[];
+  /** Executed fills to overlay as buy/sell markers. */
+  trades?: readonly ChartTrade[];
 };
+
+/**
+ * Group fills onto bar indexes of `curve`. Fills whose date is not a bar in
+ * the curve are dropped (they cannot be placed on the x-axis).
+ */
+export function buildTradeMarkers(
+  curve: readonly EquityPoint[],
+  trades: readonly ChartTrade[] = [],
+): Map<number, BarTrades> {
+  const indexByDate = new Map<string, number>();
+  curve.forEach((p, i) => {
+    if (!indexByDate.has(p.snapshot_date)) indexByDate.set(p.snapshot_date, i);
+  });
+  const out = new Map<number, BarTrades>();
+  const parts = new Map<number, string[]>();
+  for (const t of trades) {
+    const i = indexByDate.get(t.date);
+    if (i === undefined) continue;
+    const bucket = out.get(i) ?? { buys: 0, sells: 0, summary: "" };
+    if (t.side === "buy") bucket.buys += 1;
+    else bucket.sells += 1;
+    out.set(i, bucket);
+    const list = parts.get(i) ?? [];
+    if (list.length < 4) {
+      const qty = Number.isFinite(t.quantity) ? ` ×${t.quantity}` : "";
+      list.push(`${t.side.toUpperCase()} ${t.symbol ?? ""}${qty}`.replace(/\s+/g, " ").trim());
+    }
+    parts.set(i, list);
+  }
+  for (const [i, bucket] of out) {
+    const list = parts.get(i) ?? [];
+    const extra = bucket.buys + bucket.sells - list.length;
+    bucket.summary = list.join(", ") + (extra > 0 ? ` +${extra} more` : "");
+  }
+  return out;
+}
+
 
 export type ChartSize = { width: number; height: number };
 
@@ -78,7 +134,10 @@ export type HoverPayload = {
     px: (number | null)[];
     equity: (number | null)[];
     drawdown: (number | null)[];
+    /** Fill summary per index; null when nothing traded on that bar. */
+    trades: (string | null)[];
   }[];
+
 };
 
 const at = (arr: number[], i: number): number | null =>
@@ -148,6 +207,34 @@ export function renderLineChart(
     return date ? `bar ${i} · ${date}` : `bar ${i}`;
   });
 
+  const markersBySeries = plotted.map(({ s }) => buildTradeMarkers(s.curve, s.trades ?? []));
+
+  // Buy = upward triangle under the point, sell = downward triangle above it.
+  const tradeMarks = plotted
+    .map(({ s, ys }, idx) => {
+      const marks: string[] = [];
+      for (const [i, bar] of markersBySeries[idx] ?? new Map<number, BarTrades>()) {
+        const v = at(ys, i);
+        if (v === null) continue;
+        const cx = x(i);
+        const cy = y(v);
+        const tip = esc(`${labels[i]} — ${bar.summary}`);
+        if (bar.buys > 0) {
+          marks.push(
+            `<polygon class="trade buy" fill="${s.colour}" points="${fmt(cx)},${fmt(cy + 5)} ${fmt(cx - 4)},${fmt(cy + 12)} ${fmt(cx + 4)},${fmt(cy + 12)}"><title>${tip}</title></polygon>`,
+          );
+        }
+        if (bar.sells > 0) {
+          marks.push(
+            `<polygon class="trade sell" fill="${s.colour}" points="${fmt(cx)},${fmt(cy - 5)} ${fmt(cx - 4)},${fmt(cy - 12)} ${fmt(cx + 4)},${fmt(cy - 12)}"><title>${tip}</title></polygon>`,
+          );
+        }
+      }
+      return marks.join("\n  ");
+    })
+    .filter(Boolean)
+    .join("\n  ");
+
   const xTicks = [0, Math.floor((maxLen - 1) / 2), maxLen - 1]
     .map(
       (i) =>
@@ -164,7 +251,7 @@ export function renderLineChart(
     xs: Array.from({ length: maxLen }, (_, i) => Number(fmt(x(i)))),
     labels,
     unit: options.yLabel,
-    series: plotted.map(({ s, ys }) => ({
+    series: plotted.map(({ s, ys }, idx) => ({
       label: s.label,
       colour: s.colour,
       px: Array.from({ length: maxLen }, (_, i) => {
@@ -179,6 +266,10 @@ export function renderLineChart(
         const d = toDrawdownPct(s.curve);
         return Array.from({ length: maxLen }, (_, i) => at(d, i));
       })(),
+      trades: Array.from(
+        { length: maxLen },
+        (_, i) => markersBySeries[idx]?.get(i)?.summary ?? null,
+      ),
     })),
   };
 
@@ -192,6 +283,7 @@ export function renderLineChart(
   <rect class="hit" x="${PAD.left}" y="${PAD.top}" width="${w}" height="${h}" fill="transparent"/>`
     : "";
 
+
   return `<svg viewBox="0 0 ${size.width} ${size.height}" class="chart"${
     interactive ? ` data-hover="${esc(JSON.stringify(hover))}"` : ""
   } role="img" aria-label="${esc(options.title)}">
@@ -200,6 +292,7 @@ export function renderLineChart(
   ${gridRows}
   ${zero}
   ${paths}
+  ${tradeMarks}
   ${xTicks}
   ${hoverLayer}
 </svg>`;
@@ -265,6 +358,8 @@ export const HOVER_SCRIPT = `
           '<span class="tip-label">' + s.label + '</span>' +
           '<span class="tip-val">' + f2(s.equity[best]) + '%</span>' +
           '<span class="tip-dd">' + f2(s.drawdown[best]) + '%</span></div>';
+        var tr = s.trades && s.trades[best];
+        if (tr) rows += '<div class="tip-trade">' + tr + '</div>';
       });
       tip.innerHTML = '<div class="tip-head">' + data.labels[best] + '</div>' +
         '<div class="tip-row tip-head-row"><span class="tip-swatch"></span><span class="tip-label"></span>' +
@@ -285,13 +380,16 @@ export const HOVER_SCRIPT = `
 `;
 
 export function renderLegend(series: readonly ChartSeries[]): string {
-
+  const tradeKey = series.some((s) => (s.trades?.length ?? 0) > 0)
+    ? `<li class="legend-trades">&#9650; buy &nbsp;&#9660; sell</li>`
+    : "";
   return `<ul class="legend">${series
     .map(
       (s) =>
         `<li><span class="swatch${s.dashed ? " dashed" : ""}" style="--c:${s.colour}"></span>${esc(s.label)}</li>`,
     )
-    .join("")}</ul>`;
+    .join("")}${tradeKey}</ul>`;
+
 }
 
 export type ReportPanel = {
@@ -365,6 +463,10 @@ export function renderBacktestReportHtml(args: {
   .hit { cursor:crosshair; }
   .cross { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:.8; }
   .dot { stroke:var(--panel); stroke-width:1.5; }
+  .trade { fill-opacity:.95; stroke:var(--panel); stroke-width:.6; }
+  .trade.sell { fill-opacity:.55; }
+  .tip-trade { grid-column:1/-1; color:var(--ink); opacity:.8; font-size:10px;
+               margin:0 0 3px 14px; white-space:normal; }
   .chart-tip { position:absolute; pointer-events:none; z-index:2; min-width:190px;
                background:rgba(11,18,32,.96); border:1px solid var(--grid); border-radius:8px;
                padding:6px 8px; font-size:11px; box-shadow:0 6px 18px rgba(0,0,0,.45); }

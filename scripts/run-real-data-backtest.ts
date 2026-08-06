@@ -171,6 +171,7 @@ const panels: ReportPanel[] = riskLevels.map((riskLevel) => ({
         label: r.style,
         colour: COLOURS[r.style] ?? "#4ea1ff",
         curve: r.equityCurve,
+        trades: r.tradeLog,
       })),
     { label: "buy & hold", colour: "#9aa4b2", dashed: true, curve: bh.curve },
   ],

@@ -11,7 +11,7 @@
 // & hold — i.e. the breakeven cost at which swing trading becomes viable.
 
 import { parseRiskConfig } from "../src/lib/universe.server";
-import { runStyleBacktest } from "../src/lib/trading-style-backtest";
+import { runStyleBacktest, type StyleTradeRow } from "../src/lib/trading-style-backtest";
 import { fetchUniverseHistory } from "../src/lib/real-market-tape.server";
 import { buildRealTape, type PriceMode } from "../src/lib/real-market-tape";
 import {
@@ -96,6 +96,8 @@ console.log(`Buy & hold on the same tape: ${bh.ret.toFixed(1)}%`);
 // ----------------------------------------------------------------- sweep
 const cells: SweepCell[] = [];
 const curves = new Map<string, EquityPoint[]>();
+const tradeLogs = new Map<string, StyleTradeRow[]>();
+
 
 for (const riskLevel of riskLevels) {
   for (const style of styles) {
@@ -125,6 +127,7 @@ for (const riskLevel of riskLevels) {
         };
         cells.push(cell);
         curves.set(`${riskLevel}|${style}|${ticket.label}|${scenario.scale}`, m.equityCurve);
+        tradeLogs.set(`${riskLevel}|${style}|${ticket.label}|${scenario.scale}`, m.tradeLog);
         console.log(
           `${riskLevel.padEnd(8)} ${style.padEnd(8)} ${ticket.label.padEnd(9)} ` +
             `cost ${(scenario.scale * 100).toFixed(0).padStart(3)}%  ` +
@@ -186,6 +189,7 @@ for (const riskLevel of riskLevels) {
             label: sc.label,
             colour: COLOURS[i % COLOURS.length]!,
             curve: curves.get(`${riskLevel}|${style}|${ticket.label}|${sc.scale}`) ?? [],
+            trades: tradeLogs.get(`${riskLevel}|${style}|${ticket.label}|${sc.scale}`) ?? [],
           })),
           { label: "buy & hold", colour: "#9aa4b2", dashed: true, curve: bh.curve },
         ],

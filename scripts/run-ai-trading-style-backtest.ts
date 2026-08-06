@@ -192,6 +192,7 @@ const panels: ReportPanel[] = RISK.map((riskLevel) => {
         colour: SERIES_COLOUR[style],
         dashed: layer === "heuristic",
         curve: m.equityCurve,
+        trades: m.tradeLog,
       });
     }
   }
