@@ -31,6 +31,8 @@
 
 import { effectiveMaxParticipation } from "./microstructure/algo-regime-guard";
 import { computeCommission, type CommissionModel } from "./commission-model";
+import { estimateSpreadSlippage } from "./spread-slippage";
+import type { LiquidityFrictions } from "./liquidity-profile";
 import type { AssetClass } from "./universe.server";
 
 export type Side = "BUY" | "SELL";
@@ -213,7 +215,16 @@ export type Frictions = {
     /** Per-symbol asset class, enabling class overrides (e.g. crypto). */
     assetClassBySymbol?: Record<string, AssetClass>;
   };
+  /**
+   * Optional liquidity-aware execution-cost model. When present it
+   * REPLACES the flat `slippageBps` / `impactPerUnit` pair: the per-side
+   * cost is estimated per fill from the symbol's ADV, volatility, asset
+   * class and venue currency using the sqrt-participation impact model in
+   * `spread-slippage.ts`. Bigger tickets in thinner names pay more.
+   */
+  liquidity?: LiquidityFrictions;
 };
+
 
 export type SimulateOptions = {
   /**
@@ -389,22 +400,60 @@ function isFiniteNonNeg(n: number): boolean {
 }
 
 /**
+ * Per-side execution cost in bps for a fill, using the liquidity-aware
+ * microstructure model (half-spread + latency + sqrt-participation
+ * impact + urgency). Exported for TCA panels and tests.
+ */
+export function liquidityCostBps(
+  liq: LiquidityFrictions,
+  symbol: string,
+  notional: number,
+): number {
+  const adv = liq.adv20dBySymbol?.[symbol] ?? liq.defaultAdv20d ?? 0;
+  const atrPct = liq.atrPctBySymbol?.[symbol] ?? liq.defaultAtrPct ?? 0;
+  const { totalBps } = estimateSpreadSlippage({
+    notional,
+    ...(adv > 0 ? { adv20d: adv } : {}),
+    ...(atrPct > 0 ? { atrPct } : {}),
+    ...(liq.assetClassBySymbol?.[symbol]
+      ? { assetClass: liq.assetClassBySymbol[symbol] }
+      : {}),
+    ...(liq.currencyBySymbol?.[symbol] ? { currency: liq.currencyBySymbol[symbol] } : {}),
+    ...(liq.urgency ? { urgency: liq.urgency } : {}),
+  });
+  const scale = liq.costScale === undefined ? 1 : Math.max(0, liq.costScale);
+  return totalBps * scale;
+}
+
+/**
  * Effective (post-slippage) execution price for a given quoted price,
- * side, and fill quantity. BUYs pay up, SELLs receive down. Impact is
- * linear in qty. Returned price is clamped >= 0.
+ * side, and fill quantity. BUYs pay up, SELLs receive down.
+ *
+ * With `frictions.liquidity` the adverse move is size- and
+ * liquidity-dependent (participation vs ADV); otherwise it is the flat
+ * `slippageBps` plus a linear-in-quantity `impactPerUnit`. Returned price
+ * is clamped >= 0.
  */
 function effectiveFillPrice(
   quote: number,
   qty: number,
   side: Side,
   f: Frictions | undefined,
+  symbol?: string,
 ): number {
   if (!f) return quote;
+  if (f.liquidity) {
+    const bps = liquidityCostBps(f.liquidity, symbol ?? "", Math.max(0, qty * quote));
+    const frac = bps / 10_000;
+    if (side === "BUY") return quote * (1 + frac);
+    return Math.max(0, quote * (1 - frac));
+  }
   const slipFrac = (f.slippageBps ?? 0) / 10_000;
   const impact = (f.impactPerUnit ?? 0) * qty;
   if (side === "BUY") return quote * (1 + slipFrac) + impact;
   return Math.max(0, quote * (1 - slipFrac) - impact);
 }
+
 
 /** Context needed by the scaling commission model. */
 type FeeContext = { symbol: string; quantity: number };
@@ -460,7 +509,7 @@ function maxAffordableBuyQty(
   symbol: string,
 ): number {
   const spendAt = (q: number): number => {
-    const p = effectiveFillPrice(quote, q, "BUY", f);
+    const p = effectiveFillPrice(quote, q, "BUY", f, symbol);
     const notional = q * p;
     return notional + totalFee(notional, "BUY", baseFee, f, { symbol, quantity: q });
   };
@@ -876,7 +925,7 @@ export function simulateBrokerExecution(
 
       // ---- Friction-aware BUY --------------------------------------------
       const requested = requestedAfterLiquidity;
-      const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f);
+      const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f, d.symbol);
       const requestedNotional = requested * requestedEffPrice;
       const requestedSpend =
         requestedNotional
@@ -904,7 +953,7 @@ export function simulateBrokerExecution(
         }
       }
 
-      const effPrice = effectiveFillPrice(d.price, qty, "BUY", f);
+      const effPrice = effectiveFillPrice(d.price, qty, "BUY", f, d.symbol);
       const notional = qty * effPrice;
       const totalFeePaid = totalFee(notional, "BUY", fee, f, { symbol: d.symbol, quantity: qty });
       const spend = notional + totalFeePaid;
@@ -968,7 +1017,7 @@ export function simulateBrokerExecution(
       qty = held;
     }
     const f = options.frictions;
-    const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f);
+    const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f, d.symbol);
     const proceeds = qty * effSellPrice;
     const totalFeePaid = totalFee(proceeds, "SELL", fee, f, { symbol: d.symbol, quantity: qty });
     if (totalFeePaid > cash + proceeds) {

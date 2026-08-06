@@ -20,10 +20,13 @@ import {
   formatBreakeven,
   scenarioKey,
   DEFAULT_SLIPPAGE_SPECS,
+  DEFAULT_LIQUIDITY_SPECS,
+  type LiquiditySpec,
   type SlippageSpec,
   type SweepCell,
   type TicketSpec,
 } from "../src/lib/cost-sweep";
+import { buildLiquidityProfile } from "../src/lib/liquidity-profile";
 import { computeMaxDrawdown, computeSharpe, dailyReturns, type EquityPoint } from "../src/lib/backtest-metrics";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import { buildCostReturnPanels } from "../src/lib/cost-return-chart";
@@ -81,6 +84,22 @@ const slippageSpecs: SlippageSpec[] = !slippageArg
         // microstructure components are represented.
         return { label: `${bps}bps`, slippageBps: bps / 2, spreadBps: bps / 2 };
       });
+// Liquidity axis: how deep the book is relative to the tape's own measured
+// ADV. "default" uses thin/as-traded/deep; explicit values are ADV
+// multipliers, e.g. --liquidity 0.25,1,4. When set, spread + slippage are
+// estimated per fill from participation vs ADV instead of a flat bps.
+const liquidityArg = arg("liquidity", "");
+const liquiditySpecs: LiquiditySpec[] = !liquidityArg
+  ? []
+  : liquidityArg === "default"
+    ? DEFAULT_LIQUIDITY_SPECS
+    : liquidityArg.split(",").map((raw) => {
+        const advScale = Number(raw.trim());
+        if (!Number.isFinite(advScale) || advScale <= 0) {
+          throw new Error(`bad --liquidity value ${raw}`);
+        }
+        return { label: `${advScale}x ADV`, advScale };
+      });
 // Minimum per-trade fee axis, e.g. --minfee 0,3,8
 const minFeeArg = arg("minfee", "");
 const minFees = !minFeeArg ? [] : minFeeArg.split(",").map(Number);
@@ -106,21 +125,42 @@ const TICKETS: TicketSpec[] = [
   { label: "3 x 30%", maxNames: 3, perNameWeight: 0.3 },
 ];
 
-const scenarios = buildCostGrid(BASE_FRICTIONS, {
-  scales,
-  slippage: slippageSpecs,
-  minCommission: minFees,
-});
-console.log(
-  `Cost grid: ${scales.length} scale(s) x ${slippageSpecs.length || 1} slippage x ` +
-    `${minFees.length || 1} min-fee = ${scenarios.length} scenarios`,
-);
-
 console.log(`Fetching real daily history ${from} → ${to} for ${symbols.length} symbols…`);
 const histories = await fetchUniverseHistory(symbols, { from, to });
 const tape = buildRealTape(histories, { mode, from, to });
 console.log(`Tape: ${tape.bars.length} bars, ${tape.symbols.length} symbols (mode=${mode}).`);
 if (tape.bars.length < 120) throw new Error("Tape too short to backtest");
+
+// Measured liquidity from the same bars the tape was built from — median
+// daily traded value and mean absolute daily return per symbol.
+const liquidityProfile = buildLiquidityProfile(histories);
+if (liquiditySpecs.length) {
+  console.log("\nMeasured liquidity (median daily traded value, vol proxy):");
+  for (const s of liquidityProfile.bySymbol) {
+    const adv = s.adv20d >= 1e9
+      ? `${(s.adv20d / 1e9).toFixed(2)}bn`
+      : `${(s.adv20d / 1e6).toFixed(1)}m`;
+    console.log(
+      `  ${s.symbol.padEnd(6)} ADV ${adv.padStart(8)}` +
+        `${s.advMissing ? " (no volume — median used)" : ""}` +
+        `  vol ${(s.atrPct * 100).toFixed(2)}%/day`,
+    );
+  }
+}
+
+const scenarios = buildCostGrid(BASE_FRICTIONS, {
+  scales,
+  slippage: slippageSpecs,
+  minCommission: minFees,
+  liquidity: liquiditySpecs,
+  liquidityProfile,
+});
+console.log(
+  `\nCost grid: ${scales.length} scale(s) x ${slippageSpecs.length || 1} slippage x ` +
+    `${minFees.length || 1} min-fee x ${liquiditySpecs.length || 1} liquidity = ` +
+    `${scenarios.length} scenarios`,
+);
+
 
 // ------------------------------------------------------- buy & hold ref
 function buyAndHold(): { curve: EquityPoint[]; ret: number } {
@@ -198,7 +238,7 @@ console.log("\nBreakeven cost level (share of baseline Saxo-like costs):");
 for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCash })) {
   console.log(
     `  ${g.riskLevel.padEnd(8)} ${g.style.padEnd(8)} ${g.ticket.label.padEnd(9)} ` +
-      `slip ${g.slippageLabel.padEnd(14)} min £${String(g.minCommission ?? "-").padStart(3)}  ` +
+      `slip ${(g.liquidityLabel ? `${g.slippageLabel}/${g.liquidityLabel}` : g.slippageLabel).padEnd(24)} min £${String(g.minCommission ?? "-").padStart(3)}  ` +
       `ticket £${g.ticketValue.toFixed(0).padStart(5)}  baseline ${g.baselineRoundTripBps.toFixed(0).padStart(4)}bps  ` +
       `vs zero: ${formatBreakeven(g.vsZero)}  |  vs B&H: ${formatBreakeven(g.vsBenchmark)}`,
   );
@@ -206,7 +246,7 @@ for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCa
     g.riskLevel,
     g.style,
     g.ticket.label,
-    g.slippageLabel,
+    g.liquidityLabel ? `${g.slippageLabel} · ${g.liquidityLabel}` : g.slippageLabel,
     g.minCommission === null ? "-" : `£${g.minCommission}`,
     `£${g.ticketValue.toFixed(0)}`,
     `${g.baselineRoundTripBps.toFixed(0)}`,

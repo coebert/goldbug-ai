@@ -11,6 +11,7 @@
 // tested without touching a broker, a network, or the database.
 
 import type { Frictions } from "./broker-simulator";
+import { liquidityFrictions, scaleLiquidity, type LiquidityProfile } from "./liquidity-profile";
 
 export type TicketSpec = {
   /** Human label, e.g. "5 x 18%". */
@@ -30,7 +31,58 @@ export type CostScenario = {
   slippage?: SlippageSpec;
   /** Per-trade minimum commission this scenario was built with, when varied. */
   minCommission?: number;
+  /** Liquidity assumption this scenario was built with, when varied. */
+  liquidity?: LiquiditySpec;
 };
+
+/**
+ * One point on the liquidity axis. `advScale` multiplies every symbol's
+ * measured average daily traded value: 1 = the tape's own liquidity,
+ * 0.25 = books a quarter as deep (equivalently, tickets 4x larger
+ * relative to the book), 4 = mega-cap depth.
+ *
+ * When a liquidity spec is attached the simulator estimates spread and
+ * slippage PER FILL from participation vs ADV instead of using a flat
+ * bps assumption, so the same ticket costs more in thin names.
+ */
+export type LiquiditySpec = {
+  label: string;
+  advScale: number;
+  /** Optional extra multiplier on the modelled per-side bps. */
+  costScale?: number;
+  urgency?: "passive" | "normal" | "aggressive";
+};
+
+/** Sensible default depth axis: thin → deep. */
+export const DEFAULT_LIQUIDITY_SPECS: LiquiditySpec[] = [
+  { label: "thin 0.25x ADV", advScale: 0.25 },
+  { label: "as-traded ADV", advScale: 1 },
+  { label: "deep 4x ADV", advScale: 4 },
+];
+
+/**
+ * Attach the liquidity-aware execution model to a friction set, replacing
+ * the flat slippage terms (the simulator ignores them when
+ * `liquidity` is present).
+ */
+export function applyLiquidity(
+  base: Frictions,
+  spec: LiquiditySpec,
+  profile: LiquidityProfile,
+): Frictions {
+  if (!Number.isFinite(spec.advScale) || spec.advScale <= 0) {
+    throw new Error(`applyLiquidity: invalid advScale ${spec.advScale}`);
+  }
+  const scaled = scaleLiquidity(profile, spec.advScale);
+  return {
+    ...base,
+    liquidity: liquidityFrictions(scaled, {
+      ...(spec.costScale !== undefined ? { costScale: spec.costScale } : {}),
+      ...(spec.urgency ? { urgency: spec.urgency } : {}),
+    }),
+  };
+}
+
 
 /**
  * One point on the execution-cost axis: how much the price moves against
@@ -96,10 +148,14 @@ export function applyMinCommission(base: Frictions, minCommission: number): Fric
 }
 
 /**
- * Full cost grid: commission scale × slippage spec × minimum fee.
- * The commission scale still multiplies every baseline term, but the
- * slippage and minimum-fee overrides are applied afterwards so those two
- * axes are exactly the values requested rather than scaled derivatives.
+ * Full cost grid: commission scale × slippage spec × minimum fee ×
+ * liquidity. The commission scale still multiplies every baseline term,
+ * but the slippage, minimum-fee and liquidity overrides are applied
+ * afterwards so those axes are exactly the values requested rather than
+ * scaled derivatives.
+ *
+ * A liquidity axis requires `liquidityProfile`; when present it replaces
+ * the flat slippage terms with the participation-aware model.
  */
 export function buildCostGrid(
   base: Frictions,
@@ -107,37 +163,62 @@ export function buildCostGrid(
     scales: number[];
     slippage?: SlippageSpec[];
     minCommission?: number[];
+    liquidity?: LiquiditySpec[];
+    liquidityProfile?: LiquidityProfile;
   },
 ): CostScenario[] {
   const slippages = opts.slippage?.length ? opts.slippage : [null];
   const minFees = opts.minCommission?.length ? opts.minCommission : [null];
+  const liquidities = opts.liquidity?.length ? opts.liquidity : [null];
+  if (opts.liquidity?.length && !opts.liquidityProfile) {
+    throw new Error("buildCostGrid: liquidity axis requires a liquidityProfile");
+  }
   const out: CostScenario[] = [];
   for (const scale of opts.scales) {
     for (const spec of slippages) {
       for (const minFee of minFees) {
-        let frictions = scaleFrictions(base, scale);
-        if (spec) frictions = applySlippage(frictions, spec);
-        if (minFee !== null) frictions = applyMinCommission(frictions, minFee);
-        const parts = [scale === 1 ? "baseline" : `${(scale * 100).toFixed(0)}% cost`];
-        if (spec) parts.push(spec.label);
-        if (minFee !== null) parts.push(`min £${minFee}`);
-        out.push({
-          label: parts.join(" · "),
-          scale,
-          frictions,
-          ...(spec ? { slippage: spec } : {}),
-          ...(minFee !== null ? { minCommission: minFee } : {}),
-        });
+        for (const liq of liquidities) {
+          let frictions = scaleFrictions(base, scale);
+          if (spec) frictions = applySlippage(frictions, spec);
+          if (minFee !== null) frictions = applyMinCommission(frictions, minFee);
+          if (liq) {
+            // Keep the commission scale meaningful for the liquidity model:
+            // it multiplies the modelled per-side bps, not ADV.
+            frictions = applyLiquidity(
+              frictions,
+              { ...liq, costScale: (liq.costScale ?? 1) * scale },
+              opts.liquidityProfile!,
+            );
+          }
+          const parts = [scale === 1 ? "baseline" : `${(scale * 100).toFixed(0)}% cost`];
+          if (spec) parts.push(spec.label);
+          if (minFee !== null) parts.push(`min £${minFee}`);
+          if (liq) parts.push(liq.label);
+          out.push({
+            label: parts.join(" · "),
+            scale,
+            frictions,
+            ...(spec ? { slippage: spec } : {}),
+            ...(minFee !== null ? { minCommission: minFee } : {}),
+            ...(liq ? { liquidity: liq } : {}),
+          });
+        }
       }
     }
   }
   return out;
 }
 
-/** Stable identity for a scenario, safe as a map key across all three axes. */
+/** Stable identity for a scenario, safe as a map key across all four axes. */
 export function scenarioKey(sc: CostScenario): string {
-  return [sc.scale, sc.slippage?.label ?? "-", sc.minCommission ?? "-"].join("|");
+  return [
+    sc.scale,
+    sc.slippage?.label ?? "-",
+    sc.minCommission ?? "-",
+    sc.liquidity?.label ?? "-",
+  ].join("|");
 }
+
 
 
 /**
@@ -157,7 +238,13 @@ export function scaleFrictions(base: Frictions, scale: number): Frictions {
     ...(base.buyTaxBps !== undefined ? { buyTaxBps: s(base.buyTaxBps)! } : {}),
     ...(base.slippageBps !== undefined ? { slippageBps: s(base.slippageBps)! } : {}),
     ...(base.impactPerUnit !== undefined ? { impactPerUnit: s(base.impactPerUnit)! } : {}),
+    // The liquidity model rides the same cost axis via its bps multiplier
+    // (ADV itself is a market property and must not be scaled here).
+    ...(base.liquidity
+      ? { liquidity: { ...base.liquidity, costScale: (base.liquidity.costScale ?? 1) * scale } }
+      : {}),
   };
+
 }
 
 /** Build the cost axis from a baseline model and a list of scales. */
@@ -314,6 +401,8 @@ export type BreakevenGroup = {
   riskLevel: string;
   slippageLabel: string;
   minCommission: number | null;
+  /** Liquidity assumption for the series, when the axis was swept. */
+  liquidityLabel: string | null;
   ticketValue: number;
   baselineRoundTripBps: number;
   vsZero: BreakevenResult;
@@ -337,6 +426,7 @@ export function breakevenGrid(
       c.ticket.label,
       c.scenario.slippage?.label ?? "-",
       c.scenario.minCommission ?? "-",
+      c.scenario.liquidity?.label ?? "-",
     ].join("|");
     const bucket = groups.get(key);
     if (bucket) bucket.push(c);
@@ -360,6 +450,7 @@ export function breakevenGrid(
       riskLevel: first.riskLevel,
       slippageLabel: first.scenario.slippage?.label ?? "baseline",
       minCommission: first.scenario.minCommission ?? null,
+      liquidityLabel: first.scenario.liquidity?.label ?? null,
       ticketValue: tv,
       baselineRoundTripBps: roundTripCostBps(seriesBase, tv),
       vsZero: findBreakevenScale(series, {
