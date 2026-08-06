@@ -1,0 +1,118 @@
+// Human-readable company / instrument names for ticker symbols.
+//
+// Client-safe mirror of the curated universe in `universe.server.ts` (which
+// cannot be imported from the browser). Lookups normalise broker-native
+// symbols ("AAPL:xnas", "MKS:xlon") through `engineSymbolKey`, so a holding
+// row resolves to the same name as an order or a price row.
+
+import { engineSymbolKey } from "./price-symbol";
+
+export const SYMBOL_NAMES: Record<string, string> = {
+  "SPY": "S&P 500 ETF",
+  "QQQ": "Nasdaq 100 ETF",
+  "VTI": "Total US Market ETF",
+  "AAPL": "Apple",
+  "MSFT": "Microsoft",
+  "GOOGL": "Alphabet",
+  "AMZN": "Amazon",
+  "NVDA": "NVIDIA",
+  "META": "Meta",
+  "TSLA": "Tesla",
+  "JPM": "JPMorgan",
+  "V": "Visa",
+  "JNJ": "Johnson & Johnson",
+  "VOD.L": "Vodafone (LON)",
+  "HSBA.L": "HSBC (LON)",
+  "BP.L": "BP (LON)",
+  "AZN.L": "AstraZeneca (LON)",
+  "ULVR.L": "Unilever (LON)",
+  "LLOY.L": "Lloyds Banking Group (LON)",
+  "ITV.L": "ITV (LON)",
+  "TSCO.L": "Tesco (LON)",
+  "SGE.L": "Sage Group (LON)",
+  "GLEN.L": "Glencore (LON)",
+  "RR.L": "Rolls-Royce (LON)",
+  "BARC.L": "Barclays (LON)",
+  "NWG.L": "NatWest Group (LON)",
+  "MKS.L": "Marks & Spencer (LON)",
+  "ISF.L": "iShares FTSE 100 ETF",
+  "VUKE.L": "Vanguard FTSE 100 ETF",
+  "VMID.L": "Vanguard FTSE 250 ETF",
+  "VWRL.L": "Vanguard FTSE All-World ETF",
+  "VUSA.L": "Vanguard S&P 500 ETF (LON)",
+  "7203.T": "Toyota Motor (TSE)",
+  "6758.T": "Sony Group (TSE)",
+  "9984.T": "SoftBank Group (TSE)",
+  "6861.T": "Keyence (TSE)",
+  "8306.T": "Mitsubishi UFJ Financial (TSE)",
+  "8035.T": "Tokyo Electron (TSE)",
+  "9432.T": "Nippon Telegraph & Telephone (TSE)",
+  "7974.T": "Nintendo (TSE)",
+  "6098.T": "Recruit Holdings (TSE)",
+  "8058.T": "Mitsubishi Corp (TSE)",
+  "1321.T": "Nomura Nikkei 225 ETF (TSE)",
+  "1306.T": "iShares TOPIX ETF (TSE)",
+  "BHP.AX": "BHP Group (ASX)",
+  "CBA.AX": "Commonwealth Bank of Australia (ASX)",
+  "CSL.AX": "CSL Ltd (ASX)",
+  "NAB.AX": "National Australia Bank (ASX)",
+  "WBC.AX": "Westpac Banking (ASX)",
+  "ANZ.AX": "ANZ Group (ASX)",
+  "RIO.AX": "Rio Tinto (ASX)",
+  "FMG.AX": "Fortescue (ASX)",
+  "WES.AX": "Wesfarmers (ASX)",
+  "WOW.AX": "Woolworths Group (ASX)",
+  "TLS.AX": "Telstra Group (ASX)",
+  "MQG.AX": "Macquarie Group (ASX)",
+  "STW.AX": "SPDR S&P/ASX 200 ETF (ASX)",
+  "IOZ.AX": "iShares Core S&P/ASX 200 ETF (ASX)",
+  "BTC-USD": "Bitcoin",
+  "ETH-USD": "Ethereum",
+  "SOL-USD": "Solana",
+  "BTCE.DE": "BTCetc Physical Bitcoin (XETRA)",
+  "ABTC.SW": "21Shares Bitcoin ETP (SIX)",
+  "VBTC.L": "WisdomTree Physical Bitcoin (LON)",
+  "ZETH.SW": "21Shares Ethereum ETP (SIX)",
+  "ETHE.DE": "ETC Group Physical Ethereum (XETRA)",
+  "HODL.SW": "21Shares Crypto Basket Index ETP (SIX)",
+  "SGLN.L": "iShares Physical Gold ETC (LON)",
+  "SGLD.L": "Invesco Physical Gold ETC (LON)",
+  "PHAU.L": "WisdomTree Physical Gold (LON)",
+  "SSLN.L": "iShares Physical Silver ETC (LON)",
+  "PHAG.L": "WisdomTree Physical Silver (LON)",
+  "SPLT.L": "WisdomTree Physical Platinum (LON)",
+  "CRUD.L": "WisdomTree WTI Crude Oil (LON)",
+  "BRNT.L": "WisdomTree Brent Crude Oil (LON)",
+  "NGAS.L": "WisdomTree Natural Gas (LON)",
+  "COPA.L": "WisdomTree Copper (LON)",
+  "AGCP.L": "WisdomTree Agriculture (LON)",
+  "AIGB.L": "WisdomTree Broad Commodities (LON)",
+  "GLD": "SPDR Gold Shares (NYSE)",
+  "IAU": "iShares Gold Trust (NYSE)",
+  "SLV": "iShares Silver Trust (NYSE)",
+  "USO": "United States Oil Fund (NYSE)",
+  "DBC": "Invesco DB Commodity Index (NYSE)",
+  "GBPUSD=X": "GBP/USD",
+  "EURUSD=X": "EUR/USD",
+  "GBPEUR=X": "GBP/EUR",
+  "USDJPY=X": "USD/JPY",
+  "GBPJPY=X": "GBP/JPY",
+  "EURJPY=X": "EUR/JPY",
+  "AUDUSD=X": "AUD/USD",
+  "GBPAUD=X": "GBP/AUD",
+  "EURAUD=X": "EUR/AUD",
+};
+
+/**
+ * Display name for a ticker, or null when the symbol is not in the curated
+ * universe (callers then show the raw symbol unchanged).
+ */
+export function companyName(symbol: string | null | undefined): string | null {
+  const raw = String(symbol ?? "").trim();
+  if (!raw) return null;
+  return (
+    SYMBOL_NAMES[raw.toUpperCase()]
+    ?? SYMBOL_NAMES[engineSymbolKey(raw)]
+    ?? null
+  );
+}
