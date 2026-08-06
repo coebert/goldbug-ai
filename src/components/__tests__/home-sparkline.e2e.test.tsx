@@ -16,6 +16,8 @@ import { computeSparkByPortfolio, type SparkPoint } from "@/lib/spark-by-portfol
 const WIDTH = 120;
 const HEIGHT = 36;
 
+import { sparklineDomain } from "@/lib/sparkline-scale";
+
 function renderPortfolioSpark(series: SparkPoint[]) {
   return renderToStaticMarkup(
     <Sparkline values={series.map((p) => p.value)} width={WIDTH} height={HEIGHT} />,
@@ -83,14 +85,17 @@ describe("home sparkline (e2e)", () => {
       expect(p.x).toBeCloseTo(i * stepX, 1);
     });
 
-    // Trend endpoints map to the portfolio's own first/last values:
-    // min=990, max=1040 → span=50. First value 1000 → y = H - ((1000-990)/50)*H.
-    // Last value 1040 → y = 0. This proves y comes from sim-1's own values,
-    // not from any merged axis.
+    // Trend endpoints map to the portfolio's own first/last values under the
+    // shared padded domain (sparklineDomain), which every chart of this type
+    // now uses. This proves y comes from sim-1's own values, not a merged axis.
+    const { min: dMin, max: dMax } = sparklineDomain(own.map((p) => p.value));
+    const yOf = (v: number) => HEIGHT - ((v - dMin) / (dMax - dMin)) * HEIGHT;
     const first = pts[0];
     const last = pts[pts.length - 1];
-    expect(first.y).toBeCloseTo(HEIGHT - ((1000 - 990) / 50) * HEIGHT, 1);
-    expect(last.y).toBeCloseTo(0, 1);
+    expect(first.y).toBeCloseTo(yOf(1000), 1);
+    expect(last.y).toBeCloseTo(yOf(1040), 1);
+    // Padding means the extremes sit inside the box rather than on its edges.
+    expect(last.y).toBeGreaterThan(0);
 
     // Positive net change → upward stroke color.
     expect(html).toContain('aria-label="Trend up"');
@@ -119,19 +124,19 @@ describe("home sparkline (e2e)", () => {
     const own = sparkByPortfolio["sim-1"];
     const values = own.map((p) => p.value);
     const min = Math.min(...values);
-    const max = Math.max(...values);
-    const span = max - min;
+    const { min: dMin, max: dMax } = sparklineDomain(values);
 
     const html = renderPortfolioSpark(own);
     const pts = parsePoints(html);
-    const expectedYs = values.map((v) => HEIGHT - ((v - min) / span) * HEIGHT);
+    const expectedYs = values.map((v) => HEIGHT - ((v - dMin) / (dMax - dMin)) * HEIGHT);
     pts.forEach((p, i) => expect(p.y).toBeCloseTo(expectedYs[i], 1));
 
-    // If the live portfolio's value (300.46) had leaked into sim's range,
-    // it would become the new min → sim's original min (990) would no
-    // longer map to y=HEIGHT. Verify sim's own min still anchors the axis.
+    // If the live portfolio's value (300.46) had leaked into sim's range, the
+    // domain would stretch far below 990 and sim's own min would be pushed to
+    // the top of the box. It must stay in the lower part of its own axis.
     const minIdx = values.indexOf(min);
-    expect(pts[minIdx].y).toBeCloseTo(HEIGHT, 1);
+    expect(pts[minIdx].y).toBeGreaterThan(HEIGHT * 0.8);
+    expect(pts[minIdx].y).toBeLessThanOrEqual(HEIGHT);
     // And no plotted x corresponds to the live portfolio's single point.
     expect(pts).toHaveLength(values.length);
   });
