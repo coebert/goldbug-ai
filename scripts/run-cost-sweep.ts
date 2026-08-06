@@ -20,10 +20,13 @@ import {
   formatBreakeven,
   scenarioKey,
   DEFAULT_SLIPPAGE_SPECS,
+  DEFAULT_LIQUIDITY_SPECS,
+  type LiquiditySpec,
   type SlippageSpec,
   type SweepCell,
   type TicketSpec,
 } from "../src/lib/cost-sweep";
+import { buildLiquidityProfile } from "../src/lib/liquidity-profile";
 import { computeMaxDrawdown, computeSharpe, dailyReturns, type EquityPoint } from "../src/lib/backtest-metrics";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import { buildCostReturnPanels } from "../src/lib/cost-return-chart";
@@ -80,6 +83,22 @@ const slippageSpecs: SlippageSpec[] = !slippageArg
         // Split evenly between half-spread and adverse move so both
         // microstructure components are represented.
         return { label: `${bps}bps`, slippageBps: bps / 2, spreadBps: bps / 2 };
+      });
+// Liquidity axis: how deep the book is relative to the tape's own measured
+// ADV. "default" uses thin/as-traded/deep; explicit values are ADV
+// multipliers, e.g. --liquidity 0.25,1,4. When set, spread + slippage are
+// estimated per fill from participation vs ADV instead of a flat bps.
+const liquidityArg = arg("liquidity", "");
+const liquiditySpecs: LiquiditySpec[] = !liquidityArg
+  ? []
+  : liquidityArg === "default"
+    ? DEFAULT_LIQUIDITY_SPECS
+    : liquidityArg.split(",").map((raw) => {
+        const advScale = Number(raw.trim());
+        if (!Number.isFinite(advScale) || advScale <= 0) {
+          throw new Error(`bad --liquidity value ${raw}`);
+        }
+        return { label: `${advScale}x ADV`, advScale };
       });
 // Minimum per-trade fee axis, e.g. --minfee 0,3,8
 const minFeeArg = arg("minfee", "");
