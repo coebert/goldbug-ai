@@ -21,7 +21,6 @@ import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-m
 import { attachTradeMarkers, describeMarkerCell, type TradeMarkerCell } from "@/lib/chart-trade-markers";
 import {
   ResponsiveContainer,
-  AreaChart,
   Area,
   BarChart,
   Bar,
@@ -191,6 +190,11 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   />
                 </ComposedChart>
               </ResponsiveContainer>
+              {marks.length > 0 && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground">
+                  <TradeMarkerLegend />
+                </div>
+              )}
             </ChartBlock>
 
             <ChartBlock title="Drawdown (peak-to-trough %)">
@@ -261,6 +265,11 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                   />
                 </ComposedChart>
               </ResponsiveContainer>
+              {marks.length > 0 && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground">
+                  <TradeMarkerLegend />
+                </div>
+              )}
             </ChartBlock>
 
             <div className="grid gap-6 lg:grid-cols-2">
