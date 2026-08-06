@@ -48,6 +48,8 @@ function AnalyticsPage() {
         <h1 className="text-xl font-semibold">Performance analytics</h1>
         <PerformanceAnalyticsCard portfolioId={id} />
         <IntendedVsExecutedCard portfolioId={id} />
+        <SectorExposureChart portfolioId={id} />
+
 
         <ExecutionQualityCard portfolioId={id} />
         <AlgoRegimeHistoryCard portfolioId={id} />
