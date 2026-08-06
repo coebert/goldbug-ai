@@ -15,6 +15,8 @@
 // can be unit tested.
 
 import type { EquityPoint } from "./backtest-metrics";
+import type { RegimeCostSummary, WindowCosts } from "./regime-cost-attribution";
+
 
 export type RegimeLabel = "bull" | "bear" | "sideways";
 export const REGIMES: readonly RegimeLabel[] = ["bull", "bear", "sideways"] as const;
