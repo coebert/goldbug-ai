@@ -11,6 +11,7 @@
 // tested without touching a broker, a network, or the database.
 
 import type { Frictions } from "./broker-simulator";
+import { liquidityFrictions, scaleLiquidity, type LiquidityProfile } from "./liquidity-profile";
 
 export type TicketSpec = {
   /** Human label, e.g. "5 x 18%". */
