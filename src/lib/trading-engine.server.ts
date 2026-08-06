@@ -662,9 +662,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const cfg = swingGate.cfg;
   // Risk dial (1..5) → position sizing + per-side trade aggressiveness.
   const aggression = resolveAggressiveness(portfolio.risk_config);
-  const cashFloorPctEff = effectiveCashFloorPct(cfg, portfolio.risk_level);
+  const configuredCashFloorPct = effectiveCashFloorPct(cfg, portfolio.risk_level);
+
+  // EXPLICIT CASH-ALLOCATION POLICY — the engine's only exposure FLOOR.
+  // Every other sizing rule is a ceiling or a haircut, which in a quiet bull
+  // tape used to compound into a nearly flat book. The policy sets a target
+  // invested % for the regime, de-risked by the drawdown budget, and returns
+  // both the cash floor to use and a scale for proposed buys.
+  const cashPolicy = resolveCashAllocationPolicy({
+    regime: effectiveRegime.regime,
+    riskLevel: portfolio.risk_level,
+    totalValue,
+    holdingsValue,
+    cashFloorPct: configuredCashFloorPct,
+    portfolioDrawdownPct: ddSizing.drawdown_pct,
+    maxDrawdownHaltPct: cfg.max_drawdown_halt_pct,
+    indexDrawdownPct: effectiveRegime.signals.spy_drawdown_pct,
+    targetOverridePct: cfg.target_invested_pct,
+    enabled: cfg.cash_policy_enabled,
+  });
+  const cashFloorPctEff = cashPolicy.enabled
+    ? cashPolicy.effectiveCashFloorPct
+    : configuredCashFloorPct;
   const cashFloor = totalValue * cashFloorPctEff;
+  srvLog.info(`[cash-policy] ${portfolio.id}: ${cashPolicy.note}`);
   const basePerSymbolPct = tightened.per_symbol_effective_pct;
+
 
 
   // Learned drawdown sizing: the 20-year study measured the forward return
