@@ -15,6 +15,14 @@
 // can be unit tested.
 
 import type { EquityPoint } from "./backtest-metrics";
+import {
+  buildRegimeCostReport,
+  regimeCostTableRows,
+  REGIME_COST_COLUMNS,
+} from "./regime-cost-attribution";
+import type { RegimeCostSummary, WindowCosts } from "./regime-cost-attribution";
+
+
 
 export type RegimeLabel = "bull" | "bear" | "sideways";
 export const REGIMES: readonly RegimeLabel[] = ["bull", "bear", "sideways"] as const;
@@ -747,7 +755,16 @@ export type WindowResult = {
   tradesPerYear: number;
   feeDragPct: number;
   sharpe: number;
+  /**
+   * Train vs out-of-sample cost decomposition for this window. Optional so
+   * hand-built rows and older callers still typecheck; the runner populates
+   * it and the cost report aggregates it per regime. Imported type-only, so
+   * the pairing with `regime-cost-attribution` costs no runtime cycle.
+   */
+  costs?: WindowCosts;
 };
+
+
 
 export type RegimeSummary = {
   regime: RegimeLabel;
@@ -898,6 +915,14 @@ export function summariseRegime(
 
 export type RegimeReport = {
   summaries: RegimeSummary[];
+  /**
+   * Per-regime decomposition of what trading cost, split train vs
+   * out-of-sample and by axis, so a failing regime can be diagnosed as a
+   * cost problem (and which cost) rather than only as a signal problem.
+   * Regimes with no windows appear with zeroed entries, mirroring
+   * `summaries` so the two tables line up row for row.
+   */
+  costs: RegimeCostSummary[];
   /** Regimes with at least one out-of-sample window. */
   covered: RegimeLabel[];
   /** Regimes that failed the gate. */
@@ -922,10 +947,26 @@ export function buildRegimeReport(
   const worstDrawdownPct = results.length
     ? Math.min(...results.map((r) => -Math.abs(r.maxDrawdownPct)))
     : 0;
+  // Only windows carrying an attribution can be decomposed; the rest are
+  // simply absent from the cost table rather than counted as zero-cost.
+  const costs = buildRegimeCostReport(
+    results
+      .filter((r): r is WindowResult & { costs: WindowCosts } => r.costs !== undefined)
+      .map((r) => ({ regime: r.regime, netCagrPct: r.netCagrPct, costs: r.costs })),
+  );
   const verdict: RegimeReport["verdict"] =
     failed.length === 0 ? "stable" : failed.length < scored.length ? "regime-dependent" : "unstable";
-  return { summaries, covered, failed, cagrDispersionPct: dispersion, worstDrawdownPct, verdict };
+  return {
+    summaries,
+    costs,
+    covered,
+    failed,
+    cagrDispersionPct: dispersion,
+    worstDrawdownPct,
+    verdict,
+  };
 }
+
 
 // ---------------------------------------------------------------- output
 
@@ -1013,7 +1054,7 @@ export function windowTableRows(results: readonly WindowResult[]): string[][] {
   ]);
 }
 
-function pad(rows: readonly string[][], columns: readonly string[]): string {
+export function pad(rows: readonly string[][], columns: readonly string[]): string {
   const all = [[...columns], ...rows];
   const widths = columns.map((_, i) => Math.max(...all.map((r) => (r[i] ?? "").length)));
   return all.map((r) => r.map((c, i) => (c ?? "").padEnd(widths[i]!)).join("  ")).join("\n");
@@ -1022,6 +1063,12 @@ function pad(rows: readonly string[][], columns: readonly string[]): string {
 export function formatRegimeTable(summaries: readonly RegimeSummary[]): string {
   return pad(regimeTableRows(summaries), REGIME_COLUMNS);
 }
+
+/** The cost decomposition rendered with the same column padding. */
+export function formatCostTable(costs: readonly RegimeCostSummary[]): string {
+  return pad(regimeCostTableRows(costs), REGIME_COST_COLUMNS);
+}
+
 
 export function formatWindowTable(results: readonly WindowResult[]): string {
   return pad(windowTableRows(results), WINDOW_COLUMNS);
