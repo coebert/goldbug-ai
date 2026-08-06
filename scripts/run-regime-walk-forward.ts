@@ -143,16 +143,43 @@ for (const s of segments) {
 }
 
 
-const windows = walkForwardWindows(tape.bars.length, { trainBars, testBars, step });
-if (windows.length === 0) throw new Error("history too short for the requested train/test split");
+const candidates = walkForwardWindows(tape.bars.length, { trainBars, testBars, step });
+if (candidates.length === 0) throw new Error("history too short for the requested train/test split");
 console.log(
-  `\nWalk-forward: ${windows.length} windows of ${trainBars} train + ${testBars} test bars (step ${step}).`,
+  `\nWalk-forward: ${candidates.length} candidate windows of ${trainBars} train + ${testBars} test bars ` +
+    `(step ${step}${overlapPct > 0 && explicitStep == null ? `, ${Math.round(overlapPct * 100)}% overlap` : ""}).`,
+);
+
+// Label every candidate up front so the CV sampler can balance regimes
+// BEFORE we spend a backtest on each window.
+const minShare = Number(arg("min-share", "0.45"));
+const minConf = Number(arg("min-conf", "0.5"));
+const labelled = candidates.map((w) => ({
+  window: w,
+  regime: dominantRegimeWeighted(regimeBars, w.testStart, w.testEnd, {
+    minDirectionalShare: minShare,
+    minConfidence: minConf,
+  }),
+}));
+
+const sample = sampleRegimeBalancedWindows(labelled, (c) => c.regime.label, {
+  maxWindows: cvMaxWindows > 0 ? cvMaxWindows : undefined,
+  perRegimeCap: cvPerRegime > 0 ? cvPerRegime : undefined,
+  minPerRegime: cvMinPerRegime > 0 ? cvMinPerRegime : undefined,
+  seed: cvSeed,
+});
+const windows = sample.selected;
+if (windows.length < labelled.length) console.log(`CV sampling: ${sample.note} (seed ${cvSeed}).`);
+console.log(
+  `Independence: ${effectiveWindowCount(windows.map((w) => w.window)).toFixed(1)} effective windows, ` +
+    `mean overlap ${Math.round(meanWindowOverlap(windows.map((w) => w.window)) * 100)}%.`,
 );
 
 const cfg = parseRiskConfig({ trading_style: style } as never);
 const results: WindowResult[] = [];
 
-for (const w of windows) {
+for (const { window: w, regime } of windows) {
+
   // The strategy warms up on the training slice and is scored only on the
   // out-of-sample tail, so indicators are never cold at the window open.
   const bars = tape.bars.slice(w.trainStart, w.testEnd);
