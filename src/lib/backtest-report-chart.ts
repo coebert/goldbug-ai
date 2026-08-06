@@ -533,10 +533,12 @@ export function renderBacktestReportHtml(args: {
   title: string;
   subtitle?: string;
   panels: readonly ReportPanel[];
+  /** Optional toggle chips (e.g. risk level, ticket-size band). */
+  filters?: readonly ReportFilterGroup[];
 }): string {
   const panels = args.panels
     .map(
-      (p) => `<section class="panel">
+      (p) => `<section class="panel"${tagAttrs(p.tags ?? {})}>
   <h2>${esc(p.heading)}</h2>
   ${p.subtitle ? `<p class="sub">${esc(p.subtitle)}</p>` : ""}
   ${renderLegend(
@@ -558,13 +560,19 @@ export function renderBacktestReportHtml(args: {
       ? `<table><thead><tr>${p.table.columns
           .map((c) => `<th>${esc(c)}</th>`)
           .join("")}</tr></thead><tbody>${p.table.rows
-          .map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`)
+          .map(
+            (r) =>
+              `<tr${tagAttrs(rowTags(r))}>${rowCells(r)
+                .map((c) => `<td>${esc(c)}</td>`)
+                .join("")}</tr>`,
+          )
           .join("")}</tbody></table>`
       : ""
   }
 </section>`,
     )
     .join("\n");
+
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"/>
