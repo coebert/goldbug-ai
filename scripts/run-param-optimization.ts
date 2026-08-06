@@ -125,52 +125,65 @@ const candidates = sampleGrid(AXES, limit, seed);
 console.log(`Evaluating ${candidates.length} candidates × ${foldBars.length} folds…\n`);
 
 const baseCfg = parseRiskConfig({ trading_style: style } as never);
-const baseSleeve = ENTRY_SLEEVE[riskLevel];
 
 type Evaluated = { params: (typeof candidates)[number]; metrics: CandidateMetrics };
 const evaluated: Evaluated[] = [];
 const curves = new Map<string, EquityPoint[]>();
 const tradeLogs = new Map<string, StyleTradeRow[]>();
+// Every risk level evaluated, for the viability threshold check. The primary
+// level also feeds ranking, sensitivity and the equity curves.
+const evaluatedByRisk = new Map<RiskLevel, Evaluated[]>();
 
-for (const [i, params] of candidates.entries()) {
-  const { cfg, sleeve } = applyParams(baseCfg, baseSleeve, params);
-  const perFold: CandidateMetrics[] = [];
-  const foldCurves: EquityPoint[][] = [];
-  let firstLog: StyleTradeRow[] = [];
-  for (const bars of foldBars) {
-    const m = await runStyleBacktest({
-      cfg,
-      bars,
-      riskLevel,
-      startingCash,
-      feePerTrade: 0,
-      sleeve,
-      simulator: { frictions: FRICTIONS },
-    });
-    perFold.push({
-      cagrPct: m.cagrPct,
-      totalReturnPct: m.totalReturnPct,
-      maxDrawdownPct: m.maxDrawdownPct,
-      sharpe: m.sharpe,
-      trades: m.trades,
-      tradesPerYear: m.tradesPerYear,
-      feeDragPct: m.feeDragPct,
-      finalCashPct: m.finalCashPct,
-      ...(m.audit ? { audit: m.audit } : {}),
-    });
-    foldCurves.push(m.equityCurve);
-    if (firstLog.length === 0) firstLog = m.tradeLog;
-  }
-  const metrics = averageMetrics(perFold);
-  evaluated.push({ params, metrics });
-  const key = formatParams(params);
-  curves.set(key, foldCurves.flat());
-  tradeLogs.set(key, firstLog);
+for (const rl of riskLevels) {
+  const baseSleeve = ENTRY_SLEEVE[rl];
+  const rows: Evaluated[] = [];
+  if (riskLevels.length > 1) console.log(`Risk level: ${rl}`);
 
-  if ((i + 1) % 10 === 0 || i === candidates.length - 1) {
-    console.log(`  …${i + 1}/${candidates.length} evaluated`);
+  for (const [i, params] of candidates.entries()) {
+    const { cfg, sleeve } = applyParams(baseCfg, baseSleeve, params);
+    const perFold: CandidateMetrics[] = [];
+    const foldCurves: EquityPoint[][] = [];
+    let firstLog: StyleTradeRow[] = [];
+    for (const bars of foldBars) {
+      const m = await runStyleBacktest({
+        cfg,
+        bars,
+        riskLevel: rl,
+        startingCash,
+        feePerTrade: 0,
+        sleeve,
+        simulator: { frictions: FRICTIONS },
+      });
+      perFold.push({
+        cagrPct: m.cagrPct,
+        totalReturnPct: m.totalReturnPct,
+        maxDrawdownPct: m.maxDrawdownPct,
+        sharpe: m.sharpe,
+        trades: m.trades,
+        tradesPerYear: m.tradesPerYear,
+        feeDragPct: m.feeDragPct,
+        finalCashPct: m.finalCashPct,
+        ...(m.audit ? { audit: m.audit } : {}),
+      });
+      foldCurves.push(m.equityCurve);
+      if (firstLog.length === 0) firstLog = m.tradeLog;
+    }
+    const metrics = averageMetrics(perFold);
+    rows.push({ params, metrics });
+    if (rl === riskLevel) {
+      evaluated.push({ params, metrics });
+      const key = formatParams(params);
+      curves.set(key, foldCurves.flat());
+      tradeLogs.set(key, firstLog);
+    }
+
+    if ((i + 1) % 10 === 0 || i === candidates.length - 1) {
+      console.log(`  …${i + 1}/${candidates.length} evaluated`);
+    }
   }
+  evaluatedByRisk.set(rl, rows);
 }
+
 
 // ------------------------------------------------------------------ rank
 const scored = scoreAll(evaluated, constraints);
