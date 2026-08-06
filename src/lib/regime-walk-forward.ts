@@ -696,6 +696,8 @@ export const WINDOW_COLUMNS = [
   "to",
   "regime",
   "purity",
+  "conf",
+
   "net CAGR %",
   "maxDD %",
   "bench CAGR %",
