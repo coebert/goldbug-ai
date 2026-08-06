@@ -734,6 +734,8 @@ export function windowTableRows(results: readonly WindowResult[]): string[][] {
     r.to,
     r.regime,
     pctOf(r.purity),
+    pctOf(r.confidence ?? 0),
+
     f(r.netCagrPct),
     f(-Math.abs(r.maxDrawdownPct)),
     f(r.benchmarkCagrPct),
