@@ -191,7 +191,36 @@ for (const im of impacts) {
   );
 }
 
+// ------------------------------------------------- turnover attribution
+// Which knobs actually drive trading frequency, what churn costs on this tape,
+// and how quickly the strategy re-enters names it just exited.
+const drivers = rankTurnoverDrivers(scored, AXES.map((a) => a.key));
+const costCurve = turnoverCostCurve(scored);
+const logOf = (r: (typeof scored)[number]) => tradeLogs.get(formatParams(r.params)) ?? [];
+const reentryDriverKey = drivers.find((d) => d.key === "reentry_min_days")?.key ?? drivers[0]?.key;
+const reentryLevels = reentryDriverKey
+  ? reentryByLevel(scored, reentryDriverKey, logOf, { fastDays: 5 })
+  : [];
+const overallReentry = reentryProfile(scored.flatMap((r) => logOf(r)), { fastDays: 5 });
+
+console.log("\nTurnover attribution (what drives trading frequency):");
+for (const d of drivers) console.log(`  ${describeDriver(d)}`);
+console.log(
+  `\nCost of churn: ${costCurve.cagrPerTrade >= 0 ? "+" : ""}${costCurve.cagrPerTrade.toFixed(3)}pp net CAGR ` +
+    `and ${costCurve.feeDragPerTrade >= 0 ? "+" : ""}${costCurve.feeDragPerTrade.toFixed(3)}pp fees per extra trade/yr` +
+    (costCurve.breakevenTradesPerYear !== null
+      ? `  ·  fitted breakeven ≈ ${costCurve.breakevenTradesPerYear.toFixed(0)} trades/yr`
+      : "  ·  no fitted breakeven"),
+);
+console.log(
+  `Re-entry: ${(overallReentry.reentryRate * 100).toFixed(0)}% of exits re-bought, ` +
+    `median gap ${overallReentry.medianGapDays.toFixed(0)}d, ` +
+    `${(overallReentry.fastReentryShare * 100).toFixed(0)}% within ${overallReentry.fastDays}d, ` +
+    `${overallReentry.roundTripsPerSymbol.toFixed(1)} round trips/symbol`,
+);
+
 const frontier = paretoFrontier(scored);
+
 console.log("\nCAGR vs turnover frontier:");
 for (const r of frontier) {
   console.log(
