@@ -305,8 +305,31 @@ for (const r of frontier) {
 }
 
 // ---------------------------------------------------------------- report
+// Report filter tags: every row carrying a parameter set is tagged with its
+// risk level and its per-name ticket size, so the HTML toolbar can narrow the
+// tables to one scenario without re-running the sweep.
+const ticketGbp = (params: { [k: string]: unknown }): number =>
+  Math.round(Number(params["per_name_weight"] ?? 0) * startingCash);
+const ticketValue = (params: { [k: string]: unknown }): string => String(ticketGbp(params));
+const ticketLabel = (v: number): string =>
+  v >= 1000 ? `£${(v / 1000).toFixed(1).replace(/\.0$/, "")}k` : `£${v}`;
+const paramTags = (params: { [k: string]: unknown }, rl: string) => ({
+  risk: rl,
+  ticket: ticketValue(params),
+});
+const ticketOptions = [
+  ...new Set(
+    (AXES.find((a) => a.key === "per_name_weight")?.values ?? []).map((w) =>
+      Math.round(Number(w) * startingCash),
+    ),
+  ),
+]
+  .sort((a, b) => a - b)
+  .map((v) => ({ value: String(v), label: ticketLabel(v) }));
+
 const COLOURS = ["#39d98a", "#4ea1ff", "#f5a623", "#e5484d", "#a78bfa", "#9aa4b2"];
 const panels: ReportPanel[] = [
+
   {
     heading: "Best configurations (net of realistic costs)",
     subtitle:
