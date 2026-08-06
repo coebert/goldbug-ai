@@ -298,9 +298,12 @@ export function RiskControlsCard({
           risk_config: payload,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (_r, payload) => {
+      // Mirror the saved horizon locally so the badge survives a refresh.
+      writeCachedTradingMode(portfolioId, payload.trading_style === "swing" ? "swing" : "position");
       qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
     },
+
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
