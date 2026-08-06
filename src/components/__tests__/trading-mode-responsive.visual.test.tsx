@@ -84,8 +84,8 @@ describe("trading mode badge — small-screen visual regression", () => {
 
       it("scales type and padding up at sm:, never down", () => {
         // Base (phone) sizes are the smaller ones; sm: overrides are larger.
-        expect(markup).toMatch(/\btext-\[10px\]\b/);
-        expect(markup).toMatch(/\bsm:text-\[11px\]\b/);
+        expect(markup).toMatch(/text-\[10px\]/);
+        expect(markup).toMatch(/sm:text-\[11px\]/);
         expect(markup).toMatch(/\bpx-1\.5\b/);
         expect(markup).toMatch(/\bsm:px-2\b/);
       });
