@@ -87,3 +87,24 @@ export function resolveTradingMode(
 ): TradingStyle {
   return serverStyle ?? cached ?? "position";
 }
+
+/**
+ * Drift check: does this browser's cached mode disagree with what the engine
+ * will actually run for the loaded risk_config?
+ *
+ * The engine's truth is `parseTradingStyle(risk_config.trading_style)`. A stale
+ * cache (another tab, another device, an aborted flip, a save that failed after
+ * the optimistic write) can leave the UI claiming the opposite horizon, which
+ * is the confusing case this detects so the UI can warn and re-sync.
+ *
+ * Returns `drifted: false` whenever the server config has not loaded yet
+ * (`riskConfig` with no style) — an unknown server value is a gap, not a drift.
+ */
+export function detectTradingModeDrift(
+  riskConfig: unknown,
+  cached: TradingStyle | null,
+): { drifted: boolean; engineStyle: TradingStyle | null; cachedStyle: TradingStyle | null } {
+  const engineStyle = styleFromRiskConfig(riskConfig);
+  if (!engineStyle || !cached) return { drifted: false, engineStyle, cachedStyle: cached };
+  return { drifted: engineStyle !== cached, engineStyle, cachedStyle: cached };
+}
