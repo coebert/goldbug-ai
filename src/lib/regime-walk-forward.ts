@@ -747,7 +747,20 @@ export type WindowResult = {
   tradesPerYear: number;
   feeDragPct: number;
   sharpe: number;
+  /**
+   * Train vs out-of-sample cost decomposition for this window. Optional so
+   * hand-built rows and older callers still typecheck; the runner populates
+   * it and `buildRegimeReport` folds it into the per-regime cost table.
+   * Typed structurally to keep this module free of a cycle with
+   * `regime-cost-attribution`, which imports `RegimeLabel` from here.
+   */
+  costs?: {
+    train: { annualDragPct: number; axes: Record<string, number> };
+    test: { annualDragPct: number; axes: Record<string, number> };
+    dragDriftPct: number;
+  };
 };
+
 
 export type RegimeSummary = {
   regime: RegimeLabel;
