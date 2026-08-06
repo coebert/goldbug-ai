@@ -131,6 +131,7 @@ import { Metric } from "@/components/portfolio-detail/metric";
 import { formatMetricValue } from "@/components/portfolio-detail/format";
 
 import { RiskControlsCard } from "@/components/risk-controls-card";
+import { SwingModeToggle } from "@/components/swing-mode-toggle";
 import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card";
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
@@ -1967,7 +1968,11 @@ function PortfolioPage() {
                   </div>
                 )}
 
-                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <div className="mt-6">
+                  <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} />
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   <RegimePanel />
                   <FearIndexCard portfolioId={id} active={tab === "overview"} currency={p.currency} />
 
@@ -1976,6 +1981,7 @@ function PortfolioPage() {
               </TabsContent>
 
               <TabsContent value="risk" className="mt-4 space-y-4">
+                <SwingModeToggle portfolioId={id} riskConfig={p.risk_config} />
                 <RiskControlsCard
                   portfolioId={id}
                   riskConfig={p.risk_config}
