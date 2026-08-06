@@ -1,6 +1,7 @@
 // Curated symbol universe by asset class. Uses Yahoo Finance ticker syntax
 // (e.g. BTC-USD, GC=F, GBPUSD=X, VOD.L) which the price fetcher understands.
 import type { Database } from "@/integrations/supabase/types";
+import { parseTradingStyle, SWING_STYLE_OVERRIDES } from "./trading-style";
 
 export type AssetClass = Database["public"]["Enums"]["asset_class"];
 
