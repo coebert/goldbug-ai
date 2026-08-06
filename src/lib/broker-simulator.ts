@@ -879,7 +879,8 @@ export function simulateBrokerExecution(
       const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f);
       const requestedNotional = requested * requestedEffPrice;
       const requestedSpend =
-        requestedNotional + totalFee(requestedNotional, "BUY", fee, f);
+        requestedNotional
+        + totalFee(requestedNotional, "BUY", fee, f, { symbol: d.symbol, quantity: requested });
 
       let qty = requested;
       if (requestedSpend > cash) {
@@ -892,7 +893,7 @@ export function simulateBrokerExecution(
           continue;
         }
         cashTruncated = true;
-        qty = maxAffordableBuyQty(requested, d.price, cash, fee, f);
+        qty = maxAffordableBuyQty(requested, d.price, cash, fee, f, d.symbol);
         if (qty <= 0) {
           rejections.push({
             step, decisionId: d.id, symbol: d.symbol, side: d.side,
@@ -905,7 +906,7 @@ export function simulateBrokerExecution(
 
       const effPrice = effectiveFillPrice(d.price, qty, "BUY", f);
       const notional = qty * effPrice;
-      const totalFeePaid = totalFee(notional, "BUY", fee, f);
+      const totalFeePaid = totalFee(notional, "BUY", fee, f, { symbol: d.symbol, quantity: qty });
       const spend = notional + totalFeePaid;
       cash = Math.max(0, cash - spend);
 
@@ -969,7 +970,7 @@ export function simulateBrokerExecution(
     const f = options.frictions;
     const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f);
     const proceeds = qty * effSellPrice;
-    const totalFeePaid = totalFee(proceeds, "SELL", fee, f);
+    const totalFeePaid = totalFee(proceeds, "SELL", fee, f, { symbol: d.symbol, quantity: qty });
     if (totalFeePaid > cash + proceeds) {
       rejections.push({
         step, decisionId: d.id, symbol: d.symbol, side: d.side,
