@@ -14,6 +14,7 @@ import {
   effectiveCashFloorPct,
   buildDiversificationTiltBlock,
 } from "../universe.server";
+import { tradingStylePrompt } from "../trading-style";
 import { regimeDescription, humanRegime, type PersistedRegime } from "../regime-detector.server";
 import { DecisionSchema, type DecisionOutput, type Portfolio, type Holding } from "./types";
 import { formatCandidateTable, activeAssetClasses } from "./features-prompt";
