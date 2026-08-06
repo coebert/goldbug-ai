@@ -89,12 +89,31 @@ const tape = buildRealTape(histories, { mode, from, to });
 console.log(`Tape: ${tape.bars.length} bars, ${tape.symbols.length} symbols (mode=${mode}).`);
 
 const index = benchmarkIndex(tape.bars);
-const labels = classifyRegimes(index);
+const regimeBars = classifyRegimeBars(index, {
+  bullAnnualPct: Number(arg("bull-annual", "10")),
+  bearAnnualPct: Number(arg("bear-annual", "-10")),
+  bearDrawdownPct: Number(arg("bear-dd", "15")),
+  sidewaysBandPct: Number(arg("sideways-band", "6")),
+  sidewaysRangePct: Number(arg("sideways-range", "8")),
+  minTrendR2: Number(arg("min-r2", "0.35")),
+});
+const labels = regimeBars.map((b) => b.label);
+const coverage = regimeCoverage(regimeBars);
+console.log("\nRegime coverage (per bar):");
+for (const r of ["bull", "bear", "sideways"] as const) {
+  console.log(
+    `  ${r.padEnd(8)} ${String(coverage[r].bars).padStart(5)} bars  ` +
+      `${(coverage[r].share * 100).toFixed(1).padStart(5)}%  ` +
+      `mean confidence ${(coverage[r].meanConfidence * 100).toFixed(0)}%`,
+  );
+}
+
 const segments = segmentRegimes(index, labels);
 console.log(`\nRegime segments (${segments.length}):`);
 for (const s of segments) {
   console.log(`  ${s.label.padEnd(8)} ${s.from} → ${s.to}  (${s.bars} bars)`);
 }
+
 
 const windows = walkForwardWindows(tape.bars.length, { trainBars, testBars, step });
 if (windows.length === 0) throw new Error("history too short for the requested train/test split");
