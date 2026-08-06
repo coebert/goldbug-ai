@@ -117,6 +117,7 @@ import {
   buildDiversificationTiltBlock,
   type UniverseSymbol,
 } from "./universe.server";
+import { minHoldDays } from "./trading-style";
 import {
   detectAndPersistRegime,
   regimeDescription,
