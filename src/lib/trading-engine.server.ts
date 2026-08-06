@@ -118,6 +118,7 @@ import {
   type UniverseSymbol,
 } from "./universe.server";
 import { minHoldDays } from "./trading-style";
+import { applySwingViabilityGate } from "./swing-viability";
 import {
   detectAndPersistRegime,
   regimeDescription,
