@@ -685,6 +685,8 @@ export const REGIME_COLUMNS = [
   "profitable",
   "beat B&H",
   "trades/yr",
+  "confidence",
+
   "result",
 ] as const;
 
