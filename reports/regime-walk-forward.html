@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Regime walk-forward · 2016-01-01 → 2026-08-06</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b1220; --panel:#111a2b; --ink:#e6edf7; --muted:#8fa3bf; --grid:#22304a; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--ink);
+         font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:15px; margin:0 0 2px; }
+  .sub, .lead { color:var(--muted); font-size:12px; margin:0 0 10px; }
+  .panel { background:var(--panel); border:1px solid var(--grid); border-radius:12px;
+           padding:16px; margin:16px 0; }
+  .charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
+  .chart { width:100%; height:auto; overflow:visible; }
+  .line { fill:none; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
+  .grid { stroke:var(--grid); stroke-width:1; }
+  .zero { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:.7; }
+  .axis, .axis-label, .empty { fill:var(--muted); font-size:10px; }
+  .chart-title { fill:var(--ink); font-size:11px; font-weight:600; }
+  .legend { list-style:none; display:flex; flex-wrap:wrap; gap:12px; padding:0; margin:0 0 8px;
+            font-size:12px; color:var(--muted); }
+  .legend li { display:flex; align-items:center; gap:6px; }
+  .swatch { width:16px; height:0; border-top:3px solid var(--c); border-radius:2px; }
+  .swatch.dashed { border-top-style:dashed; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; font-size:12px; }
+  th, td { text-align:right; padding:4px 8px; border-bottom:1px solid var(--grid); }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:600; }
+  .chart-wrap { position:relative; margin:0; }
+  .hit { cursor:crosshair; }
+  .cross { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:.8; }
+  .dot { stroke:var(--panel); stroke-width:1.5; }
+  .trade { fill-opacity:.95; stroke:var(--panel); stroke-width:.6; }
+  .trade.sell { fill-opacity:.55; }
+  .tip-trade { grid-column:1/-1; color:var(--ink); opacity:.8; font-size:10px;
+               margin:0 0 3px 14px; white-space:normal; }
+  .chart-tip { position:absolute; pointer-events:none; z-index:2; min-width:190px;
+               background:rgba(11,18,32,.96); border:1px solid var(--grid); border-radius:8px;
+               padding:6px 8px; font-size:11px; box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  .chart-tip[hidden] { display:none; }
+  .tip-head { color:var(--muted); margin-bottom:4px; }
+  .tip-head-row { color:var(--muted); }
+  .tip-row { display:grid; grid-template-columns:10px 1fr auto auto; gap:6px; align-items:center;
+             white-space:nowrap; }
+  .tip-swatch { width:8px; height:8px; border-radius:2px; }
+  .tip-val, .tip-dd { font-variant-numeric:tabular-nums; text-align:right; min-width:56px; }
+  .tip-dd { color:var(--muted); }
+</style></head>
+<body>
+  <h1>Regime walk-forward · 2016-01-01 → 2026-08-06</h1>
+  
+  <section class="panel">
+  <h2>Per-regime walk-forward summary</h2>
+  <p class="sub">Regime verdict: unstable — covered bull, bear; failed in bull, bear; median CAGR spread 0.1pts, worst drawdown -5.7% against a -25% ceiling</p>
+  <ul class="legend"></ul>
+  <div class="charts">
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Equity curve (% from start) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Drawdown (% from high-water mark) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+  </div>
+
+  <table><thead><tr><th>regime</th><th>windows</th><th>median CAGR %</th><th>worst CAGR %</th><th>CAGR sd</th><th>median maxDD %</th><th>worst maxDD %</th><th>bench CAGR %</th><th>profitable</th><th>beat B&amp;H</th><th>trades/yr</th><th>result</th></tr></thead><tbody><tr><td>bull</td><td>18</td><td>-0.2</td><td>-9.0</td><td>4.9</td><td>-1.4</td><td>-5.7</td><td>23.9</td><td>44%</td><td>17%</td><td>140</td><td>weak returns</td></tr><tr><td>bear</td><td>2</td><td>-0.3</td><td>-1.0</td><td>0.9</td><td>-1.9</td><td>-2.2</td><td>-4.2</td><td>50%</td><td>100%</td><td>126</td><td>weak returns</td></tr><tr><td>sideways</td><td>0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0%</td><td>0%</td><td>0</td><td>no data</td></tr></tbody></table>
+</section>
+<section class="panel">
+  <h2>Out-of-sample windows</h2>
+  <p class="sub">balanced · swing · 5 x 18% · 126 train / 126 test bars</p>
+  <ul class="legend"></ul>
+  <div class="charts">
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Equity curve (% from start) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Drawdown (% from high-water mark) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+  </div>
+
+  <table><thead><tr><th>#</th><th>from</th><th>to</th><th>regime</th><th>purity</th><th>net CAGR %</th><th>maxDD %</th><th>bench CAGR %</th><th>trades/yr</th><th>fees %</th></tr></thead><tbody><tr><td>0</td><td>2016-07-05</td><td>2016-12-30</td><td>bull</td><td>48%</td><td>-0.3</td><td>-1.2</td><td>4.2</td><td>108</td><td>1.6</td></tr><tr><td>1</td><td>2017-01-03</td><td>2017-07-03</td><td>bull</td><td>77%</td><td>-2.3</td><td>-1.5</td><td>15.2</td><td>82</td><td>1.2</td></tr><tr><td>2</td><td>2017-07-05</td><td>2018-01-02</td><td>bull</td><td>75%</td><td>-1.0</td><td>-1.2</td><td>26.2</td><td>94</td><td>1.4</td></tr><tr><td>3</td><td>2018-01-03</td><td>2018-07-03</td><td>bull</td><td>52%</td><td>-2.3</td><td>-1.8</td><td>1.7</td><td>122</td><td>1.8</td></tr><tr><td>4</td><td>2018-07-05</td><td>2019-01-03</td><td>bull</td><td>62%</td><td>-1.1</td><td>-1.2</td><td>-23.6</td><td>110</td><td>1.6</td></tr><tr><td>5</td><td>2019-01-04</td><td>2019-07-05</td><td>bull</td><td>55%</td><td>0.5</td><td>-0.8</td><td>45.9</td><td>106</td><td>1.5</td></tr><tr><td>6</td><td>2019-07-08</td><td>2020-01-03</td><td>bull</td><td>87%</td><td>0.4</td><td>-1.3</td><td>45.7</td><td>116</td><td>1.7</td></tr><tr><td>7</td><td>2020-01-06</td><td>2020-07-06</td><td>bull</td><td>54%</td><td>-0.2</td><td>-2.7</td><td>16.6</td><td>154</td><td>2.2</td></tr><tr><td>8</td><td>2020-07-07</td><td>2021-01-04</td><td>bull</td><td>80%</td><td>11.8</td><td>-1.0</td><td>56.4</td><td>182</td><td>2.7</td></tr><tr><td>9</td><td>2021-01-05</td><td>2021-07-06</td><td>bull</td><td>72%</td><td>4.5</td><td>-1.5</td><td>21.5</td><td>156</td><td>2.3</td></tr><tr><td>10</td><td>2021-07-07</td><td>2022-01-03</td><td>bull</td><td>87%</td><td>0.4</td><td>-1.5</td><td>37.8</td><td>158</td><td>2.3</td></tr><tr><td>11</td><td>2022-01-04</td><td>2022-07-06</td><td>bull</td><td>40%</td><td>-7.9</td><td>-5.4</td><td>-25.5</td><td>134</td><td>2.0</td></tr><tr><td>12</td><td>2022-07-07</td><td>2023-01-04</td><td>bear</td><td>46%</td><td>-1.0</td><td>-2.2</td><td>-5.5</td><td>122</td><td>1.8</td></tr><tr><td>13</td><td>2023-01-05</td><td>2023-07-07</td><td>bull</td><td>85%</td><td>-9.0</td><td>-5.7</td><td>65.2</td><td>174</td><td>2.5</td></tr><tr><td>14</td><td>2023-07-10</td><td>2024-01-05</td><td>bull</td><td>54%</td><td>2.4</td><td>-0.8</td><td>-0.1</td><td>146</td><td>2.1</td></tr><tr><td>15</td><td>2024-01-08</td><td>2024-07-09</td><td>bull</td><td>58%</td><td>3.1</td><td>-0.5</td><td>44.4</td><td>118</td><td>1.7</td></tr><tr><td>16</td><td>2024-07-10</td><td>2025-01-07</td><td>bull</td><td>96%</td><td>-8.5</td><td>-4.6</td><td>9.7</td><td>146</td><td>2.1</td></tr><tr><td>17</td><td>2025-01-08</td><td>2025-07-11</td><td>bear</td><td>55%</td><td>0.3</td><td>-1.6</td><td>-2.9</td><td>130</td><td>1.9</td></tr><tr><td>18</td><td>2025-07-14</td><td>2026-01-09</td><td>bull</td><td>98%</td><td>-3.9</td><td>-2.3</td><td>49.2</td><td>156</td><td>2.3</td></tr><tr><td>19</td><td>2026-01-12</td><td>2026-07-14</td><td>bull</td><td>80%</td><td>2.5</td><td>-1.1</td><td>26.3</td><td>146</td><td>2.1</td></tr></tbody></table>
+</section>
+<section class="panel">
+  <h2>Regime segments</h2>
+  <p class="sub">benchmark index labelled from trailing trend and drawdown</p>
+  <ul class="legend"></ul>
+  <div class="charts">
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Equity curve (% from start) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+    <figure class="chart-wrap"><svg viewBox="0 0 620 260" class="chart" role="img" aria-label="Drawdown (% from high-water mark) (no data)">
+  <text x="310" y="130" class="empty" text-anchor="middle">no data</text>
+</svg><div class="chart-tip" hidden></div></figure>
+  </div>
+
+  <table><thead><tr><th>regime</th><th>from</th><th>to</th><th>bars</th></tr></thead><tbody><tr><td>sideways</td><td>2016-01-04</td><td>2016-01-04</td><td>1</td></tr><tr><td>bear</td><td>2016-01-05</td><td>2016-02-16</td><td>29</td></tr><tr><td>bull</td><td>2016-02-17</td><td>2016-10-03</td><td>160</td></tr><tr><td>sideways</td><td>2016-10-04</td><td>2017-01-31</td><td>82</td></tr><tr><td>bull</td><td>2017-02-01</td><td>2018-11-09</td><td>449</td></tr><tr><td>bear</td><td>2018-11-12</td><td>2019-03-08</td><td>79</td></tr><tr><td>bull</td><td>2019-03-11</td><td>2020-03-06</td><td>251</td></tr><tr><td>bear</td><td>2020-03-09</td><td>2020-05-22</td><td>54</td></tr><tr><td>bull</td><td>2020-05-26</td><td>2022-05-04</td><td>491</td></tr><tr><td>bear</td><td>2022-05-05</td><td>2023-03-07</td><td>210</td></tr><tr><td>bull</td><td>2023-03-08</td><td>2023-09-25</td><td>139</td></tr><tr><td>bear</td><td>2023-09-26</td><td>2023-12-04</td><td>49</td></tr><tr><td>bull</td><td>2023-12-05</td><td>2025-03-07</td><td>314</td></tr><tr><td>bear</td><td>2025-03-10</td><td>2025-08-01</td><td>101</td></tr><tr><td>bull</td><td>2025-08-04</td><td>2026-08-05</td><td>253</td></tr></tbody></table>
+</section>
+<script>
+(function () {
+  var f2 = function (v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2); };
+  document.querySelectorAll('.chart-wrap').forEach(function (wrap) {
+    var svg = wrap.querySelector('svg.chart');
+    var tip = wrap.querySelector('.chart-tip');
+    if (!svg || !tip || !svg.dataset.hover) return;
+    var data = JSON.parse(svg.dataset.hover);
+    var layer = svg.querySelector('.hover');
+    var cross = svg.querySelector('.hover .cross');
+    var dots = svg.querySelectorAll('.hover .dot');
+    if (!data.xs.length) return;
+
+    function hide() { if (layer) layer.style.display = 'none'; tip.hidden = true; }
+
+    function move(ev) {
+      var r = svg.getBoundingClientRect();
+      var vb = svg.viewBox.baseVal;
+      var ux = (ev.clientX - r.left) / r.width * (vb.width || r.width);
+      var best = 0, bestD = Infinity;
+      for (var i = 0; i < data.xs.length; i++) {
+        var d = Math.abs(data.xs[i] - ux);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      var ux2 = data.xs[best];
+      if (layer) layer.style.display = '';
+      if (cross) { cross.setAttribute('x1', ux2); cross.setAttribute('x2', ux2); }
+      var rows = '';
+      data.series.forEach(function (s, k) {
+        var dot = dots[k];
+        var py = s.px[best];
+        if (dot) {
+          if (py === null) { dot.setAttribute('cx', -99); dot.setAttribute('cy', -99); }
+          else { dot.setAttribute('cx', ux2); dot.setAttribute('cy', py); }
+        }
+        rows += '<div class="tip-row"><span class="tip-swatch" style="background:' + s.colour + '"></span>' +
+          '<span class="tip-label">' + s.label + '</span>' +
+          '<span class="tip-val">' + f2(s.equity[best]) + '%</span>' +
+          '<span class="tip-dd">' + f2(s.drawdown[best]) + '%</span></div>';
+        var tr = s.trades && s.trades[best];
+        if (tr) rows += '<div class="tip-trade">' + tr + '</div>';
+      });
+      tip.innerHTML = '<div class="tip-head">' + data.labels[best] + '</div>' +
+        '<div class="tip-row tip-head-row"><span class="tip-swatch"></span><span class="tip-label"></span>' +
+        '<span class="tip-val">equity</span><span class="tip-dd">drawdown</span></div>' + rows;
+      tip.hidden = false;
+      var px = ux2 / (vb.width || r.width) * r.width;
+      var left = Math.min(Math.max(px + 12, 4), r.width - tip.offsetWidth - 4);
+      tip.style.left = left + 'px';
+      tip.style.top = '8px';
+    }
+
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', hide);
+    svg.addEventListener('touchmove', function (e) { if (e.touches[0]) move(e.touches[0]); }, { passive: true });
+    svg.addEventListener('touchend', hide);
+  });
+})();
+</script>
+</body></html>
