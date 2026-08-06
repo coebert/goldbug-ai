@@ -149,7 +149,9 @@ export function segmentRegimes(
   const merged: RegimeSegment[] = [];
   for (const seg of raw) {
     const prev = merged.at(-1);
-    if (prev && seg.bars < minBars) {
+    // A short run is absorbed into the preceding segment; so is any run
+    // that ends up adjacent to a segment carrying the same label.
+    if (prev && (seg.bars < minBars || prev.label === seg.label)) {
       prev.endIndex = seg.endIndex;
       prev.to = seg.to;
       prev.bars += seg.bars;

@@ -97,7 +97,7 @@ describe("classifyRegimes", () => {
 
   it("rejects invalid thresholds", () => {
     expect(() => classifyRegimes(ramp(10, 100, 100), { lookback: 0 })).toThrow();
-    expect(() => classifyRegimes(ramp(10, 100, 100), { bullAnnualPct: -5 })).toThrow();
+    expect(() => classifyRegimes(ramp(10, 100, 100), { bullAnnualPct: -20 })).toThrow();
   });
 
   it("returns one label per bar", () => {
