@@ -31,6 +31,8 @@
 
 import { effectiveMaxParticipation } from "./microstructure/algo-regime-guard";
 import { computeCommission, type CommissionModel } from "./commission-model";
+import { estimateSpreadSlippage } from "./spread-slippage";
+import type { LiquidityFrictions } from "./liquidity-profile";
 import type { AssetClass } from "./universe.server";
 
 export type Side = "BUY" | "SELL";
