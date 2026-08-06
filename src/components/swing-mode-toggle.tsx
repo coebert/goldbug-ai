@@ -10,6 +10,7 @@ import { updateRiskConfig } from "@/lib/trading.functions";
 import { SWING_DIAL_OVERRIDES } from "@/lib/risk-presets";
 import { qk } from "@/lib/query-keys";
 import { assessSwingViability } from "@/lib/swing-viability";
+import { useTradingMode } from "@/hooks/use-trading-mode";
 
 /**
  * Always-visible on/off switch for swing trading.
