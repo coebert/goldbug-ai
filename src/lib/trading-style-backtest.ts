@@ -37,6 +37,7 @@ import {
 } from "@/lib/exits";
 import { minHoldDays, type TradingStyle } from "@/lib/trading-style";
 import { estimateFeeDrag, type FeeDragBreakdown } from "@/lib/fee-drag-objective";
+import { auditFeeDrag, fillsFromTradeLog, type FeeDragAudit } from "@/lib/fee-drag-audit";
 import type { PolicyOrder, StylePolicy } from "@/lib/style-policy";
 import type { RiskConfig } from "@/lib/universe.server";
 
