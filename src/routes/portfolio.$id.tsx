@@ -963,6 +963,7 @@ function PortfolioPage() {
               deposits={depositEvents}
               inceptionDate={q.data?.inceptionDate ?? null}
               seriesStartDate={q.data?.seriesStartDate ?? null}
+              trades={trades as unknown as import("@/lib/chart-trade-markers").MarkerTrade[]}
             />
 
             <div className="mt-2 flex justify-end">

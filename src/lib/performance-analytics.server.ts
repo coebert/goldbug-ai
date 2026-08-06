@@ -44,6 +44,15 @@ export type PerformanceAnalytics = {
   roundTrips: number;
   equityCurve: EquityCurvePoint[];
   drawdownCurve: DrawdownPoint[];
+  /** Executed trades in the window, for chart markers. */
+  trades: Array<{
+    symbol: string;
+    side: "buy" | "sell";
+    quantity: number;
+    price: number;
+    trade_date: string;
+    executed_at: string | null;
+  }>;
   regimeAttribution: AttributionSlice[];
   sizingAttribution: AttributionSlice[];
   exitAttribution: AttributionSlice[];
@@ -315,6 +324,14 @@ export async function getPerformanceAnalytics(
     roundTrips: regimeEntries.length,
     equityCurve,
     drawdownCurve,
+    trades: trades.map((t) => ({
+      symbol: t.symbol,
+      side: t.side,
+      quantity: Number(t.quantity),
+      price: Number(t.price),
+      trade_date: t.trade_date,
+      executed_at: t.executed_at ?? null,
+    })),
     regimeAttribution: rollup(regimeEntries),
     sizingAttribution: rollup(sizingEntries),
     exitAttribution: rollup(exitEntries),

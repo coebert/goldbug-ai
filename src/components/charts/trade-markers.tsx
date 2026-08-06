@@ -1,0 +1,72 @@
+import type { TradeMarkerCell } from "@/lib/chart-trade-markers";
+
+/**
+ * Buy / sell markers drawn on top of a recharts series.
+ *
+ * A buy is an upward triangle in the success colour, a sell a downward
+ * triangle in the destructive colour, both outlined against the chart
+ * background so they stay readable over the gradient fill. Point count is
+ * shown as a small badge when several trades landed on the same bar.
+ */
+export function TradeMarkerShape(props: {
+  cx?: number;
+  cy?: number;
+  side: "buy" | "sell";
+  payload?: { marker?: TradeMarkerCell | null };
+  size?: number;
+}) {
+  const { cx, cy, side, payload } = props;
+  if (cx == null || cy == null || !Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  const s = props.size ?? 5;
+  const buy = side === "buy";
+  const color = buy ? "var(--success)" : "var(--destructive)";
+  // Buys sit below the line, sells above it, so a bar with both stays legible.
+  const oy = buy ? s + 3 : -(s + 3);
+  const y = cy + oy;
+  const points = buy
+    ? `${cx},${y - s} ${cx - s},${y + s} ${cx + s},${y + s}`
+    : `${cx},${y + s} ${cx - s},${y - s} ${cx + s},${y - s}`;
+  const count = (buy ? payload?.marker?.buys : payload?.marker?.sells) ?? 0;
+  return (
+    <g pointerEvents="none">
+      <polygon
+        points={points}
+        fill={color}
+        stroke="var(--card)"
+        strokeWidth={1}
+        opacity={0.95}
+      />
+      {count > 1 && (
+        <text
+          x={cx + s + 2}
+          y={y + (buy ? s : -s)}
+          fill={color}
+          fontSize={9}
+          fontWeight={600}
+        >
+          {count}
+        </text>
+      )}
+    </g>
+  );
+}
+
+/** Legend row explaining the markers. */
+export function TradeMarkerLegend({ className }: { className?: string }) {
+  return (
+    <>
+      <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
+        <svg width="10" height="10" aria-hidden>
+          <polygon points="5,0 0,10 10,10" fill="var(--success)" />
+        </svg>
+        Buy executed
+      </span>
+      <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
+        <svg width="10" height="10" aria-hidden>
+          <polygon points="5,10 0,0 10,0" fill="var(--destructive)" />
+        </svg>
+        Sell executed
+      </span>
+    </>
+  );
+}
