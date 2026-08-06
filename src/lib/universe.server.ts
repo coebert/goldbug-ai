@@ -357,6 +357,9 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   fx_currency_limits: {},
   trading_style: "position",
   swing_min_hold_days: 2,
+  cash_policy_enabled: true,
+  target_invested_pct: null,
+
 
 };
 
