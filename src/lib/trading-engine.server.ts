@@ -864,6 +864,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         fxSystemBlock: fxContext?.block ?? null,
         fxUserBlock: fxContext?.contextBlock ?? null,
         alphaPriors,
+        sectorCycleBlock,
         cryptoSignalsBlock: cryptoDecision?.block ?? null,
         algoRegimeBlock,
         cashPolicyBlock: cashPolicy.enabled
