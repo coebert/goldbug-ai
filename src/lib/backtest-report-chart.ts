@@ -621,12 +621,28 @@ export function renderBacktestReportHtml(args: {
   .tip-swatch { width:8px; height:8px; border-radius:2px; }
   .tip-val, .tip-dd { font-variant-numeric:tabular-nums; text-align:right; min-width:56px; }
   .tip-dd { color:var(--muted); }
+  .filters { position:sticky; top:0; z-index:3; display:flex; flex-wrap:wrap; gap:14px;
+             align-items:center; background:var(--panel); border:1px solid var(--grid);
+             border-radius:12px; padding:10px 12px; margin:12px 0; }
+  .filter-group { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .filter-label { color:var(--muted); font-size:11px; text-transform:uppercase;
+                  letter-spacing:.06em; margin-right:2px; }
+  .filter-count { margin-left:auto; color:var(--muted); font-size:11px; }
+  .chip { background:transparent; color:var(--muted); border:1px solid var(--grid);
+          border-radius:999px; padding:3px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .chip:hover { border-color:var(--muted); }
+  .chip.on { background:rgba(56,189,140,.16); border-color:#38bd8c; color:var(--ink); }
+  .chip.all { font-style:italic; }
+  section.panel[hidden], tbody tr[hidden] { display:none; }
 </style></head>
 <body>
   <h1>${esc(args.title)}</h1>
   ${args.subtitle ? `<p class="lead">${esc(args.subtitle)}</p>` : ""}
+  ${renderFilterBar(args.filters ?? [])}
   ${panels}
 <script>${HOVER_SCRIPT}</script>
+<script>${FILTER_SCRIPT}</script>
+
 </body></html>`;
 
 }
