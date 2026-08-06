@@ -368,7 +368,11 @@ export function RiskControlsCard({
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShieldCheck className="h-4 w-4 text-primary" /> Risk controls
-                <TradingModeBadge riskConfig={{ trading_style: cfg.trading_style ?? "position" }} />
+                <TradingModeBadge
+                  portfolioId={portfolioId}
+                  riskConfig={{ trading_style: cfg.trading_style ?? "position" }}
+                />
+
               </CardTitle>
               <CardDescription>
                 {(cfg.trading_style ?? "position") === "swing"
