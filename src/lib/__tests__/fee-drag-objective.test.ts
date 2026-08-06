@@ -127,12 +127,11 @@ describe("estimateFeeDrag", () => {
     expect(estimateFeeDrag([], frictions, 10_000)).toEqual(EMPTY_FEE_DRAG);
     expect(estimateFeeDrag([{ notional: 100, fee: 0, side: "BUY" }], undefined, 10_000)).toEqual(
       EMPTY_FEE_DRAG,
-  estimateFeeDrag,
     );
     expect(estimateFeeDrag([{ notional: 100, fee: 3, side: "BUY" }], frictions, 0)).toEqual(
       EMPTY_FEE_DRAG,
-  estimateFeeDrag,
     );
+
   });
 });
 
