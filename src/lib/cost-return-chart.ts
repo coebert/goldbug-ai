@@ -218,7 +218,7 @@ export function buildCostReturnChart(
     label: scale === 1 ? "baseline cost" : `${(scale * 100).toFixed(0)}% cost`,
     colour: colours[i % colours.length]!,
     points: opts.tickets
-      .map((t) => {
+      .map((t): XYPoint | null => {
         const cell = cells.find(
           (c) => c.ticket.label === t.label && c.scenario.scale === scale,
         );
@@ -232,7 +232,7 @@ export function buildCostReturnChart(
           )}% cost → ${cell.totalReturnPct.toFixed(1)}% net (fees ${cell.feeDragPct.toFixed(
             1,
           )}%, ${cell.trades} trades)`,
-        } satisfies XYPoint;
+        };
       })
       .filter((p): p is XYPoint => p !== null),
   }));

@@ -397,6 +397,14 @@ export type ReportPanel = {
   heading: string;
   subtitle?: string;
   series: ChartSeries[];
+  /**
+   * Pre-rendered SVG charts. When present these replace the default
+   * equity/drawdown pair, so a panel can carry a different kind of chart
+   * (e.g. the cost-vs-return and breakeven curves) inside the same report.
+   */
+  charts?: string[];
+  /** Legend entries for pre-rendered charts, which have no ChartSeries. */
+  legend?: { label: string; colour: string; dashed?: boolean }[];
   /** Optional rows appended under the charts as a small metric table. */
   table?: { columns: string[]; rows: string[][] };
 };
@@ -412,10 +420,18 @@ export function renderBacktestReportHtml(args: {
       (p) => `<section class="panel">
   <h2>${esc(p.heading)}</h2>
   ${p.subtitle ? `<p class="sub">${esc(p.subtitle)}</p>` : ""}
-  ${renderLegend(p.series)}
+  ${renderLegend(
+    p.legend
+      ? p.legend.map((l) => ({ label: l.label, colour: l.colour, dashed: l.dashed, curve: [] }))
+      : p.series,
+  )}
   <div class="charts">
-    ${withHoverTooltip(renderEquityChart(p.series, "Equity curve (% from start)"))}
-    ${withHoverTooltip(renderDrawdownChart(p.series, "Drawdown (% from high-water mark)"))}
+    ${
+      p.charts?.length
+        ? p.charts.join("\n    ")
+        : `${withHoverTooltip(renderEquityChart(p.series, "Equity curve (% from start)"))}
+    ${withHoverTooltip(renderDrawdownChart(p.series, "Drawdown (% from high-water mark)"))}`
+    }
   </div>
 
   ${
