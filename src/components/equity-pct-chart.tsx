@@ -2,7 +2,7 @@ import { ChartFrame } from "@/components/chart-frame";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import { SAXO_AXIS, SAXO_GRID, SAXO_REFERENCE_LINE, SAXO_TOOLTIP_CONTENT, SAXO_TOOLTIP_LABEL } from "@/lib/saxo-chart";
 import {
   formatUkAxisDay,
   formatUkAxisHour,
@@ -514,42 +514,29 @@ export function EquityPctChart({
                     <stop offset={zeroOffset} stopColor="var(--destructive)" />
                   </linearGradient>
                 </defs>
-                <CartesianGrid {...GRID_PROPS} strokeDasharray="0" vertical={false} />
+                <CartesianGrid {...SAXO_GRID} />
                 <XAxis
+                  {...SAXO_AXIS}
                   dataKey="at"
-                  tick={{ ...AXIS_TICK, fontSize: 11, fill: "var(--muted-foreground)" }}
                   ticks={edgeTicks}
-                  tickMargin={8}
                   interval={0}
                   tickFormatter={(v) => ticks.format(String(v))}
-                  axisLine={false}
-                  tickLine={false}
                   padding={{ left: 2, right: 2 }}
                 />
                 <YAxis
+                  {...SAXO_AXIS}
                   yAxisId="pct"
-                  width={46}
-                  tickMargin={6}
+                  width={52}
                   tickCount={4}
                   domain={domain}
-                  tick={{ ...AXIS_TICK, fontSize: 11, fill: "var(--muted-foreground)" }}
                   tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
-                  axisLine={false}
-                  tickLine={false}
                 />
                 <YAxis yAxisId="delta" orientation="right" domain={deltaDomain} hide />
-                <ReferenceLine yAxisId="pct" {...REFERENCE_LINE} strokeDasharray="0" y={0} />
+                <ReferenceLine yAxisId="pct" {...SAXO_REFERENCE_LINE} y={0} />
                 <Tooltip
                   cursor={<SaxoCrosshair />}
-                  contentStyle={{
-                    fontSize: 12,
-                    whiteSpace: "pre-line",
-                    background: "var(--popover)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    color: "var(--popover-foreground)",
-                  }}
-                  labelStyle={{ color: "var(--muted-foreground)" }}
+                  contentStyle={{ ...SAXO_TOOLTIP_CONTENT, whiteSpace: "pre-line" }}
+                  labelStyle={SAXO_TOOLTIP_LABEL}
                   labelFormatter={(l) => (resolution === "hourly" ? fmtHour(String(l)) : fmtDay(String(l)))}
                   formatter={(v, name, item) => {
                     if (name === "buys" || name === "sells") return [] as unknown as [string, string];
