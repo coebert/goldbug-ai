@@ -27,6 +27,15 @@ import {
 import { computeMaxDrawdown, computeSharpe, dailyReturns, type EquityPoint } from "../src/lib/backtest-metrics";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import { buildCostReturnPanels } from "../src/lib/cost-return-chart";
+import {
+  formatRobustnessTable,
+  gridWidth,
+  rankRobustness,
+  robustnessTableRows,
+  summariseRobustness,
+  ROBUSTNESS_COLUMNS,
+  type RobustnessGroupBy,
+} from "../src/lib/robustness-score";
 import type { RiskLevel } from "../src/lib/risk-sim-matrix";
 import type { TradingStyle } from "../src/lib/trading-style";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -64,6 +73,9 @@ const slippageSpecs: SlippageSpec[] = !slippageArg
 // Minimum per-trade fee axis, e.g. --minfee 0,3,8
 const minFeeArg = arg("minfee", "");
 const minFees = !minFeeArg ? [] : minFeeArg.split(",").map(Number);
+// How the robustness ranking collapses the grid: style | risk+style |
+// risk+style+ticket (default) | ticket.
+const robustnessGroupBy = arg("rank-by", "risk+style+ticket") as RobustnessGroupBy;
 
 // Baseline: Saxo-like retail costs on US lines.
 const BASE_FRICTIONS = {
@@ -192,6 +204,21 @@ for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCa
   ]);
 }
 
+// ----------------------------------------------------------- robustness
+// One number per arm across the entire cost grid, so the rules can be
+// ranked on how well they survive cost assumptions rather than on which
+// single cell happened to be kindest.
+const robustness = rankRobustness(cells, {
+  groupBy: robustnessGroupBy,
+  baseFrictions: BASE_FRICTIONS,
+  startingCash,
+});
+console.log(
+  `\nRobustness ranking (grouped by ${robustnessGroupBy}, ${gridWidth(cells)} cost scenarios per arm):`,
+);
+console.log(formatRobustnessTable(robustness));
+console.log(`\n${summariseRobustness(robustness)}`);
+
 // ---------------------------------------------------------------- report
 const COLOURS = ["#39d98a", "#4ea1ff", "#f5a623", "#e5484d", "#a78bfa", "#9aa4b2"];
 const panels: ReportPanel[] = [];
@@ -257,6 +284,19 @@ panels.unshift({
     rows: breakRows,
   },
 });
+
+panels.unshift({
+  heading: "Robustness ranking",
+  subtitle:
+    `single score per ${robustnessGroupBy} across all ${gridWidth(cells)} cost scenarios · ` +
+    summariseRobustness(robustness),
+  series: [],
+  table: {
+    columns: [...ROBUSTNESS_COLUMNS],
+    rows: robustnessTableRows(robustness),
+  },
+});
+
 
 mkdirSync("reports", { recursive: true });
 const outPath = "reports/cost-sweep.html";
