@@ -1,0 +1,496 @@
+// Trading-style backtest: position vs swing on identical price tapes.
+//
+// Replays the same deterministic multi-asset tape (from `risk-sim-matrix`)
+// through the same heuristic entry rules, but runs the *risk-config driven*
+// exit engine on top: ATR-scaled hard stop, take-profit, chandelier trail,
+// R-multiple scale-outs, conditional time stop, hard max-hold cap, post-exit
+// re-entry lockout, and the swing min-hold churn guard.
+//
+// The only difference between the two arms is `parseRiskConfig({ trading_style })`,
+// so any metric delta is attributable to the horizon/risk rules themselves.
+//
+// Pure and seeded: same inputs always produce the same table.
+
+import { runBacktest, type BacktestBar } from "@/lib/backtest-runner";
+import type { SimDecision } from "@/lib/broker-simulator";
+import { buildHeuristicBuys, buildHeuristicSells } from "@/lib/heuristic-decision";
+import {
+  buildPriceTape,
+  featuresFrom,
+  DEFAULT_UNIVERSE,
+  type AssetSpec,
+  type RiskLevel,
+} from "@/lib/risk-sim-matrix";
+import {
+  computeMaxDrawdown,
+  computeSharpe,
+  computeAnnualisedVolPct,
+  dailyReturns,
+  type EquityPoint,
+} from "@/lib/backtest-metrics";
+import {
+  atrScaledStopPct,
+  evaluateChandelier,
+  evaluateScaleOut,
+  evaluateTimeStop,
+  reentryLockoutDays,
+} from "@/lib/exits";
+import { minHoldDays, type TradingStyle } from "@/lib/trading-style";
+import type { RiskConfig } from "@/lib/universe.server";
+
+export const STYLE_HORIZONS: Array<{ label: string; bars: number }> = [
+  { label: "3M", bars: 63 },
+  { label: "6M", bars: 126 },
+  { label: "1Y", bars: 252 },
+  { label: "2Y", bars: 504 },
+];
+
+export const STYLE_SEEDS = [20260731, 771, 4242, 90210, 13337];
+
+/**
+ * Portfolio-weight sleeve per risk level. The heuristic fallback's own sleeve
+ * is deliberately tiny (it exists for AI-outage ticks), which would leave the
+ * book ~95% cash and make the comparison a fee-drag contest. Here we size to
+ * portfolio weights so both styles run a genuinely invested book.
+ */
+export const ENTRY_SLEEVE: Record<RiskLevel, { maxNames: number; perNameWeight: number }> = {
+  low: { maxNames: 6, perNameWeight: 0.14 },
+  balanced: { maxNames: 7, perNameWeight: 0.18 },
+  high: { maxNames: 8, perNameWeight: 0.22 },
+};
+
+/** Mean absolute daily return over the last `n` closes — an ATR% proxy. */
+export function atrPctFrom(series: readonly number[], n = 14): number {
+  if (series.length < 3) return 0;
+  const start = Math.max(1, series.length - n);
+  let sum = 0;
+  let count = 0;
+  for (let i = start; i < series.length; i++) {
+    const prev = series[i - 1];
+    if (!(prev > 0)) continue;
+    sum += Math.abs(series[i] - prev) / prev;
+    count++;
+  }
+  return count > 0 ? sum / count : 0;
+}
+
+type PositionState = {
+  openedBar: number;
+  entryAtrPct: number;
+  highWaterMark: number;
+  scaleOutsTaken: number;
+};
+
+export type StyleRunMetrics = {
+  style: TradingStyle;
+  riskLevel: RiskLevel;
+  horizon: string;
+  bars: number;
+  seed: number;
+  startEquity: number;
+  endEquity: number;
+  totalReturnPct: number;
+  cagrPct: number;
+  maxDrawdownPct: number;
+  sharpe: number;
+  annualisedVolPct: number;
+  calmar: number;
+  trades: number;
+  buys: number;
+  sells: number;
+  winRatePct: number;
+  /** Mean bars a closed position was held. */
+  avgHoldBars: number;
+  /** Round-trips per 252 bars — turnover intensity. */
+  tradesPerYear: number;
+  /** Total commission paid as a % of starting equity. */
+  feeDragPct: number;
+  finalCashPct: number;
+  exitMix: Record<string, number>;
+};
+
+export type StyleBacktestOptions = {
+  universe?: AssetSpec[];
+  horizons?: Array<{ label: string; bars: number }>;
+  riskLevels?: RiskLevel[];
+  seeds?: number[];
+  startingCash?: number;
+  feePerTrade?: number;
+};
+
+/** Run one (config × tape) cell and score it. */
+export async function runStyleBacktest(args: {
+  cfg: RiskConfig;
+  bars: BacktestBar[];
+  riskLevel: RiskLevel;
+  startingCash: number;
+  feePerTrade: number;
+}): Promise<Omit<StyleRunMetrics, "style" | "horizon" | "seed">> {
+  const { cfg, bars, riskLevel, startingCash, feePerTrade } = args;
+
+  const positions = new Map<string, PositionState>();
+  const lockedUntilBar = new Map<string, number>();
+  const holdBarsClosed: number[] = [];
+  const exitMix: Record<string, number> = {};
+  const minHold = minHoldDays(cfg);
+  let buys = 0;
+  let sells = 0;
+
+  const noteExit = (kind: string) => {
+    exitMix[kind] = (exitMix[kind] ?? 0) + 1;
+  };
+
+  const result = await runBacktest(
+    { cash: startingCash, holdings: [] },
+    bars,
+    ({ state, closes, history, barIndex }) => {
+      if (barIndex < 31) return [];
+      const decisions: SimDecision[] = [];
+      const exiting = new Set<string>();
+      const feats = featuresFrom(history);
+
+      // ---------------------------------------------------- risk exits
+      for (const h of state.holdings) {
+        if (!(h.quantity > 0)) continue;
+        const price = closes[h.symbol];
+        if (!(price > 0)) continue;
+        const series = history[h.symbol] ?? [];
+        const atrPct = atrPctFrom(series);
+        const pos = positions.get(h.symbol) ?? {
+          openedBar: barIndex,
+          entryAtrPct: atrPct,
+          highWaterMark: price,
+          scaleOutsTaken: 0,
+        };
+        pos.highWaterMark = Math.max(pos.highWaterMark, price);
+        positions.set(h.symbol, pos);
+
+        const held = barIndex - pos.openedBar;
+        const pnlPct = (price - h.avgCost) / h.avgCost;
+
+        const sell = (qty: number, kind: string, lockout: boolean) => {
+          const q = Math.min(h.quantity, Math.floor(qty));
+          if (q < 1) return false;
+          decisions.push({
+            id: `${barIndex}-x-${kind}-${h.symbol}`,
+            symbol: h.symbol,
+            side: "SELL",
+            quantity: q,
+            price,
+          });
+          sells++;
+          noteExit(kind);
+          if (q >= h.quantity) {
+            exiting.add(h.symbol);
+            holdBarsClosed.push(held);
+            positions.delete(h.symbol);
+            if (lockout) {
+              const days = reentryLockoutDays({
+                atrPct,
+                baseCooldownDays: cfg.reentry_min_days,
+                atrDaysMult: cfg.reentry_atr_days_mult,
+                minDays: cfg.reentry_min_days,
+                maxDays: cfg.reentry_max_days,
+              });
+              lockedUntilBar.set(h.symbol, barIndex + days);
+            }
+          }
+          return true;
+        };
+
+        // 1. Hard stop (ATR-scaled, never wider than the fixed stop).
+        const stop = atrScaledStopPct({
+          fixedStopPct: cfg.stop_loss_pct,
+          atrPct,
+          atrMult: cfg.initial_stop_atr_mult,
+          floorPct: cfg.atr_scaled_stop_floor_pct,
+          enabled: cfg.atr_scaled_stop_enabled,
+        });
+        if (stop.effectiveStopPct > 0 && pnlPct <= -stop.effectiveStopPct) {
+          if (sell(h.quantity, "stop", true)) continue;
+        }
+
+        // 2. Take-profit.
+        if (cfg.take_profit_pct > 0 && pnlPct >= cfg.take_profit_pct) {
+          if (sell(h.quantity, "take_profit", false)) continue;
+        }
+
+        // 3. Chandelier trailing stop.
+        if (cfg.chandelier_enabled && atrPct > 0) {
+          const ch = evaluateChandelier({
+            avgCost: h.avgCost,
+            price,
+            highWaterMark: pos.highWaterMark,
+            atrPct,
+            initialStopAtrMult: cfg.initial_stop_atr_mult,
+            kBase: cfg.chandelier_k_base,
+            kTight: cfg.chandelier_k_tight,
+            tightenAfterR: cfg.chandelier_tighten_after_r,
+          });
+          if (ch.breached) {
+            if (sell(h.quantity, "trail", true)) continue;
+          }
+        }
+
+        // 4. Conditional time stop (no progress within the horizon).
+        if (cfg.time_stop_enabled) {
+          const ts = evaluateTimeStop({
+            avgCost: h.avgCost,
+            price,
+            atrPct: pos.entryAtrPct || atrPct,
+            initialStopAtrMult: cfg.initial_stop_atr_mult,
+            openedAtMs: pos.openedBar * 86_400_000,
+            nowMs: barIndex * 86_400_000,
+            horizonDays: cfg.time_stop_horizon_days,
+            minProgressR: cfg.time_stop_min_progress_r,
+          });
+          if (ts.triggered) {
+            if (sell(h.quantity, "time_stop", true)) continue;
+          }
+        }
+
+        // 5. Hard max-hold cap.
+        if (cfg.max_hold_days > 0 && held >= cfg.max_hold_days) {
+          if (sell(h.quantity, "max_hold", true)) continue;
+        }
+
+        // 6. R-multiple scale-out (partial).
+        if (cfg.scale_out_enabled && atrPct > 0) {
+          const so = evaluateScaleOut({
+            avgCost: h.avgCost,
+            price,
+            atrPct: pos.entryAtrPct || atrPct,
+            initialStopAtrMult: cfg.initial_stop_atr_mult,
+            levels: cfg.scale_out_levels.map((l) => ({
+              rMultiple: l.r,
+              fractionOfPosition: l.frac,
+            })),
+            levelsAlreadyTaken: pos.scaleOutsTaken,
+          });
+          if (so.fire) {
+            const qty = Math.floor(h.quantity * so.sellFraction);
+            if (qty >= 1) {
+              pos.scaleOutsTaken += 1;
+              sell(qty, "scale_out", false);
+            }
+          }
+        }
+      }
+
+      // ------------------------------------- discretionary heuristic exits
+      const discretionaryCandidates = state.holdings
+        .filter((h) => h.quantity > 0 && !exiting.has(h.symbol))
+        .map((h) => ({ symbol: h.symbol, quantity: h.quantity }));
+
+      for (const s of buildHeuristicSells(discretionaryCandidates, feats)) {
+        const pos = positions.get(s.symbol);
+        // Swing churn guard: no discretionary exit inside the min-hold window.
+        if (pos && minHold > 0 && barIndex - pos.openedBar < minHold) continue;
+        const price = closes[s.symbol];
+        if (!(price > 0) || !(s.quantity > 0)) continue;
+        decisions.push({
+          id: `${barIndex}-d-${s.symbol}`,
+          symbol: s.symbol,
+          side: "SELL",
+          quantity: s.quantity,
+          price,
+        });
+        sells++;
+        noteExit("discretionary");
+        exiting.add(s.symbol);
+        holdBarsClosed.push(pos ? barIndex - pos.openedBar : 0);
+        positions.delete(s.symbol);
+      }
+
+      // ------------------------------------------------------------ entries
+      const heldAfter = new Set(
+        state.holdings
+          .filter((h) => h.quantity > 0 && !exiting.has(h.symbol))
+          .map((h) => h.symbol),
+      );
+      // Mark-to-market equity, so position weights are portfolio weights and
+      // the book actually gets deployed instead of sitting ~95% in cash.
+      const holdingsValue = state.holdings.reduce(
+        (sum, h) => sum + h.quantity * (closes[h.symbol] || h.avgCost),
+        0,
+      );
+      const equityNow = state.cash + holdingsValue;
+      const sleeve = ENTRY_SLEEVE[riskLevel];
+      const cashFloor = equityNow * (cfg.cash_floor_pct ?? 0.05);
+      let cashAvail = Math.max(0, state.cash - cashFloor);
+
+      for (const b of buildHeuristicBuys(discretionaryCandidates, feats, {
+        cashValue: state.cash,
+        riskLevel,
+      })) {
+        if (heldAfter.size >= sleeve.maxNames) break;
+        if (heldAfter.has(b.symbol)) continue;
+        const lock = lockedUntilBar.get(b.symbol);
+        if (lock != null && barIndex < lock) continue;
+        const price = closes[b.symbol];
+        if (!(price > 0)) continue;
+
+        // Volatility sizing: shrink the ticket when daily ATR exceeds target.
+        const atrPct = atrPctFrom(history[b.symbol] ?? []);
+        const volScale =
+          cfg.volatility_sizing && atrPct > 0
+            ? Math.max(0.35, Math.min(1, cfg.vol_target_pct / atrPct))
+            : 1;
+        const budget = Math.min(cashAvail, equityNow * sleeve.perNameWeight * volScale);
+        const qty = Math.floor(budget / price);
+        if (qty < 1) continue;
+        cashAvail -= qty * price;
+        heldAfter.add(b.symbol);
+
+        decisions.push({
+          id: `${barIndex}-b-${b.symbol}`,
+          symbol: b.symbol,
+          side: "BUY",
+          quantity: qty,
+          price,
+        });
+        buys++;
+        positions.set(b.symbol, {
+          openedBar: barIndex,
+          entryAtrPct: atrPct,
+          highWaterMark: price,
+          scaleOutsTaken: 0,
+        });
+      }
+
+      return decisions;
+    },
+    { defaultFee: feePerTrade },
+  );
+
+  const equity: EquityPoint[] = result.equityCurve.map((p) => ({
+    snapshot_date: p.date,
+    total_value: p.totalValue,
+  }));
+  const endEquity = equity.at(-1)?.total_value ?? startingCash;
+  const rets = dailyReturns(equity);
+  const dd = computeMaxDrawdown(equity);
+  const years = bars.length / 252;
+  const cagr = years > 0 ? (endEquity / startingCash) ** (1 / years) - 1 : 0;
+  const ddAbs = Math.abs(dd.pct);
+  const sellSnaps = result.snapshots.filter((s) => s.side === "SELL");
+  const wins = sellSnaps.filter((s) => s.realizedPnl > 0).length;
+  const executed = result.snapshots.length;
+
+  return {
+    riskLevel,
+    bars: bars.length,
+    startEquity: startingCash,
+    endEquity,
+    totalReturnPct: (endEquity / startingCash - 1) * 100,
+    cagrPct: cagr * 100,
+    maxDrawdownPct: dd.pct,
+    sharpe: computeSharpe(rets),
+    annualisedVolPct: computeAnnualisedVolPct(rets),
+    calmar: ddAbs > 1e-9 ? (cagr * 100) / ddAbs : 0,
+    trades: buys + sells,
+    buys,
+    sells,
+    winRatePct: sellSnaps.length > 0 ? (wins / sellSnaps.length) * 100 : 0,
+    avgHoldBars:
+      holdBarsClosed.length > 0
+        ? holdBarsClosed.reduce((a, b) => a + b, 0) / holdBarsClosed.length
+        : 0,
+    tradesPerYear: years > 0 ? (buys + sells) / years : 0,
+    feeDragPct: ((executed * feePerTrade) / startingCash) * 100,
+    finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
+    exitMix,
+  };
+}
+
+const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+export function averageStyleRuns(runs: StyleRunMetrics[]): StyleRunMetrics {
+  const pick = (f: (m: StyleRunMetrics) => number) => mean(runs.map(f));
+  const exitMix: Record<string, number> = {};
+  for (const r of runs) {
+    for (const [k, v] of Object.entries(r.exitMix)) exitMix[k] = (exitMix[k] ?? 0) + v / runs.length;
+  }
+  return {
+    ...runs[0],
+    seed: -1,
+    endEquity: pick((m) => m.endEquity),
+    totalReturnPct: pick((m) => m.totalReturnPct),
+    cagrPct: pick((m) => m.cagrPct),
+    maxDrawdownPct: pick((m) => m.maxDrawdownPct),
+    sharpe: pick((m) => m.sharpe),
+    annualisedVolPct: pick((m) => m.annualisedVolPct),
+    calmar: pick((m) => m.calmar),
+    trades: pick((m) => m.trades),
+    buys: pick((m) => m.buys),
+    sells: pick((m) => m.sells),
+    winRatePct: pick((m) => m.winRatePct),
+    avgHoldBars: pick((m) => m.avgHoldBars),
+    tradesPerYear: pick((m) => m.tradesPerYear),
+    feeDragPct: pick((m) => m.feeDragPct),
+    finalCashPct: pick((m) => m.finalCashPct),
+    exitMix,
+  };
+}
+
+export type StyleComparison = {
+  perSeed: StyleRunMetrics[];
+  averaged: StyleRunMetrics[];
+  seeds: number[];
+  horizons: Array<{ label: string; bars: number }>;
+  riskLevels: RiskLevel[];
+};
+
+/**
+ * Run both styles across every (risk level × horizon × seed) cell.
+ * `configFor` is injected so the caller owns the (server-only) config parse.
+ */
+export async function compareTradingStyles(
+  configFor: (style: TradingStyle) => RiskConfig,
+  options: StyleBacktestOptions = {},
+): Promise<StyleComparison> {
+  const universe = options.universe ?? DEFAULT_UNIVERSE;
+  const horizons = options.horizons ?? STYLE_HORIZONS;
+  const riskLevels = options.riskLevels ?? (["low", "balanced", "high"] as RiskLevel[]);
+  const seeds = options.seeds ?? STYLE_SEEDS;
+  const startingCash = options.startingCash ?? 10_300;
+  const feePerTrade = options.feePerTrade ?? 3;
+  const styles: TradingStyle[] = ["position", "swing"];
+  const cfgs = { position: configFor("position"), swing: configFor("swing") };
+
+  const perSeed: StyleRunMetrics[] = [];
+  const maxBars = Math.max(...horizons.map((h) => h.bars));
+
+  for (const seed of seeds) {
+    const fullTape = buildPriceTape(universe, maxBars, seed);
+    for (const h of horizons) {
+      const tape = fullTape.slice(0, h.bars);
+      for (const riskLevel of riskLevels) {
+        for (const style of styles) {
+          const m = await runStyleBacktest({
+            cfg: cfgs[style],
+            bars: tape,
+            riskLevel,
+            startingCash,
+            feePerTrade,
+          });
+          perSeed.push({ ...m, style, horizon: h.label, seed });
+        }
+      }
+    }
+  }
+
+  const averaged: StyleRunMetrics[] = [];
+  for (const h of horizons) {
+    for (const riskLevel of riskLevels) {
+      for (const style of styles) {
+        const cell = perSeed.filter(
+          (m) => m.horizon === h.label && m.riskLevel === riskLevel && m.style === style,
+        );
+        if (cell.length) averaged.push(averageStyleRuns(cell));
+      }
+    }
+  }
+
+  return { perSeed, averaged, seeds, horizons, riskLevels };
+}
