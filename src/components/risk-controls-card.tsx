@@ -133,6 +133,10 @@ function parseCfg(raw: unknown): RiskConfig {
       r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
         ? r.diversification_tilt
         : "off",
+    trading_style: r.trading_style === "swing" ? "swing" : "position",
+    swing_min_hold_days: Number.isFinite(Number(r.swing_min_hold_days))
+      ? Math.max(0, Math.min(30, Math.floor(Number(r.swing_min_hold_days))))
+      : 2,
   };
 }
 
