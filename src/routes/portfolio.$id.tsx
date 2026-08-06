@@ -869,7 +869,7 @@ function PortfolioPage() {
                     </Button>
                   )}
                   <ModeBadge mode={p.mode} />
-                  <TradingModeBadge riskConfig={p.risk_config} />
+                  <TradingModeBadge portfolioId={p.id} riskConfig={p.risk_config} />
                   <LiveToggle
                     portfolioId={p.id}
                     mode={p.mode}
