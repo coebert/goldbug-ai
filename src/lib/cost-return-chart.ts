@@ -40,10 +40,20 @@ export function niceTicks(min: number, max: number, count = 4): number[] {
   }
   const raw = (max - min) / count;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? mag * 10;
-  const ticks: number[] = [];
-  for (let t = Math.ceil(min / step) * step; t <= max + 1e-9; t += step) ticks.push(t);
-  return ticks;
+  const candidates = [1, 2, 2.5, 5, 10].map((m) => m * mag);
+  const build = (step: number): number[] => {
+    const out: number[] = [];
+    for (let t = Math.ceil(min / step) * step; t <= max + 1e-9; t += step) out.push(t);
+    return out;
+  };
+  const first = candidates.findIndex((s) => s >= raw);
+  // Walk down to a finer step when rounding leaves the chart with almost no
+  // gridlines (e.g. a -12..34 range snapping to a single 0/20 pair).
+  for (let i = first < 0 ? candidates.length - 1 : first; i >= 0; i--) {
+    const ticks = build(candidates[i]!);
+    if (ticks.length >= 3 || i === 0) return ticks;
+  }
+  return build(candidates[0]!);
 }
 
 export type XYPoint = {
