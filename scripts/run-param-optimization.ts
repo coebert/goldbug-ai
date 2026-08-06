@@ -328,14 +328,52 @@ console.log(
 console.log(`Feasible: ${scored.filter((r) => r.check.feasible).length}/${scored.length}` +
   `  ·  disqualified for leverage/borrow: ${disqualified.length}`);
 
-console.log("\nTop 10 by mean net CAGR:");
+const robustnessByKey = new Map<string, CostRobustness>(
+  evaluated.map((e) => [formatParams(e.params), e.robustness]),
+);
+const scenarioRunsByKey = new Map<string, ScenarioRun[]>(
+  evaluated.map((e) => [formatParams(e.params), e.perScenario]),
+);
+const robustnessOf = (params: (typeof candidates)[number]) =>
+  robustnessByKey.get(formatParams(params));
+
+console.log(
+  `\nTop 10 by net CAGR (${describeCostScoreMode(costScoreMode, costTailShare)}):`,
+);
 for (const r of ranked.slice(0, 10)) console.log(`  ${formatResult(r)}`);
 
 if (winner) {
   console.log(`\nBest feasible configuration:\n  ${formatResult(winner)}`);
+  const wr = robustnessOf(winner.params);
+  if (wr) console.log(`  cost robustness: ${describeRobustness(wr)}`);
 } else {
   console.log("\nNo candidate satisfied every constraint — loosen the turnover or drawdown cap.");
 }
+
+// -------------------------------------------------- cost-scenario scoring
+if (gridVaried) {
+  console.log("\nCost robustness of the top configurations:");
+  for (const r of ranked.slice(0, 10)) {
+    const rb = robustnessOf(r.params);
+    if (!rb) continue;
+    console.log(
+      `  worst ${rb.worstCagrPct.toFixed(2).padStart(6)}%  mean ${rb.meanCagrPct.toFixed(2).padStart(6)}%  ` +
+        `best ${rb.bestCagrPct.toFixed(2).padStart(6)}%  spread ${rb.cagrSpreadPct.toFixed(2).padStart(5)}pp  ` +
+        `profitable ${(rb.profitableShare * 100).toFixed(0).padStart(3)}%  ` +
+        `worst-case ${rb.worstScenario}`,
+    );
+  }
+  const fragile = ranked.filter((r) => {
+    const rb = robustnessOf(r.params);
+    return rb && rb.profitableShare < 1 && rb.bestCagrPct > minViableCagr;
+  });
+  console.log(
+    `  ${fragile.length}/${ranked.length} configurations are profitable in some cost worlds but not all — ` +
+      `ranking uses ${describeCostScoreMode(costScoreMode, costTailShare)}, ` +
+      "and drawdown / turnover / fee constraints always use the worst scenario.",
+  );
+}
+
 
 // -------------------------------------------------------- axis sensitivity
 console.log("\nMarginal impact per axis (mean net CAGR by level):");
