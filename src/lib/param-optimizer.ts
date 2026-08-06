@@ -228,36 +228,124 @@ export type OptimizerResult = {
 };
 
 /**
- * Ranking score: net CAGR for feasible candidates; a penalised value for
- * infeasible ones so they always sort below any feasible candidate but still
- * order sensibly among themselves. Disqualified candidates score -Infinity.
+ * Objective value before feasibility handling: net CAGR, or net CAGR less the
+ * weighted annualised fee drag when the fee-efficient objective is selected.
  */
-export function scoreCandidate(m: CandidateMetrics, check: ConstraintCheck): number {
+export function objectiveValue(
+  m: CandidateMetrics,
+  objective: OptimizerObjective = NET_CAGR_OBJECTIVE,
+): number {
+  if (objective.kind === "net_cagr") return m.cagrPct;
+  return feeAdjustedCagr(m.cagrPct, annualFeeDrag(m), objective.lambda);
+}
+
+/**
+ * Ranking score: the objective value for feasible candidates; a penalised
+ * value for infeasible ones so they always sort below any feasible candidate
+ * but still order sensibly among themselves. Disqualified → -Infinity.
+ */
+export function scoreCandidate(
+  m: CandidateMetrics,
+  check: ConstraintCheck,
+  objective: OptimizerObjective = NET_CAGR_OBJECTIVE,
+): number {
   if (check.disqualified) return Number.NEGATIVE_INFINITY;
-  if (check.feasible) return m.cagrPct;
+  const value = objectiveValue(m, objective);
+  if (check.feasible) return value;
   // Push below the feasible band without collapsing the ordering.
-  return -1e6 + m.cagrPct - 100 * check.violations.length;
+  return -1e6 + value - 100 * check.violations.length;
 }
 
 export function scoreAll(
   evaluated: ReadonlyArray<{ params: ParamSet; metrics: CandidateMetrics }>,
   constraints: OptimizerConstraints,
+  objective: OptimizerObjective = NET_CAGR_OBJECTIVE,
 ): OptimizerResult[] {
   return evaluated.map(({ params, metrics }) => {
-    const check = evaluateConstraints(metrics, constraints);
-    return { params, metrics, check, score: scoreCandidate(metrics, check) };
+    const check = evaluateConstraints(metrics, constraints, objective);
+    return { params, metrics, check, score: scoreCandidate(metrics, check, objective) };
   });
 }
 
-/** Highest score first; ties broken by lower turnover, then lower drawdown. */
+/**
+ * Highest score first; ties broken by lower fee drag, then lower turnover,
+ * then lower drawdown. Fee drag leads the tie-break because between two
+ * configs that earned the same, the cheaper one is the one that survives
+ * contact with a live commission schedule.
+ */
 export function rankResults(results: readonly OptimizerResult[]): OptimizerResult[] {
   return [...results].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    const fa = annualFeeDrag(a.metrics);
+    const fb = annualFeeDrag(b.metrics);
+    if (fa !== fb) return fa - fb;
     if (a.metrics.tradesPerYear !== b.metrics.tradesPerYear) {
       return a.metrics.tradesPerYear - b.metrics.tradesPerYear;
     }
     return Math.abs(a.metrics.maxDrawdownPct) - Math.abs(b.metrics.maxDrawdownPct);
   });
+}
+
+/**
+ * Pareto frontier on (net CAGR ↑, annual fee drag ↓): the cost-of-return
+ * curve. Anything far to the right of the knee is paying for its returns.
+ */
+export function feeParetoFrontier(results: readonly OptimizerResult[]): OptimizerResult[] {
+  const pool = results.filter((r) => !r.check.disqualified);
+  const front = pool.filter(
+    (r) =>
+      !pool.some(
+        (o) =>
+          o !== r &&
+          o.metrics.cagrPct >= r.metrics.cagrPct &&
+          annualFeeDrag(o.metrics) <= annualFeeDrag(r.metrics) &&
+          (o.metrics.cagrPct > r.metrics.cagrPct ||
+            annualFeeDrag(o.metrics) < annualFeeDrag(r.metrics)),
+      ),
+  );
+  return front.sort((a, b) => annualFeeDrag(a.metrics) - annualFeeDrag(b.metrics));
+}
+
+/**
+ * What switching from plain net CAGR to the fee-efficient objective actually
+ * bought: the two winners, and the fee/CAGR difference between them.
+ */
+export type FeeObjectiveComparison = {
+  cagrWinner: OptimizerResult | null;
+  feeAwareWinner: OptimizerResult | null;
+  /** Net CAGR given up by preferring the cheaper config (negative = also better raw). */
+  cagrGivenUpPct: number;
+  /** Annual fee drag saved by the fee-aware winner. */
+  feeSavedPct: number;
+  /** Fee-adjusted CAGR improvement under the fee-aware objective. */
+  objectiveGainPct: number;
+};
+
+export function compareObjectives(
+  evaluated: ReadonlyArray<{ params: ParamSet; metrics: CandidateMetrics }>,
+  constraints: OptimizerConstraints,
+  objective: OptimizerObjective,
+): FeeObjectiveComparison {
+  const cagrWinner = bestFeasible(scoreAll(evaluated, constraints));
+  const feeAwareWinner = bestFeasible(scoreAll(evaluated, constraints, objective));
+  if (!cagrWinner || !feeAwareWinner) {
+    return {
+      cagrWinner,
+      feeAwareWinner,
+      cagrGivenUpPct: 0,
+      feeSavedPct: 0,
+      objectiveGainPct: 0,
+    };
+  }
+  return {
+    cagrWinner,
+    feeAwareWinner,
+    cagrGivenUpPct: cagrWinner.metrics.cagrPct - feeAwareWinner.metrics.cagrPct,
+    feeSavedPct: annualFeeDrag(cagrWinner.metrics) - annualFeeDrag(feeAwareWinner.metrics),
+    objectiveGainPct:
+      objectiveValue(feeAwareWinner.metrics, objective) -
+      objectiveValue(cagrWinner.metrics, objective),
+  };
 }
 
 /** Best feasible candidate, or null when nothing clears the constraints. */
