@@ -292,7 +292,91 @@ const panels: ReportPanel[] = [
   },
 ];
 
+panels.push(
+  {
+    heading: "Turnover attribution — what drives trading frequency",
+    subtitle:
+      "share of turnover variance explained by each axis (one-way eta²); " +
+      "direction is the slope of trades/yr against the parameter",
+    series: [],
+    table: {
+      columns: [
+        "parameter",
+        "variance share",
+        "direction",
+        "trades/yr per unit",
+        "quietest",
+        "busiest",
+        "spread /yr",
+        "levels (trades/yr · CAGR %)",
+      ],
+      rows: drivers.map((d) => [
+        d.key,
+        `${(d.varianceShare * 100).toFixed(0)}%`,
+        d.direction > 0 ? "raises churn" : d.direction < 0 ? "damps churn" : "flat",
+        d.slopePerUnit.toFixed(2),
+        `${String(d.quietestValue)}`,
+        `${String(d.busiestValue)}`,
+        d.spreadPerYear.toFixed(0),
+        d.levels
+          .map((l) => `${l.value}→${l.meanTradesPerYear.toFixed(0)}/yr · ${l.meanCagrPct.toFixed(1)}%`)
+          .join(", "),
+      ]),
+    },
+  },
+  {
+    heading: "Cost of churn after realistic frictions",
+    subtitle:
+      `${FRICTIONS.commissionBps}bps + $${FRICTIONS.minCommission} commission, ` +
+      `${FRICTIONS.slippageBps}bps slippage: regression of outcome on turnover across ${costCurve.n} candidates`,
+    series: [],
+    table: {
+      columns: ["measure", "value"],
+      rows: [
+        ["net CAGR per extra trade/yr (pp)", costCurve.cagrPerTrade.toFixed(3)],
+        ["fee drag per extra trade/yr (pp)", costCurve.feeDragPerTrade.toFixed(3)],
+        [
+          "fitted breakeven turnover (/yr)",
+          costCurve.breakevenTradesPerYear === null
+            ? "none in range"
+            : costCurve.breakevenTradesPerYear.toFixed(0),
+        ],
+        ["turnover of best candidate (/yr)", costCurve.bestObservedTradesPerYear.toFixed(0)],
+      ],
+    },
+  },
+  {
+    heading: "Re-entry behaviour",
+    subtitle:
+      reentryDriverKey
+        ? `flat→re-buy gaps grouped by ${reentryDriverKey}; overall ` +
+          `${(overallReentry.reentryRate * 100).toFixed(0)}% of exits were re-bought ` +
+          `(median gap ${overallReentry.medianGapDays.toFixed(0)}d)`
+        : "no axis available",
+    series: [],
+    table: {
+      columns: [
+        `${reentryDriverKey ?? "level"}`,
+        "candidates",
+        "mean gap (days)",
+        `re-entry ≤5d`,
+        "exits re-bought",
+        "trades/yr",
+      ],
+      rows: reentryLevels.map((l) => [
+        String(l.value),
+        String(l.n),
+        l.meanGapDays.toFixed(1),
+        `${(l.fastReentryShare * 100).toFixed(0)}%`,
+        `${(l.reentryRate * 100).toFixed(0)}%`,
+        l.meanTradesPerYear.toFixed(0),
+      ]),
+    },
+  },
+);
+
 const topCurves = ranked.filter((r) => !r.check.disqualified).slice(0, 5);
+
 panels.push({
   heading: "Equity curves — top 5 configurations",
   subtitle: "walk-forward folds concatenated; each fold restarts from the same cash",
