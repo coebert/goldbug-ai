@@ -3,6 +3,7 @@ import {
   annualiseFeeDragPct,
   avoidableDragPct,
   EMPTY_FEE_DRAG,
+  estimateFeeDrag,
   feeAdjustedCagr,
   feeEfficiency,
   feeObjectiveForRegime,
@@ -87,6 +88,50 @@ describe("fee drag arithmetic", () => {
   it("formats an annualised breakdown", () => {
     expect(formatFeeDrag(drag(), 2)).toBe(
       "fees 1.50%/yr (comm 1.00 of which min 0.60, slip 0.50, other 0.00)",
+    );
+  });
+});
+
+describe("estimateFeeDrag", () => {
+  const frictions = { commissionBps: 10, minCommission: 3, slippageBps: 8, buyTaxBps: 50 };
+
+  it("attributes the minimum-fee floor on a small ticket", () => {
+    // £500 buy: bps commission is £0.50, so £2.50 of the £3 booked is the floor.
+    const b = estimateFeeDrag(
+      [{ notional: 500, fee: 3 + 500 * 0.005, side: "BUY" }],
+      frictions,
+      10_000,
+    );
+    expect(b.commissionPct).toBeCloseTo(0.03, 9);
+    expect(b.minFeePct).toBeCloseTo(0.025, 9);
+    expect(b.otherPct).toBeCloseTo(0.025, 9); // stamp duty
+    expect(b.slippagePct).toBeCloseTo(0.004, 9);
+  });
+
+  it("shows the floor disappearing as the ticket grows", () => {
+    const big = estimateFeeDrag(
+      [{ notional: 5_000, fee: 5 + 5_000 * 0.005, side: "BUY" }],
+      frictions,
+      10_000,
+    );
+    expect(big.minFeePct).toBeCloseTo(0, 9);
+  });
+
+  it("charges no buy tax on sells", () => {
+    const b = estimateFeeDrag([{ notional: 1_000, fee: 3, side: "SELL" }], frictions, 10_000);
+    expect(b.otherPct).toBe(0);
+    expect(b.commissionPct).toBeCloseTo(0.03, 9);
+  });
+
+  it("is empty with no fills, no frictions or no capital", () => {
+    expect(estimateFeeDrag([], frictions, 10_000)).toEqual(EMPTY_FEE_DRAG);
+    expect(estimateFeeDrag([{ notional: 100, fee: 0, side: "BUY" }], undefined, 10_000)).toEqual(
+      EMPTY_FEE_DRAG,
+  estimateFeeDrag,
+    );
+    expect(estimateFeeDrag([{ notional: 100, fee: 3, side: "BUY" }], frictions, 0)).toEqual(
+      EMPTY_FEE_DRAG,
+  estimateFeeDrag,
     );
   });
 });
