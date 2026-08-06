@@ -127,13 +127,13 @@ describe("fee-efficient optimiser objective", () => {
 
   it("keeps the drawdown ceiling hard — cheapness cannot buy risk", () => {
     const evaluated = [
-      { params: { cfg: "cheap_risky" }, metrics: metrics({ feeDragPct: 0, maxDrawdownPct: -35 }) },
-      { params: { cfg: "safe" }, metrics: metrics({ cagrPct: 6, feeDragPct: 6 }) },
+      { params: { cfg: 1 }, metrics: metrics({ feeDragPct: 0, maxDrawdownPct: -35 }) },
+      { params: { cfg: 2 }, metrics: metrics({ cagrPct: 6, feeDragPct: 6 }) },
     ];
     const scored = scoreAll(evaluated, CONSTRAINTS, FEE_EFFICIENT_OBJECTIVE);
     expect(scored[0]!.check.feasible).toBe(false);
     expect(scored[0]!.check.violations[0]).toContain("drawdown");
-    expect(bestFeasible(scored)!.params).toEqual({ cfg: "safe" });
+    expect(bestFeasible(scored)!.params).toEqual({ cfg: 2 });
   });
 
   it("makes an over-budget fee drag infeasible but not disqualified", () => {
@@ -165,40 +165,40 @@ describe("fee-efficient optimiser objective", () => {
     const ranked = rankResults(
       scoreAll(
         [
-          { params: { cfg: "pricey" }, metrics: metrics({ feeDragPct: 6, tradesPerYear: 10 }) },
-          { params: { cfg: "cheap" }, metrics: metrics({ feeDragPct: 1, tradesPerYear: 30 }) },
+          { params: { cfg: 1 }, metrics: metrics({ feeDragPct: 6, tradesPerYear: 10 }) },
+          { params: { cfg: 2 }, metrics: metrics({ feeDragPct: 1, tradesPerYear: 30 }) },
         ],
         CONSTRAINTS,
       ),
     );
-    expect(ranked[0]!.params).toEqual({ cfg: "cheap" });
+    expect(ranked[0]!.params).toEqual({ cfg: 2 });
   });
 
   it("exposes the CAGR-vs-fees frontier", () => {
     const scored = scoreAll(
       [
-        { params: { cfg: "a" }, metrics: metrics({ cagrPct: 8, feeDragPct: 1 }) },
-        { params: { cfg: "b" }, metrics: metrics({ cagrPct: 12, feeDragPct: 5 }) },
-        { params: { cfg: "dominated" }, metrics: metrics({ cagrPct: 7, feeDragPct: 6 }) },
+        { params: { cfg: 1 }, metrics: metrics({ cagrPct: 8, feeDragPct: 1 }) },
+        { params: { cfg: 2 }, metrics: metrics({ cagrPct: 12, feeDragPct: 5 }) },
+        { params: { cfg: 3 }, metrics: metrics({ cagrPct: 7, feeDragPct: 6 }) },
       ],
       CONSTRAINTS,
     );
     const front = feeParetoFrontier(scored).map((r) => r.params["cfg"]);
-    expect(front).toEqual(["a", "b"]);
+    expect(front).toEqual([1, 2]);
   });
 
   it("quantifies what the fee-aware objective bought in a bull tape", () => {
     // Bull tape: everything makes money, the spread between configs is cost.
     const evaluated = [
-      { params: { cfg: "churn" }, metrics: metrics({ cagrPct: 18.5, feeDragPct: 16 }) },
-      { params: { cfg: "patient" }, metrics: metrics({ cagrPct: 18, feeDragPct: 3 }) },
+      { params: { cfg: 1 }, metrics: metrics({ cagrPct: 18.5, feeDragPct: 16 }) },
+      { params: { cfg: 2 }, metrics: metrics({ cagrPct: 18, feeDragPct: 3 }) },
     ];
     const cmp = compareObjectives(evaluated, CONSTRAINTS, {
       ...feeObjectiveForRegime("bull_trend"),
       maxAnnualFeeDragPct: 99,
     });
-    expect(cmp.cagrWinner!.params).toEqual({ cfg: "churn" });
-    expect(cmp.feeAwareWinner!.params).toEqual({ cfg: "patient" });
+    expect(cmp.cagrWinner!.params).toEqual({ cfg: 1 });
+    expect(cmp.feeAwareWinner!.params).toEqual({ cfg: 2 });
     expect(cmp.cagrGivenUpPct).toBeCloseTo(0.5, 6);
     expect(cmp.feeSavedPct).toBeCloseTo(6.5, 6);
     expect(cmp.objectiveGainPct).toBeGreaterThan(0);
@@ -210,8 +210,8 @@ describe("fee-efficient optimiser objective", () => {
     const one = rankResults(
       scoreAll(
         [
-          { params: { cfg: "a" }, metrics: a },
-          { params: { cfg: "b" }, metrics: b },
+          { params: { cfg: 1 }, metrics: a },
+          { params: { cfg: 2 }, metrics: b },
         ],
         CONSTRAINTS,
         FEE_EFFICIENT_OBJECTIVE,
@@ -220,14 +220,14 @@ describe("fee-efficient optimiser objective", () => {
     const two = rankResults(
       scoreAll(
         [
-          { params: { cfg: "b" }, metrics: b },
-          { params: { cfg: "a" }, metrics: a },
+          { params: { cfg: 2 }, metrics: b },
+          { params: { cfg: 1 }, metrics: a },
         ],
         CONSTRAINTS,
         FEE_EFFICIENT_OBJECTIVE,
       ),
     ).map((r) => r.params["cfg"]);
     expect(one).toEqual(two);
-    expect(one[0]).toBe("a");
+    expect(one[0]).toBe(1);
   });
 });
