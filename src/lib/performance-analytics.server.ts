@@ -52,6 +52,8 @@ export type PerformanceAnalytics = {
     price: number;
     trade_date: string;
     executed_at: string | null;
+    instrument_ccy: string | null;
+    asset_class: string | null;
   }>;
   regimeAttribution: AttributionSlice[];
   sizingAttribution: AttributionSlice[];
@@ -331,6 +333,8 @@ export async function getPerformanceAnalytics(
       price: Number(t.price),
       trade_date: t.trade_date,
       executed_at: t.executed_at ?? null,
+      instrument_ccy: t.instrument_ccy ?? null,
+      asset_class: t.asset_class ?? null,
     })),
     regimeAttribution: rollup(regimeEntries),
     sizingAttribution: rollup(sizingEntries),

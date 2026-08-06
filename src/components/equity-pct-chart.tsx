@@ -561,6 +561,8 @@ export function EquityPctChart({
                         currency: currency || "GBP",
                         maximumFractionDigits: 2,
                       }).format(x),
+                      4,
+                      { commission: true },
                     );
                     const delta = Number(item?.payload?.deltaPct ?? 0);
                     const money_ = money(Number(item?.payload?.deltaValue ?? 0));
