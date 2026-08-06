@@ -161,6 +161,9 @@ ${args.regimeNote ? `REGIME RISK ADJUSTMENT: ${args.regimeNote}` : ""}
 ${args.alphaPriors ?? ""}
 ${args.algoRegimeBlock ?? ""}
 
+${args.cashPolicyBlock ?? ""}
+
+
 ${HISTORICAL_PLAYBOOK}
 
 ${HEDGE_FUND_PLAYBOOK}
