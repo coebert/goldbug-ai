@@ -143,6 +143,11 @@ export function renderLineChart(
     })
     .join("\n  ");
 
+  const labels = Array.from({ length: maxLen }, (_, i) => {
+    const date = plotted.map((p) => p.s.curve[i]?.snapshot_date).find(Boolean);
+    return date ? `bar ${i} · ${date}` : `bar ${i}`;
+  });
+
   const xTicks = [0, Math.floor((maxLen - 1) / 2), maxLen - 1]
     .map(
       (i) =>
@@ -150,14 +155,55 @@ export function renderLineChart(
     )
     .join("\n  ");
 
-  return `<svg viewBox="0 0 ${size.width} ${size.height}" class="chart" role="img" aria-label="${esc(options.title)}">
+  const interactive = options.interactive !== false;
+  const hover: HoverPayload = {
+    x0: PAD.left,
+    x1: PAD.left + w,
+    top: PAD.top,
+    bottom: PAD.top + h,
+    xs: Array.from({ length: maxLen }, (_, i) => Number(fmt(x(i)))),
+    labels,
+    unit: options.yLabel,
+    series: plotted.map(({ s, ys }) => ({
+      label: s.label,
+      colour: s.colour,
+      px: Array.from({ length: maxLen }, (_, i) => {
+        const v = at(ys, i);
+        return v === null ? null : Number(fmt(y(v)));
+      }),
+      equity: (() => {
+        const e = toReturnPct(s.curve);
+        return Array.from({ length: maxLen }, (_, i) => at(e, i));
+      })(),
+      drawdown: (() => {
+        const d = toDrawdownPct(s.curve);
+        return Array.from({ length: maxLen }, (_, i) => at(d, i));
+      })(),
+    })),
+  };
+
+  const hoverLayer = interactive
+    ? `<g class="hover" style="display:none">
+    <line class="cross" y1="${PAD.top}" y2="${PAD.top + h}" x1="0" x2="0"/>
+    ${hover.series
+      .map((s) => `<circle class="dot" r="3.5" fill="${s.colour}" cx="-99" cy="-99"/>`)
+      .join("\n    ")}
+  </g>
+  <rect class="hit" x="${PAD.left}" y="${PAD.top}" width="${w}" height="${h}" fill="transparent"/>`
+    : "";
+
+  return `<svg viewBox="0 0 ${size.width} ${size.height}" class="chart"${
+    interactive ? ` data-hover="${esc(JSON.stringify(hover))}"` : ""
+  } role="img" aria-label="${esc(options.title)}">
   <text class="chart-title" x="${PAD.left}" y="11">${esc(options.title)}</text>
   <text class="axis-label" x="${PAD.left - 8}" y="11" text-anchor="end">${esc(options.yLabel)}</text>
   ${gridRows}
   ${zero}
   ${paths}
   ${xTicks}
+  ${hoverLayer}
 </svg>`;
+
 }
 
 export const renderEquityChart = (series: readonly ChartSeries[], title: string, size?: ChartSize) =>
