@@ -1,5 +1,12 @@
-// Quality proxy — since we don't have fundamentals directly, we approximate
-// "quality" using low-noise price characteristics and cross-sectional rank:
+// Quality — driven by the company's PUBLISHED FINANCIALS when they exist.
+//
+// `f.fundamentals_score` carries the scored reported accounts (margins, returns
+// on capital, leverage, cash generation, valuation, consensus estimates). When
+// present it is the dominant input and is weighted by how much the company has
+// actually disclosed; disclosed financial red flags subtract directly.
+//
+// When no accounts exist (ETFs, commodities, FX, crypto) or the provider has no
+// coverage, the model falls back to the original price-based proxy:
 //   • Low daily volatility (<2%)
 //   • BB width in a reasonable band (not squeeze, not blow-off)
 //   • Positive news sentiment with 2+ contributors
@@ -33,11 +40,28 @@ export function scoreQuality(f: FeatureLike): AlphaScore {
   }
   if (f.weekly_trend_up) parts.push(0.4);
 
-  const raw = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0;
+  const proxy = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0;
+
+  const fund = f.fundamentals_score;
+  if (fund && fund.coverage > 0) {
+    // Weight fundamentals by disclosure depth: full coverage (6 pillars) puts
+    // 75% of the quality signal on the reported accounts, thin coverage less.
+    const w = 0.75 * Math.min(1, fund.coverage / 6);
+    const blended = fund.score * w + proxy * (1 - w);
+    notes.unshift(`financials ${fund.score >= 0 ? "+" : ""}${fund.score.toFixed(2)} (${fund.coverage}/6)`);
+    if (fund.flags?.length) notes.push(fund.flags.slice(0, 2).join("; "));
+    return {
+      symbol: f.symbol,
+      kind: "quality",
+      score: clamp1(blended),
+      reason: notes.join(", "),
+    };
+  }
+
   return {
     symbol: f.symbol,
     kind: "quality",
-    score: clamp1(raw),
-    reason: notes.length ? notes.join(", ") : "neutral quality",
+    score: clamp1(proxy),
+    reason: notes.length ? notes.join(", ") : "neutral quality (no published financials)",
   };
 }

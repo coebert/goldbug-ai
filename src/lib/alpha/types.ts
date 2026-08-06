@@ -28,6 +28,16 @@ export type FeatureLike = {
   news_momentum: unknown | null;
   cooling: boolean;
   rank_info: { percentile?: number | null } | null;
+  /**
+   * Score derived from the company's published financials (see
+   * src/lib/fundamentals). Null for instruments with no accounts — ETFs,
+   * commodities, FX and crypto — and for companies the provider does not cover.
+   */
+  fundamentals_score?: {
+    score: number;
+    coverage: number;
+    flags?: string[];
+  } | null;
 };
 
 export type AlphaModelKind = "trend" | "mean_reversion" | "quality" | "carry";
