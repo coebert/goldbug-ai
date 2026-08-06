@@ -20,6 +20,13 @@ import {
   type SettlementState,
 } from "@/lib/snapshot-settlement";
 import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair";
+import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
+import {
+  attachTradeMarkers,
+  describeMarkerCell,
+  type MarkerTrade,
+  type TradeMarkerCell,
+} from "@/lib/chart-trade-markers";
 
 import {
   Area,
@@ -27,6 +34,7 @@ import {
   ComposedChart,
   Line,
   ReferenceLine,
+  Scatter,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -264,6 +272,7 @@ export function EquityPctChart({
   inceptionDate = null,
   seriesStartDate = null,
   currency = "GBP",
+  trades = [],
   className,
 }: {
   portfolioId?: string;
@@ -281,6 +290,8 @@ export function EquityPctChart({
   /** `YYYY-MM-DD` the series is labelled as starting: first real holdings day. */
   seriesStartDate?: string | null;
   currency?: string;
+  /** Executed buys/sells, plotted as markers on the curve. */
+  trades?: MarkerTrade[];
   className?: string;
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
@@ -374,7 +385,12 @@ export function EquityPctChart({
         : withDelta.map(
             (r) => stateByDay.get(ukDayKey(String(r.at))) ?? ("settled" as SettlementState),
           );
-    const split = splitSettledSeries(withDelta, states);
+    const split = attachTradeMarkers(
+      splitSettledSeries(withDelta, states),
+      "at",
+      "pct",
+      trades,
+    );
     const vals = withDelta.map((r) => r.pct);
     const lastSettledIdx = states.lastIndexOf("settled");
     return {
@@ -390,7 +406,7 @@ export function EquityPctChart({
         })),
       ),
     };
-  }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate]);
+  }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate, trades]);
 
   const hasDaily = equity.length >= 2;
   if (!hasDaily) return null;
@@ -527,6 +543,7 @@ export function EquityPctChart({
                   cursor={<SaxoCrosshair />}
                   contentStyle={{
                     fontSize: 12,
+                    whiteSpace: "pre-line",
                     background: "var(--popover)",
                     border: "1px solid var(--border)",
                     borderRadius: 8,
@@ -534,12 +551,23 @@ export function EquityPctChart({
                   }}
                   labelStyle={{ color: "var(--muted-foreground)" }}
                   labelFormatter={(l) => (resolution === "hourly" ? fmtHour(String(l)) : fmtDay(String(l)))}
-                  formatter={(v, _name, item) => {
+                  formatter={(v, name, item) => {
+                    if (name === "buys" || name === "sells") return [] as unknown as [string, string];
                     const state = (item?.payload?.state ?? "settled") as SettlementState;
+                    const cell = (item?.payload?.marker ?? null) as TradeMarkerCell | null;
+                    const tradeLines = describeMarkerCell(cell, (x) =>
+                      new Intl.NumberFormat("en-GB", {
+                        style: "currency",
+                        currency: currency || "GBP",
+                        maximumFractionDigits: 2,
+                      }).format(x),
+                    );
                     const delta = Number(item?.payload?.deltaPct ?? 0);
                     const money_ = money(Number(item?.payload?.deltaValue ?? 0));
                     return [
-                      `${Number(v).toFixed(2)}% · ${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(2)} pp ${money_}`,
+                      `${Number(v).toFixed(2)}% · ${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(2)} pp ${money_}${
+                        tradeLines.length ? `\n${tradeLines.join("\n")}` : ""
+                      }`,
                       state === "settled"
                         ? "vs capital (settled close)"
                         : state === "intraday"
@@ -586,6 +614,26 @@ export function EquityPctChart({
                   connectNulls
                   isAnimationActive={false}
                 />
+                {/* Executed decisions: a marker for every buy and sell, snapped
+                    to the plotted point it happened on. */}
+                <Scatter
+                  yAxisId="pct"
+                  dataKey="buyMark"
+                  name="buys"
+                  isAnimationActive={false}
+                  shape={(props: unknown) => (
+                    <TradeMarkerShape {...(props as { cx?: number; cy?: number })} side="buy" />
+                  )}
+                />
+                <Scatter
+                  yAxisId="pct"
+                  dataKey="sellMark"
+                  name="sells"
+                  isAnimationActive={false}
+                  shape={(props: unknown) => (
+                    <TradeMarkerShape {...(props as { cx?: number; cy?: number })} side="sell" />
+                  )}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           )}
@@ -608,6 +656,7 @@ export function EquityPctChart({
             />
             {resolution === "hourly" ? "Intraday marks" : "Provisional (not settled)"}
           </span>
+          {trades.length > 0 && <TradeMarkerLegend />}
           {resolution === "daily" && settlement.latestIsProvisional && (
             <span>
               {settlement.provisionalDate
