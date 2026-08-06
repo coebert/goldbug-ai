@@ -131,7 +131,10 @@ function classify(
     return { action: "unfold_gbx", corrected: stored * 100, ratio };
   }
   // Outside the unit bands, or a symbol with no pence problem: leave it.
-  const plausible = ratio > 1 / UNIT_RATIO_LO && ratio < UNIT_RATIO_LO;
+  // The reference is the close on/before the fill day, so a correct row sits
+  // within a spread's distance of it. Beyond 5x it is neither a unit error
+  // nor a believable price — report it rather than guess.
+  const plausible = ratio > 1 / PLAUSIBLE_RATIO && ratio < PLAUSIBLE_RATIO;
   return { action: plausible ? "ok" : "unexplained", corrected: stored, ratio };
 }
 
