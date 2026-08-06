@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatUk } from "@/lib/uk-time";
+import { formatUk, formatUkAxisDay, formatUkAxisHour } from "@/lib/uk-time";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Briefcase, Wallet, TrendingUp, TrendingDown, ChevronDown, Info, TrendingDown as SellIcon, RefreshCw } from "lucide-react";
 import { Sparkline } from "@/components/sparkline";
+import { AxisFramedSparkline } from "@/components/charts/axis-framed-sparkline";
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +15,7 @@ import {
 import {
   allocateRoundedShares,
   formatMoney,
+  formatMoneyAmount,
   formatMoneySigned,
   roundMoney,
 } from "@/lib/format-money";
@@ -52,6 +54,20 @@ export type HoldingSeriesInfo = {
   valueChangeSincePurchase: number | null;
   opened_at?: string | null;
 };
+
+/**
+ * Compact y-axis tick for the holding trend charts.
+ *
+ * Axis ticks live in a ~48px gutter, so the full "GBP 4,490.96" form does not
+ * fit. We keep the ISO code (holdings can be quoted in USD/EUR next to GBP)
+ * and drop decimals once the value is large enough that pennies are noise.
+ */
+function axisTick(n: number, ccy?: string | null): string {
+  const code = String(ccy || "GBP").toUpperCase();
+  const abs = Math.abs(n);
+  const digits = abs >= 1000 ? 0 : abs >= 10 ? 1 : 2;
+  return `${code} ${formatMoneyAmount(n, digits)}`;
+}
 
 export function LiveHoldingsCard({
   holdings,
@@ -470,6 +486,16 @@ export function LiveHoldingsCard({
               const trendLabel = useHourly
                 ? `${hourlyPts.length} hourly points`
                 : `${s?.closes.length ?? 0} daily closes`;
+              // X-axis end points. Hourly series carry real timestamps; the
+              // daily series is anchored at the purchase date and runs to the
+              // latest close, so we label it with the purchase date and "now".
+              const hourlyAt = s?.hourlyAt ?? [];
+              const xStart = useHourly
+                ? formatUkAxisHour(hourlyAt[0] ?? r.opened_at ?? new Date())
+                : (openedLabel || formatUkAxisDay(new Date()));
+              const xEnd = useHourly
+                ? formatUkAxisHour(hourlyAt[hourlyAt.length - 1] ?? new Date())
+                : formatUkAxisDay(new Date());
               const sparklineBlock = (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
@@ -510,17 +536,20 @@ export function LiveHoldingsCard({
                     )}
                   </div>
                   {hasSeries ? (
-                    // Full-bleed: the line fills the row instead of sitting in a
-                    // 220px island with empty space either side of it.
-                    <div className="h-14 w-full sm:h-16">
-                      <Sparkline
-                        values={trendValues}
-                        stretch
-                        className="h-full w-full"
-                        label={`${r.symbol} price trend, ${trendLabel}`}
-                      />
-                    </div>
+                    // Full-bleed and axis-framed: the line fills the row and
+                    // carries a price axis (holding currency) plus a time axis
+                    // so a reader can tell what the trend is worth and when.
+                    <AxisFramedSparkline
+                      values={trendValues}
+                      formatValue={(n) => axisTick(n, r.instrument_ccy || currency)}
+                      xStart={xStart}
+                      xEnd={xEnd}
+                      xUnit={useHourly ? "hourly" : "daily closes"}
+                      valueAxisLabel={`${r.symbol} price`}
+                      label={`${r.symbol} price trend, ${trendLabel}`}
+                    />
                   ) : (
+
                     <div
                       className="flex h-14 items-center justify-center rounded-md border border-dashed border-border/60 px-2 text-[10px] text-muted-foreground sm:h-16"
                       aria-label="No price history available yet"
