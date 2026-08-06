@@ -41,11 +41,33 @@ import {
   turnoverCostCurve,
 } from "../src/lib/turnover-attribution";
 import {
+
   buildViabilityReport,
   describeRiskLevelViability,
   VERDICT_LABEL,
   type ViabilityRow,
 } from "../src/lib/viability-threshold";
+import {
+  buildCostGrid,
+  scenarioKey,
+  DEFAULT_SLIPPAGE_SPECS,
+  DEFAULT_LIQUIDITY_SPECS,
+  type CostScenario,
+  type LiquiditySpec,
+  type SlippageSpec,
+} from "../src/lib/cost-sweep";
+import { buildLiquidityProfile } from "../src/lib/liquidity-profile";
+import {
+  aggregateScenarioMetrics,
+  costRobustness,
+  describeCostScoreMode,
+  describeRobustness,
+  scenarioCostBps,
+  type CostRobustness,
+  type CostScoreMode,
+  type ScenarioRun,
+} from "../src/lib/cost-scenario-scoring";
+
 
 import type { EquityPoint } from "../src/lib/backtest-metrics";
 
@@ -85,9 +107,52 @@ const minTrades = Number(arg("min-trades", "10"));
 // Minimum net CAGR (after costs) a configuration must clear to count as viable.
 const minViableCagr = Number(arg("min-viable-cagr", "0"));
 
+// ------------------------------------------------------- cost scenarios
+// The optimiser can score each candidate across the same cost grid the sweep
+// uses (slippage × min-fee × liquidity) instead of one hard-coded friction
+// model, so configurations that only work at optimistic execution costs get
+// ranked below ones that survive the whole grid.
+//
+//   --slippage default|2,5,10,20     total per-side bps (split spread/slip)
+//   --minfee 0,3,8                   per-trade commission floor, £
+//   --liquidity default|0.25,1,4     book depth as a multiple of measured ADV
+//   --cost-score mean|worst|cvar     how the grid collapses into one score
+const slippageArg = arg("slippage", "");
+const slippageSpecs: SlippageSpec[] = !slippageArg
+  ? []
+  : slippageArg === "default"
+    ? DEFAULT_SLIPPAGE_SPECS
+    : slippageArg.split(",").map((raw) => {
+        const bps = Number(raw.trim());
+        if (!Number.isFinite(bps) || bps < 0) throw new Error(`bad --slippage value ${raw}`);
+        return { label: `${bps}bps`, slippageBps: bps / 2, spreadBps: bps / 2 };
+      });
+const minFeeArg = arg("minfee", "");
+const minFees = !minFeeArg
+  ? []
+  : minFeeArg.split(",").map((raw) => {
+      const v = Number(raw.trim());
+      if (!Number.isFinite(v) || v < 0) throw new Error(`bad --minfee value ${raw}`);
+      return v;
+    });
+const liquidityArg = arg("liquidity", "");
+const liquiditySpecs: LiquiditySpec[] = !liquidityArg
+  ? []
+  : liquidityArg === "default"
+    ? DEFAULT_LIQUIDITY_SPECS
+    : liquidityArg.split(",").map((raw) => {
+        const advScale = Number(raw.trim());
+        if (!Number.isFinite(advScale) || advScale <= 0) {
+          throw new Error(`bad --liquidity value ${raw}`);
+        }
+        return { label: `${advScale}x ADV`, advScale };
+      });
+const costScoreMode = arg("cost-score", "mean") as CostScoreMode;
+const costTailShare = Number(arg("cost-tail", "0.34"));
 
 // Realistic Saxo-like retail execution costs. The objective is CAGR *after*
-// these, so the optimiser pays for every trade it proposes.
+// these, so the optimiser pays for every trade it proposes. When cost axes
+// are supplied this is the baseline the grid is built from.
 const FRICTIONS = {
   commissionBps: 8,
   minCommission: 3,
@@ -95,6 +160,7 @@ const FRICTIONS = {
   slippageBps: 5,
   impactPerUnit: 0.0002,
 };
+
 
 // Search space: the knobs that actually move net CAGR and turnover.
 const AXES: ParamAxis[] = [
@@ -131,12 +197,45 @@ const foldBars = Array.from({ length: folds }, (_, i) =>
 ).filter((b) => b.length >= 60);
 console.log(`Walk-forward: ${foldBars.length} folds of ~${foldSize} bars.`);
 
+// Cost grid the candidates are scored across. With no cost flags this is a
+// single baseline scenario, i.e. the previous behaviour exactly.
+const liquidityProfile = buildLiquidityProfile(histories);
+const scenarios: CostScenario[] = buildCostGrid(FRICTIONS, {
+  scales: [1],
+  slippage: slippageSpecs,
+  minCommission: minFees,
+  liquidity: liquiditySpecs,
+  liquidityProfile,
+});
+const costBpsByScenario: Record<string, number> = {};
+for (const sc of scenarios) costBpsByScenario[scenarioKey(sc)] = scenarioCostBps(sc);
+const gridVaried = scenarios.length > 1;
+if (gridVaried) {
+  console.log(
+    `Cost grid: ${slippageSpecs.length || 1} slippage x ${minFees.length || 1} min-fee x ` +
+      `${liquiditySpecs.length || 1} liquidity = ${scenarios.length} scenarios · ` +
+      `score = ${describeCostScoreMode(costScoreMode, costTailShare)}`,
+  );
+  for (const sc of scenarios) {
+    console.log(`  ${sc.label.padEnd(44)} ${costBpsByScenario[scenarioKey(sc)]!.toFixed(1)}bps/side`);
+  }
+}
+
 const candidates = sampleGrid(AXES, limit, seed);
-console.log(`Evaluating ${candidates.length} candidates × ${foldBars.length} folds…\n`);
+console.log(
+  `Evaluating ${candidates.length} candidates × ${foldBars.length} folds` +
+    (gridVaried ? ` × ${scenarios.length} cost scenarios` : "") +
+    `…\n`,
+);
 
 const baseCfg = parseRiskConfig({ trading_style: style } as never);
 
-type Evaluated = { params: (typeof candidates)[number]; metrics: CandidateMetrics };
+type Evaluated = {
+  params: (typeof candidates)[number];
+  metrics: CandidateMetrics;
+  robustness: CostRobustness;
+  perScenario: ScenarioRun[];
+};
 const evaluated: Evaluated[] = [];
 const curves = new Map<string, EquityPoint[]>();
 const tradeLogs = new Map<string, StyleTradeRow[]>();
@@ -151,37 +250,58 @@ for (const rl of riskLevels) {
 
   for (const [i, params] of candidates.entries()) {
     const { cfg, sleeve } = applyParams(baseCfg, baseSleeve, params);
-    const perFold: CandidateMetrics[] = [];
+    const perScenario: ScenarioRun[] = [];
     const foldCurves: EquityPoint[][] = [];
     let firstLog: StyleTradeRow[] = [];
-    for (const bars of foldBars) {
-      const m = await runStyleBacktest({
-        cfg,
-        bars,
-        riskLevel: rl,
-        startingCash,
-        feePerTrade: 0,
-        sleeve,
-        simulator: { frictions: FRICTIONS },
+    for (const sc of scenarios) {
+      const perFold: CandidateMetrics[] = [];
+      for (const bars of foldBars) {
+        const m = await runStyleBacktest({
+          cfg,
+          bars,
+          riskLevel: rl,
+          startingCash,
+          feePerTrade: 0,
+          sleeve,
+          simulator: { frictions: sc.frictions },
+        });
+        perFold.push({
+          cagrPct: m.cagrPct,
+          totalReturnPct: m.totalReturnPct,
+          maxDrawdownPct: m.maxDrawdownPct,
+          sharpe: m.sharpe,
+          trades: m.trades,
+          tradesPerYear: m.tradesPerYear,
+          feeDragPct: m.feeDragPct,
+          finalCashPct: m.finalCashPct,
+          ...(m.audit ? { audit: m.audit } : {}),
+        });
+        // Curves and trade logs come from the baseline (first) scenario so the
+        // charts stay comparable when the grid is varied.
+        if (sc === scenarios[0]) {
+          foldCurves.push(m.equityCurve);
+          if (firstLog.length === 0) firstLog = m.tradeLog;
+        }
+      }
+      perScenario.push({
+        scenario: scenarioKey(sc),
+        label: sc.label,
+        scale: costBpsByScenario[scenarioKey(sc)]!,
+        metrics: averageMetrics(perFold),
       });
-      perFold.push({
-        cagrPct: m.cagrPct,
-        totalReturnPct: m.totalReturnPct,
-        maxDrawdownPct: m.maxDrawdownPct,
-        sharpe: m.sharpe,
-        trades: m.trades,
-        tradesPerYear: m.tradesPerYear,
-        feeDragPct: m.feeDragPct,
-        finalCashPct: m.finalCashPct,
-        ...(m.audit ? { audit: m.audit } : {}),
-      });
-      foldCurves.push(m.equityCurve);
-      if (firstLog.length === 0) firstLog = m.tradeLog;
     }
-    const metrics = averageMetrics(perFold);
-    rows.push({ params, metrics });
+    const metrics = aggregateScenarioMetrics(perScenario, {
+      mode: costScoreMode,
+      tailShare: costTailShare,
+    });
+    const robustness = costRobustness(perScenario, {
+      minCagrPct: minViableCagr,
+      costBpsByScenario,
+    });
+    rows.push({ params, metrics, robustness, perScenario });
+
     if (rl === riskLevel) {
-      evaluated.push({ params, metrics });
+      evaluated.push({ params, metrics, robustness, perScenario });
       const key = formatParams(params);
       curves.set(key, foldCurves.flat());
       tradeLogs.set(key, firstLog);
@@ -208,14 +328,52 @@ console.log(
 console.log(`Feasible: ${scored.filter((r) => r.check.feasible).length}/${scored.length}` +
   `  ·  disqualified for leverage/borrow: ${disqualified.length}`);
 
-console.log("\nTop 10 by mean net CAGR:");
+const robustnessByKey = new Map<string, CostRobustness>(
+  evaluated.map((e) => [formatParams(e.params), e.robustness]),
+);
+const scenarioRunsByKey = new Map<string, ScenarioRun[]>(
+  evaluated.map((e) => [formatParams(e.params), e.perScenario]),
+);
+const robustnessOf = (params: (typeof candidates)[number]) =>
+  robustnessByKey.get(formatParams(params));
+
+console.log(
+  `\nTop 10 by net CAGR (${describeCostScoreMode(costScoreMode, costTailShare)}):`,
+);
 for (const r of ranked.slice(0, 10)) console.log(`  ${formatResult(r)}`);
 
 if (winner) {
   console.log(`\nBest feasible configuration:\n  ${formatResult(winner)}`);
+  const wr = robustnessOf(winner.params);
+  if (wr) console.log(`  cost robustness: ${describeRobustness(wr)}`);
 } else {
   console.log("\nNo candidate satisfied every constraint — loosen the turnover or drawdown cap.");
 }
+
+// -------------------------------------------------- cost-scenario scoring
+if (gridVaried) {
+  console.log("\nCost robustness of the top configurations:");
+  for (const r of ranked.slice(0, 10)) {
+    const rb = robustnessOf(r.params);
+    if (!rb) continue;
+    console.log(
+      `  worst ${rb.worstCagrPct.toFixed(2).padStart(6)}%  mean ${rb.meanCagrPct.toFixed(2).padStart(6)}%  ` +
+        `best ${rb.bestCagrPct.toFixed(2).padStart(6)}%  spread ${rb.cagrSpreadPct.toFixed(2).padStart(5)}pp  ` +
+        `profitable ${(rb.profitableShare * 100).toFixed(0).padStart(3)}%  ` +
+        `worst-case ${rb.worstScenario}`,
+    );
+  }
+  const fragile = ranked.filter((r) => {
+    const rb = robustnessOf(r.params);
+    return rb && rb.profitableShare < 1 && rb.bestCagrPct > minViableCagr;
+  });
+  console.log(
+    `  ${fragile.length}/${ranked.length} configurations are profitable in some cost worlds but not all — ` +
+      `ranking uses ${describeCostScoreMode(costScoreMode, costTailShare)}, ` +
+      "and drawdown / turnover / fee constraints always use the worst scenario.",
+  );
+}
+
 
 // -------------------------------------------------------- axis sensitivity
 console.log("\nMarginal impact per axis (mean net CAGR by level):");
@@ -334,7 +492,10 @@ const panels: ReportPanel[] = [
     heading: "Best configurations (net of realistic costs)",
     subtitle:
       `${style} · ${riskLevel} · ${foldBars.length} walk-forward folds · ` +
-      `objective: mean net CAGR · turnover ≤ ${maxTurnover}/yr · no leverage`,
+      `objective: net CAGR, ${describeCostScoreMode(costScoreMode, costTailShare)}` +
+      (gridVaried ? ` (${scenarios.length} cost scenarios)` : "") +
+      ` · turnover ≤ ${maxTurnover}/yr · no leverage`,
+
     series: [],
     table: {
       columns: ["rank", "CAGR %", "DD %", "sharpe", "turnover/yr", "fees %", "cash %", "status", "params"],
@@ -389,6 +550,73 @@ const panels: ReportPanel[] = [
     },
   },
 ];
+
+if (gridVaried) {
+  panels.push({
+    heading: "Cost-scenario robustness",
+    subtitle:
+      `net CAGR of the top configurations across ${scenarios.length} cost scenarios ` +
+      "(slippage × min-fee × liquidity); risk constraints are checked against the worst scenario",
+    series: [],
+    table: {
+      columns: [
+        "rank",
+        "worst CAGR %",
+        "mean CAGR %",
+        "best CAGR %",
+        "spread pp",
+        "profitable worlds",
+        "pp per bps",
+        "worst scenario",
+        "params",
+      ],
+      rows: ranked
+        .slice(0, 40)
+        .map((r, i) => ({ r, i, rb: robustnessOf(r.params) }))
+        .filter((x): x is { r: (typeof ranked)[number]; i: number; rb: CostRobustness } => !!x.rb)
+        .map(({ r, i, rb }) => ({
+          tags: paramTags(r.params, riskLevel),
+          cells: [
+            String(i + 1),
+            rb.worstCagrPct.toFixed(2),
+            rb.meanCagrPct.toFixed(2),
+            rb.bestCagrPct.toFixed(2),
+            rb.cagrSpreadPct.toFixed(2),
+            `${(rb.profitableShare * 100).toFixed(0)}%`,
+            rb.cagrPerCostBps === null ? "—" : rb.cagrPerCostBps.toFixed(3),
+            rb.worstScenario,
+            formatParams(r.params),
+          ],
+        })),
+    },
+  });
+
+  const winnerKey = winner ? formatParams(winner.params) : null;
+  const winnerRuns = winnerKey ? (scenarioRunsByKey.get(winnerKey) ?? []) : [];
+  if (winnerRuns.length) {
+    panels.push({
+      heading: "Best configuration — per cost scenario",
+      subtitle: `${winnerKey} · one row per cost world`,
+      series: [],
+      table: {
+        columns: ["scenario", "cost bps/side", "CAGR %", "DD %", "sharpe", "turnover/yr", "fees %"],
+        rows: [...winnerRuns]
+          .sort((a, b) => a.metrics.cagrPct - b.metrics.cagrPct)
+          .map((run) => [
+            run.label ?? run.scenario,
+            (costBpsByScenario[run.scenario] ?? 0).toFixed(1),
+            run.metrics.cagrPct.toFixed(2),
+            run.metrics.maxDrawdownPct.toFixed(1),
+            run.metrics.sharpe.toFixed(2),
+            run.metrics.tradesPerYear.toFixed(0),
+            run.metrics.feeDragPct.toFixed(1),
+          ]),
+      },
+    });
+  }
+}
+
+
 
 panels.push(
   {
