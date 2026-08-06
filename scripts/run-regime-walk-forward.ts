@@ -195,7 +195,7 @@ for (const { window: w, regime } of windows) {
   const oosCurve = m.equityCurve.slice(w.testStart - w.trainStart);
   if (oosCurve.length < 2) continue;
 
-  });
+
 
   const benchStart = index[w.testStart]!.value;
   const benchEnd = index[w.testEnd - 1]!.value;
