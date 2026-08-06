@@ -40,6 +40,13 @@ import {
   reentryProfile,
   turnoverCostCurve,
 } from "../src/lib/turnover-attribution";
+import {
+  buildViabilityReport,
+  describeRiskLevelViability,
+  VERDICT_LABEL,
+  type ViabilityRow,
+} from "../src/lib/viability-threshold";
+
 import type { EquityPoint } from "../src/lib/backtest-metrics";
 
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
@@ -60,7 +67,14 @@ const to = arg("to", new Date().toISOString().slice(0, 10));
 const mode = arg("mode", "total_return") as PriceMode;
 const symbols = arg("symbols", DEFAULT_SYMBOLS.join(",")).split(",").map((s) => s.trim());
 const startingCash = Number(arg("cash", "10300"));
-const riskLevel = arg("risk", "balanced") as RiskLevel;
+// `--risk balanced` optimises one level; `--risk low,balanced,high` also runs
+// the viability threshold check at every level (costs one full pass each).
+const riskLevels = arg("risk", "balanced")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean) as RiskLevel[];
+const riskLevel = riskLevels[0] ?? ("balanced" as RiskLevel);
+
 const style = arg("style", "swing") as TradingStyle;
 const folds = Number(arg("folds", "3"));
 const limit = Number(arg("limit", "96"));
@@ -68,6 +82,9 @@ const seed = Number(arg("seed", "20260806"));
 const maxTurnover = Number(arg("max-turnover", "120"));
 const maxDrawdown = Number(arg("max-dd", "30"));
 const minTrades = Number(arg("min-trades", "10"));
+// Minimum net CAGR (after costs) a configuration must clear to count as viable.
+const minViableCagr = Number(arg("min-viable-cagr", "0"));
+
 
 // Realistic Saxo-like retail execution costs. The objective is CAGR *after*
 // these, so the optimiser pays for every trade it proposes.
@@ -118,52 +135,65 @@ const candidates = sampleGrid(AXES, limit, seed);
 console.log(`Evaluating ${candidates.length} candidates × ${foldBars.length} folds…\n`);
 
 const baseCfg = parseRiskConfig({ trading_style: style } as never);
-const baseSleeve = ENTRY_SLEEVE[riskLevel];
 
 type Evaluated = { params: (typeof candidates)[number]; metrics: CandidateMetrics };
 const evaluated: Evaluated[] = [];
 const curves = new Map<string, EquityPoint[]>();
 const tradeLogs = new Map<string, StyleTradeRow[]>();
+// Every risk level evaluated, for the viability threshold check. The primary
+// level also feeds ranking, sensitivity and the equity curves.
+const evaluatedByRisk = new Map<RiskLevel, Evaluated[]>();
 
-for (const [i, params] of candidates.entries()) {
-  const { cfg, sleeve } = applyParams(baseCfg, baseSleeve, params);
-  const perFold: CandidateMetrics[] = [];
-  const foldCurves: EquityPoint[][] = [];
-  let firstLog: StyleTradeRow[] = [];
-  for (const bars of foldBars) {
-    const m = await runStyleBacktest({
-      cfg,
-      bars,
-      riskLevel,
-      startingCash,
-      feePerTrade: 0,
-      sleeve,
-      simulator: { frictions: FRICTIONS },
-    });
-    perFold.push({
-      cagrPct: m.cagrPct,
-      totalReturnPct: m.totalReturnPct,
-      maxDrawdownPct: m.maxDrawdownPct,
-      sharpe: m.sharpe,
-      trades: m.trades,
-      tradesPerYear: m.tradesPerYear,
-      feeDragPct: m.feeDragPct,
-      finalCashPct: m.finalCashPct,
-      ...(m.audit ? { audit: m.audit } : {}),
-    });
-    foldCurves.push(m.equityCurve);
-    if (firstLog.length === 0) firstLog = m.tradeLog;
-  }
-  const metrics = averageMetrics(perFold);
-  evaluated.push({ params, metrics });
-  const key = formatParams(params);
-  curves.set(key, foldCurves.flat());
-  tradeLogs.set(key, firstLog);
+for (const rl of riskLevels) {
+  const baseSleeve = ENTRY_SLEEVE[rl];
+  const rows: Evaluated[] = [];
+  if (riskLevels.length > 1) console.log(`Risk level: ${rl}`);
 
-  if ((i + 1) % 10 === 0 || i === candidates.length - 1) {
-    console.log(`  …${i + 1}/${candidates.length} evaluated`);
+  for (const [i, params] of candidates.entries()) {
+    const { cfg, sleeve } = applyParams(baseCfg, baseSleeve, params);
+    const perFold: CandidateMetrics[] = [];
+    const foldCurves: EquityPoint[][] = [];
+    let firstLog: StyleTradeRow[] = [];
+    for (const bars of foldBars) {
+      const m = await runStyleBacktest({
+        cfg,
+        bars,
+        riskLevel: rl,
+        startingCash,
+        feePerTrade: 0,
+        sleeve,
+        simulator: { frictions: FRICTIONS },
+      });
+      perFold.push({
+        cagrPct: m.cagrPct,
+        totalReturnPct: m.totalReturnPct,
+        maxDrawdownPct: m.maxDrawdownPct,
+        sharpe: m.sharpe,
+        trades: m.trades,
+        tradesPerYear: m.tradesPerYear,
+        feeDragPct: m.feeDragPct,
+        finalCashPct: m.finalCashPct,
+        ...(m.audit ? { audit: m.audit } : {}),
+      });
+      foldCurves.push(m.equityCurve);
+      if (firstLog.length === 0) firstLog = m.tradeLog;
+    }
+    const metrics = averageMetrics(perFold);
+    rows.push({ params, metrics });
+    if (rl === riskLevel) {
+      evaluated.push({ params, metrics });
+      const key = formatParams(params);
+      curves.set(key, foldCurves.flat());
+      tradeLogs.set(key, firstLog);
+    }
+
+    if ((i + 1) % 10 === 0 || i === candidates.length - 1) {
+      console.log(`  …${i + 1}/${candidates.length} evaluated`);
+    }
   }
+  evaluatedByRisk.set(rl, rows);
 }
+
 
 // ------------------------------------------------------------------ rank
 const scored = scoreAll(evaluated, constraints);
@@ -227,7 +257,44 @@ console.log(
     `${overallReentry.roundTripsPerSymbol.toFixed(1)} round trips/symbol`,
 );
 
+// -------------------------------------------------- viability thresholds
+// Fit the turnover breakeven at each risk level and flag every configuration
+// that trades past it or fails to clear the minimum net return after costs.
+const viabilityRows: ViabilityRow[] = [];
+for (const [rl, rows] of evaluatedByRisk) {
+  const rlScored = scoreAll(rows, constraints);
+  for (const r of rlScored) {
+    viabilityRows.push({
+      id: formatParams(r.params),
+      riskLevel: rl,
+      params: r.params,
+      metrics: {
+        tradesPerYear: r.metrics.tradesPerYear,
+        cagrPct: r.metrics.cagrPct,
+        feeDragPct: r.metrics.feeDragPct,
+        maxDrawdownPct: r.metrics.maxDrawdownPct,
+        sharpe: r.metrics.sharpe,
+      },
+      check: { feasible: r.check.feasible, disqualified: r.check.disqualified },
+    });
+  }
+}
+const viability = buildViabilityReport(viabilityRows, {
+  minCagrPct: minViableCagr,
+  marginalBand: 0.1,
+});
+
+console.log(`\nViability thresholds (min net CAGR ${minViableCagr.toFixed(2)}%):`);
+for (const lvl of viability.levels) console.log(`  ${describeRiskLevelViability(lvl)}`);
+console.log(
+  `  ${viability.totalFlagged}/${viability.totalAssessed} configurations flagged` +
+    (viability.universallyBelow.length
+      ? `  ·  ${viability.universallyBelow.length} below breakeven at every risk level`
+      : ""),
+);
+
 const frontier = paretoFrontier(scored);
+
 
 console.log("\nCAGR vs turnover frontier:");
 for (const r of frontier) {
@@ -375,7 +442,83 @@ panels.push(
   },
 );
 
+panels.push(
+  {
+    heading: "Viability thresholds by risk level",
+    subtitle:
+      `breakeven = turnover at which the fitted net-CAGR line crosses the ` +
+      `${minViableCagr.toFixed(2)}% floor, after ${FRICTIONS.commissionBps}bps + ` +
+      `$${FRICTIONS.minCommission} commission and ${FRICTIONS.slippageBps}bps slippage`,
+    series: [],
+    table: {
+      columns: [
+        "risk level",
+        "breakeven /yr",
+        "source",
+        "CAGR per trade (pp)",
+        "viable",
+        "marginal",
+        "below",
+        "viable share",
+        "best viable",
+      ],
+      rows: viability.levels.map((l) => [
+        l.riskLevel,
+        l.threshold.breakevenTradesPerYear === null
+          ? "—"
+          : l.threshold.breakevenTradesPerYear.toFixed(0),
+        l.threshold.source,
+        l.threshold.cagrPerTrade.toFixed(3),
+        String(l.viableCount),
+        String(l.marginalCount),
+        String(l.belowCount),
+        `${(l.viableShare * 100).toFixed(0)}%`,
+        l.bestViable
+          ? `${l.bestViable.metrics.cagrPct.toFixed(2)}% @ ${l.bestViable.metrics.tradesPerYear.toFixed(0)}/yr`
+          : "none",
+      ]),
+    },
+  },
+  {
+    heading: "Configurations flagged below breakeven",
+    subtitle:
+      `${viability.totalFlagged} of ${viability.totalAssessed} evaluated cells are below or ` +
+      `within 10% of their risk level's breakeven` +
+      (viability.universallyBelow.length
+        ? ` · ${viability.universallyBelow.length} fail at every risk level and can be dropped from the search space`
+        : ""),
+    series: [],
+    table: {
+      columns: [
+        "risk level",
+        "verdict",
+        "CAGR %",
+        "turnover/yr",
+        "headroom /yr",
+        "return margin (pp)",
+        "reason",
+        "params",
+      ],
+      rows: viability.levels
+        .flatMap((l) => l.flagged)
+        .sort((a, b) => a.returnMarginPct - b.returnMarginPct)
+        .slice(0, 25)
+        .map((a) => [
+          a.riskLevel,
+          VERDICT_LABEL[a.verdict],
+          a.metrics.cagrPct.toFixed(2),
+          a.metrics.tradesPerYear.toFixed(0),
+          a.turnoverHeadroom === null ? "—" : a.turnoverHeadroom.toFixed(0),
+          a.returnMarginPct.toFixed(2),
+          a.reasons[0] ?? "",
+          a.id,
+        ]),
+    },
+  },
+);
+
 const topCurves = ranked.filter((r) => !r.check.disqualified).slice(0, 5);
+
 
 panels.push({
   heading: "Equity curves — top 5 configurations",
