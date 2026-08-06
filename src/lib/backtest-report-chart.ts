@@ -58,7 +58,32 @@ type PlotOptions = {
   /** Fill the area between the line and zero (used for drawdown). */
   fillToZero?: boolean;
   size?: ChartSize;
+  /** Disable the hover crosshair/tooltip scaffolding. */
+  interactive?: boolean;
 };
+
+/** One hoverable x position, shared by every series in a chart. */
+export type HoverPayload = {
+  x0: number;
+  x1: number;
+  top: number;
+  bottom: number;
+  xs: number[];
+  labels: string[];
+  unit: string;
+  series: {
+    label: string;
+    colour: string;
+    /** Pixel y of the plotted metric, per index. */
+    px: (number | null)[];
+    equity: (number | null)[];
+    drawdown: (number | null)[];
+  }[];
+};
+
+const at = (arr: number[], i: number): number | null =>
+  i < arr.length && Number.isFinite(arr[i] as number) ? (arr[i] as number) : null;
+
 
 /**
  * Line chart of one value per bar for each series. Series may have different
@@ -118,6 +143,11 @@ export function renderLineChart(
     })
     .join("\n  ");
 
+  const labels = Array.from({ length: maxLen }, (_, i) => {
+    const date = plotted.map((p) => p.s.curve[i]?.snapshot_date).find(Boolean);
+    return date ? `bar ${i} · ${date}` : `bar ${i}`;
+  });
+
   const xTicks = [0, Math.floor((maxLen - 1) / 2), maxLen - 1]
     .map(
       (i) =>
@@ -125,14 +155,55 @@ export function renderLineChart(
     )
     .join("\n  ");
 
-  return `<svg viewBox="0 0 ${size.width} ${size.height}" class="chart" role="img" aria-label="${esc(options.title)}">
+  const interactive = options.interactive !== false;
+  const hover: HoverPayload = {
+    x0: PAD.left,
+    x1: PAD.left + w,
+    top: PAD.top,
+    bottom: PAD.top + h,
+    xs: Array.from({ length: maxLen }, (_, i) => Number(fmt(x(i)))),
+    labels,
+    unit: options.yLabel,
+    series: plotted.map(({ s, ys }) => ({
+      label: s.label,
+      colour: s.colour,
+      px: Array.from({ length: maxLen }, (_, i) => {
+        const v = at(ys, i);
+        return v === null ? null : Number(fmt(y(v)));
+      }),
+      equity: (() => {
+        const e = toReturnPct(s.curve);
+        return Array.from({ length: maxLen }, (_, i) => at(e, i));
+      })(),
+      drawdown: (() => {
+        const d = toDrawdownPct(s.curve);
+        return Array.from({ length: maxLen }, (_, i) => at(d, i));
+      })(),
+    })),
+  };
+
+  const hoverLayer = interactive
+    ? `<g class="hover" style="display:none">
+    <line class="cross" y1="${PAD.top}" y2="${PAD.top + h}" x1="0" x2="0"/>
+    ${hover.series
+      .map((s) => `<circle class="dot" r="3.5" fill="${s.colour}" cx="-99" cy="-99"/>`)
+      .join("\n    ")}
+  </g>
+  <rect class="hit" x="${PAD.left}" y="${PAD.top}" width="${w}" height="${h}" fill="transparent"/>`
+    : "";
+
+  return `<svg viewBox="0 0 ${size.width} ${size.height}" class="chart"${
+    interactive ? ` data-hover="${esc(JSON.stringify(hover))}"` : ""
+  } role="img" aria-label="${esc(options.title)}">
   <text class="chart-title" x="${PAD.left}" y="11">${esc(options.title)}</text>
   <text class="axis-label" x="${PAD.left - 8}" y="11" text-anchor="end">${esc(options.yLabel)}</text>
   ${gridRows}
   ${zero}
   ${paths}
   ${xTicks}
+  ${hoverLayer}
 </svg>`;
+
 }
 
 export const renderEquityChart = (series: readonly ChartSeries[], title: string, size?: ChartSize) =>
@@ -150,7 +221,71 @@ export const renderDrawdownChart = (series: readonly ChartSeries[], title: strin
     ...(size ? { size } : {}),
   });
 
+/** Wrap a chart SVG with the positioned tooltip element the hover script fills. */
+export const withHoverTooltip = (svg: string) =>
+  `<figure class="chart-wrap">${svg}<div class="chart-tip" hidden></div></figure>`;
+
+/** Inline script that drives crosshair + tooltip for every chart on the page. */
+export const HOVER_SCRIPT = `
+(function () {
+  var f2 = function (v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2); };
+  document.querySelectorAll('.chart-wrap').forEach(function (wrap) {
+    var svg = wrap.querySelector('svg.chart');
+    var tip = wrap.querySelector('.chart-tip');
+    if (!svg || !tip || !svg.dataset.hover) return;
+    var data = JSON.parse(svg.dataset.hover);
+    var layer = svg.querySelector('.hover');
+    var cross = svg.querySelector('.hover .cross');
+    var dots = svg.querySelectorAll('.hover .dot');
+    if (!data.xs.length) return;
+
+    function hide() { if (layer) layer.style.display = 'none'; tip.hidden = true; }
+
+    function move(ev) {
+      var r = svg.getBoundingClientRect();
+      var vb = svg.viewBox.baseVal;
+      var ux = (ev.clientX - r.left) / r.width * (vb.width || r.width);
+      var best = 0, bestD = Infinity;
+      for (var i = 0; i < data.xs.length; i++) {
+        var d = Math.abs(data.xs[i] - ux);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      var ux2 = data.xs[best];
+      if (layer) layer.style.display = '';
+      if (cross) { cross.setAttribute('x1', ux2); cross.setAttribute('x2', ux2); }
+      var rows = '';
+      data.series.forEach(function (s, k) {
+        var dot = dots[k];
+        var py = s.px[best];
+        if (dot) {
+          if (py === null) { dot.setAttribute('cx', -99); dot.setAttribute('cy', -99); }
+          else { dot.setAttribute('cx', ux2); dot.setAttribute('cy', py); }
+        }
+        rows += '<div class="tip-row"><span class="tip-swatch" style="background:' + s.colour + '"></span>' +
+          '<span class="tip-label">' + s.label + '</span>' +
+          '<span class="tip-val">' + f2(s.equity[best]) + '%</span>' +
+          '<span class="tip-dd">' + f2(s.drawdown[best]) + '%</span></div>';
+      });
+      tip.innerHTML = '<div class="tip-head">' + data.labels[best] + '</div>' +
+        '<div class="tip-row tip-head-row"><span class="tip-swatch"></span><span class="tip-label"></span>' +
+        '<span class="tip-val">equity</span><span class="tip-dd">drawdown</span></div>' + rows;
+      tip.hidden = false;
+      var px = ux2 / (vb.width || r.width) * r.width;
+      var left = Math.min(Math.max(px + 12, 4), r.width - tip.offsetWidth - 4);
+      tip.style.left = left + 'px';
+      tip.style.top = '8px';
+    }
+
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', hide);
+    svg.addEventListener('touchmove', function (e) { if (e.touches[0]) move(e.touches[0]); }, { passive: true });
+    svg.addEventListener('touchend', hide);
+  });
+})();
+`;
+
 export function renderLegend(series: readonly ChartSeries[]): string {
+
   return `<ul class="legend">${series
     .map(
       (s) =>
@@ -181,9 +316,10 @@ export function renderBacktestReportHtml(args: {
   ${p.subtitle ? `<p class="sub">${esc(p.subtitle)}</p>` : ""}
   ${renderLegend(p.series)}
   <div class="charts">
-    ${renderEquityChart(p.series, "Equity curve (% from start)")}
-    ${renderDrawdownChart(p.series, "Drawdown (% from high-water mark)")}
+    ${withHoverTooltip(renderEquityChart(p.series, "Equity curve (% from start)"))}
+    ${withHoverTooltip(renderDrawdownChart(p.series, "Drawdown (% from high-water mark)"))}
   </div>
+
   ${
     p.table
       ? `<table><thead><tr>${p.table.columns
@@ -225,10 +361,27 @@ export function renderBacktestReportHtml(args: {
   th, td { text-align:right; padding:4px 8px; border-bottom:1px solid var(--grid); }
   th:first-child, td:first-child { text-align:left; }
   th { color:var(--muted); font-weight:600; }
+  .chart-wrap { position:relative; margin:0; }
+  .hit { cursor:crosshair; }
+  .cross { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:.8; }
+  .dot { stroke:var(--panel); stroke-width:1.5; }
+  .chart-tip { position:absolute; pointer-events:none; z-index:2; min-width:190px;
+               background:rgba(11,18,32,.96); border:1px solid var(--grid); border-radius:8px;
+               padding:6px 8px; font-size:11px; box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  .chart-tip[hidden] { display:none; }
+  .tip-head { color:var(--muted); margin-bottom:4px; }
+  .tip-head-row { color:var(--muted); }
+  .tip-row { display:grid; grid-template-columns:10px 1fr auto auto; gap:6px; align-items:center;
+             white-space:nowrap; }
+  .tip-swatch { width:8px; height:8px; border-radius:2px; }
+  .tip-val, .tip-dd { font-variant-numeric:tabular-nums; text-align:right; min-width:56px; }
+  .tip-dd { color:var(--muted); }
 </style></head>
 <body>
   <h1>${esc(args.title)}</h1>
   ${args.subtitle ? `<p class="lead">${esc(args.subtitle)}</p>` : ""}
   ${panels}
+<script>${HOVER_SCRIPT}</script>
 </body></html>`;
+
 }
