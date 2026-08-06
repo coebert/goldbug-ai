@@ -33,7 +33,15 @@ import {
   type OptimizerConstraints,
   type ParamAxis,
 } from "../src/lib/param-optimizer";
+import {
+  describeDriver,
+  rankTurnoverDrivers,
+  reentryByLevel,
+  reentryProfile,
+  turnoverCostCurve,
+} from "../src/lib/turnover-attribution";
 import type { EquityPoint } from "../src/lib/backtest-metrics";
+
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import type { RiskLevel } from "../src/lib/risk-sim-matrix";
 import type { TradingStyle } from "../src/lib/trading-style";
