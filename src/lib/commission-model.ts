@@ -269,3 +269,51 @@ export function commissionBreakevenNotional(
   if (rate <= 0) return Number.POSITIVE_INFINITY;
   return floor / (rate * probe.volumeMultiplier || rate);
 }
+
+/**
+ * Scale every monetary/rate term of a tiered model by `scale`, preserving the
+ * tier structure (breakpoints, venue and asset routing, discount ladder).
+ *
+ * This is what lets the tiered model ride the sweep's single "cost scale"
+ * axis the same way the flat `commissionBps`/`minCommission` pair used to:
+ * 0.5 means "a broker half as expensive at every notional", not "a different
+ * shape of schedule".
+ */
+export function scaleCommissionModel(model: CommissionModel, scale: number): CommissionModel {
+  if (!Number.isFinite(scale) || scale < 0) {
+    throw new Error(`scaleCommissionModel: invalid scale ${scale}`);
+  }
+  const n = (v: number | undefined) =>
+    v === undefined ? undefined : Number((v * scale).toFixed(10));
+  const scaleTier = (t: CommissionTier): CommissionTier => ({
+    ...t,
+    bps: n(t.bps) ?? 0,
+    ...(t.min !== undefined ? { min: n(t.min)! } : {}),
+    ...(t.cap !== undefined ? { cap: n(t.cap)! } : {}),
+    ...(t.perUnit !== undefined ? { perUnit: n(t.perUnit)! } : {}),
+  });
+  const scaleSchedule = (s: VenueCommissionSchedule): VenueCommissionSchedule => ({
+    ...s,
+    tiers: s.tiers.map(scaleTier),
+    ...(s.capBps !== undefined ? { capBps: n(s.capBps)! } : {}),
+  });
+  return {
+    ...model,
+    name: scale === 1 ? model.name : `${model.name}@${scale}x`,
+    venues: Object.fromEntries(
+      Object.entries(model.venues).map(([k, v]) => [k, scaleSchedule(v)]),
+    ),
+    fallback: scaleSchedule(model.fallback),
+    ...(model.assetOverrides
+      ? {
+          assetOverrides: Object.fromEntries(
+            Object.entries(model.assetOverrides).map(([k, v]) => [
+              k,
+              scaleSchedule(v as VenueCommissionSchedule),
+            ]),
+          ) as CommissionModel["assetOverrides"],
+        }
+      : {}),
+  };
+}
+

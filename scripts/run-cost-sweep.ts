@@ -21,11 +21,15 @@ import {
   scenarioKey,
   DEFAULT_SLIPPAGE_SPECS,
   DEFAULT_LIQUIDITY_SPECS,
+  DEFAULT_COMMISSION_SPECS,
+  type CommissionSpec,
+  type CostContext,
   type LiquiditySpec,
   type SlippageSpec,
   type SweepCell,
   type TicketSpec,
 } from "../src/lib/cost-sweep";
+
 import { buildLiquidityProfile } from "../src/lib/liquidity-profile";
 import { computeMaxDrawdown, computeSharpe, dailyReturns, type EquityPoint } from "../src/lib/backtest-metrics";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
@@ -101,13 +105,35 @@ const liquiditySpecs: LiquiditySpec[] = !liquidityArg
         return { label: `${advScale}x ADV`, advScale };
       });
 // Minimum per-trade fee axis, e.g. --minfee 0,3,8
+// (ignored for tiered schedules, which carry their own per-tier floors)
 const minFeeArg = arg("minfee", "");
 const minFees = !minFeeArg ? [] : minFeeArg.split(",").map(Number);
+// Commission-schedule axis. Default is the tiered Saxo-like model at the
+// Classic breakpoint; "default" sweeps flat + all three volume tiers, and
+// explicit values pick named specs, e.g. --commission classic,vip.
+const commissionArg = arg("commission", "classic");
+const commissionSpecs: CommissionSpec[] =
+  commissionArg === "default"
+    ? DEFAULT_COMMISSION_SPECS
+    : commissionArg.split(",").map((raw) => {
+        const want = raw.trim().toLowerCase();
+        const found = DEFAULT_COMMISSION_SPECS.find((s) => s.label.includes(want));
+        if (!found) {
+          throw new Error(
+            `bad --commission value ${raw} (expected one of: ` +
+              `${DEFAULT_COMMISSION_SPECS.map((s) => s.label).join(", ")}, default)`,
+          );
+        }
+        return found;
+      });
 // How the robustness ranking collapses the grid: style | risk+style |
-// risk+style+ticket (default) | ticket.
+// risk+style+ticket (default) | ticket | commission | risk+style+commission |
+// ticket+commission.
 const robustnessGroupBy = arg("rank-by", "risk+style+ticket") as RobustnessGroupBy;
 
-// Baseline: Saxo-like retail costs on US lines.
+// Baseline: Saxo-like retail costs on US lines. The commission terms here
+// are only a fallback — the commission axis replaces them with the tiered
+// schedule, which prices each venue/asset class on its own ladder.
 const BASE_FRICTIONS = {
   commissionBps: 8,
   minCommission: 3,
@@ -115,6 +141,16 @@ const BASE_FRICTIONS = {
   slippageBps: 5,
   impactPerUnit: 0.0002,
 };
+
+// Instrument mix used to express tiered costs in bps. A tiered schedule
+// charges per venue and asset class, so any single-number cost read-out is
+// only honest as a mean over the names actually traded.
+const COST_CONTEXTS: CostContext[] = symbols.map((symbol) => ({
+  symbol,
+  currency: symbol.endsWith(".L") ? "GBP" : "USD",
+  unitPrice: 100,
+}));
+
 
 // Ticket-size axis. Fewer, larger positions amortise the fixed commission
 // minimum; more, smaller ones are eaten alive by it.
@@ -154,12 +190,17 @@ const scenarios = buildCostGrid(BASE_FRICTIONS, {
   minCommission: minFees,
   liquidity: liquiditySpecs,
   liquidityProfile,
+  commission: commissionSpecs,
 });
 console.log(
   `\nCost grid: ${scales.length} scale(s) x ${slippageSpecs.length || 1} slippage x ` +
-    `${minFees.length || 1} min-fee x ${liquiditySpecs.length || 1} liquidity = ` +
-    `${scenarios.length} scenarios`,
+    `${minFees.length || 1} min-fee x ${liquiditySpecs.length || 1} liquidity x ` +
+    `${commissionSpecs.length} commission = ${scenarios.length} scenarios`,
 );
+console.log(
+  `Commission schedules: ${commissionSpecs.map((s) => s.label).join(", ")}`,
+);
+
 
 
 // ------------------------------------------------------- buy & hold ref
@@ -232,12 +273,17 @@ for (const riskLevel of riskLevels) {
 }
 
 // ------------------------------------------------------------- breakeven
-type BreakRow = [string, string, string, string, string, string, string, string, string];
+type BreakRow = [string, string, string, string, string, string, string, string, string, string];
 const breakRows: BreakRow[] = [];
 console.log("\nBreakeven cost level (share of baseline Saxo-like costs):");
-for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCash })) {
+for (const g of breakevenGrid(cells, {
+  baseFrictions: BASE_FRICTIONS,
+  startingCash,
+  costContexts: COST_CONTEXTS,
+})) {
   console.log(
     `  ${g.riskLevel.padEnd(8)} ${g.style.padEnd(8)} ${g.ticket.label.padEnd(9)} ` +
+      `${(g.commissionLabel ?? "-").padEnd(16)} ` +
       `slip ${(g.liquidityLabel ? `${g.slippageLabel}/${g.liquidityLabel}` : g.slippageLabel).padEnd(24)} min £${String(g.minCommission ?? "-").padStart(3)}  ` +
       `ticket £${g.ticketValue.toFixed(0).padStart(5)}  baseline ${g.baselineRoundTripBps.toFixed(0).padStart(4)}bps  ` +
       `vs zero: ${formatBreakeven(g.vsZero)}  |  vs B&H: ${formatBreakeven(g.vsBenchmark)}`,
@@ -246,6 +292,7 @@ for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCa
     g.riskLevel,
     g.style,
     g.ticket.label,
+    g.commissionLabel ?? "-",
     g.liquidityLabel ? `${g.slippageLabel} · ${g.liquidityLabel}` : g.slippageLabel,
     g.minCommission === null ? "-" : `£${g.minCommission}`,
     `£${g.ticketValue.toFixed(0)}`,
@@ -258,12 +305,15 @@ for (const g of breakevenGrid(cells, { baseFrictions: BASE_FRICTIONS, startingCa
 // ----------------------------------------------------------- robustness
 // One number per arm across the entire cost grid, so the rules can be
 // ranked on how well they survive cost assumptions rather than on which
-// single cell happened to be kindest.
+// single cell happened to be kindest. Cost decay is measured against the
+// tiered schedule's actual per-ticket charge, not a flat bps assumption.
 const robustness = rankRobustness(cells, {
   groupBy: robustnessGroupBy,
   baseFrictions: BASE_FRICTIONS,
   startingCash,
+  costContexts: COST_CONTEXTS,
 });
+
 console.log(
   `\nRobustness ranking (grouped by ${robustnessGroupBy}, ${gridWidth(cells)} cost scenarios per arm):`,
 );
@@ -368,6 +418,7 @@ panels.unshift({
       "risk",
       "style",
       "ticket",
+      "schedule",
       "slippage",
       "min fee",
       "notional",
@@ -375,6 +426,7 @@ panels.unshift({
       "vs zero",
       "vs buy & hold",
     ],
+
     rows: breakRows,
   },
 });
