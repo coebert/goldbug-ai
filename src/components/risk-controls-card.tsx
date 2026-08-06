@@ -364,16 +364,19 @@ export function RiskControlsCard({
     <Card>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger className="w-full text-left">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldCheck className="h-4 w-4 text-primary" /> Risk controls
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+            <div className="min-w-0">
+              <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base">
+                <span className="flex min-w-0 items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="truncate">Risk controls</span>
+                </span>
                 <TradingModeBadge
                   portfolioId={portfolioId}
                   riskConfig={{ trading_style: cfg.trading_style ?? "position" }}
                 />
-
               </CardTitle>
+
               <CardDescription>
                 {(cfg.trading_style ?? "position") === "swing"
                   ? "Swing horizon (days–weeks) · "
