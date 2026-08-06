@@ -75,3 +75,15 @@ export function clearCachedTradingMode(portfolioId: string): void {
 export const TRADING_MODE_EVENT = "aegis:trading-mode";
 
 export type TradingModeEventDetail = { portfolioId: string; style: TradingStyle };
+
+/**
+ * Precedence rule shared by every surface: the server config wins whenever it
+ * is loaded, the cached choice covers the loading gap, and position trading is
+ * the safe default when neither is known.
+ */
+export function resolveTradingMode(
+  serverStyle: TradingStyle | null,
+  cached: TradingStyle | null,
+): TradingStyle {
+  return serverStyle ?? cached ?? "position";
+}
