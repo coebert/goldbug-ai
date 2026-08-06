@@ -67,6 +67,14 @@ import {
   type CostScoreMode,
   type ScenarioRun,
 } from "../src/lib/cost-scenario-scoring";
+import {
+  summariseCostAxes,
+  renderCostAxisMatrix,
+  describeCostAxisSummary,
+  formatViableTickets,
+  formatTicket,
+  type CostCellEntry,
+} from "../src/lib/cost-axis-summary";
 
 
 import type { EquityPoint } from "../src/lib/backtest-metrics";
