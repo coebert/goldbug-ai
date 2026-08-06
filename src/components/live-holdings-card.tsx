@@ -510,17 +510,20 @@ export function LiveHoldingsCard({
                     )}
                   </div>
                   {hasSeries ? (
-                    // Full-bleed: the line fills the row instead of sitting in a
-                    // 220px island with empty space either side of it.
-                    <div className="h-14 w-full sm:h-16">
-                      <Sparkline
-                        values={trendValues}
-                        stretch
-                        className="h-full w-full"
-                        label={`${r.symbol} price trend, ${trendLabel}`}
-                      />
-                    </div>
+                    // Full-bleed and axis-framed: the line fills the row and
+                    // carries a price axis (holding currency) plus a time axis
+                    // so a reader can tell what the trend is worth and when.
+                    <AxisFramedSparkline
+                      values={trendValues}
+                      formatValue={(n) => axisTick(n, r.instrument_ccy || currency)}
+                      xStart={xStart}
+                      xEnd={xEnd}
+                      xUnit={useHourly ? "hourly" : "daily closes"}
+                      valueAxisLabel={`${r.symbol} price`}
+                      label={`${r.symbol} price trend, ${trendLabel}`}
+                    />
                   ) : (
+
                     <div
                       className="flex h-14 items-center justify-center rounded-md border border-dashed border-border/60 px-2 text-[10px] text-muted-foreground sm:h-16"
                       aria-label="No price history available yet"
