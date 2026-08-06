@@ -354,7 +354,12 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
 
 
 export function parseRiskConfig(raw: unknown): RiskConfig {
-  const base = { ...DEFAULT_RISK_CONFIG };
+  const style = parseTradingStyle((raw as Record<string, unknown> | null)?.trading_style);
+  // The style rebases the exit/holding defaults; explicit fields below still win.
+  const base: RiskConfig =
+    style === "swing"
+      ? { ...DEFAULT_RISK_CONFIG, ...SWING_STYLE_OVERRIDES, trading_style: "swing" }
+      : { ...DEFAULT_RISK_CONFIG };
   if (!raw || typeof raw !== "object") return base;
   const r = raw as Record<string, unknown>;
   const out: RiskConfig = { ...base };
