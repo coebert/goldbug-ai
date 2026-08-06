@@ -15,7 +15,11 @@
 // can be unit tested.
 
 import type { EquityPoint } from "./backtest-metrics";
-import { buildRegimeCostReport } from "./regime-cost-attribution";
+import {
+  buildRegimeCostReport,
+  regimeCostTableRows,
+  REGIME_COST_COLUMNS,
+} from "./regime-cost-attribution";
 import type { RegimeCostSummary, WindowCosts } from "./regime-cost-attribution";
 
 

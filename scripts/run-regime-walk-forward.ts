@@ -38,6 +38,7 @@ import {
   regimeCoverage,
 
   formatRegimeTable,
+  formatCostTable,
   formatWindowTable,
   regimeTableRows,
   segmentRegimes,
@@ -56,9 +57,7 @@ import {
 import {
   attributeWindowCosts,
   explainRegimeCosts,
-  regimeCostTableRows,
   summariseCostAttribution,
-  REGIME_COST_COLUMNS,
 } from "../src/lib/regime-cost-attribution";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
 import type { RiskLevel } from "../src/lib/risk-sim-matrix";
@@ -267,7 +266,7 @@ console.log(formatRegimeTable(report.summaries));
 console.log(`\n${summariseReport(report, gate)}`);
 
 console.log("\nCost decomposition (median per regime, IS = training slice, OOS = scored slice):");
-console.log(formatRegimeTable(report.summaries, REGIME_COST_COLUMNS, regimeCostTableRows(report.costs)));
+console.log(formatCostTable(report.costs));
 console.log(summariseCostAttribution(report.costs));
 for (const c of report.costs) {
   if (c.windows > 0) console.log(`  ${explainRegimeCosts(c)}`);
