@@ -719,6 +719,8 @@ export function regimeTableRows(summaries: readonly RegimeSummary[]): string[][]
     pctOf(s.positiveRate),
     pctOf(s.beatBenchmarkRate),
     f(s.medianTradesPerYear, 0),
+    pctOf(s.meanConfidence),
+
     s.windows === 0 ? "no data" : s.pass ? "pass" : s.drawdownStable ? "weak returns" : "drawdown breach",
   ]);
 }
