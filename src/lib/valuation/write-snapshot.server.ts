@@ -232,11 +232,27 @@ export async function writeEquitySnapshot(
 
 
 
+  // Never downgrade a broker-authoritative valuation. Once the broker has told
+  // us what the account is worth on a given date, a locally recomputed figure
+  // (backfill/revalue/engine marks off cached closes) must not overwrite it —
+  // that is how the app ends up showing a number that differs from Saxo.
+  if (!AUTHORITATIVE_SOURCES.has(input.source)) {
+    const existing = await existingSnapshotSource(client, input.portfolioId, input.snapshotDate);
+    if (existing && AUTHORITATIVE_SOURCES.has(existing)) {
+      return {
+        written: false,
+        reason: "authoritative_exists",
+        message: `a ${existing} snapshot already exists for ${input.snapshotDate}; not overwriting with ${input.source}`,
+      };
+    }
+  }
+
   if (!AUTHORITATIVE_SOURCES.has(input.source)) {
     const prior =
       input.priorTotal !== undefined
         ? input.priorTotal
         : (await priorSnapshot(client, input.portfolioId, input.snapshotDate))?.total_value ?? null;
+
     const problem = checkPlausibleMove({
       priorTotal: prior,
       nextTotal: total,
