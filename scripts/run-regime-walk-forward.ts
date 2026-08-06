@@ -4,10 +4,24 @@
 //   bun run scripts/run-regime-walk-forward.ts --style swing --ticket "5 x 18%"
 //   bun run scripts/run-regime-walk-forward.ts --train 252 --test 126 --max-dd 25
 //
+//   # denser cross-validation: 75%-overlapping windows, capped at 60 draws,
+//   # keeping every bear/sideways slice the tape can offer
+//   bun run scripts/run-regime-walk-forward.ts --overlap 0.75 --cv-max 60 \
+//     --cv-per-regime 25 --cv-min-per-regime 8 --min-eff 3
+//
 // Runs the optimised parameter set out-of-sample on rolling windows, tags
 // each window bull / bear / sideways from the benchmark tape, then reports
 // net CAGR and drawdown per regime so the strategy can be judged on
 // stability rather than on one flattering all-history number.
+//
+// Non-overlapping windows (the default) are statistically clean but sparse,
+// and bear/sideways regimes often draw only two or three slices. `--overlap`
+// slides the window by a fraction of the test length instead of a whole test
+// length, and the CV sampler thins the resulting dense candidate set back to
+// a manageable, regime-balanced draw. Because overlapping slices share bars,
+// every regime also reports an independence-adjusted "eff. windows" count,
+// and `--min-eff` gates on that rather than the raw count.
+
 
 import { parseRiskConfig } from "../src/lib/universe.server";
 import { runStyleBacktest } from "../src/lib/trading-style-backtest";
