@@ -1634,6 +1634,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         if (systematic.note) sizingNotes.push(systematic.note);
         if (haircuts.floored) sizingNotes.push("haircut floor applied");
       }
+      if (fundGate.note) sizingNotes.push(fundGate.note);
+
 
       // Overnight-gap guard: skip fresh buys when 1d move is > 2σ
       const gap = await checkOvernightGap(meta.symbol, asOf).catch(() => null);
