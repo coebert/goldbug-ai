@@ -114,6 +114,26 @@ async function priorSnapshot(
   }
 }
 
+/** Source of the row already stored for this exact date, if any. */
+async function existingSnapshotSource(
+  client: MinimalClient,
+  portfolioId: string,
+  snapshotDate: string,
+): Promise<SnapshotSource | null> {
+  try {
+    const { data } = await client
+      .from("equity_snapshots")
+      .select("source")
+      .eq("portfolio_id", portfolioId)
+      .eq("snapshot_date", snapshotDate)
+      .maybeSingle();
+    const src = (data as { source?: string } | null)?.source;
+    return (src as SnapshotSource | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Pure part of the band check, exported so it can be unit-tested without a
  * database. Returns null when the move is acceptable.
