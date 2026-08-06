@@ -627,7 +627,11 @@ export function summariseRegime(
     medianBenchmarkCagrPct: median(rows.map((r) => r.benchmarkCagrPct)),
     positiveRate,
     beatBenchmarkRate: rows.filter((r) => r.netCagrPct > r.benchmarkCagrPct).length / rows.length,
+    meanConfidence:
+      rows.reduce((a, r) => a + (Number.isFinite(r.confidence ?? NaN) ? r.confidence! : 0), 0)
+      / rows.length,
     medianTradesPerYear: median(rows.map((r) => r.tradesPerYear)),
+
     drawdownStable,
     pass:
       drawdownStable
