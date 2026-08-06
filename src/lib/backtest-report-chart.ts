@@ -392,6 +392,24 @@ export function renderLegend(series: readonly ChartSeries[]): string {
 
 }
 
+/**
+ * A table row. Plain string arrays still work; the tagged form lets the report
+ * filter rows client-side (e.g. by risk level or ticket-size band).
+ */
+export type ReportTableRow = string[] | { cells: string[]; tags?: Record<string, string> };
+
+/** A group of toggle chips rendered in the report toolbar. */
+export type ReportFilterGroup = {
+  /** Tag key rows/panels are matched on. */
+  key: string;
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  /** Values selected on load. Defaults to all options. */
+  selected?: string[];
+  /** "single" behaves like radio buttons. Default "multi". */
+  mode?: "single" | "multi";
+};
+
 export type ReportPanel = {
   /** e.g. "balanced risk" */
   heading: string;
@@ -406,8 +424,109 @@ export type ReportPanel = {
   /** Legend entries for pre-rendered charts, which have no ChartSeries. */
   legend?: { label: string; colour: string; dashed?: boolean }[];
   /** Optional rows appended under the charts as a small metric table. */
-  table?: { columns: string[]; rows: string[][] };
+  table?: { columns: string[]; rows: ReportTableRow[] };
+  /** Filter tags for the whole panel; the panel hides when they are unselected. */
+  tags?: Record<string, string>;
 };
+
+const rowCells = (r: ReportTableRow): string[] => (Array.isArray(r) ? r : r.cells);
+const rowTags = (r: ReportTableRow): Record<string, string> =>
+  Array.isArray(r) ? {} : (r.tags ?? {});
+
+const tagAttrs = (tags: Record<string, string>): string =>
+  Object.entries(tags)
+    .map(([k, v]) => ` data-f-${esc(k)}="${esc(v)}"`)
+    .join("");
+
+/** Toolbar markup for the filter chip groups. */
+export function renderFilterBar(groups: readonly ReportFilterGroup[]): string {
+  if (groups.length === 0) return "";
+  const bar = groups
+    .map((g) => {
+      const selected = new Set(g.selected ?? g.options.map((o) => o.value));
+      const chips = g.options
+        .map(
+          (o) =>
+            `<button type="button" class="chip${selected.has(o.value) ? " on" : ""}" ` +
+            `data-key="${esc(g.key)}" data-value="${esc(o.value)}" ` +
+            `data-mode="${esc(g.mode ?? "multi")}" aria-pressed="${selected.has(o.value)}">` +
+            `${esc(o.label)}</button>`,
+        )
+        .join("");
+      const all =
+        (g.mode ?? "multi") === "multi"
+          ? `<button type="button" class="chip all" data-key="${esc(g.key)}" data-all="1">all</button>`
+          : "";
+      return `<div class="filter-group"><span class="filter-label">${esc(g.label)}</span>${chips}${all}</div>`;
+    })
+    .join("");
+  return `<div class="filters" id="report-filters">${bar}<span class="filter-count" id="filter-count"></span></div>`;
+}
+
+/** Client-side filtering: chips toggle `data-f-*` tags on rows and panels. */
+export const FILTER_SCRIPT = `
+(function () {
+  var bar = document.getElementById('report-filters');
+  if (!bar) return;
+  var state = {};
+  bar.querySelectorAll('.chip[data-value]').forEach(function (c) {
+    var k = c.dataset.key;
+    state[k] = state[k] || { mode: c.dataset.mode || 'multi', on: new Set(), all: new Set() };
+    state[k].all.add(c.dataset.value);
+    if (c.classList.contains('on')) state[k].on.add(c.dataset.value);
+  });
+  function visible(el) {
+    for (var k in state) {
+      var tag = el.dataset['f' + k.charAt(0).toUpperCase() + k.slice(1).replace(/-(.)/g, function (m, c) { return c.toUpperCase(); })];
+      if (tag == null) continue;
+      if (!state[k].on.has(tag)) return false;
+    }
+    return true;
+  }
+  function apply() {
+    var shown = 0, total = 0;
+    document.querySelectorAll('tbody tr').forEach(function (tr) {
+      total++;
+      var ok = visible(tr);
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    document.querySelectorAll('section.panel').forEach(function (p) {
+      var ok = visible(p);
+      var body = p.querySelector('tbody');
+      if (ok && body && !p.querySelector('.charts svg')) {
+        ok = Array.prototype.some.call(body.rows, function (r) { return !r.hidden; });
+      }
+      p.hidden = !ok;
+    });
+    var out = document.getElementById('filter-count');
+    if (out) out.textContent = shown === total ? total + ' rows' : shown + ' of ' + total + ' rows';
+  }
+  bar.addEventListener('click', function (e) {
+    var c = e.target.closest('.chip');
+    if (!c) return;
+    var k = c.dataset.key, s = state[k];
+    if (!s) return;
+    if (c.dataset.all) {
+      s.on = new Set(s.all);
+    } else if (s.mode === 'single') {
+      s.on = new Set([c.dataset.value]);
+    } else if (s.on.has(c.dataset.value)) {
+      if (s.on.size > 1) s.on.delete(c.dataset.value);
+    } else {
+      s.on.add(c.dataset.value);
+    }
+    bar.querySelectorAll('.chip[data-key="' + k + '"][data-value]').forEach(function (b) {
+      var on = s.on.has(b.dataset.value);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    apply();
+  });
+  apply();
+})();
+`;
+
 
 /** Self-contained HTML report: one panel per risk level, two charts each. */
 export function renderBacktestReportHtml(args: {
