@@ -82,6 +82,9 @@ const seed = Number(arg("seed", "20260806"));
 const maxTurnover = Number(arg("max-turnover", "120"));
 const maxDrawdown = Number(arg("max-dd", "30"));
 const minTrades = Number(arg("min-trades", "10"));
+// Minimum net CAGR (after costs) a configuration must clear to count as viable.
+const minViableCagr = Number(arg("min-viable-cagr", "0"));
+
 
 // Realistic Saxo-like retail execution costs. The objective is CAGR *after*
 // these, so the optimiser pays for every trade it proposes.
