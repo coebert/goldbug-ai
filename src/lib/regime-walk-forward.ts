@@ -370,6 +370,113 @@ export function dominantRegime(
   return { label: best, purity: counts[best] / slice.length };
 }
 
+export type DominantRegimeOptions = {
+  /**
+   * Weight each bar's vote by its confidence (default true), so a window of
+   * hesitant bull bars loses to a smaller run of high-confidence chop.
+   */
+  weightByConfidence?: boolean;
+  /**
+   * Vote share a directional label must reach to hold; below this the window
+   * is called sideways because the tape could not make up its mind
+   * (default 0.45).
+   */
+  minDirectionalShare?: number;
+  /**
+   * Mean confidence a directional label must reach to hold (default 0.5).
+   */
+  minConfidence?: number;
+};
+
+export type DominantRegimeResult = {
+  label: RegimeLabel;
+  purity: number;
+  /** Mean confidence of the bars carrying the winning label, 0..1. */
+  confidence: number;
+  /** Vote share per label over the range, confidence-weighted when enabled. */
+  shares: Record<RegimeLabel, number>;
+  /** True when a directional winner was demoted to sideways. */
+  demoted: boolean;
+};
+
+/**
+ * Confidence-weighted regime for a bar range. Unlike the plain majority vote
+ * this demotes weak bull/bear wins to sideways, which is what makes the
+ * walk-forward runner report real chop coverage rather than only extremes.
+ */
+export function dominantRegimeWeighted(
+  bars: readonly RegimeBar[],
+  start: number,
+  end: number,
+  opts: DominantRegimeOptions = {},
+): DominantRegimeResult {
+  const weighted = opts.weightByConfidence ?? true;
+  const minShare = opts.minDirectionalShare ?? 0.45;
+  const minConf = opts.minConfidence ?? 0.5;
+  const slice = bars.slice(start, end);
+  const empty: Record<RegimeLabel, number> = { bull: 0, bear: 0, sideways: 0 };
+  if (slice.length === 0) {
+    return { label: "sideways", purity: 0, confidence: 0, shares: { ...empty }, demoted: false };
+  }
+
+  const weight: Record<RegimeLabel, number> = { ...empty };
+  const confSum: Record<RegimeLabel, number> = { ...empty };
+  const count: Record<RegimeLabel, number> = { ...empty };
+  for (const b of slice) {
+    weight[b.label] += weighted ? Math.max(0.05, b.confidence) : 1;
+    confSum[b.label] += b.confidence;
+    count[b.label] += 1;
+  }
+  const total = weight.bull + weight.bear + weight.sideways;
+  const shares: Record<RegimeLabel, number> = {
+    bull: total > 0 ? weight.bull / total : 0,
+    bear: total > 0 ? weight.bear / total : 0,
+    sideways: total > 0 ? weight.sideways / total : 0,
+  };
+
+  const order: RegimeLabel[] = ["bear", "bull", "sideways"];
+  let best = order[0]!;
+  for (const l of order) if (weight[l] > weight[best]) best = l;
+
+  const meanConf = (l: RegimeLabel) => (count[l] > 0 ? confSum[l] / count[l] : 0);
+  let label = best;
+  let demoted = false;
+  if (best !== "sideways" && (shares[best] < minShare || meanConf(best) < minConf)) {
+    label = "sideways";
+    demoted = true;
+  }
+
+  return {
+    label,
+    purity: count[label] / slice.length,
+    confidence: meanConf(label),
+    shares,
+    demoted,
+  };
+}
+
+/** Share of bars falling in each regime — the coverage read for a tape. */
+export function regimeCoverage(
+  bars: readonly RegimeBar[],
+): Record<RegimeLabel, { bars: number; share: number; meanConfidence: number }> {
+  const out = {
+    bull: { bars: 0, share: 0, meanConfidence: 0 },
+    bear: { bars: 0, share: 0, meanConfidence: 0 },
+    sideways: { bars: 0, share: 0, meanConfidence: 0 },
+  } satisfies Record<RegimeLabel, { bars: number; share: number; meanConfidence: number }>;
+  for (const b of bars) {
+    out[b.label].bars += 1;
+    out[b.label].meanConfidence += b.confidence;
+  }
+  for (const r of REGIMES) {
+    const n = out[r].bars;
+    out[r].share = bars.length ? n / bars.length : 0;
+    out[r].meanConfidence = n ? out[r].meanConfidence / n : 0;
+  }
+  return out;
+}
+
+
 // ------------------------------------------------------------- scoring
 
 /** Net CAGR of an equity curve over `bars` bars, in %. */
