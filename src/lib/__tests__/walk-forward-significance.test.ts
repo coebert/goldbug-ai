@@ -113,7 +113,7 @@ describe("signTest", () => {
   it("is significant only when the wins are lopsided enough", () => {
     expect(signTest(Array.from({ length: 8 }, () => 1)).significant).toBe(true);
     expect(signTest([1, 1, -1, -1]).significant).toBe(false);
-    expect(signTest([1, 1, 1, -1]).pValue).toBeCloseTo(0.5, 6);
+    expect(signTest([1, 1, 1, -1]).pValue).toBeCloseTo(0.625, 6);
   });
 
   it("returns p=1 with no non-tied folds", () => {
@@ -128,7 +128,9 @@ describe("signFlipPermutationTest", () => {
     expect(r.permutations).toBe(32);
     // Only the all-positive and all-negative flips reach |mean| = 2.
     expect(r.pValue).toBeCloseTo(2 / 32, 10);
-    expect(r.significant).toBe(true);
+    // 0.0625 — five identical folds cannot clear a 5% bar however clean they look.
+    expect(r.significant).toBe(false);
+    expect(signFlipPermutationTest([2, 2, 2, 2, 2, 2]).significant).toBe(true);
   });
 
   it("gives a large p-value to noise", () => {
