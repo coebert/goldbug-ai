@@ -80,7 +80,12 @@ export type SnapshotWriteInput = {
 
 export type SnapshotWriteResult = {
   written: boolean;
-  reason?: "invariants" | "implausible_jump" | "unsynced_positions" | "db_error";
+  reason?:
+    | "invariants"
+    | "implausible_jump"
+    | "unsynced_positions"
+    | "authoritative_exists"
+    | "db_error";
   message?: string;
   violations?: EquityInvariantViolation[];
 };
@@ -109,6 +114,26 @@ async function priorSnapshot(
     if (!data) return null;
     const t = Number(data.total_value);
     return Number.isFinite(t) ? { total_value: t } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Source of the row already stored for this exact date, if any. */
+async function existingSnapshotSource(
+  client: MinimalClient,
+  portfolioId: string,
+  snapshotDate: string,
+): Promise<SnapshotSource | null> {
+  try {
+    const { data } = await client
+      .from("equity_snapshots")
+      .select("source")
+      .eq("portfolio_id", portfolioId)
+      .eq("snapshot_date", snapshotDate)
+      .maybeSingle();
+    const src = (data as { source?: string } | null)?.source;
+    return (src as SnapshotSource | undefined) ?? null;
   } catch {
     return null;
   }
@@ -212,11 +237,27 @@ export async function writeEquitySnapshot(
 
 
 
+  // Never downgrade a broker-authoritative valuation. Once the broker has told
+  // us what the account is worth on a given date, a locally recomputed figure
+  // (backfill/revalue/engine marks off cached closes) must not overwrite it —
+  // that is how the app ends up showing a number that differs from Saxo.
+  if (!AUTHORITATIVE_SOURCES.has(input.source)) {
+    const existing = await existingSnapshotSource(client, input.portfolioId, input.snapshotDate);
+    if (existing && AUTHORITATIVE_SOURCES.has(existing)) {
+      return {
+        written: false,
+        reason: "authoritative_exists",
+        message: `a ${existing} snapshot already exists for ${input.snapshotDate}; not overwriting with ${input.source}`,
+      };
+    }
+  }
+
   if (!AUTHORITATIVE_SOURCES.has(input.source)) {
     const prior =
       input.priorTotal !== undefined
         ? input.priorTotal
         : (await priorSnapshot(client, input.portfolioId, input.snapshotDate))?.total_value ?? null;
+
     const problem = checkPlausibleMove({
       priorTotal: prior,
       nextTotal: total,

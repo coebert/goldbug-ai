@@ -254,7 +254,7 @@ const PORTFOLIO_TABS: PortfolioTab[] = [
 
 export const Route = createFileRoute("/portfolio/$id")({
   ssr: false,
-  validateSearch: (search: Record<string, unknown>): { tab: PortfolioTab } => {
+  validateSearch: (search: Record<string, unknown>): { tab?: PortfolioTab } => {
     const t = String(search.tab ?? "overview") as PortfolioTab;
     return { tab: PORTFOLIO_TABS.includes(t) ? t : "overview" };
   },
@@ -271,7 +271,8 @@ const SIMPLE_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk"];
 
 function PortfolioPage() {
   const { id } = Route.useParams();
-  const { tab: rawTab } = Route.useSearch();
+  const { tab: searchTab } = Route.useSearch();
+  const rawTab: PortfolioTab = searchTab ?? "overview";
   const advancedLevel = useIsAdvanced();
   // In Simple mode the expert tabs aren't rendered, so a deep link to one
   // would leave the tab strip with no active trigger — fall back to Summary.

@@ -43,7 +43,7 @@ import {
 import { getTradesDashboard, type TradeRow } from "@/lib/trades.functions";
 
 export const Route = createFileRoute("/trades")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { order?: string } => ({
     order: typeof search.order === "string" ? search.order : undefined,
   }),
   head: () => ({
