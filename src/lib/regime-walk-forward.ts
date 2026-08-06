@@ -202,31 +202,34 @@ export function classifyRegimeBars(
     let confidence: number;
     let reason: string;
 
-    const bandwidth = Math.max(1, t.sidewaysBandPct);
+    // The chop band can never swallow the directional thresholds themselves,
+    // so a caller that lowers bullAnnualPct still gets bull labels.
+    const band = Math.min(t.sidewaysBandPct, t.bullAnnualPct, Math.abs(t.bearAnnualPct));
+    const bandwidth = Math.max(1, band);
 
     if (drawdownPct <= -t.bearDrawdownPct) {
       label = "bear";
       // Deeper than the trigger ⇒ more certain; twice the trigger pins it at 1.
       confidence = clamp01(0.6 + 0.4 * ((-drawdownPct - t.bearDrawdownPct) / t.bearDrawdownPct));
       reason = `drawdown ${drawdownPct.toFixed(1)}%`;
-    } else if (rangePct <= t.sidewaysRangePct && back >= 3) {
-      label = "sideways";
-      confidence = clamp01(0.6 + 0.4 * (1 - rangePct / Math.max(1e-9, t.sidewaysRangePct)));
-      reason = `range ${rangePct.toFixed(1)}%`;
-    } else if (Math.abs(trendPct) <= t.sidewaysBandPct) {
-      label = "sideways";
-      confidence = clamp01(0.5 + 0.5 * (1 - Math.abs(trendPct) / bandwidth));
-      reason = `trend ${trendPct.toFixed(1)}% inside ±${t.sidewaysBandPct}% band`;
-    } else if (trendPct >= t.bullAnnualPct && r2 >= t.minTrendR2) {
+    } else if (trendPct >= t.bullAnnualPct && trendPct > band && r2 >= t.minTrendR2) {
       label = "bull";
       const strength = clamp01((trendPct - t.bullAnnualPct) / Math.max(1, Math.abs(t.bullAnnualPct)));
       confidence = clamp01(0.45 + 0.3 * strength + 0.25 * r2);
       reason = `trend +${trendPct.toFixed(1)}%, R² ${r2.toFixed(2)}`;
-    } else if (trendPct <= t.bearAnnualPct && r2 >= t.minTrendR2) {
+    } else if (trendPct <= t.bearAnnualPct && -trendPct > band && r2 >= t.minTrendR2) {
       label = "bear";
       const strength = clamp01((t.bearAnnualPct - trendPct) / Math.max(1, Math.abs(t.bearAnnualPct)));
       confidence = clamp01(0.45 + 0.3 * strength + 0.25 * r2);
       reason = `trend ${trendPct.toFixed(1)}%, R² ${r2.toFixed(2)}`;
+    } else if (rangePct <= t.sidewaysRangePct && back >= 3) {
+      label = "sideways";
+      confidence = clamp01(0.6 + 0.4 * (1 - rangePct / Math.max(1e-9, t.sidewaysRangePct)));
+      reason = `range ${rangePct.toFixed(1)}%`;
+    } else if (Math.abs(trendPct) <= band) {
+      label = "sideways";
+      confidence = clamp01(0.5 + 0.5 * (1 - Math.abs(trendPct) / bandwidth));
+      reason = `trend ${trendPct.toFixed(1)}% inside ±${band}% band`;
     } else {
       label = "sideways";
       // Directional in return but not in path: chop with a tilt. Weak
@@ -237,6 +240,7 @@ export function classifyRegimeBars(
         ? `choppy below peak (${drawdownPct.toFixed(1)}%), R² ${r2.toFixed(2)}`
         : `trend ${trendPct.toFixed(1)}% but R² only ${r2.toFixed(2)}`;
     }
+
 
     out.push({
       index: i,
