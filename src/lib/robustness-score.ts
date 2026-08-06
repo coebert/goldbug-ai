@@ -18,17 +18,26 @@
 // Pure and deterministic: no clock, no network, no database.
 
 import {
+  blendedRoundTripBps,
   cellScore,
-  roundTripCostBps,
   scenarioKey,
   seriesBaseFrictions,
   ticketValue,
+  type CostContext,
   type SweepCell,
 } from "./cost-sweep";
 import type { Frictions } from "./broker-simulator";
 
 /** How cells are collapsed into one comparable "arm". */
-export type RobustnessGroupBy = "style" | "risk+style" | "risk+style+ticket" | "ticket";
+export type RobustnessGroupBy =
+  | "style"
+  | "risk+style"
+  | "risk+style+ticket"
+  | "ticket"
+  | "commission"
+  | "risk+style+commission"
+  | "ticket+commission";
+
 
 export type RobustnessWeights = {
   /** Share of the grid with a positive net return. */
@@ -71,6 +80,9 @@ export type RobustnessRow = {
   style: string;
   riskLevel: string;
   ticketLabel: string;
+  /** Commission schedule behind the arm, or "mixed" when collapsed across. */
+  commissionLabel: string;
+
   /** Number of cost-grid cells behind this row. */
   cells: number;
   profitHitRate: number;
@@ -132,7 +144,13 @@ export function slope(xs: readonly number[], ys: readonly number[]): number | nu
 
 // ------------------------------------------------------------- grouping
 
+/** Commission schedule label for a cell; "-" when the axis was not swept. */
+export function commissionLabelOf(cell: SweepCell): string {
+  return cell.scenario.commission?.label ?? "-";
+}
+
 export function armKey(cell: SweepCell, groupBy: RobustnessGroupBy): string {
+  const comm = commissionLabelOf(cell);
   switch (groupBy) {
     case "style":
       return cell.style;
@@ -142,8 +160,15 @@ export function armKey(cell: SweepCell, groupBy: RobustnessGroupBy): string {
       return `${cell.riskLevel} · ${cell.style}`;
     case "risk+style+ticket":
       return `${cell.riskLevel} · ${cell.style} · ${cell.ticket.label}`;
+    case "commission":
+      return comm;
+    case "risk+style+commission":
+      return `${cell.riskLevel} · ${cell.style} · ${comm}`;
+    case "ticket+commission":
+      return `${cell.ticket.label} · ${comm}`;
   }
 }
+
 
 export function groupCells(
   cells: readonly SweepCell[],
@@ -180,6 +205,12 @@ export type RobustnessOptions = {
    */
   baseFrictions?: Frictions;
   startingCash?: number;
+  /**
+   * Instrument mix used to price tiered commission schedules in bps. A
+   * tiered schedule charges differently per venue/asset, so the cost axis
+   * is only meaningful as a mean over the names actually traded.
+   */
+  costContexts?: readonly CostContext[];
   /** Return magnitude treated as "good" when squashing, in % (default 20). */
   returnScale?: number;
 };
@@ -196,22 +227,28 @@ function resolveWeights(partial?: Partial<RobustnessWeights>): RobustnessWeights
 
 /**
  * Modelled round-trip cost in bps for one cell. The cell's scenario already
- * carries a fully-resolved friction model (scale × slippage × min fee), so
- * the baseline is only consulted for terms the grid never varied.
+ * carries a fully-resolved friction model (scale × schedule × slippage ×
+ * min fee), so the baseline is only consulted for terms the grid never
+ * varied. Tiered schedules are priced over the supplied instrument mix.
  */
 export function cellRoundTripBps(
   cell: SweepCell,
-  opts: { baseFrictions?: Frictions; startingCash?: number },
+  opts: { baseFrictions?: Frictions; startingCash?: number; costContexts?: readonly CostContext[] },
 ): number | null {
   if (opts.startingCash === undefined) return null;
   const tv = ticketValue(opts.startingCash, cell.ticket);
   if (!(tv > 0)) return null;
-  const f = opts.baseFrictions
+  const merged = opts.baseFrictions
     ? { ...seriesBaseFrictions(opts.baseFrictions, cell.scenario), ...cell.scenario.frictions }
-    : cell.scenario.frictions;
-  const bps = roundTripCostBps(f, tv);
+    : { ...cell.scenario.frictions };
+  // A tiered schedule fully replaces the flat pair; never charge both.
+  const f = merged.commission
+    ? { ...merged, commissionBps: undefined, minCommission: undefined }
+    : merged;
+  const bps = blendedRoundTripBps(f, tv, opts.costContexts ?? []);
   return Number.isFinite(bps) ? bps : null;
 }
+
 
 /** Score one already-grouped set of cells. */
 export function scoreArm(
@@ -277,6 +314,8 @@ export function scoreArm(
     style: uniq(cells.map((c) => c.style)),
     riskLevel: uniq(cells.map((c) => c.riskLevel)),
     ticketLabel: uniq(cells.map((c) => c.ticket.label)),
+    commissionLabel: uniq(cells.map((c) => commissionLabelOf(c))),
+
     cells: cells.length,
     profitHitRate,
     benchmarkHitRate,
@@ -326,6 +365,7 @@ const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
 export const ROBUSTNESS_COLUMNS = [
   "#",
   "arm",
+  "schedule",
   "score",
   "grade",
   "cells",
@@ -344,11 +384,13 @@ export function robustnessTableRows(rows: readonly RobustnessRow[]): string[][] 
   return rows.map((r, i) => [
     String(i + 1),
     r.arm,
+    r.commissionLabel,
     r.score.toFixed(1),
     r.grade,
     String(r.cells),
     pct(r.profitHitRate),
     pct(r.benchmarkHitRate),
+
     r.medianReturnPct.toFixed(1),
     r.worstReturnPct.toFixed(1),
     r.bestReturnPct.toFixed(1),
@@ -367,7 +409,7 @@ export function formatRobustnessTable(rows: readonly RobustnessRow[]): string {
     Math.max(c.length, ...body.map((r) => (r[i] ?? "").length)),
   );
   const line = (cells: readonly string[]) =>
-    cells.map((c, i) => (i === 1 ? c.padEnd(widths[i]!) : c.padStart(widths[i]!))).join("  ");
+    cells.map((c, i) => (i === 1 || i === 2 ? c.padEnd(widths[i]!) : c.padStart(widths[i]!))).join("  ");
   return [line(cols), line(widths.map((w) => "-".repeat(w))), ...body.map(line)].join("\n");
 }
 
