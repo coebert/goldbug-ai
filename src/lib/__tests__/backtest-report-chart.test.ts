@@ -20,7 +20,10 @@ const series = (label: string, values: number[], dashed = false): ChartSeries =>
 
 describe("backtest report charts", () => {
   it("expresses the equity curve as % from the first point", () => {
-    expect(toReturnPct(curve(100, 110, 99))).toEqual([0, 10, -1]);
+    const pct = toReturnPct(curve(100, 110, 99));
+    expect(pct[0]).toBeCloseTo(0, 9);
+    expect(pct[1]).toBeCloseTo(10, 9);
+    expect(pct[2]).toBeCloseTo(-1, 9);
   });
 
   it("measures drawdown against the running high-water mark", () => {
