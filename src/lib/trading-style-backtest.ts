@@ -108,7 +108,13 @@ export type StyleRunMetrics = {
   feeDragPct: number;
   finalCashPct: number;
   exitMix: Record<string, number>;
+  /**
+   * Equity curve for the run, one point per bar. Averaged cells hold the
+   * per-bar mean across seeds so charts line up with the metric table.
+   */
+  equityCurve: EquityPoint[];
 };
+
 
 export type StyleBacktestOptions = {
   universe?: AssetSpec[];
