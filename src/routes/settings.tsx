@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Settings as SettingsIcon } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowLeft, Settings as SettingsIcon } from "lucide-react";
 import { PushNotificationsCard } from "@/components/push-notifications-card";
 import { TradingControlsCard } from "@/components/trading-controls-card";
 import { MfaCard } from "@/components/mfa-card";
