@@ -195,6 +195,22 @@ export type Frictions = {
   buyTaxBps?: number;
   slippageBps?: number;
   impactPerUnit?: number;
+  /**
+   * Optional scaling commission model. When present it REPLACES the flat
+   * `commissionBps`/`minCommission` pair: the fee is computed per fill from
+   * the tiered venue schedule (bps that steps down with notional, per-share
+   * component, per-ticket floor and cap) plus the monthly-volume discount.
+   * Buy-side tax and per-decision `fee` still apply on top.
+   */
+  commission?: {
+    model?: CommissionModel;
+    /** Trailing 30-day traded notional used for the discount ladder. */
+    monthlyVolume?: number;
+    /** Per-symbol trade currency (defaults to inference from the ticker). */
+    currencyBySymbol?: Record<string, string>;
+    /** Per-symbol asset class, enabling class overrides (e.g. crypto). */
+    assetClassBySymbol?: Record<string, AssetClass>;
+  };
 };
 
 export type SimulateOptions = {
