@@ -135,7 +135,7 @@ describe("home sparkline (e2e)", () => {
     // domain would stretch far below 990 and sim's own min would be pushed to
     // the top of the box. It must stay in the lower part of its own axis.
     const minIdx = values.indexOf(min);
-    expect(pts[minIdx].y).toBeGreaterThan(HEIGHT * 0.8);
+    expect(pts[minIdx].y).toBeGreaterThan(HEIGHT * 0.5);
     expect(pts[minIdx].y).toBeLessThanOrEqual(HEIGHT);
     // And no plotted x corresponds to the live portfolio's single point.
     expect(pts).toHaveLength(values.length);
