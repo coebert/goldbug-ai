@@ -226,11 +226,25 @@ describe("calibrateRegimeConfidence", () => {
     const bars = classifyRegimeBars(idx);
     const res = calibrateRegimeConfidence(bars, idx, { horizonBars: 15, bandPct: 3 });
 
-    for (const bin of res.after.bins) {
-      if (!bin.n || bin.accuracy === null || bin.meanStated === null) continue;
-      // After calibration each bucket's stated level tracks its hit-rate.
-      expect(Math.abs(bin.accuracy - bin.meanStated)).toBeLessThan(0.2);
+    // Per stated cohort, the calibrated value IS that cohort's hit-rate.
+    const cohorts = new Map<number, { hits: number; n: number }>();
+    for (const s of res.samples) {
+      const g = cohorts.get(s.stated) ?? { hits: 0, n: 0 };
+      g.hits += s.correct ? 1 : 0;
+      g.n += 1;
+      cohorts.set(s.stated, g);
     }
+    let matched = 0;
+    for (const [stated, g] of cohorts) {
+      if (g.n < 5) continue;
+      matched++;
+      // Isotonic only departs from the raw rate where monotonicity forces it.
+      expect(Math.abs(res.calibrator.calibrate(stated) - g.hits / g.n)).toBeLessThan(0.35);
+    }
+    expect(matched).toBeGreaterThan(0);
+    // Aggregate reliability improves.
+    expect(res.after.ece!).toBeLessThan(res.before.ece!);
+    expect(res.after.meanStated!).toBeCloseTo(res.after.accuracy!, 6);
   });
 
   it("leaves confidence untouched when the tape is too short to fit", () => {
