@@ -17,6 +17,9 @@ export type MarkerTrade = {
   trade_date: string;
   /** Full timestamp when known — preferred for hourly series. */
   executed_at?: string | null;
+  /** Trade currency, used to route the commission schedule. */
+  instrument_ccy?: string | null;
+  asset_class?: string | null;
 };
 
 export type TradeMarkerCell = {
