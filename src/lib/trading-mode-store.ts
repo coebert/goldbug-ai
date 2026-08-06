@@ -104,7 +104,11 @@ export function detectTradingModeDrift(
   riskConfig: unknown,
   cached: TradingStyle | null,
 ): { drifted: boolean; engineStyle: TradingStyle | null; cachedStyle: TradingStyle | null } {
-  const engineStyle = styleFromRiskConfig(riskConfig);
+  const cfg = (riskConfig ?? {}) as Record<string, unknown>;
+  // A junk value ("Swing", 1, "") is not "unknown" — the engine coerces it to
+  // position, so the UI must too, otherwise the cache silently wins.
+  const engineStyle: TradingStyle | null =
+    "trading_style" in cfg ? (cfg["trading_style"] === "swing" ? "swing" : "position") : null;
   if (!engineStyle || !cached) return { drifted: false, engineStyle, cachedStyle: cached };
   return { drifted: engineStyle !== cached, engineStyle, cachedStyle: cached };
 }
