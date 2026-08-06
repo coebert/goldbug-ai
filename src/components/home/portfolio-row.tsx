@@ -746,7 +746,10 @@ function HoldingsStrip({
                 maximumFractionDigits: 4,
               })} @ ${currency} ${r.avg.toFixed(2)} · ${w.toFixed(1)}% of portfolio`}
             >
-              <span className="truncate font-semibold tracking-tight">{r.symbol}</span>
+              <SymbolTicker
+                symbol={r.symbol}
+                className="truncate font-semibold tracking-tight"
+              />
               <span className="truncate text-muted-foreground">{fmtVal(r.value)}</span>
               <span className="shrink-0 rounded-sm bg-primary/10 px-1 text-[10px] font-medium text-primary">
                 {w.toFixed(1)}%
