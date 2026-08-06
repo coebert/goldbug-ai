@@ -230,7 +230,13 @@ export function scaleFrictions(base: Frictions, scale: number): Frictions {
     ...(base.buyTaxBps !== undefined ? { buyTaxBps: s(base.buyTaxBps)! } : {}),
     ...(base.slippageBps !== undefined ? { slippageBps: s(base.slippageBps)! } : {}),
     ...(base.impactPerUnit !== undefined ? { impactPerUnit: s(base.impactPerUnit)! } : {}),
+    // The liquidity model rides the same cost axis via its bps multiplier
+    // (ADV itself is a market property and must not be scaled here).
+    ...(base.liquidity
+      ? { liquidity: { ...base.liquidity, costScale: (base.liquidity.costScale ?? 1) * scale } }
+      : {}),
   };
+
 }
 
 /** Build the cost axis from a baseline model and a list of scales. */
