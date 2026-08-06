@@ -361,10 +361,27 @@ export function renderBacktestReportHtml(args: {
   th, td { text-align:right; padding:4px 8px; border-bottom:1px solid var(--grid); }
   th:first-child, td:first-child { text-align:left; }
   th { color:var(--muted); font-weight:600; }
+  .chart-wrap { position:relative; margin:0; }
+  .hit { cursor:crosshair; }
+  .cross { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:.8; }
+  .dot { stroke:var(--panel); stroke-width:1.5; }
+  .chart-tip { position:absolute; pointer-events:none; z-index:2; min-width:190px;
+               background:rgba(11,18,32,.96); border:1px solid var(--grid); border-radius:8px;
+               padding:6px 8px; font-size:11px; box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  .chart-tip[hidden] { display:none; }
+  .tip-head { color:var(--muted); margin-bottom:4px; }
+  .tip-head-row { color:var(--muted); }
+  .tip-row { display:grid; grid-template-columns:10px 1fr auto auto; gap:6px; align-items:center;
+             white-space:nowrap; }
+  .tip-swatch { width:8px; height:8px; border-radius:2px; }
+  .tip-val, .tip-dd { font-variant-numeric:tabular-nums; text-align:right; min-width:56px; }
+  .tip-dd { color:var(--muted); }
 </style></head>
 <body>
   <h1>${esc(args.title)}</h1>
   ${args.subtitle ? `<p class="lead">${esc(args.subtitle)}</p>` : ""}
   ${panels}
+<script>${HOVER_SCRIPT}</script>
 </body></html>`;
+
 }
