@@ -79,9 +79,38 @@ describe("backtest report charts", () => {
     expect(html.match(/<section class="panel">/g)).toHaveLength(2);
     expect(html).toContain("balanced risk");
     expect(html).toContain("<table>");
-    expect(html).not.toMatch(/<script/i);
+    // Exactly one inline script: the hover/tooltip driver.
+    expect(html.match(/<script>/g)).toHaveLength(1);
+    expect(html).toContain("chart-tip");
     expect(html).not.toContain("undefined");
   });
+
+  it("embeds hover geometry with equity and drawdown for every bar", () => {
+    const svg = renderEquityChart([series("ai · swing", [100, 110, 99])], "Equity");
+    const match = svg.match(/data-hover="([^"]+)"/);
+    expect(match).toBeTruthy();
+    const payload = JSON.parse(
+      (match as RegExpMatchArray)[1]!
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&"),
+    );
+    expect(payload.xs).toHaveLength(3);
+    expect(payload.labels[1]).toBe("bar 1 · 2026-01-02");
+    expect(payload.series[0].equity.map(Math.round)).toEqual([0, 10, -1]);
+    expect(payload.series[0].drawdown[2]).toBeCloseTo(-10, 1);
+    expect(payload.series[0].px.every((v: number | null) => Number.isFinite(v))).toBe(true);
+    expect(svg).toContain('class="hit"');
+    expect(svg).toContain('class="dot"');
+  });
+
+  it("keeps the drawdown chart hoverable with its own marker positions", () => {
+    const svg = renderDrawdownChart([series("ai · swing", [100, 90])], "Drawdown");
+    expect(svg).toContain("data-hover=");
+    expect((svg.match(/class="dot"/g) ?? []).length).toBe(1);
+  });
+
 
   it("escapes labels so a hostile series name cannot inject markup", () => {
     const html = renderBacktestReportHtml({
