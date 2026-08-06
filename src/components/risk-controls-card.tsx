@@ -39,6 +39,7 @@ import {
   resolveAggressiveness,
 } from "@/lib/risk-aggressiveness";
 import { qk } from "@/lib/query-keys";
+import { TradingModeDriftNotice } from "@/components/trading-mode-drift-notice";
 import { TradingModeBadge } from "@/components/trading-mode-badge";
 import { writeCachedTradingMode } from "@/lib/trading-mode-store";
 
@@ -392,6 +393,13 @@ export function RiskControlsCard({
             />
           </CardHeader>
         </CollapsibleTrigger>
+        {/* Outside the trigger: it has its own dismiss button. */}
+        <TradingModeDriftNotice
+          portfolioId={portfolioId}
+          riskConfig={{ trading_style: initial.trading_style ?? "position" }}
+          className="mx-6 mb-4"
+        />
+
         <CollapsibleContent>
           <CardContent className="space-y-6">
             <div className="rounded-md border border-border bg-muted/30 p-4">
