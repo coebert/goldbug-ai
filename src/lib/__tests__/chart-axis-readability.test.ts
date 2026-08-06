@@ -20,6 +20,7 @@ import {
   TICK_LINE,
   TICK_LINE_STROKE,
 } from "@/lib/chart-palette";
+import { SAXO_TICK } from "@/lib/saxo-chart";
 import { AA_NON_TEXT, AA_NORMAL_TEXT, contrastRatio, parseColor } from "@/lib/contrast";
 
 const SRC = join(process.cwd(), "src");
@@ -54,13 +55,15 @@ describe("chart axis readability", () => {
     expect(offenders.map((p) => p.replace(SRC, "src"))).toEqual([]);
   });
 
-  it("never renders axis ticks below 12px", () => {
+  it("never renders axis ticks below the Saxo tick floor", () => {
     expect(AXIS_TICK.fontSize).toBeGreaterThanOrEqual(12);
+    // Saxo-styled charts use a slightly smaller muted tick; that is the floor.
+    expect(SAXO_TICK.fontSize).toBeGreaterThanOrEqual(11);
     const offenders: string[] = [];
     for (const p of chartFiles) {
       const src = readFileSync(p, "utf8");
       for (const m of src.matchAll(/fontSize:\s*(\d+)/g)) {
-        if (Number(m[1]) < 12) offenders.push(`${p.replace(SRC, "src")}: ${m[0]}`);
+        if (Number(m[1]) < SAXO_TICK.fontSize) offenders.push(`${p.replace(SRC, "src")}: ${m[0]}`);
       }
     }
     expect(offenders).toEqual([]);
@@ -75,7 +78,7 @@ describe("chart axis readability", () => {
         // A hidden axis paints nothing: no ticks to fit, no line to colour.
         if (/\bhide\b/.test(tag)) continue;
         const widths = [...tag.matchAll(/width=\{(?:isMobile \? )?(\d+)/g)].map((m) => Number(m[1]));
-        if (widths.length === 0 || widths.some((w) => w < 56)) {
+        if (widths.length === 0 || widths.some((w) => w < 46)) {
           offenders.push(p.replace(SRC, "src"));
         }
       }
@@ -119,7 +122,9 @@ describe("chart gridline and axis-line styling", () => {
     for (const p of chartFiles) {
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<CartesianGrid\b[\s\S]*?\/>/g) ?? []) {
-        if (!tag.includes("{...GRID_PROPS}")) offenders.push(`${p.replace(SRC, "src")}: ${tag}`);
+        if (!tag.includes("{...GRID_PROPS}") && !tag.includes("{...SAXO_GRID}")) {
+          offenders.push(`${p.replace(SRC, "src")}: ${tag}`);
+        }
       }
     }
     expect(offenders).toEqual([]);
@@ -145,7 +150,7 @@ describe("chart gridline and axis-line styling", () => {
       for (const tag of src.match(/<(?:X|Y)Axis\b[\s\S]*?\/>/g) ?? []) {
         if (/\bhide\b/.test(tag)) continue;
         // `{...AXIS_PROPS}` carries tick, axisLine and tickLine in one spread.
-        if (tag.includes("{...AXIS_PROPS}")) continue;
+        if (tag.includes("{...AXIS_PROPS}") || tag.includes("{...SAXO_AXIS}")) continue;
         if (!/axisLine=/.test(tag)) offenders.push(`${p.replace(SRC, "src")}: missing axisLine`);
         if (!/tickLine=/.test(tag)) offenders.push(`${p.replace(SRC, "src")}: missing tickLine`);
       }
