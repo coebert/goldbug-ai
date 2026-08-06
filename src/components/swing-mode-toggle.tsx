@@ -72,6 +72,8 @@ export function SwingModeToggle({
         },
       }),
     onSuccess: (_r, next) => {
+      // Only persist once the server accepted the change.
+      setStyle(next ? "swing" : "position");
       qc.invalidateQueries({ queryKey: qk.portfolio.detail(portfolioId) });
       toast.success(
         next
@@ -89,6 +91,7 @@ export function SwingModeToggle({
     setActive(next);
     mut.mutate(next);
   };
+
 
   return (
     <Card className={active ? "border-primary/50" : undefined}>
