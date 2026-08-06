@@ -115,6 +115,13 @@ export type StyleRunMetrics = {
    * starting equity. Feeds the fee-efficient optimiser objective.
    */
   feeDrag: FeeDragBreakdown;
+  /**
+   * Proof that the `feeDrag` split above is reproducible from `tradeLog`:
+   * commission, minimum-fee floors, slippage/impact and FX/taxes are all
+   * re-derived from the executed fills and compared component by component.
+   * Optional so hand-built metrics still typecheck.
+   */
+  feeDragAudit?: FeeDragAudit;
   finalCashPct: number;
   exitMix: Record<string, number>;
   /**
