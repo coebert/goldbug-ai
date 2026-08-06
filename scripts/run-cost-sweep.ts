@@ -266,18 +266,6 @@ const costReturnPanels = styles.flatMap((style) =>
 panels.unshift(...costReturnPanels);
 
 panels.unshift({
-  heading: "Robustness ranking",
-  subtitle:
-    `single score per ${robustnessGroupBy} across all ${gridWidth(cells)} cost scenarios · ` +
-    summariseRobustness(robustness),
-  series: [],
-  table: {
-    columns: [...ROBUSTNESS_COLUMNS],
-    rows: robustnessTableRows(robustness),
-  },
-});
-
-panels.push({
   heading: "Breakeven summary",
   subtitle: "cost level at which each ticket size turns viable",
   series: [],
@@ -296,6 +284,19 @@ panels.push({
     rows: breakRows,
   },
 });
+
+panels.unshift({
+  heading: "Robustness ranking",
+  subtitle:
+    `single score per ${robustnessGroupBy} across all ${gridWidth(cells)} cost scenarios · ` +
+    summariseRobustness(robustness),
+  series: [],
+  table: {
+    columns: [...ROBUSTNESS_COLUMNS],
+    rows: robustnessTableRows(robustness),
+  },
+});
+
 
 mkdirSync("reports", { recursive: true });
 const outPath = "reports/cost-sweep.html";
