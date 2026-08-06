@@ -8,6 +8,13 @@
 // Pure and client-safe — no recharts, no DOM. The rendering shapes live in
 // `src/components/charts/trade-markers.tsx`.
 
+import {
+  computeCommission,
+  type CommissionBreakdown,
+  type CommissionInput,
+  type CommissionModel,
+} from "./commission-model";
+
 export type MarkerTrade = {
   symbol: string;
   side: "buy" | "sell";
@@ -17,6 +24,9 @@ export type MarkerTrade = {
   trade_date: string;
   /** Full timestamp when known — preferred for hourly series. */
   executed_at?: string | null;
+  /** Trade currency, used to route the commission schedule. */
+  instrument_ccy?: string | null;
+  asset_class?: string | null;
 };
 
 export type TradeMarkerCell = {
@@ -121,22 +131,79 @@ export function attachTradeMarkers<R extends Record<string, unknown>>(
   });
 }
 
+/** Commission the tiered model charges for a marker trade. */
+export function tradeCommission(
+  t: MarkerTrade,
+  model?: CommissionModel,
+): CommissionBreakdown {
+  const quantity = Math.abs(Number(t.quantity) || 0);
+  const price = Math.abs(Number(t.price) || 0);
+  return computeCommission({
+    notional: quantity * price,
+    quantity,
+    symbol: t.symbol,
+    currency: t.instrument_ccy ?? null,
+    assetClass: (t.asset_class ?? null) as CommissionInput["assetClass"],
+    model,
+  });
+}
+
+/**
+ * One-line fee breakdown: effective bps, the per-ticket floor/cap that bound
+ * it, the per-share component when the venue charges one, and the total fee.
+ */
+export function describeCommission(
+  b: CommissionBreakdown,
+  money: (v: number) => string,
+): string {
+  const parts: string[] = [];
+  parts.push(Number.isFinite(b.bps) ? `${b.bps.toFixed(1)} bps` : "— bps");
+  const floor = b.tier.min ?? 0;
+  if (floor > 0) parts.push(`floor ${money(floor)}${b.minFloorApplied ? " ✓" : ""}`);
+  const cap = b.tier.cap ?? 0;
+  if (cap > 0) parts.push(`cap ${money(cap)}${b.capApplied ? " ✓" : ""}`);
+  const perUnitRate = (b.tier.perUnit ?? 0) * b.volumeMultiplier;
+  if (perUnitRate > 0) {
+    parts.push(`${money(perUnitRate)}/sh → ${money(b.perUnit)}`);
+  }
+  parts.push(`fee ${money(b.commission)}`);
+  return `   ${parts.join(" · ")}`;
+}
+
+export type MarkerCellOptions = {
+  /** Append a commission breakdown line under each trade plus a total. */
+  commission?: boolean;
+  model?: CommissionModel;
+};
+
 /** Compact tooltip lines describing what was executed at a point. */
 export function describeMarkerCell(
   cell: TradeMarkerCell | null | undefined,
   money: (v: number) => string,
   maxLines = 4,
+  options?: MarkerCellOptions,
 ): string[] {
   if (!cell || cell.trades.length === 0) return [];
-  const lines = cell.trades
-    .slice(0, maxLines)
-    .map(
-      (t) =>
-        `${t.side === "buy" ? "▲ BUY" : "▼ SELL"} ${t.symbol} · ${
-          Math.abs(Number(t.quantity) || 0)
-        } @ ${money(Math.abs(Number(t.price) || 0))}`,
+  const shown = cell.trades.slice(0, maxLines);
+  const lines: string[] = [];
+  for (const t of shown) {
+    lines.push(
+      `${t.side === "buy" ? "▲ BUY" : "▼ SELL"} ${t.symbol} · ${
+        Math.abs(Number(t.quantity) || 0)
+      } @ ${money(Math.abs(Number(t.price) || 0))}`,
     );
-  const extra = cell.trades.length - lines.length;
+    if (options?.commission) {
+      lines.push(describeCommission(tradeCommission(t, options.model), money));
+    }
+  }
+  const extra = cell.trades.length - shown.length;
   if (extra > 0) lines.push(`+${extra} more`);
+  if (options?.commission && cell.trades.length > 1) {
+    const total = cell.trades.reduce(
+      (a, t) => a + tradeCommission(t, options.model).commission,
+      0,
+    );
+    lines.push(`   Total fees ${money(total)}`);
+  }
   return lines;
 }

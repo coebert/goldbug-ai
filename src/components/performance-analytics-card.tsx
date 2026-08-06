@@ -76,7 +76,9 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
     [data?.drawdownCurve, marks],
   );
   const markerTooltip = (item: { payload?: { marker?: TradeMarkerCell | null } } | undefined) =>
-    describeMarkerCell(item?.payload?.marker ?? null, (v) => fmtCcyPrecise.format(v));
+    describeMarkerCell(item?.payload?.marker ?? null, (v) => fmtCcyPrecise.format(v), 4, {
+      commission: true,
+    });
 
   return (
     <Card>
