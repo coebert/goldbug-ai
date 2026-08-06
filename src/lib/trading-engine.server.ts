@@ -1652,6 +1652,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         { label: `fear${fearIndex.score.toFixed(0)}`, mult: fearIndex.sizeMultiplier },
         { label: "dd", mult: ddSizing.size_multiplier },
         { label: "sector", mult: secMult.mult },
+        phaseMult.mult < 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
         { label: "event", mult: evPenalty },
         fundGate.mult < 1 ? { label: "financials", mult: fundGate.mult } : null,
 
@@ -1662,6 +1663,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         if (systematic.note) sizingNotes.push(systematic.note);
         if (haircuts.floored) sizingNotes.push("haircut floor applied");
       }
+      if (phaseMult.mult > 1) {
+        spend *= phaseMult.mult;
+      }
+      if (phaseMult.note) sizingNotes.push(phaseMult.note);
       if (fundGate.note) sizingNotes.push(fundGate.note);
 
 
