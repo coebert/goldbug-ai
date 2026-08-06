@@ -15,7 +15,9 @@
 // can be unit tested.
 
 import type { EquityPoint } from "./backtest-metrics";
+import { buildRegimeCostReport } from "./regime-cost-attribution";
 import type { RegimeCostSummary, WindowCosts } from "./regime-cost-attribution";
+
 
 
 export type RegimeLabel = "bull" | "bear" | "sideways";
