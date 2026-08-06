@@ -179,7 +179,11 @@ export async function runStyleBacktest(args: {
    * is traded at the close with only `feePerTrade`.
    */
   simulator?: SimulateOptions;
-
+  /**
+   * Override the per-risk-level entry sleeve (ticket size + breadth). Used by
+   * the cost sweep to test whether bigger tickets amortise fixed commissions.
+   */
+  sleeve?: { maxNames: number; perNameWeight: number };
 }): Promise<Omit<StyleRunMetrics, "style" | "horizon" | "seed">> {
   const { cfg, bars, riskLevel, startingCash, feePerTrade } = args;
   const policy = args.policy ?? heuristicStylePolicy;
@@ -342,7 +346,7 @@ export async function runStyleBacktest(args: {
         0,
       );
       const equityNow = state.cash + holdingsValue;
-      const sleeve = ENTRY_SLEEVE[riskLevel];
+      const sleeve = args.sleeve ?? ENTRY_SLEEVE[riskLevel];
       const cashFloor = equityNow * (cfg.cash_floor_pct ?? 0.05);
       let cashAvail = Math.max(0, state.cash - cashFloor);
 
