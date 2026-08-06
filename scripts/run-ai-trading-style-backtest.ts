@@ -17,6 +17,12 @@ import {
 import { createAiStylePolicy, type AiStylePolicyStats } from "../src/lib/ai-style-policy.server";
 import { buildPriceTape, DEFAULT_UNIVERSE, type RiskLevel } from "../src/lib/risk-sim-matrix";
 import type { TradingStyle } from "../src/lib/trading-style";
+import {
+  renderBacktestReportHtml,
+  type ChartSeries,
+  type ReportPanel,
+} from "../src/lib/backtest-report-chart";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 const key = process.env["LOVABLE_API_KEY"];
 if (!key) throw new Error("LOVABLE_API_KEY missing");
@@ -169,3 +175,59 @@ console.log(
   `\nAI policy: ${stats.calls} model calls, ${stats.cacheHits} cache hits, ${stats.failures} schema misses (${stats.repaired} repaired), ` +
     `${stats.orders} orders across ${stats.calls + stats.cacheHits} decisions (${stats.emptyDecisions} no-action).`,
 );
+
+// ---- Visual report: equity curve + drawdown per risk level -----------------
+const SERIES_COLOUR: Record<TradingStyle, string> = {
+  position: "#4da3ff",
+  swing: "#33d69f",
+};
+
+const panels: ReportPanel[] = RISK.map((riskLevel) => {
+  const series: ChartSeries[] = [];
+  for (const layer of ["ai", "heuristic"] as const) {
+    for (const style of STYLES) {
+      const m = averaged.get(`${layer}|${riskLevel}|${style}`)!;
+      series.push({
+        label: `${layer} · ${style}`,
+        colour: SERIES_COLOUR[style],
+        dashed: layer === "heuristic",
+        curve: m.equityCurve,
+      });
+    }
+  }
+  const rows = series.map((s) => {
+    const [layer, style] = s.label.split(" · ") as ["ai" | "heuristic", TradingStyle];
+    const m = averaged.get(`${layer}|${riskLevel}|${style}`)!;
+    return [
+      s.label,
+      m.totalReturnPct.toFixed(2),
+      m.maxDrawdownPct.toFixed(2),
+      m.sharpe.toFixed(2),
+      m.calmar.toFixed(2),
+      m.tradesPerYear.toFixed(1),
+      m.feeDragPct.toFixed(2),
+      m.finalCashPct.toFixed(1),
+    ];
+  });
+  return {
+    heading: `${riskLevel} risk`,
+    subtitle: `solid = AI decision layer, dashed = heuristic control · seeds ${SEEDS.join(", ")} averaged`,
+    series,
+    table: {
+      columns: ["Cell", "Ret%", "MaxDD%", "Sharpe", "Calmar", "Trd/y", "Fee%", "Cash%"],
+      rows,
+    },
+  };
+});
+
+const html = renderBacktestReportHtml({
+  title: "Swing vs position — AI backtest report",
+  subtitle: `${BARS} bars · AI decisions every ${CADENCE} bars · start £${START} · £${FEE}/trade · gemini-2.5-flash`,
+  panels,
+});
+
+const outDir = process.env["AI_BT_OUT_DIR"] ?? "/mnt/documents";
+mkdirSync(outDir, { recursive: true });
+const outPath = `${outDir}/trading-style-backtest.html`;
+writeFileSync(outPath, html);
+console.log(`\nChart report written to ${outPath}`);
