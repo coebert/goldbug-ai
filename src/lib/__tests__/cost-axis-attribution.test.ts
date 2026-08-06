@@ -176,7 +176,7 @@ describe("attributeFrontierFailures", () => {
 describe("pairRoundTrips / worstCostPeriods", () => {
   const trades = [
     { date: "2024-01-02", side: "buy" as const, symbol: "AAPL", quantity: 10, price: 100 },
-    { date: "2024-01-09", side: "sell" as const, symbol: "AAPL", quantity: 10, price: 101 },
+    { date: "2024-01-09", side: "sell" as const, symbol: "AAPL", quantity: 10, price: 100.5 },
     { date: "2024-02-01", side: "buy" as const, symbol: "MSFT", quantity: 5, price: 200 },
     { date: "2024-03-01", side: "sell" as const, symbol: "MSFT", quantity: 5, price: 180 },
     { date: "2024-04-01", side: "buy" as const, symbol: "KO", quantity: 20, price: 50 },
@@ -193,11 +193,11 @@ describe("pairRoundTrips / worstCostPeriods", () => {
   it("costs each round trip and detects cost-flipped winners", () => {
     const trips = pairRoundTrips(trades, frictions);
     const aapl = trips[0]!;
-    expect(aapl.grossPnl).toBeCloseTo(10, 8);
+    expect(aapl.grossPnl).toBeCloseTo(5, 8);
     expect(aapl.costAmount).toBeGreaterThan(0);
     expect(aapl.netPnl).toBeCloseTo(aapl.grossPnl - aapl.costAmount, 10);
-    expect(aapl.flippedByCosts).toBe(true); // £6 min commission + slippage > £10 gross
-    expect(aapl.costShareOfGross).toBeGreaterThan(0.5);
+    expect(aapl.flippedByCosts).toBe(true); // £6 min commission + £1 slippage > £5 gross
+    expect(aapl.costShareOfGross).toBeGreaterThan(1);
   });
 
   it("splits partial sells across lots", () => {
