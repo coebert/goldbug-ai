@@ -240,8 +240,17 @@ console.log(`\n${summariseReport(report, gate)}`);
 
 for (const s of report.summaries) {
   if (s.windows === 0) {
-    console.log(`  ${s.regime}: no out-of-sample window landed in this regime — widen --from.`);
+    console.log(
+      `  ${s.regime}: no out-of-sample window landed in this regime — widen --from or raise --overlap.`,
+    );
+  } else if (!s.sufficientEvidence) {
+    console.log(
+      `  ${s.regime}: only ${s.effectiveWindows.toFixed(1)} independent windows (${s.windows} raw at ` +
+        `${Math.round(s.overlapShare * 100)}% overlap) vs the --min-eff ${gate.minEffectiveWindows} ` +
+        `requirement — verdict withheld, lengthen the history rather than the overlap.`,
+    );
   } else if (!s.drawdownStable) {
+
     console.log(
       `  ${s.regime}: drawdown breach — worst ${s.worstMaxDrawdownPct.toFixed(1)}% vs the ` +
         `-${gate.maxDrawdownPct}% ceiling.`,
