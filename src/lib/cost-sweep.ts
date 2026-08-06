@@ -234,16 +234,27 @@ export function findBreakevenScale(
     baseFrictions?: Frictions;
     /** Notional of one position, used with `baseFrictions`. */
     ticketValue?: number;
+    /**
+     * Execution-cost / minimum-fee assumptions that were held fixed across
+     * the series. They are re-applied after scaling so the bps read-out
+     * does not scale terms the sweep never varied.
+     */
+    fixedSlippage?: SlippageSpec;
+    fixedMinCommission?: number;
   } = {},
 ): BreakevenResult {
   const target = opts.target ?? "zero";
   const sorted = [...cells].sort((a, b) => a.scenario.scale - b.scenario.scale);
   if (sorted.length === 0) return { scale: null, verdict: "never", roundTripBps: null };
 
-  const bpsAt = (scale: number): number | null =>
-    opts.baseFrictions && opts.ticketValue !== undefined
-      ? roundTripCostBps(scaleFrictions(opts.baseFrictions, scale), opts.ticketValue)
-      : null;
+  const bpsAt = (scale: number): number | null => {
+    if (!opts.baseFrictions || opts.ticketValue === undefined) return null;
+    let f = scaleFrictions(opts.baseFrictions, scale);
+    if (opts.fixedSlippage) f = applySlippage(f, opts.fixedSlippage);
+    if (opts.fixedMinCommission !== undefined) f = applyMinCommission(f, opts.fixedMinCommission);
+    return roundTripCostBps(f, opts.ticketValue);
+  };
+
 
   const scores = sorted.map((c) => cellScore(c, target));
   if (scores.every((s) => s > 0)) {
