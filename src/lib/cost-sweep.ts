@@ -31,7 +31,58 @@ export type CostScenario = {
   slippage?: SlippageSpec;
   /** Per-trade minimum commission this scenario was built with, when varied. */
   minCommission?: number;
+  /** Liquidity assumption this scenario was built with, when varied. */
+  liquidity?: LiquiditySpec;
 };
+
+/**
+ * One point on the liquidity axis. `advScale` multiplies every symbol's
+ * measured average daily traded value: 1 = the tape's own liquidity,
+ * 0.25 = books a quarter as deep (equivalently, tickets 4x larger
+ * relative to the book), 4 = mega-cap depth.
+ *
+ * When a liquidity spec is attached the simulator estimates spread and
+ * slippage PER FILL from participation vs ADV instead of using a flat
+ * bps assumption, so the same ticket costs more in thin names.
+ */
+export type LiquiditySpec = {
+  label: string;
+  advScale: number;
+  /** Optional extra multiplier on the modelled per-side bps. */
+  costScale?: number;
+  urgency?: "passive" | "normal" | "aggressive";
+};
+
+/** Sensible default depth axis: thin → deep. */
+export const DEFAULT_LIQUIDITY_SPECS: LiquiditySpec[] = [
+  { label: "thin 0.25x ADV", advScale: 0.25 },
+  { label: "as-traded ADV", advScale: 1 },
+  { label: "deep 4x ADV", advScale: 4 },
+];
+
+/**
+ * Attach the liquidity-aware execution model to a friction set, replacing
+ * the flat slippage terms (the simulator ignores them when
+ * `liquidity` is present).
+ */
+export function applyLiquidity(
+  base: Frictions,
+  spec: LiquiditySpec,
+  profile: LiquidityProfile,
+): Frictions {
+  if (!Number.isFinite(spec.advScale) || spec.advScale <= 0) {
+    throw new Error(`applyLiquidity: invalid advScale ${spec.advScale}`);
+  }
+  const scaled = scaleLiquidity(profile, spec.advScale);
+  return {
+    ...base,
+    liquidity: liquidityFrictions(scaled, {
+      ...(spec.costScale !== undefined ? { costScale: spec.costScale } : {}),
+      ...(spec.urgency ? { urgency: spec.urgency } : {}),
+    }),
+  };
+}
+
 
 /**
  * One point on the execution-cost axis: how much the price moves against
