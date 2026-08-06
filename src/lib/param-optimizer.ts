@@ -180,6 +180,28 @@ export function evaluateConstraints(
   if (c.minTrades !== undefined && m.trades < c.minTrades) {
     violations.push(`only ${m.trades} trades (< ${c.minTrades})`);
   }
+  // Fee-drag limits are *soft*: they demote a candidate rather than kill it,
+  // exactly like turnover. The drawdown ceiling above stays the hard risk
+  // constraint, so the optimiser can never trade risk for cheapness.
+  if (objective.kind === "fee_efficient_cagr") {
+    const fees = annualFeeDrag(m);
+    if (
+      objective.maxAnnualFeeDragPct !== undefined &&
+      fees > objective.maxAnnualFeeDragPct + 1e-9
+    ) {
+      violations.push(
+        `fee drag ${fees.toFixed(2)}%/yr > ${objective.maxAnnualFeeDragPct.toFixed(2)}%/yr`,
+      );
+    }
+    if (objective.minFeeEfficiency !== undefined) {
+      const eff = feeEfficiency(m.cagrPct, fees);
+      if (eff < objective.minFeeEfficiency - 1e-9) {
+        violations.push(
+          `fee efficiency ${Number.isFinite(eff) ? eff.toFixed(2) : "∞"}x < ${objective.minFeeEfficiency.toFixed(2)}x`,
+        );
+      }
+    }
+  }
   if (c.enforceNoLeverage !== false && m.audit) {
     if (m.audit.minCash < -1e-6) {
       violations.push(`borrowed cash (min ${m.audit.minCash.toFixed(2)})`);
