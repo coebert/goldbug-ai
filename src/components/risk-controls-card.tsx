@@ -211,6 +211,16 @@ function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
     );
   }
   push("Diversification tilt", prev.diversification_tilt ?? "off", next.diversification_tilt ?? "off");
+  push(
+    "Trading style",
+    prev.trading_style === "swing" ? "Swing (days–weeks)" : "Position (months)",
+    next.trading_style === "swing" ? "Swing (days–weeks)" : "Position (months)",
+  );
+  push(
+    "Swing min hold",
+    `${prev.swing_min_hold_days ?? 2}d`,
+    `${next.swing_min_hold_days ?? 2}d`,
+  );
   return out;
 }
 
