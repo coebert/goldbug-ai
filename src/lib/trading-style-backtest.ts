@@ -37,6 +37,7 @@ import {
 } from "@/lib/exits";
 import { minHoldDays, type TradingStyle } from "@/lib/trading-style";
 import { estimateFeeDrag, type FeeDragBreakdown } from "@/lib/fee-drag-objective";
+import { auditFeeDrag, fillsFromTradeLog, type FeeDragAudit } from "@/lib/fee-drag-audit";
 import type { PolicyOrder, StylePolicy } from "@/lib/style-policy";
 import type { RiskConfig } from "@/lib/universe.server";
 
@@ -114,6 +115,13 @@ export type StyleRunMetrics = {
    * starting equity. Feeds the fee-efficient optimiser objective.
    */
   feeDrag: FeeDragBreakdown;
+  /**
+   * Proof that the `feeDrag` split above is reproducible from `tradeLog`:
+   * commission, minimum-fee floors, slippage/impact and FX/taxes are all
+   * re-derived from the executed fills and compared component by component.
+   * Optional so hand-built metrics still typecheck.
+   */
+  feeDragAudit?: FeeDragAudit;
   finalCashPct: number;
   exitMix: Record<string, number>;
   /**
@@ -558,6 +566,34 @@ export async function runStyleBacktest(args: {
   };
 
 
+  const tradeLog: StyleTradeRow[] = result.snapshots
+    .filter((s) => s.fillQuantity > 0)
+    .map((s) => ({
+      date: s.date,
+      side: s.side === "BUY" ? ("buy" as const) : ("sell" as const),
+      symbol: s.symbol,
+      quantity: s.fillQuantity,
+      price: s.fillPrice,
+      fee: s.fee || 0,
+    }));
+
+  const feeDragPct =
+    (result.snapshots.reduce((sum, s) => sum + (s.fee || 0), 0) / startingCash) * 100;
+  const feeDrag = estimateFeeDrag(
+    fillsFromTradeLog(tradeLog),
+    args.simulator?.frictions,
+    startingCash,
+  );
+  // Fee drag is the one cost the optimiser is allowed to optimise against, so
+  // the breakdown it ranks on must provably come from the fills that executed.
+  const feeDragAudit = auditFeeDrag({
+    rows: tradeLog,
+    frictions: args.simulator?.frictions,
+    startingCash,
+    reported: feeDrag,
+    reportedFeeDragPct: feeDragPct,
+  });
+
   return {
     riskLevel,
     bars: bars.length,
@@ -578,36 +614,19 @@ export async function runStyleBacktest(args: {
         ? holdBarsClosed.reduce((a, b) => a + b, 0) / holdBarsClosed.length
         : 0,
     tradesPerYear: years > 0 ? (buys + sells) / years : 0,
-    feeDragPct: (result.snapshots.reduce((sum, s) => sum + (s.fee || 0), 0) / startingCash) * 100,
+    feeDragPct,
     years,
-    feeDrag: estimateFeeDrag(
-      result.snapshots
-        .filter((s) => s.fillQuantity > 0)
-        .map((s) => ({
-          notional: s.fillQuantity * s.fillPrice,
-          fee: s.fee || 0,
-          side: s.side === "BUY" ? ("BUY" as const) : ("SELL" as const),
-        })),
-      args.simulator?.frictions,
-      startingCash,
-    ),
+    feeDrag,
+    feeDragAudit,
     finalCashPct: endEquity > 0 ? (result.finalState.cash / endEquity) * 100 : 0,
     exitMix,
     audit,
 
     equityCurve: equity,
-    tradeLog: result.snapshots
-      .filter((s) => s.fillQuantity > 0)
-      .map((s) => ({
-        date: s.date,
-        side: s.side === "BUY" ? ("buy" as const) : ("sell" as const),
-        symbol: s.symbol,
-        quantity: s.fillQuantity,
-        price: s.fillPrice,
-        fee: s.fee || 0,
-      })),
+    tradeLog,
   };
 }
+
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
@@ -659,6 +678,9 @@ export function averageStyleRuns(runs: StyleRunMetrics[]): StyleRunMetrics {
       slippagePct: pick((m) => m.feeDrag.slippagePct),
       otherPct: pick((m) => m.feeDrag.otherPct),
     },
+    // The averaged cell has no single fill set behind it, so a per-fill
+    // reconciliation would be meaningless — audits live on the per-seed runs.
+    feeDragAudit: undefined,
     finalCashPct: pick((m) => m.finalCashPct),
     exitMix,
     equityCurve: averageEquityCurves(runs.map((r) => r.equityCurve)),

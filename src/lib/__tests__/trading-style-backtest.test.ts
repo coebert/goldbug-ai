@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import { parseRiskConfig } from "@/lib/universe.server";
 import { buildPriceTape, DEFAULT_UNIVERSE } from "@/lib/risk-sim-matrix";
 import { runStyleBacktest, atrPctFrom } from "@/lib/trading-style-backtest";
+import { auditFeeDrag, formatFeeDragAudit } from "@/lib/fee-drag-audit";
 
 const tape = buildPriceTape(DEFAULT_UNIVERSE, 252, 20260731);
 const run = (style: "position" | "swing") =>
@@ -52,5 +53,36 @@ describe("trading-style backtest harness", () => {
   it("atrPctFrom returns a positive mean absolute daily move", () => {
     expect(atrPctFrom([100, 102, 100, 103])).toBeGreaterThan(0);
     expect(atrPctFrom([100])).toBe(0);
+  });
+});
+
+describe("backtest fee-drag output reconciles with its own fills", () => {
+  it("emits a passing audit whose components come from the trade log", async () => {
+    for (const style of ["position", "swing"] as const) {
+      const m = await run(style);
+      expect(m.feeDragAudit, `${style} run must publish a fee-drag audit`).toBeDefined();
+      const audit = m.feeDragAudit!;
+      expect(formatFeeDragAudit(audit)).toContain("reconciles");
+      expect(audit.ok).toBe(true);
+      expect(audit.fills).toBe(m.tradeLog.length);
+
+      // Independent re-derivation: the reported split must be exactly what the
+      // executed fills imply, component by component.
+      const redone = auditFeeDrag({
+        rows: m.tradeLog,
+        frictions: undefined,
+        startingCash: m.startEquity,
+        reported: m.feeDrag,
+        reportedFeeDragPct: m.feeDragPct,
+      });
+      expect(redone.ok).toBe(true);
+      expect(redone.reconstructed).toEqual(m.feeDrag);
+      expect(m.feeDrag.minFeePct).toBeLessThanOrEqual(m.feeDrag.commissionPct + 1e-9);
+      expect(m.feeDrag.commissionPct + m.feeDrag.otherPct).toBeCloseTo(m.feeDragPct, 9);
+      expect(audit.bookedFees).toBeCloseTo(
+        m.tradeLog.reduce((s, t) => s + (t.fee ?? 0), 0),
+        9,
+      );
+    }
   });
 });
