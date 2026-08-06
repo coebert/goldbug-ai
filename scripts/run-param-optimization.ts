@@ -41,11 +41,33 @@ import {
   turnoverCostCurve,
 } from "../src/lib/turnover-attribution";
 import {
+import {
   buildViabilityReport,
   describeRiskLevelViability,
   VERDICT_LABEL,
   type ViabilityRow,
 } from "../src/lib/viability-threshold";
+import {
+  buildCostGrid,
+  scenarioKey,
+  DEFAULT_SLIPPAGE_SPECS,
+  DEFAULT_LIQUIDITY_SPECS,
+  type CostScenario,
+  type LiquiditySpec,
+  type SlippageSpec,
+} from "../src/lib/cost-sweep";
+import { buildLiquidityProfile } from "../src/lib/liquidity-profile";
+import {
+  aggregateScenarioMetrics,
+  costRobustness,
+  describeCostScoreMode,
+  describeRobustness,
+  scenarioCostBps,
+  type CostRobustness,
+  type CostScoreMode,
+  type ScenarioRun,
+} from "../src/lib/cost-scenario-scoring";
+
 
 import type { EquityPoint } from "../src/lib/backtest-metrics";
 
