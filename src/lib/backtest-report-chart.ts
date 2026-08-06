@@ -316,9 +316,10 @@ export function renderBacktestReportHtml(args: {
   ${p.subtitle ? `<p class="sub">${esc(p.subtitle)}</p>` : ""}
   ${renderLegend(p.series)}
   <div class="charts">
-    ${renderEquityChart(p.series, "Equity curve (% from start)")}
-    ${renderDrawdownChart(p.series, "Drawdown (% from high-water mark)")}
+    ${withHoverTooltip(renderEquityChart(p.series, "Equity curve (% from start)"))}
+    ${withHoverTooltip(renderDrawdownChart(p.series, "Drawdown (% from high-water mark)"))}
   </div>
+
   ${
     p.table
       ? `<table><thead><tr>${p.table.columns
