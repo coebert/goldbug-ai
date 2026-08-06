@@ -1674,6 +1674,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           spend = livePolicy.deployableValue;
           sizingNotes.push(`invested≤${(livePolicy.maxInvestedPct * 100).toFixed(0)}%`);
         }
+        // A deployment boost may never spend cash we do not have, and never
+        // eats into the (already policy-adjusted) cash floor.
+        spend = Math.min(spend, Math.max(0, workingCash - cashFloor));
+
       }
 
 
