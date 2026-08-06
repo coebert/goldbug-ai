@@ -125,21 +125,42 @@ const TICKETS: TicketSpec[] = [
   { label: "3 x 30%", maxNames: 3, perNameWeight: 0.3 },
 ];
 
-const scenarios = buildCostGrid(BASE_FRICTIONS, {
-  scales,
-  slippage: slippageSpecs,
-  minCommission: minFees,
-});
-console.log(
-  `Cost grid: ${scales.length} scale(s) x ${slippageSpecs.length || 1} slippage x ` +
-    `${minFees.length || 1} min-fee = ${scenarios.length} scenarios`,
-);
-
 console.log(`Fetching real daily history ${from} → ${to} for ${symbols.length} symbols…`);
 const histories = await fetchUniverseHistory(symbols, { from, to });
 const tape = buildRealTape(histories, { mode, from, to });
 console.log(`Tape: ${tape.bars.length} bars, ${tape.symbols.length} symbols (mode=${mode}).`);
 if (tape.bars.length < 120) throw new Error("Tape too short to backtest");
+
+// Measured liquidity from the same bars the tape was built from — median
+// daily traded value and mean absolute daily return per symbol.
+const liquidityProfile = buildLiquidityProfile(histories);
+if (liquiditySpecs.length) {
+  console.log("\nMeasured liquidity (median daily traded value, vol proxy):");
+  for (const s of liquidityProfile.bySymbol) {
+    const adv = s.adv20d >= 1e9
+      ? `${(s.adv20d / 1e9).toFixed(2)}bn`
+      : `${(s.adv20d / 1e6).toFixed(1)}m`;
+    console.log(
+      `  ${s.symbol.padEnd(6)} ADV ${adv.padStart(8)}` +
+        `${s.advMissing ? " (no volume — median used)" : ""}` +
+        `  vol ${(s.atrPct * 100).toFixed(2)}%/day`,
+    );
+  }
+}
+
+const scenarios = buildCostGrid(BASE_FRICTIONS, {
+  scales,
+  slippage: slippageSpecs,
+  minCommission: minFees,
+  liquidity: liquiditySpecs,
+  liquidityProfile,
+});
+console.log(
+  `\nCost grid: ${scales.length} scale(s) x ${slippageSpecs.length || 1} slippage x ` +
+    `${minFees.length || 1} min-fee x ${liquiditySpecs.length || 1} liquidity = ` +
+    `${scenarios.length} scenarios`,
+);
+
 
 // ------------------------------------------------------- buy & hold ref
 function buyAndHold(): { curve: EquityPoint[]; ret: number } {
