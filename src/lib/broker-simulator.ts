@@ -400,22 +400,60 @@ function isFiniteNonNeg(n: number): boolean {
 }
 
 /**
+ * Per-side execution cost in bps for a fill, using the liquidity-aware
+ * microstructure model (half-spread + latency + sqrt-participation
+ * impact + urgency). Exported for TCA panels and tests.
+ */
+export function liquidityCostBps(
+  liq: LiquidityFrictions,
+  symbol: string,
+  notional: number,
+): number {
+  const adv = liq.adv20dBySymbol?.[symbol] ?? liq.defaultAdv20d ?? 0;
+  const atrPct = liq.atrPctBySymbol?.[symbol] ?? liq.defaultAtrPct ?? 0;
+  const { totalBps } = estimateSpreadSlippage({
+    notional,
+    ...(adv > 0 ? { adv20d: adv } : {}),
+    ...(atrPct > 0 ? { atrPct } : {}),
+    ...(liq.assetClassBySymbol?.[symbol]
+      ? { assetClass: liq.assetClassBySymbol[symbol] }
+      : {}),
+    ...(liq.currencyBySymbol?.[symbol] ? { currency: liq.currencyBySymbol[symbol] } : {}),
+    ...(liq.urgency ? { urgency: liq.urgency } : {}),
+  });
+  const scale = liq.costScale === undefined ? 1 : Math.max(0, liq.costScale);
+  return totalBps * scale;
+}
+
+/**
  * Effective (post-slippage) execution price for a given quoted price,
- * side, and fill quantity. BUYs pay up, SELLs receive down. Impact is
- * linear in qty. Returned price is clamped >= 0.
+ * side, and fill quantity. BUYs pay up, SELLs receive down.
+ *
+ * With `frictions.liquidity` the adverse move is size- and
+ * liquidity-dependent (participation vs ADV); otherwise it is the flat
+ * `slippageBps` plus a linear-in-quantity `impactPerUnit`. Returned price
+ * is clamped >= 0.
  */
 function effectiveFillPrice(
   quote: number,
   qty: number,
   side: Side,
   f: Frictions | undefined,
+  symbol?: string,
 ): number {
   if (!f) return quote;
+  if (f.liquidity) {
+    const bps = liquidityCostBps(f.liquidity, symbol ?? "", Math.max(0, qty * quote));
+    const frac = bps / 10_000;
+    if (side === "BUY") return quote * (1 + frac);
+    return Math.max(0, quote * (1 - frac));
+  }
   const slipFrac = (f.slippageBps ?? 0) / 10_000;
   const impact = (f.impactPerUnit ?? 0) * qty;
   if (side === "BUY") return quote * (1 + slipFrac) + impact;
   return Math.max(0, quote * (1 - slipFrac) - impact);
 }
+
 
 /** Context needed by the scaling commission model. */
 type FeeContext = { symbol: string; quantity: number };
