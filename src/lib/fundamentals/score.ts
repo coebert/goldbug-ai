@@ -45,11 +45,21 @@ function higherBetter(value: number | null, bad: number, good: number): number |
   return clamp1((value - bad) / (good - bad));
 }
 
+/**
+ * A negative P/E or PEG means the company has no earnings to value, which is a
+ * weakness — not a cheap multiple and not a neutral absence of data.
+ */
+function earningsMultiple(value: number | null, good: number, bad: number): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  if (value <= 0) return -0.6;
+  return lowerBetter(value, good, bad);
+}
+
 export function scoreValuation(f: Fundamentals): number | null {
   return meanOf([
-    lowerBetter(f.trailing_pe, 10, 45),
-    lowerBetter(f.forward_pe, 9, 38),
-    lowerBetter(f.peg, 0.8, 3.5),
+    earningsMultiple(f.trailing_pe, 10, 45),
+    earningsMultiple(f.forward_pe, 9, 38),
+    earningsMultiple(f.peg, 0.8, 3.5),
     lowerBetter(f.price_to_book, 1, 12),
     lowerBetter(f.ev_ebitda, 6, 25),
   ]);
