@@ -39,6 +39,7 @@ import {
   resolveAggressiveness,
 } from "@/lib/risk-aggressiveness";
 import { qk } from "@/lib/query-keys";
+import { TradingModeBadge } from "@/components/trading-mode-badge";
 
 // The dial config lives in `@/lib/risk-presets` so the server-side sweep and
 // the live engine read exactly the same table this card writes.
@@ -363,8 +364,12 @@ export function RiskControlsCard({
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShieldCheck className="h-4 w-4 text-primary" /> Risk controls
+                <TradingModeBadge riskConfig={{ trading_style: cfg.trading_style ?? "position" }} />
               </CardTitle>
               <CardDescription>
+                {(cfg.trading_style ?? "position") === "swing"
+                  ? "Swing horizon (days–weeks) · "
+                  : "Position horizon (months) · "}
                 Stop-loss {(cfg.stop_loss_pct * 100).toFixed(0)}% · Take-profit {(cfg.take_profit_pct * 100).toFixed(0)}% ·{" "}
                 {cfg.atr_trailing_mult > 0 ? `trail ${cfg.atr_trailing_mult}×ATR · ` : ""}
                 {cfg.max_hold_days > 0 ? `max-hold ${cfg.max_hold_days}d · ` : ""}

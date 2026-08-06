@@ -132,6 +132,7 @@ import { formatMetricValue } from "@/components/portfolio-detail/format";
 
 import { RiskControlsCard } from "@/components/risk-controls-card";
 import { SwingModeToggle } from "@/components/swing-mode-toggle";
+import { TradingModeBadge } from "@/components/trading-mode-badge";
 import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card";
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
@@ -868,6 +869,7 @@ function PortfolioPage() {
                     </Button>
                   )}
                   <ModeBadge mode={p.mode} />
+                  <TradingModeBadge riskConfig={p.risk_config} />
                   <LiveToggle
                     portfolioId={p.id}
                     mode={p.mode}
