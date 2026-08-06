@@ -90,7 +90,7 @@ describe("classifyRegimes", () => {
   });
 
   it("honours custom thresholds", () => {
-    const idx = ramp(200, 100, 110); // ~+6%/yr
+    const idx = ramp(200, 100, 103); // ~+4%/yr on the trailing quarter
     expect(classifyRegimes(idx).at(-1)).toBe("sideways");
     expect(classifyRegimes(idx, { bullAnnualPct: 2 }).at(-1)).toBe("bull");
   });
