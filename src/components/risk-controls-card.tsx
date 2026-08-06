@@ -252,10 +252,16 @@ export function RiskControlsCard({
   const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const applyLevel = (lvl: number) => {
+    const style = cfg.trading_style ?? "position";
     const nextCfg: RiskConfig = {
       ...RISK_PRESETS[lvl].cfg,
       asset_class_limits: { ...RISK_PRESETS[lvl].cfg.asset_class_limits },
       risk_level: lvl,
+      // The dial changes how much risk is taken, not the holding horizon.
+      trading_style: style,
+      ...(style === "swing"
+        ? { ...SWING_DIAL_OVERRIDES, swing_min_hold_days: cfg.swing_min_hold_days ?? 2 }
+        : {}),
     };
     const changes = diffConfigs(cfg, nextCfg);
     setLastChange({
