@@ -275,7 +275,10 @@ const panels: ReportPanel[] = [
     heading: "Out-of-sample windows",
     subtitle:
       `${riskLevel} · ${style} · ${maxNames} x ${(perNameWeight * 100).toFixed(0)}% · ` +
-      `${trainBars} train / ${testBars} test bars`,
+      `${trainBars} train / ${testBars} test bars, step ${step}` +
+      `${overlapPct > 0 && explicitStep == null ? ` (${Math.round(overlapPct * 100)}% overlap)` : ""} · ` +
+      sample.note,
+
     series: [],
     table: { columns: [...WINDOW_COLUMNS], rows: windowTableRows(results) },
   },
