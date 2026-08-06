@@ -4,10 +4,24 @@
 //   bun run scripts/run-regime-walk-forward.ts --style swing --ticket "5 x 18%"
 //   bun run scripts/run-regime-walk-forward.ts --train 252 --test 126 --max-dd 25
 //
+//   # denser cross-validation: 75%-overlapping windows, capped at 60 draws,
+//   # keeping every bear/sideways slice the tape can offer
+//   bun run scripts/run-regime-walk-forward.ts --overlap 0.75 --cv-max 60 \
+//     --cv-per-regime 25 --cv-min-per-regime 8 --min-eff 3
+//
 // Runs the optimised parameter set out-of-sample on rolling windows, tags
 // each window bull / bear / sideways from the benchmark tape, then reports
 // net CAGR and drawdown per regime so the strategy can be judged on
 // stability rather than on one flattering all-history number.
+//
+// Non-overlapping windows (the default) are statistically clean but sparse,
+// and bear/sideways regimes often draw only two or three slices. `--overlap`
+// slides the window by a fraction of the test length instead of a whole test
+// length, and the CV sampler thins the resulting dense candidate set back to
+// a manageable, regime-balanced draw. Because overlapping slices share bars,
+// every regime also reports an independence-adjusted "eff. windows" count,
+// and `--min-eff` gates on that rather than the raw count.
+
 
 import { parseRiskConfig } from "../src/lib/universe.server";
 import { runStyleBacktest } from "../src/lib/trading-style-backtest";
@@ -29,6 +43,10 @@ import {
   segmentRegimes,
   summariseReport,
   walkForwardWindows,
+  resolveWalkForwardStep,
+  sampleRegimeBalancedWindows,
+  effectiveWindowCount,
+  meanWindowOverlap,
   windowTableRows,
   REGIME_COLUMNS,
   WINDOW_COLUMNS,
@@ -59,7 +77,17 @@ const maxNames = Number(arg("names", "5"));
 const perNameWeight = Number(arg("weight", "0.18"));
 const trainBars = Number(arg("train", "252"));
 const testBars = Number(arg("test", "126"));
-const step = Number(arg("step", String(testBars)));
+// `--overlap 0..0.95` shares that fraction of each test slice with the next
+// window. An explicit `--step` still wins. Default 0 = disjoint slices.
+const overlapPct = Number(arg("overlap", "0"));
+const explicitStep = argv.includes("--step") ? Number(arg("step", String(testBars))) : undefined;
+const step = resolveWalkForwardStep({ trainBars, testBars, step: explicitStep, overlapPct });
+
+// Cross-validation sampling of the (possibly dense) candidate windows.
+const cvMaxWindows = Number(arg("cv-max", "0")); // 0 = keep everything
+const cvPerRegime = Number(arg("cv-per-regime", "0")); // 0 = uncapped
+const cvMinPerRegime = Number(arg("cv-min-per-regime", "0"));
+const cvSeed = Number(arg("cv-seed", "1"));
 
 // The optimised cost assumptions the parameter set was chosen under.
 const FRICTIONS = {
@@ -74,7 +102,9 @@ const gate: RegimeGate = {
   maxDrawdownPct: Number(arg("max-dd", "25")),
   minMedianCagrPct: Number(arg("min-cagr", "0")),
   minPositiveRate: Number(arg("min-hit", "0.5")),
+  minEffectiveWindows: Number(arg("min-eff", "0")),
 };
+
 
 console.log(
   `Parameter set: ${riskLevel} · ${style} · ${maxNames} x ${(perNameWeight * 100).toFixed(0)}% · ` +
@@ -117,16 +147,43 @@ for (const s of segments) {
 }
 
 
-const windows = walkForwardWindows(tape.bars.length, { trainBars, testBars, step });
-if (windows.length === 0) throw new Error("history too short for the requested train/test split");
+const candidates = walkForwardWindows(tape.bars.length, { trainBars, testBars, step });
+if (candidates.length === 0) throw new Error("history too short for the requested train/test split");
 console.log(
-  `\nWalk-forward: ${windows.length} windows of ${trainBars} train + ${testBars} test bars (step ${step}).`,
+  `\nWalk-forward: ${candidates.length} candidate windows of ${trainBars} train + ${testBars} test bars ` +
+    `(step ${step}${overlapPct > 0 && explicitStep == null ? `, ${Math.round(overlapPct * 100)}% overlap` : ""}).`,
+);
+
+// Label every candidate up front so the CV sampler can balance regimes
+// BEFORE we spend a backtest on each window.
+const minShare = Number(arg("min-share", "0.45"));
+const minConf = Number(arg("min-conf", "0.5"));
+const labelled = candidates.map((w) => ({
+  window: w,
+  regime: dominantRegimeWeighted(regimeBars, w.testStart, w.testEnd, {
+    minDirectionalShare: minShare,
+    minConfidence: minConf,
+  }),
+}));
+
+const sample = sampleRegimeBalancedWindows(labelled, (c) => c.regime.label, {
+  maxWindows: cvMaxWindows > 0 ? cvMaxWindows : undefined,
+  perRegimeCap: cvPerRegime > 0 ? cvPerRegime : undefined,
+  minPerRegime: cvMinPerRegime > 0 ? cvMinPerRegime : undefined,
+  seed: cvSeed,
+});
+const windows = sample.selected;
+if (windows.length < labelled.length) console.log(`CV sampling: ${sample.note} (seed ${cvSeed}).`);
+console.log(
+  `Independence: ${effectiveWindowCount(windows.map((w) => w.window)).toFixed(1)} effective windows, ` +
+    `mean overlap ${Math.round(meanWindowOverlap(windows.map((w) => w.window)) * 100)}%.`,
 );
 
 const cfg = parseRiskConfig({ trading_style: style } as never);
 const results: WindowResult[] = [];
 
-for (const w of windows) {
+for (const { window: w, regime } of windows) {
+
   // The strategy warms up on the training slice and is scored only on the
   // out-of-sample tail, so indicators are never cold at the window open.
   const bars = tape.bars.slice(w.trainStart, w.testEnd);
@@ -142,10 +199,8 @@ for (const w of windows) {
   const oosCurve = m.equityCurve.slice(w.testStart - w.trainStart);
   if (oosCurve.length < 2) continue;
 
-  const regime = dominantRegimeWeighted(regimeBars, w.testStart, w.testEnd, {
-    minDirectionalShare: Number(arg("min-share", "0.45")),
-    minConfidence: Number(arg("min-conf", "0.5")),
-  });
+
+
   const benchStart = index[w.testStart]!.value;
   const benchEnd = index[w.testEnd - 1]!.value;
   const years = (w.testEnd - w.testStart) / 252;
@@ -185,8 +240,17 @@ console.log(`\n${summariseReport(report, gate)}`);
 
 for (const s of report.summaries) {
   if (s.windows === 0) {
-    console.log(`  ${s.regime}: no out-of-sample window landed in this regime — widen --from.`);
+    console.log(
+      `  ${s.regime}: no out-of-sample window landed in this regime — widen --from or raise --overlap.`,
+    );
+  } else if (!s.sufficientEvidence) {
+    console.log(
+      `  ${s.regime}: only ${s.effectiveWindows.toFixed(1)} independent windows (${s.windows} raw at ` +
+        `${Math.round(s.overlapShare * 100)}% overlap) vs the --min-eff ${gate.minEffectiveWindows} ` +
+        `requirement — verdict withheld, lengthen the history rather than the overlap.`,
+    );
   } else if (!s.drawdownStable) {
+
     console.log(
       `  ${s.regime}: drawdown breach — worst ${s.worstMaxDrawdownPct.toFixed(1)}% vs the ` +
         `-${gate.maxDrawdownPct}% ceiling.`,
@@ -211,7 +275,10 @@ const panels: ReportPanel[] = [
     heading: "Out-of-sample windows",
     subtitle:
       `${riskLevel} · ${style} · ${maxNames} x ${(perNameWeight * 100).toFixed(0)}% · ` +
-      `${trainBars} train / ${testBars} test bars`,
+      `${trainBars} train / ${testBars} test bars, step ${step}` +
+      `${overlapPct > 0 && explicitStep == null ? ` (${Math.round(overlapPct * 100)}% overlap)` : ""} · ` +
+      sample.note,
+
     series: [],
     table: { columns: [...WINDOW_COLUMNS], rows: windowTableRows(results) },
   },

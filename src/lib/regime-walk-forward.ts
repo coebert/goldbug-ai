@@ -358,6 +358,229 @@ export function walkForwardWindows(
   return out;
 }
 
+// ------------------------------------------------- overlapping sampling
+//
+// Non-overlapping windows are statistically clean but brutally sparse: ten
+// years of daily bars with a 252/126 split yields ~18 out-of-sample slices,
+// and bear/sideways regimes may pick up only two or three of them. Judging
+// drawdown stability on three windows is judging noise.
+//
+// Overlapping windows fix the coverage problem at the cost of independence:
+// neighbouring slices share bars, so their results are correlated and the
+// raw window count overstates how much evidence you actually have. We
+// therefore always report BOTH the raw count and an effective (independence-
+// adjusted) count, and the gate is applied against the effective one.
+
+/** Smallest step we will ever advance by, to avoid degenerate 1-bar shifts. */
+export const MIN_OVERLAP_STEP_BARS = 5;
+
+export type OverlapOptions = {
+  trainBars: number;
+  testBars: number;
+  /** Explicit step in bars. Wins over `overlapPct` when provided. */
+  step?: number;
+  /** Fraction of each test slice shared with the next window, 0..0.95. */
+  overlapPct?: number;
+  /** Lower bound on the resolved step (default MIN_OVERLAP_STEP_BARS). */
+  minStepBars?: number;
+};
+
+/** Resolve the bar step implied by an explicit step or an overlap fraction. */
+export function resolveWalkForwardStep(opts: OverlapOptions): number {
+  const { testBars } = opts;
+  if (testBars < 1) throw new Error("resolveWalkForwardStep: testBars must be >= 1");
+  const floor = Math.max(1, Math.floor(opts.minStepBars ?? MIN_OVERLAP_STEP_BARS));
+  if (opts.step != null && Number.isFinite(opts.step)) {
+    return Math.max(1, Math.floor(opts.step));
+  }
+  const overlap = Math.min(0.95, Math.max(0, Number(opts.overlapPct ?? 0)));
+  if (!(overlap > 0)) return testBars;
+  return Math.min(testBars, Math.max(Math.min(floor, testBars), Math.round(testBars * (1 - overlap))));
+}
+
+/**
+ * Rolling windows with an overlap fraction instead of a raw step.
+ * `overlapPct: 0` reproduces `walkForwardWindows` exactly.
+ */
+export function overlappingWalkForwardWindows(
+  totalBars: number,
+  opts: OverlapOptions,
+): WalkForwardWindow[] {
+  return walkForwardWindows(totalBars, {
+    trainBars: opts.trainBars,
+    testBars: opts.testBars,
+    step: resolveWalkForwardStep(opts),
+  });
+}
+
+/**
+ * Independence-adjusted window count for a set of (possibly overlapping)
+ * test slices: unique bars covered / mean slice length. Disjoint windows
+ * return exactly their count; fully duplicated windows collapse toward 1.
+ */
+export function effectiveWindowCount(
+  windows: readonly { testStart: number; testEnd: number }[],
+): number {
+  if (windows.length === 0) return 0;
+  const sorted = [...windows].sort((a, b) => a.testStart - b.testStart);
+  let uniqueBars = 0;
+  let cursor = -Infinity;
+  for (const w of sorted) {
+    const start = Math.max(w.testStart, cursor);
+    if (w.testEnd > start) uniqueBars += w.testEnd - start;
+    cursor = Math.max(cursor, w.testEnd);
+  }
+  const meanLen =
+    windows.reduce((sum, w) => sum + Math.max(0, w.testEnd - w.testStart), 0) / windows.length;
+  if (!(meanLen > 0)) return 0;
+  return uniqueBars / meanLen;
+}
+
+/** Mean pairwise overlap share across consecutive windows, 0..1. */
+export function meanWindowOverlap(
+  windows: readonly { testStart: number; testEnd: number }[],
+): number {
+  if (windows.length < 2) return 0;
+  const sorted = [...windows].sort((a, b) => a.testStart - b.testStart);
+  let total = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1]!;
+    const cur = sorted[i]!;
+    const shared = Math.max(0, Math.min(prev.testEnd, cur.testEnd) - cur.testStart);
+    const len = Math.max(1, cur.testEnd - cur.testStart);
+    total += Math.min(1, shared / len);
+  }
+  return total / (sorted.length - 1);
+}
+
+// ------------------------------------------------- cross-validation draws
+
+/** Deterministic 32-bit PRNG so a sampled run is reproducible from its seed. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export type CvSampleOptions = {
+  /** Hard cap on how many windows are actually backtested. */
+  maxWindows?: number;
+  /** Cap per regime; prevents a bull-dominated tape swamping the sample. */
+  perRegimeCap?: number;
+  /** Minimum windows to keep per regime when supply allows. */
+  minPerRegime?: number;
+  /** Regimes to fill first when the cap binds (default bear, then sideways). */
+  prioritise?: readonly RegimeLabel[];
+  /** Seed for the deterministic thinning draw. */
+  seed?: number;
+};
+
+export type CvSample<T> = {
+  selected: T[];
+  /** Windows available per regime before sampling. */
+  available: Record<RegimeLabel, number>;
+  /** Windows kept per regime. */
+  kept: Record<RegimeLabel, number>;
+  note: string;
+};
+
+const emptyCounts = (): Record<RegimeLabel, number> => ({ bull: 0, bear: 0, sideways: 0 });
+
+/**
+ * Regime-stratified thinning of a dense (overlapping) candidate set.
+ *
+ * With a large overlap the raw candidate list can run to hundreds of windows,
+ * most of them bull. This keeps the scarce bear/sideways windows in full and
+ * spreads the cut across the abundant regimes, so the sample the backtest
+ * spends time on is the one that actually tests stability. Selection is
+ * deterministic for a given seed and preserves chronological order.
+ */
+export function sampleRegimeBalancedWindows<T>(
+  candidates: readonly T[],
+  regimeOf: (item: T) => RegimeLabel,
+  opts: CvSampleOptions = {},
+): CvSample<T> {
+  const available = emptyCounts();
+  const byRegime: Record<RegimeLabel, T[]> = { bull: [], bear: [], sideways: [] };
+  const order = new Map<T, number>();
+  candidates.forEach((c, i) => {
+    const r = regimeOf(c);
+    byRegime[r].push(c);
+    available[r] += 1;
+    order.set(c, i);
+  });
+
+  const priority = opts.prioritise ?? (["bear", "sideways", "bull"] as const);
+  const ranked = [...REGIMES].sort(
+    (a, b) =>
+      (priority.indexOf(a) < 0 ? 99 : priority.indexOf(a))
+      - (priority.indexOf(b) < 0 ? 99 : priority.indexOf(b)),
+  );
+
+  const maxWindows = Math.max(0, Math.floor(opts.maxWindows ?? candidates.length));
+  const perRegimeCap = Math.max(0, Math.floor(opts.perRegimeCap ?? candidates.length));
+  const minPerRegime = Math.max(0, Math.floor(opts.minPerRegime ?? 0));
+  const rand = mulberry32(Math.floor(opts.seed ?? 1));
+
+  /** Evenly spaced thinning, jittered by the seed, keeping chronology. */
+  const thin = (rows: readonly T[], keep: number): T[] => {
+    if (keep >= rows.length) return [...rows];
+    if (keep <= 0) return [];
+    const stride = rows.length / keep;
+    const picked = new Set<number>();
+    for (let i = 0; i < keep; i++) {
+      const base = i * stride;
+      let idx = Math.floor(base + rand() * stride);
+      idx = Math.min(rows.length - 1, Math.max(0, idx));
+      while (picked.has(idx) && idx < rows.length) idx++;
+      while (picked.has(idx) && idx > 0) idx--;
+      picked.add(idx);
+    }
+    return [...picked].sort((a, b) => a - b).map((i) => rows[i]!);
+  };
+
+  const kept = emptyCounts();
+  const chosen: T[] = [];
+  let budget = maxWindows;
+
+  // Pass 1 — guarantee the minimum for the scarce regimes first.
+  if (minPerRegime > 0) {
+    for (const regime of ranked) {
+      const rows = byRegime[regime];
+      const keep = Math.min(rows.length, minPerRegime, perRegimeCap, budget);
+      const picked = thin(rows, keep);
+      chosen.push(...picked);
+      kept[regime] += picked.length;
+      budget -= picked.length;
+    }
+  }
+
+  // Pass 2 — share the remaining budget, still favouring scarce regimes.
+  for (const regime of ranked) {
+    if (budget <= 0) break;
+    const rows = byRegime[regime].filter((r) => !chosen.includes(r));
+    const room = Math.max(0, Math.min(perRegimeCap - kept[regime], rows.length, budget));
+    if (room <= 0) continue;
+    const picked = thin(rows, room);
+    chosen.push(...picked);
+    kept[regime] += picked.length;
+    budget -= picked.length;
+  }
+
+  const selected = chosen.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+  const note =
+    `sampled ${selected.length}/${candidates.length} windows `
+    + `(bull ${kept.bull}/${available.bull}, bear ${kept.bear}/${available.bear}, `
+    + `sideways ${kept.sideways}/${available.sideways})`;
+  return { selected, available, kept, note };
+}
+
+
+
 /** Majority regime over a bar range; ties resolve bear > bull > sideways. */
 export function dominantRegime(
   labels: readonly RegimeLabel[],
@@ -546,12 +769,22 @@ export type RegimeSummary = {
   /** Mean regime confidence across the windows in this regime, 0..1. */
   meanConfidence: number;
   medianTradesPerYear: number;
+  /**
+   * Independence-adjusted window count. Equals `windows` for disjoint slices
+   * and shrinks as overlap rises, so an overlapping run cannot fake evidence.
+   */
+  effectiveWindows: number;
+  /** Mean overlap share between consecutive windows in this regime, 0..1. */
+  overlapShare: number;
 
   /** True when every window respected the drawdown ceiling. */
   drawdownStable: boolean;
+  /** True when the regime has enough independent evidence to judge. */
+  sufficientEvidence: boolean;
   /** True when the regime is profitable and drawdown-stable throughout. */
   pass: boolean;
 };
+
 
 export function median(values: readonly number[]): number {
   const xs = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
@@ -574,12 +807,19 @@ export type RegimeGate = {
   minMedianCagrPct: number;
   /** Share of windows that must be profitable (default 0.5). */
   minPositiveRate: number;
+  /**
+   * Independent-window evidence a regime needs before its verdict counts
+   * (default 0 = no requirement). Applied to `effectiveWindows`, not the raw
+   * count, so overlapping slices cannot buy a pass.
+   */
+  minEffectiveWindows: number;
 };
 
 export const DEFAULT_REGIME_GATE: RegimeGate = {
   maxDrawdownPct: 25,
   minMedianCagrPct: 0,
   minPositiveRate: 0.5,
+  minEffectiveWindows: 0,
 };
 
 /** Aggregate the out-of-sample windows that fell in one regime. */
@@ -607,8 +847,11 @@ export function summariseRegime(
       beatBenchmarkRate: 0,
       meanConfidence: 0,
       medianTradesPerYear: 0,
+      effectiveWindows: 0,
+      overlapShare: 0,
 
       drawdownStable: true,
+      sufficientEvidence: false,
       pass: false,
     };
   }
@@ -617,6 +860,10 @@ export function summariseRegime(
   const positiveRate = cagrs.filter((c) => c > 0).length / rows.length;
   const drawdownStable = dds.every((d) => Math.abs(d) <= g.maxDrawdownPct + 1e-9);
   const medianNetCagrPct = median(cagrs);
+  // Overlapping windows share bars, so `windows` overstates the evidence.
+  const slices = rows.map((r) => r.window);
+  const effectiveWindows = effectiveWindowCount(slices);
+  const sufficientEvidence = effectiveWindows >= g.minEffectiveWindows - 1e-9;
   return {
     regime,
     windows: rows.length,
@@ -635,14 +882,19 @@ export function summariseRegime(
       rows.reduce((a, r) => a + (Number.isFinite(r.confidence ?? NaN) ? r.confidence! : 0), 0)
       / rows.length,
     medianTradesPerYear: median(rows.map((r) => r.tradesPerYear)),
+    effectiveWindows,
+    overlapShare: meanWindowOverlap(slices),
 
     drawdownStable,
+    sufficientEvidence,
     pass:
       drawdownStable
+      && sufficientEvidence
       && medianNetCagrPct >= g.minMedianCagrPct - 1e-9
       && positiveRate >= g.minPositiveRate - 1e-9,
   };
 }
+
 
 export type RegimeReport = {
   summaries: RegimeSummary[];
@@ -680,6 +932,8 @@ export function buildRegimeReport(
 export const REGIME_COLUMNS = [
   "regime",
   "windows",
+  "eff. windows",
+  "overlap",
   "median CAGR %",
   "worst CAGR %",
   "CAGR sd",
@@ -716,6 +970,8 @@ export function regimeTableRows(summaries: readonly RegimeSummary[]): string[][]
   return summaries.map((s) => [
     s.regime,
     String(s.windows),
+    f(s.effectiveWindows),
+    pctOf(s.overlapShare),
     f(s.medianNetCagrPct),
     f(s.worstNetCagrPct),
     f(s.cagrStdPct),
@@ -727,9 +983,18 @@ export function regimeTableRows(summaries: readonly RegimeSummary[]): string[][]
     f(s.medianTradesPerYear, 0),
     pctOf(s.meanConfidence),
 
-    s.windows === 0 ? "no data" : s.pass ? "pass" : s.drawdownStable ? "weak returns" : "drawdown breach",
+    s.windows === 0
+      ? "no data"
+      : !s.sufficientEvidence
+        ? "too few independent windows"
+        : s.pass
+          ? "pass"
+          : s.drawdownStable
+            ? "weak returns"
+            : "drawdown breach",
   ]);
 }
+
 
 export function windowTableRows(results: readonly WindowResult[]): string[][] {
   return results.map((r) => [
