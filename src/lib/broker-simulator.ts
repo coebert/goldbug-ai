@@ -406,19 +406,41 @@ function effectiveFillPrice(
   return Math.max(0, quote * (1 - slipFrac) - impact);
 }
 
+/** Context needed by the scaling commission model. */
+type FeeContext = { symbol: string; quantity: number };
+
 /**
- * Total fee for a fill: baseFee (per-decision override) + commission
- * (max of bps-of-notional and minCommission) + buy-side tax.
+ * Total fee for a fill: baseFee (per-decision override) + commission +
+ * buy-side tax. Commission is either the scaling model (when
+ * `frictions.commission` is set) or the flat max(bps-of-notional, floor).
  */
 function totalFee(
   notional: number,
   side: Side,
   baseFee: number,
   f: Frictions | undefined,
+  ctx?: FeeContext,
 ): number {
   if (!f) return baseFee;
-  const bpsComm = notional * ((f.commissionBps ?? 0) / 10_000);
-  const commission = Math.max(f.minCommission ?? 0, bpsComm);
+  let commission: number;
+  if (f.commission) {
+    const c = f.commission;
+    const symbol = ctx?.symbol ?? "";
+    commission = computeCommission({
+      notional,
+      quantity: ctx?.quantity ?? 0,
+      symbol,
+      ...(c.currencyBySymbol?.[symbol] ? { currency: c.currencyBySymbol[symbol] } : {}),
+      ...(c.assetClassBySymbol?.[symbol]
+        ? { assetClass: c.assetClassBySymbol[symbol] }
+        : {}),
+      ...(c.monthlyVolume !== undefined ? { monthlyVolume: c.monthlyVolume } : {}),
+      ...(c.model ? { model: c.model } : {}),
+    }).commission;
+  } else {
+    const bpsComm = notional * ((f.commissionBps ?? 0) / 10_000);
+    commission = Math.max(f.minCommission ?? 0, bpsComm);
+  }
   const tax = side === "BUY" ? notional * ((f.buyTaxBps ?? 0) / 10_000) : 0;
   return baseFee + commission + tax;
 }
@@ -435,11 +457,12 @@ function maxAffordableBuyQty(
   cash: number,
   baseFee: number,
   f: Frictions,
+  symbol: string,
 ): number {
   const spendAt = (q: number): number => {
     const p = effectiveFillPrice(quote, q, "BUY", f);
     const notional = q * p;
-    return notional + totalFee(notional, "BUY", baseFee, f);
+    return notional + totalFee(notional, "BUY", baseFee, f, { symbol, quantity: q });
   };
   if (spendAt(requested) <= cash) return requested;
   if (spendAt(0) > cash) return 0; // fixed fees alone unaffordable
