@@ -2,6 +2,9 @@
 //   bun run scripts/run-trading-style-backtest.ts
 import { parseRiskConfig } from "../src/lib/universe.server";
 import { compareTradingStyles, type StyleRunMetrics } from "../src/lib/trading-style-backtest";
+import { buildHorizonComparisonPanels } from "../src/lib/backtest-horizon-panel";
+import { renderBacktestReportHtml } from "../src/lib/backtest-report-chart";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 const pad = (s: string | number, n: number) => String(s).padStart(n);
 const num = (v: number, d = 2, n = 8) => pad(v.toFixed(d), n);
@@ -107,3 +110,17 @@ for (const [label, f, d] of metrics) {
     [pad(label, 18), pad(p.toFixed(d), 10), pad(s.toFixed(d), 10), pad((s - p >= 0 ? "+" : "") + (s - p).toFixed(d), 10)].join(" "),
   );
 }
+
+// --------------------------- combined all-horizon report (per risk level)
+const html = renderBacktestReportHtml({
+  title: "Swing vs position — all horizons combined",
+  subtitle:
+    `Every horizon (${cmp.horizons.map((h) => h.label).join(", ")}) overlaid on shared equity ` +
+    `and drawdown axes, one panel per risk level. Seeds averaged: ${cmp.seeds.join(", ")}.`,
+  panels: buildHorizonComparisonPanels(cmp.riskLevels, cmp.averaged, {
+    horizonOrder: cmp.horizons.map((h) => h.label),
+  }),
+});
+mkdirSync("reports", { recursive: true });
+writeFileSync("reports/trading-style-horizons.html", html);
+console.log("\nCombined horizon report → reports/trading-style-horizons.html");
