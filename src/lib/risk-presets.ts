@@ -33,6 +33,10 @@ export type RiskDialConfig = {
   buy_aggressiveness?: number;
   /** How much of a wanted trim is taken in one go (0.25–1.5). */
   sell_aggressiveness?: number;
+  /** "position" (months) or "swing" (days-to-weeks) trading horizon. */
+  trading_style?: "position" | "swing";
+  /** Swing only: minimum sessions held before a discretionary sell. */
+  swing_min_hold_days?: number;
 };
 
 export const RISK_DIAL_DEFAULTS: RiskDialConfig = {
