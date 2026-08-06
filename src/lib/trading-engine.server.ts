@@ -84,7 +84,10 @@ import { computeAttribution, formatAttributionBlock } from "./attribution.server
 import { getOrRefreshHyperparams, formatHyperparamBlock, type TunedHyperparams } from "./hyperparam-tuning.server";
 import { getOrWalkForward } from "./hyperparam-walkforward.server";
 import { logCounterfactual, evaluatePendingCounterfactuals } from "./counterfactuals.server";
-import { ensembleVote, scoreDisagreement } from "./ensemble.server";
+import { ensembleVote } from "./ensemble.server";
+import { unifiedScore } from "./alpha/unified-score";
+import { combineHaircuts } from "./sizing-haircuts";
+import { loadMeasuredEdge } from "./measured-edge.server";
 import { computeAndPersistCalibration, getLatestCalibration, formatCalibrationBlock } from "./calibration.server";
 import {
   parseCircuit,
@@ -698,6 +701,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
   const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
+
+  // Measured trading edge (rolling signal_performance) — feeds Kelly sizing
+  // instead of the old hardcoded 2% assumption. Falls back to the prior when
+  // there is not enough measurement yet.
+  const measuredEdge = await loadMeasuredEdge(portfolio.id);
 
   // Crypto sleeve — dedicated allocation & risk-management engine. Computes
   // per-symbol trend/momentum/drawdown signals, maps regime → sleeve target,
@@ -1482,25 +1490,24 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         `dial ${aggression.level} (${aggression.name}) size×${aggression.sizeMult.toFixed(2)} buy×${aggression.buy.toFixed(2)}`,
       ];
 
-      // Conviction-weighted Kelly cap (only shrinks; never grows above requested %)
+      // Conviction-weighted Kelly cap (only shrinks; never grows above requested %).
+      // The edge term is the MEASURED edge read back from `signal_performance`
+      // (shrunk toward the 2% prior by sample count), not a hardcoded guess.
       if (typeof order.conviction === "number") {
         const feat = featureBySymbol.get(meta.symbol);
         const convSpend = convictionSizedSpend({
           baseSize: spend,
           conviction: order.conviction,
+          edge: measuredEdge.edge,
           volPct: feat?.vol20d ?? null,
           kellyCap: hyperparams?.kelly_cap ?? null,
         });
         if (convSpend < spend) {
           spend = convSpend;
-          sizingNotes.push(`kelly@conv=${order.conviction.toFixed(2)}${hyperparams ? ` cap=${(hyperparams.kelly_cap * 100).toFixed(0)}%` : ""}`);
+          sizingNotes.push(
+            `kelly@conv=${order.conviction.toFixed(2)}${hyperparams ? ` cap=${(hyperparams.kelly_cap * 100).toFixed(0)}%` : ""} ${measuredEdge.note}`,
+          );
         }
-      }
-
-      // K. Global calibration multiplier — shrinks buys when AI conviction has been over-stated
-      if (calibration.global_size_mult !== 1) {
-        spend *= calibration.global_size_mult;
-        sizingNotes.push(`calib×${calibration.global_size_mult.toFixed(2)}`);
       }
 
       // Phase 2 — two-sided sizing bonus. Lifts spend (up to cap) when the
@@ -1521,38 +1528,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
-      // J. Ensemble second opinion — halve on strong disagreement, log to journal
-      {
-        const feat = featureBySymbol.get(meta.symbol);
-        if (feat) {
-          const vote = ensembleVote({
-            symbol: feat.symbol, price: feat.price,
-            sma20: feat.sma20, sma50: feat.sma50, rsi14: feat.rsi14,
-            change5d: feat.change5d, change30d: feat.change30d,
-          });
-          if (scoreDisagreement(order.side, vote)) {
-            spend *= 0.5;
-            sizingNotes.push(`ensemble≠AI (${vote.side} ${vote.score.toFixed(2)}) x0.5`);
-          }
-        }
-      }
-
-      // Loss cooldown: halve size while cooling
-      if (isSymbolCooling(cooldowns, meta.symbol, asOf)) {
-        spend *= 0.5;
-        sizingNotes.push("cooldown x0.5");
-      }
-
-      // Cross-sectional ranking guardrail: outside top quartile => halve size,
-      // outside universe entirely (should not happen) => leave alone.
-      const rankInfo = rankMap.get(meta.symbol) ?? null;
-      if (rankInfo && !rankInfo.top_quartile) {
-        spend *= 0.5;
-        sizingNotes.push(`rank #${rankInfo.rank}/${rankInfo.universe_size} x0.5`);
-      }
-
-      // FEAR INDEX overlay — panic blocks fresh buys outright, elevated fear
-      // shrinks them, complacency trims risk-taking slightly.
+      // FEAR INDEX overlay — panic blocks fresh buys outright before any
+      // sizing work; softer readings become a haircut below.
       if (fearIndex.blockNewBuys) {
         executed.push({
           symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
@@ -1561,23 +1538,47 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      if (fearIndex.sizeMultiplier !== 1) {
-        spend *= fearIndex.sizeMultiplier;
-        sizingNotes.push(`fear${fearIndex.score.toFixed(0)}×${fearIndex.sizeMultiplier.toFixed(2)}`);
-      }
 
+      // ---- Soft haircuts -------------------------------------------------
+      // Collected, then combined ONCE with diminishing marginal severity so
+      // a stack of mild headwinds cannot compound a ticket down to a few
+      // percent of its intended size. Hard caps below still bind via `min`.
+      const rankInfo = rankMap.get(meta.symbol) ?? null;
 
-      // Portfolio-level 5-day drawdown → shrink new buys
-      if (ddSizing.size_multiplier < 1) {
-        spend *= ddSizing.size_multiplier;
-        sizingNotes.push(`dd×${ddSizing.size_multiplier.toFixed(2)}`);
-      }
+      // The three systematic scorers vote once, together, instead of each
+      // applying its own independent halving on the same raw features.
+      const featForVote = featureBySymbol.get(meta.symbol);
+      const ensemble = featForVote
+        ? ensembleVote({
+            symbol: featForVote.symbol, price: featForVote.price,
+            sma20: featForVote.sma20, sma50: featForVote.sma50, rsi14: featForVote.rsi14,
+            change5d: featForVote.change5d, change30d: featForVote.change30d,
+          })
+        : null;
+      const systematic = unifiedScore({
+        side: order.side,
+        alphaComposite: alphaCompositeBySymbol.get(meta.symbol) ?? null,
+        rankPercentile: rankInfo?.percentile ?? null,
+        ensembleScore: ensemble?.score ?? null,
+      });
 
-      // Sector rotation size multiplier
       const secMult = sectorSizeMultiplier(symbolSector(meta.symbol), sectorScores);
-      if (secMult.mult !== 1) {
-        spend *= secMult.mult;
-        sizingNotes.push(secMult.note);
+      const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
+
+      const haircuts = combineHaircuts([
+        { label: "calib", mult: calibration.global_size_mult },
+        { label: "systematic", mult: systematic.mult },
+        isSymbolCooling(cooldowns, meta.symbol, asOf) ? { label: "cooldown", mult: 0.5 } : null,
+        { label: `fear${fearIndex.score.toFixed(0)}`, mult: fearIndex.sizeMultiplier },
+        { label: "dd", mult: ddSizing.size_multiplier },
+        { label: "sector", mult: secMult.mult },
+        { label: "event", mult: evPenalty },
+      ]);
+      if (haircuts.mult < 1) {
+        spend *= haircuts.mult;
+        if (haircuts.note) sizingNotes.push(haircuts.note);
+        if (systematic.note) sizingNotes.push(systematic.note);
+        if (haircuts.floored) sizingNotes.push("haircut floor applied");
       }
 
       // Overnight-gap guard: skip fresh buys when 1d move is > 2σ
@@ -1610,13 +1611,6 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
-      // Event penalty (symbol-specific and broad macro)
-      const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
-      if (evPenalty < 1) {
-        spend *= evPenalty;
-        sizingNotes.push(`event x${evPenalty.toFixed(2)}`);
-
-      }
 
       // Enforce per-symbol position cap
       const existingVal = holdingsByS.get(meta.symbol)
