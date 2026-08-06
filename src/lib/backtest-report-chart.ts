@@ -58,7 +58,32 @@ type PlotOptions = {
   /** Fill the area between the line and zero (used for drawdown). */
   fillToZero?: boolean;
   size?: ChartSize;
+  /** Disable the hover crosshair/tooltip scaffolding. */
+  interactive?: boolean;
 };
+
+/** One hoverable x position, shared by every series in a chart. */
+export type HoverPayload = {
+  x0: number;
+  x1: number;
+  top: number;
+  bottom: number;
+  xs: number[];
+  labels: string[];
+  unit: string;
+  series: {
+    label: string;
+    colour: string;
+    /** Pixel y of the plotted metric, per index. */
+    px: (number | null)[];
+    equity: (number | null)[];
+    drawdown: (number | null)[];
+  }[];
+};
+
+const at = (arr: number[], i: number): number | null =>
+  i < arr.length && Number.isFinite(arr[i] as number) ? (arr[i] as number) : null;
+
 
 /**
  * Line chart of one value per bar for each series. Series may have different
