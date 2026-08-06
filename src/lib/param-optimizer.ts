@@ -19,6 +19,14 @@
  */
 import type { RiskConfig } from "./universe.server";
 import type { RunAudit } from "./trading-style-backtest";
+import {
+  annualiseFeeDragPct,
+  feeAdjustedCagr,
+  feeEfficiency,
+  NET_CAGR_OBJECTIVE,
+  type FeeDragBreakdown,
+  type OptimizerObjective,
+} from "./fee-drag-objective";
 
 export type ParamValue = number | boolean;
 
