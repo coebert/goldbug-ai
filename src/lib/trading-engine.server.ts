@@ -164,6 +164,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 import { classesFromUniverse, buildCandidateFeatures } from "./trading-engine/candidate-features.server";
 import { loadFundamentalsScores } from "./fundamentals/cache.server";
+import { fundamentalsGate } from "./fundamentals/gate";
 import type { Fundamentals, FundamentalsScore } from "./fundamentals/types";
 export { classesFromUniverse, buildCandidateFeatures } from "./trading-engine/candidate-features.server";
 import { callAiForDecision } from "./trading-engine/ai-decision.server";
@@ -1571,6 +1572,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         continue;
       }
 
+      // PUBLISHED COMPANY FINANCIALS — mandatory check on every equity buy.
+      // The prompt asks the model to read the accounts; this enforces it.
+      const fundFeat = featureBySymbol.get(meta.symbol);
+      const fundGate = fundamentalsGate({
+        score: fundFeat?.fundamentals_score ?? null,
+        assetClass: fundFeat?.asset_class ?? null,
+        riskLevel: portfolio.risk_level,
+      });
+      if (fundGate.block) {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason,
+          rejected: `financial health: ${fundGate.block}`,
+        });
+        continue;
+      }
+
+
+
       // ---- Soft haircuts -------------------------------------------------
       // Collected, then combined ONCE with diminishing marginal severity so
       // a stack of mild headwinds cannot compound a ticket down to a few
@@ -1605,6 +1625,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         { label: "dd", mult: ddSizing.size_multiplier },
         { label: "sector", mult: secMult.mult },
         { label: "event", mult: evPenalty },
+        fundGate.mult < 1 ? { label: "financials", mult: fundGate.mult } : null,
+
       ]);
       if (haircuts.mult < 1) {
         spend *= haircuts.mult;
@@ -1612,6 +1634,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         if (systematic.note) sizingNotes.push(systematic.note);
         if (haircuts.floored) sizingNotes.push("haircut floor applied");
       }
+      if (fundGate.note) sizingNotes.push(fundGate.note);
+
 
       // Overnight-gap guard: skip fresh buys when 1d move is > 2σ
       const gap = await checkOvernightGap(meta.symbol, asOf).catch(() => null);
