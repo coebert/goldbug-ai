@@ -73,7 +73,17 @@ const maxNames = Number(arg("names", "5"));
 const perNameWeight = Number(arg("weight", "0.18"));
 const trainBars = Number(arg("train", "252"));
 const testBars = Number(arg("test", "126"));
-const step = Number(arg("step", String(testBars)));
+// `--overlap 0..0.95` shares that fraction of each test slice with the next
+// window. An explicit `--step` still wins. Default 0 = disjoint slices.
+const overlapPct = Number(arg("overlap", "0"));
+const explicitStep = argv.includes("--step") ? Number(arg("step", String(testBars))) : undefined;
+const step = resolveWalkForwardStep({ trainBars, testBars, step: explicitStep, overlapPct });
+
+// Cross-validation sampling of the (possibly dense) candidate windows.
+const cvMaxWindows = Number(arg("cv-max", "0")); // 0 = keep everything
+const cvPerRegime = Number(arg("cv-per-regime", "0")); // 0 = uncapped
+const cvMinPerRegime = Number(arg("cv-min-per-regime", "0"));
+const cvSeed = Number(arg("cv-seed", "1"));
 
 // The optimised cost assumptions the parameter set was chosen under.
 const FRICTIONS = {
@@ -88,7 +98,9 @@ const gate: RegimeGate = {
   maxDrawdownPct: Number(arg("max-dd", "25")),
   minMedianCagrPct: Number(arg("min-cagr", "0")),
   minPositiveRate: Number(arg("min-hit", "0.5")),
+  minEffectiveWindows: Number(arg("min-eff", "0")),
 };
+
 
 console.log(
   `Parameter set: ${riskLevel} · ${style} · ${maxNames} x ${(perNameWeight * 100).toFixed(0)}% · ` +
