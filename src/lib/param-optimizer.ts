@@ -445,6 +445,17 @@ export function averageMetrics(runs: readonly CandidateMetrics[]): CandidateMetr
     tradesPerYear: avg((m) => m.tradesPerYear),
     feeDragPct: avg((m) => m.feeDragPct),
     finalCashPct: avg((m) => m.finalCashPct),
+    ...(runs.every((r) => r.years !== undefined) ? { years: avg((m) => m.years ?? 0) } : {}),
+    ...(runs.every((r) => r.feeDrag !== undefined)
+      ? {
+          feeDrag: {
+            commissionPct: avg((m) => m.feeDrag?.commissionPct ?? 0),
+            minFeePct: avg((m) => m.feeDrag?.minFeePct ?? 0),
+            slippagePct: avg((m) => m.feeDrag?.slippagePct ?? 0),
+            otherPct: avg((m) => m.feeDrag?.otherPct ?? 0),
+          },
+        }
+      : {}),
     ...(mergedAudit ? { audit: mergedAudit } : {}),
   };
 }
@@ -467,7 +478,7 @@ export function formatResult(r: OptimizerResult): string {
     `CAGR ${r.metrics.cagrPct.toFixed(2).padStart(6)}%  ` +
     `DD ${Math.abs(r.metrics.maxDrawdownPct).toFixed(1).padStart(5)}%  ` +
     `turnover ${r.metrics.tradesPerYear.toFixed(0).padStart(4)}/yr  ` +
-    `fees ${r.metrics.feeDragPct.toFixed(1).padStart(5)}%  ` +
+    `fees ${annualFeeDrag(r.metrics).toFixed(1).padStart(5)}%/yr  ` +
     `${status}  ${formatParams(r.params)}`
   );
 }
