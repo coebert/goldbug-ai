@@ -228,7 +228,7 @@ export const withHoverTooltip = (svg: string) =>
 /** Inline script that drives crosshair + tooltip for every chart on the page. */
 export const HOVER_SCRIPT = `
 (function () {
-  var f2 = function (v) { return v === null || v === undefined ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2); };
+  var f2 = function (v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2); };
   document.querySelectorAll('.chart-wrap').forEach(function (wrap) {
     var svg = wrap.querySelector('svg.chart');
     var tip = wrap.querySelector('.chart-tip');
