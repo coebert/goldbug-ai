@@ -26,7 +26,119 @@ export type CostScenario = {
   /** Multiplier applied to the baseline friction model. */
   scale: number;
   frictions: Frictions;
+  /** Slippage/spread assumption this scenario was built with, when varied. */
+  slippage?: SlippageSpec;
+  /** Per-trade minimum commission this scenario was built with, when varied. */
+  minCommission?: number;
 };
+
+/**
+ * One point on the execution-cost axis: how much the price moves against
+ * us per side. `spreadBps` is the half-spread we cross; `slippageBps` is
+ * the extra adverse move (queue position, latency, momentum). They are
+ * additive per side. `impactPerUnit` scales with order size and is passed
+ * straight through to the simulator.
+ */
+export type SlippageSpec = {
+  label: string;
+  /** Adverse move per side, in bps of notional. */
+  slippageBps: number;
+  /** Half-spread crossed per side, in bps of notional. Default 0. */
+  spreadBps?: number;
+  /** Size-dependent impact term; when omitted the baseline value is kept. */
+  impactPerUnit?: number;
+};
+
+/** Total per-side proportional cost implied by a slippage spec, in bps. */
+export function slippageBpsOf(spec: SlippageSpec): number {
+  const slip = spec.slippageBps ?? 0;
+  const spread = spec.spreadBps ?? 0;
+  if (!Number.isFinite(slip) || slip < 0) {
+    throw new Error(`slippageBpsOf: invalid slippageBps ${spec.slippageBps}`);
+  }
+  if (!Number.isFinite(spread) || spread < 0) {
+    throw new Error(`slippageBpsOf: invalid spreadBps ${spec.spreadBps}`);
+  }
+  return Number((slip + spread).toFixed(10));
+}
+
+/**
+ * Tight → brutal execution assumptions, usable as the default slippage
+ * axis. Spread and slippage are separated so the labels stay readable.
+ */
+export const DEFAULT_SLIPPAGE_SPECS: SlippageSpec[] = [
+  { label: "tight 2bps", slippageBps: 1, spreadBps: 1, impactPerUnit: 0 },
+  { label: "normal 5bps", slippageBps: 3, spreadBps: 2, impactPerUnit: 0.0001 },
+  { label: "wide 10bps", slippageBps: 6, spreadBps: 4, impactPerUnit: 0.0002 },
+  { label: "stressed 20bps", slippageBps: 13, spreadBps: 7, impactPerUnit: 0.0005 },
+];
+
+/**
+ * Override only the execution-cost terms of a friction model, leaving
+ * commission, minimum fee and tax untouched. This is what makes slippage
+ * an independent sweep axis instead of riding on the single cost scale.
+ */
+export function applySlippage(base: Frictions, spec: SlippageSpec): Frictions {
+  const total = slippageBpsOf(spec);
+  return {
+    ...base,
+    slippageBps: total,
+    ...(spec.impactPerUnit !== undefined ? { impactPerUnit: spec.impactPerUnit } : {}),
+  };
+}
+
+/** Override the fixed per-trade minimum commission. */
+export function applyMinCommission(base: Frictions, minCommission: number): Frictions {
+  if (!Number.isFinite(minCommission) || minCommission < 0) {
+    throw new Error(`applyMinCommission: invalid minCommission ${minCommission}`);
+  }
+  return { ...base, minCommission };
+}
+
+/**
+ * Full cost grid: commission scale × slippage spec × minimum fee.
+ * The commission scale still multiplies every baseline term, but the
+ * slippage and minimum-fee overrides are applied afterwards so those two
+ * axes are exactly the values requested rather than scaled derivatives.
+ */
+export function buildCostGrid(
+  base: Frictions,
+  opts: {
+    scales: number[];
+    slippage?: SlippageSpec[];
+    minCommission?: number[];
+  },
+): CostScenario[] {
+  const slippages = opts.slippage?.length ? opts.slippage : [null];
+  const minFees = opts.minCommission?.length ? opts.minCommission : [null];
+  const out: CostScenario[] = [];
+  for (const scale of opts.scales) {
+    for (const spec of slippages) {
+      for (const minFee of minFees) {
+        let frictions = scaleFrictions(base, scale);
+        if (spec) frictions = applySlippage(frictions, spec);
+        if (minFee !== null) frictions = applyMinCommission(frictions, minFee);
+        const parts = [scale === 1 ? "baseline" : `${(scale * 100).toFixed(0)}% cost`];
+        if (spec) parts.push(spec.label);
+        if (minFee !== null) parts.push(`min £${minFee}`);
+        out.push({
+          label: parts.join(" · "),
+          scale,
+          frictions,
+          ...(spec ? { slippage: spec } : {}),
+          ...(minFee !== null ? { minCommission: minFee } : {}),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** Stable identity for a scenario, safe as a map key across all three axes. */
+export function scenarioKey(sc: CostScenario): string {
+  return [sc.scale, sc.slippage?.label ?? "-", sc.minCommission ?? "-"].join("|");
+}
+
 
 /**
  * Scale a friction model. All cost terms move together so a single
