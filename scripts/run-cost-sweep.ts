@@ -25,6 +25,7 @@ import {
 } from "../src/lib/cost-sweep";
 import { computeMaxDrawdown, computeSharpe, dailyReturns, type EquityPoint } from "../src/lib/backtest-metrics";
 import { renderBacktestReportHtml, type ReportPanel } from "../src/lib/backtest-report-chart";
+import { buildCostReturnPanels } from "../src/lib/cost-return-chart";
 import type { RiskLevel } from "../src/lib/risk-sim-matrix";
 import type { TradingStyle } from "../src/lib/trading-style";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -210,6 +211,17 @@ for (const riskLevel of riskLevels) {
     }
   }
 }
+// Cost-vs-return + breakeven curve, one panel per risk level, for each style.
+const costReturnPanels = styles.flatMap((style) =>
+  buildCostReturnPanels(cells, {
+    baseFrictions: BASE_FRICTIONS,
+    startingCash,
+    tickets: TICKETS,
+    style,
+  }),
+);
+panels.unshift(...costReturnPanels);
+
 panels.unshift({
   heading: "Breakeven summary",
   subtitle: "cost level at which each ticket size turns viable",
