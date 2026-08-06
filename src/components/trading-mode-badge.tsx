@@ -1,5 +1,6 @@
 import { Activity, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useTradingMode } from "@/hooks/use-trading-mode";
 
 /**
  * Single source of truth for how the active trading horizon is labelled.
@@ -8,6 +9,10 @@ import { Badge } from "@/components/ui/badge";
  * "Swing Active" (days-to-weeks holds, tight stops) vs "Position Only"
  * (months-long holds). Reading `trading_style` off the raw risk_config
  * keeps every surface consistent with what the hourly run actually uses.
+ *
+ * Pass `portfolioId` to have the last known mode restored from local storage
+ * while the portfolio query is still loading, so the badge does not flash
+ * "Position Only" on every refresh.
  */
 export function isSwingActive(riskConfig: unknown): boolean {
   const cfg = (riskConfig ?? {}) as Record<string, unknown>;
@@ -20,12 +25,14 @@ export function tradingModeLabel(riskConfig: unknown): string {
 
 export function TradingModeBadge({
   riskConfig,
+  portfolioId,
   className,
 }: {
   riskConfig: unknown;
+  portfolioId?: string;
   className?: string;
 }) {
-  const swing = isSwingActive(riskConfig);
+  const { isSwing: swing } = useTradingMode(portfolioId, riskConfig);
   const Icon = swing ? Activity : Timer;
   return (
     <Badge
@@ -42,3 +49,4 @@ export function TradingModeBadge({
     </Badge>
   );
 }
+
