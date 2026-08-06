@@ -30,6 +30,8 @@
 // arithmetic and its guarantees.
 
 import { effectiveMaxParticipation } from "./microstructure/algo-regime-guard";
+import { computeCommission, type CommissionModel } from "./commission-model";
+import type { AssetClass } from "./universe.server";
 
 export type Side = "BUY" | "SELL";
 
@@ -195,6 +197,22 @@ export type Frictions = {
   buyTaxBps?: number;
   slippageBps?: number;
   impactPerUnit?: number;
+  /**
+   * Optional scaling commission model. When present it REPLACES the flat
+   * `commissionBps`/`minCommission` pair: the fee is computed per fill from
+   * the tiered venue schedule (bps that steps down with notional, per-share
+   * component, per-ticket floor and cap) plus the monthly-volume discount.
+   * Buy-side tax and per-decision `fee` still apply on top.
+   */
+  commission?: {
+    model?: CommissionModel;
+    /** Trailing 30-day traded notional used for the discount ladder. */
+    monthlyVolume?: number;
+    /** Per-symbol trade currency (defaults to inference from the ticker). */
+    currencyBySymbol?: Record<string, string>;
+    /** Per-symbol asset class, enabling class overrides (e.g. crypto). */
+    assetClassBySymbol?: Record<string, AssetClass>;
+  };
 };
 
 export type SimulateOptions = {
@@ -388,19 +406,41 @@ function effectiveFillPrice(
   return Math.max(0, quote * (1 - slipFrac) - impact);
 }
 
+/** Context needed by the scaling commission model. */
+type FeeContext = { symbol: string; quantity: number };
+
 /**
- * Total fee for a fill: baseFee (per-decision override) + commission
- * (max of bps-of-notional and minCommission) + buy-side tax.
+ * Total fee for a fill: baseFee (per-decision override) + commission +
+ * buy-side tax. Commission is either the scaling model (when
+ * `frictions.commission` is set) or the flat max(bps-of-notional, floor).
  */
 function totalFee(
   notional: number,
   side: Side,
   baseFee: number,
   f: Frictions | undefined,
+  ctx?: FeeContext,
 ): number {
   if (!f) return baseFee;
-  const bpsComm = notional * ((f.commissionBps ?? 0) / 10_000);
-  const commission = Math.max(f.minCommission ?? 0, bpsComm);
+  let commission: number;
+  if (f.commission) {
+    const c = f.commission;
+    const symbol = ctx?.symbol ?? "";
+    commission = computeCommission({
+      notional,
+      quantity: ctx?.quantity ?? 0,
+      symbol,
+      ...(c.currencyBySymbol?.[symbol] ? { currency: c.currencyBySymbol[symbol] } : {}),
+      ...(c.assetClassBySymbol?.[symbol]
+        ? { assetClass: c.assetClassBySymbol[symbol] }
+        : {}),
+      ...(c.monthlyVolume !== undefined ? { monthlyVolume: c.monthlyVolume } : {}),
+      ...(c.model ? { model: c.model } : {}),
+    }).commission;
+  } else {
+    const bpsComm = notional * ((f.commissionBps ?? 0) / 10_000);
+    commission = Math.max(f.minCommission ?? 0, bpsComm);
+  }
   const tax = side === "BUY" ? notional * ((f.buyTaxBps ?? 0) / 10_000) : 0;
   return baseFee + commission + tax;
 }
@@ -417,11 +457,12 @@ function maxAffordableBuyQty(
   cash: number,
   baseFee: number,
   f: Frictions,
+  symbol: string,
 ): number {
   const spendAt = (q: number): number => {
     const p = effectiveFillPrice(quote, q, "BUY", f);
     const notional = q * p;
-    return notional + totalFee(notional, "BUY", baseFee, f);
+    return notional + totalFee(notional, "BUY", baseFee, f, { symbol, quantity: q });
   };
   if (spendAt(requested) <= cash) return requested;
   if (spendAt(0) > cash) return 0; // fixed fees alone unaffordable
@@ -838,7 +879,8 @@ export function simulateBrokerExecution(
       const requestedEffPrice = effectiveFillPrice(d.price, requested, "BUY", f);
       const requestedNotional = requested * requestedEffPrice;
       const requestedSpend =
-        requestedNotional + totalFee(requestedNotional, "BUY", fee, f);
+        requestedNotional
+        + totalFee(requestedNotional, "BUY", fee, f, { symbol: d.symbol, quantity: requested });
 
       let qty = requested;
       if (requestedSpend > cash) {
@@ -851,7 +893,7 @@ export function simulateBrokerExecution(
           continue;
         }
         cashTruncated = true;
-        qty = maxAffordableBuyQty(requested, d.price, cash, fee, f);
+        qty = maxAffordableBuyQty(requested, d.price, cash, fee, f, d.symbol);
         if (qty <= 0) {
           rejections.push({
             step, decisionId: d.id, symbol: d.symbol, side: d.side,
@@ -864,7 +906,7 @@ export function simulateBrokerExecution(
 
       const effPrice = effectiveFillPrice(d.price, qty, "BUY", f);
       const notional = qty * effPrice;
-      const totalFeePaid = totalFee(notional, "BUY", fee, f);
+      const totalFeePaid = totalFee(notional, "BUY", fee, f, { symbol: d.symbol, quantity: qty });
       const spend = notional + totalFeePaid;
       cash = Math.max(0, cash - spend);
 
@@ -928,7 +970,7 @@ export function simulateBrokerExecution(
     const f = options.frictions;
     const effSellPrice = effectiveFillPrice(d.price, qty, "SELL", f);
     const proceeds = qty * effSellPrice;
-    const totalFeePaid = totalFee(proceeds, "SELL", fee, f);
+    const totalFeePaid = totalFee(proceeds, "SELL", fee, f, { symbol: d.symbol, quantity: qty });
     if (totalFeePaid > cash + proceeds) {
       rejections.push({
         step, decisionId: d.id, symbol: d.symbol, side: d.side,
