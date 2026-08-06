@@ -493,21 +493,25 @@ panels.push(
         "viable share",
         "best viable",
       ],
-      rows: viability.levels.map((l) => [
-        l.riskLevel,
-        l.threshold.breakevenTradesPerYear === null
-          ? "—"
-          : l.threshold.breakevenTradesPerYear.toFixed(0),
-        l.threshold.source,
-        l.threshold.cagrPerTrade.toFixed(3),
-        String(l.viableCount),
-        String(l.marginalCount),
-        String(l.belowCount),
-        `${(l.viableShare * 100).toFixed(0)}%`,
-        l.bestViable
-          ? `${l.bestViable.metrics.cagrPct.toFixed(2)}% @ ${l.bestViable.metrics.tradesPerYear.toFixed(0)}/yr`
-          : "none",
-      ]),
+      rows: viability.levels.map((l) => ({
+        tags: { risk: l.riskLevel },
+        cells: [
+          l.riskLevel,
+          l.threshold.breakevenTradesPerYear === null
+            ? "—"
+            : l.threshold.breakevenTradesPerYear.toFixed(0),
+          l.threshold.source,
+          l.threshold.cagrPerTrade.toFixed(3),
+          String(l.viableCount),
+          String(l.marginalCount),
+          String(l.belowCount),
+          `${(l.viableShare * 100).toFixed(0)}%`,
+          l.bestViable
+            ? `${l.bestViable.metrics.cagrPct.toFixed(2)}% @ ${l.bestViable.metrics.tradesPerYear.toFixed(0)}/yr`
+            : "none",
+        ],
+      })),
+
     },
   },
   {
