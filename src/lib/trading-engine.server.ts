@@ -1636,7 +1636,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         ensembleScore: ensemble?.score ?? null,
       });
 
-      const secMult = sectorSizeMultiplier(symbolSector(meta.symbol), sectorScores);
+      const symSector = symbolSector(meta.symbol);
+      const secMult = sectorSizeMultiplier(symSector, sectorScores);
+      // Cycle phase (growing / stagnating / shrinking) — cuts stack into the
+      // haircuts below; the growth boost is applied separately since
+      // combineHaircuts ignores multipliers >= 1. Hard caps still bind later.
+      const cycleRow = sectorCycleFor(sectorCycle, symSector);
+      const phaseMult = sectorPhaseMultiplier(cycleRow, order.side);
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
 
       const haircuts = combineHaircuts([
