@@ -195,7 +195,7 @@ describe("withHoldout", () => {
   it("downgrades go to caution when the holdout weakens", () => {
     const out = withHoldout(
       goodSummary(),
-      assessHoldout([seg(0, { sharpe: 0.2 }), seg(1, { sharpe: 0.2 })], wf(1.1)),
+      assessHoldout([seg(0, { sharpe: 0.45 }), seg(1, { sharpe: 0.45 })], wf(1.1)),
     );
     expect(out.verdict).toBe("caution");
     expect(out.reasons[0]).toMatch(/weaker than walk-forward/);
