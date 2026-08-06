@@ -55,6 +55,19 @@ export type PreflightAnomalyReport = {
   baselineRuns: number;
 };
 
+/**
+ * Noise floors for the RELATIVE (ratio/z-score) rules.
+ *
+ * A sub-second phase can easily double against its median — news ingestion at
+ * 260ms vs a 117ms baseline is 2.2x, scores hard, and used to be reported as a
+ * "Pre-flight anomaly". That is measurement noise, not a run risk: no phase
+ * that finishes this fast can eat the deadline. Relative flags therefore need
+ * BOTH a meaningful absolute duration and a meaningful absolute regression.
+ * Absolute ceilings and budget-share rules below are unaffected.
+ */
+export const MIN_RELATIVE_FLAG_MS = 1_500;
+export const MIN_RELATIVE_DELTA_MS = 750;
+
 /** Absolute "this is slow whatever the history says" ceilings, in ms. */
 const ABSOLUTE_SLOW_MS: Record<RunPhase, number> = {
   saxo_refresh: 6_000,
@@ -155,7 +168,13 @@ export function analyzePreflight(input: {
     let severity: PhaseAnomaly["severity"] = "ok";
     const reasons: string[] = [];
 
-    if (score !== null && ratio !== null) {
+    // Relative rules only apply once the step is slow enough in absolute terms
+    // for a regression to matter to the run's deadline.
+    const relativeEligible =
+      p.ms >= MIN_RELATIVE_FLAG_MS &&
+      (base === null || p.ms - base.medianMs >= MIN_RELATIVE_DELTA_MS);
+
+    if (score !== null && ratio !== null && relativeEligible) {
       if (score >= 6 && ratio >= 2) {
         severity = "critical";
         reasons.push(`${ratio.toFixed(1)}x its usual ${Math.round(base!.medianMs)}ms`);
