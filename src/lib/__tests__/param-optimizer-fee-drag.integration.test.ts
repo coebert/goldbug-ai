@@ -56,8 +56,8 @@ const FRICTIONS: FeeDragFrictions = {
   buyTaxBps: 50, // UK stamp duty on buys
 };
 
-/** Fixed base config; only the sleeve keys are swept, so the cast is inert. */
-const BASE_CFG = { max_position_pct: 20 } as unknown as RiskConfig;
+/** Fixed base config; the swept keys are the sleeve pair plus `hold_days`. */
+const BASE_CFG = { max_position_pct: 20, hold_days: 20 } as unknown as RiskConfig;
 const BASE_SLEEVE: Sleeve = { maxNames: 6, perNameWeight: 0.1 };
 
 const CLEAN_AUDIT: RunAudit = {
