@@ -161,7 +161,9 @@ describe("breakevenGrid", () => {
     const tight = groups.find((g) => g.slippageLabel === "tight 2bps")!;
     const stressed = groups.find((g) => g.slippageLabel === "stressed 20bps")!;
     expect(tight.vsZero.verdict).toBe("interpolated");
-    expect(stressed.vsZero.verdict).toBe("never");
+    expect(stressed.vsZero.verdict).toBe("interpolated");
+    // stressed execution breaks even at a much lower commission scale
+    expect(stressed.vsZero.scale!).toBeLessThan(tight.vsZero.scale!);
     expect(stressed.baselineRoundTripBps).toBeGreaterThan(tight.baselineRoundTripBps);
   });
 
