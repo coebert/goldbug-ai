@@ -37,16 +37,19 @@ export function TradingModeBadge({
   return (
     <Badge
       variant={swing ? "default" : "secondary"}
-      className={`shrink-0 gap-1 text-[11px] ${className ?? ""}`}
+      className={`inline-flex max-w-full shrink-0 items-center gap-1 whitespace-nowrap px-1.5 py-0.5 text-[10px] leading-none sm:px-2 sm:text-[11px] ${className ?? ""}`}
       title={
         swing
           ? "Swing trading: holding days to weeks with tighter stops and targets"
           : "Position trading: months-long holds with wider stops and slower turnover"
       }
     >
-      <Icon className="h-3 w-3" />
-      {swing ? "Swing Active" : "Position Only"}
+      <Icon className="h-3 w-3 shrink-0" />
+      {/* Short label on phones, full wording once there is room. */}
+      <span className="sm:hidden">{swing ? "Swing" : "Position"}</span>
+      <span className="hidden sm:inline">{swing ? "Swing Active" : "Position Only"}</span>
     </Badge>
   );
 }
+
 
