@@ -100,7 +100,7 @@ function simulate(params: ParamSet): CandidateMetrics {
 
   // Gross: more concentration and more shots on goal earn more, with
   // diminishing returns; drawdown scales with single-name weight.
-  const grossCagr = 6 + 40 * sleeve.perNameWeight + 60 / holdDays;
+  const grossCagr = 6 + 40 * sleeve.perNameWeight + 240 / holdDays;
   const maxDrawdownPct = -(8 + 130 * sleeve.perNameWeight);
 
   const cagrPct = grossCagr - annualDrag;
