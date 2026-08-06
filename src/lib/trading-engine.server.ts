@@ -164,6 +164,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 import { classesFromUniverse, buildCandidateFeatures } from "./trading-engine/candidate-features.server";
 import { loadFundamentalsScores } from "./fundamentals/cache.server";
+import { fundamentalsGate } from "./fundamentals/gate";
 import type { Fundamentals, FundamentalsScore } from "./fundamentals/types";
 export { classesFromUniverse, buildCandidateFeatures } from "./trading-engine/candidate-features.server";
 import { callAiForDecision } from "./trading-engine/ai-decision.server";
