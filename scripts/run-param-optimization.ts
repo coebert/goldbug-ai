@@ -551,6 +551,73 @@ const panels: ReportPanel[] = [
   },
 ];
 
+if (gridVaried) {
+  panels.push({
+    heading: "Cost-scenario robustness",
+    subtitle:
+      `net CAGR of the top configurations across ${scenarios.length} cost scenarios ` +
+      "(slippage × min-fee × liquidity); risk constraints are checked against the worst scenario",
+    series: [],
+    table: {
+      columns: [
+        "rank",
+        "worst CAGR %",
+        "mean CAGR %",
+        "best CAGR %",
+        "spread pp",
+        "profitable worlds",
+        "pp per bps",
+        "worst scenario",
+        "params",
+      ],
+      rows: ranked
+        .slice(0, 40)
+        .map((r, i) => ({ r, i, rb: robustnessOf(r.params) }))
+        .filter((x): x is { r: (typeof ranked)[number]; i: number; rb: CostRobustness } => !!x.rb)
+        .map(({ r, i, rb }) => ({
+          tags: paramTags(r.params, riskLevel),
+          cells: [
+            String(i + 1),
+            rb.worstCagrPct.toFixed(2),
+            rb.meanCagrPct.toFixed(2),
+            rb.bestCagrPct.toFixed(2),
+            rb.cagrSpreadPct.toFixed(2),
+            `${(rb.profitableShare * 100).toFixed(0)}%`,
+            rb.cagrPerCostBps === null ? "—" : rb.cagrPerCostBps.toFixed(3),
+            rb.worstScenario,
+            formatParams(r.params),
+          ],
+        })),
+    },
+  });
+
+  const winnerKey = winner ? formatParams(winner.params) : null;
+  const winnerRuns = winnerKey ? (scenarioRunsByKey.get(winnerKey) ?? []) : [];
+  if (winnerRuns.length) {
+    panels.push({
+      heading: "Best configuration — per cost scenario",
+      subtitle: `${winnerKey} · one row per cost world`,
+      series: [],
+      table: {
+        columns: ["scenario", "cost bps/side", "CAGR %", "DD %", "sharpe", "turnover/yr", "fees %"],
+        rows: [...winnerRuns]
+          .sort((a, b) => a.metrics.cagrPct - b.metrics.cagrPct)
+          .map((run) => [
+            run.label ?? run.scenario,
+            (costBpsByScenario[run.scenario] ?? 0).toFixed(1),
+            run.metrics.cagrPct.toFixed(2),
+            run.metrics.maxDrawdownPct.toFixed(1),
+            run.metrics.sharpe.toFixed(2),
+            run.metrics.tradesPerYear.toFixed(0),
+            run.metrics.feeDragPct.toFixed(1),
+          ]),
+      },
+    });
+  }
+}
+
+
+
 panels.push(
   {
     heading: "Turnover attribution — what drives trading frequency",
