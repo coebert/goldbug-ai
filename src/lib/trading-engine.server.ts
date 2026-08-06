@@ -1254,6 +1254,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
+      // SWING CHURN GUARD — a fresh swing entry must be given room to work.
+      // Only discretionary AI sells are blocked here; risk exits (stop,
+      // trailing stop, take-profit, time stop, max-hold) run earlier in the
+      // pipeline and are unaffected.
+      const swingMinHold = minHoldDays(cfg);
+      if (swingMinHold > 0) {
+        const openedAt = (cur as unknown as { opened_at?: string | null }).opened_at;
+        const heldDays = openedAt
+          ? Math.floor((nowMs - Date.parse(openedAt)) / 86_400_000)
+          : Number.POSITIVE_INFINITY;
+        if (heldDays < swingMinHold) {
+          executed.push({
+            symbol: meta.symbol, side: "sell", quantity: 0, price, value: 0,
+            reason: order.reason,
+            rejected: `swing min-hold: held ${heldDays}d < ${swingMinHold}d`,
+          });
+          continue;
+        }
+      }
       // Risk dial, sell side: a defensive profile exits faster than it
       // enters. Clamped to the held quantity, so this can only accelerate an
       // exit — never short.
