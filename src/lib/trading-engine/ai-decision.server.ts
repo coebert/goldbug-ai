@@ -52,6 +52,9 @@ export async function callAiForDecision(args: {
   alphaPriors?: string | null;
   cryptoSignalsBlock?: string | null;
   algoRegimeBlock?: string | null;
+  /** Explicit target-exposure block from the cash-allocation policy. */
+  cashPolicyBlock?: string | null;
+
 
 
 
