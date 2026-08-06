@@ -109,7 +109,10 @@ export function splitHoldout(opts: HoldoutSplitOptions): HoldoutSplit {
   const holdout: DateWindow = { from: holdoutFrom, to };
   const trainable: DateWindow = { from, to: addDaysISO(holdoutFrom, -1) };
 
-  const segmentDays = Math.max(1, Math.floor(opts.segmentDays ?? Math.floor(holdoutDays / 3) || holdoutDays));
+  const segmentDays = Math.max(
+    1,
+    Math.floor(opts.segmentDays ?? (Math.floor(holdoutDays / 3) || holdoutDays)),
+  );
   const segments: DateWindow[] = [];
   let cursor = holdoutFrom;
   while (cursor <= to) {
