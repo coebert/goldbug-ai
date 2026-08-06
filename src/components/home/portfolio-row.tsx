@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import { Sparkline } from "@/components/sparkline";
+import { SymbolTicker } from "@/components/symbol-ticker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
