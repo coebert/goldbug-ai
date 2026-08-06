@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  clearTradingModeDrift,
   detectTradingModeDrift,
+  readTradingModeDrift,
+  recordTradingModeDrift,
   readCachedTradingMode,
   resolveTradingMode,
   styleFromRiskConfig,
@@ -50,7 +53,8 @@ export function useTradingMode(
     const stored = readCachedTradingMode(portfolioId);
     const { drifted, engineStyle } = detectTradingModeDrift(riskConfig, stored);
     if (!engineStyle) return;
-    if (drifted && stored) setDrift({ from: stored, to: engineStyle });
+    if (drifted && stored) recordTradingModeDrift(portfolioId, { from: stored, to: engineStyle });
+    setDrift(readTradingModeDrift(portfolioId));
     setCached(engineStyle);
     if (stored !== engineStyle) writeCachedTradingMode(portfolioId, engineStyle); // auto re-sync
   }, [portfolioId, serverStyle, riskConfig]);
@@ -81,12 +85,16 @@ export function useTradingMode(
 
   const setStyleAndClear = useCallback(
     (s: TradingStyle) => {
+      clearTradingModeDrift(portfolioId);
       setDrift(null);
       setStyle(s);
     },
-    [setStyle],
+    [portfolioId, setStyle],
   );
-  const dismissDrift = useCallback(() => setDrift(null), []);
+  const dismissDrift = useCallback(() => {
+    clearTradingModeDrift(portfolioId);
+    setDrift(null);
+  }, [portfolioId]);
 
   const style = resolveTradingMode(serverStyle, cached);
   return { style, isSwing: style === "swing", setStyle: setStyleAndClear, drift, dismissDrift };

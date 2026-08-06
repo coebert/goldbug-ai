@@ -112,3 +112,32 @@ export function detectTradingModeDrift(
   if (!engineStyle || !cached) return { drifted: false, engineStyle, cachedStyle: cached };
   return { drifted: engineStyle !== cached, engineStyle, cachedStyle: cached };
 }
+
+/**
+ * Drift log — shared across every surface in the tab.
+ *
+ * Several components resolve the mode independently (badge, toggle, risk
+ * panel). Whichever one loads the server config first performs the re-sync, so
+ * without a shared record the others would see an already-clean cache and the
+ * warning would appear or vanish depending on mount order.
+ */
+const driftLog = new Map<string, { from: TradingStyle; to: TradingStyle }>();
+
+export function recordTradingModeDrift(
+  portfolioId: string,
+  drift: { from: TradingStyle; to: TradingStyle },
+): void {
+  if (!portfolioId) return;
+  driftLog.set(portfolioId, drift);
+}
+
+export function readTradingModeDrift(
+  portfolioId: string | undefined,
+): { from: TradingStyle; to: TradingStyle } | null {
+  if (!portfolioId) return null;
+  return driftLog.get(portfolioId) ?? null;
+}
+
+export function clearTradingModeDrift(portfolioId: string | undefined): void {
+  if (portfolioId) driftLog.delete(portfolioId);
+}
