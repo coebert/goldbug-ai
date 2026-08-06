@@ -472,6 +472,8 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("reentry_atr_days_mult", 0, 5);
   num("reentry_min_days", 0, 365);
   num("reentry_max_days", 0, 365);
+  out.trading_style = style;
+  num("swing_min_hold_days", 0, 30);
   bool("alpha_bonus_enabled");
   num("alpha_bonus_cap", 1, 3);
   bool("risk_parity_enabled");
