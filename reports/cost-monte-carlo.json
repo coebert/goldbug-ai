@@ -1,0 +1,159 @@
+{
+  "spec": {
+    "commissionBps": {
+      "min": 4,
+      "max": 14
+    },
+    "minCommission": {
+      "min": 2,
+      "max": 10
+    },
+    "slippageBps": {
+      "min": 2,
+      "max": 25
+    },
+    "commonFactor": 0.5,
+    "slippageTail": "fat"
+  },
+  "seed": 20260806,
+  "draws": 12,
+  "riskLevel": "balanced",
+  "style": "swing",
+  "summaries": [
+    {
+      "cohort": "low churn (hold 10d/gap 30d)",
+      "trials": 12,
+      "tradesPerYear": 93.24358974358977,
+      "netCagr": {
+        "p5": -7.902315898178594,
+        "p25": -5.14069459607156,
+        "median": -4.2890764344852395,
+        "p75": -3.485136369798772,
+        "p95": -1.5063245222104584,
+        "mean": -4.457795590728722
+      },
+      "maxDrawdown": {
+        "p5": -37.56549425548713,
+        "p25": -26.55082679483838,
+        "median": -22.872209328510486,
+        "p75": -19.28061991542112,
+        "p95": -10.556570804340991,
+        "mean": -23.366791899398592
+      },
+      "feeDrag": {
+        "p5": 17.63601490751641,
+        "p25": 25.931508106265436,
+        "median": 28.868414704832567,
+        "p75": 32.19689016468208,
+        "p95": 42.90586113812519,
+        "mean": 29.297350289031087
+      },
+      "profitableRate": 0,
+      "drawdownPassRate": 1,
+      "cvarNetCagr": -8.829276275944043,
+      "cvarDrawdown": -6.5163452828272534,
+      "costSpreadPct": 1.6555582262727881,
+      "sensitivity": {
+        "perCommissionBp": -0.022536475736004688,
+        "perMinFee": -1.1314628964791567,
+        "perSlippageBp": -0.08624956514679458,
+        "r2": 0.9921760408373425
+      },
+      "drawdownSlippageSlope": -0.3773630186881648
+    },
+    {
+      "cohort": "medium churn (hold 5d/gap 15d)",
+      "trials": 12,
+      "tradesPerYear": 128.57264957264957,
+      "netCagr": {
+        "p5": -12.139540713700798,
+        "p25": -7.712746875310411,
+        "median": -6.747657299804893,
+        "p75": -5.296153026444625,
+        "p95": -2.3681956583302712,
+        "mean": -6.852331088909282
+      },
+      "maxDrawdown": {
+        "p5": -51.86661394074884,
+        "p25": -36.87267679214847,
+        "median": -33.1913655323399,
+        "p75": -27.488860108630742,
+        "p95": -15.71781240278131,
+        "mean": -33.07521914299145
+      },
+      "feeDrag": {
+        "p5": 24.42791729916918,
+        "p25": 35.96467258451163,
+        "median": 39.90939563032674,
+        "p75": 44.218798369359114,
+        "p95": 58.44184970179916,
+        "mean": 40.321490980133945
+      },
+      "profitableRate": 0,
+      "drawdownPassRate": 1,
+      "cvarNetCagr": -13.494326212554897,
+      "cvarDrawdown": -9.272676386980036,
+      "costSpreadPct": 2.4165938488657863,
+      "sensitivity": {
+        "perCommissionBp": -0.06100843341432691,
+        "perMinFee": -1.7171341175631119,
+        "perSlippageBp": -0.12220118276332231,
+        "r2": 0.9935041128610296
+      },
+      "drawdownSlippageSlope": -0.49494733260616763
+    },
+    {
+      "cohort": "high churn (hold 2d/gap 3d)",
+      "trials": 12,
+      "tradesPerYear": 170.01923076923077,
+      "netCagr": {
+        "p5": -18.512061678889054,
+        "p25": -11.62522047536245,
+        "median": -9.974615522621944,
+        "p75": -7.862444917589029,
+        "p95": -3.2798056447212867,
+        "mean": -10.225071983777752
+      },
+      "maxDrawdown": {
+        "p5": -68.08422395123019,
+        "p25": -50.234895727092756,
+        "median": -44.981979544122154,
+        "p75": -37.75298651406071,
+        "p95": -20.16004591146867,
+        "mean": -44.31229941506975
+      },
+      "feeDrag": {
+        "p5": 32.74185013417923,
+        "p25": 47.633719428024236,
+        "median": 52.69693081864852,
+        "p75": 58.49331613998969,
+        "p95": 75.85924500005447,
+        "mean": 53.17468218364931
+      },
+      "profitableRate": 0,
+      "drawdownPassRate": 1,
+      "cvarNetCagr": -20.863573051283566,
+      "cvarDrawdown": -11.722376476896141,
+      "costSpreadPct": 3.7627755577734217,
+      "sensitivity": {
+        "perCommissionBp": -0.12632773351122295,
+        "perMinFee": -2.6427754918382855,
+        "perSlippageBp": -0.1837489134628092,
+        "r2": 0.9898250622612284
+      },
+      "drawdownSlippageSlope": -0.7039618958357368
+    }
+  ],
+  "impact": {
+    "baseline": "low churn (hold 10d/gap 30d)",
+    "churned": "high churn (hold 2d/gap 3d)",
+    "extraTradesPerYear": 76.77564102564101,
+    "medianCagrCostPct": 5.6855390881367045,
+    "cagrPerExtraTrade": 0.0740539448734513,
+    "extraFeeDragPct": 23.82851611381595,
+    "tailDrawdownCostPct": -9.60347510712768,
+    "profitableRateDelta": 0,
+    "spreadAmplification": 2.27281378453519,
+    "verdict": "churn-dominated"
+  }
+}
