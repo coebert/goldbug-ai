@@ -33,7 +33,9 @@ import { formatUkAxisDay } from "@/lib/uk-time";
 import { sectorLabel } from "@/lib/sector-exposure";
 import { getSectorExposureSeries } from "@/lib/sector-exposure.functions";
 
-const WINDOWS = [30, 90, 180] as const;
+const WINDOWS = [30, 90, 180, 365] as const;
+
+type SeriesKey = "growing" | "stagnating" | "shrinking" | "unclassified" | "tilt";
 
 const PHASE_STYLE = {
   growing: { label: "Growing", color: SAXO_COLOR.up },
