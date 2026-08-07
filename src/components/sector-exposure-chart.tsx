@@ -54,7 +54,17 @@ function signedPct(v: number) {
 
 export function SectorExposureChart({ portfolioId }: { portfolioId: string }) {
   const [windowDays, setWindowDays] = useState<(typeof WINDOWS)[number]>(90);
+  const [hidden, setHidden] = useState<Record<SeriesKey, boolean>>({
+    growing: false,
+    stagnating: false,
+    shrinking: false,
+    unclassified: false,
+    tilt: false,
+  });
+  const shown = (k: SeriesKey) => !hidden[k];
+  const toggle = (k: SeriesKey) => setHidden((h) => ({ ...h, [k]: !h[k] }));
   const fetchSeries = useServerFn(getSectorExposureSeries);
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["sector-exposure", portfolioId, windowDays],
