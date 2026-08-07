@@ -33,7 +33,9 @@ import { formatUkAxisDay } from "@/lib/uk-time";
 import { sectorLabel } from "@/lib/sector-exposure";
 import { getSectorExposureSeries } from "@/lib/sector-exposure.functions";
 
-const WINDOWS = [30, 90, 180] as const;
+const WINDOWS = [30, 90, 180, 365] as const;
+
+type SeriesKey = "growing" | "stagnating" | "shrinking" | "unclassified" | "tilt";
 
 const PHASE_STYLE = {
   growing: { label: "Growing", color: SAXO_COLOR.up },
@@ -52,7 +54,17 @@ function signedPct(v: number) {
 
 export function SectorExposureChart({ portfolioId }: { portfolioId: string }) {
   const [windowDays, setWindowDays] = useState<(typeof WINDOWS)[number]>(90);
+  const [hidden, setHidden] = useState<Record<SeriesKey, boolean>>({
+    growing: false,
+    stagnating: false,
+    shrinking: false,
+    unclassified: false,
+    tilt: false,
+  });
+  const shown = (k: SeriesKey) => !hidden[k];
+  const toggle = (k: SeriesKey) => setHidden((h) => ({ ...h, [k]: !h[k] }));
   const fetchSeries = useServerFn(getSectorExposureSeries);
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["sector-exposure", portfolioId, windowDays],
@@ -150,81 +162,109 @@ export function SectorExposureChart({ portfolioId }: { portfolioId: string }) {
                       name,
                     ]}
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="growing"
-                    name="Growing"
-                    stackId="exposure"
-                    stroke={PHASE_STYLE.growing.color}
-                    fill={PHASE_STYLE.growing.color}
-                    fillOpacity={SAXO_METRIC.splitFillPeakOpacity}
-                    strokeWidth={SAXO_METRIC.hairlineWidth}
-                    isAnimationActive={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="stagnating"
-                    name="Stagnating"
-                    stackId="exposure"
-                    stroke={PHASE_STYLE.stagnating.color}
-                    fill={PHASE_STYLE.stagnating.color}
-                    fillOpacity={0.22}
-                    strokeWidth={SAXO_METRIC.hairlineWidth}
-                    isAnimationActive={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="shrinking"
-                    name="Shrinking"
-                    stackId="exposure"
-                    stroke={PHASE_STYLE.shrinking.color}
-                    fill={PHASE_STYLE.shrinking.color}
-                    fillOpacity={SAXO_METRIC.splitFillDownPeakOpacity}
-                    strokeWidth={SAXO_METRIC.hairlineWidth}
-                    isAnimationActive={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="unclassified"
-                    name="Unclassified"
-                    stackId="exposure"
-                    stroke={PHASE_STYLE.unclassified.color}
-                    fill={PHASE_STYLE.unclassified.color}
-                    fillOpacity={0.14}
-                    strokeWidth={SAXO_METRIC.hairlineWidth}
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="tilt"
-                    name="Net tilt"
-                    dot={false}
-                    stroke={SAXO_COLOR.crosshair}
-                    strokeWidth={SAXO_METRIC.strokeWidth}
-                    isAnimationActive={false}
-                  />
+                  {shown("growing") ? (
+                    <Area
+                      type="monotone"
+                      dataKey="growing"
+                      name="Growing"
+                      stackId="exposure"
+                      stroke={PHASE_STYLE.growing.color}
+                      fill={PHASE_STYLE.growing.color}
+                      fillOpacity={SAXO_METRIC.splitFillPeakOpacity}
+                      strokeWidth={SAXO_METRIC.hairlineWidth}
+                      isAnimationActive={false}
+                    />
+                  ) : null}
+                  {shown("stagnating") ? (
+                    <Area
+                      type="monotone"
+                      dataKey="stagnating"
+                      name="Stagnating"
+                      stackId="exposure"
+                      stroke={PHASE_STYLE.stagnating.color}
+                      fill={PHASE_STYLE.stagnating.color}
+                      fillOpacity={0.22}
+                      strokeWidth={SAXO_METRIC.hairlineWidth}
+                      isAnimationActive={false}
+                    />
+                  ) : null}
+                  {shown("shrinking") ? (
+                    <Area
+                      type="monotone"
+                      dataKey="shrinking"
+                      name="Shrinking"
+                      stackId="exposure"
+                      stroke={PHASE_STYLE.shrinking.color}
+                      fill={PHASE_STYLE.shrinking.color}
+                      fillOpacity={SAXO_METRIC.splitFillDownPeakOpacity}
+                      strokeWidth={SAXO_METRIC.hairlineWidth}
+                      isAnimationActive={false}
+                    />
+                  ) : null}
+                  {shown("unclassified") ? (
+                    <Area
+                      type="monotone"
+                      dataKey="unclassified"
+                      name="Unclassified"
+                      stackId="exposure"
+                      stroke={PHASE_STYLE.unclassified.color}
+                      fill={PHASE_STYLE.unclassified.color}
+                      fillOpacity={0.14}
+                      strokeWidth={SAXO_METRIC.hairlineWidth}
+                      isAnimationActive={false}
+                    />
+                  ) : null}
+                  {shown("tilt") ? (
+                    <Line
+                      type="monotone"
+                      dataKey="tilt"
+                      name="Net tilt"
+                      dot={false}
+                      stroke={SAXO_COLOR.crosshair}
+                      strokeWidth={SAXO_METRIC.strokeWidth}
+                      isAnimationActive={false}
+                    />
+                  ) : null}
                 </ComposedChart>
               </ResponsiveContainer>
             </ChartFrame>
 
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {Object.entries(PHASE_STYLE).map(([key, s]) => (
-                <span key={key} className="inline-flex items-center gap-1.5">
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ background: s.color }}
-                  />
-                  {s.label}
-                </span>
-              ))}
-              <span className="inline-flex items-center gap-1.5">
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
+              {(Object.entries(PHASE_STYLE) as Array<[SeriesKey, { label: string; color: string }]>).map(
+                ([key, s]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={shown(key)}
+                    onClick={() => toggle(key)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2 py-0.5 transition-opacity ${
+                      shown(key) ? "text-foreground" : "text-muted-foreground opacity-50"
+                    }`}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ background: s.color }}
+                    />
+                    {s.label}
+                  </button>
+                ),
+              )}
+              <button
+                type="button"
+                aria-pressed={shown("tilt")}
+                onClick={() => toggle("tilt")}
+                className={`inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2 py-0.5 transition-opacity ${
+                  shown("tilt") ? "text-foreground" : "text-muted-foreground opacity-50"
+                }`}
+              >
                 <span
                   className="inline-block h-0.5 w-4"
                   style={{ background: SAXO_COLOR.crosshair }}
                 />
                 Net tilt (growing − shrinking)
-              </span>
+              </button>
             </div>
+
 
             {data?.latestBySector.length ? (
               <div className="space-y-1.5">
