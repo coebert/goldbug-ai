@@ -2,6 +2,7 @@ import { z } from "zod";
 import { generateText } from "ai";
 
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { estimateHoldingPeriod } from "./expected-holding-period";
 
 /**
  * Server-only helpers for building the plain-English explanation of a
@@ -162,6 +163,9 @@ export async function runExplainOrder(
 ): Promise<ExplainOrderOutput> {
   const prompt = buildExplainPrompt(data);
   const promptHash = await hashPrompt(prompt);
+  const hold = holdEstimateFor(data);
+  const holdLabel = hold.applicable ? hold.label : "";
+  const holdBasis = hold.applicable ? hold.basis : "";
 
   if (db) {
     try {
@@ -178,6 +182,8 @@ export async function runExplainOrder(
           orderKey: data.orderKey,
           explanation: hit.explanation as string,
           model: (hit.model as string | null) ?? "cache",
+          holdLabel,
+          holdBasis,
         };
       }
     } catch (err) {
@@ -219,5 +225,7 @@ export async function runExplainOrder(
     orderKey: data.orderKey,
     explanation,
     model,
+    holdLabel,
+    holdBasis,
   };
 }
