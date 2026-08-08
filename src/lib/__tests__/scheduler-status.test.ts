@@ -50,7 +50,7 @@ describe("summariseJobRuns", () => {
     expect(cron.failures).toBe(1);
     expect(cron.weekendFailures).toBe(1);
     expect(cron.avgDurationMs).toBe(2000);
-    expect(cron.lastRunAt).toBe(SUN);
+    expect(cron.lastRunAt).toBe(MON);
     expect(cron.lastWeekendRunAt).toBe(SUN);
   });
 
