@@ -24,6 +24,7 @@ import { TranslationQualityCard } from "@/components/translation-quality-card";
 import { BatchLessonsCard } from "@/components/batch-lessons-card";
 import { RetrainScheduleCard } from "@/components/retrain-schedule-card";
 import { RunMetricsCard } from "@/components/run-metrics-card";
+import { SchedulerStatusCard } from "@/components/scheduler-status-card";
 import { RunPortfolioStatusTable } from "@/components/admin/run-portfolio-status-table";
 import { PreflightAnomalyCard } from "@/components/preflight-anomaly-card";
 import { MicrostructureCalibrationCard } from "@/components/microstructure-calibration-card";
@@ -598,6 +599,8 @@ function AdminPage() {
       </Card>
 
       <PreflightAnomalyCard />
+
+      <SchedulerStatusCard />
 
       <RunMetricsCard />
 
