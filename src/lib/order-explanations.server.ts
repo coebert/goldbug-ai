@@ -49,6 +49,7 @@ export const ExplainInputSchema = z.object({
     .partial()
     .nullable()
     .optional(),
+  tradingStyle: z.enum(["position", "swing"]).nullable().optional(),
 });
 
 export type ExplainOrderInput = z.infer<typeof ExplainInputSchema>;
