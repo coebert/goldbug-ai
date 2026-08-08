@@ -104,10 +104,27 @@ export function OrderExplanationsBackfillCard({ portfolioId }: { portfolioId?: s
           <span>{missing === 0 ? "All caught up" : `${missing} remaining`}</span>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <Button size="sm" onClick={run} disabled={running || q.isLoading || missing === 0}>
-          {running && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-          {running ? "Backfilling…" : missing === 0 ? "Nothing to backfill" : "Backfill explanations"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={run} disabled={running || q.isLoading || missing === 0}>
+            {running && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+            {running
+              ? "Backfilling…"
+              : missing === 0
+                ? "Nothing to backfill"
+                : "Backfill explanations"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={rerunMissing}
+            disabled={running || q.isFetching}
+            title="Re-check for trades with no summary and generate them"
+          >
+            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} />
+            Retry missing explanations
+          </Button>
+        </div>
+
       </CardContent>
     </Card>
   );
