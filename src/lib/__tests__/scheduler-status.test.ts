@@ -141,7 +141,7 @@ describe("summariseTickActivity", () => {
     expect(a.total).toBe(4);
     expect(a.weekend).toBe(3);
     expect(a.weekday).toBe(1);
-    expect(a.lastTickAt).toBe("2026-08-09T15:00:00.000Z");
+    expect(a.lastTickAt).toBe(MON);
     expect(a.lastWeekendTickAt).toBe("2026-08-09T15:00:00.000Z");
     expect(a.weekendDays).toEqual(["2026-08-08", "2026-08-09"]);
   });
