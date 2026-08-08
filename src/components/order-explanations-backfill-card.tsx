@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -47,6 +47,42 @@ export function OrderExplanationsBackfillCard({ portfolioId }: { portfolioId?: s
       void q.refetch();
     }
   }
+
+  /**
+   * Re-check the server for orders that still have no stored explanation
+   * (batches that failed, were rate-limited, or arrived after the last
+   * backfill) and generate them.
+   */
+  async function rerunMissing() {
+    setRunning(true);
+    setError(null);
+    try {
+      const fresh = await q.refetch();
+      setLive(
+        fresh.data
+          ? { explained: fresh.data.explained, total: fresh.data.totalOrders }
+          : null,
+      );
+      if ((fresh.data?.missing ?? 0) === 0) {
+        setError(null);
+        return;
+      }
+      for (let i = 0; i < 200; i += 1) {
+        const res = await backfillFn({
+          data: { batchSize: 10, ...(portfolioId ? { portfolioId } : {}) },
+        });
+        setLive({ explained: res.explained, total: res.totalOrders });
+        if (res.errors.length) setError(res.errors[0] ?? null);
+        if (res.missing === 0 || res.generated === 0) break;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Retry failed");
+    } finally {
+      setRunning(false);
+      void q.refetch();
+    }
+  }
+
 
   return (
     <Card>
