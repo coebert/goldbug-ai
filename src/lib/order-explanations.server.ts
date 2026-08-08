@@ -58,7 +58,11 @@ export type ExplainOrderOutput = {
   orderKey: string;
   explanation: string;
   model: string;
+  /** Deterministic expected-hold window (empty for sells). */
+  holdLabel: string;
+  holdBasis: string;
 };
+
 
 const SIGNAL_HUMAN: Record<string, string> = {
   sma_trend: "the medium-term trend (moving averages)",
