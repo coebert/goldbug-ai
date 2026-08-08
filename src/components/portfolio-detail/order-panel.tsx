@@ -3,6 +3,7 @@ import { Activity, Newspaper, ShieldAlert, ShieldCheck } from "lucide-react";
 import { JargonText } from "@/components/jargon-text";
 import { OrderConfidenceBadge } from "@/components/order-confidence-badge";
 import type { ConfidenceRegime } from "@/lib/order-confidence";
+import type { TradingStyle } from "@/lib/trading-style";
 import { fmtNum, keywordMatch } from "./format";
 import { LiquidityStrip, SignalBadges, SignalImportance } from "./signal-visuals";
 import { PlainEnglishExplanation } from "./plain-english-explanation";
@@ -19,6 +20,7 @@ export function OrderPanel({
   weights,
   conviction,
   regime,
+  tradingStyle,
 }: {
   decisionId: string;
   orderIndex: number;
@@ -30,6 +32,7 @@ export function OrderPanel({
   weights?: SignalWeights | null;
   conviction?: number | null;
   regime?: ConfidenceRegime;
+  tradingStyle?: TradingStyle | null;
 }) {
   const approved = !order.rejected;
   const side = order.side;
@@ -95,6 +98,7 @@ export function OrderPanel({
         relatedNews={relatedNews}
         guardrails={guardrails}
         currency={currency}
+        tradingStyle={tradingStyle ?? null}
       />
 
       {weights && (

@@ -2030,7 +2030,17 @@ function PortfolioPage() {
                   </p>
                 )}
                 {decisions.map((d) => (
-                  <DecisionCard key={d.id} decision={d} currency={p.currency} />
+                  <DecisionCard
+                    key={d.id}
+                    decision={d}
+                    currency={p.currency}
+                    tradingStyle={
+                      (p.risk_config as { trading_style?: string } | null)?.trading_style ===
+                      "swing"
+                        ? "swing"
+                        : "position"
+                    }
+                  />
                 ))}
               </TabsContent>
 
