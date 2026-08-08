@@ -2024,6 +2024,8 @@ function PortfolioPage() {
                 <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
                   <TodaysDecisionSummaryCard portfolioId={p.id} currency={p.currency} />
                 </Suspense>
+                <OrderExplanationsBackfillCard portfolioId={p.id} />
+
                 {decisions.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No AI decisions yet. Run one day or a backtest to see the AI's reasoning here.
