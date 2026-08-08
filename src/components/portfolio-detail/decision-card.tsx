@@ -7,6 +7,7 @@ import { ChevronDown, Newspaper } from "lucide-react";
 import { JargonText } from "@/components/jargon-text";
 import { getCurrentRegime } from "@/lib/regime.functions";
 import type { ConfidenceRegime } from "@/lib/order-confidence";
+import type { TradingStyle } from "@/lib/trading-style";
 import { OrderPanel } from "./order-panel";
 import { normalizeWeights, SignalBadges } from "./signal-visuals";
 import type { DecisionRaw, SignalWeights } from "./types";
@@ -14,6 +15,7 @@ import type { DecisionRaw, SignalWeights } from "./types";
 export function DecisionCard({
   decision,
   currency,
+  tradingStyle,
 }: {
   decision: {
     id: string;
@@ -24,6 +26,7 @@ export function DecisionCard({
     raw: unknown;
   };
   currency: string;
+  tradingStyle?: TradingStyle | null;
 }) {
   const raw = (decision.raw ?? {}) as DecisionRaw;
   const executed = raw.executed ?? [];
@@ -140,6 +143,7 @@ export function DecisionCard({
                 weights={weightsByKey.get(`${o.symbol.toUpperCase()}:${o.side}`)}
                 conviction={convictionByKey.get(`${o.symbol.toUpperCase()}:${o.side}`) ?? null}
                 regime={regime}
+                tradingStyle={tradingStyle ?? null}
               />
             ))}
           </div>

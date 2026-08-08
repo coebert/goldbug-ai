@@ -2,6 +2,7 @@ import { z } from "zod";
 import { generateText } from "ai";
 
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { estimateHoldingPeriod } from "./expected-holding-period";
 
 /**
  * Server-only helpers for building the plain-English explanation of a
@@ -49,6 +50,7 @@ export const ExplainInputSchema = z.object({
     .partial()
     .nullable()
     .optional(),
+  tradingStyle: z.enum(["position", "swing"]).nullable().optional(),
 });
 
 export type ExplainOrderInput = z.infer<typeof ExplainInputSchema>;
@@ -57,7 +59,11 @@ export type ExplainOrderOutput = {
   orderKey: string;
   explanation: string;
   model: string;
+  /** Deterministic expected-hold window (empty for sells). */
+  holdLabel: string;
+  holdBasis: string;
 };
+
 
 const SIGNAL_HUMAN: Record<string, string> = {
   sma_trend: "the medium-term trend (moving averages)",
@@ -78,6 +84,15 @@ function topWeights(
     .slice(0, 3);
 }
 
+export function holdEstimateFor(data: ExplainOrderInput) {
+  return estimateHoldingPeriod({
+    side: data.side,
+    weights: data.weights ?? null,
+    reason: data.reason,
+    tradingStyle: data.tradingStyle ?? null,
+  });
+}
+
 export function buildExplainPrompt(data: ExplainOrderInput): string {
   const weights = topWeights(data.weights ?? null)
     .map(([k, v]) => `- ${SIGNAL_HUMAN[k] ?? k}: ${(v * 100).toFixed(0)}%`)
@@ -95,20 +110,32 @@ export function buildExplainPrompt(data: ExplainOrderInput): string {
     ? `The order was BLOCKED by a guardrail. Guardrail reason: "${data.rejected}". Explain why the safety rule stopped this trade in plain terms.`
     : "The order was executed within the portfolio's safety rules.";
 
+  const hold = holdEstimateFor(data);
+  const holdNote =
+    data.side === "buy" && !data.rejected
+      ? `Planned holding period (already computed — state it in your answer, do not change it): ${hold.label}. Why that long: ${hold.basis} It can end sooner if: ${hold.earlyExit}`
+      : "";
+
   return `You are explaining an automated trading decision to a non-technical investor.
 
-Write 2-3 short sentences, no jargon, no bullet points, no markdown. Do not restate raw numbers already shown in the UI (quantity, price, weights). Focus on WHY the AI made this call in everyday language, and — if it was blocked — why the safety rule stopped it. Never give financial advice, never predict outcomes.
+Write 3-4 short sentences, no jargon, no bullet points, no markdown. Do not restate raw numbers already shown in the UI (quantity, price, weights). Focus on WHY the AI made this call in everyday language, and — if it was blocked — why the safety rule stopped it. ${
+    holdNote
+      ? "End with one sentence saying how long the AI expects to hold this, using the planned holding period given below, and what would make it sell sooner."
+      : ""
+  } Never give financial advice, never predict outcomes.
 
 Order:
 - Action: ${data.side.toUpperCase()} ${data.symbol}
 - Size: ${data.quantity} units at ${data.currency} ${data.price} (${data.currency} ${data.value})
 ${guardrailNote}
+${holdNote}
 
 AI's internal reason: "${data.reason}"
 
 ${weights ? `Top drivers the AI weighted most heavily:\n${weights}` : ""}
 ${news ? `\nHeadlines the AI considered:\n${news}` : ""}`;
 }
+
 
 export type ExplanationCacheClient = {
   from: (table: string) => any;
@@ -136,6 +163,9 @@ export async function runExplainOrder(
 ): Promise<ExplainOrderOutput> {
   const prompt = buildExplainPrompt(data);
   const promptHash = await hashPrompt(prompt);
+  const hold = holdEstimateFor(data);
+  const holdLabel = hold.applicable ? hold.label : "";
+  const holdBasis = hold.applicable ? hold.basis : "";
 
   if (db) {
     try {
@@ -152,6 +182,8 @@ export async function runExplainOrder(
           orderKey: data.orderKey,
           explanation: hit.explanation as string,
           model: (hit.model as string | null) ?? "cache",
+          holdLabel,
+          holdBasis,
         };
       }
     } catch (err) {
@@ -193,5 +225,7 @@ export async function runExplainOrder(
     orderKey: data.orderKey,
     explanation,
     model,
+    holdLabel,
+    holdBasis,
   };
 }
