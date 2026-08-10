@@ -1719,16 +1719,27 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       // a breakout chase only runs at full size when THIS regime has measured
       // positive expectancy for the cohort. Sideways and high-vol tape are cut
       // or skipped outright regardless of how clean the break looks.
+      const brkVix = options?.vix ?? effectiveRegime.signals.vix_level ?? null;
+      const brkRealisedVol = effectiveRegime.signals.spy_vol_20d ?? null;
       const brkRegime = breakoutRegimeAction({
         breakout: featForVote?.breakout ?? null,
         side: order.side,
         regime: effectiveRegime.regime,
-        vol: {
-          vix: options?.vix ?? effectiveRegime.signals.vix_level ?? null,
-          realisedVol20d: effectiveRegime.signals.spy_vol_20d ?? null,
-        },
+        vol: { vix: brkVix, realisedVol20d: brkRealisedVol },
         table: breakoutExpectancy,
       });
+      breakoutAuditBySymbol.set(
+        String(meta.symbol).toUpperCase(),
+        buildBreakoutDecisionAudit({
+          decision: brkRegime,
+          breakout: featForVote?.breakout ?? null,
+          regime: effectiveRegime.regime,
+          vix: brkVix,
+          realisedVol20d: brkRealisedVol,
+          tableSource: breakoutExpectancy?.source ?? null,
+          tableAsOf: breakoutExpectancy?.asOf ?? null,
+        }),
+      );
       if (brkRegime.action === "skip") {
         executed.push({
           symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
@@ -1737,6 +1748,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         continue;
       }
       const brk = { mult: brkRegime.mult, note: brkRegime.note };
+
 
       const haircuts = combineHaircuts([
         { label: "calib", mult: calibration.global_size_mult },
