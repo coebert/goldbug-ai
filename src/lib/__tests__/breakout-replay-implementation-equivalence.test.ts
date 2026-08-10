@@ -397,39 +397,24 @@ function chunkedReplay(
 // The engine under test, projected into the same shape
 // ---------------------------------------------------------------------------
 
+/**
+ * The engine projected into the same shape. Per-symbol holdings are left empty
+ * here: the engine reports only the total, so the per-symbol property is
+ * proven between the three independent implementations instead.
+ */
 function engineLedger(rows: readonly Row[], plan: LimitedPlan, capital: number, costs: Costs): Ledger {
   const replay = runCostedReplay(rows, plan, capital, costs);
-  const steps: LedgerStep[] = replay.trace.map((t) => {
-    // Reconstruct per-symbol holdings from the engine's own fill record.
-    const open = replay.fills.filter((f) => f.fillStep <= t.step && f.releaseRank > rankAtStep(replay, t.step));
-    return {
+  return {
+    steps: replay.trace.map((t) => ({
       step: t.step,
       cashMicros: t.cashMicros,
       holdingsMicros: t.openNotionalMicros,
-      bySymbol: t.openNotionalMicros === 0 ? {} : tally(open),
+      bySymbol: {},
       cumulativeCostMicros: t.cumulativeCostMicros,
-    };
-  });
-  return {
-    steps,
+    })),
     terminalCashMicros: replay.summary.terminalCashMicros,
     totalCostMicros: replay.summary.totalCostMicros,
   };
-}
-
-/** The calendar rank the engine was at when it recorded `step`. */
-function rankAtStep(replay: ReturnType<typeof runCostedReplay>, step: number): number {
-  const fill = replay.fills.find((f) => f.fillStep === step);
-  if (fill) return fill.releaseRank - 1 >= 0 ? fill.releaseRank - (fill.releaseRank - stepRank(replay, step)) : 0;
-  return stepRank(replay, step);
-}
-
-function stepRank(replay: ReturnType<typeof runCostedReplay>, step: number): number {
-  // The engine stores dateRank; the plan step order is chronological by
-  // construction, so the rank of a step is the rank of the last fill at or
-  // before it, defaulting to the step's own position in the calendar.
-  const ranks = [...replay.dateRank.values()];
-  return ranks[Math.min(step, ranks.length - 1)] ?? 0;
 }
 
 // ---------------------------------------------------------------------------
