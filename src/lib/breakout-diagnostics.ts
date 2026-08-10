@@ -269,6 +269,10 @@ export type SymbolDiagnostic = {
   confirmedContributionPct: number;
   /** Plain-language role of this symbol in the confirmed result. */
   role: "driver" | "drag" | "neutral" | "thin";
+  /** Regime cells + vol measurements behind every signal on this symbol. */
+  regimeVol: RegimeVolContext;
+  /** Same cut restricted to the confirmed cohort (what the live gate sees). */
+  confirmedRegimeVol: RegimeVolContext;
 };
 
 export type SymbolDiagnosticsOptions = {
