@@ -32,7 +32,7 @@ const REGIMES: RegimeName[] = [
   "trending", "range_bound", "unknown",
 ];
 
-const KINDS: AlphaModelKind[] = ["trend", "mean_reversion", "quality", "carry"];
+const KINDS: AlphaModelKind[] = ["trend", "mean_reversion", "quality", "carry", "breakout"];
 
 // Known aliases the matrix accepts, plus a handful of casing / whitespace
 // mutations we want to survive normalisation.

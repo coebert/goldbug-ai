@@ -21,6 +21,7 @@ import type { SymbolEventFeatures } from "../market-events";
 import type { RankInfo } from "../cross-sectional-ranking.server";
 import type { UniverseSymbol } from "../universe.server";
 import type { Fundamentals, FundamentalsScore } from "../fundamentals/types";
+import { detectBreakout, type BreakoutEvidence } from "../alpha/breakout";
 
 export function classesFromUniverse(u: unknown): Database["public"]["Enums"]["asset_class"][] {
   if (!Array.isArray(u)) return ["stock", "etf", "crypto", "commodity", "fx"];
@@ -54,6 +55,9 @@ export async function buildCandidateFeatures(
     vw_momentum_10d: number | null;
     weekly_trend_up: boolean;
     weekly_rsi14: number | null;
+    // Evidence-based range-breakout state (Donchian base + ATR penetration
+    // + volume confirmation + failure history).
+    breakout: BreakoutEvidence | null;
     // Sentiment / cooldown are filled in later once news + cooldowns load
     news_score: number | null;
     news_contributors: number;
@@ -97,6 +101,7 @@ export async function buildCandidateFeatures(
         vw_momentum_10d: volumeWeightedMomentum(candles, 10),
         weekly_trend_up: wk?.weekly_trend_up ?? false,
         weekly_rsi14: wk?.weekly_rsi14 ?? null,
+        breakout: detectBreakout(candles),
         news_score: null,
         news_contributors: 0,
         news_momentum: null,

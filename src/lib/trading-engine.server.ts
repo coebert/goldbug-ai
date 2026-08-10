@@ -156,7 +156,7 @@ import {
   evaluateEventBlackout,
   reentryLockoutDays,
 } from "./exits";
-import { scoreUniverse, formatAlphaPriorsForPrompt } from "./alpha";
+import { scoreUniverse, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutSizeMultiplier } from "./alpha";
 import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
 import {
   planOrderSlices,
@@ -737,7 +737,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     effectiveRegime.regime,
   );
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
-  const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
+  const alphaPriors = [
+    formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10),
+    "",
+    formatBreakoutBlock(
+      features as unknown as Parameters<typeof formatBreakoutBlock>[0],
+      8,
+    ),
+  ].join("\n");
 
   // Sector cycle: classify every sector as growing / stagnating / shrinking
   // from its 30d vs 90d momentum relative to the cross-sector median. Feeds
@@ -1658,6 +1665,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }));
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
 
+      // Range-breakout evidence: lean into confirmed, volume-backed expansions
+      // and cut size on unconfirmed / failed / stale ones.
+      const brk = breakoutSizeMultiplier(featForVote?.breakout ?? null, order.side);
+
       const haircuts = combineHaircuts([
         { label: "calib", mult: calibration.global_size_mult },
         { label: "systematic", mult: systematic.mult },
@@ -1668,6 +1679,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         phaseMult.mult < 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
         { label: "event", mult: evPenalty },
         fundGate.mult < 1 ? { label: "financials", mult: fundGate.mult } : null,
+        brk.mult < 1 ? { label: "breakout", mult: brk.mult } : null,
 
       ]);
       if (haircuts.mult < 1) {
@@ -1679,6 +1691,8 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       if (phaseMult.mult > 1) {
         spend *= phaseMult.mult;
       }
+      if (brk.mult > 1) spend *= brk.mult;
+      if (brk.note) sizingNotes.push(brk.note);
       if (phaseMult.note) sizingNotes.push(phaseMult.note);
       if (fundGate.note) sizingNotes.push(fundGate.note);
 
