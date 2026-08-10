@@ -1,8 +1,8 @@
 /**
- * Regression: the "trending" regime must render trend=71% in the alpha priors
- * prompt block. This locks in both the raw weight (0.60) and the strategy
+ * Regression: the "trending" regime must render trend=55% in the alpha priors
+ * prompt block. This locks in both the raw weight (0.48) and the strategy
  * gate matrix (mean_reversion + carry disabled in trending), whose combined
- * renormalization produces 0.60 / (0.60 + 0.25) ≈ 70.588% → "71%".
+ * renormalization produces 0.48 / (0.48 + 0.20 + 0.20) ≈ 54.5% → "55%".
  *
  * If any of those inputs drift, this test fails loudly rather than letting
  * the prompt weight silently go stale (as happened previously when the raw
@@ -29,16 +29,17 @@ const baseFeature = (over: Partial<FeatureLike> = {}): FeatureLike => ({
   ...over,
 });
 
-describe("composite: trending regime weight is pinned to 71%", () => {
-  it("raw trending weights match the documented matrix (trend=0.60)", () => {
+describe("composite: trending regime weight is pinned to 55%", () => {
+  it("raw trending weights match the documented matrix (trend=0.48)", () => {
     // Guard against silent tweaks to the raw regime matrix. If a rebalance is
     // intentional, update this file *and* the prompt assertion together.
     const w = weightsForRegime("trending");
     expect(w).toEqual({
-      trend: 0.60,
-      mean_reversion: 0.10,
-      quality: 0.25,
-      carry: 0.05,
+      trend: 0.48,
+      mean_reversion: 0.08,
+      quality: 0.20,
+      carry: 0.04,
+      breakout: 0.20,
     });
   });
 
@@ -49,25 +50,26 @@ describe("composite: trending regime weight is pinned to 71%", () => {
       mean_reversion: false,
       quality: true,
       carry: false,
+      breakout: true,
     });
   });
 
-  it("effective (gated + renormalised) trend weight rounds to 71%", () => {
+  it("effective (gated + renormalised) trend weight rounds to 55%", () => {
     const eff = effectiveWeightsForRegime("trending");
-    // 0.60 / (0.60 + 0.25) = 0.70588…
-    expect(eff.trend).toBeCloseTo(0.60 / 0.85, 5);
-    expect(Math.round(eff.trend * 100)).toBe(71);
+    // 0.48 / (0.48 + 0.20 + 0.20) = 0.5454…
+    expect(eff.trend).toBeCloseTo(0.48 / 0.88, 5);
+    expect(Math.round(eff.trend * 100)).toBe(55);
 
     // Gated models must renormalise to exactly 0.
     expect(eff.mean_reversion).toBe(0);
     expect(eff.carry).toBe(0);
 
     // And the effective weights must still sum to 1.
-    const sum = eff.trend + eff.mean_reversion + eff.quality + eff.carry;
+    const sum = eff.trend + eff.mean_reversion + eff.quality + eff.carry + eff.breakout;
     expect(sum).toBeCloseTo(1, 5);
   });
 
-  it("formatAlphaPriorsForPrompt renders trend=71% for the trending regime", () => {
+  it("formatAlphaPriorsForPrompt renders trend=55% for the trending regime", () => {
     const scores = [
       scoreCandidate(
         baseFeature({
@@ -78,7 +80,7 @@ describe("composite: trending regime weight is pinned to 71%", () => {
       ),
     ];
     const block = formatAlphaPriorsForPrompt(scores, "trending", 5);
-    expect(block).toContain("trend=71%");
+    expect(block).toContain("trend=55%");
     // Sanity: gated strategies should not be advertised with non-zero weight.
     expect(block).not.toMatch(/mean_reversion=(?!0%)\d+%/);
     expect(block).not.toMatch(/carry=(?!0%)\d+%/);
