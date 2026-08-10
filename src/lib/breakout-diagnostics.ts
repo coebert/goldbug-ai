@@ -356,6 +356,8 @@ export type SignalStateDiagnostic = {
   stopRatePct: number;
   /** Share of trades that reached their profit target. */
   targetRatePct: number;
+  /** Regime cells + vol measurements behind this cohort's signals. */
+  regimeVol: RegimeVolContext;
 };
 
 export function signalStateDiagnostics(
