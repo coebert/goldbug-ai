@@ -12,6 +12,7 @@ import { AlgoRegimeHistoryCard } from "@/components/algo-regime-history-card";
 import { AlgoRegimeCalibrationCard } from "@/components/algo-regime-calibration-card";
 import { AlgoRegimeBacktestCard } from "@/components/algo-regime-backtest-card";
 import { BreakoutBacktestCard } from "@/components/breakout-backtest-card";
+import { BreakoutOrderLogCard } from "@/components/breakout-order-log-card";
 import { BreakoutOverlayCard } from "@/components/breakout-overlay-card";
 import { BreakoutParamSweepCard } from "@/components/breakout-param-sweep-card";
 import { BreakoutExitSweepCard } from "@/components/breakout-exit-sweep-card";
