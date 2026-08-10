@@ -789,6 +789,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Per-symbol sector evidence captured at sizing time so the audit trail can
   // replay exactly which phase/momentum/multiplier applied to each decision.
   const sectorAuditBySymbol = new Map<string, SectorDecisionAudit>();
+  // Per-symbol breakout gate evidence (expectancy cell, vol inputs, age band
+  // and the exact skip / downsize reason) captured at decision time.
+  const breakoutAuditBySymbol = new Map<string, BreakoutDecisionAudit>();
 
   // Measured trading edge (rolling signal_performance) — feeds Kelly sizing
   // instead of the old hardcoded 2% assumption. Falls back to the prior when
