@@ -467,5 +467,5 @@ export function buildBreakoutDiagnostics(
     }
   }
 
-  return { symbols, states, notes };
+  return { symbols, states, regimeVol, notes };
 }
