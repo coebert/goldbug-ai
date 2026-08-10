@@ -441,6 +441,8 @@ export function runBreakoutBacktest(
         direction: ev.direction,
         side,
         regime: regimeByDate.get(clean[i]!.date) ?? "sideways",
+        realisedVol20d: realisedVolAt(clean, i),
+        atrPct: clean[i]!.close > 0 ? atr / clean[i]!.close : null,
         quality: ev.quality,
         penetrationAtr: ev.penetration_atr,
         volumeRatio: ev.volume_ratio,
