@@ -169,8 +169,37 @@ function summarise(
   };
 }
 
-const chronological = (trades: readonly SignalTrade[]) =>
-  [...trades].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+/**
+ * Deterministic tie-break for signals that share a date.
+ *
+ * Sorting on date alone is a *partial* order: a stable sort then leaves
+ * same-day signals in whatever order the caller's array happened to be in.
+ * That order is invisible in the totals (compounding is commutative) but not
+ * in the *path* — max drawdown reads the equity curve step by step, so two
+ * callers holding the same cohort in a different order could report different
+ * drawdowns for identical trades.
+ *
+ * The comparator below is a total order over the fields that identify a
+ * signal, so the cohort has exactly one canonical sequence regardless of how
+ * it arrived. Ties are broken on stable, caller-independent data: date, then
+ * symbol, then holding period, then realised return, then size — and finally
+ * a JSON form so two genuinely identical rows still order consistently.
+ */
+function compareSignals(a: SignalTrade, b: SignalTrade): number {
+  if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+  if (a.symbol !== b.symbol) return a.symbol < b.symbol ? -1 : 1;
+  const num = (x: number | undefined) => (Number.isFinite(x as number) ? (x as number) : 0);
+  if (num(a.barsHeld) !== num(b.barsHeld)) return num(a.barsHeld) - num(b.barsHeld);
+  if (num(a.returnPct) !== num(b.returnPct)) return num(a.returnPct) - num(b.returnPct);
+  if (num(a.entry) !== num(b.entry)) return num(a.entry) - num(b.entry);
+  const ka = `${a.side}|${a.direction}|${a.cohort}|${a.exitReason}`;
+  const kb = `${b.side}|${b.direction}|${b.cohort}|${b.exitReason}`;
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
+/** Canonical cohort order: chronological, with same-day ties fully resolved. */
+export const chronological = (trades: readonly SignalTrade[]) => [...trades].sort(compareSignals);
+
 
 /** Replay the confirmed cohort at flat size 1 — the control for every cell. */
 export function baselineExecution(
