@@ -36,6 +36,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   ACTIONS,
+  ACTION_STANCE,
   CONFIDENCE_LABELS,
   STANCES,
   actionMix,
@@ -138,7 +139,7 @@ function ActionMixPanel({ mix, prevMix }: { mix: ActionMix; prevMix: ActionMix |
               label={a[0].toUpperCase() + a.slice(1)}
               count={mix.byAction[a].count}
               pct={mix.byAction[a].pct}
-              colour={STANCE_BAR[ACTION_STANCE_UI[a]]}
+              colour={STANCE_BAR[ACTION_STANCE[a]]}
               deltaCount={diff?.byAction[a].count}
             />
           ))}
