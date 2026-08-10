@@ -21,6 +21,9 @@ export const runWalkForward = createServerFn({ method: "POST" })
         commission_bps: z.number().min(0).max(500).default(5),
         slippage_bps: z.number().min(0).max(500).default(10),
         min_trade_value: z.number().min(0).max(100000).default(25),
+        /** Days reserved at the end of history; 0 disables the holdout. */
+        holdout_days: z.number().int().min(0).max(1000).default(252),
+        holdout_segment_days: z.number().int().min(20).max(500).optional(),
       })
       .parse(i),
   )
@@ -45,6 +48,10 @@ export const runWalkForward = createServerFn({ method: "POST" })
       mode: data.mode,
       maxFolds: data.max_folds,
       objective: data.objective,
+      holdoutDays: data.holdout_days,
+      ...(data.holdout_segment_days === undefined
+        ? {}
+        : { holdoutSegmentDays: data.holdout_segment_days }),
       execution: {
         commission_bps: data.commission_bps,
         slippage_bps: data.slippage_bps,
