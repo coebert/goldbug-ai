@@ -164,7 +164,7 @@ describe("minimizing a snapshot mismatch", () => {
   it("shrinks the cohort to near the size where the regression starts", () => {
     // Planted regression: the position cap is ignored once the cohort is large.
     const regressed: CaseRenderer = (c, trades) =>
-      current(c, trades.length >= 40 ? trades : trades, ) && c.size >= 40
+      c.size >= 40
         ? current({ ...c, limits: resolveSizingLimits({ ...c.limits, maxPositionSize: 99 }) }, trades)
         : current(c, trades);
 
@@ -199,7 +199,7 @@ describe("minimizing a snapshot mismatch", () => {
         .filter((t) => t.cohort === "confirmed")
         .map((t) => ({ symbol: t.symbol, date: t.date, barsHeld: t.barsHeld, size: 1 }));
       const plan = applySizingLimits(rows, c.limits);
-      const bound = plan.limits.breaches.budget > 0;
+      const bound = plan.report.breaches.budget > 0;
       return bound
         ? current({ ...c, limits: resolveSizingLimits({ ...c.limits, maxTotalDeployedPct: 999 }) }, trades)
         : current(c, trades);
@@ -221,7 +221,7 @@ describe("minimizing a snapshot mismatch", () => {
     // second and report the wrong minimum.
     const regressed: CaseRenderer = (c, trades) => {
       const base = current(c, trades);
-      if (c.size >= 80) return { ...base, deployedPct: r2(base.deployedPct + 1) };
+      if (c.size >= 80) return { ...base, deployedPct: r2((base.deployedPct as number) + 1) };
       if (c.size <= 10) return { ...base, taken: (base.taken as number) + 1 };
       return base;
     };
