@@ -132,6 +132,84 @@ function occupancy(rows: readonly Row[], plan: LimitedPlan, cap: number) {
   return { peak, stranded, overAdmissions, taken };
 }
 
+/**
+ * Walk the plan as a cash ledger, step by step.
+ *
+ * The occupancy check counts slots; this one counts money. Model: the cohort
+ * is granted `budget` units of cash (the aggregate deployment allowance).
+ * Entering a position debits its allowed size from cash and credits that size
+ * to the symbol's holding; the position is returned to cash when its hold
+ * window closes. Sizes here are exposure multiples, so this is a purely
+ * relative ledger — but the two rules it enforces are the real ones:
+ *
+ *  - cash never goes negative at any step (no borrowing to fund a signal),
+ *  - no holding ever goes negative at any step (no implicit short or
+ *    double-release of a position that was never opened).
+ *
+ * It also checks conservation (cash + holdings == budget at every step) and
+ * that the book fully unwinds to all-cash once the last window closes, which
+ * is what catches a release path that credits cash without debiting holdings.
+ */
+function assertLedger(rows: readonly Row[], plan: LimitedPlan, budget: number, ctx: string) {
+  const dates = [...new Set(rows.map((x) => x.date))].sort();
+  const rank = new Map(dates.map((d, i) => [d, i]));
+
+  let cash = budget;
+  const holdings = new Map<string, number>();
+  const open: { until: number; symbol: string; size: number }[] = [];
+  let minCash = cash;
+
+  const release = (upTo: number) => {
+    for (let j = open.length - 1; j >= 0; j--) {
+      const pos = open[j];
+      if (pos.until > upTo) continue;
+      const held = holdings.get(pos.symbol) ?? 0;
+      // Releasing more than is held would mean the ledger lost track of a
+      // position — assert before mutating so the failure names the symbol.
+      expect(held + EPS, `released more than held (${pos.symbol}): ${ctx}`).toBeGreaterThanOrEqual(pos.size);
+      const next = held - pos.size;
+      if (next <= EPS) holdings.delete(pos.symbol);
+      else holdings.set(pos.symbol, next);
+      cash += pos.size;
+      open.splice(j, 1);
+    }
+  };
+
+  plan.signals.forEach((s, i) => {
+    const at = rank.get(s.date) ?? 0;
+    release(at);
+
+    if (s.size > 0) {
+      // No borrowing: the debit must be affordable *before* it is applied.
+      expect(cash + EPS, `cash would go negative funding ${s.symbol}: ${ctx}`).toBeGreaterThanOrEqual(s.size);
+      cash -= s.size;
+      holdings.set(s.symbol, (holdings.get(s.symbol) ?? 0) + s.size);
+      open.push({ until: at + Math.max(1, rows[i].barsHeld), symbol: s.symbol, size: s.size });
+    }
+
+    if (cash < minCash) minCash = cash;
+
+    // Step invariants: cash solvent, every holding long-only, nothing created
+    // or destroyed.
+    expect(cash, `negative cash at step ${i}: ${ctx}`).toBeGreaterThanOrEqual(-EPS);
+    for (const [symbol, qty] of holdings) {
+      expect(qty, `negative holding in ${symbol} at step ${i}: ${ctx}`).toBeGreaterThanOrEqual(-EPS);
+    }
+    const held = [...holdings.values()].reduce((a, b) => a + b, 0);
+    expect(Math.abs(cash + held - budget), `ledger does not balance at step ${i}: ${ctx}`).toBeLessThan(1e-6);
+    // No leverage: exposure on the book can never exceed the granted capital.
+    expect(held, `holdings exceed capital at step ${i}: ${ctx}`).toBeLessThanOrEqual(budget + EPS);
+  });
+
+  // Unwind everything and confirm the book returns to all cash.
+  release(Number.POSITIVE_INFINITY);
+  expect(holdings.size, `holdings left open after unwind: ${ctx}`).toBe(0);
+  expect(Math.abs(cash - budget), `cash did not return to capital: ${ctx}`).toBeLessThan(1e-6);
+
+  return { minCash };
+}
+
+
 /** Every invariant that must hold for a single limited plan. */
 function assertPlanInvariants(rows: readonly Row[], limits: SizingLimits, ctx: string) {
   const plan = applySizingLimits(rows, limits);
