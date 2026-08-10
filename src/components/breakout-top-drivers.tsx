@@ -314,18 +314,45 @@ function WhatIfCompare({
             </tr>
           </thead>
           <tbody>
-            {cmp.rows.map((r) => (
+            {cmp.rows.map((r) => {
+              const em = emphasis.by.get(r.symbol);
+              const isTopMover = Boolean(em?.topRankMover || em?.topSizeMover);
+              return (
               <Fragment key={r.symbol}>
                 <tr
-                  className="border-t border-border/30"
+                  className={`border-t border-border/30 ${
+                    isTopMover ? "bg-primary/5" : ""
+                  }`}
                   data-testid={`what-if-row-${r.symbol}`}
+                  data-top-mover={isTopMover ? "true" : undefined}
                 >
                   <td className="py-1 font-medium">
-                    {r.symbol}
+                    <span
+                      className={
+                        isTopMover
+                          ? "border-l-2 border-primary pl-1.5 text-foreground"
+                          : "pl-[calc(0.375rem+2px)]"
+                      }
+                    >
+                      {r.symbol}
+                    </span>
                     {r.status !== "same" ? (
                       <span className="ml-1 text-[10px] text-muted-foreground">
                         {STATUS_LABEL[r.status]}
                       </span>
+                    ) : null}
+                    {isTopMover ? (
+                      <Badge
+                        variant="outline"
+                        className="ml-1 border-primary/40 px-1 py-0 text-[9px] font-medium text-primary"
+                        data-testid={`what-if-top-mover-${r.symbol}`}
+                      >
+                        {em?.topRankMover && em?.topSizeMover
+                          ? "biggest move"
+                          : em?.topRankMover
+                            ? "biggest rank move"
+                            : "biggest size move"}
+                      </Badge>
                     ) : null}
                   </td>
                   <td className="py-1">
@@ -347,15 +374,32 @@ function WhatIfCompare({
                     )}
                   </td>
                   <td className="py-1 text-right tabular-nums">
-                    {r.rankDelta == null
-                      ? "—"
-                      : `${r.rankDelta > 0 ? "+" : ""}${r.rankDelta}`}
+                    <span
+                      className={`inline-block rounded px-1 ${moverTier(
+                        em?.rankIntensity ?? 0,
+                        em?.topRankMover ?? false,
+                      )}`}
+                      data-testid={`what-if-rank-delta-${r.symbol}`}
+                    >
+                      {r.rankDelta == null
+                        ? "—"
+                        : `${r.rankDelta > 0 ? "↑+" : r.rankDelta < 0 ? "↓" : ""}${r.rankDelta}`}
+                    </span>
                   </td>
-                  <td
-                    className={`py-1 text-right tabular-nums ${r.sizeDelta ? tone(r.sizeDelta) : ""}`}
-                  >
-                    {r.sizeDelta == null ? "—" : `${r.sizeDelta > 0 ? "+" : ""}${r.sizeDelta.toFixed(2)}×`}
+                  <td className="py-1 text-right tabular-nums">
+                    <span
+                      className={`inline-block rounded px-1 ${r.sizeDelta ? tone(r.sizeDelta) : ""} ${moverTier(
+                        em?.sizeIntensity ?? 0,
+                        em?.topSizeMover ?? false,
+                      )}`}
+                      data-testid={`what-if-size-delta-${r.symbol}`}
+                    >
+                      {r.sizeDelta == null
+                        ? "—"
+                        : `${r.sizeDelta > 0 ? "+" : ""}${r.sizeDelta.toFixed(2)}×`}
+                    </span>
                   </td>
+
                   <td className="py-1 text-right">
                     <Button
                       type="button"
