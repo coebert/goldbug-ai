@@ -161,7 +161,10 @@ function walkLedger(rows: readonly Row[], plan: LimitedPlan, capital: number, ct
     const at = rank.get(s.date) ?? 0;
     release(at);
 
-    if (Number.isFinite(s.requestedSize) && s.size < s.requestedSize - EPS) reduced++;
+    // `requestedSize` is already sanitised by the engine (NaN → 0, negatives
+    // → 0, Infinity kept as "as much as allowed"), so a reduction is simply an
+    // allowed size below the request — including Infinity clamped to the cap.
+    if (s.size < s.requestedSize - EPS) reduced++;
 
     if (s.size > 0) {
       entries++;
