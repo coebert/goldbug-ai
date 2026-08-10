@@ -56,6 +56,8 @@ export async function callAiForDecision(args: {
   sectorCycleBlock?: string | null;
   /** Explicit target-exposure block from the cash-allocation policy. */
   cashPolicyBlock?: string | null;
+  /** Cash-funded short sleeve (inverse ETFs) and its live room. */
+  shortSleeveBlock?: string | null;
 
 
 
@@ -165,6 +167,8 @@ ${args.algoRegimeBlock ?? ""}
 ${args.sectorCycleBlock ?? ""}
 
 ${args.cashPolicyBlock ?? ""}
+
+${args.shortSleeveBlock ?? ""}
 
 
 ${HISTORICAL_PLAYBOOK}
