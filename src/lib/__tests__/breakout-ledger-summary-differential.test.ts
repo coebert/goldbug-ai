@@ -5,6 +5,7 @@ import {
   applyDriverSizing,
   baselineExecution,
   buildExecutionGrid,
+  chronological,
   driverSizingPlan,
   type ExecutionSummary,
 } from "@/lib/breakout-driver-execution";
@@ -307,16 +308,14 @@ function assertSummaryMatches(summary: ExecutionSummary, sized: readonly { retur
 /** Rebuild the exact sized trade list a replay would have executed. */
 function sizedTrades(trades: readonly SignalTrade[], sizes: readonly number[]) {
   const confirmed = [...trades]
-    .filter((t) => t.cohort === "confirmed")
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    .filter((t) => t.cohort === "confirmed");
   return confirmed.map((t, i) => ({ returnPct: t.returnPct, size: sizes[i] }));
 }
 
 function requestedSizes(trades: readonly SignalTrade[], risk: RiskLevel, gapWeight: number) {
   const plan = driverSizingPlan(trades, { risk, gapWeight });
   const confirmed = [...trades]
-    .filter((t) => t.cohort === "confirmed")
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    .filter((t) => t.cohort === "confirmed");
   return confirmed.map((t) => ({
     symbol: t.symbol,
     date: t.date,
@@ -394,8 +393,7 @@ describe("ledger vs summary (differential)", () => {
 
       const summary = baselineExecution(trades, LIMITS);
       const confirmed = [...trades]
-        .filter((t) => t.cohort === "confirmed")
-        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+        .filter((t) => t.cohort === "confirmed");
       const rows = confirmed.map((t) => ({ symbol: t.symbol, date: t.date, barsHeld: t.barsHeld, size: 1 }));
       const limited = applySizingLimits(rows, LIMITS);
 
@@ -414,7 +412,6 @@ describe("ledger vs summary (differential)", () => {
 
       const baseRows = [...trades]
         .filter((t) => t.cohort === "confirmed")
-        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
         .map((t) => ({ symbol: t.symbol, date: t.date, barsHeld: t.barsHeld, size: 1 }));
       const baseWalk = recomputeSummary(
         sizedTrades(trades, applySizingLimits(baseRows, LIMITS).signals.map((s) => s.size)),
