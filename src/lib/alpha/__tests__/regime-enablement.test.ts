@@ -33,7 +33,7 @@ describe("effectiveWeightsForRegime", () => {
   it("renormalises enabled weights to sum to 1", () => {
     for (const r of ["risk_on", "risk_off", "high_vol", "low_vol", "trending", "range_bound"]) {
       const w = effectiveWeightsForRegime(r);
-      const s = w.trend + w.mean_reversion + w.quality + w.carry;
+      const s = w.trend + w.mean_reversion + w.quality + w.carry + w.breakout;
       expect(s).toBeCloseTo(1, 6);
     }
   });
@@ -45,7 +45,7 @@ describe("effectiveWeightsForRegime", () => {
   it("passes through unchanged in unknown regime (all enabled)", () => {
     const raw = weightsForRegime("unknown");
     const eff = effectiveWeightsForRegime("unknown");
-    for (const k of ["trend", "mean_reversion", "quality", "carry"] as const) {
+    for (const k of ["trend", "mean_reversion", "quality", "carry", "breakout"] as const) {
       expect(eff[k]).toBeCloseTo(raw[k], 6);
     }
   });

@@ -29,7 +29,7 @@ describe("regime matrix", () => {
   it("weights sum to 1 for every regime", () => {
     for (const r of ["risk_on","risk_off","high_vol","low_vol","trending","range_bound","unknown"]) {
       const w = weightsForRegime(r);
-      const sum = w.trend + w.mean_reversion + w.quality + w.carry;
+      const sum = w.trend + w.mean_reversion + w.quality + w.carry + w.breakout;
       expect(sum).toBeCloseTo(1, 5);
     }
   });
