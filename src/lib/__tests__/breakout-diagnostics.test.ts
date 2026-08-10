@@ -16,6 +16,8 @@ function trade(over: Partial<SignalTrade>): SignalTrade {
     direction: "up",
     side: "long",
     regime: "bull",
+    realisedVol20d: 0.01,
+    atrPct: 0.02,
     quality: 0.8,
     penetrationAtr: 0.5,
     volumeRatio: 1.4,
