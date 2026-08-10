@@ -5,6 +5,7 @@ import {
   applyDriverSizing,
   baselineExecution,
   buildExecutionGrid,
+  chronological,
   driverSizingPlan,
 } from "@/lib/breakout-driver-execution";
 import { applySizingLimits, resolveSizingLimits } from "@/lib/breakout-sizing-limits";
@@ -146,9 +147,8 @@ const summaryOf = (trades: readonly SignalTrade[], risk: RiskLevel, gapWeight: n
 /** The per-signal trade tape: what was actually executed, in replay order. */
 const tape = (trades: readonly SignalTrade[], risk: RiskLevel, gapWeight: number, limits = LIMITS) => {
   const plan = driverSizingPlan(trades, { risk, gapWeight });
-  const confirmed = [...trades]
-    .filter((t) => t.cohort === "confirmed")
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  // Same canonical order the engine replays in — same-day ties resolved.
+  const confirmed = chronological(trades.filter((t) => t.cohort === "confirmed"));
   const rows = confirmed.map((t) => ({
     symbol: t.symbol,
     date: t.date,
