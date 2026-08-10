@@ -27,13 +27,34 @@ export const DEFAULT_SIZING_LIMITS: SizingLimits = {
   maxTotalDeployedPct: 100,
 };
 
+/**
+ * NaN must never reach the caps: a single NaN size poisons the running spend
+ * and silently disables the budget cap for every later signal. Treat any
+ * non-finite value as "no size" for inputs, and as the default for limits.
+ */
+function finiteOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 export function resolveSizingLimits(partial?: Partial<SizingLimits>): SizingLimits {
   const l = { ...DEFAULT_SIZING_LIMITS, ...(partial ?? {}) };
   return {
-    maxPositionSize: Math.max(0, l.maxPositionSize),
-    maxConcurrentSignals: Math.max(0, Math.floor(l.maxConcurrentSignals)),
-    maxTotalDeployedPct: Math.max(0, l.maxTotalDeployedPct),
+    // Infinity is a legitimate "uncapped" request and is kept as-is; NaN is not.
+    maxPositionSize: Math.max(0, finiteOrInf(l.maxPositionSize, DEFAULT_SIZING_LIMITS.maxPositionSize)),
+    maxConcurrentSignals: Math.max(
+      0,
+      Math.floor(finiteOrInf(l.maxConcurrentSignals, DEFAULT_SIZING_LIMITS.maxConcurrentSignals)),
+    ),
+    maxTotalDeployedPct: Math.max(
+      0,
+      finiteOrInf(l.maxTotalDeployedPct, DEFAULT_SIZING_LIMITS.maxTotalDeployedPct),
+    ),
   };
+}
+
+function finiteOrInf(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || Number.isNaN(value)) return fallback;
+  return value;
 }
 
 export type LimitReason = "position" | "concurrency" | "budget";
@@ -104,7 +125,9 @@ export function applySizingLimits(
 
   for (const s of signals) {
     const rank = ranks.get(s.date) ?? 0;
-    const requestedSize = Math.max(0, s.size);
+    // NaN is a bug upstream, not a trade: size it 0. An infinite request is a
+    // real "as much as allowed" ask and is left for the position cap to clamp.
+    const requestedSize = Math.max(0, finiteOrInf(s.size, 0));
     const clamped: LimitReason[] = [];
     let size = requestedSize;
 
@@ -135,7 +158,7 @@ export function applySizingLimits(
 
     if (size > 0) {
       spent += size;
-      open.push({ until: rank + Math.max(1, s.barsHeld), size });
+      open.push({ until: rank + Math.max(1, finiteOr(s.barsHeld, 1)), size });
       if (open.length > peakConcurrent) peakConcurrent = open.length;
       if (size > peakPositionSize) peakPositionSize = size;
     }
@@ -144,7 +167,7 @@ export function applySizingLimits(
     out.push({ symbol: s.symbol, date: s.date, requestedSize, size, clamped });
   }
 
-  const requested = signals.reduce((a, s) => a + Math.max(0, s.size), 0);
+  const requested = signals.reduce((a, s) => a + Math.max(0, finiteOrInf(s.size, 0)), 0);
   const requestedDeployedPct = total ? (requested / total) * 100 : 0;
   const deployedPct = total ? (spent / total) * 100 : 0;
   const anyBreach = breaches.position + breaches.concurrency + breaches.budget;
