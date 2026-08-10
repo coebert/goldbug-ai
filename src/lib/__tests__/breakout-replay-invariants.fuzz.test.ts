@@ -278,6 +278,31 @@ describe("replay invariants (property-based)", () => {
     }
   });
 
+  it("cash stays solvent and holdings stay long-only under starved budgets", () => {
+    // The stress shape for the ledger: a tiny budget against oversized,
+    // partly poisoned requests and long overlapping holds, so partial fills
+    // and refusals happen constantly and any off-by-one in the release path
+    // shows up as negative cash or a negative holding.
+    for (let i = 0; i < 120; i++) {
+      const r = rng(caseSeed(BASE_SEED, "ledger", i));
+      const rows = randomRows(r, 20 + Math.floor(r() * 220), true).map((row) => ({
+        ...row,
+        barsHeld: 3 + Math.floor(r() * 25),
+      }));
+      const limits = resolveSizingLimits({
+        maxPositionSize: 0.5 + r() * 2,
+        maxConcurrentSignals: 1 + Math.floor(r() * 8),
+        // Deliberately starved: often far less capital than the cohort asks for.
+        maxTotalDeployedPct: 1 + r() * 40,
+      });
+      const { minCash, budget } = assertPlanInvariants(rows, limits, `ledger case ${i} — ${REPRO}`);
+      expect(minCash, `cash dipped below zero (case ${i}) — ${REPRO}`).toBeGreaterThanOrEqual(-EPS);
+      expect(minCash, `cash exceeded capital (case ${i}) — ${REPRO}`).toBeLessThanOrEqual(budget + EPS);
+    }
+  });
+
+
+
   it("slot admission is monotonic in the concurrency cap", () => {
     for (let i = 0; i < 60; i++) {
       const r = rng(caseSeed(BASE_SEED, "monotone", i));
