@@ -1700,7 +1700,28 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
       // Range-breakout evidence: lean into confirmed, volume-backed expansions
       // and cut size on unconfirmed / failed / stale ones.
-      const brk = breakoutSizeMultiplier(featForVote?.breakout ?? null, order.side);
+      //
+      // The raw evidence multiplier is then gated by the regime action rule:
+      // a breakout chase only runs at full size when THIS regime has measured
+      // positive expectancy for the cohort. Sideways and high-vol tape are cut
+      // or skipped outright regardless of how clean the break looks.
+      const brkRegime = breakoutRegimeAction({
+        breakout: featForVote?.breakout ?? null,
+        side: order.side,
+        regime: effectiveRegime.regime,
+        vol: {
+          vix: options?.vix ?? effectiveRegime.signals.vix_level ?? null,
+          realisedVol20d: effectiveRegime.signals.spy_vol_20d ?? null,
+        },
+      });
+      if (brkRegime.action === "skip") {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason, rejected: brkRegime.note,
+        });
+        continue;
+      }
+      const brk = { mult: brkRegime.mult, note: brkRegime.note || brkRegime.rawMult !== 1 ? brkRegime.note : "" };
 
       const haircuts = combineHaircuts([
         { label: "calib", mult: calibration.global_size_mult },
