@@ -373,6 +373,113 @@ export async function routeOrdersToBroker(params: {
     }
   }
 
+  // ---------- Portfolio cost governor.
+  // The per-ticket viability gate is memoryless: fifty individually "viable"
+  // small tickets still burn a fortnight's returns in commission floors and
+  // stamp duty. This pass adds portfolio memory — a NAV-scaled minimum ticket,
+  // a rolling friction budget as a % of NAV, a daily BUY-ticket cap and a
+  // per-symbol re-entry cooldown. SELLs are never gated.
+  try {
+    const { loadGovernorInputs } = await import("./cost-governor.server");
+    const { planAdmissions, governorForNav } = await import("./cost-governor");
+    const { estimateTradeCosts } = await import("./trade-viability-gate");
+    const { convertAmount } = await import("./fx.server");
+    const { inferSaxoCurrency } = await import("./saxo-fees");
+
+    const inputs = await loadGovernorInputs({
+      supabaseAdmin: supabaseAdmin as never,
+      portfolioId: portfolio.id,
+      baseCcy: portfolioCurrency,
+    });
+
+    if (inputs.navBase > 0) {
+      const fxCache = new Map<string, number>([[portfolioCurrency, 1]]);
+      const rateTo = async (ccy: string) => {
+        const from = ccy.toUpperCase();
+        const hit = fxCache.get(from);
+        if (hit !== undefined) return hit;
+        let r = 1;
+        try {
+          const res = await convertAmount(1, from, portfolioCurrency);
+          if (Number.isFinite(res.amount) && res.amount > 0) r = res.amount;
+        } catch {
+          r = 1;
+        }
+        fxCache.set(from, r);
+        return r;
+      };
+
+      const candidates = [] as Array<{
+        symbol: string;
+        side: "buy" | "sell";
+        notionalBase: number;
+        estCostBase: number;
+      }>;
+      for (const o of routable) {
+        if (preSkips.has(`${o.symbol}:${o.side}`)) continue;
+        const qty = Math.floor(o.quantity);
+        if (qty <= 0) continue;
+        const ccy = o.instrument_ccy?.toUpperCase() ?? inferSaxoCurrency(o.symbol);
+        const fx = await rateTo(ccy);
+        const costs = estimateTradeCosts({
+          symbol: o.symbol,
+          side: o.side === "sell" ? "sell" : "buy",
+          quantity: qty,
+          price: o.price,
+        });
+        candidates.push({
+          symbol: o.symbol,
+          side: o.side === "sell" ? "sell" : "buy",
+          notionalBase: qty * o.price * fx,
+          estCostBase: costs.oneWayCost * fx,
+        });
+      }
+
+      const plan = planAdmissions(candidates, {
+        navBase: inputs.navBase,
+        buysAlreadyToday: inputs.buysAlreadyToday,
+        trailingCostBase: inputs.trailingCostBase,
+        lastBuyDaysAgo: inputs.lastBuyDaysAgo,
+        ...governorForNav(inputs.navBase),
+      });
+
+      const blocked: Array<{ symbol: string; reason: string }> = [];
+      for (const d of plan.decisions) {
+        if (d.kind === "skip") {
+          preSkips.set(`${d.candidate.symbol}:${d.candidate.side}`, d.reason);
+          blocked.push({ symbol: d.candidate.symbol, reason: d.reason });
+        }
+      }
+
+      if (blocked.length > 0) {
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_COST_GOVERNOR",
+          path: "/reconcile/pre-place/cost-governor",
+          status: 200,
+          request: asJson({
+            asOf,
+            decisionId,
+            navBase: inputs.navBase,
+            trailingCostBase: inputs.trailingCostBase,
+            windowDays: inputs.windowDays,
+            buysAlreadyToday: inputs.buysAlreadyToday,
+            minTicketBase: plan.minTicketBase,
+          }),
+          response: asJson({ blocked, budgetRemaining: plan.costBudgetRemainingBase }),
+          error: `cost governor blocked ${blocked.length} buy(s)`,
+        });
+      }
+    }
+  } catch {
+    /* governor is advisory — never block the tick on its failure */
+  }
+
+
+
   try {
     const { syncLiveCashFromBroker } = await import("./live-cash-sync.server");
     const { withOwnedClient } = await import("./_server/owned-client");
