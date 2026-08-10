@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { SignalTrade } from "@/lib/breakout-backtest";
 import {
   buildBreakoutDiagnostics,
+  regimeGateVerdict,
+  regimeVolContext,
   qualityBucket,
   signalStateDiagnostics,
   summarizeSlice,
