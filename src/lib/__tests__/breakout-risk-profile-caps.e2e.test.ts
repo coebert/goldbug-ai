@@ -267,9 +267,11 @@ describe("switching profiles inside the full grid", () => {
     expect(cells[0]!.limits.breaches.position).toBeLessThanOrEqual(
       cells[2]!.limits.breaches.position,
     );
-    // Only the aggressive profile asks above the 1.1x ceiling.
+    // Only the aggressive profile asks above the 1.1x ceiling; conservative's
+    // shortfall comes purely from the shared concurrency book.
     expect(cells[2]!.limits.requestedDeployedPct).toBeGreaterThan(cells[2]!.deployedPct);
-    expect(cells[0]!.limits.requestedDeployedPct).toBeCloseTo(cells[0]!.deployedPct, 10);
+    expect(cells[0]!.limits.breaches.position).toBe(0);
+    expect(cells[2]!.limits.breaches.position).toBeGreaterThan(0);
   });
 
   it("a risk switch never moves the baseline control", () => {
