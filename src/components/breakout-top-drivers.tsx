@@ -29,6 +29,8 @@ import {
   findExecutionCell,
   type ExecutionGrid,
 } from "@/lib/breakout-driver-execution";
+import type { SignalTrade } from "@/lib/breakout-backtest";
+import { MixTimelineChart } from "@/components/breakout-mix-timeline";
 import {
   compareDriverSettings,
   moverEmphasis,
@@ -640,10 +642,12 @@ export function BreakoutTopDrivers({
   drivers,
   symbols,
   execution,
+  trades,
 }: {
   drivers: TopDrivers;
   symbols?: readonly SymbolDiagnostic[];
   execution?: ExecutionGrid;
+  trades?: readonly SignalTrade[];
 }) {
   // Snap the slider to the weights the backtest was actually replayed at, so
   // the execution numbers below always match the ranking above.
@@ -773,6 +777,10 @@ export function BreakoutTopDrivers({
       </div>
 
       <ActionMixPanel mix={mix} prevMix={prevMix} />
+
+      {trades?.length ? (
+        <MixTimelineChart trades={trades} setting={{ risk, gapWeight }} />
+      ) : null}
 
       {showCompare && symbols?.length ? (
         <WhatIfCompare symbols={symbols} a={prev} b={{ risk, gapWeight }} />
