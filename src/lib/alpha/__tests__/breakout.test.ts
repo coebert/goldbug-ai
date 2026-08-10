@@ -105,8 +105,11 @@ describe("detectBreakout", () => {
   it("marks stale breakouts as extended", () => {
     const c = base();
     const hi = Math.max(...c.map((x) => x.high));
+    // slow grind that keeps making new closing highs (no upper wicks, so the
+    // trailing channel never gets ahead of the close)
     for (let i = 0; i < 14; i++) {
-      c.push({ high: hi + 3 + i, low: hi + 1 + i, close: hi + 2 + i, volume: 2_000_000 });
+      const px = hi + 3 + i * 0.5;
+      c.push({ high: px, low: px - 0.5, close: px, volume: 2_000_000 });
     }
     const b = detectBreakout(c);
     expect(b.state).toBe("extended");
