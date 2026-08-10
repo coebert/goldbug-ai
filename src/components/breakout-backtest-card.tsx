@@ -218,7 +218,7 @@ export function BreakoutBacktestCard({ portfolioId }: { portfolioId: string }) {
                 diagnostics={result.diagnostics}
                 timing={result.timing}
                 execution={result.execution}
-                trades={result.trades}
+                mixTimelines={result.mixTimelines}
               />
             )}
 
