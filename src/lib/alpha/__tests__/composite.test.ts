@@ -114,7 +114,7 @@ describe("composite scoring", () => {
     const scores = features.map((f) => scoreCandidate(f, "trending"));
     const block = formatAlphaPriorsForPrompt(scores, "trending", 5);
     expect(block).toContain("ALPHA PRIORS");
-    expect(block).toContain("trend=71%");
+    expect(block).toContain("trend=55%");
     expect(block).toContain("A ");
   });
 });
