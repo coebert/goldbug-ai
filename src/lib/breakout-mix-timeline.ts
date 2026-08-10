@@ -49,7 +49,12 @@ export type MixTimelinePoint = {
   sellPct: number;
   /** Mean size multiplier across the ranked set. */
   avgSize: number;
-  mix: ActionMix;
+  /**
+   * Full mix breakdown. Omitted on timelines that crossed the wire — the
+   * chart only reads the stance shares, and the nested buckets triple the
+   * payload for every point.
+   */
+  mix?: ActionMix;
 };
 
 export type MixTimeline = {
@@ -83,21 +88,18 @@ export function periodKey(date: string, bucket: MixBucketSize): string {
   return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
 }
 
-export function mixTimeline(
-  trades: readonly SignalTrade[],
-  setting: DriverSetting,
-  options: MixTimelineOptions = {},
-): MixTimeline {
+/**
+ * Bucket the sample once and resolve each bucket's evaluation window to a
+ * ranked symbol set. The symbols depend only on the window, never on the
+ * (risk, gap weight) setting, so a whole settings grid reuses this work.
+ */
+function buildWindows(trades: readonly SignalTrade[], options: MixTimelineOptions) {
   const bucket = options.bucket ?? "month";
   const window = options.window ?? "expanding";
   const rollingBuckets = Math.max(1, options.rollingBuckets ?? 6);
   const minConfirmed = options.minConfirmed ?? 3;
-  const trimEmptyLead = options.trimEmptyLead ?? true;
 
   const ordered = [...trades].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-
-  // Bucket in date order; a Map preserves insertion order, which is already
-  // chronological because `ordered` is.
   const buckets = new Map<string, SignalTrade[]>();
   for (const t of ordered) {
     const key = periodKey(t.date, bucket);
@@ -107,33 +109,31 @@ export function mixTimeline(
   }
 
   const keys = [...buckets.keys()];
-  const points: MixTimelinePoint[] = [];
-
-  for (let i = 0; i < keys.length; i++) {
+  const windows = keys.map((key, i) => {
     const from = window === "rolling" ? Math.max(0, i - rollingBuckets + 1) : 0;
     const windowTrades: SignalTrade[] = [];
     for (let j = from; j <= i; j++) windowTrades.push(...(buckets.get(keys[j]!) ?? []));
-
-    const symbols = symbolDiagnostics(windowTrades, { minTrades: minConfirmed });
-    const mix = actionMixFor(symbols, setting, { minConfirmed });
-    const bucketTrades = buckets.get(keys[i]!) ?? [];
-
-    points.push({
-      period: keys[i]!,
-      asOf: bucketTrades[bucketTrades.length - 1]?.date ?? keys[i]!,
+    const bucketTrades = buckets.get(key)!;
+    return {
+      period: key,
+      asOf: bucketTrades[bucketTrades.length - 1]?.date ?? key,
       bucketTrades: bucketTrades.length,
       windowTrades: windowTrades.length,
-      ranked: mix.total,
-      buy: mix.byStance.buy.count,
-      hold: mix.byStance.hold.count,
-      sell: mix.byStance.sell.count,
-      buyPct: mix.byStance.buy.pct,
-      holdPct: mix.byStance.hold.pct,
-      sellPct: mix.byStance.sell.pct,
-      avgSize: mix.avgSize,
-      mix,
-    });
-  }
+      symbols: symbolDiagnostics(windowTrades, { minTrades: minConfirmed }),
+    };
+  });
+
+  return { bucket, window, rollingBuckets, minConfirmed, windows };
+}
+
+export function mixTimeline(
+  trades: readonly SignalTrade[],
+  setting: DriverSetting,
+  options: MixTimelineOptions = {},
+): MixTimeline {
+  const trimEmptyLead = options.trimEmptyLead ?? true;
+  const built = buildWindows(trades, options);
+  const points = pointsFor(built, setting);
 
   // Early buckets often carry too few signals for any symbol to rank. Charting
   // those as "100% stand aside" would be a lie — they are "no opinion yet".
@@ -155,7 +155,86 @@ export function mixTimeline(
         (s) => `${s === "hold" ? "partial" : s === "sell" ? "stand aside" : "buy"} ${signed(shift[s])}pp`,
       ).join(" · ")} from ${first.period} to ${last!.period}`;
 
-  return { setting, bucket, window, rollingBuckets, points: trimmed, shift, summary };
+  return {
+    setting,
+    bucket: built.bucket,
+    window: built.window,
+    rollingBuckets: built.rollingBuckets,
+    points: trimmed,
+    shift,
+    summary,
+  };
+}
+
+type BuiltWindows = ReturnType<typeof buildWindows>;
+
+function pointsFor(built: BuiltWindows, setting: DriverSetting): MixTimelinePoint[] {
+  return built.windows.map((w) => {
+    const mix = actionMixFor(w.symbols, setting, { minConfirmed: built.minConfirmed });
+    return {
+      period: w.period,
+      asOf: w.asOf,
+      bucketTrades: w.bucketTrades,
+      windowTrades: w.windowTrades,
+      ranked: mix.total,
+      buy: mix.byStance.buy.count,
+      hold: mix.byStance.hold.count,
+      sell: mix.byStance.sell.count,
+      buyPct: mix.byStance.buy.pct,
+      holdPct: mix.byStance.hold.pct,
+      sellPct: mix.byStance.sell.pct,
+      avgSize: mix.avgSize,
+      mix,
+    };
+  });
+}
+
+export type MixTimelineGrid = {
+  bucket: MixBucketSize;
+  window: MixWindowMode;
+  rollingBuckets: number;
+  /** Keyed `${risk}|${gapWeight}` — see `mixTimelineKey`. */
+  entries: Record<string, MixTimeline>;
+};
+
+export const mixTimelineKey = (setting: DriverSetting) =>
+  `${setting.risk}|${setting.gapWeight}`;
+
+/**
+ * One timeline per (risk × gap weight) cell, sharing a single pass of window
+ * bucketing and symbol ranking. `mix` is stripped from every point so the grid
+ * is cheap to serialise to the client.
+ */
+export function mixTimelineGrid(
+  trades: readonly SignalTrade[],
+  risks: readonly DriverSetting["risk"][],
+  gapWeights: readonly number[],
+  options: MixTimelineOptions = {},
+): MixTimelineGrid {
+  const built = buildWindows(trades, options);
+  const trimEmptyLead = options.trimEmptyLead ?? true;
+  const entries: Record<string, MixTimeline> = {};
+
+  for (const risk of risks) {
+    for (const gapWeight of gapWeights) {
+      const setting = { risk, gapWeight };
+      const raw = pointsFor(built, setting);
+      const points = (trimEmptyLead ? dropLeadingEmpty(raw) : raw).map(
+        ({ mix: _mix, ...rest }) => rest,
+      );
+      entries[mixTimelineKey(setting)] = {
+        setting,
+        bucket: built.bucket,
+        window: built.window,
+        rollingBuckets: built.rollingBuckets,
+        points,
+        shift: shiftOf(points),
+        summary: summaryOf(points, built),
+      };
+    }
+  }
+
+  return { bucket: built.bucket, window: built.window, rollingBuckets: built.rollingBuckets, entries };
 }
 
 function dropLeadingEmpty(points: MixTimelinePoint[]): MixTimelinePoint[] {
