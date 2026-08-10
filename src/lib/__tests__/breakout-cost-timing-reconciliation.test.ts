@@ -503,7 +503,7 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
   };
 
   it("catches a friction deferred to the next step even though the total is unchanged", () => {
-    const { replay, seed } = findMutableCase();
+    const { replay, plan, seed } = findMutableCase();
     const idx = replay.journal.findIndex(
       (l) => l.feeMicros + l.slipMicros > 0 && l.step < replay.trace.length - 2,
     );
@@ -511,10 +511,10 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
     const leg = replay.journal[idx];
     const amount = leg.feeMicros + leg.slipMicros;
 
-    // The charge is settled one step late: the money is identical and the
-    // running total catches up immediately after, but for one step the ledger
-    // reports cash that has in fact already been spent.
-    const tampered: Replay = {
+    // (a) Settlement slid one step late, with the running total sliding too.
+    // Internally self-consistent and the grand total is identical — only the
+    // fill-anchored timing check knows the charge belongs a step earlier.
+    const deferred: Replay = {
       ...replay,
       journal: replay.journal.map((l, i) => (i === idx ? { ...l, step: l.step + 1 } : l)),
       trace: replay.trace.map((t) =>
@@ -523,11 +523,20 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
           : t,
       ),
     };
-    // The grand total is untouched...
-    assertSummaryMatchesJournal(tampered, `deferral control · seed=${seed}`);
-    // ...but the per-step identity catches it.
-    expect(() => assertStepCashIdentity(tampered, `deferral control · seed=${seed}`)).toThrow();
+    assertSummaryMatchesJournal(deferred, `deferral control · seed=${seed}`);
+    expect(() => assertBookingTiming(deferred, plan, `deferral control · seed=${seed}`)).toThrow();
+
+    // (b) The more insidious variant: the charge is journalled on time but the
+    // cash it consumed is released a step late, so the ledger briefly reports
+    // money that is already spent. The per-step identity catches this.
+    const staleCash: Replay = {
+      ...replay,
+      trace: replay.trace.map((t) => (t.step === leg.step ? { ...t, cashMicros: t.cashMicros + amount } : t)),
+    };
+    assertSummaryMatchesJournal(staleCash, `stale-cash control · seed=${seed}`);
+    expect(() => assertStepCashIdentity(staleCash, `stale-cash control · seed=${seed}`)).toThrow();
   });
+
 
 
   it("catches an entry friction pre-charged on the previous step", () => {
