@@ -14,7 +14,7 @@
 
 import { estimateTradeCosts } from "./trade-viability-gate";
 import { convertAmount } from "./fx.server";
-import { ukTodayIso } from "./uk-time";
+import { ukDayKey } from "./uk-time";
 
 export type GovernorInputs = {
   navBase: number;
@@ -87,7 +87,7 @@ export async function loadGovernorInputs(args: {
       .order("filled_at", { ascending: false })
       .limit(1000);
 
-    const today = ukTodayIso();
+    const today = ukDayKey(new Date());
     const now = Date.now();
 
     for (const f of (fills?.data ?? []) as Array<Record<string, unknown>>) {
@@ -109,7 +109,7 @@ export async function loadGovernorInputs(args: {
       trailingCostBase += await toBase(oneWay, ccy);
 
       if (side === "buy") {
-        if (filledAt.slice(0, 10) === today) buysAlreadyToday += 1;
+        if (filledAt && ukDayKey(filledAt) === today) buysAlreadyToday += 1;
         const t = Date.parse(filledAt);
         if (Number.isFinite(t)) {
           const days = Math.floor((now - t) / 86_400_000);
