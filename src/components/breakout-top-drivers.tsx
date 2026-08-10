@@ -237,8 +237,23 @@ export function BreakoutTopDrivers({
   );
   const [weightIdx, setWeightIdx] = useState(initialIdx);
   const gapWeight = weights[Math.min(weightIdx, weights.length - 1)] ?? drivers.gapWeight;
-  const setGapWeight = (i: number) => setWeightIdx(i);
   const [risk, setRisk] = useState<RiskLevel>("balanced");
+  // Remember the setting the user was on before the latest change so the
+  // what-if view can diff "previous vs current".
+  const [prev, setPrev] = useState<DriverSetting>({ risk: "balanced", gapWeight });
+  const [showCompare, setShowCompare] = useState(false);
+  const setGapWeight = (i: number) => {
+    const next = weights[Math.min(i, weights.length - 1)] ?? gapWeight;
+    if (next === gapWeight) return;
+    setPrev({ risk, gapWeight });
+    setWeightIdx(i);
+  };
+  const changeRisk = (l: RiskLevel) => {
+    if (l === risk) return;
+    setPrev({ risk, gapWeight });
+    setRisk(l);
+  };
+
 
   const view = useMemo(() => {
     if (!symbols?.length || gapWeight === drivers.gapWeight) return drivers;
