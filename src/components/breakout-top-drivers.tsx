@@ -275,7 +275,16 @@ function ChangeExplanation({ row }: { row: DriverCompareRow }) {
   );
 }
 
+/** Discrete emphasis tiers — Tailwind can't compile a runtime opacity value. */
+function moverTier(intensity: number, top: boolean): string {
+  if (top) return "bg-primary/20 font-semibold ring-1 ring-primary/40";
+  if (intensity >= 0.6) return "bg-primary/10 font-medium";
+  if (intensity >= 0.3) return "bg-primary/5";
+  return "";
+}
+
 function WhatIfCompare({
+
   symbols,
   a,
   b,
