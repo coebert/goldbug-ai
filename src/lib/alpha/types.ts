@@ -38,9 +38,14 @@ export type FeatureLike = {
     coverage: number;
     flags?: string[];
   } | null;
+  /**
+   * Range-breakout evidence computed from daily candles in
+   * buildCandidateFeatures(). Null when history is too short.
+   */
+  breakout?: import("./breakout").BreakoutEvidence | null;
 };
 
-export type AlphaModelKind = "trend" | "mean_reversion" | "quality" | "carry";
+export type AlphaModelKind = "trend" | "mean_reversion" | "quality" | "carry" | "breakout";
 
 export type AlphaScore = {
   symbol: string;

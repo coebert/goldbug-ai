@@ -22,21 +22,21 @@ export type StrategyWeights = Record<AlphaModelKind, number>;
 const MATRIX: Record<RegimeName, StrategyWeights> = {
   // Broad up-trend, low fear — lean into trend + quality, dip-buying
   // still helps but carry is dead weight.
-  risk_on:     { trend: 0.50, mean_reversion: 0.20, quality: 0.25, carry: 0.05 },
+  risk_on:     { trend: 0.42, mean_reversion: 0.16, quality: 0.22, carry: 0.05, breakout: 0.15 },
   // Defensive — quality + carry dominate, cut trend exposure, keep a
   // small mean-reversion tilt for capitulation dip-buys.
-  risk_off:    { trend: 0.10, mean_reversion: 0.20, quality: 0.40, carry: 0.30 },
+  risk_off:    { trend: 0.10, mean_reversion: 0.18, quality: 0.38, carry: 0.28, breakout: 0.06 },
   // Vol spikes — trend gets whipsawed, MR gets hurt by knives, quality
   // + carry survive best.
-  high_vol:    { trend: 0.15, mean_reversion: 0.15, quality: 0.40, carry: 0.30 },
+  high_vol:    { trend: 0.14, mean_reversion: 0.14, quality: 0.37, carry: 0.28, breakout: 0.07 },
   // Calm tape — trend and MR both work, carry rewarded.
-  low_vol:     { trend: 0.35, mean_reversion: 0.25, quality: 0.25, carry: 0.15 },
+  low_vol:     { trend: 0.30, mean_reversion: 0.22, quality: 0.22, carry: 0.13, breakout: 0.13 },
   // Directional — trend dominates.
-  trending:    { trend: 0.60, mean_reversion: 0.10, quality: 0.25, carry: 0.05 },
+  trending:    { trend: 0.48, mean_reversion: 0.08, quality: 0.20, carry: 0.04, breakout: 0.20 },
   // Range-bound — MR dominates.
-  range_bound: { trend: 0.10, mean_reversion: 0.55, quality: 0.25, carry: 0.10 },
+  range_bound: { trend: 0.08, mean_reversion: 0.48, quality: 0.22, carry: 0.09, breakout: 0.13 },
   // Fallback — balanced.
-  unknown:     { trend: 0.35, mean_reversion: 0.20, quality: 0.30, carry: 0.15 },
+  unknown:     { trend: 0.30, mean_reversion: 0.18, quality: 0.26, carry: 0.13, breakout: 0.13 },
 };
 
 const ALIASES: Record<string, RegimeName> = {
@@ -79,13 +79,13 @@ export function weightsForRegime(raw: string | null | undefined): StrategyWeight
 //   - Quality is the one factor we never fully disable; it is our
 //     defensive default across every regime.
 const ENABLEMENT: Record<RegimeName, Record<AlphaModelKind, boolean>> = {
-  risk_on:     { trend: true,  mean_reversion: true,  quality: true, carry: false },
-  risk_off:    { trend: false, mean_reversion: false, quality: true, carry: false },
-  high_vol:    { trend: false, mean_reversion: false, quality: true, carry: true  },
-  low_vol:     { trend: true,  mean_reversion: true,  quality: true, carry: true  },
-  trending:    { trend: true,  mean_reversion: false, quality: true, carry: false },
-  range_bound: { trend: false, mean_reversion: true,  quality: true, carry: true  },
-  unknown:     { trend: true,  mean_reversion: true,  quality: true, carry: true  },
+  risk_on:     { trend: true,  mean_reversion: true,  quality: true, carry: false, breakout: true  },
+  risk_off:    { trend: false, mean_reversion: false, quality: true, carry: false, breakout: false },
+  high_vol:    { trend: false, mean_reversion: false, quality: true, carry: true,  breakout: false },
+  low_vol:     { trend: true,  mean_reversion: true,  quality: true, carry: true,  breakout: true  },
+  trending:    { trend: true,  mean_reversion: false, quality: true, carry: false, breakout: true  },
+  range_bound: { trend: false, mean_reversion: true,  quality: true, carry: true,  breakout: true  },
+  unknown:     { trend: true,  mean_reversion: true,  quality: true, carry: true,  breakout: true  },
 };
 
 export function enabledStrategiesForRegime(
@@ -103,7 +103,7 @@ export function effectiveWeightsForRegime(
 ): StrategyWeights {
   const base = weightsForRegime(raw);
   const enabled = enabledStrategiesForRegime(raw);
-  const gated: StrategyWeights = { trend: 0, mean_reversion: 0, quality: 0, carry: 0 };
+  const gated: StrategyWeights = { trend: 0, mean_reversion: 0, quality: 0, carry: 0, breakout: 0 };
   let live = 0;
   (Object.keys(base) as AlphaModelKind[]).forEach((k) => {
     if (enabled[k]) {
