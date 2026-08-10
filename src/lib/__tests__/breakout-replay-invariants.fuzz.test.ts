@@ -342,9 +342,15 @@ function describeCase(c: Case): string {
  * of the random haystack. The seed line still reproduces the original run.
  */
 function verifyPlan(rows: readonly Row[], limits: SizingLimits, ctx: string) {
-  const check = (c: Case) => attempt(() => assertPlanInvariants(c.rows, c.limits, ctx));
-  expectNoCounterexample({ rows: [...rows], limits }, check, shrinkCase, describeCase, ctx);
-  return assertPlanInvariants(rows, limits, ctx);
+  try {
+    // Happy path stays single-pass: minimization only costs anything on failure.
+    return assertPlanInvariants(rows, limits, ctx);
+  } catch {
+    const check = (c: Case) => attempt(() => assertPlanInvariants(c.rows, c.limits, ctx));
+    expectNoCounterexample({ rows: [...rows], limits }, check, shrinkCase, describeCase, ctx);
+    // Unreachable: the case failed above, so the minimizer always fails too.
+    throw new Error(`non-deterministic invariant failure: ${ctx}`);
+  }
 }
 
 const CASES = 400;
