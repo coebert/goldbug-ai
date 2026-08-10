@@ -20,6 +20,8 @@ function trade(over: Partial<SignalTrade>): SignalTrade {
     penetrationAtr: 0.5,
     volumeRatio: 1.4,
     falseBreakoutRate: 0.2,
+    ageBars: 2,
+    pendingLatencyBars: null,
     entry: 100,
     exit: 103,
     exitReason: "target",
