@@ -19,6 +19,7 @@ import {
 } from "@/lib/breakout-backtest";
 import { buildBreakoutDiagnostics, type BreakoutDiagnostics } from "@/lib/breakout-diagnostics";
 import { buildBreakoutTimingReport, type BreakoutTimingReport } from "@/lib/breakout-timing";
+import { buildExecutionGrid, type ExecutionGrid } from "@/lib/breakout-driver-execution";
 
 export type BreakoutBacktestResponse = Omit<BreakoutBacktestReport, "trades"> & {
   /** Most recent signals only — the full list can be thousands of rows. */
@@ -28,6 +29,11 @@ export type BreakoutBacktestResponse = Omit<BreakoutBacktestReport, "trades"> & 
   diagnostics: BreakoutDiagnostics;
   /** Signal-age, pending-latency and hold-time cuts, plus the recommended mapping. */
   timing: BreakoutTimingReport;
+  /**
+   * Confirmed cohort replayed at the driver-recommended size for every
+   * (risk setting × expectancy-gap weight) combination the UI can select.
+   */
+  execution: ExecutionGrid;
   skippedSymbols: string[];
 };
 
@@ -143,6 +149,7 @@ export const runBreakoutSignalBacktest = createServerFn({ method: "POST" })
       timing: buildBreakoutTimingReport(trades, {
         source: `backtest ${rest.from ?? "?"} → ${rest.to ?? "?"}`,
       }),
+      execution: buildExecutionGrid(trades),
       totalTrades: trades.length,
       skippedSymbols,
     };

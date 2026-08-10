@@ -24,6 +24,11 @@ import {
   type DriverAction,
   type RiskLevel,
 } from "@/lib/breakout-driver-actions";
+import {
+  DEFAULT_GAP_WEIGHTS,
+  findExecutionCell,
+  type ExecutionGrid,
+} from "@/lib/breakout-driver-execution";
 
 const ACTION_TONE: Record<DriverAction, string> = {
   prioritise: "border-emerald-500/40 text-emerald-500",
@@ -131,6 +136,81 @@ function Side({
   );
 }
 
+const pp = (v: number, digits = 1) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}pp`;
+
+/**
+ * The measured consequence of the two controls: the confirmed cohort replayed
+ * with each symbol sized at its recommended multiplier, against the flat-1
+ * baseline on exactly the same signals.
+ */
+function ExecutionImpact({
+  cell,
+  grid,
+}: {
+  cell: ReturnType<typeof findExecutionCell> & object;
+  grid: ExecutionGrid;
+}) {
+  const b = grid.baseline;
+  const rows: [string, string, string, number][] = [
+    [
+      "Compounded",
+      `${signed(b.cumulativeReturnPct, 1)}`,
+      `${signed(cell.cumulativeReturnPct, 1)}`,
+      cell.vsBaseline.cumulativeReturnPp,
+    ],
+    [
+      "Avg / signal",
+      signed(b.avgReturnPct),
+      signed(cell.avgReturnPct),
+      cell.vsBaseline.avgReturnPp,
+    ],
+    [
+      "Max drawdown",
+      `${b.maxDrawdownPct.toFixed(1)}%`,
+      `${cell.maxDrawdownPct.toFixed(1)}%`,
+      cell.vsBaseline.maxDrawdownPp,
+    ],
+    [
+      "Capital deployed",
+      `${b.deployedPct.toFixed(0)}%`,
+      `${cell.deployedPct.toFixed(0)}%`,
+      cell.vsBaseline.deployedPp,
+    ],
+  ];
+
+  return (
+    <div className="rounded-md border border-border/40 p-2" data-testid="driver-execution-impact">
+      <p className="text-[11px] font-medium text-muted-foreground">
+        Backtest at these settings — {cell.taken}/{cell.signals} confirmed signals taken, avg size{" "}
+        {cell.avgSize.toFixed(2)}×, win rate {cell.winRatePct.toFixed(1)}%
+      </p>
+      <table className="mt-1 w-full text-xs">
+        <thead className="text-[11px] text-muted-foreground">
+          <tr>
+            <th className="py-1 text-left font-normal">Metric</th>
+            <th className="py-1 text-right font-normal">Flat 1×</th>
+            <th className="py-1 text-right font-normal">Sized</th>
+            <th className="py-1 text-right font-normal">Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, base, sized, delta]) => (
+            <tr key={label} className="border-t border-border/30">
+              <td className="py-1">{label}</td>
+              <td className="py-1 text-right tabular-nums text-muted-foreground">{base}</td>
+              <td className="py-1 text-right tabular-nums">{sized}</td>
+              <td className={`py-1 text-right tabular-nums ${tone(delta)}`}>{pp(delta)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-[11px] text-muted-foreground">{grid.summary}</p>
+    </div>
+  );
+}
+
+
+
 /**
  * Ranks the names moving the confirmed cohort most, blending signed P&L share
  * with the expectancy gap (confirmed − failed average return) so both
@@ -142,11 +222,22 @@ function Side({
 export function BreakoutTopDrivers({
   drivers,
   symbols,
+  execution,
 }: {
   drivers: TopDrivers;
   symbols?: readonly SymbolDiagnostic[];
+  execution?: ExecutionGrid;
 }) {
-  const [gapWeight, setGapWeight] = useState(drivers.gapWeight);
+  // Snap the slider to the weights the backtest was actually replayed at, so
+  // the execution numbers below always match the ranking above.
+  const weights = execution?.gapWeights?.length ? execution.gapWeights : [...DEFAULT_GAP_WEIGHTS];
+  const initialIdx = Math.max(
+    0,
+    weights.findIndex((w) => w === drivers.gapWeight),
+  );
+  const [weightIdx, setWeightIdx] = useState(initialIdx);
+  const gapWeight = weights[Math.min(weightIdx, weights.length - 1)] ?? drivers.gapWeight;
+  const setGapWeight = (i: number) => setWeightIdx(i);
   const [risk, setRisk] = useState<RiskLevel>("balanced");
 
   const view = useMemo(() => {
@@ -158,6 +249,8 @@ export function BreakoutTopDrivers({
     () => recommendDriverActions([...view.positive, ...view.negative], risk),
     [view, risk],
   );
+
+  const cell = execution ? findExecutionCell(execution, risk, gapWeight) : null;
 
   if (!view.positive.length && !view.negative.length) return null;
   const profile = RISK_PROFILES[risk];
@@ -203,9 +296,9 @@ export function BreakoutTopDrivers({
           <Slider
             className="mt-2"
             min={0}
-            max={6}
-            step={0.5}
-            value={[gapWeight]}
+            max={weights.length - 1}
+            step={1}
+            value={[Math.min(weightIdx, weights.length - 1)]}
             onValueChange={([v]) => setGapWeight(v ?? 0)}
             aria-label="Expectancy-gap weight"
             data-testid="gap-weight-slider"
@@ -221,6 +314,8 @@ export function BreakoutTopDrivers({
       <p className="text-[11px] text-muted-foreground" data-testid="driver-action-summary">
         {summariseActions(recs, risk)}
       </p>
+
+      {cell ? <ExecutionImpact cell={cell} grid={execution!} /> : null}
       <p className="text-[11px] text-muted-foreground">{view.summary}</p>
       <div className="grid gap-2 sm:grid-cols-2">
         <Side
