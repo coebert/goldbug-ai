@@ -111,7 +111,7 @@ const LIMITS: SizingLimits = {
 /** One 2k-signal integration-sized replay. */
 const BUDGET_INTEGRATION = 1.5;
 /** The fuzz suite's shape: 3,000 small cohorts back to back. */
-const BUDGET_FUZZ = 6;
+const BUDGET_FUZZ = 8;
 /** Ceiling on the observed scaling exponent — 1 is linear, 2 is quadratic. */
 const MAX_SCALING_EXPONENT = 1.45;
 
