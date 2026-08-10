@@ -266,7 +266,88 @@ function assertPlanInvariants(rows: readonly Row[], limits: SizingLimits, ctx: s
   return { plan, taken: occ.taken, minCash: ledger.minCash, budget };
 }
 
+// ---------------------------------------------------------------------------
+// Counterexample minimization
+// ---------------------------------------------------------------------------
+
+type Case = { rows: Row[]; limits: SizingLimits };
+
+/** Simpler versions of a failing case, cheapest structural wins first. */
+function shrinkCase(c: Case): Case[] {
+  const out: Case[] = [];
+
+  // 1. Fewer signals — by far the biggest readability win.
+  for (const rows of shrinkList(c.rows)) out.push({ ...c, rows });
+
+  // 2. Plainer caps.
+  for (const v of shrinkNumber(c.limits.maxPositionSize, { min: 0.01 })) {
+    out.push({ ...c, limits: resolveSizingLimits({ ...c.limits, maxPositionSize: v }) });
+  }
+  for (const v of shrinkNumber(c.limits.maxConcurrentSignals, { min: 1, integer: true })) {
+    out.push({ ...c, limits: resolveSizingLimits({ ...c.limits, maxConcurrentSignals: v }) });
+  }
+  for (const v of shrinkNumber(c.limits.maxTotalDeployedPct, { min: 1 })) {
+    out.push({ ...c, limits: resolveSizingLimits({ ...c.limits, maxTotalDeployedPct: v }) });
+  }
+
+  // 3. Plainer rows: flatten hold windows, round sizes, collapse symbols.
+  if (c.rows.some((x) => x.barsHeld !== 1)) {
+    out.push({ ...c, rows: c.rows.map((x) => ({ ...x, barsHeld: 1 })) });
+  }
+  if (c.rows.some((x) => Number.isFinite(x.size) && x.size !== Number(x.size.toFixed(2)))) {
+    out.push({
+      ...c,
+      rows: c.rows.map((x) => ({ ...x, size: Number.isFinite(x.size) ? Number(x.size.toFixed(2)) : x.size })),
+    });
+  }
+  if (new Set(c.rows.map((x) => x.symbol)).size > 1) {
+    out.push({ ...c, rows: c.rows.map((x) => ({ ...x, symbol: "S0" })) });
+  }
+
+  // 4. Per-row size simplification, only once the cohort is small enough to read.
+  if (c.rows.length <= 12) {
+    c.rows.forEach((row, i) => {
+      const swap = (size: number) => ({
+        ...c,
+        rows: c.rows.map((x, j) => (j === i ? { ...x, size } : x)),
+      });
+      if (!Number.isFinite(row.size)) out.push(swap(1));
+      else for (const v of shrinkNumber(row.size, { min: 0 })) out.push(swap(v));
+    });
+  }
+
+  return out;
+}
+
+function describeCase(c: Case): string {
+  const rows =
+    c.rows.length <= 10
+      ? c.rows.map((x) => `  { ${x.symbol} ${x.date} bars=${x.barsHeld} size=${x.size} }`).join("\n")
+      : `  …${c.rows.length} rows (first 6)\n` +
+        c.rows
+          .slice(0, 6)
+          .map((x) => `  { ${x.symbol} ${x.date} bars=${x.barsHeld} size=${x.size} }`)
+          .join("\n");
+  return [
+    `rows: ${c.rows.length}`,
+    rows,
+    `limits: position<=${c.limits.maxPositionSize}, concurrent<=${c.limits.maxConcurrentSignals}, deployed<=${c.limits.maxTotalDeployedPct}%`,
+  ].join("\n");
+}
+
+/**
+ * Run every plan invariant; on failure, shrink the cohort and caps down to the
+ * smallest case that still breaks the *same* invariant, and report that instead
+ * of the random haystack. The seed line still reproduces the original run.
+ */
+function verifyPlan(rows: readonly Row[], limits: SizingLimits, ctx: string) {
+  const check = (c: Case) => attempt(() => assertPlanInvariants(c.rows, c.limits, ctx));
+  expectNoCounterexample({ rows: [...rows], limits }, check, shrinkCase, describeCase, ctx);
+  return assertPlanInvariants(rows, limits, ctx);
+}
+
 const CASES = 400;
+
 
 describe("replay invariants (property-based)", () => {
   it(`holds across ${CASES} random cohorts and cap sets`, () => {
