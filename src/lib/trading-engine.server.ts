@@ -132,6 +132,14 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { cached } from "./market-context-cache.server";
 import { computePortfolioDrawdownSizing, grossExposureLimit } from "./portfolio-drawdown.server";
 import {
+  isShortProxy,
+  splitExposure,
+  gateShortSleeveBuy,
+  netAwareInvestedValue,
+  formatShortSleeveBlock,
+  SHORT_PROXIES,
+} from "./short-sleeve";
+import {
   resolveCashAllocationPolicy,
   formatCashAllocationBlock,
 } from "./cash-allocation-policy";
@@ -279,6 +287,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
   let fullUniverse = filterUniverse(classesFromUniverse(portfolio.universe));
 
+  // Short sleeve gate at the universe level: when shorts are switched off the
+  // inverse ETFs are not tradeable at all, so the AI never sees them.
+  const shortsEnabled = parseRiskConfig(portfolio.risk_config).shorts_enabled;
+  if (!shortsEnabled) {
+    const proxies = new Set(SHORT_PROXIES.map((p) => p.symbol));
+    fullUniverse = fullUniverse.filter((u) => !proxies.has(u.symbol));
+  }
+
   // Live-broker tradeability filter. Our Saxo integration only reliably resolves
   // plain equities/ETFs (US + LSE `.L`). Yahoo FX pairs (`=X`), futures (`=F`),
   // and crypto spot (`-USD`) do not map to Saxo retail cash-account UICs and
@@ -367,6 +383,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     return sum + value;
   }, 0);
   const totalValue = cash + holdingsValue;
+
+  // Long vs short-sleeve split of the current book — feeds the prompt and the
+  // net-aware sizing caps below.
+  const exposureSplit = splitExposure(
+    (holdings ?? []).map((h) => ({
+      symbol: h.symbol,
+      value: holdingLivePrice(priceMap, h) * Number(h.quantity),
+    })),
+    totalValue,
+  );
 
 
   // Cash-aware universe filter. Uses raw risk_config (pre-regime tightening) so
@@ -882,6 +908,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         cashPolicyBlock: cashPolicy.enabled
           ? formatCashAllocationBlock(cashPolicy, portfolio.currency || "GBP")
           : null,
+        shortSleeveBlock: formatShortSleeveBlock({
+          enabled: cfg.shorts_enabled,
+          nav: totalValue,
+          exposure: exposureSplit,
+          maxSleevePct: cfg.short_sleeve_max_pct,
+          currency: portfolio.currency || "GBP",
+        }),
 
       });
 
