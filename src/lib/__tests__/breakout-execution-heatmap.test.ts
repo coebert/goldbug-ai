@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { buildHeatmap } from "@/lib/breakout-execution-heatmap";
 import type { ExecutionCell, ExecutionGrid } from "@/lib/breakout-driver-execution";
 import type { RiskLevel } from "@/lib/breakout-driver-actions";
+import { DEFAULT_SIZING_LIMITS } from "@/lib/breakout-sizing-limits";
+
+const noLimitReport = {
+  limits: DEFAULT_SIZING_LIMITS,
+  breaches: { position: 0, concurrency: 0, budget: 0 },
+  requestedDeployedPct: 80,
+  deployedPct: 80,
+  peakConcurrent: 2,
+  peakPositionSize: 1,
+  summary: "",
+};
 
 function cell(risk: RiskLevel, gapWeight: number, ret: number, dd: number): ExecutionCell {
   return {
@@ -19,6 +30,7 @@ function cell(risk: RiskLevel, gapWeight: number, ret: number, dd: number): Exec
     maxDrawdownPct: dd,
     returnPerUnitPct: ret / 0.8,
     actionCounts: { prioritise: 1, trade: 2, downsize: 1, avoid: 0 },
+    limits: noLimitReport,
     vsBaseline: {
       cumulativeReturnPp: 0,
       avgReturnPp: 0,
@@ -30,6 +42,7 @@ function cell(risk: RiskLevel, gapWeight: number, ret: number, dd: number): Exec
 
 const grid: ExecutionGrid = {
   baseline: cell("balanced", 0, 1, 10),
+  limits: DEFAULT_SIZING_LIMITS,
   risks: ["conservative", "balanced", "aggressive"],
   gapWeights: [0, 2],
   cells: [
