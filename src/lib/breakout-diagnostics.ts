@@ -527,12 +527,17 @@ export function topDrivers(
   const limit = options.limit ?? 5;
   const minConfirmed = options.minConfirmed ?? 3;
   const gapWeight = options.gapWeight ?? 2;
+  const fullSampleAt = options.fullSampleAt ?? 20;
+  const totalConfirmed = symbols.reduce((a, s) => a + s.confirmed.trades, 0);
 
   const rows: TopDriver[] = symbols
     .filter((s) => s.confirmed.trades >= minConfirmed)
     .map((s) => {
       const shareTerm = s.confirmedContributionPct;
       const gapTerm = s.avgReturnGapPct * gapWeight;
+      const lead: TopDriver["lead"] =
+        Math.abs(gapTerm) > Math.abs(shareTerm) ? "expectancy gap" : "P&L share";
+      const tradeSharePct = totalConfirmed ? (s.confirmed.trades / totalConfirmed) * 100 : 0;
       return {
         symbol: s.symbol,
         contributionPct: s.confirmedContributionPct,
@@ -540,11 +545,21 @@ export function topDrivers(
         winRateGapPp: s.winRateGapPp,
         confirmedTrades: s.confirmed.trades,
         confirmedAvgReturnPct: s.confirmed.avgReturnPct,
+        tradeSharePct,
         score: shareTerm + gapTerm,
-        lead: Math.abs(gapTerm) > Math.abs(shareTerm) ? "expectancy gap" : "P&L share",
+        lead,
         gateDriver: s.confirmedRegimeVol.dominantDriver,
+        confidence: driverConfidence({
+          confirmedTrades: s.confirmed.trades,
+          minConfirmed,
+          fullSampleAt,
+          tradeSharePct,
+          contributionPct: s.confirmedContributionPct,
+          lead,
+        }),
       } satisfies TopDriver;
     });
+
 
   const positive = rows
     .filter((r) => r.score > 0)
