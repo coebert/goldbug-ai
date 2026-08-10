@@ -170,25 +170,61 @@ export function detectBreakout(
   const channelLow = Math.min(...prior.map((c) => c.low));
   const atr = atrOf(candles) ?? null;
 
-  // Base quality: measured over the bars immediately preceding the breakout.
-  const baseBars = Math.min(prior.length, Math.max(cfg.minBaseBars, Math.round(lookback / 2)));
-  const base = prior.slice(prior.length - baseBars);
-  const baseHigh = Math.max(...base.map((c) => c.high));
-  const baseLow = Math.min(...base.map((c) => c.low));
-  const baseMid = (baseHigh + baseLow) / 2;
-  const baseWidthPct = baseMid > 0 ? (baseHigh - baseLow) / baseMid : null;
-
   const adv = (() => {
     const vols = candles.slice(-21, -1).map((c) => c.volume ?? 0).filter((v) => v > 0);
     if (vols.length < 5) return null;
     return vols.reduce((a, b) => a + b, 0) / vols.length;
   })();
-  const volumeRatio = adv && last.volume ? last.volume / adv : null;
 
   const history = falseBreakoutHistory(candles, cfg);
   const falseRate = history.attempts > 0 ? history.failures / history.attempts : 0;
-
   const distanceToHighAtr = atr ? (channelHigh - last.close) / atr : null;
+
+  // Walk backwards to find how many trailing bars closed beyond the channel
+  // that existed *before* them. This keeps the broken level pinned to the
+  // pre-breakout range instead of letting the breakout bars raise it.
+  const scan = (dir: "up" | "down") => {
+    let k = 0;
+    let level: number | null = null;
+    let firstIdx = -1;
+    while (k < cfg.maxAgeBars + cfg.failWindowBars + 5) {
+      const idx = candles.length - 1 - k;
+      if (idx - lookback < 0) break;
+      const win = candles.slice(idx - lookback, idx);
+      if (win.length < cfg.minBaseBars) break;
+      const lvl = dir === "up" ? Math.max(...win.map((c) => c.high)) : Math.min(...win.map((c) => c.low));
+      const out = dir === "up" ? candles[idx].close > lvl : candles[idx].close < lvl;
+      if (!out) break;
+      level = lvl;
+      firstIdx = idx;
+      k++;
+    }
+    return { held: k, level, firstIdx };
+  };
+
+  const upScan = scan("up");
+  const downScan = scan("down");
+  const active = upScan.held >= downScan.held ? upScan : downScan;
+  const activeDir: "up" | "down" = upScan.held >= downScan.held ? "up" : "down";
+
+  // Base quality: the bars immediately preceding the breakout (or the last
+  // bars of the range when we are still inside it).
+  const baseEnd = active.held > 0 ? active.firstIdx : candles.length - 1;
+  const baseBars = Math.min(baseEnd, Math.max(cfg.minBaseBars, Math.round(lookback / 2)));
+  const base = candles.slice(Math.max(0, baseEnd - baseBars), baseEnd);
+  const baseHigh = base.length ? Math.max(...base.map((c) => c.high)) : null;
+  const baseLow = base.length ? Math.min(...base.map((c) => c.low)) : null;
+  const baseMid = baseHigh != null && baseLow != null ? (baseHigh + baseLow) / 2 : 0;
+  const baseWidthPct = baseMid > 0 ? (baseHigh! - baseLow!) / baseMid : null;
+
+  // Volume confirmation uses the strongest of the breakout bars.
+  const volumeRatio = (() => {
+    if (!adv) return null;
+    const bars = active.held > 0 ? candles.slice(candles.length - active.held) : [last];
+    const vols = bars.map((c) => c.volume ?? 0).filter((v) => v > 0);
+    if (!vols.length) return null;
+    return Math.max(...vols) / adv;
+  })();
 
   const evidence: BreakoutEvidence = {
     state: "none",
@@ -199,7 +235,7 @@ export function detectBreakout(
     distance_to_high_atr: distanceToHighAtr,
     penetration_atr: 0,
     base_width_pct: baseWidthPct,
-    base_bars: baseBars,
+    base_bars: base.length,
     volume_ratio: volumeRatio,
     bars_since_breakout: 0,
     prior_attempts: history.attempts,
@@ -210,9 +246,27 @@ export function detectBreakout(
     reasons: [],
   };
 
-  const up = last.close > channelHigh;
-  const down = last.close < channelLow;
-  if (!up && !down) {
+  if (active.held === 0) {
+    // Nothing outside the channel right now — but did a pierce fail within
+    // the last few bars? A failed breakout is itself a tradeable tell.
+    let failedDir: "up" | "down" | null = null;
+    let failedLevel: number | null = null;
+    for (let back = 1; back <= cfg.failWindowBars; back++) {
+      const idx = candles.length - 1 - back;
+      if (idx - lookback < 0) break;
+      const win = candles.slice(idx - lookback, idx);
+      const hi = Math.max(...win.map((c) => c.high));
+      const lo = Math.min(...win.map((c) => c.low));
+      if (candles[idx].close > hi) { failedDir = "up"; failedLevel = hi; break; }
+      if (candles[idx].close < lo) { failedDir = "down"; failedLevel = lo; break; }
+    }
+    if (failedDir) {
+      evidence.state = "failed";
+      evidence.direction = failedDir;
+      evidence.level = failedLevel;
+      evidence.reasons.push(`closed back inside ${failedLevel?.toFixed(2)} — failed ${failedDir === "up" ? "breakout" : "breakdown"}`);
+      return evidence;
+    }
     evidence.reasons.push(
       distanceToHighAtr != null
         ? `inside range, ${distanceToHighAtr.toFixed(1)} ATR below ${channelHigh.toFixed(2)}`
@@ -221,28 +275,17 @@ export function detectBreakout(
     return evidence;
   }
 
-  const direction: "up" | "down" = up ? "up" : "down";
-  const level = up ? channelHigh : channelLow;
+  const direction = activeDir;
+  const level = active.level ?? (direction === "up" ? channelHigh : channelLow);
   const penetration = atr ? Math.abs(last.close - level) / atr : 0;
-
-  // How many consecutive recent closes held beyond the level?
-  let held = 0;
-  for (let i = candles.length - 1; i >= 0; i--) {
-    const c = candles[i];
-    if (up ? c.close > level : c.close < level) held++;
-    else break;
-  }
-  // Did a recent pierce already fail (closed back inside within the window)?
-  const recent = candles.slice(-(cfg.failWindowBars + held + 1), candles.length - held);
-  const pierced = recent.some((c) => (up ? c.close > level : c.close < level));
-  const failedRecently = pierced && held < cfg.confirmBars;
+  const held = active.held;
 
   evidence.direction = direction;
   evidence.level = level;
   evidence.penetration_atr = penetration;
   evidence.bars_since_breakout = held;
 
-  const hasBase = baseWidthPct != null && baseWidthPct <= cfg.maxBasePct && baseBars >= cfg.minBaseBars;
+  const hasBase = baseWidthPct != null && baseWidthPct <= cfg.maxBasePct && base.length >= cfg.minBaseBars;
   const decisive = penetration >= cfg.minPenetrationAtr;
   const volumeOk = volumeRatio == null ? false : volumeRatio >= cfg.minVolumeRatio;
   const confirmed = held >= cfg.confirmBars;
