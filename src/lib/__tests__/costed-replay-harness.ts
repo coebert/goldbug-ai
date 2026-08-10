@@ -154,10 +154,15 @@ export function sanitiseCosts(c: Costs): Costs {
   };
 }
 
-/** Capital must be a finite, non-negative bank. */
+/**
+ * Capital must be a finite, non-negative bank. Capped at 1e9 units so the
+ * micro-unit ledger stays inside exact integer range (1e9 * 1e6 < 2^53) —
+ * past that, "integer" arithmetic silently starts rounding.
+ */
 export function sanitiseCapital(v: number): number {
-  return !Number.isFinite(v) || v <= 0 ? 0 : Math.min(v, 1e12);
+  return !Number.isFinite(v) || v <= 0 ? 0 : Math.min(v, 1e9);
 }
+
 
 /**
  * Holding period in bars. A missing, NaN, zero, negative or absurd bar count
