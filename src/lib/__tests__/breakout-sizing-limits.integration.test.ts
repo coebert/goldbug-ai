@@ -107,22 +107,43 @@ describe("sizing limits inside the execution flow — position ceiling", () => {
     const confirmed = trades
       .filter((t) => t.cohort === "confirmed")
       .sort((a, b) => (a.date < b.date ? -1 : 1));
-    const s = applyDriverSizing(trades, {
-      risk: "aggressive",
+    const options = {
+      risk: "aggressive" as const,
       gapWeight: 3,
       limits: { maxPositionSize: 0.8, maxConcurrentSignals: 999, maxTotalDeployedPct: 100_000 },
-    });
-    const sizes = confirmed.map(() => 0.8);
-    // Every requested multiplier in this cohort is >= 0.8 or 0 (avoid), so the
-    // exact per-row sizes come from the report rather than being assumed.
+    };
+    const s = applyDriverSizing(trades, options);
+
+    // Rebuild the same request the executor makes, then cap it independently.
+    const plan = driverSizingPlan(trades, options);
+    const requested = confirmed.map((t) => ({
+      symbol: t.symbol,
+      date: t.date,
+      barsHeld: t.barsHeld,
+      size: plan.get(t.symbol)?.sizeMultiplier ?? 1,
+    }));
+    const limited = applySizingLimits(requested, options.limits);
+    const returns = confirmed.map((t) => t.returnPct);
+
+    // The reported P&L matches the CLAMPED sizes...
     expect(s.cumulativeReturnPct).toBeCloseTo(
       recompute(
-        confirmed.map((_, i) => Math.min(sizes[i]!, 0.8)),
-        confirmed.map((t) => t.returnPct),
+        limited.signals.map((r) => r.size),
+        returns,
+      ),
+      6,
+    );
+    // ...and is genuinely different from the P&L of the requested sizes.
+    expect(limited.report.breaches.position).toBeGreaterThan(0);
+    expect(s.cumulativeReturnPct).not.toBeCloseTo(
+      recompute(
+        requested.map((r) => r.size),
+        returns,
       ),
       6,
     );
   });
+
 
   it("sizes everything to zero when the ceiling is zero", () => {
     const grid = buildExecutionGrid(cohort(), {
