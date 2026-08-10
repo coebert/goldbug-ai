@@ -110,8 +110,8 @@ async function score(
   // Warm up on everything before the scored slice; only the tail is measured.
   const curve = m.equityCurve.slice(scoreFrom - warmFrom);
   if (curve.length < 2) return null;
-  const first = curve[0]!.value;
-  const last = curve[curve.length - 1]!.value;
+  const first = curve[0]!.total_value;
+  const last = curve[curve.length - 1]!.total_value;
   const totalReturnPct = ((last - first) / first) * 100;
   const days = curve.length;
   const years = Math.max(0.05, days / 252);
@@ -119,10 +119,10 @@ async function score(
   let maxDd = 0;
   const rets: number[] = [];
   for (let i = 0; i < curve.length; i++) {
-    const v = curve[i]!.value;
+    const v = curve[i]!.total_value;
     if (v > peak) peak = v;
     maxDd = Math.min(maxDd, ((v - peak) / peak) * 100);
-    if (i > 0) rets.push(curve[i]!.value / curve[i - 1]!.value - 1);
+    if (i > 0) rets.push(curve[i]!.total_value / curve[i - 1]!.total_value - 1);
   }
   const mean = rets.length ? rets.reduce((a, b) => a + b, 0) / rets.length : 0;
   const sd = rets.length > 1
