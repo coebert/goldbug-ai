@@ -280,6 +280,54 @@ export type Database = {
         }
         Relationships: []
       }
+      breakout_expectancy_runs: {
+        Row: {
+          as_of: string | null
+          cells: Json
+          computed_at: string
+          diff: Json
+          dropped_cells: string[]
+          id: string
+          reasons: string[]
+          source: string
+          status: string
+          symbols: string[]
+          total_trades: number
+          triggered_by: string
+          windows: Json
+        }
+        Insert: {
+          as_of?: string | null
+          cells?: Json
+          computed_at?: string
+          diff?: Json
+          dropped_cells?: string[]
+          id?: string
+          reasons?: string[]
+          source: string
+          status: string
+          symbols?: string[]
+          total_trades?: number
+          triggered_by?: string
+          windows?: Json
+        }
+        Update: {
+          as_of?: string | null
+          cells?: Json
+          computed_at?: string
+          diff?: Json
+          dropped_cells?: string[]
+          id?: string
+          reasons?: string[]
+          source?: string
+          status?: string
+          symbols?: string[]
+          total_trades?: number
+          triggered_by?: string
+          windows?: Json
+        }
+        Relationships: []
+      }
       broker_block_events: {
         Row: {
           broker: string
