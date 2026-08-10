@@ -290,18 +290,12 @@ export function detectBreakout(
   const volumeOk = volumeRatio == null ? false : volumeRatio >= cfg.minVolumeRatio;
   const confirmed = held >= cfg.confirmBars;
 
-  if (hasBase) evidence.reasons.push(`base ${baseBars}b ${(baseWidthPct! * 100).toFixed(1)}% wide`);
+  if (hasBase) evidence.reasons.push(`base ${base.length}b ${(baseWidthPct! * 100).toFixed(1)}% wide`);
   else evidence.reasons.push("no compressed base");
   evidence.reasons.push(`${direction === "up" ? "above" : "below"} ${level.toFixed(2)} by ${penetration.toFixed(2)} ATR`);
   if (volumeRatio != null) evidence.reasons.push(`vol ${volumeRatio.toFixed(2)}x ADV20`);
   else evidence.reasons.push("no volume data");
   if (history.attempts > 0) evidence.reasons.push(`${history.failures}/${history.attempts} prior breakouts failed`);
-
-  if (failedRecently) {
-    evidence.state = "failed";
-    evidence.reasons.push("closed back inside the range — failed breakout");
-    return evidence;
-  }
 
   evidence.state = confirmed ? (held > cfg.maxAgeBars ? "extended" : "confirmed") : "pending";
 
