@@ -201,13 +201,31 @@ describe("applySizingLimits — property-based fuzz", () => {
   });
 
   it("is deterministic: the same poisoned cohort always yields the same plan", () => {
-    for (let seed = 5000; seed < 5200; seed++) {
-      const r = rng(seed);
+    const LABEL = "determinism";
+    for (let i = 0; i < 200; i++) {
+      const r = rng(caseSeed(BASE_SEED, LABEL, i));
       const cohort = randomCohort(r);
       const partial = randomLimits(r);
       const a = applySizingLimits(cohort, partial);
       const b = applySizingLimits(cohort, partial);
-      expect(a, `seed ${seed}`).toEqual(b);
+      expect(a, fuzzContext(BASE_SEED, FILE, LABEL, i)).toEqual(b);
+    }
+  });
+
+  it("regenerates an identical cohort from the same case seed", () => {
+    // The seeding contract itself: replaying a reported case seed must
+    // reproduce byte-identical inputs, otherwise a CI repro is worthless.
+    const LABEL = "invariants";
+    for (let i = 0; i < 50; i++) {
+      const seed = caseSeed(BASE_SEED, LABEL, i);
+      const first = randomCohort(rng(seed));
+      const second = randomCohort(rng(seed));
+      expect(JSON.stringify(second), fuzzContext(BASE_SEED, FILE, LABEL, i)).toBe(
+        JSON.stringify(first),
+      );
+      // Different indices must not collide onto the same stream.
+      expect(caseSeed(BASE_SEED, LABEL, i)).not.toBe(caseSeed(BASE_SEED, LABEL, i + 1));
+      expect(caseSeed(BASE_SEED, LABEL, i)).not.toBe(caseSeed(BASE_SEED, "determinism", i));
     }
   });
 
@@ -215,8 +233,9 @@ describe("applySizingLimits — property-based fuzz", () => {
     // NaN and -Infinity degrade to 0; +Infinity degrades to an uncapped ask,
     // which the position ceiling then clamps. Swapping them for their
     // equivalents must not change a single allowed size.
-    for (let seed = 9000; seed < 9400; seed++) {
-      const r = rng(seed);
+    const LABEL = "degradation";
+    for (let i = 0; i < 400; i++) {
+      const r = rng(caseSeed(BASE_SEED, LABEL, i));
       const cohort = randomCohort(r);
       const partial = { ...randomLimits(r), maxPositionSize: 1.5 };
       const substituted = cohort.map((s) => ({
@@ -231,17 +250,20 @@ describe("applySizingLimits — property-based fuzz", () => {
       const clean = applySizingLimits(substituted, partial);
       expect(
         raw.signals.map((s) => s.size),
-        `seed ${seed}`,
+        fuzzContext(BASE_SEED, FILE, LABEL, i),
       ).toEqual(clean.signals.map((s) => s.size));
-      expect(raw.report.deployedPct, `seed ${seed}`).toBe(clean.report.deployedPct);
+      expect(raw.report.deployedPct, fuzzContext(BASE_SEED, FILE, LABEL, i)).toBe(
+        clean.report.deployedPct,
+      );
     }
   });
 
   it("never deploys more than the tightest of the competing caps allows", () => {
     // Caps deliberately set to fight each other: a generous per-position
     // ceiling against a tiny budget, and vice versa.
-    for (let seed = 12000; seed < 12600; seed++) {
-      const r = rng(seed);
+    const LABEL = "competing-caps";
+    for (let i = 0; i < 600; i++) {
+      const r = rng(caseSeed(BASE_SEED, LABEL, i));
       const cohort = randomCohort(r);
       const tight = {
         maxPositionSize: r() < 0.5 ? 0.1 : 4,
@@ -254,11 +276,11 @@ describe("applySizingLimits — property-based fuzz", () => {
         cohort.length * tight.maxPositionSize,
         (cohort.length * tight.maxTotalDeployedPct) / 100,
       );
-      expect(Number.isFinite(spent), `seed ${seed}`).toBe(true);
-      expect(spent <= ceiling + EPS, `seed ${seed}: ${spent} > ${ceiling}`).toBe(true);
-      expect(report.peakConcurrent, `seed ${seed}`).toBeLessThanOrEqual(
-        tight.maxConcurrentSignals,
-      );
+      const ctx = fuzzContext(BASE_SEED, FILE, LABEL, i, { tight, spent, ceiling });
+      expect(Number.isFinite(spent), ctx).toBe(true);
+      expect(spent <= ceiling + EPS, ctx).toBe(true);
+      expect(report.peakConcurrent, ctx).toBeLessThanOrEqual(tight.maxConcurrentSignals);
     }
   });
+
 });
