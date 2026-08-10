@@ -422,7 +422,9 @@ function WhatIfCompare({
                   </tr>
                 ) : null}
               </Fragment>
-            ))}
+              );
+            })}
+
           </tbody>
         </table>
       </div>
