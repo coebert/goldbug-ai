@@ -128,7 +128,13 @@ const summaryShape = (risk: RiskLevel, gapWeight: number) => {
 describe("backtest replay summary snapshots", () => {
   it("fixture cohort is stable", () => {
     const confirmed = TRADES.filter((t) => t.cohort === "confirmed").length;
-    expect({ total: TRADES.length, confirmed, symbols: PROFILES.length }).toMatchInlineSnapshot();
+    expect({ total: TRADES.length, confirmed, symbols: PROFILES.length }).toMatchInlineSnapshot(`
+      {
+        "confirmed": 28,
+        "symbols": 4,
+        "total": 36,
+      }
+    `);
   });
 
   it("baseline (flat 1x) replay", () => {
@@ -141,22 +147,131 @@ describe("backtest replay summary snapshots", () => {
       winRatePct: r2(b.winRatePct),
       cumulativeReturnPct: r2(b.cumulativeReturnPct),
       maxDrawdownPct: r2(b.maxDrawdownPct),
-    }).toMatchInlineSnapshot();
+    }).toMatchInlineSnapshot(`
+      {
+        "caps": {
+          "budget": 0,
+          "concurrency": 5,
+          "position": 0,
+        },
+        "cumulativeReturnPct": 33.55,
+        "deployedPct": 82.14,
+        "maxDrawdownPct": -8.27,
+        "peakConcurrent": 4,
+        "taken": "23/28",
+        "winRatePct": 65.22,
+      }
+    `);
   });
 
   it("allocations per risk level at gap weight 2", () => {
     const byRisk = Object.fromEntries(RISK_LEVELS.map((risk) => [risk, planShape(risk, 2)]));
-    expect(byRisk).toMatchInlineSnapshot();
+    expect(byRisk).toMatchInlineSnapshot(`
+      {
+        "aggressive": [
+          "LOSR downsize 0.85x",
+          "MARG trade 1.3x",
+          "WINR prioritise 1.6x",
+        ],
+        "balanced": [
+          "LOSR avoid 0x",
+          "MARG trade 1x",
+          "WINR downsize 0.6x",
+        ],
+        "conservative": [
+          "LOSR avoid 0x",
+          "MARG downsize 0.35x",
+          "WINR downsize 0.35x",
+        ],
+      }
+    `);
   });
 
   it("allocations shift with expectancy-gap weight (balanced risk)", () => {
     const byWeight = Object.fromEntries([0, 2, 4, 6].map((w) => [w, planShape(RISK_LEVELS[1], w)]));
-    expect(byWeight).toMatchInlineSnapshot();
+    expect(byWeight).toMatchInlineSnapshot(`
+      {
+        "0": [
+          "LOSR avoid 0x",
+          "MARG trade 1x",
+          "WINR downsize 0.6x",
+        ],
+        "2": [
+          "LOSR avoid 0x",
+          "MARG trade 1x",
+          "WINR downsize 0.6x",
+        ],
+        "4": [
+          "LOSR avoid 0x",
+          "MARG trade 1x",
+          "WINR downsize 0.6x",
+        ],
+        "6": [
+          "LOSR avoid 0x",
+          "MARG trade 1x",
+          "WINR downsize 0.6x",
+        ],
+      }
+    `);
   });
 
   it("replay summary per risk level at gap weight 2", () => {
     const byRisk = Object.fromEntries(RISK_LEVELS.map((risk) => [risk, summaryShape(risk, 2)]));
-    expect(byRisk).toMatchInlineSnapshot();
+    expect(byRisk).toMatchInlineSnapshot(`
+      {
+        "aggressive": {
+          "avgSize": 1.01,
+          "caps": {
+            "budget": 0,
+            "concurrency": 5,
+            "position": 9,
+          },
+          "cumulativeReturnPct": 59.93,
+          "deployedPct": 100.71,
+          "maxDrawdownPct": -7.06,
+          "peakConcurrent": 4,
+          "peakPositionSize": 1.5,
+          "returnPerUnitPct": 59.51,
+          "taken": "23/28",
+          "vsBaselinePp": 26.39,
+          "winRatePct": 65.22,
+        },
+        "balanced": {
+          "avgSize": 0.53,
+          "caps": {
+            "budget": 0,
+            "concurrency": 1,
+            "position": 0,
+          },
+          "cumulativeReturnPct": 26.44,
+          "deployedPct": 52.86,
+          "maxDrawdownPct": -1,
+          "peakConcurrent": 4,
+          "peakPositionSize": 1,
+          "returnPerUnitPct": 50.02,
+          "taken": "18/28",
+          "vsBaselinePp": -7.11,
+          "winRatePct": 77.78,
+        },
+        "conservative": {
+          "avgSize": 0.27,
+          "caps": {
+            "budget": 0,
+            "concurrency": 1,
+            "position": 0,
+          },
+          "cumulativeReturnPct": 14.75,
+          "deployedPct": 27.14,
+          "maxDrawdownPct": -1,
+          "peakConcurrent": 4,
+          "peakPositionSize": 1,
+          "returnPerUnitPct": 54.32,
+          "taken": "18/28",
+          "vsBaselinePp": -18.8,
+          "winRatePct": 77.78,
+        },
+      }
+    `);
   });
 
   it("full grid: return, drawdown and deployment per cell", () => {
@@ -165,7 +280,28 @@ describe("backtest replay summary snapshots", () => {
       (c) =>
         `${c.risk} @${c.gapWeight} → ret ${r2(c.cumulativeReturnPct)}% (${r2(c.vsBaseline.cumulativeReturnPp)}pp) dd ${r2(c.maxDrawdownPct)}% dep ${r2(c.deployedPct)}% taken ${c.taken}`,
     );
-    expect(cells).toMatchInlineSnapshot();
+    expect(cells).toMatchInlineSnapshot(`
+      [
+        "conservative @0 → ret 14.75% (-18.8pp) dd -1% dep 27.14% taken 18",
+        "conservative @1 → ret 14.75% (-18.8pp) dd -1% dep 27.14% taken 18",
+        "conservative @2 → ret 14.75% (-18.8pp) dd -1% dep 27.14% taken 18",
+        "conservative @3 → ret 14.75% (-18.8pp) dd -1% dep 27.14% taken 18",
+        "conservative @4 → ret 14.75% (-18.8pp) dd -1% dep 27.14% taken 18",
+        "conservative @6 → ret 14.75% (-18.8pp) dd -1% dep 27.14% taken 18",
+        "balanced @0 → ret 26.44% (-7.11pp) dd -1% dep 52.86% taken 18",
+        "balanced @1 → ret 26.44% (-7.11pp) dd -1% dep 52.86% taken 18",
+        "balanced @2 → ret 26.44% (-7.11pp) dd -1% dep 52.86% taken 18",
+        "balanced @3 → ret 26.44% (-7.11pp) dd -1% dep 52.86% taken 18",
+        "balanced @4 → ret 26.44% (-7.11pp) dd -1% dep 52.86% taken 18",
+        "balanced @6 → ret 26.44% (-7.11pp) dd -1% dep 52.86% taken 18",
+        "aggressive @0 → ret 59.93% (26.39pp) dd -7.06% dep 100.71% taken 23",
+        "aggressive @1 → ret 59.93% (26.39pp) dd -7.06% dep 100.71% taken 23",
+        "aggressive @2 → ret 59.93% (26.39pp) dd -7.06% dep 100.71% taken 23",
+        "aggressive @3 → ret 59.93% (26.39pp) dd -7.06% dep 100.71% taken 23",
+        "aggressive @4 → ret 59.93% (26.39pp) dd -7.06% dep 100.71% taken 23",
+        "aggressive @6 → ret 59.93% (26.39pp) dd -7.06% dep 100.71% taken 23",
+      ]
+    `);
   });
 
   it("grid best cell and headline summary", () => {
@@ -174,6 +310,12 @@ describe("backtest replay summary snapshots", () => {
       best: grid.best ? `${grid.best.risk} @${grid.best.gapWeight}` : null,
       bestReturnPct: grid.best ? r2(grid.best.cumulativeReturnPct) : null,
       summary: grid.summary,
-    }).toMatchInlineSnapshot();
+    }).toMatchInlineSnapshot(`
+      {
+        "best": "aggressive @0",
+        "bestReturnPct": 59.93,
+        "summary": "Baseline (flat 1×) compounds 33.5% at -8.3% drawdown. Best setting: aggressive @ 0× gap → 59.9% (+26.4pp) using 101% of baseline capital.",
+      }
+    `);
   });
 });
