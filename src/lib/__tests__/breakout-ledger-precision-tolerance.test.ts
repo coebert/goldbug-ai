@@ -56,12 +56,12 @@ const TOLERANCE = {
 } as const;
 
 /** Scale-free comparison used by every soundness assertion. */
-function within(actual: number, expected: number, relative = TOLERANCE.relative): boolean {
+function within(actual: number, expected: number, relative: number = TOLERANCE.relative): boolean {
   const scale = Math.max(Math.abs(actual), Math.abs(expected), 1);
   return Math.abs(actual - expected) <= Math.max(relative * scale, TOLERANCE.absoluteFloor);
 }
 
-function expectWithin(actual: number, expected: number, msg: string, relative = TOLERANCE.relative) {
+function expectWithin(actual: number, expected: number, msg: string, relative: number = TOLERANCE.relative) {
   const scale = Math.max(Math.abs(actual), Math.abs(expected), 1);
   const bound = Math.max(relative * scale, TOLERANCE.absoluteFloor);
   expect(Math.abs(actual - expected), `${msg} (drift ${Math.abs(actual - expected)} > ${bound})`).toBeLessThanOrEqual(
