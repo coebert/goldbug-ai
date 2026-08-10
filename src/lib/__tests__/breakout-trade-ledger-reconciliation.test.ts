@@ -288,10 +288,12 @@ function runLedger(book: Book): LedgerStep[] {
   const out: LedgerStep[] = [];
 
   for (let step = 0; step < book.steps; step++) {
-    // Exits settle before entries at the same step, matching the engine's
-    // release-then-open ordering; integer maths makes the order irrelevant to
-    // the totals, but it keeps intermediate balances realistic.
-    const here = (byStep.get(step) ?? []).slice().sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "exit" ? -1 : 1));
+    // Exits (and the fees charged on them) settle before entries at the same
+    // step, matching the engine's release-then-open ordering; integer maths
+    // makes the order irrelevant to the totals, but it keeps intermediate
+    // balances realistic. Within a side, the fill settles before its fees.
+    const order = (l: Leg) => (l.parent === "exit" ? 0 : 2) + (isCostLeg(l) ? 1 : 0);
+    const here = (byStep.get(step) ?? []).slice().sort((a, b) => order(a) - order(b));
     for (const leg of here) {
       cash += leg.cashMicro;
       const held = (holdings.get(leg.symbol) ?? 0) + leg.holdingMicro;
