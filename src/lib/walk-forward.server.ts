@@ -23,6 +23,14 @@ import {
   type WalkForwardMode,
   type WalkForwardSummary,
 } from "./walk-forward";
+import {
+  assessHoldout,
+  buildFoldsWithHoldout,
+  withHoldout,
+  type DateWindow,
+  type HoldoutSegmentResult,
+  type SummaryWithHoldout,
+} from "./walk-forward-holdout";
 
 export type WalkForwardParams = {
   rebalance: "monthly" | "quarterly";
@@ -52,8 +60,42 @@ export type WalkForwardReport = {
   starting_cash: number;
   folds: WalkForwardFoldReport[];
   oos_curve: Array<{ date: string; value: number; foldIndex: number }>;
-  summary: WalkForwardSummary;
+  summary: SummaryWithHoldout;
+  /** Days reserved at the end of history that folds were never allowed to see. */
+  holdout_days: number;
+  /** Params frozen after walk-forward and replayed over the holdout. */
+  holdout_params: WalkForwardParams | null;
+  holdout_segments: Array<{
+    index: number;
+    window: DateWindow;
+    metrics: FoldMetrics;
+    benchmark: FoldMetrics | null;
+  }>;
+  holdout_note?: string;
 };
+
+/**
+ * Freeze one parameter set for the holdout: the combination walk-forward chose
+ * most often, tie-broken by mean out-of-sample Sharpe. Using the last fold's
+ * winner alone would let one noisy window pick the frozen strategy.
+ */
+function freezeParams(
+  outcomes: Array<FoldOutcome<WalkForwardParams>>,
+): WalkForwardParams | null {
+  if (!outcomes.length) return null;
+  const buckets = new Map<string, { params: WalkForwardParams; n: number; sharpe: number }>();
+  for (const o of outcomes) {
+    const key = `${o.params.rebalance}|${o.params.top_k}`;
+    const b = buckets.get(key) ?? { params: o.params, n: 0, sharpe: 0 };
+    b.n += 1;
+    b.sharpe += o.outOfSample.sharpe;
+    buckets.set(key, b);
+  }
+  const ranked = [...buckets.values()].sort(
+    (a, b) => b.n - a.n || b.sharpe / b.n - a.sharpe / a.n,
+  );
+  return ranked[0]?.params ?? null;
+}
 
 const DEFAULT_GRID: WalkForwardParams[] = [
   { rebalance: "monthly", top_k: 4 },
@@ -94,6 +136,9 @@ export async function runWalkForwardEvaluation(opts: {
   maxFolds?: number;
   objective?: SelectionObjective;
   grid?: WalkForwardParams[];
+  /** Calendar days carved off the end of history before folds are built. */
+  holdoutDays?: number;
+  holdoutSegmentDays?: number;
   execution?: { commission_bps?: number; slippage_bps?: number; min_trade_value?: number };
 }): Promise<WalkForwardReport> {
   const { runLongHorizonBacktest, LONG_HORIZON_UNIVERSE } = await import("./long-horizon.server");
@@ -101,13 +146,16 @@ export async function runWalkForwardEvaluation(opts: {
   const objective: SelectionObjective = opts.objective ?? "sharpe";
   const grid = opts.grid && opts.grid.length > 0 ? opts.grid : DEFAULT_GRID;
 
-  const folds = buildWalkForwardFolds({
+  const holdoutDays = Math.max(0, opts.holdoutDays ?? 0);
+  const { folds, split } = buildFoldsWithHoldout({
     from: opts.from,
     to: opts.to,
     trainDays: opts.trainDays,
     testDays: opts.testDays,
     mode,
     maxFolds: opts.maxFolds ?? 12,
+    holdoutDays,
+    ...(opts.holdoutSegmentDays === undefined ? {} : { segmentDays: opts.holdoutSegmentDays }),
   });
 
   const runWindow = async (window: { from: string; to: string }, params: WalkForwardParams) =>
@@ -183,6 +231,30 @@ export async function runWalkForwardEvaluation(opts: {
     });
   }
 
+  // Holdout: freeze one parameter set, replay it over tape no fold ever saw.
+  const summary = summariseWalkForward(outcomes);
+  const frozen = freezeParams(outcomes);
+  const segmentResults: HoldoutSegmentResult[] = [];
+  if (frozen && split.holdout) {
+    for (const [i, window] of split.segments.entries()) {
+      try {
+        const res = await runWindow(window, frozen);
+        const strat = res.series.find((s) => s.key === "aegis");
+        const spy = res.series.find((s) => s.key === "spy");
+        if (!strat || strat.curve.length < 2) continue;
+        segmentResults.push({
+          index: i,
+          window,
+          metrics: toFoldMetrics(strat.metrics),
+          benchmark: spy ? toFoldMetrics(spy.metrics) : null,
+        });
+      } catch (err) {
+        console.warn(`walk-forward: holdout segment ${i} failed`, err);
+      }
+    }
+  }
+  const holdout = assessHoldout(segmentResults, outcomes.length ? summary : null);
+
   return {
     from: opts.from,
     to: opts.to,
@@ -194,6 +266,15 @@ export async function runWalkForwardEvaluation(opts: {
     starting_cash: opts.startingCash,
     folds: reports,
     oos_curve: stitchOutOfSampleCurve(oosCurves, opts.startingCash),
-    summary: summariseWalkForward(outcomes),
+    summary: withHoldout(summary, holdout),
+    holdout_days: holdoutDays,
+    holdout_params: frozen,
+    holdout_segments: segmentResults.map((s) => ({
+      index: s.index,
+      window: s.window,
+      metrics: s.metrics,
+      benchmark: s.benchmark ?? null,
+    })),
+    ...(split.note ? { holdout_note: split.note } : {}),
   };
 }
