@@ -147,6 +147,9 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
   const sectorMap = ctx.sectorBySymbol ?? {};
   const sectorFor = (sym: string) => sectorMap[sym] ?? null;
 
+  const breakoutMap = ctx.breakoutBySymbol ?? {};
+  const breakoutFor = (sym: string) => breakoutMap[sym] ?? null;
+
   const rows: AuditInsert[] = [];
 
   const sellSymbols = new Set<string>();
