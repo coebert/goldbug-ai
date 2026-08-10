@@ -17,11 +17,14 @@ import {
   type BreakoutBacktestReport,
   type SymbolBars,
 } from "@/lib/breakout-backtest";
+import { buildBreakoutDiagnostics, type BreakoutDiagnostics } from "@/lib/breakout-diagnostics";
 
 export type BreakoutBacktestResponse = Omit<BreakoutBacktestReport, "trades"> & {
   /** Most recent signals only — the full list can be thousands of rows. */
   recentTrades: BreakoutBacktestReport["trades"];
   totalTrades: number;
+  /** Per-symbol and per-signal-state cuts of the same trades. */
+  diagnostics: BreakoutDiagnostics;
   skippedSymbols: string[];
 };
 
@@ -133,6 +136,7 @@ export const runBreakoutSignalBacktest = createServerFn({ method: "POST" })
     return {
       ...rest,
       recentTrades: trades.slice(-60).reverse(),
+      diagnostics: buildBreakoutDiagnostics(trades, { limit: 24 }),
       totalTrades: trades.length,
       skippedSymbols,
     };
