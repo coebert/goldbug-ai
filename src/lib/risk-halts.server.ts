@@ -201,6 +201,11 @@ export async function loadEquityStats(
   }
 
   const flows = mergeFlows(recorded, detectExternalFlows(points));
-  return flowAdjustedStats(points, flows, asOf);
+  const stats = flowAdjustedStats(points, flows, asOf);
+  return {
+    peakEquity: stats.peakEquity,
+    priorCloseEquity: stats.priorCloseEquity,
+    netExternalFlow: stats.netFlow,
+  };
 }
 
