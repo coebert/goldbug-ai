@@ -164,7 +164,7 @@ import {
   evaluateEventBlackout,
   reentryLockoutDays,
 } from "./exits";
-import { scoreUniverse, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutSizeMultiplier } from "./alpha";
+import { scoreUniverse, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutSizeMultiplier, breakoutRegimeAction } from "./alpha";
 import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
 import {
   planOrderSlices,
