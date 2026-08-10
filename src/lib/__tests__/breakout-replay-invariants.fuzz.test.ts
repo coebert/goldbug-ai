@@ -83,6 +83,25 @@ function randomLimits(r: () => number): SizingLimits {
   });
 }
 
+
+/** Random frictions, sometimes poisoned with values config should never hold. */
+function randomCosts(r: () => number, poison: boolean): Costs {
+  const c: Costs = {
+    commissionBps: r() * 60,
+    minFee: r() * 0.05,
+    slippageBps: r() * 40,
+  };
+  if (poison) {
+    const p = r();
+    if (p < 0.12) c.commissionBps = NaN;
+    else if (p < 0.2) c.slippageBps = Infinity;
+    else if (p < 0.28) c.minFee = -r() * 5;
+    else if (p < 0.34) c.minFee = 1e12;
+    else if (p < 0.4) c.slippageBps = 20_000;
+  }
+  return c;
+}
+
 function randomTrades(r: () => number, n: number): SignalTrade[] {
   const regimes = ["bull", "bear", "sideways"] as const;
   const symbols = 2 + Math.floor(r() * 10);
@@ -209,6 +228,187 @@ function assertLedger(rows: readonly Row[], plan: LimitedPlan, budget: number, c
 
   return { minCash };
 }
+
+// ---------------------------------------------------------------------------
+// Costed ledger: the same solvency rules once fees and slippage are charged
+// ---------------------------------------------------------------------------
+
+/**
+ * Frictions charged on every fill. Deliberately crude — the point is not to
+ * reproduce Saxo's fee schedule (that is tested in `saxo-fees`), it is that no
+ * plausible cost model can push the replay into borrowing or a short holding.
+ */
+type Costs = {
+  /** Proportional commission on notional, in basis points, per side. */
+  commissionBps: number;
+  /** Fixed ticket charge per side, in the ledger's exposure units. */
+  minFee: number;
+  /** Adverse price move on execution, in basis points, per side. */
+  slippageBps: number;
+};
+
+/**
+ * Costs arrive from config and backtest sweeps, so they get the same treatment
+ * as sizes: a NaN or negative fee must degrade to "no cost", never to a credit.
+ */
+function sanitiseCosts(c: Costs): Costs {
+  const clean = (v: number, max: number) =>
+    !Number.isFinite(v) || v <= 0 ? 0 : Math.min(v, max);
+  return {
+    commissionBps: clean(c.commissionBps, 5_000),
+    minFee: clean(c.minFee, 1e6),
+    slippageBps: clean(c.slippageBps, 5_000),
+  };
+}
+
+/** Cash needed to open `size`: the notional plus entry frictions. */
+function entryCost(size: number, c: Costs) {
+  const slip = (size * c.slippageBps) / 10_000;
+  const commission = (size * c.commissionBps) / 10_000;
+  return { slip, fee: commission + c.minFee, total: size + slip + commission + c.minFee };
+}
+
+/** Cash returned when `size` is closed: the notional less exit frictions. */
+function exitProceeds(size: number, c: Costs) {
+  const slip = (size * c.slippageBps) / 10_000;
+  const commission = (size * c.commissionBps) / 10_000;
+  const friction = Math.min(size, slip + commission + c.minFee);
+  return { friction, proceeds: size - friction };
+}
+
+/**
+ * Walk the plan as a cash ledger *with frictions charged at every step*.
+ *
+ * The uncosted ledger proves the sizing engine never spends more capital than
+ * it was granted. This one proves the stronger, real-money version: once every
+ * fill pays commission, a minimum ticket and slippage, the book still never
+ * borrows and never goes short.
+ *
+ * Because `applySizingLimits` sizes positions without fee headroom, a cohort
+ * that deploys its full budget genuinely cannot also pay the tickets. That is
+ * not an engine bug, so the ledger models what a fee-aware executor must do:
+ * scale the fill down to what cash can actually fund, and refuse it outright if
+ * even the minimum ticket is unaffordable. The invariants then assert that this
+ * fee-aware path is always well behaved:
+ *
+ *  - cash is never negative at any step, including the step that pays fees,
+ *  - no holding is ever negative, and a close never releases more than is held,
+ *  - the funded size never exceeds the size the sizing engine allowed, so costs
+ *    can only shrink exposure, never manufacture it,
+ *  - nothing is created or destroyed: cash + holdings + frictions paid always
+ *    equals the granted capital,
+ *  - the book fully unwinds, ending in cash equal to capital less total costs,
+ *    and total costs never exceed capital.
+ */
+function assertCostedLedger(
+  rows: readonly Row[],
+  plan: LimitedPlan,
+  budget: number,
+  rawCosts: Costs,
+  ctx: string,
+) {
+  const costs = sanitiseCosts(rawCosts);
+  const dates = [...new Set(rows.map((x) => x.date))].sort();
+  const rank = new Map(dates.map((d, i) => [d, i]));
+
+  let cash = budget;
+  let paid = 0;
+  let funded = 0;
+  let refused = 0;
+  let minCash = cash;
+  const holdings = new Map<string, number>();
+  const open: { until: number; symbol: string; size: number }[] = [];
+
+  const charge = (amount: number, what: string, step: number) => {
+    expect(amount, `negative ${what} charge at step ${step}: ${ctx}`).toBeGreaterThanOrEqual(0);
+    expect(cash + EPS, `cash would go negative paying ${what} at step ${step}: ${ctx}`).toBeGreaterThanOrEqual(
+      amount,
+    );
+    cash -= amount;
+    paid += amount;
+  };
+
+  const release = (upTo: number, step: number) => {
+    for (let j = open.length - 1; j >= 0; j--) {
+      const pos = open[j];
+      if (pos.until > upTo) continue;
+      const held = holdings.get(pos.symbol) ?? 0;
+      expect(held + EPS, `released more than held (${pos.symbol}) at step ${step}: ${ctx}`).toBeGreaterThanOrEqual(
+        pos.size,
+      );
+      const next = held - pos.size;
+      if (next <= EPS) holdings.delete(pos.symbol);
+      else holdings.set(pos.symbol, next);
+      // Exit frictions come out of the proceeds, never out of thin air: the
+      // position returns its notional to cash and immediately pays the cost.
+      const { friction, proceeds } = exitProceeds(pos.size, costs);
+      cash += pos.size;
+      open.splice(j, 1);
+      expect(proceeds, `exit proceeds went negative (${pos.symbol}) at step ${step}: ${ctx}`).toBeGreaterThanOrEqual(
+        -EPS,
+      );
+      charge(friction, `exit friction on ${pos.symbol}`, step);
+    }
+  };
+
+  plan.signals.forEach((s, i) => {
+    const at = rank.get(s.date) ?? 0;
+    release(at, i);
+
+    if (s.size > 0) {
+      // Fee-aware fill: shrink to what cash can fund, including entry costs.
+      const perUnit = 1 + (costs.slippageBps + costs.commissionBps) / 10_000;
+      const affordable = Math.max(0, (cash - costs.minFee) / perUnit);
+      const size = Math.min(s.size, affordable);
+
+      // Costs may only reduce the engine-allowed size.
+      expect(size, `costed fill exceeds the allowed size at step ${i}: ${ctx}`).toBeLessThanOrEqual(
+        s.size + EPS,
+      );
+
+      if (size > EPS) {
+        const { slip, fee, total } = entryCost(size, costs);
+        expect(cash + 1e-6, `entry unaffordable after sizing at step ${i}: ${ctx}`).toBeGreaterThanOrEqual(
+          total,
+        );
+        cash -= size;
+        holdings.set(s.symbol, (holdings.get(s.symbol) ?? 0) + size);
+        charge(slip + fee, `entry friction on ${s.symbol}`, i);
+        open.push({ until: at + Math.max(1, rows[i].barsHeld), symbol: s.symbol, size });
+        funded++;
+      } else {
+        // Refused for want of cash — must leave the book untouched.
+        refused++;
+      }
+    }
+
+    if (cash < minCash) minCash = cash;
+
+    expect(cash, `negative cash at step ${i}: ${ctx}`).toBeGreaterThanOrEqual(-EPS);
+    for (const [symbol, qty] of holdings) {
+      expect(qty, `negative holding in ${symbol} at step ${i}: ${ctx}`).toBeGreaterThanOrEqual(-EPS);
+    }
+    const held = [...holdings.values()].reduce((a, b) => a + b, 0);
+    expect(held, `holdings exceed capital at step ${i}: ${ctx}`).toBeLessThanOrEqual(budget + EPS);
+    // Conservation with costs: capital is either in cash, on the book, or spent.
+    expect(
+      Math.abs(cash + held + paid - budget),
+      `costed ledger does not balance at step ${i}: ${ctx}`,
+    ).toBeLessThan(1e-6);
+  });
+
+  release(Number.POSITIVE_INFINITY, plan.signals.length);
+  expect(holdings.size, `holdings left open after unwind: ${ctx}`).toBe(0);
+  expect(cash, `terminal cash negative: ${ctx}`).toBeGreaterThanOrEqual(-EPS);
+  expect(paid, `costs exceed capital: ${ctx}`).toBeLessThanOrEqual(budget + 1e-6);
+  expect(Math.abs(cash + paid - budget), `capital lost after unwind: ${ctx}`).toBeLessThan(1e-6);
+  // Frictions are a pure drag: terminal cash can never beat the starting bank.
+  expect(cash, `costs increased terminal cash: ${ctx}`).toBeLessThanOrEqual(budget + EPS);
+
+  return { minCash, paid, funded, refused, terminalCash: cash, costs };
+}
+
+
 
 
 /** Every invariant that must hold for a single limited plan. */
@@ -512,6 +712,120 @@ describe("replay invariants (property-based)", () => {
         const best = Math.max(...grid.cells.filter((c) => c.taken > 0).map((c) => c.cumulativeReturnPct));
         expect(grid.best.cumulativeReturnPct, `best cell is not the best (case ${i}) — ${REPRO}`).toBe(best);
       }
+    }
+  });
+
+  it("keeps cash and holdings non-negative once fees and slippage are charged", () => {
+    // Same solvency properties as the uncosted ledger, but every fill now pays
+    // commission, a fixed ticket and slippage on entry *and* exit.
+    for (let i = 0; i < 200; i++) {
+      const r = rng(caseSeed(BASE_SEED, "costed", i));
+      const rows = randomRows(r, 5 + Math.floor(r() * 200), r() < 0.35);
+      const limits = randomLimits(r);
+      const costs = randomCosts(r, r() < 0.3);
+      const ctx = `costed case ${i} — ${REPRO}`;
+
+      const plan = applySizingLimits(rows, limits);
+      const budget = (rows.length * limits.maxTotalDeployedPct) / 100;
+      const led = assertCostedLedger(rows, plan, budget, costs, ctx);
+
+      expect(led.minCash, `cash dipped below zero: ${ctx}`).toBeGreaterThanOrEqual(-EPS);
+      expect(led.paid, `frictions went negative: ${ctx}`).toBeGreaterThanOrEqual(0);
+      expect(led.funded + led.refused, `fills unaccounted for: ${ctx}`).toBe(
+        plan.signals.filter((s) => s.size > 0).length,
+      );
+    }
+  });
+
+  it("stays solvent when frictions dominate the budget", () => {
+    // The stress shape for costs: a starved budget against a large minimum
+    // ticket and punitive slippage, so most fills are shrunk or refused and any
+    // path that charges a fee it cannot fund shows up as negative cash.
+    for (let i = 0; i < 120; i++) {
+      const r = rng(caseSeed(BASE_SEED, "costed-starved", i));
+      const rows = randomRows(r, 20 + Math.floor(r() * 180), true).map((row) => ({
+        ...row,
+        barsHeld: 3 + Math.floor(r() * 20),
+      }));
+      const limits = resolveSizingLimits({
+        maxPositionSize: 0.5 + r() * 2,
+        maxConcurrentSignals: 1 + Math.floor(r() * 8),
+        maxTotalDeployedPct: 1 + r() * 30,
+      });
+      const budget = (rows.length * limits.maxTotalDeployedPct) / 100;
+      const costs: Costs = {
+        commissionBps: 50 + r() * 400,
+        // A ticket charge that is a meaningful fraction of the whole bank.
+        minFee: (budget / (2 + r() * 8)) * (r() < 0.5 ? 1 : 0.25),
+        slippageBps: 100 + r() * 900,
+      };
+      const ctx = `friction-dominated case ${i} — ${REPRO}`;
+
+      const plan = applySizingLimits(rows, limits);
+      const led = assertCostedLedger(rows, plan, budget, costs, ctx);
+
+      expect(led.minCash, `cash dipped below zero: ${ctx}`).toBeGreaterThanOrEqual(-EPS);
+      // Costs are a drag, never a windfall.
+      expect(led.terminalCash, `terminal cash above capital: ${ctx}`).toBeLessThanOrEqual(budget + EPS);
+      expect(led.paid, `costs exceeded capital: ${ctx}`).toBeLessThanOrEqual(budget + 1e-6);
+    }
+  });
+
+  it("charges more and funds no more as frictions rise", () => {
+    // Monotonicity: raising costs can only make the book smaller and poorer.
+    for (let i = 0; i < 40; i++) {
+      const r = rng(caseSeed(BASE_SEED, "costed-monotone", i));
+      const rows = randomRows(r, 40 + Math.floor(r() * 120), false);
+      const limits = randomLimits(r);
+      const plan = applySizingLimits(rows, limits);
+      const budget = (rows.length * limits.maxTotalDeployedPct) / 100;
+
+      let prevFunded = Number.POSITIVE_INFINITY;
+      let prevTerminal = Number.POSITIVE_INFINITY;
+      for (const bps of [0, 5, 25, 100, 400, 1500]) {
+        const ctx = `monotone case ${i} @ ${bps}bps — ${REPRO}`;
+        const led = assertCostedLedger(
+          rows,
+          plan,
+          budget,
+          { commissionBps: bps, minFee: 0, slippageBps: bps },
+          ctx,
+        );
+        expect(led.funded, `higher costs funded more fills: ${ctx}`).toBeLessThanOrEqual(prevFunded);
+        expect(led.terminalCash, `higher costs left more cash: ${ctx}`).toBeLessThanOrEqual(
+          prevTerminal + 1e-6,
+        );
+        prevFunded = led.funded;
+        prevTerminal = led.terminalCash;
+      }
+    }
+  });
+
+  it("treats poisoned cost inputs as zero cost, never as a credit", () => {
+    const r = rng(caseSeed(BASE_SEED, "costed-poison", 0));
+    const rows = randomRows(r, 80, false);
+    const limits = randomLimits(r);
+    const plan = applySizingLimits(rows, limits);
+    const budget = (rows.length * limits.maxTotalDeployedPct) / 100;
+
+    const free = assertCostedLedger(
+      rows,
+      plan,
+      budget,
+      { commissionBps: 0, minFee: 0, slippageBps: 0 },
+      `free — ${REPRO}`,
+    );
+    expect(free.paid, `zero-cost run charged something — ${REPRO}`).toBeLessThan(1e-9);
+
+    for (const bad of [
+      { commissionBps: NaN, minFee: NaN, slippageBps: NaN },
+      { commissionBps: -100, minFee: -5, slippageBps: -100 },
+      { commissionBps: Number.NEGATIVE_INFINITY, minFee: -0, slippageBps: -0 },
+    ] as Costs[]) {
+      const led = assertCostedLedger(rows, plan, budget, bad, `poisoned ${JSON.stringify(bad)} — ${REPRO}`);
+      expect(led.paid, `poisoned costs charged something — ${REPRO}`).toBeLessThan(1e-9);
+      expect(led.funded, `poisoned costs changed funding — ${REPRO}`).toBe(free.funded);
+      expect(led.terminalCash, `poisoned costs created cash — ${REPRO}`).toBeLessThanOrEqual(budget + EPS);
     }
   });
 
