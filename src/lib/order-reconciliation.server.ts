@@ -16,6 +16,7 @@ import { logReconcileEvent, type ReconcileReasonCode } from "./reconcile-event-l
 import { decideSimFill } from "./sim-fill-rules";
 import { getMarketStatusForSymbol, inferVenue, marketHadOpenPeriod } from "./market-hours";
 import { resolveFillRecord, type FillPriceCandidate } from "./fill-record";
+import { modelledFillFee } from "./trade-viability-gate";
 
 export type OrderReconcileOutcome =
   | "filled"
@@ -366,7 +367,12 @@ export async function reconcileOrderStatusesForPortfolio(params: {
             side: row.side as string,
             quantity: qty,
             fill_price: fillPrice,
-            fee: 0,
+            fee: modelledFillFee({
+              symbol: row.symbol as string,
+              side: (row.side as string) === "sell" ? "sell" : "buy",
+              quantity: qty,
+              price: fillPrice,
+            }),
             currency: fillCurrency,
             broker_fill_id: brokerOrderId,
             filled_at: new Date().toISOString(),
@@ -510,7 +516,12 @@ export async function reconcileOrderStatusesForPortfolio(params: {
             side: row.side as string,
             quantity: qty,
             fill_price: resolved.fillPrice,
-            fee: 0,
+            fee: modelledFillFee({
+              symbol: row.symbol as string,
+              side: (row.side as string) === "sell" ? "sell" : "buy",
+              quantity: qty,
+              price: resolved.fillPrice,
+            }),
             currency: resolved.currency,
             broker_fill_id: brokerOrderId,
             filled_at: new Date().toISOString(),
@@ -730,7 +741,12 @@ export async function reconcileOrderStatusesForPortfolio(params: {
           side: row.side as string,
           quantity: hist.filledAmount,
           fill_price: histFill.fillPrice,
-          fee: 0,
+          fee: modelledFillFee({
+            symbol: row.symbol as string,
+            side: (row.side as string) === "sell" ? "sell" : "buy",
+            quantity: hist.filledAmount,
+            price: histFill.fillPrice,
+          }),
           currency: histFill.currency,
           broker_fill_id: brokerOrderId,
           filled_at: hist.filledAt ?? new Date().toISOString(),
