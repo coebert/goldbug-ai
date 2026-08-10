@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -31,6 +31,7 @@ import {
 } from "@/lib/breakout-driver-execution";
 import {
   compareDriverSettings,
+  type DriverCompareRow,
   type DriverSetting,
 } from "@/lib/breakout-driver-compare";
 import { Button } from "@/components/ui/button";
@@ -180,6 +181,98 @@ const STATUS_LABEL: Record<string, string> = {
   same: "same",
 };
 
+/** Small 0–1 meter used for the confidence factor breakdown. */
+function FactorBar({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(1, value)) * 100;
+  return (
+    <span className="inline-block h-1 w-14 overflow-hidden rounded-full bg-muted align-middle">
+      <span
+        className="block h-full rounded-full"
+        style={{
+          width: `${pct}%`,
+          backgroundColor:
+            pct >= 66
+              ? "var(--saxo-up)"
+              : pct >= 40
+                ? "var(--muted-foreground)"
+                : "var(--saxo-down)",
+        }}
+      />
+    </span>
+  );
+}
+
+/** Expanded "why did this move" panel for one compared driver. */
+function ChangeExplanation({ row }: { row: DriverCompareRow }) {
+  const x = row.explain;
+  return (
+    <div
+      className="space-y-2 rounded-md bg-muted/30 p-2 text-[11px]"
+      data-testid={`what-if-why-${row.symbol}`}
+    >
+      <p className="font-medium">{x.headline}</p>
+
+      <div>
+        <p className="text-muted-foreground">Δ score attribution</p>
+        <ul className="mt-1 space-y-0.5">
+          {x.scoreFactors.map((f) => (
+            <li key={f.label} className="flex items-baseline justify-between gap-2">
+              <span>
+                <span className="font-medium">{f.label}</span>
+                <span className="ml-1 text-muted-foreground">{f.detail}</span>
+              </span>
+              <span className={`tabular-nums ${f.delta ? tone(f.delta) : "text-muted-foreground"}`}>
+                {f.delta > 0 ? "+" : ""}
+                {f.delta.toFixed(1)}
+              </span>
+            </li>
+          ))}
+          {row.scoreDelta != null ? (
+            <li className="flex items-baseline justify-between gap-2 border-t border-border/30 pt-0.5 font-medium">
+              <span>Net Δ score</span>
+              <span className={`tabular-nums ${tone(row.scoreDelta)}`}>
+                {row.scoreDelta > 0 ? "+" : ""}
+                {row.scoreDelta.toFixed(1)}
+              </span>
+            </li>
+          ) : null}
+        </ul>
+      </div>
+
+      {x.confidenceFactors.length ? (
+        <div>
+          <p className="text-muted-foreground">Confidence factors (current setting)</p>
+          <ul className="mt-1 space-y-0.5">
+            {x.confidenceFactors.map((f) => (
+              <li key={f.label} className="flex items-baseline gap-2">
+                <span className="w-14 shrink-0 font-medium">{f.label}</span>
+                <FactorBar value={f.value} />
+                <span className="w-8 shrink-0 tabular-nums text-muted-foreground">
+                  {(f.value * 100).toFixed(0)}
+                </span>
+                <span className="text-muted-foreground">{f.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {x.rankReason ? (
+        <p>
+          <span className="text-muted-foreground">Rank: </span>
+          {x.rankReason}
+        </p>
+      ) : null}
+      {x.sizeReason ? (
+        <p>
+          <span className="text-muted-foreground">Size: </span>
+          {x.sizeReason}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function WhatIfCompare({
   symbols,
   a,
@@ -191,6 +284,7 @@ function WhatIfCompare({
 }) {
   const cmp = useMemo(() => compareDriverSettings(symbols, a, b), [symbols, a, b]);
   const head = (s: DriverSetting) => `${s.risk} · ${s.gapWeight.toFixed(1)}×`;
+  const [open, setOpen] = useState<string | null>(null);
 
   return (
     <div className="rounded-md border border-border/40 p-2" data-testid="driver-what-if">
@@ -212,52 +306,74 @@ function WhatIfCompare({
               <th className="py-1 text-left font-normal">Current · {head(b)}</th>
               <th className="py-1 text-right font-normal">Δ rank</th>
               <th className="py-1 text-right font-normal">Δ size</th>
+              <th className="py-1 text-right font-normal">Why</th>
             </tr>
           </thead>
           <tbody>
             {cmp.rows.map((r) => (
-              <tr
-                key={r.symbol}
-                className="border-t border-border/30"
-                data-testid={`what-if-row-${r.symbol}`}
-              >
-                <td className="py-1 font-medium">
-                  {r.symbol}
-                  {r.status !== "same" ? (
-                    <span className="ml-1 text-[10px] text-muted-foreground">
-                      {STATUS_LABEL[r.status]}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="py-1">
-                  {r.a.action ? (
-                    <span className={ACTION_TONE[r.a.action]}>
-                      {r.a.action} · {r.a.sizeMultiplier?.toFixed(2)}×
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">unranked</span>
-                  )}
-                </td>
-                <td className="py-1">
-                  {r.b.action ? (
-                    <span className={ACTION_TONE[r.b.action]}>
-                      {r.b.action} · {r.b.sizeMultiplier?.toFixed(2)}×
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">unranked</span>
-                  )}
-                </td>
-                <td className="py-1 text-right tabular-nums">
-                  {r.rankDelta == null
-                    ? "—"
-                    : `${r.rankDelta > 0 ? "+" : ""}${r.rankDelta}`}
-                </td>
-                <td
-                  className={`py-1 text-right tabular-nums ${r.sizeDelta ? tone(r.sizeDelta) : ""}`}
+              <Fragment key={r.symbol}>
+                <tr
+                  className="border-t border-border/30"
+                  data-testid={`what-if-row-${r.symbol}`}
                 >
-                  {r.sizeDelta == null ? "—" : `${r.sizeDelta > 0 ? "+" : ""}${r.sizeDelta.toFixed(2)}×`}
-                </td>
-              </tr>
+                  <td className="py-1 font-medium">
+                    {r.symbol}
+                    {r.status !== "same" ? (
+                      <span className="ml-1 text-[10px] text-muted-foreground">
+                        {STATUS_LABEL[r.status]}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="py-1">
+                    {r.a.action ? (
+                      <span className={ACTION_TONE[r.a.action]}>
+                        {r.a.action} · {r.a.sizeMultiplier?.toFixed(2)}×
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">unranked</span>
+                    )}
+                  </td>
+                  <td className="py-1">
+                    {r.b.action ? (
+                      <span className={ACTION_TONE[r.b.action]}>
+                        {r.b.action} · {r.b.sizeMultiplier?.toFixed(2)}×
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">unranked</span>
+                    )}
+                  </td>
+                  <td className="py-1 text-right tabular-nums">
+                    {r.rankDelta == null
+                      ? "—"
+                      : `${r.rankDelta > 0 ? "+" : ""}${r.rankDelta}`}
+                  </td>
+                  <td
+                    className={`py-1 text-right tabular-nums ${r.sizeDelta ? tone(r.sizeDelta) : ""}`}
+                  >
+                    {r.sizeDelta == null ? "—" : `${r.sizeDelta > 0 ? "+" : ""}${r.sizeDelta.toFixed(2)}×`}
+                  </td>
+                  <td className="py-1 text-right">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 px-1 text-[10px]"
+                      aria-expanded={open === r.symbol}
+                      data-testid={`what-if-why-toggle-${r.symbol}`}
+                      onClick={() => setOpen((cur) => (cur === r.symbol ? null : r.symbol))}
+                    >
+                      {open === r.symbol ? "Hide" : "Explain"}
+                    </Button>
+                  </td>
+                </tr>
+                {open === r.symbol ? (
+                  <tr>
+                    <td colSpan={6} className="pb-2">
+                      <ChangeExplanation row={r} />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -88,3 +88,61 @@ describe("compareDriverSettings", () => {
     expect(cmp.rows).toHaveLength(1);
   });
 });
+
+describe("explainDriverChange", () => {
+  it("attributes the whole score delta to the gap-weight term", () => {
+    const cmp = compareDriverSettings(
+      symbols(),
+      { risk: "balanced", gapWeight: 1 },
+      { risk: "balanced", gapWeight: 4 },
+    );
+    for (const r of cmp.rows) {
+      if (r.scoreDelta == null) continue;
+      const summed = r.explain.scoreFactors.reduce((a, f) => a + f.delta, 0);
+      expect(summed).toBeCloseTo(r.scoreDelta, 6);
+      const share = r.explain.scoreFactors.find((f) => f.label === "P&L share");
+      expect(share?.delta).toBe(0);
+      const gap = r.explain.scoreFactors.find((f) => f.label === "Expectancy gap × weight");
+      expect(gap?.delta).toBeCloseTo((4 - 1) * (r.b.expectancyGapPct ?? 0), 6);
+    }
+  });
+
+  it("names the risk change as the cause when only the risk level moves", () => {
+    const cmp = compareDriverSettings(
+      symbols(),
+      { risk: "conservative", gapWeight: 2 },
+      { risk: "aggressive", gapWeight: 2 },
+    );
+    for (const r of cmp.rows) {
+      expect(r.scoreDelta).toBe(0);
+      expect(r.explain.headline).toContain("risk conservative → aggressive");
+      expect(r.explain.sizeReason).toBeTruthy();
+    }
+  });
+
+  it("reports confidence factors worst-first with the sample and breadth inputs", () => {
+    const cmp = compareDriverSettings(
+      symbols(),
+      { risk: "balanced", gapWeight: 1 },
+      { risk: "balanced", gapWeight: 3 },
+    );
+    const row = cmp.rows[0]!;
+    const labels = row.explain.confidenceFactors.map((f) => f.label);
+    expect(labels).toContain("Sample");
+    expect(labels).toContain("Breadth");
+    const values = row.explain.confidenceFactors.map((f) => f.value);
+    expect([...values].sort((a, b) => a - b)).toEqual(values);
+  });
+
+  it("explains entering and leaving the ranked set", () => {
+    const cmp = compareDriverSettings(
+      symbols(),
+      { risk: "balanced", gapWeight: 2 },
+      { risk: "balanced", gapWeight: 2 },
+      { minConfirmed: 1 },
+    );
+    for (const r of cmp.rows) {
+      expect(r.explain.rankReason).toBeTruthy();
+    }
+  });
+});
