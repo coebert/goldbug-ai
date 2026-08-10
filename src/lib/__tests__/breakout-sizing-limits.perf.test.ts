@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applySizingLimits, type SizingLimits } from "@/lib/breakout-sizing-limits";
+import { caseSeed, resolveFuzzSeed, rng } from "./fuzz-seed";
 
 /**
  * Performance regression guard for the sizing-limits pipeline.
