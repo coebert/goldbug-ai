@@ -511,9 +511,12 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
     const leg = replay.journal[idx];
     const amount = leg.feeMicros + leg.slipMicros;
 
-    // Same money, one step late: totals identical, cash trace wrong for a step.
+    // The charge is settled one step late: the money is identical and the
+    // running total catches up immediately after, but for one step the ledger
+    // reports cash that has in fact already been spent.
     const tampered: Replay = {
       ...replay,
+      journal: replay.journal.map((l, i) => (i === idx ? { ...l, step: l.step + 1 } : l)),
       trace: replay.trace.map((t) =>
         t.step === leg.step
           ? { ...t, cashMicros: t.cashMicros + amount, cumulativeCostMicros: t.cumulativeCostMicros - amount }
@@ -525,6 +528,7 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
     // ...but the per-step identity catches it.
     expect(() => assertStepCashIdentity(tampered, `deferral control · seed=${seed}`)).toThrow();
   });
+
 
   it("catches an entry friction pre-charged on the previous step", () => {
     const { replay, plan, seed } = findMutableCase();
