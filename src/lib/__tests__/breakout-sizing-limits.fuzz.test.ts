@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   applySizingLimits,
   resolveSizingLimits,
   type LimitReason,
   type SizingLimits,
 } from "@/lib/breakout-sizing-limits";
+import { announceFuzzSeed, caseSeed, fuzzContext, resolveFuzzSeed, rng } from "./fuzz-seed";
 
 /**
  * Property-based fuzzing for the sizing-limit caps.
@@ -15,20 +16,17 @@ import {
  * negative and zero sizes, and with caps that fight each other — and assert
  * invariants that must hold for EVERY input rather than specific outputs.
  *
- * The generator is seeded so a failure is reproducible: the seed is printed
- * in the assertion context of any failing case.
+ * Seeding is deterministic: every case derives its stream from one base seed
+ * (`FUZZ_SEED`, default fixed). The base seed and a copy-pasteable replay
+ * command are printed at suite start and embedded in every failure message,
+ * so a red CI run can be reproduced locally verbatim.
  */
 
-/** Deterministic PRNG (mulberry32) — same seed, same cohort, every run. */
-function rng(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+const FILE = "src/lib/__tests__/breakout-sizing-limits.fuzz.test.ts";
+const BASE_SEED = resolveFuzzSeed();
+
+beforeAll(() => announceFuzzSeed(BASE_SEED, FILE));
+
 
 /** Sizes that a buggy pipeline could plausibly hand the caps. */
 function randomSize(r: () => number): number {
