@@ -404,14 +404,110 @@ export function signalStateDiagnostics(
   return out;
 }
 
+/**
+ * A single name ranked by how much it moves the confirmed cohort's result.
+ *
+ * Two independent signals are blended into one score:
+ *   - signed P&L share  — how much of the cohort's gross movement this name
+ *                         accounts for, signed by its own contribution.
+ *   - expectancy gap    — confirmed minus failed average return, i.e. how much
+ *                         edge the *signal itself* adds on this name.
+ * A name can carry P&L purely because it traded a lot (share high, gap ~0), or
+ * show real signal edge on a handful of trades (gap high, share small). The
+ * blend surfaces both, and both components are kept on the row so the UI can
+ * show which one is doing the work.
+ */
+export type TopDriver = {
+  symbol: string;
+  /** Signed share of the confirmed cohort's gross P&L, in percent. */
+  contributionPct: number;
+  /** confirmed − failed average return, in percentage points. */
+  expectancyGapPct: number;
+  /** confirmed − failed win rate, in percentage points. */
+  winRateGapPp: number;
+  confirmedTrades: number;
+  confirmedAvgReturnPct: number;
+  /** Blended rank score; positive = helps the cohort, negative = hurts it. */
+  score: number;
+  /** Which component dominates the score. */
+  lead: "P&L share" | "expectancy gap";
+  /** Gate layer binding this name's confirmed signals, for context. */
+  gateDriver: RegimeGateVerdict["driver"] | "mixed";
+};
+
+export type TopDrivers = {
+  positive: TopDriver[];
+  negative: TopDriver[];
+  /** Weight applied to the expectancy gap when blending the score. */
+  gapWeight: number;
+  summary: string;
+};
+
+export type TopDriversOptions = {
+  /** Rows per side. Default 5. */
+  limit?: number;
+  /** Minimum confirmed signals before a name can be ranked. Default 3. */
+  minConfirmed?: number;
+  /** Weight on the expectancy gap relative to P&L share. Default 2. */
+  gapWeight?: number;
+};
+
+export function topDrivers(
+  symbols: readonly SymbolDiagnostic[],
+  options: TopDriversOptions = {},
+): TopDrivers {
+  const limit = options.limit ?? 5;
+  const minConfirmed = options.minConfirmed ?? 3;
+  const gapWeight = options.gapWeight ?? 2;
+
+  const rows: TopDriver[] = symbols
+    .filter((s) => s.confirmed.trades >= minConfirmed)
+    .map((s) => {
+      const shareTerm = s.confirmedContributionPct;
+      const gapTerm = s.avgReturnGapPct * gapWeight;
+      return {
+        symbol: s.symbol,
+        contributionPct: s.confirmedContributionPct,
+        expectancyGapPct: s.avgReturnGapPct,
+        winRateGapPp: s.winRateGapPp,
+        confirmedTrades: s.confirmed.trades,
+        confirmedAvgReturnPct: s.confirmed.avgReturnPct,
+        score: shareTerm + gapTerm,
+        lead: Math.abs(gapTerm) > Math.abs(shareTerm) ? "expectancy gap" : "P&L share",
+        gateDriver: s.confirmedRegimeVol.dominantDriver,
+      } satisfies TopDriver;
+    });
+
+  const positive = rows
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score || b.confirmedTrades - a.confirmedTrades)
+    .slice(0, limit);
+  const negative = rows
+    .filter((r) => r.score < 0)
+    .sort((a, b) => a.score - b.score || b.confirmedTrades - a.confirmedTrades)
+    .slice(0, limit);
+
+  const fmt = (r: TopDriver) => `${r.symbol} (${r.score >= 0 ? "+" : ""}${r.score.toFixed(1)})`;
+  const summary = !rows.length
+    ? "Not enough confirmed signals to rank contributors."
+    : `Top up: ${positive.length ? positive.slice(0, 3).map(fmt).join(", ") : "none"} · top down: ${
+        negative.length ? negative.slice(0, 3).map(fmt).join(", ") : "none"
+      }.`;
+
+  return { positive, negative, gapWeight, summary };
+}
+
 export type BreakoutDiagnostics = {
   symbols: SymbolDiagnostic[];
   states: SignalStateDiagnostic[];
   /** Regime cells + vol measurements across the whole sample. */
   regimeVol: RegimeVolContext;
+  /** Biggest positive/negative contributors, ranked. */
+  topDrivers: TopDrivers;
   /** One-line takeaways for the UI, already ranked by usefulness. */
   notes: string[];
 };
+
 
 export function buildBreakoutDiagnostics(
   trades: readonly SignalTrade[],
@@ -420,6 +516,7 @@ export function buildBreakoutDiagnostics(
   const symbols = symbolDiagnostics(trades, options);
   const states = signalStateDiagnostics(trades);
   const regimeVol = regimeVolContext(trades);
+  const drivers2 = topDrivers(symbols);
   const notes: string[] = [];
   if (trades.length) {
     notes.push(`Gate context: ${regimeVol.summary}.`);
@@ -467,5 +564,5 @@ export function buildBreakoutDiagnostics(
     }
   }
 
-  return { symbols, states, regimeVol, notes };
+  return { symbols, states, regimeVol, topDrivers: drivers2, notes };
 }

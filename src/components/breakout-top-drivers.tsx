@@ -1,0 +1,77 @@
+import { Badge } from "@/components/ui/badge";
+import type { TopDriver, TopDrivers } from "@/lib/breakout-diagnostics";
+
+const signed = (v: number, digits = 2) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
+const tone = (v: number) => (v >= 0 ? "text-emerald-500" : "text-red-500");
+
+function DriverRow({ d }: { d: TopDriver }) {
+  return (
+    <li className="flex items-baseline justify-between gap-2 border-t border-border/30 py-1 first:border-t-0">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium">{d.symbol}</p>
+        <p className="text-[11px] text-muted-foreground">
+          {d.confirmedTrades} confirmed · avg {signed(d.confirmedAvgReturnPct)} · led by {d.lead}
+          {d.gateDriver !== "none" ? ` · gate: ${d.gateDriver}` : ""}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className={`text-xs font-semibold tabular-nums ${tone(d.score)}`}>
+          {d.score >= 0 ? "+" : ""}
+          {d.score.toFixed(1)}
+        </p>
+        <p className="text-[11px] text-muted-foreground tabular-nums">
+          share {signed(d.contributionPct, 0)} · gap {signed(d.expectancyGapPct)}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function Side({
+  title,
+  rows,
+  empty,
+}: {
+  title: string;
+  rows: readonly TopDriver[];
+  empty: string;
+}) {
+  return (
+    <div className="rounded-md border border-border/40 p-2">
+      <p className="text-[11px] font-medium text-muted-foreground">{title}</p>
+      {rows.length ? (
+        <ul className="mt-1">
+          {rows.map((d) => (
+            <DriverRow key={d.symbol} d={d} />
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-[11px] text-muted-foreground">{empty}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Ranks the names moving the confirmed cohort most, blending signed P&L share
+ * with the expectancy gap (confirmed − failed average return) so both
+ * "traded a lot" and "real signal edge" contributors surface.
+ */
+export function BreakoutTopDrivers({ drivers }: { drivers: TopDrivers }) {
+  if (!drivers.positive.length && !drivers.negative.length) return null;
+  return (
+    <div className="space-y-2" data-testid="breakout-top-drivers">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium">Top drivers</p>
+        <Badge variant="outline" className="text-[10px] font-normal">
+          score = P&amp;L share + {drivers.gapWeight}× expectancy gap
+        </Badge>
+      </div>
+      <p className="text-[11px] text-muted-foreground">{drivers.summary}</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Side title="Biggest positive" rows={drivers.positive} empty="No net-positive contributors." />
+        <Side title="Biggest negative" rows={drivers.negative} empty="No net-negative contributors." />
+      </div>
+    </div>
+  );
+}
