@@ -8,6 +8,7 @@ import type {
   SymbolDiagnostic,
 } from "@/lib/breakout-diagnostics";
 import type { BreakoutTimingReport, BucketRow } from "@/lib/breakout-timing";
+import type { ExecutionGrid } from "@/lib/breakout-driver-execution";
 
 const pct = (v: number, digits = 2) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
 const tone = (v: number) => (v >= 0 ? "text-emerald-500" : "text-red-500");
@@ -151,9 +152,11 @@ function BucketTable({ title, rows }: { title: string; rows: BucketRow[] }) {
 export function BreakoutDiagnosticsSection({
   diagnostics,
   timing,
+  execution,
 }: {
   diagnostics: BreakoutDiagnostics;
   timing?: BreakoutTimingReport;
+  execution?: ExecutionGrid;
 }) {
   const [tab, setTab] = useState<"symbols" | "states" | "timing">("symbols");
   const [openSymbol, setOpenSymbol] = useState<string | null>(null);
@@ -195,7 +198,11 @@ export function BreakoutDiagnosticsSection({
         </ul>
       )}
 
-      {tab !== "timing" && <BreakoutTopDrivers drivers={diagnostics.topDrivers} symbols={diagnostics.symbols} />}
+      {tab !== "timing" && <BreakoutTopDrivers
+          drivers={diagnostics.topDrivers}
+          symbols={diagnostics.symbols}
+          execution={execution}
+        />}
 
       {tab !== "timing" && <RegimeVolCells ctx={diagnostics.regimeVol} label="All signals" />}
 
