@@ -309,8 +309,8 @@ function runLedger(book: Book): LedgerStep[] {
 // Reconciliation
 // ---------------------------------------------------------------------------
 
-function reconcile(rows: readonly Row[], limits: SizingLimits, ctx: string) {
-  const book = buildBook(rows, limits);
+function reconcile(rows: readonly Row[], limits: SizingLimits, ctx: string, costs: CostModel = ZERO_COSTS) {
+  const book = buildBook(rows, limits, costs);
   const ledger = runLedger(book);
 
   const legsAt = (step: number) => book.legs.filter((l) => l.step === step);
@@ -321,20 +321,42 @@ function reconcile(rows: readonly Row[], limits: SizingLimits, ctx: string) {
   for (const snap of ledger) {
     const here = legsAt(snap.step);
 
-    // 1. Cash: the step's balance change equals the sum of that step's cash legs.
+    // 1. Cash: the step's balance change equals the sum of that step's cash
+    //    legs — fills *and* the commission / spread / FX fees booked with them.
     const cashDelta = snap.cashMicro - prevCash;
     const legCash = here.reduce((a, l) => a + l.cashMicro, 0);
     expect(cashDelta, `cash delta at step ${snap.step} is not explained by the trade legs: ${ctx}`).toBe(legCash);
 
+    // 1b. The same delta, decomposed: fills plus each fee type separately. A
+    //     fee silently folded into a fill price would still satisfy (1); this
+    //     check pins each friction to its own line.
+    const fillCash = here.filter((l) => !isCostLeg(l)).reduce((a, l) => a + l.cashMicro, 0);
+    const feeCash: Record<CostKind, number> = { commission: 0, spread: 0, fx: 0 };
+    for (const leg of here) {
+      if (isCostLeg(leg)) feeCash[leg.kind] += leg.cashMicro;
+    }
+    expect(
+      fillCash + feeCash.commission + feeCash.spread + feeCash.fx,
+      `fill + fee decomposition does not rebuild the cash delta at step ${snap.step}: ${ctx}`,
+    ).toBe(cashDelta);
+    for (const kind of COST_KINDS) {
+      expect(feeCash[kind], `${kind} at step ${snap.step} is not a debit: ${ctx}`).toBeLessThanOrEqual(0);
+    }
+
     // 2. Holdings: same rule, per symbol, over the union of both sides so a
     //    balance that moved without a leg (or a leg with no balance move) fails.
+    //    Fee legs carry no quantity, so they must not perturb this at all.
     const symbols = new Set<string>([...prevHoldings.keys(), ...snap.holdingsMicro.keys(), ...here.map((l) => l.symbol)]);
     for (const symbol of symbols) {
       const delta = (snap.holdingsMicro.get(symbol) ?? 0) - (prevHoldings.get(symbol) ?? 0);
       const legHold = here.filter((l) => l.symbol === symbol).reduce((a, l) => a + l.holdingMicro, 0);
+      const fillHold = here
+        .filter((l) => l.symbol === symbol && !isCostLeg(l))
+        .reduce((a, l) => a + l.holdingMicro, 0);
       expect(delta, `holding delta for ${symbol} at step ${snap.step} is not explained by its legs: ${ctx}`).toBe(
         legHold,
       );
+      expect(legHold, `a fee leg moved the ${symbol} holding at step ${snap.step}: ${ctx}`).toBe(fillHold);
     }
 
     // 3. No holding may go short — a mis-attributed exit shows up here first.
