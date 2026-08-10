@@ -307,15 +307,13 @@ function assertSummaryMatches(summary: ExecutionSummary, sized: readonly { retur
 
 /** Rebuild the exact sized trade list a replay would have executed. */
 function sizedTrades(trades: readonly SignalTrade[], sizes: readonly number[]) {
-  const confirmed = [...trades]
-    .filter((t) => t.cohort === "confirmed");
+  const confirmed = chronological(trades.filter((t) => t.cohort === "confirmed"));
   return confirmed.map((t, i) => ({ returnPct: t.returnPct, size: sizes[i] }));
 }
 
 function requestedSizes(trades: readonly SignalTrade[], risk: RiskLevel, gapWeight: number) {
   const plan = driverSizingPlan(trades, { risk, gapWeight });
-  const confirmed = [...trades]
-    .filter((t) => t.cohort === "confirmed");
+  const confirmed = chronological(trades.filter((t) => t.cohort === "confirmed"));
   return confirmed.map((t) => ({
     symbol: t.symbol,
     date: t.date,
@@ -392,8 +390,7 @@ describe("ledger vs summary (differential)", () => {
       const ctx = `baseline case ${i} — ${REPRO}`;
 
       const summary = baselineExecution(trades, LIMITS);
-      const confirmed = [...trades]
-        .filter((t) => t.cohort === "confirmed");
+      const confirmed = chronological(trades.filter((t) => t.cohort === "confirmed"));
       const rows = confirmed.map((t) => ({ symbol: t.symbol, date: t.date, barsHeld: t.barsHeld, size: 1 }));
       const limited = applySizingLimits(rows, LIMITS);
 
