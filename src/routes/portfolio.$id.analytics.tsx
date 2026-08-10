@@ -59,6 +59,7 @@ function AnalyticsPage() {
         <AlgoRegimeRiskEnvelopeCard portfolioId={id} />
         <AlgoRegimeBacktestCard portfolioId={id} />
         <BreakoutBacktestCard portfolioId={id} />
+        <BreakoutOverlayCard portfolioId={id} />
 
       </main>
     </div>
