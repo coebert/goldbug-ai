@@ -34,6 +34,7 @@ import {
   type DriverSetting,
 } from "@/lib/breakout-driver-compare";
 import { Button } from "@/components/ui/button";
+import { ExecutionHeatmap } from "@/components/breakout-execution-heatmap";
 import {
   ACTIONS,
   ACTION_STANCE,
@@ -598,6 +599,10 @@ export function BreakoutTopDrivers({
       ) : null}
 
       {cell ? <ExecutionImpact cell={cell} grid={execution!} /> : null}
+
+      {execution ? (
+        <ExecutionHeatmap grid={execution} current={{ risk, gapWeight }} />
+      ) : null}
 
       <p className="text-[11px] text-muted-foreground">{view.summary}</p>
       <div className="grid gap-2 sm:grid-cols-2">
