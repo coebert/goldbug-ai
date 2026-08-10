@@ -102,6 +102,14 @@ export type SignalTrade = {
   /** Direction of the hypothetical trade taken. */
   side: "long" | "short";
   regime: RegimeLabel;
+  /**
+   * 20-day stdev of daily returns at signal time (0.012 = 1.2%/day) — the same
+   * measurement the live gate reads to decide "high-vol downsize". null before
+   * enough history exists.
+   */
+  realisedVol20d: number | null;
+  /** ATR(14) as a share of price at signal time (0.02 = 2%). */
+  atrPct: number | null;
   quality: number;
   penetrationAtr: number;
   volumeRatio: number | null;
