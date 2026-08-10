@@ -260,7 +260,10 @@ function assertPlanInvariants(rows: readonly Row[], limits: SizingLimits, ctx: s
     expect(plan.report.breaches[reason], `${reason} breach count mismatch: ${ctx}`).toBe(labelled);
   }
 
-  return { plan, taken: occ.taken };
+  // Cash and holdings, walked step by step.
+  const ledger = assertLedger(rows, plan, budget, ctx);
+
+  return { plan, taken: occ.taken, minCash: ledger.minCash, budget };
 }
 
 const CASES = 400;
