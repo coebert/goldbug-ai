@@ -190,6 +190,7 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
         features: featureBlock,
         regime: regimeSlim,
         sector: sectorFor(sym),
+        breakout: breakoutFor(sym),
         run_rationale: ctx.rationale ?? null,
       }),
       order_id: orderId,
