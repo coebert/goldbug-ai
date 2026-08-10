@@ -21,3 +21,15 @@ export { scoreCandidate, scoreUniverse, formatAlphaPriorsForPrompt } from "./com
 export { resolveRegime, weightsForRegime, effectiveWeightsForRegime, enabledStrategiesForRegime } from "./regime-matrix";
 export type { AlphaScore, AlphaModelKind, CompositeScore, FeatureLike } from "./types";
 export type { RegimeName, StrategyWeights } from "./regime-matrix";
+export {
+  breakoutAgeAction,
+  ageBandFor,
+  breakoutMinHoldBars,
+  agePolicyFromRecommendation,
+  DEFAULT_BREAKOUT_AGE_POLICY,
+} from "./breakout-age-policy";
+export type {
+  BreakoutAgePolicy,
+  BreakoutAgeBand,
+  BreakoutAgeDecision,
+} from "./breakout-age-policy";

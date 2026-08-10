@@ -214,7 +214,10 @@ export function BreakoutBacktestCard({ portfolioId }: { portfolioId: string }) {
             </div>
 
             {result.diagnostics && (
-              <BreakoutDiagnosticsSection diagnostics={result.diagnostics} />
+              <BreakoutDiagnosticsSection
+                diagnostics={result.diagnostics}
+                timing={result.timing}
+              />
             )}
 
             <p className="text-[11px] text-muted-foreground">

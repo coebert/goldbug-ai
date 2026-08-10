@@ -71,6 +71,13 @@ export type BreakoutBacktestConfig = {
   detector: Partial<BreakoutConfig>;
   /** Regime classifier overrides. */
   regime: Partial<RegimeThresholds>;
+  /**
+   * Emit an observation on EVERY qualifying bar instead of once per cohort
+   * per breakout episode. Off for scorecards (one vote per episode); on for
+   * signal-age studies, where the whole point is to compare entering the same
+   * break on bar 1, bar 3 and bar 6.
+   */
+  emitEveryBar: boolean;
 };
 
 export const DEFAULT_BREAKOUT_BACKTEST_CONFIG: BreakoutBacktestConfig = {
@@ -83,6 +90,7 @@ export const DEFAULT_BREAKOUT_BACKTEST_CONFIG: BreakoutBacktestConfig = {
   minQuality: 0,
   detector: {},
   regime: {},
+  emitEveryBar: false,
 };
 
 export type SignalTrade = {
@@ -98,6 +106,14 @@ export type SignalTrade = {
   penetrationAtr: number;
   volumeRatio: number | null;
   falseBreakoutRate: number;
+  /** Consecutive bars the break has been held at signal time (signal age). */
+  ageBars: number;
+  /**
+   * Bars elapsed between the episode's first "pending" bar and this signal.
+   * null when the episode never showed a pending bar first (e.g. the signal
+   * IS the pending bar, or the detector jumped straight to confirmed).
+   */
+  pendingLatencyBars: number | null;
   entry: number;
   exit: number;
   exitReason: "target" | "stop" | "horizon" | "data_end";
@@ -351,16 +367,23 @@ export function runBreakoutBacktest(
     // additionally spaces repeats of the same cohort across episodes.
     const episodeSeen = new Set<SignalCohort>();
     const lastEmit = new Map<SignalCohort, number>();
+    // Index of the first "pending" bar of the current episode — the clock we
+    // measure pending -> confirmed / pending -> failed latency against.
+    let episodePendingIdx: number | null = null;
     for (let i = cfg.warmupBars; i < clean.length - 1; i++) {
       barsScanned++;
       const ev = detectBreakout(candles.slice(0, i + 1), detector);
       if (ev.state === "none" || !ev.direction) {
         episodeSeen.clear();
+        episodePendingIdx = null;
         continue;
       }
       const cohort = ev.state as SignalCohort;
-      if (episodeSeen.has(cohort)) continue;
-      if (i - (lastEmit.get(cohort) ?? -Infinity) < cfg.cooldownBars) continue;
+      if (cohort === "pending" && episodePendingIdx === null) episodePendingIdx = i;
+      if (!cfg.emitEveryBar) {
+        if (episodeSeen.has(cohort)) continue;
+        if (i - (lastEmit.get(cohort) ?? -Infinity) < cfg.cooldownBars) continue;
+      }
       if (cohort !== "failed" && ev.quality < cfg.minQuality) continue;
 
       const atr = atrAt(clean, i);
@@ -389,13 +412,19 @@ export function runBreakoutBacktest(
         penetrationAtr: ev.penetration_atr,
         volumeRatio: ev.volume_ratio,
         falseBreakoutRate: ev.false_breakout_rate,
+        ageBars: ev.bars_since_breakout,
+        pendingLatencyBars:
+          episodePendingIdx === null || cohort === "pending" ? null : i - episodePendingIdx,
         entry: clean[i]!.close,
         ...sim,
       });
       episodeSeen.add(cohort);
       lastEmit.set(cohort, i);
       // A failure closes the episode — anything after it is a fresh attempt.
-      if (cohort === "failed") episodeSeen.clear();
+      if (cohort === "failed") {
+        episodeSeen.clear();
+        episodePendingIdx = null;
+      }
     }
   }
 

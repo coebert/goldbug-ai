@@ -18,6 +18,7 @@ import {
   type SymbolBars,
 } from "@/lib/breakout-backtest";
 import { buildBreakoutDiagnostics, type BreakoutDiagnostics } from "@/lib/breakout-diagnostics";
+import { buildBreakoutTimingReport, type BreakoutTimingReport } from "@/lib/breakout-timing";
 
 export type BreakoutBacktestResponse = Omit<BreakoutBacktestReport, "trades"> & {
   /** Most recent signals only — the full list can be thousands of rows. */
@@ -25,6 +26,8 @@ export type BreakoutBacktestResponse = Omit<BreakoutBacktestReport, "trades"> & 
   totalTrades: number;
   /** Per-symbol and per-signal-state cuts of the same trades. */
   diagnostics: BreakoutDiagnostics;
+  /** Signal-age, pending-latency and hold-time cuts, plus the recommended mapping. */
+  timing: BreakoutTimingReport;
   skippedSymbols: string[];
 };
 
@@ -137,6 +140,9 @@ export const runBreakoutSignalBacktest = createServerFn({ method: "POST" })
       ...rest,
       recentTrades: trades.slice(-60).reverse(),
       diagnostics: buildBreakoutDiagnostics(trades, { limit: 24 }),
+      timing: buildBreakoutTimingReport(trades, {
+        source: `backtest ${rest.from ?? "?"} → ${rest.to ?? "?"}`,
+      }),
       totalTrades: trades.length,
       skippedSymbols,
     };
