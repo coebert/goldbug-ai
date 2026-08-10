@@ -125,8 +125,9 @@ export function applySizingLimits(
 
   for (const s of signals) {
     const rank = ranks.get(s.date) ?? 0;
-    // A NaN or -Infinity request is a bug upstream, not a trade: size it 0.
-    const requestedSize = Math.max(0, finiteOr(s.size, 0));
+    // NaN is a bug upstream, not a trade: size it 0. An infinite request is a
+    // real "as much as allowed" ask and is left for the position cap to clamp.
+    const requestedSize = Math.max(0, finiteOrInf(s.size, 0));
     const clamped: LimitReason[] = [];
     let size = requestedSize;
 
@@ -166,7 +167,7 @@ export function applySizingLimits(
     out.push({ symbol: s.symbol, date: s.date, requestedSize, size, clamped });
   }
 
-  const requested = signals.reduce((a, s) => a + Math.max(0, finiteOr(s.size, 0)), 0);
+  const requested = signals.reduce((a, s) => a + Math.max(0, finiteOrInf(s.size, 0)), 0);
   const requestedDeployedPct = total ? (requested / total) * 100 : 0;
   const deployedPct = total ? (spent / total) * 100 : 0;
   const anyBreach = breaches.position + breaches.concurrency + breaches.budget;
