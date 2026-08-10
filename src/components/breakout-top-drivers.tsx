@@ -283,8 +283,10 @@ function WhatIfCompare({
   b: DriverSetting;
 }) {
   const cmp = useMemo(() => compareDriverSettings(symbols, a, b), [symbols, a, b]);
+  const emphasis = useMemo(() => moverEmphasis(cmp.rows), [cmp.rows]);
   const head = (s: DriverSetting) => `${s.risk} · ${s.gapWeight.toFixed(1)}×`;
   const [open, setOpen] = useState<string | null>(null);
+
 
   return (
     <div className="rounded-md border border-border/40 p-2" data-testid="driver-what-if">
