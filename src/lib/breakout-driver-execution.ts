@@ -7,6 +7,12 @@ import {
   type DriverRecommendation,
   type RiskLevel,
 } from "@/lib/breakout-driver-actions";
+import {
+  applySizingLimits,
+  resolveSizingLimits,
+  type LimitReport,
+  type SizingLimits,
+} from "@/lib/breakout-sizing-limits";
 
 /**
  * Feeds the driver recommendations back into the backtest.
@@ -27,6 +33,8 @@ export type DriverSizingOptions = {
   minConfirmed?: number;
   /** Size used for symbols that never got ranked. Default 1. */
   unrankedSize?: number;
+  /** Safety caps applied after the recommendation. Defaults are always on. */
+  limits?: Partial<SizingLimits>;
 };
 
 export type SizedSymbolPlan = DriverRecommendation & {
@@ -56,6 +64,8 @@ export type ExecutionSummary = {
   /** Return per unit of size deployed — capital efficiency. */
   returnPerUnitPct: number;
   actionCounts: Record<DriverAction, number>;
+  /** How the safety caps changed the requested sizes. */
+  limits: LimitReport;
 };
 
 export type ExecutionCell = ExecutionSummary & {
@@ -70,6 +80,8 @@ export type ExecutionCell = ExecutionSummary & {
 
 export type ExecutionGrid = {
   baseline: ExecutionSummary;
+  /** Safety caps in force for every cell in the grid. */
+  limits: SizingLimits;
   risks: RiskLevel[];
   gapWeights: number[];
   cells: ExecutionCell[];
@@ -116,6 +128,7 @@ function summarise(
   actionCounts: Record<DriverAction, number>,
   risk: RiskLevel,
   gapWeight: number,
+  limits: LimitReport,
 ): ExecutionSummary {
   const signals = sized.length;
   const totalSize = sized.reduce((a, t) => a + t.size, 0);
@@ -152,6 +165,7 @@ function summarise(
     maxDrawdownPct: maxDd,
     returnPerUnitPct: totalSize ? ((equity - 1) * 100) / (totalSize / Math.max(1, signals)) : 0,
     actionCounts,
+    limits,
   };
 }
 
@@ -159,13 +173,22 @@ const chronological = (trades: readonly SignalTrade[]) =>
   [...trades].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
 /** Replay the confirmed cohort at flat size 1 — the control for every cell. */
-export function baselineExecution(trades: readonly SignalTrade[]): ExecutionSummary {
+export function baselineExecution(
+  trades: readonly SignalTrade[],
+  limits?: Partial<SizingLimits>,
+): ExecutionSummary {
   const confirmed = chronological(trades.filter((t) => t.cohort === "confirmed"));
+  // The flat-1x control obeys the same caps, so comparisons stay honest.
+  const limited = applySizingLimits(
+    confirmed.map((t) => ({ symbol: t.symbol, date: t.date, barsHeld: t.barsHeld, size: 1 })),
+    limits,
+  );
   return summarise(
-    confirmed.map((t) => ({ returnPct: t.returnPct, size: 1 })),
+    confirmed.map((t, i) => ({ returnPct: t.returnPct, size: limited.signals[i].size })),
     EMPTY_ACTIONS(),
     "balanced",
     0,
+    limited.report,
   );
 }
 
@@ -178,12 +201,22 @@ export function applyDriverSizing(
   const plan = driverSizingPlan(trades, options);
   const confirmed = chronological(trades.filter((t) => t.cohort === "confirmed"));
   const actionCounts = EMPTY_ACTIONS();
-  const sized = confirmed.map((t) => {
+  const requested = confirmed.map((t) => {
     const rec = plan.get(t.symbol);
     if (rec) actionCounts[rec.action]++;
-    return { returnPct: t.returnPct, size: rec ? rec.sizeMultiplier : unrankedSize };
+    return {
+      symbol: t.symbol,
+      date: t.date,
+      barsHeld: t.barsHeld,
+      size: rec ? rec.sizeMultiplier : unrankedSize,
+    };
   });
-  return summarise(sized, actionCounts, options.risk, options.gapWeight);
+  const limited = applySizingLimits(requested, options.limits);
+  const sized = confirmed.map((t, i) => ({
+    returnPct: t.returnPct,
+    size: limited.signals[i].size,
+  }));
+  return summarise(sized, actionCounts, options.risk, options.gapWeight, limited.report);
 }
 
 export function buildExecutionGrid(
@@ -193,11 +226,13 @@ export function buildExecutionGrid(
     gapWeights?: readonly number[];
     minConfirmed?: number;
     unrankedSize?: number;
+    limits?: Partial<SizingLimits>;
   } = {},
 ): ExecutionGrid {
   const risks = [...(options.risks ?? RISK_LEVELS)];
   const gapWeights = [...(options.gapWeights ?? DEFAULT_GAP_WEIGHTS)];
-  const baseline = baselineExecution(trades);
+  const limits = resolveSizingLimits(options.limits);
+  const baseline = baselineExecution(trades, limits);
 
   const cells: ExecutionCell[] = [];
   for (const risk of risks) {
@@ -207,6 +242,7 @@ export function buildExecutionGrid(
         gapWeight,
         minConfirmed: options.minConfirmed,
         unrankedSize: options.unrankedSize,
+        limits,
       });
       cells.push({
         ...s,
@@ -230,7 +266,7 @@ export function buildExecutionGrid(
       ? `Baseline (flat 1×) compounds ${baseline.cumulativeReturnPct.toFixed(1)}% at ${baseline.maxDrawdownPct.toFixed(1)}% drawdown. Best setting: ${best.risk} @ ${best.gapWeight}× gap → ${best.cumulativeReturnPct.toFixed(1)}% (${best.vsBaseline.cumulativeReturnPp >= 0 ? "+" : ""}${best.vsBaseline.cumulativeReturnPp.toFixed(1)}pp) using ${best.deployedPct.toFixed(0)}% of baseline capital.`
       : "Every setting sized the confirmed cohort to zero.";
 
-  return { baseline, risks, gapWeights, cells, best, summary };
+  return { baseline, limits, risks, gapWeights, cells, best, summary };
 }
 
 export function findExecutionCell(
