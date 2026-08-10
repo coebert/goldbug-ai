@@ -322,13 +322,23 @@ function assertSummaryMatchesJournal(replay: Replay, ctx: string) {
 /** (2) Cash identity at every step — this is what detects a shifted booking. */
 function assertStepCashIdentity(replay: Replay, ctx: string) {
   for (const t of replay.trace) {
+    // Cumulative cost is derived from the journal legs themselves, not read
+    // off the trace, so a charge that slides to a neighbouring step shows up
+    // here even if the trace's own running total slid with it.
+    const bookedByNow = replay.journal
+      .filter((l) => l.step <= t.step)
+      .reduce((a, l) => a + l.feeMicros + l.slipMicros, 0);
+    expect(t.cumulativeCostMicros, `running cost total drifted from the journal at step ${t.step}: ${ctx}`).toBe(
+      bookedByNow,
+    );
     expect(
       t.cashMicros,
       `cash at step ${t.step} does not equal capital − open notional − costs booked so far: ${ctx}`,
-    ).toBe(replay.capitalMicros - t.openNotionalMicros - t.cumulativeCostMicros);
+    ).toBe(replay.capitalMicros - t.openNotionalMicros - bookedByNow);
     expect(t.cashMicros, `negative cash at step ${t.step}: ${ctx}`).toBeGreaterThanOrEqual(0);
   }
 }
+
 
 /** (1) Every leg sits on the step of the fill that incurred it. */
 function assertBookingTiming(replay: Replay, plan: LimitedPlan, ctx: string) {
