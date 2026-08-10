@@ -6,14 +6,24 @@
 //   * `trading_enabled = false` — global kill switch. Admin-only to flip
 //     (see the RLS policy on public.trading_controls).
 //   * `daily_notional_limit` — maximum BUY notional that may be routed to the
-//     broker in a single UK trading day, summed across all portfolios.
+//
+// Two things the running total must get right, both of which have bitten us:
+//
+//   * Only REAL-money (`live_prod`) fills count. Simulated portfolios route
+//     nothing to the broker, so charging their fills against the cap silently
+//     burns the whole day's real budget — on 10 Aug 2026 two sim fills
+//     "spent" £671k of a £10k limit and blocked every live buy, NVDA included.
+//   * Notional must be in base units. LSE tickers fill in pence, so a raw
+//     quantity x fill_price on GLEN.L over-counts by 100x.
 //
 // Notional is summed in the instrument's own currency without FX conversion,
 // which is intentionally conservative for a GBP-denominated limit: it never
 // under-counts a GBP/USD/EUR day materially, and erring low means the gate
 // trips earlier rather than later.
 
+import { normalizeLseDisplayPriceToBase } from "@/lib/market-price-units";
 import { ukDayKey } from "@/lib/uk-time";
+
 
 export interface TradingGate {
   enabled: boolean;
