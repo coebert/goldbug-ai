@@ -87,15 +87,16 @@ function canonicalFills(fills: Replay["fills"], rename: (s: string) => string = 
 /** The full comparison: the fills must match first, then the ledger they produced. */
 function assertSameLedger(a: Replay, b: Replay, ctx: string, rename: (s: string) => string = (s) => s) {
   // Precondition of the property: the two replays really do fill the same set.
-  expect(canonicalFills(b.fills, rename), `fill sets differ, property does not apply: ${ctx}`).toEqual(
-    canonicalFills(a.fills),
+  // `rename` maps a's symbols onto b's, so it is applied to a's side.
+  expect(canonicalFills(b.fills), `fill sets differ, property does not apply: ${ctx}`).toEqual(
+    canonicalFills(a.fills, rename),
   );
   expect(b.summary.filledCount, `fill count differs: ${ctx}`).toBe(a.summary.filledCount);
   expect(b.summary.refusedCount, `refusal count differs: ${ctx}`).toBe(a.summary.refusedCount);
 
   expect(transitions(b), `per-step ledger transitions differ: ${ctx}`).toEqual(transitions(a));
-  expect(canonicalJournal(b.journal, rename), `cost journal differs: ${ctx}`).toEqual(
-    canonicalJournal(a.journal),
+  expect(canonicalJournal(b.journal), `cost journal differs: ${ctx}`).toEqual(
+    canonicalJournal(a.journal, rename),
   );
   expect(b.summary, `summary totals differ: ${ctx}`).toEqual(a.summary);
 }
