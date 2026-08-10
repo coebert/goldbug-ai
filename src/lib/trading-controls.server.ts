@@ -59,19 +59,32 @@ export async function loadTradingGate(): Promise<TradingGate> {
   const todayKey = ukDayKey(new Date());
   const since = new Date(Date.now() - 36 * 3600_000).toISOString();
 
-  const { data: fills } = await supabaseAdmin
-    .from("live_fills")
-    .select("side, quantity, fill_price, filled_at")
-    .gte("filled_at", since);
+  // Only real-money portfolios can consume the broker budget.
+  const { data: realPortfolios } = await supabaseAdmin
+    .from("portfolios")
+    .select("id")
+    .eq("mode", "live_prod");
+  const realIds = new Set((realPortfolios ?? []).map((p) => String(p.id)));
+
+  const { data: fills } = realIds.size
+    ? await supabaseAdmin
+        .from("live_fills")
+        .select("side, quantity, fill_price, filled_at, symbol, portfolio_id")
+        .in("portfolio_id", [...realIds])
+        .gte("filled_at", since)
+    : { data: [] as never[] };
 
   let spentToday = 0;
   for (const f of fills ?? []) {
+    if (!realIds.has(String(f.portfolio_id))) continue;
     if (String(f.side).toLowerCase() !== "buy") continue;
     if (ukDayKey(new Date(f.filled_at as string)) !== todayKey) continue;
     const qty = Number(f.quantity ?? 0);
-    const px = Number(f.fill_price ?? 0);
+    // Pence-quoted LSE fills land here in GBX; the cap is a base-currency figure.
+    const px = normalizeLseDisplayPriceToBase(String(f.symbol ?? ""), Number(f.fill_price ?? 0));
     if (Number.isFinite(qty) && Number.isFinite(px)) spentToday += qty * px;
   }
+
 
   return {
     enabled: Boolean(controls.trading_enabled),
