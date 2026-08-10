@@ -1021,6 +1021,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const executed: ExecutedTrade[] = [];
   let newPositions = 0;
 
+  // Breakout expectancy table: the newest auto-published grid (weekly cron),
+  // falling back to the recorded study if nothing has been published yet.
+  // Loaded once per run so the gate never pays a round-trip per order.
+  const { loadLiveExpectancyTable } = await import("./breakout-expectancy-store.server");
+  const breakoutExpectancy = await loadLiveExpectancyTable();
+
+
   // -------- Hard risk halts (max daily loss, max drawdown) --------
   // Evaluated once against pre-execution equity. If either trips, every BUY
   // in this run is rejected with a halt reason — sells (including automatic
