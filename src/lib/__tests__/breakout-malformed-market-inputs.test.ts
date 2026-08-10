@@ -246,7 +246,7 @@ describe("malformed market inputs — constraints hold", () => {
 describe("malformed market inputs — fuzzed corruption", () => {
   it("holds every constraint when a random slice of the tape is corrupted", () => {
     for (let c = 0; c < 200; c += 1) {
-      const seed = caseSeed(BASE_SEED, c);
+      const seed = caseSeed(BASE_SEED, "corrupted-tape", c);
       const r = rng(seed);
       const rows = randomRows(r, 6 + Math.floor(r() * 40));
 
