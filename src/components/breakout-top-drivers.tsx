@@ -34,6 +34,7 @@ import {
   type DriverSetting,
 } from "@/lib/breakout-driver-compare";
 import { Button } from "@/components/ui/button";
+import { ExecutionHeatmap } from "@/components/breakout-execution-heatmap";
 import {
   ACTIONS,
   ACTION_STANCE,
