@@ -9,6 +9,7 @@ import type {
 } from "@/lib/breakout-diagnostics";
 import type { BreakoutTimingReport, BucketRow } from "@/lib/breakout-timing";
 import type { ExecutionGrid } from "@/lib/breakout-driver-execution";
+import type { MixTimelineGrids } from "@/lib/breakout-mix-timeline";
 
 const pct = (v: number, digits = 2) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
 const tone = (v: number) => (v >= 0 ? "text-emerald-500" : "text-red-500");
@@ -153,10 +154,12 @@ export function BreakoutDiagnosticsSection({
   diagnostics,
   timing,
   execution,
+  mixTimelines,
 }: {
   diagnostics: BreakoutDiagnostics;
   timing?: BreakoutTimingReport;
   execution?: ExecutionGrid;
+  mixTimelines?: MixTimelineGrids;
 }) {
   const [tab, setTab] = useState<"symbols" | "states" | "timing">("symbols");
   const [openSymbol, setOpenSymbol] = useState<string | null>(null);
@@ -202,6 +205,7 @@ export function BreakoutDiagnosticsSection({
           drivers={diagnostics.topDrivers}
           symbols={diagnostics.symbols}
           execution={execution}
+          mixTimelines={mixTimelines}
         />}
 
       {tab !== "timing" && <RegimeVolCells ctx={diagnostics.regimeVol} label="All signals" />}
