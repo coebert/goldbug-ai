@@ -34,6 +34,143 @@ import {
   type DriverSetting,
 } from "@/lib/breakout-driver-compare";
 import { Button } from "@/components/ui/button";
+import {
+  ACTIONS,
+  ACTION_STANCE,
+  CONFIDENCE_LABELS,
+  STANCES,
+  actionMix,
+  actionMixFor,
+  diffActionMix,
+  type ActionMix,
+} from "@/lib/breakout-action-mix";
+
+const STANCE_LABEL: Record<(typeof STANCES)[number], string> = {
+  buy: "Buy",
+  hold: "Partial / hold",
+  sell: "Stand aside",
+};
+
+const STANCE_BAR: Record<(typeof STANCES)[number], string> = {
+  buy: "bg-emerald-500",
+  hold: "bg-amber-500",
+  sell: "bg-red-500",
+};
+
+const CONF_BAR: Record<(typeof CONFIDENCE_LABELS)[number], string> = {
+  high: "bg-sky-500",
+  medium: "bg-sky-500/60",
+  low: "bg-sky-500/30",
+};
+
+const delta = (n: number, digits = 0) =>
+  n === 0 ? "±0" : `${n > 0 ? "+" : ""}${n.toFixed(digits)}`;
+
+function MixBar({
+  label,
+  count,
+  pct,
+  colour,
+  deltaCount,
+  testId,
+}: {
+  label: string;
+  count: number;
+  pct: number;
+  colour: string;
+  deltaCount?: number;
+  testId: string;
+}) {
+  return (
+    <div data-testid={testId}>
+      <div className="flex items-baseline justify-between gap-2 text-[11px]">
+        <span>{label}</span>
+        <span className="tabular-nums text-muted-foreground">
+          {count} · {pct.toFixed(0)}%
+          {deltaCount != null && deltaCount !== 0 ? (
+            <span className={`ml-1 ${deltaCount > 0 ? "text-emerald-500" : "text-red-500"}`}>
+              {delta(deltaCount)}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className={`h-full ${colour}`} style={{ width: `${Math.min(100, pct)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Recommended-action mix at the current setting, with shift vs the previous one. */
+function ActionMixPanel({ mix, prevMix }: { mix: ActionMix; prevMix: ActionMix | null }) {
+  const diff = prevMix ? diffActionMix(prevMix, mix) : null;
+  return (
+    <div className="rounded-md border border-border/40 p-2" data-testid="driver-action-mix">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-medium">Recommended action mix</p>
+        <Badge variant="outline" className="text-[10px] font-normal tabular-nums">
+          avg size {mix.avgSize.toFixed(2)}×
+          {diff && diff.avgSizeDelta !== 0 ? ` (${delta(diff.avgSizeDelta, 2)}×)` : ""}
+        </Badge>
+      </div>
+      <p className="mt-1 text-[11px] text-muted-foreground" data-testid="action-mix-summary">
+        {mix.summary}
+      </p>
+      <div className="mt-2 grid gap-3 sm:grid-cols-3">
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Stance</p>
+          {STANCES.map((s) => (
+            <MixBar
+              key={s}
+              testId={`mix-stance-${s}`}
+              label={STANCE_LABEL[s]}
+              count={mix.byStance[s].count}
+              pct={mix.byStance[s].pct}
+              colour={STANCE_BAR[s]}
+              deltaCount={diff?.byStance[s].count}
+            />
+          ))}
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Action</p>
+          {ACTIONS.map((a) => (
+            <MixBar
+              key={a}
+              testId={`mix-action-${a}`}
+              label={a[0].toUpperCase() + a.slice(1)}
+              count={mix.byAction[a].count}
+              pct={mix.byAction[a].pct}
+              colour={STANCE_BAR[ACTION_STANCE[a]]}
+              deltaCount={diff?.byAction[a].count}
+            />
+          ))}
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Confidence</p>
+          {CONFIDENCE_LABELS.map((c) => (
+            <MixBar
+              key={c}
+              testId={`mix-confidence-${c}`}
+              label={c[0].toUpperCase() + c.slice(1)}
+              count={mix.byConfidence[c].count}
+              pct={mix.byConfidence[c].pct}
+              colour={CONF_BAR[c]}
+              deltaCount={diff?.byConfidence[c].count}
+            />
+          ))}
+        </div>
+      </div>
+      {diff ? (
+        <p className="mt-2 text-[11px] text-muted-foreground" data-testid="action-mix-shift">
+          Shift from {diff.from.setting.risk} · {diff.from.setting.gapWeight.toFixed(1)}×:{" "}
+          {diff.summary}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+
 
 const STATUS_LABEL: Record<string, string> = {
   entered: "new",
@@ -364,7 +501,19 @@ export function BreakoutTopDrivers({
     [view, risk],
   );
 
+  const mix = useMemo(
+    () => actionMix([...view.positive, ...view.negative], { risk, gapWeight }),
+    [view, risk, gapWeight],
+  );
+
+  const prevMix = useMemo(() => {
+    if (!symbols?.length) return null;
+    if (prev.risk === risk && prev.gapWeight === gapWeight) return null;
+    return actionMixFor(symbols, prev);
+  }, [symbols, prev, risk, gapWeight]);
+
   const cell = execution ? findExecutionCell(execution, risk, gapWeight) : null;
+
 
   if (!view.positive.length && !view.negative.length) return null;
   const profile = RISK_PROFILES[risk];
@@ -441,6 +590,8 @@ export function BreakoutTopDrivers({
           </Button>
         ) : null}
       </div>
+
+      <ActionMixPanel mix={mix} prevMix={prevMix} />
 
       {showCompare && symbols?.length ? (
         <WhatIfCompare symbols={symbols} a={prev} b={{ risk, gapWeight }} />
