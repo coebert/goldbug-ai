@@ -66,6 +66,71 @@ function randomLimits(r: () => number): SizingLimits {
 }
 
 // ---------------------------------------------------------------------------
+// Cost model: commission, spread and FX fee legs
+// ---------------------------------------------------------------------------
+
+/**
+ * Real fills never move cash by the notional alone. Three frictions are booked
+ * as their own cash legs so they can be reconciled independently:
+ *
+ *   commission — bps of notional with a per-ticket minimum (Saxo-style)
+ *   spread     — half the quoted spread, charged on both sides of the round trip
+ *   fx fee     — bps of notional, only on instruments quoted in a foreign ccy
+ *
+ * They are cash-only: a fee never changes the share count, so the holdings
+ * reconciliation must stay untouched by them. Each fee is booked on the exact
+ * step of the fill that incurred it, so a cost that leaks into the wrong step
+ * (or is netted silently into the fill price) breaks the step reconciliation.
+ */
+type CostModel = {
+  commissionBps: number;
+  minCommissionMicro: number;
+  halfSpreadBps: number;
+  fxFeeBps: number;
+  /** Symbols quoted in a foreign currency, i.e. the ones the FX fee applies to. */
+  foreign: ReadonlySet<string>;
+};
+
+const ZERO_COSTS: CostModel = {
+  commissionBps: 0,
+  minCommissionMicro: 0,
+  halfSpreadBps: 0,
+  fxFeeBps: 0,
+  foreign: new Set(),
+};
+
+function randomCosts(r: () => number, symbols: readonly string[]): CostModel {
+  const foreign = new Set(symbols.filter(() => r() < 0.5));
+  return {
+    commissionBps: Math.round(r() * 25),
+    minCommissionMicro: Math.round(r() * 5000),
+    halfSpreadBps: Math.round(r() * 40),
+    fxFeeBps: Math.round(r() * 30),
+    foreign,
+  };
+}
+
+const bpsOf = (notionalMicro: number, bps: number) => (bps <= 0 ? 0 : Math.round((notionalMicro * bps) / 10_000));
+
+type CostKind = "commission" | "spread" | "fx";
+const COST_KINDS: readonly CostKind[] = ["commission", "spread", "fx"];
+type CostBreakdown = Record<CostKind, number>;
+
+/** Costs charged on one fill leg, as positive amounts (they debit cash). */
+function costsFor(costs: CostModel, symbol: string, notionalMicro: number): CostBreakdown {
+  const notional = Math.max(0, notionalMicro);
+  if (notional === 0) return { commission: 0, spread: 0, fx: 0 };
+  const commission = Math.max(costs.minCommissionMicro, bpsOf(notional, costs.commissionBps));
+  return {
+    commission,
+    spread: bpsOf(notional, costs.halfSpreadBps),
+    fx: costs.foreign.has(symbol) ? bpsOf(notional, costs.fxFeeBps) : 0,
+  };
+}
+
+const sumCosts = (b: CostBreakdown) => b.commission + b.spread + b.fx;
+
+// ---------------------------------------------------------------------------
 // The executed trade list (what the UI renders) and the ledger legs it implies
 // ---------------------------------------------------------------------------
 
@@ -73,10 +138,14 @@ type Leg = {
   step: number;
   tradeId: number;
   symbol: string;
-  kind: "entry" | "exit";
+  kind: "entry" | "exit" | CostKind;
+  /** Which fill the leg belongs to — fees settle with their own fill. */
+  parent: "entry" | "exit";
   cashMicro: number;
   holdingMicro: number;
 };
+
+const isCostLeg = (l: Leg): l is Leg & { kind: CostKind } => l.kind !== "entry" && l.kind !== "exit";
 
 type ExecutedTrade = {
   id: number;
@@ -84,23 +153,34 @@ type ExecutedTrade = {
   entryStep: number;
   exitStep: number;
   sizeMicro: number;
-  /** Cash paid out at entry (negative) plus cash returned at exit (positive). */
+  /** Cash paid out at entry (negative) plus cash returned at exit (positive), before fees. */
   cashLegsMicro: [number, number];
   holdingLegsMicro: [number, number];
   pnlMicro: number;
+  /** Fees on the entry fill and on the exit fill, as positive debits. */
+  entryCosts: CostBreakdown;
+  exitCosts: CostBreakdown;
+  costsMicro: number;
 };
 
-type Book = { trades: ExecutedTrade[]; legs: Leg[]; steps: number; capitalMicro: number };
+type Book = {
+  trades: ExecutedTrade[];
+  legs: Leg[];
+  steps: number;
+  capitalMicro: number;
+  costs: CostModel;
+};
 
 /**
  * Build the executed trade list from the sized plan.
  *
- * Each funded signal becomes one trade with exactly two legs: an entry that
- * debits cash and credits the holding, and an exit `barsHeld` steps later that
- * does the reverse plus P&L. Skipped signals produce no trade and no leg —
- * which is itself part of what gets reconciled.
+ * Each funded signal becomes one trade with an entry that debits cash and
+ * credits the holding, an exit `barsHeld` steps later that does the reverse
+ * plus P&L, and — when a cost model is supplied — commission, spread and FX
+ * legs attached to each of those two fills. Skipped signals produce no trade
+ * and no leg, which is itself part of what gets reconciled.
  */
-function buildBook(rows: readonly Row[], limits: SizingLimits): Book {
+function buildBook(rows: readonly Row[], limits: SizingLimits, costs: CostModel = ZERO_COSTS): Book {
   const dates = [...new Set(rows.map((x) => x.date))].sort();
   const rank = new Map(dates.map((d, i) => [d, i]));
   const plan = applySizingLimits(rows, limits);
@@ -119,6 +199,12 @@ function buildBook(rows: readonly Row[], limits: SizingLimits): Book {
     // `|| 0` normalises -0, which is arithmetically identical but fails Object.is.
     const pnlMicro = Math.round((sizeMicro * row.returnPct) / 100) || 0;
     const id = trades.length;
+    const exitGross = sizeMicro + pnlMicro;
+
+    // Fees are charged on the traded notional of each side: the cash paid in at
+    // entry, and the gross proceeds at exit (a loss shrinks the exit ticket).
+    const entryCosts = costsFor(costs, s.symbol, sizeMicro);
+    const exitCosts = costsFor(costs, s.symbol, exitGross);
 
     trades.push({
       id,
@@ -126,26 +212,56 @@ function buildBook(rows: readonly Row[], limits: SizingLimits): Book {
       entryStep,
       exitStep,
       sizeMicro,
-      cashLegsMicro: [-sizeMicro, sizeMicro + pnlMicro],
+      cashLegsMicro: [-sizeMicro, exitGross],
       holdingLegsMicro: [sizeMicro, -sizeMicro],
       pnlMicro,
+      entryCosts,
+      exitCosts,
+      costsMicro: sumCosts(entryCosts) + sumCosts(exitCosts),
     });
     legs.push(
-      { step: entryStep, tradeId: id, symbol: s.symbol, kind: "entry", cashMicro: -sizeMicro, holdingMicro: sizeMicro },
+      {
+        step: entryStep,
+        tradeId: id,
+        symbol: s.symbol,
+        kind: "entry",
+        parent: "entry",
+        cashMicro: -sizeMicro,
+        holdingMicro: sizeMicro,
+      },
       {
         step: exitStep,
         tradeId: id,
         symbol: s.symbol,
         kind: "exit",
-        cashMicro: sizeMicro + pnlMicro,
+        parent: "exit",
+        cashMicro: exitGross,
         holdingMicro: -sizeMicro,
       },
     );
+    for (const [parent, step, breakdown] of [
+      ["entry", entryStep, entryCosts],
+      ["exit", exitStep, exitCosts],
+    ] as const) {
+      for (const kind of COST_KINDS) {
+        const amount = breakdown[kind];
+        if (amount === 0) continue;
+        legs.push({
+          step,
+          tradeId: id,
+          symbol: s.symbol,
+          kind,
+          parent,
+          cashMicro: -amount,
+          holdingMicro: 0,
+        });
+      }
+    }
     if (exitStep > lastStep) lastStep = exitStep;
   });
 
   const capitalMicro = toMicro((rows.length * limits.maxTotalDeployedPct) / 100);
-  return { trades, legs, steps: lastStep + 1, capitalMicro };
+  return { trades, legs, steps: lastStep + 1, capitalMicro, costs };
 }
 
 // ---------------------------------------------------------------------------
@@ -172,10 +288,12 @@ function runLedger(book: Book): LedgerStep[] {
   const out: LedgerStep[] = [];
 
   for (let step = 0; step < book.steps; step++) {
-    // Exits settle before entries at the same step, matching the engine's
-    // release-then-open ordering; integer maths makes the order irrelevant to
-    // the totals, but it keeps intermediate balances realistic.
-    const here = (byStep.get(step) ?? []).slice().sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "exit" ? -1 : 1));
+    // Exits (and the fees charged on them) settle before entries at the same
+    // step, matching the engine's release-then-open ordering; integer maths
+    // makes the order irrelevant to the totals, but it keeps intermediate
+    // balances realistic. Within a side, the fill settles before its fees.
+    const order = (l: Leg) => (l.parent === "exit" ? 0 : 2) + (isCostLeg(l) ? 1 : 0);
+    const here = (byStep.get(step) ?? []).slice().sort((a, b) => order(a) - order(b));
     for (const leg of here) {
       cash += leg.cashMicro;
       const held = (holdings.get(leg.symbol) ?? 0) + leg.holdingMicro;
@@ -191,8 +309,8 @@ function runLedger(book: Book): LedgerStep[] {
 // Reconciliation
 // ---------------------------------------------------------------------------
 
-function reconcile(rows: readonly Row[], limits: SizingLimits, ctx: string) {
-  const book = buildBook(rows, limits);
+function reconcile(rows: readonly Row[], limits: SizingLimits, ctx: string, costs: CostModel = ZERO_COSTS) {
+  const book = buildBook(rows, limits, costs);
   const ledger = runLedger(book);
 
   const legsAt = (step: number) => book.legs.filter((l) => l.step === step);
@@ -203,20 +321,42 @@ function reconcile(rows: readonly Row[], limits: SizingLimits, ctx: string) {
   for (const snap of ledger) {
     const here = legsAt(snap.step);
 
-    // 1. Cash: the step's balance change equals the sum of that step's cash legs.
+    // 1. Cash: the step's balance change equals the sum of that step's cash
+    //    legs — fills *and* the commission / spread / FX fees booked with them.
     const cashDelta = snap.cashMicro - prevCash;
     const legCash = here.reduce((a, l) => a + l.cashMicro, 0);
     expect(cashDelta, `cash delta at step ${snap.step} is not explained by the trade legs: ${ctx}`).toBe(legCash);
 
+    // 1b. The same delta, decomposed: fills plus each fee type separately. A
+    //     fee silently folded into a fill price would still satisfy (1); this
+    //     check pins each friction to its own line.
+    const fillCash = here.filter((l) => !isCostLeg(l)).reduce((a, l) => a + l.cashMicro, 0);
+    const feeCash: Record<CostKind, number> = { commission: 0, spread: 0, fx: 0 };
+    for (const leg of here) {
+      if (isCostLeg(leg)) feeCash[leg.kind] += leg.cashMicro;
+    }
+    expect(
+      fillCash + feeCash.commission + feeCash.spread + feeCash.fx,
+      `fill + fee decomposition does not rebuild the cash delta at step ${snap.step}: ${ctx}`,
+    ).toBe(cashDelta);
+    for (const kind of COST_KINDS) {
+      expect(feeCash[kind], `${kind} at step ${snap.step} is not a debit: ${ctx}`).toBeLessThanOrEqual(0);
+    }
+
     // 2. Holdings: same rule, per symbol, over the union of both sides so a
     //    balance that moved without a leg (or a leg with no balance move) fails.
+    //    Fee legs carry no quantity, so they must not perturb this at all.
     const symbols = new Set<string>([...prevHoldings.keys(), ...snap.holdingsMicro.keys(), ...here.map((l) => l.symbol)]);
     for (const symbol of symbols) {
       const delta = (snap.holdingsMicro.get(symbol) ?? 0) - (prevHoldings.get(symbol) ?? 0);
       const legHold = here.filter((l) => l.symbol === symbol).reduce((a, l) => a + l.holdingMicro, 0);
+      const fillHold = here
+        .filter((l) => l.symbol === symbol && !isCostLeg(l))
+        .reduce((a, l) => a + l.holdingMicro, 0);
       expect(delta, `holding delta for ${symbol} at step ${snap.step} is not explained by its legs: ${ctx}`).toBe(
         legHold,
       );
+      expect(legHold, `a fee leg moved the ${symbol} holding at step ${snap.step}: ${ctx}`).toBe(fillHold);
     }
 
     // 3. No holding may go short — a mis-attributed exit shows up here first.
@@ -341,5 +481,122 @@ describe("executed trades reconcile to the cash/holdings ledger", () => {
       .filter((l) => l.step === tampered.legs[0].step)
       .reduce((a, l) => a + l.cashMicro, 0);
     expect(step0.cashMicro - before, `tampering went undetected — ${REPRO}`).not.toBe(legCashFromList);
+  });
+});
+
+describe("commission, spread and FX fee legs reconcile to the ledger", () => {
+  const costedCase = (c: number, tag: string, size = 30) => {
+    const r = rng(caseSeed(BASE_SEED, tag, c));
+    const rows = randomRows(r, size + Math.floor(r() * 90));
+    const costs = randomCosts(r, [...new Set(rows.map((x) => x.symbol))]);
+    return { rows, limits: randomLimits(r), costs, ctx: `case ${c} — ${REPRO}` };
+  };
+
+  it("every per-step cash delta still equals its fills plus its fee legs exactly", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-steps");
+      const { book } = reconcile(rows, limits, ctx, costs);
+      // Guard against a vacuous pass: the model must actually charge something.
+      if (book.trades.length > 0) {
+        expect(book.legs.some(isCostLeg) || book.trades.every((t) => t.costsMicro === 0), ctx).toBe(true);
+      }
+    }
+  });
+
+  it("each fee leg equals the modelled commission / spread / FX for its own fill", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-legs");
+      const { book } = reconcile(rows, limits, ctx, costs);
+      for (const t of book.trades) {
+        const mine = book.legs.filter((l) => l.tradeId === t.id);
+        for (const parent of ["entry", "exit"] as const) {
+          const expected = parent === "entry" ? t.entryCosts : t.exitCosts;
+          const step = parent === "entry" ? t.entryStep : t.exitStep;
+          for (const kind of COST_KINDS) {
+            const booked = mine
+              .filter((l) => l.parent === parent && l.kind === kind)
+              .reduce((a, l) => a - l.cashMicro, 0);
+            expect(booked, `${parent} ${kind} != model for trade ${t.id}: ${ctx}`).toBe(expected[kind]);
+            for (const leg of mine.filter((l) => l.parent === parent && l.kind === kind)) {
+              expect(leg.step, `${kind} booked away from its fill for trade ${t.id}: ${ctx}`).toBe(step);
+              expect(leg.holdingMicro, `${kind} moved shares for trade ${t.id}: ${ctx}`).toBe(0);
+            }
+          }
+        }
+        // Commission honours the per-ticket floor; FX only hits foreign names.
+        if (t.sizeMicro > 0) {
+          expect(t.entryCosts.commission, `commission below the floor: ${ctx}`).toBeGreaterThanOrEqual(
+            costs.minCommissionMicro,
+          );
+        }
+        if (!costs.foreign.has(t.symbol)) {
+          expect(t.entryCosts.fx + t.exitCosts.fx, `FX fee charged on a domestic name: ${ctx}`).toBe(0);
+        }
+      }
+    }
+  });
+
+  it("each trade's cash legs net to P&L minus its own fees, with a flat holding", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-trades");
+      const { book } = reconcile(rows, limits, ctx, costs);
+      for (const t of book.trades) {
+        const fees = book.legs.filter((l) => l.tradeId === t.id && isCostLeg(l)).reduce((a, l) => a - l.cashMicro, 0);
+        expect(fees, `fee legs != trade fee total for trade ${t.id}: ${ctx}`).toBe(t.costsMicro);
+        const netCash = book.legs.filter((l) => l.tradeId === t.id).reduce((a, l) => a + l.cashMicro, 0);
+        expect(netCash, `net cash != P&L - fees for trade ${t.id}: ${ctx}`).toBe(t.pnlMicro - t.costsMicro);
+        const netHold = book.legs.filter((l) => l.tradeId === t.id).reduce((a, l) => a + l.holdingMicro, 0);
+        expect(netHold, `trade ${t.id} did not unwind flat: ${ctx}`).toBe(0);
+      }
+    }
+  });
+
+  it("closing cash equals capital plus P&L minus total commission, spread and FX", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-close", 25);
+      const { book, ledger } = reconcile(rows, limits, ctx, costs);
+      const last = ledger[ledger.length - 1];
+      if (!last) {
+        expect(book.trades.length, `no ledger steps but trades exist: ${ctx}`).toBe(0);
+        continue;
+      }
+      const pnl = book.trades.reduce((a, t) => a + t.pnlMicro, 0);
+      const byKind: Record<CostKind, number> = { commission: 0, spread: 0, fx: 0 };
+      for (const leg of book.legs) {
+        if (isCostLeg(leg)) byKind[leg.kind] -= leg.cashMicro;
+      }
+      const totalFees = byKind.commission + byKind.spread + byKind.fx;
+      expect(totalFees, `fee legs != trade-list fee total: ${ctx}`).toBe(
+        book.trades.reduce((a, t) => a + t.costsMicro, 0),
+      );
+      expect(last.cashMicro, `closing cash != capital + P&L - fees: ${ctx}`).toBe(book.capitalMicro + pnl - totalFees);
+      expect(last.holdingsMicro.size, `book was not flat at the end: ${ctx}`).toBe(0);
+    }
+  });
+
+  it("a dropped FX fee leg is caught by the step reconciliation", () => {
+    // Negative control for the costed path: remove one fee from the ledger and
+    // the per-step tie-out against the trade list must diverge.
+    const r = rng(caseSeed(BASE_SEED, "costed-control", 0));
+    const rows = randomRows(r, 60).map((row, i) => ({ ...row, symbol: "S0", size: i === 0 ? 1 : row.size }));
+    const costs: CostModel = {
+      commissionBps: 10,
+      minCommissionMicro: 2_000,
+      halfSpreadBps: 15,
+      fxFeeBps: 25,
+      foreign: new Set(["S0"]),
+    };
+    const limits = resolveSizingLimits({ maxPositionSize: 2, maxConcurrentSignals: 8, maxTotalDeployedPct: 200 });
+    const book = buildBook(rows, limits, costs);
+    const dropped = book.legs.find((l) => l.kind === "fx");
+    expect(dropped, `control needs an FX leg — ${REPRO}`).toBeDefined();
+
+    const tampered: Book = { ...book, legs: book.legs.filter((l) => l !== dropped) };
+    const ledger = runLedger(tampered);
+    const step = dropped!.step;
+    const idx = ledger.findIndex((s) => s.step === step);
+    const before = idx > 0 ? ledger[idx - 1].cashMicro : book.capitalMicro;
+    const expectedFromList = book.legs.filter((l) => l.step === step).reduce((a, l) => a + l.cashMicro, 0);
+    expect(ledger[idx].cashMicro - before, `dropped FX fee went undetected — ${REPRO}`).not.toBe(expectedFromList);
   });
 });
