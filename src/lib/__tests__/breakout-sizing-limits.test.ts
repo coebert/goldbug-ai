@@ -239,3 +239,120 @@ describe("applySizingLimits — multiple caps on one run", () => {
     expect(report.breaches.budget).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Regression: a single NaN size used to be added to the running `spent`
+ * total, making `budget - spent` NaN forever after. Every later comparison
+ * (`remaining <= 0`, `size > remaining`) then evaluated false, so the budget
+ * cap silently stopped firing for the rest of the cohort.
+ */
+describe("NaN size does not disable the budget cap for later signals", () => {
+  const budgetLimits = {
+    maxPositionSize: 5,
+    maxConcurrentSignals: 100,
+    maxTotalDeployedPct: 100,
+  } as const;
+
+  it("keeps clamping later signals after a NaN size", () => {
+    const withNaN = applySizingLimits(
+      [
+        sig("NAN", "2026-03-01", Number.NaN),
+        sig("A", "2026-03-02", 2),
+        sig("B", "2026-03-03", 2),
+        sig("C", "2026-03-04", 2),
+      ],
+      budgetLimits,
+    );
+
+    // Budget = 4 signals × 100% = 4.0 units.
+    expect(withNaN.signals[0].size).toBe(0);
+    expect(withNaN.signals[1].size).toBe(2);
+    expect(withNaN.signals[2].size).toBe(2);
+    // The fourth ask must be refused: the budget is already fully spent.
+    expect(withNaN.signals[3].size).toBe(0);
+    expect(withNaN.signals[3].clamped).toContain("budget");
+    expect(withNaN.report.breaches.budget).toBeGreaterThan(0);
+    expect(withNaN.report.deployedPct).toBeLessThanOrEqual(100 + 1e-9);
+  });
+
+  it("produces the same capped sizes as an equivalent cohort with a 0 size", () => {
+    const nan = applySizingLimits(
+      [
+        sig("X", "2026-03-01", 2),
+        sig("NAN", "2026-03-02", Number.NaN),
+        sig("Y", "2026-03-03", 2),
+        sig("Z", "2026-03-04", 2),
+      ],
+      budgetLimits,
+    );
+    const zero = applySizingLimits(
+      [
+        sig("X", "2026-03-01", 2),
+        sig("NAN", "2026-03-02", 0),
+        sig("Y", "2026-03-03", 2),
+        sig("Z", "2026-03-04", 2),
+      ],
+      budgetLimits,
+    );
+    expect(nan.signals.map((s) => s.size)).toEqual(zero.signals.map((s) => s.size));
+    expect(nan.report.deployedPct).toBe(zero.report.deployedPct);
+    expect(nan.report.breaches).toEqual(zero.report.breaches);
+  });
+
+  it("still allows a partial fill of the residual budget after a NaN", () => {
+    const { signals, report } = applySizingLimits(
+      [
+        sig("NAN", "2026-04-01", Number.NaN),
+        sig("A", "2026-04-02", 1.5),
+        // Only 0.5 of the 2.0 budget is left; this must be trimmed, not passed.
+        sig("B", "2026-04-03", 1.5),
+      ],
+      { maxPositionSize: 5, maxConcurrentSignals: 100, maxTotalDeployedPct: 66.6667 },
+    );
+    expect(signals[1].size).toBeCloseTo(1.5, 6);
+    expect(signals[2].size).toBeCloseTo(0.5, 4);
+    expect(signals[2].clamped).toContain("budget");
+    expect(report.deployedPct).toBeLessThanOrEqual(66.6667 + 1e-6);
+  });
+
+  it("stays finite and capped when several NaN sizes are interleaved", () => {
+    const mixed = [
+      sig("N1", "2026-05-01", Number.NaN),
+      sig("A", "2026-05-02", 3),
+      sig("N2", "2026-05-03", Number.NaN),
+      sig("B", "2026-05-04", 3),
+      sig("N3", "2026-05-05", Number.NaN),
+      sig("C", "2026-05-06", 3),
+    ];
+    const { signals, report } = applySizingLimits(mixed, {
+      maxPositionSize: 1.5,
+      maxConcurrentSignals: 100,
+      maxTotalDeployedPct: 50,
+    });
+    const spent = signals.reduce((a, s) => a + s.size, 0);
+    // Budget = 6 × 50% = 3.0 units, regardless of how many NaNs came through.
+    expect(Number.isFinite(spent)).toBe(true);
+    expect(spent).toBeLessThanOrEqual(3 + 1e-9);
+    expect(report.deployedPct).toBeLessThanOrEqual(50 + 1e-9);
+    expect(signals.every((s) => Number.isFinite(s.size))).toBe(true);
+    expect(Number.isFinite(report.requestedDeployedPct)).toBe(true);
+    expect(Number.isFinite(report.peakPositionSize)).toBe(true);
+  });
+
+  it("does not let a NaN barsHeld leak into the concurrency book or budget", () => {
+    const { signals, report } = applySizingLimits(
+      [
+        { symbol: "N", date: "2026-06-01", size: Number.NaN, barsHeld: Number.NaN },
+        { symbol: "A", date: "2026-06-02", size: 1, barsHeld: Number.NaN },
+        { symbol: "B", date: "2026-06-03", size: 1, barsHeld: 2 },
+        { symbol: "C", date: "2026-06-04", size: 1, barsHeld: 2 },
+      ],
+      { maxPositionSize: 2, maxConcurrentSignals: 2, maxTotalDeployedPct: 50 },
+    );
+    const spent = signals.reduce((a, s) => a + s.size, 0);
+    expect(spent).toBeLessThanOrEqual((4 * 50) / 100 + 1e-9);
+    expect(Number.isFinite(report.deployedPct)).toBe(true);
+    expect(report.peakConcurrent).toBeLessThanOrEqual(2);
+    expect(report.breaches.budget).toBeGreaterThan(0);
+  });
+});
