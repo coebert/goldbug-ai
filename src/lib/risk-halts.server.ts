@@ -151,6 +151,11 @@ export function evaluateRiskHalts(i: HaltInputs): HaltStatus {
  *   • prior-close equity (the snapshot strictly before `asOf`), and
  *   • all-time peak equity.
  *
+ * Both are restated onto today's capital base by netting out external cash
+ * flows (recorded sim deposits plus detected deposit/withdrawal steps). A
+ * deposit that later leaves the account must never read as a trading
+ * drawdown — that previously halted every BUY on the portfolio indefinitely.
+ *
  * `client` can be an authenticated per-user client (RLS) or the admin
  * client — the caller decides which is appropriate for the surface.
  */
@@ -158,19 +163,49 @@ export async function loadEquityStats(
   client: SupabaseClient<Database>,
   portfolioId: string,
   asOf: string,
-): Promise<{ priorCloseEquity: number | null; peakEquity: number | null }> {
+): Promise<{ priorCloseEquity: number | null; peakEquity: number | null; netExternalFlow: number }> {
   const { data } = await client
     .from("equity_snapshots")
-    .select("total_value, snapshot_date")
+    .select("total_value, cash, holdings_value, snapshot_date")
     .eq("portfolio_id", portfolioId)
     .order("snapshot_date", { ascending: false })
     .limit(400);
   const rows = data ?? [];
-  if (rows.length === 0) return { priorCloseEquity: null, peakEquity: null };
-  const peak = rows.reduce((m, r) => Math.max(m, Number(r.total_value) || 0), 0);
-  const prior = rows.find((r) => (r.snapshot_date as string) < asOf);
+  if (rows.length === 0) {
+    return { priorCloseEquity: null, peakEquity: null, netExternalFlow: 0 };
+  }
+
+  const points = rows.map((r) => ({
+    date: String(r.snapshot_date),
+    totalValue: Number(r.total_value) || 0,
+    cash: Number(r.cash) || 0,
+    holdingsValue: Number(r.holdings_value) || 0,
+  }));
+
+  const { detectExternalFlows, mergeFlows, flowAdjustedStats } = await import(
+    "./equity-external-flows"
+  );
+
+  // Recorded sim funding events are authoritative where they exist.
+  const recorded: Array<{ date: string; amount: number; source: "recorded" }> = [];
+  const funds = await client
+    .from("sim_fund_events")
+    .select("amount, created_at")
+    .eq("portfolio_id", portfolioId)
+    .order("created_at", { ascending: true })
+    .limit(400);
+  for (const f of funds.data ?? []) {
+    const amount = Number(f.amount);
+    if (!Number.isFinite(amount) || amount === 0) continue;
+    recorded.push({ date: String(f.created_at).slice(0, 10), amount, source: "recorded" });
+  }
+
+  const flows = mergeFlows(recorded, detectExternalFlows(points));
+  const stats = flowAdjustedStats(points, flows, asOf);
   return {
-    peakEquity: peak > 0 ? peak : null,
-    priorCloseEquity: prior ? Number(prior.total_value) : null,
+    peakEquity: stats.peakEquity,
+    priorCloseEquity: stats.priorCloseEquity,
+    netExternalFlow: stats.netFlow,
   };
 }
+

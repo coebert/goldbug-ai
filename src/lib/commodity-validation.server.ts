@@ -84,9 +84,65 @@ export type CommodityValidator = (
 export function makeCommodityValidator(args: {
   supabaseAdmin: SupabaseClient<Database>;
   env: string; // "live" | "sim"
+  /**
+   * Optional on-demand instrument lookup (Saxo /ref/v1 search, which also
+   * upserts `saxo_instrument_cache`). Without it a symbol that has never
+   * been traded can never be verified — the cache only fills during
+   * execution, and execution is what this gate blocks. That deadlock silently
+   * killed every first buy of a new ETP. Resolve `null` when the instrument
+   * genuinely does not exist; throw for transient failures (we then fail open
+   * and let the broker precheck decide).
+   */
+  resolveInstrument?: (symbol: string) => Promise<{ assetType: string } | null>;
 }): CommodityValidator {
-  const { supabaseAdmin, env } = args;
+  const { supabaseAdmin, env, resolveInstrument } = args;
   const cacheHits = new Map<string, CommodityValidationOutcome>();
+
+  // Shared verdict for an asset type coming from either the cache or a live
+  // lookup, so both paths enforce exactly the same allowlist.
+  const verdictForAssetType = (meta: UniverseSymbol, assetType: string): CommodityValidationOutcome =>
+    (COMMODITY_ALLOWED_SAXO_ASSET_TYPES as readonly string[]).includes(assetType)
+      ? { ok: true, meta }
+      : {
+          ok: false,
+          meta,
+          reason: `commodity ${meta.symbol} blocked: Saxo asset type '${assetType}' not permitted (must be Etc/Etf/Fund; no CFDs/futures)`,
+        };
+
+  // Cache miss / stale row: try to resolve the instrument live before
+  // blocking. A successful lookup writes the cache row as a side effect.
+  const resolveOrBlock = async (
+    meta: UniverseSymbol,
+    staleness: "missing" | "stale",
+  ): Promise<CommodityValidationOutcome> => {
+    if (!resolveInstrument) {
+      return {
+        ok: false,
+        meta,
+        reason: `commodity ${meta.symbol} blocked: not yet verified as Saxo-tradable (instrument cache row ${staleness} for env=${env}). Trigger a live-broker refresh or place a manual smoke order to populate.`,
+      };
+    }
+    try {
+      const hit = await resolveInstrument(meta.symbol);
+      if (!hit) {
+        return {
+          ok: false,
+          meta,
+          reason: `commodity ${meta.symbol} blocked: Saxo has no matching tradable instrument (env=${env})`,
+        };
+      }
+      return verdictForAssetType(meta, String(hit.assetType ?? ""));
+    } catch (e) {
+      // Transient lookup failure (token/network/rate limit). Fail open — the
+      // broker's own precheck rejects anything unroutable, and freezing the
+      // sleeve on an outage is the worse failure.
+      return {
+        ok: true,
+        meta,
+        reason: `commodity ${meta.symbol}: live instrument lookup failed (${e instanceof Error ? e.message : String(e)}); relying on broker validation`,
+      };
+    }
+  };
 
   return async (input) => {
     const { needsValidation, meta, failFast } = classifyCommodityProposal(input);
@@ -114,11 +170,7 @@ export function makeCommodityValidator(args: {
         reason: `commodity ${meta.symbol}: instrument cache lookup failed (${error.message}); relying on broker validation`,
       };
     } else if (!data) {
-      outcome = {
-        ok: false,
-        meta,
-        reason: `commodity ${meta.symbol} blocked: not yet verified as Saxo-tradable (no instrument cache row for env=${env}). Trigger a live-broker refresh or place a manual smoke order to populate.`,
-      };
+      outcome = await resolveOrBlock(meta, "missing");
     } else {
       const assetType = String(data.asset_type ?? "");
       if (!(COMMODITY_ALLOWED_SAXO_ASSET_TYPES as readonly string[]).includes(assetType)) {
@@ -130,11 +182,7 @@ export function makeCommodityValidator(args: {
       } else {
         const age = Date.now() - new Date(String(data.refreshed_at)).getTime();
         if (!Number.isFinite(age) || age > MAX_CACHE_AGE_MS) {
-          outcome = {
-            ok: false,
-            meta,
-            reason: `commodity ${meta.symbol} blocked: Saxo instrument cache is stale (>${Math.round(MAX_CACHE_AGE_MS / 86_400_000)}d). Refresh required before new buys.`,
-          };
+          outcome = await resolveOrBlock(meta, "stale");
         } else {
           outcome = { ok: true, meta };
         }
