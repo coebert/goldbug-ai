@@ -121,7 +121,8 @@ describe("breakoutRegimeAction with the age layer", () => {
       table: positiveTable,
     });
     expect(fresh.action).toBe("trade");
-    expect(aged.mult).toBeLessThan(fresh.rawMult);
+    expect(fresh.mult).toBe(fresh.rawMult);
+    expect(aged.mult).toBeLessThan(aged.rawMult);
     expect(aged.mult).toBeCloseTo(aged.rawMult * 0.85, 6);
     expect(aged.action).toBe("downsize");
   });
