@@ -317,6 +317,8 @@ export function symbolDiagnostics(
       avgReturnGapPct: confirmed.avgReturnPct - failed.avgReturnPct,
       confirmedContributionPct: contribution,
       role,
+      regimeVol: regimeVolContext(ts),
+      confirmedRegimeVol: regimeVolContext(ts.filter((t) => t.cohort === "confirmed")),
     });
   }
 
