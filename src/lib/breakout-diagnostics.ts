@@ -516,6 +516,7 @@ export function buildBreakoutDiagnostics(
   const symbols = symbolDiagnostics(trades, options);
   const states = signalStateDiagnostics(trades);
   const regimeVol = regimeVolContext(trades);
+  const drivers2 = topDrivers(symbols);
   const notes: string[] = [];
   if (trades.length) {
     notes.push(`Gate context: ${regimeVol.summary}.`);
@@ -563,5 +564,5 @@ export function buildBreakoutDiagnostics(
     }
   }
 
-  return { symbols, states, regimeVol, notes };
+  return { symbols, states, regimeVol, topDrivers: drivers2, notes };
 }
