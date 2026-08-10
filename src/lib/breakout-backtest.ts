@@ -433,7 +433,7 @@ export function runBreakoutBacktest(
       notes.push(
         `Confirmed breakouts win ${gap.toFixed(1)}pp more often and earn ${retGap.toFixed(2)}pp more per trade than failed ones.`,
       );
-    } else if (gap > 0 || retGap > 0) {
+    } else if (gap > 0 && retGap > 0) {
       verdict = "weak";
       notes.push(
         `Confirmed edges out failed (${gap.toFixed(1)}pp win rate, ${retGap.toFixed(2)}pp return) but not by enough to lean on.`,
