@@ -397,9 +397,8 @@ export function runBreakoutBacktest(
       // A failure closes the episode — anything after it is a fresh attempt.
       if (cohort === "failed") episodeSeen.clear();
     }
-
-    }
   }
+
 
   trades.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
