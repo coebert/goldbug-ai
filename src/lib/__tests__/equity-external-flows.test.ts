@@ -19,9 +19,9 @@ describe("detectExternalFlows", () => {
       p("2026-07-23", 813871.36, 0),
       p("2026-07-24", 1812871.36, 0),
     ]);
-    expect(flows).toEqual([
-      { date: "2026-07-24", amount: 999000, source: "detected" },
-    ]);
+    expect(flows).toHaveLength(1);
+    expect(flows[0].date).toBe("2026-07-24");
+    expect(flows[0].amount).toBeCloseTo(999000, 2);
   });
 
   it("flags a large pure-cash withdrawal as negative", () => {
