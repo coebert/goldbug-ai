@@ -1,16 +1,58 @@
 import { Badge } from "@/components/ui/badge";
-import type { TopDriver, TopDrivers } from "@/lib/breakout-diagnostics";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { DriverConfidenceLabel, TopDriver, TopDrivers } from "@/lib/breakout-diagnostics";
 
 const signed = (v: number, digits = 2) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
 const tone = (v: number) => (v >= 0 ? "text-emerald-500" : "text-red-500");
+
+const CONFIDENCE_VARIANT: Record<DriverConfidenceLabel, "default" | "secondary" | "outline"> = {
+  high: "default",
+  medium: "secondary",
+  low: "outline",
+};
+
+function ConfidenceBadge({ d }: { d: TopDriver }) {
+  const c = d.confidence;
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+        <Badge
+          variant={CONFIDENCE_VARIANT[c.label]}
+          className="cursor-default text-[10px] font-normal"
+          data-testid={`driver-confidence-${d.symbol}`}
+        >
+          {c.label} conf · {(c.score * 100).toFixed(0)}
+        </Badge>
+      </TooltipTrigger>
+        <TooltipContent className="max-w-64 text-[11px]">
+          <ul className="list-disc space-y-0.5 pl-3">
+            {c.reasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 function DriverRow({ d }: { d: TopDriver }) {
   return (
     <li className="flex items-baseline justify-between gap-2 border-t border-border/30 py-1 first:border-t-0">
       <div className="min-w-0">
-        <p className="truncate text-xs font-medium">{d.symbol}</p>
+        <p className="flex items-center gap-1.5 truncate text-xs font-medium">
+          {d.symbol}
+          <ConfidenceBadge d={d} />
+        </p>
         <p className="text-[11px] text-muted-foreground">
-          {d.confirmedTrades} confirmed · avg {signed(d.confirmedAvgReturnPct)} · led by {d.lead}
+          {d.confirmedTrades} confirmed ({d.tradeSharePct.toFixed(0)}% of cohort) · avg{" "}
+          {signed(d.confirmedAvgReturnPct)} · led by {d.lead}
           {d.gateDriver !== "none" ? ` · gate: ${d.gateDriver}` : ""}
         </p>
       </div>
@@ -26,6 +68,7 @@ function DriverRow({ d }: { d: TopDriver }) {
     </li>
   );
 }
+
 
 function Side({
   title,

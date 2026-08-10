@@ -417,6 +417,24 @@ export function signalStateDiagnostics(
  * blend surfaces both, and both components are kept on the row so the UI can
  * show which one is doing the work.
  */
+export type DriverConfidenceLabel = "high" | "medium" | "low";
+
+/**
+ * How much weight to put on a driver row. Blends three independent doubts:
+ *   - sample     — few confirmed signals means the score is noise-dominated.
+ *   - breadth    — a name whose P&L share dwarfs its share of cohort trades is
+ *                  carried by a couple of outlier moves, not a repeatable edge.
+ *   - basis      — expectancy-gap-led rows lean on the failed cohort as a
+ *                  control, which is a weaker basis than realised P&L share.
+ */
+export type DriverConfidence = {
+  score: number;
+  label: DriverConfidenceLabel;
+  sampleScore: number;
+  breadthScore: number;
+  reasons: string[];
+};
+
 export type TopDriver = {
   symbol: string;
   /** Signed share of the confirmed cohort's gross P&L, in percent. */
@@ -427,12 +445,16 @@ export type TopDriver = {
   winRateGapPp: number;
   confirmedTrades: number;
   confirmedAvgReturnPct: number;
+  /** This name's share of all confirmed signals in the sample, in percent. */
+  tradeSharePct: number;
   /** Blended rank score; positive = helps the cohort, negative = hurts it. */
   score: number;
   /** Which component dominates the score. */
   lead: "P&L share" | "expectancy gap";
   /** Gate layer binding this name's confirmed signals, for context. */
   gateDriver: RegimeGateVerdict["driver"] | "mixed";
+  /** How trustworthy this row is, for badging in the UI. */
+  confidence: DriverConfidence;
 };
 
 export type TopDrivers = {
@@ -450,7 +472,55 @@ export type TopDriversOptions = {
   minConfirmed?: number;
   /** Weight on the expectancy gap relative to P&L share. Default 2. */
   gapWeight?: number;
+  /** Confirmed signals at which the sample is treated as fully trustworthy. Default 20. */
+  fullSampleAt?: number;
 };
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+export function driverConfidence(input: {
+  confirmedTrades: number;
+  minConfirmed: number;
+  fullSampleAt: number;
+  tradeSharePct: number;
+  contributionPct: number;
+  lead: TopDriver["lead"];
+}): DriverConfidence {
+  const span = Math.max(1, input.fullSampleAt - input.minConfirmed);
+  const sampleScore = clamp01((input.confirmedTrades - input.minConfirmed) / span);
+
+  const absContribution = Math.abs(input.contributionPct);
+  const breadthScore =
+    absContribution <= 0.0001
+      ? 1
+      : clamp01(input.tradeSharePct / absContribution);
+
+  const basisFactor = input.lead === "expectancy gap" ? 0.85 : 1;
+  // Multiplicative so a thin sample alone can drag the row to "low" even when
+  // its P&L is perfectly broad-based, and vice versa.
+  const score = clamp01((0.35 + 0.65 * sampleScore) * (0.4 + 0.6 * breadthScore) * basisFactor);
+  const label: DriverConfidenceLabel = score >= 0.66 ? "high" : score >= 0.4 ? "medium" : "low";
+
+  const reasons: string[] = [];
+  reasons.push(
+    sampleScore >= 0.66
+      ? `${input.confirmedTrades} confirmed signals`
+      : `only ${input.confirmedTrades} confirmed signals`,
+  );
+  if (breadthScore < 0.6) {
+    reasons.push(
+      `P&L share (${absContribution.toFixed(0)}%) far exceeds its ${input.tradeSharePct.toFixed(0)}% share of trades — outlier-driven`,
+    );
+  } else {
+    reasons.push("P&L spread in line with its trade count");
+  }
+  if (input.lead === "expectancy gap") {
+    reasons.push("score led by the expectancy gap, which leans on the failed cohort as control");
+  }
+
+  return { score, label, sampleScore, breadthScore, reasons };
+}
+
 
 export function topDrivers(
   symbols: readonly SymbolDiagnostic[],
@@ -459,12 +529,17 @@ export function topDrivers(
   const limit = options.limit ?? 5;
   const minConfirmed = options.minConfirmed ?? 3;
   const gapWeight = options.gapWeight ?? 2;
+  const fullSampleAt = options.fullSampleAt ?? 20;
+  const totalConfirmed = symbols.reduce((a, s) => a + s.confirmed.trades, 0);
 
   const rows: TopDriver[] = symbols
     .filter((s) => s.confirmed.trades >= minConfirmed)
     .map((s) => {
       const shareTerm = s.confirmedContributionPct;
       const gapTerm = s.avgReturnGapPct * gapWeight;
+      const lead: TopDriver["lead"] =
+        Math.abs(gapTerm) > Math.abs(shareTerm) ? "expectancy gap" : "P&L share";
+      const tradeSharePct = totalConfirmed ? (s.confirmed.trades / totalConfirmed) * 100 : 0;
       return {
         symbol: s.symbol,
         contributionPct: s.confirmedContributionPct,
@@ -472,11 +547,21 @@ export function topDrivers(
         winRateGapPp: s.winRateGapPp,
         confirmedTrades: s.confirmed.trades,
         confirmedAvgReturnPct: s.confirmed.avgReturnPct,
+        tradeSharePct,
         score: shareTerm + gapTerm,
-        lead: Math.abs(gapTerm) > Math.abs(shareTerm) ? "expectancy gap" : "P&L share",
+        lead,
         gateDriver: s.confirmedRegimeVol.dominantDriver,
+        confidence: driverConfidence({
+          confirmedTrades: s.confirmed.trades,
+          minConfirmed,
+          fullSampleAt,
+          tradeSharePct,
+          contributionPct: s.confirmedContributionPct,
+          lead,
+        }),
       } satisfies TopDriver;
     });
+
 
   const positive = rows
     .filter((r) => r.score > 0)
