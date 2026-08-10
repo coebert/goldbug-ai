@@ -342,3 +342,37 @@ export function formatBreakoutBlock(
     "Only 'confirmed'/ACTIONABLE breakouts justify chasing strength; 'pending' needs another close, 'failed' is a reversal tell, 'extended' is too late to chase.",
   ].join("\n");
 }
+
+/**
+ * Deterministic sizing response to breakout evidence. Applied alongside the
+ * other sizing haircuts in the engine so the signal actually changes ticket
+ * size rather than only informing the prompt.
+ *
+ *   buys:  actionable confirmed breakout   x1.20 (lean into proven expansion)
+ *          confirmed but not actionable    x1.00
+ *          pending (unconfirmed)           x0.80 (wait-and-see)
+ *          extended (too late to chase)    x0.70
+ *          failed upside breakout          x0.50
+ *          confirmed breakdown             x0.50
+ *   sells: confirmed breakdown             x1.20 (exit faster)
+ *          failed breakout                 x1.15
+ */
+export function breakoutSizeMultiplier(
+  b: BreakoutEvidence | null | undefined,
+  side: "buy" | "sell",
+): { mult: number; note: string } {
+  if (!b || b.state === "none" || b.direction == null) return { mult: 1, note: "" };
+  const dir = b.direction;
+  if (side === "sell") {
+    if (b.state === "failed" && dir === "up") return { mult: 1.15, note: "failed breakout — exit faster" };
+    if (b.state === "confirmed" && dir === "down") return { mult: 1.2, note: "confirmed breakdown — exit faster" };
+    return { mult: 1, note: "" };
+  }
+  if (b.state === "failed") return { mult: dir === "up" ? 0.5 : 1, note: dir === "up" ? "failed breakout x0.50" : "" };
+  if (dir === "down") return { mult: b.state === "confirmed" ? 0.5 : 0.8, note: `${b.state} breakdown — buys cut` };
+  if (b.state === "pending") return { mult: 0.8, note: "unconfirmed breakout x0.80" };
+  if (b.state === "extended") return { mult: 0.7, note: "extended breakout — chasing x0.70" };
+  return b.actionable
+    ? { mult: 1.2, note: `actionable breakout q=${b.quality.toFixed(2)} x1.20` }
+    : { mult: 1, note: "confirmed breakout, evidence incomplete" };
+}

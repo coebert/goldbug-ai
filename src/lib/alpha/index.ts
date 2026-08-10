@@ -2,7 +2,7 @@ export { scoreTrend } from "./trend";
 export { scoreMeanReversion } from "./mean-reversion";
 export { scoreQuality } from "./quality";
 export { scoreCarry } from "./carry";
-export { scoreBreakout, detectBreakout, formatBreakoutBlock, DEFAULT_BREAKOUT_CONFIG } from "./breakout";
+export { scoreBreakout, detectBreakout, breakoutSizeMultiplier, formatBreakoutBlock, DEFAULT_BREAKOUT_CONFIG } from "./breakout";
 export type { BreakoutEvidence, BreakoutConfig, BreakoutState } from "./breakout";
 export { scoreCandidate, scoreUniverse, formatAlphaPriorsForPrompt } from "./composite";
 export { resolveRegime, weightsForRegime, effectiveWeightsForRegime, enabledStrategiesForRegime } from "./regime-matrix";
