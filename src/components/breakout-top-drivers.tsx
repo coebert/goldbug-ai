@@ -29,6 +29,105 @@ import {
   findExecutionCell,
   type ExecutionGrid,
 } from "@/lib/breakout-driver-execution";
+import {
+  compareDriverSettings,
+  type DriverSetting,
+} from "@/lib/breakout-driver-compare";
+import { Button } from "@/components/ui/button";
+
+const STATUS_LABEL: Record<string, string> = {
+  entered: "new",
+  left: "dropped",
+  changed: "changed",
+  same: "same",
+};
+
+function WhatIfCompare({
+  symbols,
+  a,
+  b,
+}: {
+  symbols: readonly SymbolDiagnostic[];
+  a: DriverSetting;
+  b: DriverSetting;
+}) {
+  const cmp = useMemo(() => compareDriverSettings(symbols, a, b), [symbols, a, b]);
+  const head = (s: DriverSetting) => `${s.risk} · ${s.gapWeight.toFixed(1)}×`;
+
+  return (
+    <div className="rounded-md border border-border/40 p-2" data-testid="driver-what-if">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-medium">What-if: previous vs current</p>
+        <Badge variant="outline" className="text-[10px] font-normal">
+          {cmp.changedCount} changed
+        </Badge>
+      </div>
+      <p className="mt-1 text-[11px] text-muted-foreground" data-testid="what-if-summary">
+        {cmp.summary}
+      </p>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-1 text-left font-normal">Symbol</th>
+              <th className="py-1 text-left font-normal">Previous · {head(a)}</th>
+              <th className="py-1 text-left font-normal">Current · {head(b)}</th>
+              <th className="py-1 text-right font-normal">Δ rank</th>
+              <th className="py-1 text-right font-normal">Δ size</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cmp.rows.map((r) => (
+              <tr
+                key={r.symbol}
+                className="border-t border-border/30"
+                data-testid={`what-if-row-${r.symbol}`}
+              >
+                <td className="py-1 font-medium">
+                  {r.symbol}
+                  {r.status !== "same" ? (
+                    <span className="ml-1 text-[10px] text-muted-foreground">
+                      {STATUS_LABEL[r.status]}
+                    </span>
+                  ) : null}
+                </td>
+                <td className="py-1">
+                  {r.a.action ? (
+                    <span className={ACTION_TONE[r.a.action]}>
+                      {r.a.action} · {r.a.sizeMultiplier?.toFixed(2)}×
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">unranked</span>
+                  )}
+                </td>
+                <td className="py-1">
+                  {r.b.action ? (
+                    <span className={ACTION_TONE[r.b.action]}>
+                      {r.b.action} · {r.b.sizeMultiplier?.toFixed(2)}×
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">unranked</span>
+                  )}
+                </td>
+                <td className="py-1 text-right tabular-nums">
+                  {r.rankDelta == null
+                    ? "—"
+                    : `${r.rankDelta > 0 ? "+" : ""}${r.rankDelta}`}
+                </td>
+                <td
+                  className={`py-1 text-right tabular-nums ${r.sizeDelta ? tone(r.sizeDelta) : ""}`}
+                >
+                  {r.sizeDelta == null ? "—" : `${r.sizeDelta > 0 ? "+" : ""}${r.sizeDelta.toFixed(2)}×`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 
 const ACTION_TONE: Record<DriverAction, string> = {
   prioritise: "border-emerald-500/40 text-emerald-500",
@@ -237,8 +336,23 @@ export function BreakoutTopDrivers({
   );
   const [weightIdx, setWeightIdx] = useState(initialIdx);
   const gapWeight = weights[Math.min(weightIdx, weights.length - 1)] ?? drivers.gapWeight;
-  const setGapWeight = (i: number) => setWeightIdx(i);
   const [risk, setRisk] = useState<RiskLevel>("balanced");
+  // Remember the setting the user was on before the latest change so the
+  // what-if view can diff "previous vs current".
+  const [prev, setPrev] = useState<DriverSetting>({ risk: "balanced", gapWeight });
+  const [showCompare, setShowCompare] = useState(false);
+  const setGapWeight = (i: number) => {
+    const next = weights[Math.min(i, weights.length - 1)] ?? gapWeight;
+    if (next === gapWeight) return;
+    setPrev({ risk, gapWeight });
+    setWeightIdx(i);
+  };
+  const changeRisk = (l: RiskLevel) => {
+    if (l === risk) return;
+    setPrev({ risk, gapWeight });
+    setRisk(l);
+  };
+
 
   const view = useMemo(() => {
     if (!symbols?.length || gapWeight === drivers.gapWeight) return drivers;
@@ -271,7 +385,7 @@ export function BreakoutTopDrivers({
             type="single"
             size="sm"
             value={risk}
-            onValueChange={(v) => v && setRisk(v as RiskLevel)}
+            onValueChange={(v) => v && changeRisk(v as RiskLevel)}
             className="mt-1 justify-start"
             data-testid="driver-risk-toggle"
           >
@@ -311,11 +425,29 @@ export function BreakoutTopDrivers({
         </div>
       </div>
 
-      <p className="text-[11px] text-muted-foreground" data-testid="driver-action-summary">
-        {summariseActions(recs, risk)}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-muted-foreground" data-testid="driver-action-summary">
+          {summariseActions(recs, risk)}
+        </p>
+        {symbols?.length ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={() => setShowCompare((s) => !s)}
+            data-testid="what-if-toggle"
+          >
+            {showCompare ? "Hide what-if" : "Compare with previous"}
+          </Button>
+        ) : null}
+      </div>
+
+      {showCompare && symbols?.length ? (
+        <WhatIfCompare symbols={symbols} a={prev} b={{ risk, gapWeight }} />
+      ) : null}
 
       {cell ? <ExecutionImpact cell={cell} grid={execution!} /> : null}
+
       <p className="text-[11px] text-muted-foreground">{view.summary}</p>
       <div className="grid gap-2 sm:grid-cols-2">
         <Side
