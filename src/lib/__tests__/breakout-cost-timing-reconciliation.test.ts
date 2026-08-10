@@ -400,7 +400,7 @@ function buildCase(seed: number) {
 describe("fee/slippage deduction timing vs replay summary totals", () => {
   it("books every friction on the step of the fill that incurred it", () => {
     for (let c = 0; c < 120; c++) {
-      const seed = caseSeed(BASE_SEED, c);
+      const seed = caseSeed(BASE_SEED, "timing", c);
       const { plan, replay } = buildCase(seed);
       assertBookingTiming(replay, plan, `seed=${seed} · ${REPRO}`);
     }
@@ -408,7 +408,7 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
 
   it("keeps cash equal to capital minus open notional minus costs booked so far", () => {
     for (let c = 0; c < 120; c++) {
-      const seed = caseSeed(BASE_SEED, 1_000 + c);
+      const seed = caseSeed(BASE_SEED, "cash-identity", c);
       const { replay } = buildCase(seed);
       assertStepCashIdentity(replay, `seed=${seed} · ${REPRO}`);
     }
@@ -416,7 +416,7 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
 
   it("reports summary cost totals exactly equal to the journal legs", () => {
     for (let c = 0; c < 150; c++) {
-      const seed = caseSeed(BASE_SEED, 2_000 + c);
+      const seed = caseSeed(BASE_SEED, "summary-totals", c);
       const { replay } = buildCase(seed);
       const ctx = `seed=${seed} · ${REPRO}`;
       assertSummaryMatchesJournal(replay, ctx);
@@ -434,7 +434,7 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
     ];
     for (const [label, costs] of variants) {
       for (let c = 0; c < 25; c++) {
-        const seed = caseSeed(BASE_SEED, 3_000 + c);
+        const seed = caseSeed(BASE_SEED, "cost-variants", c);
         const r = rng(seed);
         const rows = randomRows(r, 30 + Math.floor(r() * 30));
         const plan = applySizingLimits(rows, randomLimits(r));
@@ -463,7 +463,7 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
 
   it("charges exactly two legs per funded fill and none per refused signal", () => {
     for (let c = 0; c < 80; c++) {
-      const seed = caseSeed(BASE_SEED, 4_000 + c);
+      const seed = caseSeed(BASE_SEED, "leg-count", c);
       const { replay } = buildCase(seed);
       const ctx = `seed=${seed} · ${REPRO}`;
       expect(replay.journal.length, `leg count != 2 per fill: ${ctx}`).toBe(replay.summary.filledCount * 2);
@@ -481,7 +481,7 @@ describe("fee/slippage deduction timing vs replay summary totals", () => {
 
   const findMutableCase = () => {
     for (let c = 0; c < 400; c++) {
-      const seed = caseSeed(BASE_SEED, 5_000 + c);
+      const seed = caseSeed(BASE_SEED, "controls", c);
       const built = buildCase(seed);
       const hasCost = built.replay.journal.some((l) => l.feeMicros + l.slipMicros > 0);
       const hasExit = built.replay.journal.some(
