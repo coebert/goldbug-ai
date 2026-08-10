@@ -14,6 +14,7 @@ import { AlgoRegimeBacktestCard } from "@/components/algo-regime-backtest-card";
 import { BreakoutBacktestCard } from "@/components/breakout-backtest-card";
 import { BreakoutOverlayCard } from "@/components/breakout-overlay-card";
 import { BreakoutParamSweepCard } from "@/components/breakout-param-sweep-card";
+import { BreakoutExitSweepCard } from "@/components/breakout-exit-sweep-card";
 import { AlgoRegimeRiskEnvelopeCard } from "@/components/algo-regime-risk-envelope-card";
 
 export const Route = createFileRoute("/portfolio/$id/analytics")({
@@ -62,6 +63,7 @@ function AnalyticsPage() {
         <BreakoutBacktestCard portfolioId={id} />
         <BreakoutOverlayCard portfolioId={id} />
         <BreakoutParamSweepCard portfolioId={id} />
+        <BreakoutExitSweepCard portfolioId={id} />
 
       </main>
     </div>
