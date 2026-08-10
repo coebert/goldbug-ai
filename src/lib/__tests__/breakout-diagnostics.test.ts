@@ -278,7 +278,7 @@ describe("top drivers", () => {
 
   it("surfaces a small-share name when its expectancy gap is large", () => {
     const symbols = symbolDiagnostics([
-      ...many(30, { symbol: "BIG", returnPct: 1 }),
+      ...many(30, { symbol: "BIG", returnPct: 4 }),
       ...many(4, { symbol: "EDGE", returnPct: 6 }, 1),
       ...many(4, { symbol: "EDGE", cohort: "failed", returnPct: -8 }, 6),
     ]);
