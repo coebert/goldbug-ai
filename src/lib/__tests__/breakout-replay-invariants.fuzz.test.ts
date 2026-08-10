@@ -13,6 +13,7 @@ import {
   type SizingLimits,
 } from "@/lib/breakout-sizing-limits";
 import { announceFuzzSeed, caseSeed, reproCommand, resolveFuzzSeed, rng } from "./fuzz-seed";
+import { attempt, expectNoCounterexample, shrinkList, shrinkNumber } from "./fuzz-shrink";
 
 /**
  * Property-based invariants for the full replay.
@@ -355,7 +356,7 @@ describe("replay invariants (property-based)", () => {
       const r = rng(caseSeed(BASE_SEED, "plan", i));
       const rows = randomRows(r, 1 + Math.floor(r() * 300), r() < 0.4);
       const limits = randomLimits(r);
-      assertPlanInvariants(rows, limits, `case ${i} — ${REPRO}`);
+      verifyPlan(rows, limits, `case ${i} — ${REPRO}`);
     }
   });
 
@@ -376,7 +377,7 @@ describe("replay invariants (property-based)", () => {
         // Deliberately starved: often far less capital than the cohort asks for.
         maxTotalDeployedPct: 1 + r() * 40,
       });
-      const { minCash, budget } = assertPlanInvariants(rows, limits, `ledger case ${i} — ${REPRO}`);
+      const { minCash, budget } = verifyPlan(rows, limits, `ledger case ${i} — ${REPRO}`);
       expect(minCash, `cash dipped below zero (case ${i}) — ${REPRO}`).toBeGreaterThanOrEqual(-EPS);
       expect(minCash, `cash exceeded capital (case ${i}) — ${REPRO}`).toBeLessThanOrEqual(budget + EPS);
     }
@@ -393,7 +394,7 @@ describe("replay invariants (property-based)", () => {
       let previous = -1;
       for (const cap of [1, 2, 3, 5, 8, 13, 21, 34]) {
         const limits = resolveSizingLimits({ ...base, maxConcurrentSignals: cap });
-        const { taken } = assertPlanInvariants(rows, limits, `case ${i} cap ${cap} — ${REPRO}`);
+        const { taken } = verifyPlan(rows, limits, `case ${i} cap ${cap} — ${REPRO}`);
         expect(taken, `cap ${cap} admitted fewer than a tighter cap (case ${i}) — ${REPRO}`).toBeGreaterThanOrEqual(
           previous,
         );
@@ -415,7 +416,7 @@ describe("replay invariants (property-based)", () => {
           maxConcurrentSignals: cap,
           maxTotalDeployedPct: pct,
         });
-        const { plan } = assertPlanInvariants(rows, limits, `case ${i} budget ${pct} — ${REPRO}`);
+        const { plan } = verifyPlan(rows, limits, `case ${i} budget ${pct} — ${REPRO}`);
         expect(plan.report.deployedPct, `budget ${pct} deployed less than a tighter one — ${REPRO}`).toBeGreaterThanOrEqual(
           prevBudget - 1e-6,
         );
@@ -429,7 +430,7 @@ describe("replay invariants (property-based)", () => {
           maxConcurrentSignals: cap,
           maxTotalDeployedPct: 100_000,
         });
-        const { plan } = assertPlanInvariants(rows, limits, `case ${i} ceiling ${ceiling} — ${REPRO}`);
+        const { plan } = verifyPlan(rows, limits, `case ${i} ceiling ${ceiling} — ${REPRO}`);
         expect(plan.report.deployedPct, `ceiling ${ceiling} deployed less than a tighter one — ${REPRO}`).toBeGreaterThanOrEqual(
           prevCeiling - 1e-6,
         );
