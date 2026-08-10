@@ -24,6 +24,11 @@ import {
   type DriverAction,
   type RiskLevel,
 } from "@/lib/breakout-driver-actions";
+import {
+  DEFAULT_GAP_WEIGHTS,
+  findExecutionCell,
+  type ExecutionGrid,
+} from "@/lib/breakout-driver-execution";
 
 const ACTION_TONE: Record<DriverAction, string> = {
   prioritise: "border-emerald-500/40 text-emerald-500",
@@ -142,11 +147,22 @@ function Side({
 export function BreakoutTopDrivers({
   drivers,
   symbols,
+  execution,
 }: {
   drivers: TopDrivers;
   symbols?: readonly SymbolDiagnostic[];
+  execution?: ExecutionGrid;
 }) {
-  const [gapWeight, setGapWeight] = useState(drivers.gapWeight);
+  // Snap the slider to the weights the backtest was actually replayed at, so
+  // the execution numbers below always match the ranking above.
+  const weights = execution?.gapWeights?.length ? execution.gapWeights : [...DEFAULT_GAP_WEIGHTS];
+  const initialIdx = Math.max(
+    0,
+    weights.findIndex((w) => w === drivers.gapWeight),
+  );
+  const [weightIdx, setWeightIdx] = useState(initialIdx);
+  const gapWeight = weights[Math.min(weightIdx, weights.length - 1)] ?? drivers.gapWeight;
+  const setGapWeight = (i: number) => setWeightIdx(i);
   const [risk, setRisk] = useState<RiskLevel>("balanced");
 
   const view = useMemo(() => {
@@ -158,6 +174,8 @@ export function BreakoutTopDrivers({
     () => recommendDriverActions([...view.positive, ...view.negative], risk),
     [view, risk],
   );
+
+  const cell = execution ? findExecutionCell(execution, risk, gapWeight) : null;
 
   if (!view.positive.length && !view.negative.length) return null;
   const profile = RISK_PROFILES[risk];
@@ -203,9 +221,9 @@ export function BreakoutTopDrivers({
           <Slider
             className="mt-2"
             min={0}
-            max={6}
-            step={0.5}
-            value={[gapWeight]}
+            max={weights.length - 1}
+            step={1}
+            value={[Math.min(weightIdx, weights.length - 1)]}
             onValueChange={([v]) => setGapWeight(v ?? 0)}
             aria-label="Expectancy-gap weight"
             data-testid="gap-weight-slider"
@@ -221,6 +239,8 @@ export function BreakoutTopDrivers({
       <p className="text-[11px] text-muted-foreground" data-testid="driver-action-summary">
         {summariseActions(recs, risk)}
       </p>
+
+      {cell ? <ExecutionImpact cell={cell} grid={execution!} /> : null}
       <p className="text-[11px] text-muted-foreground">{view.summary}</p>
       <div className="grid gap-2 sm:grid-cols-2">
         <Side
