@@ -407,6 +407,8 @@ export function signalStateDiagnostics(
 export type BreakoutDiagnostics = {
   symbols: SymbolDiagnostic[];
   states: SignalStateDiagnostic[];
+  /** Regime cells + vol measurements across the whole sample. */
+  regimeVol: RegimeVolContext;
   /** One-line takeaways for the UI, already ranked by usefulness. */
   notes: string[];
 };
@@ -417,7 +419,12 @@ export function buildBreakoutDiagnostics(
 ): BreakoutDiagnostics {
   const symbols = symbolDiagnostics(trades, options);
   const states = signalStateDiagnostics(trades);
+  const regimeVol = regimeVolContext(trades);
   const notes: string[] = [];
+  if (trades.length) {
+    notes.push(`Gate context: ${regimeVol.summary}.`);
+  }
+
 
   const drivers = symbols.filter((s) => s.role === "driver");
   const drags = symbols.filter((s) => s.role === "drag");
