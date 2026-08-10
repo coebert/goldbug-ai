@@ -116,3 +116,33 @@ describe("mixTimeline", () => {
     );
   });
 });
+
+describe("mixTimelineGrids", () => {
+  it("covers every risk × weight cell and strips the heavy mix payload", async () => {
+    const { mixTimelineGrids, mixTimelineKey } = await import("@/lib/breakout-mix-timeline");
+    const grids = mixTimelineGrids(sample(), ["conservative", "balanced"], [0, 2], {
+      minConfirmed: 1,
+      rollingBuckets: 1,
+    });
+    for (const mode of ["expanding", "rolling"] as const) {
+      expect(Object.keys(grids[mode].entries).sort()).toEqual(
+        ["conservative|0", "conservative|2", "balanced|0", "balanced|2"].sort(),
+      );
+      const tl = grids[mode].entries[mixTimelineKey({ risk: "balanced", gapWeight: 2 })]!;
+      expect(tl.points.length).toBe(3);
+      expect(tl.points.every((p) => p.mix === undefined)).toBe(true);
+    }
+    expect(grids.expanding.entries["balanced|2"]!.points.at(-1)!.windowTrades).toBe(72);
+    expect(grids.rolling.entries["balanced|2"]!.points.at(-1)!.windowTrades).toBe(24);
+  });
+
+  it("matches the single-setting timeline it shares windows with", async () => {
+    const { mixTimelineGrids } = await import("@/lib/breakout-mix-timeline");
+    const one = mixTimeline(sample(), { risk: "balanced", gapWeight: 2 }, { minConfirmed: 1 });
+    const grid = mixTimelineGrids(sample(), ["balanced"], [2], { minConfirmed: 1 });
+    expect(grid.expanding.entries["balanced|2"]!.points.map((p) => p.buyPct)).toEqual(
+      one.points.map((p) => p.buyPct),
+    );
+    expect(grid.expanding.entries["balanced|2"]!.summary).toBe(one.summary);
+  });
+});
