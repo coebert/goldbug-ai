@@ -408,8 +408,8 @@ describe("replay path equivalence and solvency", () => {
     const grid = buildExecutionGrid(trades, { limits: GRID_LIMITS });
 
     for (const spec of HEATMAP_METRICS) {
-      const map = buildHeatmap(grid, spec.metric);
-      const ctx = `heatmap ${spec.metric} — ${REPRO}`;
+      const map = buildHeatmap(grid, spec.key);
+      const ctx = `heatmap ${spec.key} — ${REPRO}`;
       for (const cell of grid.cells) {
         const rows = driverRows(trades, cell.risk, cell.gapWeight);
         assertSolvent(rows, applySizingLimits(rows, GRID_LIMITS).signals, GRID_LIMITS, ctx);
