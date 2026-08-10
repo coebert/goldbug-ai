@@ -71,6 +71,13 @@ export type BreakoutBacktestConfig = {
   detector: Partial<BreakoutConfig>;
   /** Regime classifier overrides. */
   regime: Partial<RegimeThresholds>;
+  /**
+   * Emit an observation on EVERY qualifying bar instead of once per cohort
+   * per breakout episode. Off for scorecards (one vote per episode); on for
+   * signal-age studies, where the whole point is to compare entering the same
+   * break on bar 1, bar 3 and bar 6.
+   */
+  emitEveryBar: boolean;
 };
 
 export const DEFAULT_BREAKOUT_BACKTEST_CONFIG: BreakoutBacktestConfig = {
@@ -83,6 +90,7 @@ export const DEFAULT_BREAKOUT_BACKTEST_CONFIG: BreakoutBacktestConfig = {
   minQuality: 0,
   detector: {},
   regime: {},
+  emitEveryBar: false,
 };
 
 export type SignalTrade = {
@@ -372,8 +380,10 @@ export function runBreakoutBacktest(
       }
       const cohort = ev.state as SignalCohort;
       if (cohort === "pending" && episodePendingIdx === null) episodePendingIdx = i;
-      if (episodeSeen.has(cohort)) continue;
-      if (i - (lastEmit.get(cohort) ?? -Infinity) < cfg.cooldownBars) continue;
+      if (!cfg.emitEveryBar) {
+        if (episodeSeen.has(cohort)) continue;
+        if (i - (lastEmit.get(cohort) ?? -Infinity) < cfg.cooldownBars) continue;
+      }
       if (cohort !== "failed" && ev.quality < cfg.minQuality) continue;
 
       const atr = atrAt(clean, i);

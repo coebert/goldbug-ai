@@ -16,7 +16,7 @@ for (const s of SYMS) {
   series.push({ symbol: s, bars });
 }
 console.log("symbols", series.length, "bars", series.reduce((a, s) => a + s.bars.length, 0));
-const rep = runBreakoutBacktest(series, {});
+const rep = runBreakoutBacktest(series, { emitEveryBar: process.env.EVERY === "1" });
 console.log("trades", rep.trades.length, rep.from, "->", rep.to, "verdict", rep.edge.verdict);
 const t = buildBreakoutTimingReport(rep.trades);
 for (const c of t.cohorts) {
