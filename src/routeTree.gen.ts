@@ -46,6 +46,7 @@ import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
 import { Route as ApiPublicHooksCreditBudgetCheckRouteImport } from './routes/api/public/hooks/credit-budget-check'
 import { Route as ApiPublicHooksCorporateActionDeadlinesRouteImport } from './routes/api/public/hooks/corporate-action-deadlines'
+import { Route as ApiPublicHooksBreakoutExpectancyRouteImport } from './routes/api/public/hooks/breakout-expectancy'
 import { Route as ApiPublicHooksBatchRetrainRouteImport } from './routes/api/public/hooks/batch-retrain'
 import { Route as ApiPublicHooksBackfillIntradayEquityRouteImport } from './routes/api/public/hooks/backfill-intraday-equity'
 import { Route as ApiPublicHooksBackfillDailyEquityChangesRouteImport } from './routes/api/public/hooks/backfill-daily-equity-changes'
@@ -248,6 +249,12 @@ const ApiPublicHooksCorporateActionDeadlinesRoute =
     path: '/api/public/hooks/corporate-action-deadlines',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBreakoutExpectancyRoute =
+  ApiPublicHooksBreakoutExpectancyRouteImport.update({
+    id: '/api/public/hooks/breakout-expectancy',
+    path: '/api/public/hooks/breakout-expectancy',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksBatchRetrainRoute =
   ApiPublicHooksBatchRetrainRouteImport.update({
     id: '/api/public/hooks/batch-retrain',
@@ -301,6 +308,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
+  '/api/public/hooks/breakout-expectancy': typeof ApiPublicHooksBreakoutExpectancyRoute
   '/api/public/hooks/corporate-action-deadlines': typeof ApiPublicHooksCorporateActionDeadlinesRoute
   '/api/public/hooks/credit-budget-check': typeof ApiPublicHooksCreditBudgetCheckRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -344,6 +352,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
+  '/api/public/hooks/breakout-expectancy': typeof ApiPublicHooksBreakoutExpectancyRoute
   '/api/public/hooks/corporate-action-deadlines': typeof ApiPublicHooksCorporateActionDeadlinesRoute
   '/api/public/hooks/credit-budget-check': typeof ApiPublicHooksCreditBudgetCheckRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -388,6 +397,7 @@ export interface FileRoutesById {
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
   '/api/public/hooks/batch-retrain': typeof ApiPublicHooksBatchRetrainRoute
+  '/api/public/hooks/breakout-expectancy': typeof ApiPublicHooksBreakoutExpectancyRoute
   '/api/public/hooks/corporate-action-deadlines': typeof ApiPublicHooksCorporateActionDeadlinesRoute
   '/api/public/hooks/credit-budget-check': typeof ApiPublicHooksCreditBudgetCheckRoute
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
@@ -433,6 +443,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
     | '/api/public/hooks/batch-retrain'
+    | '/api/public/hooks/breakout-expectancy'
     | '/api/public/hooks/corporate-action-deadlines'
     | '/api/public/hooks/credit-budget-check'
     | '/api/public/hooks/daily-run'
@@ -476,6 +487,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
     | '/api/public/hooks/batch-retrain'
+    | '/api/public/hooks/breakout-expectancy'
     | '/api/public/hooks/corporate-action-deadlines'
     | '/api/public/hooks/credit-budget-check'
     | '/api/public/hooks/daily-run'
@@ -519,6 +531,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
     | '/api/public/hooks/batch-retrain'
+    | '/api/public/hooks/breakout-expectancy'
     | '/api/public/hooks/corporate-action-deadlines'
     | '/api/public/hooks/credit-budget-check'
     | '/api/public/hooks/daily-run'
@@ -559,6 +572,7 @@ export interface RootRouteChildren {
   ApiPublicHooksBackfillDailyEquityChangesRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   ApiPublicHooksBackfillIntradayEquityRoute: typeof ApiPublicHooksBackfillIntradayEquityRoute
   ApiPublicHooksBatchRetrainRoute: typeof ApiPublicHooksBatchRetrainRoute
+  ApiPublicHooksBreakoutExpectancyRoute: typeof ApiPublicHooksBreakoutExpectancyRoute
   ApiPublicHooksCorporateActionDeadlinesRoute: typeof ApiPublicHooksCorporateActionDeadlinesRoute
   ApiPublicHooksCreditBudgetCheckRoute: typeof ApiPublicHooksCreditBudgetCheckRoute
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
@@ -836,6 +850,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCorporateActionDeadlinesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/breakout-expectancy': {
+      id: '/api/public/hooks/breakout-expectancy'
+      path: '/api/public/hooks/breakout-expectancy'
+      fullPath: '/api/public/hooks/breakout-expectancy'
+      preLoaderRoute: typeof ApiPublicHooksBreakoutExpectancyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/batch-retrain': {
       id: '/api/public/hooks/batch-retrain'
       path: '/api/public/hooks/batch-retrain'
@@ -911,6 +932,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksBackfillIntradayEquityRoute:
     ApiPublicHooksBackfillIntradayEquityRoute,
   ApiPublicHooksBatchRetrainRoute: ApiPublicHooksBatchRetrainRoute,
+  ApiPublicHooksBreakoutExpectancyRoute: ApiPublicHooksBreakoutExpectancyRoute,
   ApiPublicHooksCorporateActionDeadlinesRoute:
     ApiPublicHooksCorporateActionDeadlinesRoute,
   ApiPublicHooksCreditBudgetCheckRoute: ApiPublicHooksCreditBudgetCheckRoute,
