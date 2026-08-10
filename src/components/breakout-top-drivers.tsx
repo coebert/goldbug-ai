@@ -30,7 +30,7 @@ import {
   type ExecutionGrid,
 } from "@/lib/breakout-driver-execution";
 import { MixTimelineChart } from "@/components/breakout-mix-timeline";
-import type { MixTimelineGrid } from "@/lib/breakout-mix-timeline";
+import type { MixTimelineGrids } from "@/lib/breakout-mix-timeline";
 import {
   compareDriverSettings,
   moverEmphasis,
@@ -647,7 +647,7 @@ export function BreakoutTopDrivers({
   drivers: TopDrivers;
   symbols?: readonly SymbolDiagnostic[];
   execution?: ExecutionGrid;
-  mixTimelines?: MixTimelineGrid;
+  mixTimelines?: MixTimelineGrids;
 }) {
   // Snap the slider to the weights the backtest was actually replayed at, so
   // the execution numbers below always match the ranking above.

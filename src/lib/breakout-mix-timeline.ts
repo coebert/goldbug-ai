@@ -261,3 +261,18 @@ function dropLeadingEmpty<T extends PointLike>(points: T[]): T[] {
 }
 
 const signed = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}`;
+
+/** Both window modes precomputed, so the UI can toggle without a round trip. */
+export type MixTimelineGrids = Record<MixWindowMode, MixTimelineGrid>;
+
+export function mixTimelineGrids(
+  trades: readonly SignalTrade[],
+  risks: readonly DriverSetting["risk"][],
+  gapWeights: readonly number[],
+  options: Omit<MixTimelineOptions, "window"> = {},
+): MixTimelineGrids {
+  return {
+    expanding: mixTimelineGrid(trades, risks, gapWeights, { ...options, window: "expanding" }),
+    rolling: mixTimelineGrid(trades, risks, gapWeights, { ...options, window: "rolling" }),
+  };
+}

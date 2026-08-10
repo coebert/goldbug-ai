@@ -25,7 +25,7 @@ import {
   type ExecutionGrid,
 } from "@/lib/breakout-driver-execution";
 import { RISK_LEVELS } from "@/lib/breakout-driver-actions";
-import { mixTimelineGrid, type MixTimelineGrid } from "@/lib/breakout-mix-timeline";
+import { mixTimelineGrids, type MixTimelineGrids } from "@/lib/breakout-mix-timeline";
 
 export type BreakoutBacktestResponse = Omit<BreakoutBacktestReport, "trades"> & {
   /** Most recent signals only — the full list can be thousands of rows. */
@@ -41,7 +41,7 @@ export type BreakoutBacktestResponse = Omit<BreakoutBacktestReport, "trades"> & 
    */
   execution: ExecutionGrid;
   /** Stance mix (buy/partial/stand aside) per period, one series per setting. */
-  mixTimelines: MixTimelineGrid;
+  mixTimelines: MixTimelineGrids;
   skippedSymbols: string[];
 };
 
@@ -161,7 +161,7 @@ export const runBreakoutSignalBacktest = createServerFn({ method: "POST" })
       // Computed here rather than client-side: the chart needs every trade in
       // the sample, and shipping thousands of rows to the browser to bucket
       // them there would dwarf the whole response.
-      mixTimelines: mixTimelineGrid(trades, RISK_LEVELS, DEFAULT_GAP_WEIGHTS),
+      mixTimelines: mixTimelineGrids(trades, RISK_LEVELS, DEFAULT_GAP_WEIGHTS),
       totalTrades: trades.length,
       skippedSymbols,
     };
