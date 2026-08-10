@@ -116,7 +116,8 @@ function buildBook(rows: readonly Row[], limits: SizingLimits): Book {
     const entryStep = rank.get(s.date) ?? 0;
     const exitStep = entryStep + Math.max(1, row.barsHeld);
     // P&L is booked in the same integer space so the exit credit is exact.
-    const pnlMicro = Math.round((sizeMicro * row.returnPct) / 100);
+    // `|| 0` normalises -0, which is arithmetically identical but fails Object.is.
+    const pnlMicro = Math.round((sizeMicro * row.returnPct) / 100) || 0;
     const id = trades.length;
 
     trades.push({
