@@ -84,7 +84,7 @@ export const DEFAULT_EXIT_SWEEP_OBJECTIVE: ExitSweepObjective = {
   minConfirmedTrades: 25,
   winRateWeight: 1,
   drawdownWeight: 0.35,
-  expectancyWeight: 8,
+  expectancyWeight: 20,
 };
 
 export type BreakoutExitSweepReport = {
