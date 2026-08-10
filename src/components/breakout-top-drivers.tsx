@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -192,10 +192,10 @@ function FactorBar({ value }: { value: number }) {
           width: `${pct}%`,
           backgroundColor:
             pct >= 66
-              ? "hsl(var(--saxo-up))"
+              ? "var(--saxo-up)"
               : pct >= 40
-                ? "hsl(var(--muted-foreground))"
-                : "hsl(var(--saxo-down))",
+                ? "var(--muted-foreground)"
+                : "var(--saxo-down)",
         }}
       />
     </span>
@@ -311,9 +311,8 @@ function WhatIfCompare({
           </thead>
           <tbody>
             {cmp.rows.map((r) => (
-              <>
+              <Fragment key={r.symbol}>
                 <tr
-                  key={r.symbol}
                   className="border-t border-border/30"
                   data-testid={`what-if-row-${r.symbol}`}
                 >
@@ -368,13 +367,13 @@ function WhatIfCompare({
                   </td>
                 </tr>
                 {open === r.symbol ? (
-                  <tr key={`${r.symbol}-why`}>
+                  <tr>
                     <td colSpan={6} className="pb-2">
                       <ChangeExplanation row={r} />
                     </td>
                   </tr>
                 ) : null}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
