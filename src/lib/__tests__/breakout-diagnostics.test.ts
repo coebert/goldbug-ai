@@ -249,7 +249,9 @@ describe("regime + vol context", () => {
     expect(confirmed.regimeVol.cells.map((c) => c.regime)).toEqual(["bull", "sideways"]);
     // The sideways cell is both chop and high-vol: the high-vol layer binds.
     const side = confirmed.regimeVol.cells.find((c) => c.regime === "sideways")!;
-    expect(side.gate.action).toBe("skip");
+    expect(side.gate.action).toBe("downsize");
+    expect(side.gate.driver).toBe("high-vol downsize");
+    expect(side.highVolSharePct).toBe(100);
     expect(d.notes[0]).toContain("Gate context");
   });
 });
