@@ -31,6 +31,7 @@ import {
 } from "@/lib/breakout-driver-execution";
 import {
   compareDriverSettings,
+  type DriverCompareRow,
   type DriverSetting,
 } from "@/lib/breakout-driver-compare";
 import { Button } from "@/components/ui/button";
