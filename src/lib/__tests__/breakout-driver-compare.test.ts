@@ -59,7 +59,7 @@ describe("compareDriverSettings", () => {
     );
     expect(cmp.changedCount).toBe(0);
     expect(cmp.rows.every((r) => r.status === "same")).toBe(true);
-    expect(cmp.rankDeltaSane ?? true).toBe(true);
+    expect(cmp.rows.every((r) => r.rankDelta === 0)).toBe(true);
     expect(cmp.summary).toContain("same setting");
   });
 
