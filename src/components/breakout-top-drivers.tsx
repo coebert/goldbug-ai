@@ -31,9 +31,11 @@ import {
 } from "@/lib/breakout-driver-execution";
 import {
   compareDriverSettings,
+  moverEmphasis,
   type DriverCompareRow,
   type DriverSetting,
 } from "@/lib/breakout-driver-compare";
+
 import { Button } from "@/components/ui/button";
 import { ExecutionHeatmap } from "@/components/breakout-execution-heatmap";
 import {
@@ -273,7 +275,16 @@ function ChangeExplanation({ row }: { row: DriverCompareRow }) {
   );
 }
 
+/** Discrete emphasis tiers — Tailwind can't compile a runtime opacity value. */
+function moverTier(intensity: number, top: boolean): string {
+  if (top) return "bg-primary/20 font-semibold ring-1 ring-primary/40";
+  if (intensity >= 0.6) return "bg-primary/10 font-medium";
+  if (intensity >= 0.3) return "bg-primary/5";
+  return "";
+}
+
 function WhatIfCompare({
+
   symbols,
   a,
   b,
@@ -283,8 +294,10 @@ function WhatIfCompare({
   b: DriverSetting;
 }) {
   const cmp = useMemo(() => compareDriverSettings(symbols, a, b), [symbols, a, b]);
+  const emphasis = useMemo(() => moverEmphasis(cmp.rows), [cmp.rows]);
   const head = (s: DriverSetting) => `${s.risk} · ${s.gapWeight.toFixed(1)}×`;
   const [open, setOpen] = useState<string | null>(null);
+
 
   return (
     <div className="rounded-md border border-border/40 p-2" data-testid="driver-what-if">
@@ -310,18 +323,45 @@ function WhatIfCompare({
             </tr>
           </thead>
           <tbody>
-            {cmp.rows.map((r) => (
+            {cmp.rows.map((r) => {
+              const em = emphasis.by.get(r.symbol);
+              const isTopMover = Boolean(em?.topRankMover || em?.topSizeMover);
+              return (
               <Fragment key={r.symbol}>
                 <tr
-                  className="border-t border-border/30"
+                  className={`border-t border-border/30 ${
+                    isTopMover ? "bg-primary/5" : ""
+                  }`}
                   data-testid={`what-if-row-${r.symbol}`}
+                  data-top-mover={isTopMover ? "true" : undefined}
                 >
                   <td className="py-1 font-medium">
-                    {r.symbol}
+                    <span
+                      className={
+                        isTopMover
+                          ? "border-l-2 border-primary pl-1.5 text-foreground"
+                          : "pl-[calc(0.375rem+2px)]"
+                      }
+                    >
+                      {r.symbol}
+                    </span>
                     {r.status !== "same" ? (
                       <span className="ml-1 text-[10px] text-muted-foreground">
                         {STATUS_LABEL[r.status]}
                       </span>
+                    ) : null}
+                    {isTopMover ? (
+                      <Badge
+                        variant="outline"
+                        className="ml-1 border-primary/40 px-1 py-0 text-[9px] font-medium text-primary"
+                        data-testid={`what-if-top-mover-${r.symbol}`}
+                      >
+                        {em?.topRankMover && em?.topSizeMover
+                          ? "biggest move"
+                          : em?.topRankMover
+                            ? "biggest rank move"
+                            : "biggest size move"}
+                      </Badge>
                     ) : null}
                   </td>
                   <td className="py-1">
@@ -343,15 +383,32 @@ function WhatIfCompare({
                     )}
                   </td>
                   <td className="py-1 text-right tabular-nums">
-                    {r.rankDelta == null
-                      ? "—"
-                      : `${r.rankDelta > 0 ? "+" : ""}${r.rankDelta}`}
+                    <span
+                      className={`inline-block rounded px-1 ${moverTier(
+                        em?.rankIntensity ?? 0,
+                        em?.topRankMover ?? false,
+                      )}`}
+                      data-testid={`what-if-rank-delta-${r.symbol}`}
+                    >
+                      {r.rankDelta == null
+                        ? "—"
+                        : `${r.rankDelta > 0 ? "↑+" : r.rankDelta < 0 ? "↓" : ""}${r.rankDelta}`}
+                    </span>
                   </td>
-                  <td
-                    className={`py-1 text-right tabular-nums ${r.sizeDelta ? tone(r.sizeDelta) : ""}`}
-                  >
-                    {r.sizeDelta == null ? "—" : `${r.sizeDelta > 0 ? "+" : ""}${r.sizeDelta.toFixed(2)}×`}
+                  <td className="py-1 text-right tabular-nums">
+                    <span
+                      className={`inline-block rounded px-1 ${r.sizeDelta ? tone(r.sizeDelta) : ""} ${moverTier(
+                        em?.sizeIntensity ?? 0,
+                        em?.topSizeMover ?? false,
+                      )}`}
+                      data-testid={`what-if-size-delta-${r.symbol}`}
+                    >
+                      {r.sizeDelta == null
+                        ? "—"
+                        : `${r.sizeDelta > 0 ? "+" : ""}${r.sizeDelta.toFixed(2)}×`}
+                    </span>
                   </td>
+
                   <td className="py-1 text-right">
                     <Button
                       type="button"
@@ -374,7 +431,9 @@ function WhatIfCompare({
                   </tr>
                 ) : null}
               </Fragment>
-            ))}
+              );
+            })}
+
           </tbody>
         </table>
       </div>

@@ -357,3 +357,51 @@ export function compareDriverSettings(
 
   return { a, b, rows: rows.slice(0, limit), changedCount, summary };
 }
+
+/**
+ * Relative emphasis for the compare table.
+ *
+ * Intensity is scaled against the largest absolute move in the *current* diff,
+ * not an absolute scale, so the eye is always drawn to the biggest movers on
+ * screen even when every move is small. Rows tie-break on the other axis so a
+ * name that tops both rank and size is flagged once as the headline mover.
+ */
+export type DriverEmphasis = {
+  symbol: string;
+  /** 0–1 relative to the largest |Δ rank| in the diff. */
+  rankIntensity: number;
+  /** 0–1 relative to the largest |Δ size| in the diff. */
+  sizeIntensity: number;
+  /** Ties included: every row sharing the largest |Δ rank|. */
+  topRankMover: boolean;
+  /** Ties included: every row sharing the largest |Δ size|. */
+  topSizeMover: boolean;
+};
+
+export type DriverEmphasisMap = {
+  by: Map<string, DriverEmphasis>;
+  maxRankDelta: number;
+  maxSizeDelta: number;
+};
+
+export function moverEmphasis(rows: readonly DriverCompareRow[]): DriverEmphasisMap {
+  const absRank = (r: DriverCompareRow) => Math.abs(r.rankDelta ?? 0);
+  const absSize = (r: DriverCompareRow) => Math.abs(r.sizeDelta ?? 0);
+  const maxRankDelta = rows.reduce((m, r) => Math.max(m, absRank(r)), 0);
+  const maxSizeDelta = rows.reduce((m, r) => Math.max(m, absSize(r)), 0);
+
+  const by = new Map<string, DriverEmphasis>();
+  for (const r of rows) {
+    const rd = absRank(r);
+    const sd = absSize(r);
+    by.set(r.symbol, {
+      symbol: r.symbol,
+      rankIntensity: maxRankDelta > 0 ? rd / maxRankDelta : 0,
+      sizeIntensity: maxSizeDelta > 0 ? sd / maxSizeDelta : 0,
+      // A zero move is never "the biggest mover", even when nothing moved.
+      topRankMover: maxRankDelta > 0 && rd === maxRankDelta,
+      topSizeMover: maxSizeDelta > 0 && sd === maxSizeDelta,
+    });
+  }
+  return { by, maxRankDelta, maxSizeDelta };
+}
