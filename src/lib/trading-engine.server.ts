@@ -1721,7 +1721,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         });
         continue;
       }
-      const brk = { mult: brkRegime.mult, note: brkRegime.note || brkRegime.rawMult !== 1 ? brkRegime.note : "" };
+      const brk = { mult: brkRegime.mult, note: brkRegime.note };
 
       const haircuts = combineHaircuts([
         { label: "calib", mult: calibration.global_size_mult },
