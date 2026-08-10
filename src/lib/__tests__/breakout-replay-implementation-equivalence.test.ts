@@ -542,9 +542,10 @@ describe("replay implementation equivalence — property based", () => {
 
   it("a single altered release rule is caught by the differential", () => {
     const cohort = randomCohort(caseSeed(BASE_SEED, "negative-control", 0));
-    // One position held a bar longer — the classic off-by-one in a release rule.
     const drifted = naiveReplay(
-      cohort.rows.map((row, i) => (i === 0 ? { ...row, barsHeld: row.barsHeld + 1 } : row)),
+      // Every position held one bar longer — the classic off-by-one in a
+      // release rule. It must move the cash trace.
+      cohort.rows.map((row) => ({ ...row, barsHeld: row.barsHeld + 1 })),
       cohort.plan,
       cohort.capital,
       cohort.costs,
