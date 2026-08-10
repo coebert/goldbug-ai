@@ -376,6 +376,7 @@ export function signalStateDiagnostics(
     out.push({
       cohort,
       overall: summarizeSlice(ts),
+      regimeVol: regimeVolContext(ts),
       byDirection: (["up", "down"] as const)
         .map((direction) => ({
           direction,
