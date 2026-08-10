@@ -385,7 +385,7 @@ export function BreakoutTopDrivers({
             type="single"
             size="sm"
             value={risk}
-            onValueChange={(v) => v && setRisk(v as RiskLevel)}
+            onValueChange={(v) => v && changeRisk(v as RiskLevel)}
             className="mt-1 justify-start"
             data-testid="driver-risk-toggle"
           >
