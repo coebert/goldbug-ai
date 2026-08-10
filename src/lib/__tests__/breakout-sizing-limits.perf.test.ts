@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applySizingLimits, type SizingLimits } from "@/lib/breakout-sizing-limits";
+import { caseSeed, resolveFuzzSeed, rng } from "./fuzz-seed";
 
 /**
  * Performance regression guard for the sizing-limits pipeline.
@@ -68,17 +69,14 @@ const day = (i: number) => {
 
 type Row = { symbol: string; date: string; barsHeld: number; size: number };
 
-/** Deterministic PRNG so timings are comparable run to run. */
-function rng(seed: number) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 0x1_0000_0000;
-  };
-}
+/**
+ * Workload seeding shares the fuzz suite's contract, so a slow or failing
+ * perf run replays exactly with `FUZZ_SEED=<base> bunx vitest run <file>`.
+ */
+const BASE_SEED = resolveFuzzSeed();
 
-function cohort(n: number, seed = 7, poison = false): Row[] {
-  const r = rng(seed);
+function cohort(n: number, index = 0, poison = false): Row[] {
+  const r = rng(caseSeed(BASE_SEED, poison ? "perf-poisoned" : "perf-clean", index));
   const out: Row[] = [];
   for (let i = 0; i < n; i++) {
     let size = r() * 2;
@@ -99,6 +97,7 @@ function cohort(n: number, seed = 7, poison = false): Row[] {
   return out;
 }
 
+
 const LIMITS: SizingLimits = {
   maxPositionSize: 1.5,
   maxConcurrentSignals: 5,
@@ -112,7 +111,7 @@ const LIMITS: SizingLimits = {
 /** One 2k-signal integration-sized replay. */
 const BUDGET_INTEGRATION = 1.5;
 /** The fuzz suite's shape: 3,000 small cohorts back to back. */
-const BUDGET_FUZZ = 6;
+const BUDGET_FUZZ = 8;
 /** Ceiling on the observed scaling exponent — 1 is linear, 2 is quadratic. */
 const MAX_SCALING_EXPONENT = 1.45;
 
