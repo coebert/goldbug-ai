@@ -194,6 +194,8 @@ export function BreakoutDiagnosticsSection({
         </ul>
       )}
 
+      {tab !== "timing" && <RegimeVolCells ctx={diagnostics.regimeVol} label="All signals" />}
+
       {tab === "timing" && timing ? (
         <div className="space-y-3" data-testid="breakout-timing-blocks">
           {timing.cohorts.map((c) => (
@@ -355,6 +357,7 @@ export function BreakoutDiagnosticsSection({
                   </tbody>
                 </table>
               </div>
+              <RegimeVolCells ctx={st.regimeVol} label={`${st.cohort} regime cells`} />
             </div>
           ))}
         </div>
