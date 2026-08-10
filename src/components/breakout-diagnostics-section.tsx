@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import type {
   BreakoutDiagnostics,
@@ -155,6 +155,7 @@ export function BreakoutDiagnosticsSection({
   timing?: BreakoutTimingReport;
 }) {
   const [tab, setTab] = useState<"symbols" | "states" | "timing">("symbols");
+  const [openSymbol, setOpenSymbol] = useState<string | null>(null);
   if (!diagnostics.symbols.length && !diagnostics.states.length) return null;
 
   return (
@@ -250,7 +251,8 @@ export function BreakoutDiagnosticsSection({
                 <th className="py-1 pr-3 text-right font-normal">Fail win</th>
                 <th className="py-1 pr-3 text-right font-normal">Fail avg</th>
                 <th className="py-1 pr-3 text-right font-normal">Gap</th>
-                <th className="py-1 text-right font-normal">P&amp;L share</th>
+                <th className="py-1 pr-3 text-right font-normal">P&amp;L share</th>
+                <th className="py-1 text-right font-normal">Regime / vol</th>
               </tr>
             </thead>
             <tbody>
@@ -258,8 +260,8 @@ export function BreakoutDiagnosticsSection({
                 const open = openSymbol === s.symbol;
                 const ctx = s.confirmedRegimeVol.cells.length ? s.confirmedRegimeVol : s.regimeVol;
                 return (
-                  <>
-                    <tr key={s.symbol} className="border-t border-border/40">
+                  <Fragment key={s.symbol}>
+                    <tr className="border-t border-border/40">
                       <td className="py-1 pr-3">
                         <button
                           type="button"
@@ -290,13 +292,13 @@ export function BreakoutDiagnosticsSection({
                       </td>
                     </tr>
                     {open && (
-                      <tr key={`${s.symbol}-cells`} className="border-t border-border/20">
+                      <tr className="border-t border-border/20">
                         <td colSpan={10} className="pb-2">
                           <RegimeVolCells ctx={ctx} label={`${s.symbol} confirmed cells`} />
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
