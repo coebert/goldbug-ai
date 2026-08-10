@@ -299,7 +299,9 @@ describe("execution grid properties over random grids, seeds and risk settings",
         expect(cell.avgSize, `negative avg size at ${where}`).toBeGreaterThanOrEqual(0);
         expect(cell.winRatePct, `win rate out of range at ${where}`).toBeGreaterThanOrEqual(0);
         expect(cell.winRatePct, `win rate out of range at ${where}`).toBeLessThanOrEqual(100);
-        expect(cell.maxDrawdownPct, `drawdown out of range at ${where}`).toBeGreaterThanOrEqual(0);
+        // Drawdown is reported as a negative-or-zero percentage.
+        expect(cell.maxDrawdownPct, `drawdown out of range at ${where}`).toBeLessThanOrEqual(0);
+        expect(cell.maxDrawdownPct, `drawdown below -100% at ${where}`).toBeGreaterThanOrEqual(-100);
         // A cap of zero on any axis must mean nothing gets funded.
         if (c.limits.maxPositionSize === 0 || c.limits.maxConcurrentSignals === 0) {
           expect(cell.taken, `funded a signal under a zero cap at ${where}`).toBe(0);
