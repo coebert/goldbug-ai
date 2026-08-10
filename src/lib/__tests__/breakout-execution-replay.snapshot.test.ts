@@ -318,4 +318,39 @@ describe("backtest replay summary snapshots", () => {
       }
     `);
   });
+
+  /**
+   * Inline snapshots tell you *that* the grid moved; on an 18-cell grid they
+   * then dump every cell and leave you to find the one that matters. This guard
+   * pins the same values in a machine-comparable form and runs them through the
+   * mismatch minimizer, so a regression reports the plainest cell that changed
+   * and the root field inside it — the smallest change that alters the replay
+   * summary — instead of a wall of diff.
+   */
+  it("pinned grid values: a drift reports the smallest changed cell", () => {
+    const PINNED_BY_RISK: Record<RiskLevel, SnapshotShape> = {
+      conservative: { cumulativeReturnPct: 14.75, maxDrawdownPct: -1, deployedPct: 27.14, taken: 18 },
+      balanced: { cumulativeReturnPct: 26.44, maxDrawdownPct: -1, deployedPct: 52.86, taken: 18 },
+      aggressive: { cumulativeReturnPct: 59.93, maxDrawdownPct: -7.06, deployedPct: 100.71, taken: 23 },
+    };
+    const GAP_WEIGHTS = [0, 1, 2, 3, 4, 6];
+    const coords = RISK_LEVELS.flatMap((risk) => GAP_WEIGHTS.map((gapWeight) => ({ risk, gapWeight })));
+    const pinned: PinnedCells = Object.fromEntries(
+      coords.map((c) => [cellKey(c.risk, c.gapWeight), PINNED_BY_RISK[c.risk]]),
+    );
+
+    const actual = (risk: RiskLevel, gapWeight: number): SnapshotShape => {
+      const s = applyDriverSizing(TRADES, { risk, gapWeight, limits: LIMITS });
+      return {
+        cumulativeReturnPct: r2(s.cumulativeReturnPct),
+        maxDrawdownPct: r2(s.maxDrawdownPct),
+        deployedPct: r2(s.deployedPct),
+        taken: s.taken,
+      };
+    };
+
+    const mismatch = minimizeGridMismatch(pinned, actual, coords);
+    if (mismatch) expect.fail(mismatch.report);
+  });
 });
+
