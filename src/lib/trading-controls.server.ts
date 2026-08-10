@@ -6,7 +6,7 @@
 //   * `trading_enabled = false` — global kill switch. Admin-only to flip
 //     (see the RLS policy on public.trading_controls).
 //   * `daily_notional_limit` — maximum BUY notional that may be routed to the
-//
+//     broker in a single UK trading day, summed across real-money portfolios.
 // Two things the running total must get right, both of which have bitten us:
 //
 //   * Only REAL-money (`live_prod`) fills count. Simulated portfolios route
