@@ -195,7 +195,7 @@ export function BreakoutDiagnosticsSection({
         </ul>
       )}
 
-      {tab !== "timing" && <BreakoutTopDrivers drivers={diagnostics.topDrivers} />}
+      {tab !== "timing" && <BreakoutTopDrivers drivers={diagnostics.topDrivers} symbols={diagnostics.symbols} />}
 
       {tab !== "timing" && <RegimeVolCells ctx={diagnostics.regimeVol} label="All signals" />}
 
