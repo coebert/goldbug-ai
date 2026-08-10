@@ -66,8 +66,10 @@ export function ExecutionHeatmap({
                 {row.cells.map((c) => {
                   const isCurrent =
                     current?.risk === c.risk && current?.gapWeight === c.gapWeight;
-                  const alpha = 0.12 + Math.abs(c.intensity - 0.5) * 1.4 * 0.6;
-                  const hue = c.good ? "var(--chart-positive-rgb)" : "var(--chart-negative-rgb)";
+                  const strength = Math.round(
+                    8 + Math.min(1, Math.abs(c.intensity - 0.5) * 2) * 52,
+                  );
+                  const base = c.good ? "var(--saxo-up)" : "var(--saxo-down)";
                   return (
                     <td key={c.gapWeight} className="p-0">
                       <Tooltip>
@@ -77,7 +79,9 @@ export function ExecutionHeatmap({
                             className={`rounded-sm px-1.5 py-2 text-center tabular-nums ${
                               isCurrent ? "ring-2 ring-primary" : ""
                             } ${c.isBest ? "font-semibold" : ""}`}
-                            style={{ backgroundColor: `rgb(${hue} / ${alpha.toFixed(2)})` }}
+                            style={{
+                              backgroundColor: `color-mix(in oklab, ${base} ${strength}%, transparent)`,
+                            }}
                           >
                             {c.value.toFixed(1)}
                             {map.metric.suffix}
