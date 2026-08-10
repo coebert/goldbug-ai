@@ -5,6 +5,7 @@ import type {
   SignalSlice,
   SymbolDiagnostic,
 } from "@/lib/breakout-diagnostics";
+import type { BreakoutTimingReport, BucketRow } from "@/lib/breakout-timing";
 
 const pct = (v: number, digits = 2) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
 const tone = (v: number) => (v >= 0 ? "text-emerald-500" : "text-red-500");
@@ -41,12 +42,47 @@ const ROLE_TONE: Record<SymbolDiagnostic["role"], string> = {
  * Per-symbol and per-signal-state breakdown of a breakout backtest — shows
  * which names and which breakout states create the confirmed-vs-failed gap.
  */
+function BucketTable({ title, rows }: { title: string; rows: BucketRow[] }) {
+  if (!rows.length) return null;
+  return (
+    <div className="min-w-[220px] flex-1">
+      <p className="text-[11px] font-medium text-muted-foreground">{title}</p>
+      <table className="mt-1 w-full text-xs">
+        <thead className="text-[11px] text-muted-foreground">
+          <tr>
+            <th className="py-1 pr-2 text-left font-normal">Band</th>
+            <th className="py-1 pr-2 text-right font-normal">n</th>
+            <th className="py-1 pr-2 text-right font-normal">Win</th>
+            <th className="py-1 text-right font-normal">Avg</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-t border-border/30">
+              <td className="py-1 pr-2">{r.label}</td>
+              <td className="py-1 pr-2 text-right tabular-nums">{r.slice.trades}</td>
+              <td className="py-1 pr-2 text-right tabular-nums">
+                {r.slice.winRatePct.toFixed(0)}%
+              </td>
+              <td className={`py-1 text-right tabular-nums ${tone(r.expectancyPct)}`}>
+                {pct(r.expectancyPct)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function BreakoutDiagnosticsSection({
   diagnostics,
+  timing,
 }: {
   diagnostics: BreakoutDiagnostics;
+  timing?: BreakoutTimingReport;
 }) {
-  const [tab, setTab] = useState<"symbols" | "states">("symbols");
+  const [tab, setTab] = useState<"symbols" | "states" | "timing">("symbols");
   if (!diagnostics.symbols.length && !diagnostics.states.length) return null;
 
   return (
@@ -59,7 +95,7 @@ export function BreakoutDiagnosticsSection({
           </p>
         </div>
         <div className="flex gap-1">
-          {(["symbols", "states"] as const).map((t) => (
+          {(timing ? (["symbols", "states", "timing"] as const) : (["symbols", "states"] as const)).map((t) => (
             <button
               key={t}
               type="button"
@@ -71,7 +107,7 @@ export function BreakoutDiagnosticsSection({
                   : "border-border text-muted-foreground"
               }`}
             >
-              {t === "symbols" ? "Per symbol" : "Per signal"}
+              {t === "symbols" ? "Per symbol" : t === "states" ? "Per signal" : "Timing"}
             </button>
           ))}
         </div>
@@ -85,7 +121,51 @@ export function BreakoutDiagnosticsSection({
         </ul>
       )}
 
-      {tab === "symbols" ? (
+      {tab === "timing" && timing ? (
+        <div className="space-y-3" data-testid="breakout-timing-blocks">
+          {timing.cohorts.map((c) => (
+            <div key={c.cohort} className="rounded-md border border-border/40 p-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-xs font-medium capitalize">{c.cohort}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {c.overall.trades} signals · avg age {c.avgAgeBars.toFixed(1)}b ·{" "}
+                  {c.avgPendingLatencyBars == null
+                    ? "no pending lead-in"
+                    : `resolves ${c.avgPendingLatencyBars.toFixed(1)}b after pending`}{" "}
+                  · decay {c.ageDecayPctPerBar >= 0 ? "+" : ""}
+                  {c.ageDecayPctPerBar.toFixed(3)}%/bar
+                </p>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-4">
+                <BucketTable title="By signal age at entry" rows={c.byAge} />
+                <BucketTable title="By pending → resolution" rows={c.byPendingLatency} />
+                <BucketTable title="By realised hold time" rows={c.byHoldTime} />
+              </div>
+            </div>
+          ))}
+          {timing.recommended.map((r) => (
+            <div key={r.cohort} className="rounded-md border border-primary/30 bg-primary/5 p-2">
+              <p className="text-xs font-medium capitalize">
+                Recommended {r.cohort} age mapping
+                {r.staleAgeBars != null && (
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    · stale from {r.staleAgeBars} bars
+                  </span>
+                )}
+              </p>
+              <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                {r.rules.map((rule) => (
+                  <li key={`${rule.minAgeBars}-${rule.maxAgeBars}`}>
+                    age {rule.minAgeBars}–
+                    {Number.isFinite(rule.maxAgeBars) ? rule.maxAgeBars : "+"} →{" "}
+                    {rule.veto ? "skip" : `×${rule.mult.toFixed(2)}`} ({rule.reason})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : tab === "symbols" ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] text-xs" data-testid="breakout-symbol-table">
             <thead className="text-[11px] text-muted-foreground">
