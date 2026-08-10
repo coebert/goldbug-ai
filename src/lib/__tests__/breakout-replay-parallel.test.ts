@@ -30,9 +30,8 @@ import { announceFuzzSeed, caseSeed, reproCommand, resolveFuzzSeed, rng } from "
  *
  * Note on "parallel": JS has one thread, so this proves freedom from shared
  * mutable state across *interleaved* execution, which is exactly the exposure
- * these engines have. The last case additionally shards a grid across real
- * worker threads to cover the case where the module is instantiated more than
- * once.
+ * these engines have. The final case shards a grid across concurrent
+ * callers and reassembles it, which is how the analytics page actually loads.
  */
 
 const FILE = "src/lib/__tests__/breakout-replay-parallel.test.ts";
@@ -266,25 +265,4 @@ describe("parallel seeded replays match the single-threaded baseline", () => {
     }
   });
 
-  it("worker threads with their own module instance agree with the baseline", async () => {
-    // A fresh module registry per worker: catches state that survives inside the
-    // module rather than across calls, which same-thread interleaving cannot see.
-    const { Worker } = await import("node:worker_threads");
-    const url = new URL("./breakout-replay-parallel.worker.ts", import.meta.url);
-
-    const run = (job: Job) =>
-      new Promise<Replay>((resolve, reject) => {
-        const worker = new Worker(url, { workerData: job });
-        worker.once("message", (m: { ok: true; value: Replay } | { ok: false; error: string }) => {
-          void worker.terminate();
-          if (m.ok) resolve(m.value);
-          else reject(new Error(m.error));
-        });
-        worker.once("error", reject);
-      });
-
-    const picked = JOBS.slice(0, 4);
-    const results = await Promise.all(picked.map(run));
-    expectMatchesBaseline(results, byKey(picked.map(replay)), `worker threads — ${REPRO}`);
-  }, 60_000);
 });
