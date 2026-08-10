@@ -242,3 +242,23 @@ export function assessTradeViability(input: ViabilityInput): ViabilityResult {
 
   return { viable: true, budgetBps, costs, minViableNotional: floor };
 }
+
+/**
+ * Modelled per-side cash cost of an executed fill (commission with the venue
+ * floor + UK stamp duty on liable buys + PTM levy). Saxo's fill payloads
+ * frequently omit commission, which is how ~£180 of friction on a £10k
+ * account became invisible in `live_fills.fee` (every row read 0). Booking
+ * the modelled number keeps cost attribution and the portfolio cost governor
+ * honest; the half-spread is excluded because it is price impact, not a fee.
+ */
+export function modelledFillFee(args: {
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  assetClass?: string | null;
+}): number {
+  const costs = estimateTradeCosts({ ...args, spreadBps: 0 });
+  const fee = costs.commission + costs.stampDuty + costs.ptmLevy;
+  return Number.isFinite(fee) && fee > 0 ? Number(fee.toFixed(4)) : 0;
+}

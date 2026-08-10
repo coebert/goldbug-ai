@@ -9,7 +9,7 @@
 import type { BrokerOrderResult } from "@/lib/brokers/adapter";
 import { asJson } from "@/lib/_server/db-json";
 import { createHash } from "node:crypto";
-import { assessTradeViability } from "@/lib/trade-viability-gate";
+import { assessTradeViability, modelledFillFee } from "@/lib/trade-viability-gate";
 import { resolveFillRecord } from "@/lib/fill-record";
 
 
@@ -1778,7 +1778,12 @@ export async function routeOrdersToBroker(params: {
           side: order.side,
           quantity: brokerRes.filledQuantity,
           fill_price: resolved.fillPrice,
-          fee: 0,
+          fee: modelledFillFee({
+            symbol: order.symbol,
+            side: order.side === "sell" ? "sell" : "buy",
+            quantity: brokerRes.filledQuantity,
+            price: resolved.fillPrice,
+          }),
           currency: fillCcy,
           broker_fill_id: brokerRes.brokerOrderId || null,
           filled_at: new Date().toISOString(),
