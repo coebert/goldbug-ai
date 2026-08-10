@@ -234,12 +234,12 @@ describe("replay is invariant to equivalent iteration orders", () => {
     }
   });
 
-  it("same-day signals may arrive in any order when no cap binds", () => {
-    // With caps wide open every signal is funded at its requested size, so the
-    // book, the sizes and the compounded return are all order-free. Drawdown is
-    // deliberately excluded: it is a property of the *path*, and same-day
-    // signals have no defined order between them, so which one is counted
-    // first legitimately moves the worst point of the equity curve.
+  it("same-day signals may arrive in any order — including the drawdown path", () => {
+    // The cohort is sorted on a total order (date, then symbol, holding period,
+    // return, entry, side/direction/cohort/exit reason), so same-day signals
+    // have exactly one canonical sequence however they arrived. That makes the
+    // equity *path* — and therefore max drawdown — order-invariant too, so
+    // nothing is excluded from this comparison any more.
     for (let i = 0; i < 15; i++) {
       const r = rng(caseSeed(BASE_SEED, "sameday", i));
       const base = distinctDayCohort(caseSeed(BASE_SEED, "sameday-cohort", i), 90);
@@ -247,18 +247,18 @@ describe("replay is invariant to equivalent iteration orders", () => {
       const clustered = base.map((t, k) => ({ ...t, date: day(k % 6) })) as SignalTrade[];
       const ctx = `same-day case ${i} — ${REPRO}`;
 
-      const pathFree = ({ maxDrawdownPct, ...rest }: ReturnType<typeof summaryOf>) => rest;
-      const expected = pathFree(summaryOf(clustered, "balanced", 2, LOOSE));
-      const expectedTape = [...tape(clustered, "balanced", 2, LOOSE)].sort();
+      const expected = summaryOf(clustered, "balanced", 2, LOOSE);
+      const expectedTape = tape(clustered, "balanced", 2, LOOSE);
       for (let s = 0; s < 4; s++) {
         const shuffled = shuffle(clustered, r);
-        expect(pathFree(summaryOf(shuffled, "balanced", 2, LOOSE)), `same-day order changed P&L: ${ctx}`)
+        expect(summaryOf(shuffled, "balanced", 2, LOOSE), `same-day order changed P&L: ${ctx}`)
           .toEqual(expected);
-        expect([...tape(shuffled, "balanced", 2, LOOSE)].sort(), `same-day fills changed: ${ctx}`)
+        expect(tape(shuffled, "balanced", 2, LOOSE), `same-day fills changed: ${ctx}`)
           .toEqual(expectedTape);
       }
     }
   });
+
 
   it("grid cells do not depend on the order they are computed in", () => {
     for (let i = 0; i < 6; i++) {
