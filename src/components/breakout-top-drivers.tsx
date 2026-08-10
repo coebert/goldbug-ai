@@ -425,11 +425,29 @@ export function BreakoutTopDrivers({
         </div>
       </div>
 
-      <p className="text-[11px] text-muted-foreground" data-testid="driver-action-summary">
-        {summariseActions(recs, risk)}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-muted-foreground" data-testid="driver-action-summary">
+          {summariseActions(recs, risk)}
+        </p>
+        {symbols?.length ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={() => setShowCompare((s) => !s)}
+            data-testid="what-if-toggle"
+          >
+            {showCompare ? "Hide what-if" : "Compare with previous"}
+          </Button>
+        ) : null}
+      </div>
+
+      {showCompare && symbols?.length ? (
+        <WhatIfCompare symbols={symbols} a={prev} b={{ risk, gapWeight }} />
+      ) : null}
 
       {cell ? <ExecutionImpact cell={cell} grid={execution!} /> : null}
+
       <p className="text-[11px] text-muted-foreground">{view.summary}</p>
       <div className="grid gap-2 sm:grid-cols-2">
         <Side
