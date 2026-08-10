@@ -40,6 +40,7 @@ import {
   CONFIDENCE_LABELS,
   STANCES,
   actionMix,
+  actionMixFor,
   diffActionMix,
   type ActionMix,
 } from "@/lib/breakout-action-mix";
@@ -589,6 +590,8 @@ export function BreakoutTopDrivers({
           </Button>
         ) : null}
       </div>
+
+      <ActionMixPanel mix={mix} prevMix={prevMix} />
 
       {showCompare && symbols?.length ? (
         <WhatIfCompare symbols={symbols} a={prev} b={{ risk, gapWeight }} />
