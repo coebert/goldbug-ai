@@ -139,20 +139,57 @@ function orderDue(due: OpenPos[], order: ReleaseOrder): OpenPos[] {
 }
 
 /**
+ * Market data is not trustworthy: bars go missing, a feed sends a zero or
+ * negative price, a symbol gaps by years, a field arrives as null. None of
+ * that may reach the money. Everything entering the ledger is coerced to a
+ * finite, sane value here — a bad input can only ever mean "no cost" or "no
+ * hold", never a credit, a negative holding or a NaN that poisons the books.
+ */
+export function sanitiseCosts(c: Costs): Costs {
+  const clean = (v: number, max: number) => (!Number.isFinite(v) || v <= 0 ? 0 : Math.min(v, max));
+  return {
+    commissionBps: clean(c.commissionBps, 5_000),
+    minFee: clean(c.minFee, 1e6),
+    slippageBps: clean(c.slippageBps, 5_000),
+  };
+}
+
+/** Capital must be a finite, non-negative bank. */
+export function sanitiseCapital(v: number): number {
+  return !Number.isFinite(v) || v <= 0 ? 0 : Math.min(v, 1e12);
+}
+
+/**
+ * Holding period in bars. A missing, NaN, zero, negative or absurd bar count
+ * degrades to "close on the next step", which is the safe direction: the
+ * position always unwinds rather than being stranded on the book forever.
+ */
+export function holdBars(row: Row | undefined): number {
+  const v = row?.barsHeld;
+  if (!Number.isFinite(v as number)) return 1;
+  return Math.min(Math.max(1, Math.floor(v as number)), 1e6);
+}
+
+/**
  * Walks the plan charging frictions on both sides of every fill, booking each
  * charge on the step where that fill happens.
  */
 export function runCostedReplay(
   rows: readonly Row[],
   plan: LimitedPlan,
-  capital: number,
-  costs: Costs,
+  rawCapital: number,
+  rawCosts: Costs,
   options: ReplayOptions = {},
 ): Replay {
   const releaseOrder = options.releaseOrder ?? "lifo";
-  const dates = [...new Set(rows.map((x) => x.date))].sort();
+  const costs = sanitiseCosts(rawCosts);
+  const capital = sanitiseCapital(rawCapital);
+  // Dates are ranked as opaque sortable keys, so a huge gap, a duplicate or a
+  // malformed date changes the ranking but never the arithmetic.
+  const dates = [...new Set(rows.map((x) => String(x?.date ?? "")))].sort();
   const dateRank = new Map(dates.map((d, i) => [d, i]));
   const capitalMicros = toMicros(capital);
+
 
   let cashMicros = capitalMicros;
   let seq = 0;
