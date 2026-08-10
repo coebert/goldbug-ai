@@ -66,6 +66,71 @@ function randomLimits(r: () => number): SizingLimits {
 }
 
 // ---------------------------------------------------------------------------
+// Cost model: commission, spread and FX fee legs
+// ---------------------------------------------------------------------------
+
+/**
+ * Real fills never move cash by the notional alone. Three frictions are booked
+ * as their own cash legs so they can be reconciled independently:
+ *
+ *   commission — bps of notional with a per-ticket minimum (Saxo-style)
+ *   spread     — half the quoted spread, charged on both sides of the round trip
+ *   fx fee     — bps of notional, only on instruments quoted in a foreign ccy
+ *
+ * They are cash-only: a fee never changes the share count, so the holdings
+ * reconciliation must stay untouched by them. Each fee is booked on the exact
+ * step of the fill that incurred it, so a cost that leaks into the wrong step
+ * (or is netted silently into the fill price) breaks the step reconciliation.
+ */
+type CostModel = {
+  commissionBps: number;
+  minCommissionMicro: number;
+  halfSpreadBps: number;
+  fxFeeBps: number;
+  /** Symbols quoted in a foreign currency, i.e. the ones the FX fee applies to. */
+  foreign: ReadonlySet<string>;
+};
+
+const ZERO_COSTS: CostModel = {
+  commissionBps: 0,
+  minCommissionMicro: 0,
+  halfSpreadBps: 0,
+  fxFeeBps: 0,
+  foreign: new Set(),
+};
+
+function randomCosts(r: () => number, symbols: readonly string[]): CostModel {
+  const foreign = new Set(symbols.filter(() => r() < 0.5));
+  return {
+    commissionBps: Math.round(r() * 25),
+    minCommissionMicro: Math.round(r() * 5000),
+    halfSpreadBps: Math.round(r() * 40),
+    fxFeeBps: Math.round(r() * 30),
+    foreign,
+  };
+}
+
+const bpsOf = (notionalMicro: number, bps: number) => (bps <= 0 ? 0 : Math.round((notionalMicro * bps) / 10_000));
+
+type CostKind = "commission" | "spread" | "fx";
+const COST_KINDS: readonly CostKind[] = ["commission", "spread", "fx"];
+type CostBreakdown = Record<CostKind, number>;
+
+/** Costs charged on one fill leg, as positive amounts (they debit cash). */
+function costsFor(costs: CostModel, symbol: string, notionalMicro: number): CostBreakdown {
+  const notional = Math.max(0, notionalMicro);
+  if (notional === 0) return { commission: 0, spread: 0, fx: 0 };
+  const commission = Math.max(costs.minCommissionMicro, bpsOf(notional, costs.commissionBps));
+  return {
+    commission,
+    spread: bpsOf(notional, costs.halfSpreadBps),
+    fx: costs.foreign.has(symbol) ? bpsOf(notional, costs.fxFeeBps) : 0,
+  };
+}
+
+const sumCosts = (b: CostBreakdown) => b.commission + b.spread + b.fx;
+
+// ---------------------------------------------------------------------------
 // The executed trade list (what the UI renders) and the ledger legs it implies
 // ---------------------------------------------------------------------------
 
@@ -73,10 +138,14 @@ type Leg = {
   step: number;
   tradeId: number;
   symbol: string;
-  kind: "entry" | "exit";
+  kind: "entry" | "exit" | CostKind;
+  /** Which fill the leg belongs to — fees settle with their own fill. */
+  parent: "entry" | "exit";
   cashMicro: number;
   holdingMicro: number;
 };
+
+const isCostLeg = (l: Leg): l is Leg & { kind: CostKind } => l.kind !== "entry" && l.kind !== "exit";
 
 type ExecutedTrade = {
   id: number;
@@ -84,23 +153,34 @@ type ExecutedTrade = {
   entryStep: number;
   exitStep: number;
   sizeMicro: number;
-  /** Cash paid out at entry (negative) plus cash returned at exit (positive). */
+  /** Cash paid out at entry (negative) plus cash returned at exit (positive), before fees. */
   cashLegsMicro: [number, number];
   holdingLegsMicro: [number, number];
   pnlMicro: number;
+  /** Fees on the entry fill and on the exit fill, as positive debits. */
+  entryCosts: CostBreakdown;
+  exitCosts: CostBreakdown;
+  costsMicro: number;
 };
 
-type Book = { trades: ExecutedTrade[]; legs: Leg[]; steps: number; capitalMicro: number };
+type Book = {
+  trades: ExecutedTrade[];
+  legs: Leg[];
+  steps: number;
+  capitalMicro: number;
+  costs: CostModel;
+};
 
 /**
  * Build the executed trade list from the sized plan.
  *
- * Each funded signal becomes one trade with exactly two legs: an entry that
- * debits cash and credits the holding, and an exit `barsHeld` steps later that
- * does the reverse plus P&L. Skipped signals produce no trade and no leg —
- * which is itself part of what gets reconciled.
+ * Each funded signal becomes one trade with an entry that debits cash and
+ * credits the holding, an exit `barsHeld` steps later that does the reverse
+ * plus P&L, and — when a cost model is supplied — commission, spread and FX
+ * legs attached to each of those two fills. Skipped signals produce no trade
+ * and no leg, which is itself part of what gets reconciled.
  */
-function buildBook(rows: readonly Row[], limits: SizingLimits): Book {
+function buildBook(rows: readonly Row[], limits: SizingLimits, costs: CostModel = ZERO_COSTS): Book {
   const dates = [...new Set(rows.map((x) => x.date))].sort();
   const rank = new Map(dates.map((d, i) => [d, i]));
   const plan = applySizingLimits(rows, limits);
@@ -119,6 +199,12 @@ function buildBook(rows: readonly Row[], limits: SizingLimits): Book {
     // `|| 0` normalises -0, which is arithmetically identical but fails Object.is.
     const pnlMicro = Math.round((sizeMicro * row.returnPct) / 100) || 0;
     const id = trades.length;
+    const exitGross = sizeMicro + pnlMicro;
+
+    // Fees are charged on the traded notional of each side: the cash paid in at
+    // entry, and the gross proceeds at exit (a loss shrinks the exit ticket).
+    const entryCosts = costsFor(costs, s.symbol, sizeMicro);
+    const exitCosts = costsFor(costs, s.symbol, exitGross);
 
     trades.push({
       id,
@@ -126,23 +212,54 @@ function buildBook(rows: readonly Row[], limits: SizingLimits): Book {
       entryStep,
       exitStep,
       sizeMicro,
-      cashLegsMicro: [-sizeMicro, sizeMicro + pnlMicro],
+      cashLegsMicro: [-sizeMicro, exitGross],
       holdingLegsMicro: [sizeMicro, -sizeMicro],
       pnlMicro,
+      entryCosts,
+      exitCosts,
+      costsMicro: sumCosts(entryCosts) + sumCosts(exitCosts),
     });
     legs.push(
-      { step: entryStep, tradeId: id, symbol: s.symbol, kind: "entry", cashMicro: -sizeMicro, holdingMicro: sizeMicro },
+      {
+        step: entryStep,
+        tradeId: id,
+        symbol: s.symbol,
+        kind: "entry",
+        parent: "entry",
+        cashMicro: -sizeMicro,
+        holdingMicro: sizeMicro,
+      },
       {
         step: exitStep,
         tradeId: id,
         symbol: s.symbol,
         kind: "exit",
-        cashMicro: sizeMicro + pnlMicro,
+        parent: "exit",
+        cashMicro: exitGross,
         holdingMicro: -sizeMicro,
       },
     );
+    for (const [parent, step, breakdown] of [
+      ["entry", entryStep, entryCosts],
+      ["exit", exitStep, exitCosts],
+    ] as const) {
+      for (const kind of COST_KINDS) {
+        const amount = breakdown[kind];
+        if (amount === 0) continue;
+        legs.push({
+          step,
+          tradeId: id,
+          symbol: s.symbol,
+          kind,
+          parent,
+          cashMicro: -amount,
+          holdingMicro: 0,
+        });
+      }
+    }
     if (exitStep > lastStep) lastStep = exitStep;
   });
+
 
   const capitalMicro = toMicro((rows.length * limits.maxTotalDeployedPct) / 100);
   return { trades, legs, steps: lastStep + 1, capitalMicro };
