@@ -264,7 +264,6 @@ function explainSizeChange(
 
 function confidenceFactorsFrom(conf: DriverConfidence | null): ConfidenceFactor[] {
   if (!conf) return [];
-  const basis = conf.score > 0 ? conf.score : 0;
   const factors: ConfidenceFactor[] = [
     {
       label: "Sample",
@@ -282,7 +281,8 @@ function confidenceFactorsFrom(conf: DriverConfidence | null): ConfidenceFactor[
   if (basisReason) {
     factors.push({ label: "Basis", value: 0.85, detail: basisReason });
   }
-  return factors.sort((x, y) => x.value - y.value).map((f) => ({ ...f, value: f.value || basis * 0 + f.value }));
+  // Worst factor first: that is the one holding the badge down.
+  return factors.sort((x, y) => x.value - y.value);
 }
 
 export function compareDriverSettings(
