@@ -5,6 +5,7 @@ import {
   applyDriverSizing,
   baselineExecution,
   buildExecutionGrid,
+  chronological,
   driverSizingPlan,
 } from "@/lib/breakout-driver-execution";
 import { buildHeatmap, HEATMAP_METRICS } from "@/lib/breakout-execution-heatmap";
@@ -108,9 +109,9 @@ function randomTrades(r: () => number, n: number): SignalTrade[] {
   })) as SignalTrade[];
 }
 
-const chronological = (trades: readonly SignalTrade[]) =>
-  [...trades].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-
+// The reference paths must order the cohort exactly as production does,
+// including same-day tie-breaks — otherwise the differential compares two
+// different tapes.
 const confirmedOf = (trades: readonly SignalTrade[]) =>
   chronological(trades.filter((t) => t.cohort === "confirmed"));
 
