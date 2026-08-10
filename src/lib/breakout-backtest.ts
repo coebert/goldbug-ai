@@ -345,16 +345,22 @@ export function runBreakoutBacktest(
       volume: b.volume ?? undefined,
     }));
 
-    let cooldownUntil = -1;
+    // One observation per cohort per breakout *episode*: a pending signal must
+    // not swallow the confirmation that follows it two bars later, but neither
+    // should a five-bar confirmation run count five times. `cooldownBars`
+    // additionally spaces repeats of the same cohort across episodes.
+    const episodeSeen = new Set<SignalCohort>();
+    const lastEmit = new Map<SignalCohort, number>();
     for (let i = cfg.warmupBars; i < clean.length - 1; i++) {
       barsScanned++;
-      if (i <= cooldownUntil) continue;
       const ev = detectBreakout(candles.slice(0, i + 1), detector);
-      if (ev.state === "none" || !ev.direction) continue;
+      if (ev.state === "none" || !ev.direction) {
+        episodeSeen.clear();
+        continue;
+      }
       const cohort = ev.state as SignalCohort;
-      // Only score the *first* bar of a confirmation run so one breakout is
-      // one observation, not `confirmBars` duplicates.
-      if (cohort === "confirmed" && ev.bars_since_breakout > detector.confirmBars) continue;
+      if (episodeSeen.has(cohort)) continue;
+      if (i - (lastEmit.get(cohort) ?? -Infinity) < cfg.cooldownBars) continue;
       if (cohort !== "failed" && ev.quality < cfg.minQuality) continue;
 
       const atr = atrAt(clean, i);
@@ -386,7 +392,12 @@ export function runBreakoutBacktest(
         entry: clean[i]!.close,
         ...sim,
       });
-      cooldownUntil = i + cfg.cooldownBars;
+      episodeSeen.add(cohort);
+      lastEmit.set(cohort, i);
+      // A failure closes the episode — anything after it is a fresh attempt.
+      if (cohort === "failed") episodeSeen.clear();
+    }
+
     }
   }
 
