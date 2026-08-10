@@ -210,6 +210,31 @@ export function atrAt(bars: readonly BacktestBar[], idx: number, period = 14): n
 }
 
 /**
+ * Stdev of daily close-to-close returns over the trailing `period` bars ending
+ * at `idx`. This is the exact measurement the live breakout gate reads as
+ * `realisedVol20d`, so backtest diagnostics and live decisions speak the same
+ * units (0.012 = 1.2% per day).
+ */
+export function realisedVolAt(
+  bars: readonly BacktestBar[],
+  idx: number,
+  period = 20,
+): number | null {
+  if (idx < period) return null;
+  const rets: number[] = [];
+  for (let i = idx - period + 1; i <= idx; i++) {
+    const prev = bars[i - 1]!.close;
+    const cur = bars[i]!.close;
+    if (!(prev > EPS) || !(cur > EPS)) return null;
+    rets.push(cur / prev - 1);
+  }
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const variance = rets.reduce((a, r) => a + (r - mean) ** 2, 0) / (rets.length - 1);
+  return Number.isFinite(variance) ? Math.sqrt(variance) : null;
+}
+
+
+/**
  * Walk a trade forward from `entryIdx` and resolve its exit.
  * Intrabar ordering is pessimistic: when both the stop and the target are
  * touched in the same bar we assume the stop filled first.
