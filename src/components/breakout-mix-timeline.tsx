@@ -9,11 +9,10 @@ import {
   YAxis,
 } from "recharts";
 import {
-  mixTimeline,
-  type MixBucketSize,
+  mixTimelineKey,
+  type MixTimelineGrids,
   type MixWindowMode,
 } from "@/lib/breakout-mix-timeline";
-import type { SignalTrade } from "@/lib/breakout-backtest";
 import type { DriverSetting } from "@/lib/breakout-driver-compare";
 import {
   SAXO_AXIS,
@@ -39,21 +38,22 @@ const STANCE_SERIES = [
 const signed = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}pp`;
 
 export function MixTimelineChart({
-  trades,
+  grid,
   setting,
 }: {
-  trades: readonly SignalTrade[];
+  grid: MixTimelineGrids;
   setting: DriverSetting;
 }) {
-  const [bucket, setBucket] = useState<MixBucketSize>("month");
   const [window, setWindow] = useState<MixWindowMode>("expanding");
 
+  // The whole risk × gap-weight grid is precomputed server-side, so switching
+  // setting or window is a lookup, not a recompute.
   const timeline = useMemo(
-    () => mixTimeline(trades, setting, { bucket, window, rollingBuckets: 6 }),
-    [trades, setting, bucket, window],
+    () => grid[window]?.entries[mixTimelineKey(setting)] ?? null,
+    [grid, window, setting],
   );
 
-  if (!timeline.points.length) return null;
+  if (!timeline?.points.length) return null;
 
   return (
     <div className="rounded-md border border-border/40 p-2" data-testid="mix-timeline">
@@ -62,18 +62,6 @@ export function MixTimelineChart({
           Stance mix over time — {setting.risk} · {setting.gapWeight.toFixed(1)}× gap
         </p>
         <div className="flex flex-wrap gap-1">
-          {(["month", "quarter"] as const).map((b) => (
-            <Button
-              key={b}
-              size="sm"
-              variant={bucket === b ? "secondary" : "ghost"}
-              className="h-6 px-2 text-[11px]"
-              onClick={() => setBucket(b)}
-              data-testid={`mix-timeline-bucket-${b}`}
-            >
-              {b === "month" ? "Monthly" : "Quarterly"}
-            </Button>
-          ))}
           {(["expanding", "rolling"] as const).map((w) => (
             <Button
               key={w}
@@ -83,7 +71,7 @@ export function MixTimelineChart({
               onClick={() => setWindow(w)}
               data-testid={`mix-timeline-window-${w}`}
             >
-              {w === "expanding" ? "Cumulative" : "Rolling 6"}
+              {w === "expanding" ? "Cumulative" : `Rolling ${grid.rolling.rollingBuckets}`}
             </Button>
           ))}
         </div>
