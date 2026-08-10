@@ -599,6 +599,10 @@ export function BreakoutTopDrivers({
 
       {cell ? <ExecutionImpact cell={cell} grid={execution!} /> : null}
 
+      {execution ? (
+        <ExecutionHeatmap grid={execution} current={{ risk, gapWeight }} />
+      ) : null}
+
       <p className="text-[11px] text-muted-foreground">{view.summary}</p>
       <div className="grid gap-2 sm:grid-cols-2">
         <Side
