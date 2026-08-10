@@ -5,7 +5,14 @@ import {
   type LimitReason,
   type SizingLimits,
 } from "@/lib/breakout-sizing-limits";
-import { announceFuzzSeed, caseSeed, fuzzContext, resolveFuzzSeed, rng } from "./fuzz-seed";
+import {
+  announceFuzzSeed,
+  caseSeed,
+  fuzzContext,
+  reproCommand,
+  resolveFuzzSeed,
+  rng,
+} from "./fuzz-seed";
 
 /**
  * Property-based fuzzing for the sizing-limit caps.
