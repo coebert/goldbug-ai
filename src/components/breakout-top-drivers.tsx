@@ -1,5 +1,10 @@
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { DriverConfidenceLabel, TopDriver, TopDrivers } from "@/lib/breakout-diagnostics";
 
 const signed = (v: number, digits = 2) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
@@ -14,8 +19,9 @@ const CONFIDENCE_VARIANT: Record<DriverConfidenceLabel, "default" | "secondary" 
 function ConfidenceBadge({ d }: { d: TopDriver }) {
   const c = d.confidence;
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
         <Badge
           variant={CONFIDENCE_VARIANT[c.label]}
           className="cursor-default text-[10px] font-normal"
@@ -24,14 +30,15 @@ function ConfidenceBadge({ d }: { d: TopDriver }) {
           {c.label} conf · {(c.score * 100).toFixed(0)}
         </Badge>
       </TooltipTrigger>
-      <TooltipContent className="max-w-64 text-[11px]">
-        <ul className="list-disc space-y-0.5 pl-3">
-          {c.reasons.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
-      </TooltipContent>
-    </Tooltip>
+        <TooltipContent className="max-w-64 text-[11px]">
+          <ul className="list-disc space-y-0.5 pl-3">
+            {c.reasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
