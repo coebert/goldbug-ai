@@ -151,6 +151,104 @@ describe("buildBreakoutDiagnostics", () => {
   });
 
   it("is empty-safe", () => {
-    expect(buildBreakoutDiagnostics([])).toEqual({ symbols: [], states: [], notes: [] });
+    const d = buildBreakoutDiagnostics([]);
+    expect(d.symbols).toEqual([]);
+    expect(d.states).toEqual([]);
+    expect(d.notes).toEqual([]);
+    expect(d.regimeVol.cells).toEqual([]);
   });
 });
+
+describe("regime + vol context", () => {
+  it("splits a group into regime cells with vol measurements", () => {
+    const trades = [
+      ...Array.from({ length: 4 }, (_, i) =>
+        trade({ regime: "bull", realisedVol20d: 0.008, returnPct: 2, date: `2025-01-0${i + 1}` }),
+      ),
+      ...Array.from({ length: 6 }, (_, i) =>
+        trade({ regime: "sideways", realisedVol20d: 0.02, returnPct: -2, date: `2025-02-0${i + 1}` }),
+      ),
+    ];
+    const ctx = regimeVolContext(trades);
+    expect(ctx.cells.map((c) => c.regime)).toEqual(["bull", "sideways"]);
+    const bull = ctx.cells.find((c) => c.regime === "bull")!;
+    const side = ctx.cells.find((c) => c.regime === "sideways")!;
+    expect(bull.sharePct).toBeCloseTo(40);
+    expect(bull.highVolSharePct).toBe(0);
+    expect(side.highVolSharePct).toBe(100);
+    expect(side.avgRealisedVol20d).toBeCloseTo(0.02);
+    expect(ctx.sidewaysSharePct).toBeCloseTo(60);
+    expect(ctx.highVolSharePct).toBeCloseTo(60);
+  });
+
+  it("ignores missing vol readings rather than counting them as calm", () => {
+    const ctx = regimeVolContext([
+      trade({ realisedVol20d: null }),
+      trade({ realisedVol20d: 0.02, date: "2025-01-03" }),
+    ]);
+    expect(ctx.avgRealisedVol20d).toBeCloseTo(0.02);
+    expect(ctx.highVolSharePct).toBeCloseTo(50);
+  });
+
+  it("vetoes a proven-negative cell (regime gating)", () => {
+    const v = regimeGateVerdict({
+      regime: "bull",
+      highVol: false,
+      trades: 60,
+      expectancyPct: -0.8,
+    });
+    expect(v.action).toBe("skip");
+    expect(v.mult).toBe(0);
+    expect(v.driver).toBe("regime gating");
+  });
+
+  it("caps size in sideways tape and attributes it to chop", () => {
+    const v = regimeGateVerdict({ regime: "sideways", highVol: false, trades: 60, expectancyPct: 1.2 });
+    expect(v.action).toBe("downsize");
+    expect(v.driver).toBe("sideways tape");
+    expect(v.mult).toBeLessThan(1);
+  });
+
+  it("attributes a high-vol cap separately from chop", () => {
+    const v = regimeGateVerdict({ regime: "bull", highVol: true, trades: 60, expectancyPct: 1.2 });
+    expect(v.action).toBe("downsize");
+    expect(v.driver).toBe("high-vol downsize");
+  });
+
+  it("flags a thin cell as unproven rather than bad", () => {
+    const v = regimeGateVerdict({ regime: "bull", highVol: false, trades: 3, expectancyPct: -0.5 });
+    expect(v.action).toBe("downsize");
+    expect(v.driver).toBe("unproven sample");
+  });
+
+  it("passes a proven-positive benign cell at full size", () => {
+    const v = regimeGateVerdict({ regime: "bull", highVol: false, trades: 60, expectancyPct: 1.4 });
+    expect(v.action).toBe("trade");
+    expect(v.mult).toBe(1);
+    expect(v.driver).toBe("none");
+  });
+
+  it("attaches regime cells to symbol rows and state blocks", () => {
+    const trades = [
+      ...Array.from({ length: 30 }, (_, i) =>
+        trade({
+          symbol: "AAA",
+          regime: i % 2 ? "sideways" : "bull",
+          realisedVol20d: i % 2 ? 0.03 : 0.007,
+          returnPct: i % 2 ? -2 : 1,
+          date: `2025-03-${String(i + 1).padStart(2, "0")}`,
+        }),
+      ),
+    ];
+    const d = buildBreakoutDiagnostics(trades);
+    expect(d.symbols[0]!.regimeVol.cells.length).toBe(2);
+    expect(d.symbols[0]!.confirmedRegimeVol.cells.length).toBe(2);
+    const confirmed = d.states.find((s) => s.cohort === "confirmed")!;
+    expect(confirmed.regimeVol.cells.map((c) => c.regime)).toEqual(["bull", "sideways"]);
+    // The sideways cell is both chop and high-vol: the high-vol layer binds.
+    const side = confirmed.regimeVol.cells.find((c) => c.regime === "sideways")!;
+    expect(side.gate.action).toBe("skip");
+    expect(d.notes[0]).toContain("Gate context");
+  });
+});
+
