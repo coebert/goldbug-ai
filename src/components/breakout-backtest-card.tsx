@@ -10,6 +10,7 @@ import {
   type BreakoutBacktestResponse,
 } from "@/lib/breakout-backtest.functions";
 import type { CohortStats, SignalCohort } from "@/lib/breakout-backtest";
+import { BreakoutDiagnosticsSection } from "@/components/breakout-diagnostics-section";
 
 const COHORTS: readonly SignalCohort[] = ["confirmed", "pending", "extended", "failed"];
 const REGIMES = ["all", "bull", "bear", "sideways"] as const;
@@ -211,6 +212,10 @@ export function BreakoutBacktestCard({ portfolioId }: { portfolioId: string }) {
                 </div>
               ))}
             </div>
+
+            {result.diagnostics && (
+              <BreakoutDiagnosticsSection diagnostics={result.diagnostics} />
+            )}
 
             <p className="text-[11px] text-muted-foreground">
               Trades are opened at the signal bar's close, held up to{" "}
