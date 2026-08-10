@@ -260,9 +260,8 @@ function buildBook(rows: readonly Row[], limits: SizingLimits, costs: CostModel 
     if (exitStep > lastStep) lastStep = exitStep;
   });
 
-
   const capitalMicro = toMicro((rows.length * limits.maxTotalDeployedPct) / 100);
-  return { trades, legs, steps: lastStep + 1, capitalMicro };
+  return { trades, legs, steps: lastStep + 1, capitalMicro, costs };
 }
 
 // ---------------------------------------------------------------------------
