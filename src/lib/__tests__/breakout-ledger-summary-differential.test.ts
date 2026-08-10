@@ -407,8 +407,7 @@ describe("ledger vs summary (differential)", () => {
       const trades = randomTrades(r, 120 + Math.floor(r() * 120));
       const grid = buildExecutionGrid(trades, { limits: LIMITS });
 
-      const baseRows = [...trades]
-        .filter((t) => t.cohort === "confirmed")
+      const baseRows = chronological(trades.filter((t) => t.cohort === "confirmed"))
         .map((t) => ({ symbol: t.symbol, date: t.date, barsHeld: t.barsHeld, size: 1 }));
       const baseWalk = recomputeSummary(
         sizedTrades(trades, applySizingLimits(baseRows, LIMITS).signals.map((s) => s.size)),
