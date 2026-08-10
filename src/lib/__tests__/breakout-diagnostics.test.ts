@@ -4,7 +4,6 @@ import {
   buildBreakoutDiagnostics,
   regimeGateVerdict,
   regimeVolContext,
-  symbolDiagnostics,
   topDrivers,
   qualityBucket,
   signalStateDiagnostics,
