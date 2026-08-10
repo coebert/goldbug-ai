@@ -54,15 +54,16 @@ const JOB_COUNT = 12;
 const COHORT_SIZE = 140;
 
 /**
- * Budgets in ms, before REPLAY_BENCH_SCALE. Observed locally at roughly an
- * order of magnitude below each figure; they exist to catch "the replay got
- * 10x slower", not normal machine-to-machine variation.
+ * Budgets in ms, before REPLAY_BENCH_SCALE. Observed locally at ~12ms for a
+ * 12-job batch and ~5ms for the sharded grid, so each budget sits roughly an
+ * order of magnitude clear: they catch "the replay got 10x slower", not normal
+ * machine-to-machine variation.
  */
 const BUDGETS = {
-  sequentialBatch: 900,
-  concurrentBatch: 900,
-  perReplay: 90,
-  shardedGrid: 1_200,
+  sequentialBatch: 150,
+  concurrentBatch: 150,
+  perReplay: 15,
+  shardedGrid: 100,
 };
 
 /** Concurrency must not cost more than this multiple of the sequential batch. */
