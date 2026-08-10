@@ -2997,6 +2997,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             }),
         ],
       ),
+      breakoutBySymbol: Object.fromEntries(breakoutAuditBySymbol.entries()),
     });
   } catch (e) {
     srvLog.warn("ai_decision_audit skipped", portfolioId, e);
