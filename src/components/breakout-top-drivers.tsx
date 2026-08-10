@@ -500,7 +500,19 @@ export function BreakoutTopDrivers({
     [view, risk],
   );
 
+  const mix = useMemo(
+    () => actionMix([...view.positive, ...view.negative], { risk, gapWeight }),
+    [view, risk, gapWeight],
+  );
+
+  const prevMix = useMemo(() => {
+    if (!symbols?.length) return null;
+    if (prev.risk === risk && prev.gapWeight === gapWeight) return null;
+    return actionMixFor(symbols, prev);
+  }, [symbols, prev, risk, gapWeight]);
+
   const cell = execution ? findExecutionCell(execution, risk, gapWeight) : null;
+
 
   if (!view.positive.length && !view.negative.length) return null;
   const profile = RISK_PROFILES[risk];
