@@ -191,8 +191,9 @@ function compareSignals(a: SignalTrade, b: SignalTrade): number {
   const num = (x: number | undefined) => (Number.isFinite(x as number) ? (x as number) : 0);
   if (num(a.barsHeld) !== num(b.barsHeld)) return num(a.barsHeld) - num(b.barsHeld);
   if (num(a.returnPct) !== num(b.returnPct)) return num(a.returnPct) - num(b.returnPct);
-  const ka = `${a.direction ?? ""}|${a.cohort ?? ""}`;
-  const kb = `${b.direction ?? ""}|${b.cohort ?? ""}`;
+  if (num(a.entry) !== num(b.entry)) return num(a.entry) - num(b.entry);
+  const ka = `${a.side}|${a.direction}|${a.cohort}|${a.exitReason}`;
+  const kb = `${b.side}|${b.direction}|${b.cohort}|${b.exitReason}`;
   return ka < kb ? -1 : ka > kb ? 1 : 0;
 }
 
