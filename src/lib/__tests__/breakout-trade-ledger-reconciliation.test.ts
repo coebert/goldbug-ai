@@ -483,3 +483,120 @@ describe("executed trades reconcile to the cash/holdings ledger", () => {
     expect(step0.cashMicro - before, `tampering went undetected — ${REPRO}`).not.toBe(legCashFromList);
   });
 });
+
+describe("commission, spread and FX fee legs reconcile to the ledger", () => {
+  const costedCase = (c: number, tag: string, size = 30) => {
+    const r = rng(caseSeed(BASE_SEED, tag, c));
+    const rows = randomRows(r, size + Math.floor(r() * 90));
+    const costs = randomCosts(r, [...new Set(rows.map((x) => x.symbol))]);
+    return { rows, limits: randomLimits(r), costs, ctx: `case ${c} — ${REPRO}` };
+  };
+
+  it("every per-step cash delta still equals its fills plus its fee legs exactly", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-steps");
+      const { book } = reconcile(rows, limits, ctx, costs);
+      // Guard against a vacuous pass: the model must actually charge something.
+      if (book.trades.length > 0) {
+        expect(book.legs.some(isCostLeg) || book.trades.every((t) => t.costsMicro === 0), ctx).toBe(true);
+      }
+    }
+  });
+
+  it("each fee leg equals the modelled commission / spread / FX for its own fill", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-legs");
+      const { book } = reconcile(rows, limits, ctx, costs);
+      for (const t of book.trades) {
+        const mine = book.legs.filter((l) => l.tradeId === t.id);
+        for (const parent of ["entry", "exit"] as const) {
+          const expected = parent === "entry" ? t.entryCosts : t.exitCosts;
+          const step = parent === "entry" ? t.entryStep : t.exitStep;
+          for (const kind of COST_KINDS) {
+            const booked = mine
+              .filter((l) => l.parent === parent && l.kind === kind)
+              .reduce((a, l) => a - l.cashMicro, 0);
+            expect(booked, `${parent} ${kind} != model for trade ${t.id}: ${ctx}`).toBe(expected[kind]);
+            for (const leg of mine.filter((l) => l.parent === parent && l.kind === kind)) {
+              expect(leg.step, `${kind} booked away from its fill for trade ${t.id}: ${ctx}`).toBe(step);
+              expect(leg.holdingMicro, `${kind} moved shares for trade ${t.id}: ${ctx}`).toBe(0);
+            }
+          }
+        }
+        // Commission honours the per-ticket floor; FX only hits foreign names.
+        if (t.sizeMicro > 0) {
+          expect(t.entryCosts.commission, `commission below the floor: ${ctx}`).toBeGreaterThanOrEqual(
+            costs.minCommissionMicro,
+          );
+        }
+        if (!costs.foreign.has(t.symbol)) {
+          expect(t.entryCosts.fx + t.exitCosts.fx, `FX fee charged on a domestic name: ${ctx}`).toBe(0);
+        }
+      }
+    }
+  });
+
+  it("each trade's cash legs net to P&L minus its own fees, with a flat holding", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-trades");
+      const { book } = reconcile(rows, limits, ctx, costs);
+      for (const t of book.trades) {
+        const fees = book.legs.filter((l) => l.tradeId === t.id && isCostLeg(l)).reduce((a, l) => a - l.cashMicro, 0);
+        expect(fees, `fee legs != trade fee total for trade ${t.id}: ${ctx}`).toBe(t.costsMicro);
+        const netCash = book.legs.filter((l) => l.tradeId === t.id).reduce((a, l) => a + l.cashMicro, 0);
+        expect(netCash, `net cash != P&L - fees for trade ${t.id}: ${ctx}`).toBe(t.pnlMicro - t.costsMicro);
+        const netHold = book.legs.filter((l) => l.tradeId === t.id).reduce((a, l) => a + l.holdingMicro, 0);
+        expect(netHold, `trade ${t.id} did not unwind flat: ${ctx}`).toBe(0);
+      }
+    }
+  });
+
+  it("closing cash equals capital plus P&L minus total commission, spread and FX", () => {
+    for (let c = 0; c < CASES; c++) {
+      const { rows, limits, costs, ctx } = costedCase(c, "costed-close", 25);
+      const { book, ledger } = reconcile(rows, limits, ctx, costs);
+      const last = ledger[ledger.length - 1];
+      if (!last) {
+        expect(book.trades.length, `no ledger steps but trades exist: ${ctx}`).toBe(0);
+        continue;
+      }
+      const pnl = book.trades.reduce((a, t) => a + t.pnlMicro, 0);
+      const byKind: Record<CostKind, number> = { commission: 0, spread: 0, fx: 0 };
+      for (const leg of book.legs) {
+        if (isCostLeg(leg)) byKind[leg.kind] -= leg.cashMicro;
+      }
+      const totalFees = byKind.commission + byKind.spread + byKind.fx;
+      expect(totalFees, `fee legs != trade-list fee total: ${ctx}`).toBe(
+        book.trades.reduce((a, t) => a + t.costsMicro, 0),
+      );
+      expect(last.cashMicro, `closing cash != capital + P&L - fees: ${ctx}`).toBe(book.capitalMicro + pnl - totalFees);
+      expect(last.holdingsMicro.size, `book was not flat at the end: ${ctx}`).toBe(0);
+    }
+  });
+
+  it("a dropped FX fee leg is caught by the step reconciliation", () => {
+    // Negative control for the costed path: remove one fee from the ledger and
+    // the per-step tie-out against the trade list must diverge.
+    const r = rng(caseSeed(BASE_SEED, "costed-control", 0));
+    const rows = randomRows(r, 60).map((row, i) => ({ ...row, symbol: "S0", size: i === 0 ? 1 : row.size }));
+    const costs: CostModel = {
+      commissionBps: 10,
+      minCommissionMicro: 2_000,
+      halfSpreadBps: 15,
+      fxFeeBps: 25,
+      foreign: new Set(["S0"]),
+    };
+    const limits = resolveSizingLimits({ maxPositionSize: 2, maxConcurrentSignals: 8, maxTotalDeployedPct: 200 });
+    const book = buildBook(rows, limits, costs);
+    const dropped = book.legs.find((l) => l.kind === "fx");
+    expect(dropped, `control needs an FX leg — ${REPRO}`).toBeDefined();
+
+    const tampered: Book = { ...book, legs: book.legs.filter((l) => l !== dropped) };
+    const ledger = runLedger(tampered);
+    const step = dropped!.step;
+    const idx = ledger.findIndex((s) => s.step === step);
+    const before = idx > 0 ? ledger[idx - 1].cashMicro : book.capitalMicro;
+    const expectedFromList = book.legs.filter((l) => l.step === step).reduce((a, l) => a + l.cashMicro, 0);
+    expect(ledger[idx].cashMicro - before, `dropped FX fee went undetected — ${REPRO}`).not.toBe(expectedFromList);
+  });
+});
