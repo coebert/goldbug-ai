@@ -8,6 +8,13 @@ import {
   driverSizingPlan,
 } from "@/lib/breakout-driver-execution";
 import { resolveSizingLimits, type SizingLimits } from "@/lib/breakout-sizing-limits";
+import {
+  cellKey,
+  minimizeGridMismatch,
+  type PinnedCells,
+  type SnapshotShape,
+} from "./snapshot-shrink";
+
 
 /**
  * Snapshot coverage for the full replay summary.
