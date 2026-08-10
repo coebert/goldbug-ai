@@ -86,11 +86,21 @@ const EPS = 1e-9;
 
 describe("applySizingLimits — property-based fuzz", () => {
   it("upholds every safety invariant across 3000 random cohorts", () => {
-    for (let seed = 1; seed <= 3000; seed++) {
+    const LABEL = "invariants";
+    for (let i = 0; i < 3000; i++) {
+      const seed = caseSeed(BASE_SEED, LABEL, i);
       const r = rng(seed);
       const cohort = randomCohort(r);
       const partial = randomLimits(r);
-      const ctx = { seed, partial, cohort };
+      const ctx = {
+        baseSeed: BASE_SEED,
+        case: `${LABEL}#${i}`,
+        caseSeed: seed,
+        repro: reproCommand(BASE_SEED, FILE),
+        partial,
+        cohort,
+      };
+
 
       const { signals, report } = applySizingLimits(cohort, partial);
       const limits = resolveSizingLimits(partial);
