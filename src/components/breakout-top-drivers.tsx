@@ -31,9 +31,11 @@ import {
 } from "@/lib/breakout-driver-execution";
 import {
   compareDriverSettings,
+  moverEmphasis,
   type DriverCompareRow,
   type DriverSetting,
 } from "@/lib/breakout-driver-compare";
+
 import { Button } from "@/components/ui/button";
 import { ExecutionHeatmap } from "@/components/breakout-execution-heatmap";
 import {
