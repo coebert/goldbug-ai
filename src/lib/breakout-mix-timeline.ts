@@ -139,21 +139,8 @@ export function mixTimeline(
   // those as "100% stand aside" would be a lie — they are "no opinion yet".
   const trimmed = trimEmptyLead ? dropLeadingEmpty(points) : points;
 
-  const first = trimmed.find((p) => p.ranked > 0) ?? null;
-  const last = [...trimmed].reverse().find((p) => p.ranked > 0) ?? null;
-  const shift = {
-    buy: first && last ? last.buyPct - first.buyPct : 0,
-    hold: first && last ? last.holdPct - first.holdPct : 0,
-    sell: first && last ? last.sellPct - first.sellPct : 0,
-  } satisfies Record<DriverStance, number>;
-
-  const summary = !first
-    ? "Not enough signals in any period to rank drivers."
-    : `${trimmed.length} ${bucket === "month" ? "months" : "quarters"} (${window}${
-        window === "rolling" ? ` ${rollingBuckets}` : ""
-      }) · ${STANCES.map(
-        (s) => `${s === "hold" ? "partial" : s === "sell" ? "stand aside" : "buy"} ${signed(shift[s])}pp`,
-      ).join(" · ")} from ${first.period} to ${last!.period}`;
+  const shift = shiftOf(trimmed);
+  const summary = summaryOf(trimmed, built);
 
   return {
     setting,
@@ -167,6 +154,37 @@ export function mixTimeline(
 }
 
 type BuiltWindows = ReturnType<typeof buildWindows>;
+
+type PointLike = Omit<MixTimelinePoint, "mix">;
+
+function shiftOf(points: readonly PointLike[]): Record<DriverStance, number> {
+  const first = points.find((p) => p.ranked > 0) ?? null;
+  const last = [...points].reverse().find((p) => p.ranked > 0) ?? null;
+  if (!first || !last) return { buy: 0, hold: 0, sell: 0 };
+  return {
+    buy: last.buyPct - first.buyPct,
+    hold: last.holdPct - first.holdPct,
+    sell: last.sellPct - first.sellPct,
+  };
+}
+
+const STANCE_WORD: Record<DriverStance, string> = {
+  buy: "buy",
+  hold: "partial",
+  sell: "stand aside",
+};
+
+function summaryOf(points: readonly PointLike[], built: BuiltWindows): string {
+  const first = points.find((p) => p.ranked > 0) ?? null;
+  const last = [...points].reverse().find((p) => p.ranked > 0) ?? null;
+  if (!first || !last) return "Not enough signals in any period to rank drivers.";
+  const shift = shiftOf(points);
+  return `${points.length} ${built.bucket === "month" ? "months" : "quarters"} (${built.window}${
+    built.window === "rolling" ? ` ${built.rollingBuckets}` : ""
+  }) · ${STANCES.map((s) => `${STANCE_WORD[s]} ${signed(shift[s])}pp`).join(" · ")} from ${
+    first.period
+  } to ${last.period}`;
+}
 
 function pointsFor(built: BuiltWindows, setting: DriverSetting): MixTimelinePoint[] {
   return built.windows.map((w) => {
@@ -237,7 +255,7 @@ export function mixTimelineGrid(
   return { bucket: built.bucket, window: built.window, rollingBuckets: built.rollingBuckets, entries };
 }
 
-function dropLeadingEmpty(points: MixTimelinePoint[]): MixTimelinePoint[] {
+function dropLeadingEmpty<T extends PointLike>(points: T[]): T[] {
   const firstRanked = points.findIndex((p) => p.ranked > 0);
   return firstRanked <= 0 ? points : points.slice(firstRanked);
 }
