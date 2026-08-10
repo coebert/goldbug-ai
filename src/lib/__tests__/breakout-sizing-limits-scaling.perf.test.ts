@@ -258,10 +258,10 @@ describe("sizing-limits scaling stress", () => {
     expect(grid.cells.length).toBe(RISK_LEVELS.length * 6);
     for (const cell of grid.cells) {
       const ctx = `${cell.risk} @ ${cell.gapWeight}× — ${REPRO}`;
-      expect(cell.limitReport.peakConcurrent, `peak concurrency over cap: ${ctx}`).toBeLessThanOrEqual(
+      expect(cell.limits.peakConcurrent, `peak concurrency over cap: ${ctx}`).toBeLessThanOrEqual(
         limits.maxConcurrentSignals,
       );
-      expect(cell.limitReport.peakPositionSize, `position over ceiling: ${ctx}`).toBeLessThanOrEqual(
+      expect(cell.limits.peakPositionSize, `position over ceiling: ${ctx}`).toBeLessThanOrEqual(
         limits.maxPositionSize + 1e-9,
       );
       expect(cell.deployedPct, `deployment over budget: ${ctx}`).toBeLessThanOrEqual(
@@ -269,6 +269,6 @@ describe("sizing-limits scaling stress", () => {
       );
       expect(Number.isFinite(cell.cumulativeReturnPct), `non-finite return: ${ctx}`).toBe(true);
     }
-    expect(grid.baseline.limitReport.peakConcurrent).toBeLessThanOrEqual(limits.maxConcurrentSignals);
+    expect(grid.baseline.limits.peakConcurrent).toBeLessThanOrEqual(limits.maxConcurrentSignals);
   });
 });
