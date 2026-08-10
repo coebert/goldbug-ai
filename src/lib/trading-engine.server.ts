@@ -1720,6 +1720,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           vix: options?.vix ?? effectiveRegime.signals.vix_level ?? null,
           realisedVol20d: effectiveRegime.signals.spy_vol_20d ?? null,
         },
+        table: breakoutExpectancy,
       });
       if (brkRegime.action === "skip") {
         executed.push({
