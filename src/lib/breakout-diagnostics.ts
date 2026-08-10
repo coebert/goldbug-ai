@@ -16,6 +16,11 @@
 // No I/O, no clock, no randomness — same trades in, same rows out.
 
 import type { SignalCohort, SignalTrade } from "@/lib/breakout-backtest";
+import type { RegimeLabel } from "@/lib/regime-walk-forward";
+import {
+  DEFAULT_BREAKOUT_REGIME_POLICY,
+  type BreakoutRegimePolicyConfig,
+} from "@/lib/alpha/breakout-regime-policy";
 
 export type SignalSlice = {
   trades: number;
