@@ -27,7 +27,7 @@ import {
   type ExpectancyWindow,
 } from "@/lib/breakout-expectancy-refresh";
 import { loadLiveExpectancyTable, invalidateLiveExpectancyCache } from "@/lib/breakout-expectancy-store.server";
-import { londonToday } from "@/lib/uk-time";
+import { ukDayKey } from "@/lib/uk-time";
 
 /** Liquid, deeply-quoted names with long price_cache history. */
 export const EXPECTANCY_REFRESH_SYMBOLS = [
@@ -143,7 +143,7 @@ export async function refreshBreakoutExpectancy(options?: {
     });
   }
 
-  const asOf = londonToday();
+  const asOf = ukDayKey(new Date());
   const candidate = mergeExpectancyWindows(windows, {
     source: `auto-refresh ${asOf} (${series.length} symbols; ${windowSpecs
       .map((w) => `${w.label}x${w.weight}`)
