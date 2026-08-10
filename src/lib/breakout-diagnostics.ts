@@ -16,6 +16,11 @@
 // No I/O, no clock, no randomness — same trades in, same rows out.
 
 import type { SignalCohort, SignalTrade } from "@/lib/breakout-backtest";
+import type { RegimeLabel } from "@/lib/regime-walk-forward";
+import {
+  DEFAULT_BREAKOUT_REGIME_POLICY,
+  type BreakoutRegimePolicyConfig,
+} from "@/lib/alpha/breakout-regime-policy";
 
 export type SignalSlice = {
   trades: number;
@@ -67,6 +72,186 @@ export function summarizeSlice(trades: readonly SignalTrade[]): SignalSlice {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Regime + volatility context
+//
+// A diagnostic group's headline number ("confirmed lose 0.8% here") is not
+// actionable on its own: the same number is produced by three very different
+// causes, and the live gate treats each one differently.
+//
+//   * regime gating      — the cell itself has measured negative expectancy
+//                          on an adequate sample, so the gate vetoes.
+//   * sideways tape      — chop, hostile by construction, size is capped.
+//   * high-vol downsize  — realised vol clears the gate's threshold, size is
+//                          capped regardless of what the cell says.
+//
+// So every group carries the regime cells behind it, the volatility actually
+// measured at signal time, and what the live gate would do with that cell.
+// ---------------------------------------------------------------------------
+
+export const REGIME_ORDER: readonly RegimeLabel[] = ["bull", "bear", "sideways"] as const;
+
+export type RegimeGateVerdict = {
+  action: "trade" | "downsize" | "skip";
+  /** Size multiplier cap the gate would apply (1 = untouched, 0 = vetoed). */
+  mult: number;
+  /** Which layer bound: what the user is trying to attribute the gap to. */
+  driver: "regime gating" | "sideways tape" | "high-vol downsize" | "unproven sample" | "none";
+  reason: string;
+};
+
+/**
+ * Replay the live gate's *cell-level* logic against a measured slice. This is
+ * deliberately the same ordering as `breakoutRegimeAction`: veto on measured
+ * negative expectancy first, then hostile tape, then thin sample.
+ */
+export function regimeGateVerdict(
+  input: { regime: RegimeLabel; highVol: boolean; trades: number; expectancyPct: number },
+  config: Partial<BreakoutRegimePolicyConfig> = {},
+): RegimeGateVerdict {
+  const cfg = { ...DEFAULT_BREAKOUT_REGIME_POLICY, ...config };
+  const proven = input.trades >= cfg.minTrades;
+  const ev = `${input.expectancyPct >= 0 ? "+" : ""}${input.expectancyPct.toFixed(2)}%/trade on n=${input.trades}`;
+  if (proven && input.expectancyPct <= cfg.minExpectancyPct) {
+    return {
+      action: "skip",
+      mult: 0,
+      driver: "regime gating",
+      reason: `${input.regime} expectancy ${ev} — gate vetoes chases in this cell`,
+    };
+  }
+  if (input.regime === "sideways" || input.highVol) {
+    const cap = input.highVol ? cfg.highVolMult : cfg.sidewaysMult;
+    return {
+      action: "downsize",
+      mult: cap,
+      driver: input.highVol ? "high-vol downsize" : "sideways tape",
+      reason: `${input.highVol ? "high-vol tape" : "sideways tape"} caps size at x${cap.toFixed(2)}; ${ev}`,
+    };
+  }
+  if (!proven) {
+    return {
+      action: "downsize",
+      mult: cfg.unprovenMult,
+      driver: "unproven sample",
+      reason: `only ${input.trades} trades in the ${input.regime} cell — unproven, x${cfg.unprovenMult.toFixed(2)}`,
+    };
+  }
+  return { action: "trade", mult: 1, driver: "none", reason: `${input.regime} expectancy ${ev} — full size` };
+}
+
+export type RegimeVolCell = {
+  regime: RegimeLabel;
+  slice: SignalSlice;
+  /** Share of this group's signals that fell in this regime. */
+  sharePct: number;
+  /** Mean 20d realised daily stdev at signal time (0.012 = 1.2%/day). */
+  avgRealisedVol20d: number | null;
+  /** Share of the cell's signals that cleared the gate's high-vol threshold. */
+  highVolSharePct: number;
+  /** Mean ATR(14) as a share of price. */
+  avgAtrPct: number | null;
+  gate: RegimeGateVerdict;
+};
+
+export type RegimeVolContext = {
+  cells: RegimeVolCell[];
+  avgRealisedVol20d: number | null;
+  highVolSharePct: number;
+  sidewaysSharePct: number;
+  /** The layer that explains most of this group's gated signals. */
+  dominantDriver: RegimeGateVerdict["driver"] | "mixed";
+  /** One-line plain-language attribution for the UI. */
+  summary: string;
+};
+
+function avgOrNull(xs: (number | null | undefined)[]): number | null {
+  const vals = xs.filter((x): x is number => x != null && Number.isFinite(x));
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+function isHighVolTrade(t: SignalTrade, cfg: BreakoutRegimePolicyConfig): boolean {
+  return t.realisedVol20d != null && t.realisedVol20d >= cfg.realisedVolHigh;
+}
+
+/**
+ * Regime cells + volatility measurements behind an arbitrary set of trades.
+ * Used to annotate both the per-symbol rows and the per-signal-state blocks.
+ */
+export function regimeVolContext(
+  trades: readonly SignalTrade[],
+  config: Partial<BreakoutRegimePolicyConfig> = {},
+): RegimeVolContext {
+  const cfg = { ...DEFAULT_BREAKOUT_REGIME_POLICY, ...config };
+  const total = trades.length;
+  const cells: RegimeVolCell[] = [];
+  for (const regime of REGIME_ORDER) {
+    const ts = trades.filter((t) => t.regime === regime);
+    if (!ts.length) continue;
+    const slice = summarizeSlice(ts);
+    const highVolShare = (ts.filter((t) => isHighVolTrade(t, cfg)).length / ts.length) * 100;
+    cells.push({
+      regime,
+      slice,
+      sharePct: total ? (ts.length / total) * 100 : 0,
+      avgRealisedVol20d: avgOrNull(ts.map((t) => t.realisedVol20d)),
+      highVolSharePct: highVolShare,
+      avgAtrPct: avgOrNull(ts.map((t) => t.atrPct)),
+      gate: regimeGateVerdict(
+        {
+          regime,
+          // A cell counts as high-vol tape when most of its signals fired
+          // above the gate's realised-vol threshold.
+          highVol: highVolShare >= 50,
+          trades: slice.trades,
+          expectancyPct: slice.avgReturnPct,
+        },
+        cfg,
+      ),
+    });
+  }
+
+  const highVolSharePct = total
+    ? (trades.filter((t) => isHighVolTrade(t, cfg)).length / total) * 100
+    : 0;
+  const sidewaysSharePct = total
+    ? (trades.filter((t) => t.regime === "sideways").length / total) * 100
+    : 0;
+
+  // Attribute by how many signals sit under each binding layer.
+  const weight = new Map<RegimeGateVerdict["driver"], number>();
+  for (const c of cells) {
+    weight.set(c.gate.driver, (weight.get(c.gate.driver) ?? 0) + c.slice.trades);
+  }
+  const ranked = [...weight.entries()]
+    .filter(([driver]) => driver !== "none")
+    .sort((a, b) => b[1] - a[1]);
+  const top = ranked[0];
+  const dominantDriver: RegimeVolContext["dominantDriver"] = !top
+    ? "none"
+    : ranked.length > 1 && ranked[1]![1] === top[1]
+      ? "mixed"
+      : top[0];
+
+  const volTxt =
+    avgOrNull(trades.map((t) => t.realisedVol20d)) == null
+      ? "vol not measured"
+      : `vol ${(avgOrNull(trades.map((t) => t.realisedVol20d))! * 100).toFixed(2)}%/day, ${highVolSharePct.toFixed(0)}% above the high-vol line`;
+  const summary = !total
+    ? "No signals."
+    : `${sidewaysSharePct.toFixed(0)}% sideways · ${volTxt} · mostly bound by ${dominantDriver === "none" ? "nothing (full size)" : dominantDriver}`;
+
+  return {
+    cells,
+    avgRealisedVol20d: avgOrNull(trades.map((t) => t.realisedVol20d)),
+    highVolSharePct,
+    sidewaysSharePct,
+    dominantDriver,
+    summary,
+  };
+}
+
+
 export type SymbolDiagnostic = {
   symbol: string;
   all: SignalSlice;
@@ -84,6 +269,10 @@ export type SymbolDiagnostic = {
   confirmedContributionPct: number;
   /** Plain-language role of this symbol in the confirmed result. */
   role: "driver" | "drag" | "neutral" | "thin";
+  /** Regime cells + vol measurements behind every signal on this symbol. */
+  regimeVol: RegimeVolContext;
+  /** Same cut restricted to the confirmed cohort (what the live gate sees). */
+  confirmedRegimeVol: RegimeVolContext;
 };
 
 export type SymbolDiagnosticsOptions = {
@@ -132,6 +321,8 @@ export function symbolDiagnostics(
       avgReturnGapPct: confirmed.avgReturnPct - failed.avgReturnPct,
       confirmedContributionPct: contribution,
       role,
+      regimeVol: regimeVolContext(ts),
+      confirmedRegimeVol: regimeVolContext(ts.filter((t) => t.cohort === "confirmed")),
     });
   }
 
@@ -165,6 +356,8 @@ export type SignalStateDiagnostic = {
   stopRatePct: number;
   /** Share of trades that reached their profit target. */
   targetRatePct: number;
+  /** Regime cells + vol measurements behind this cohort's signals. */
+  regimeVol: RegimeVolContext;
 };
 
 export function signalStateDiagnostics(
@@ -183,6 +376,7 @@ export function signalStateDiagnostics(
     out.push({
       cohort,
       overall: summarizeSlice(ts),
+      regimeVol: regimeVolContext(ts),
       byDirection: (["up", "down"] as const)
         .map((direction) => ({
           direction,
@@ -213,6 +407,8 @@ export function signalStateDiagnostics(
 export type BreakoutDiagnostics = {
   symbols: SymbolDiagnostic[];
   states: SignalStateDiagnostic[];
+  /** Regime cells + vol measurements across the whole sample. */
+  regimeVol: RegimeVolContext;
   /** One-line takeaways for the UI, already ranked by usefulness. */
   notes: string[];
 };
@@ -223,7 +419,12 @@ export function buildBreakoutDiagnostics(
 ): BreakoutDiagnostics {
   const symbols = symbolDiagnostics(trades, options);
   const states = signalStateDiagnostics(trades);
+  const regimeVol = regimeVolContext(trades);
   const notes: string[] = [];
+  if (trades.length) {
+    notes.push(`Gate context: ${regimeVol.summary}.`);
+  }
+
 
   const drivers = symbols.filter((s) => s.role === "driver");
   const drags = symbols.filter((s) => s.role === "drag");
@@ -266,5 +467,5 @@ export function buildBreakoutDiagnostics(
     }
   }
 
-  return { symbols, states, notes };
+  return { symbols, states, regimeVol, notes };
 }

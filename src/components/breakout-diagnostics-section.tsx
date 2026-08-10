@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import type {
   BreakoutDiagnostics,
+  RegimeVolContext,
   SignalSlice,
   SymbolDiagnostic,
 } from "@/lib/breakout-diagnostics";
@@ -9,6 +10,77 @@ import type { BreakoutTimingReport, BucketRow } from "@/lib/breakout-timing";
 
 const pct = (v: number, digits = 2) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
 const tone = (v: number) => (v >= 0 ? "text-emerald-500" : "text-red-500");
+
+const GATE_TONE: Record<string, string> = {
+  skip: "border-red-500/40 text-red-500",
+  downsize: "border-amber-500/40 text-amber-500",
+  trade: "border-emerald-500/40 text-emerald-500",
+};
+
+const volTxt = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(2)}%/day`);
+
+/**
+ * The regime cells and volatility measurements sitting under a diagnostic
+ * group, so a performance gap can be attributed to regime gating, sideways
+ * tape or the high-vol downsize rule rather than guessed at.
+ */
+function RegimeVolCells({ ctx, label }: { ctx: RegimeVolContext; label?: string }) {
+  if (!ctx.cells.length) return null;
+  return (
+    <div className="mt-2 rounded-md border border-border/40 bg-muted/20 p-2" data-testid="regime-vol-cells">
+      <p className="text-[11px] text-muted-foreground">
+        {label ? `${label} — ` : ""}
+        {ctx.summary}
+      </p>
+      <div className="mt-1 overflow-x-auto">
+        <table className="w-full min-w-[520px] text-xs">
+          <thead className="text-[11px] text-muted-foreground">
+            <tr>
+              <th className="py-1 pr-3 text-left font-normal">Regime cell</th>
+              <th className="py-1 pr-3 text-right font-normal">n</th>
+              <th className="py-1 pr-3 text-right font-normal">Share</th>
+              <th className="py-1 pr-3 text-right font-normal">Win</th>
+              <th className="py-1 pr-3 text-right font-normal">Expectancy</th>
+              <th className="py-1 pr-3 text-right font-normal">Realised vol</th>
+              <th className="py-1 pr-3 text-right font-normal">High-vol</th>
+              <th className="py-1 text-left font-normal">Live gate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ctx.cells.map((c) => (
+              <tr key={c.regime} className="border-t border-border/30 align-top">
+                <td className="py-1 pr-3 capitalize">{c.regime}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{c.slice.trades}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{c.sharePct.toFixed(0)}%</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{c.slice.winRatePct.toFixed(0)}%</td>
+                <td className={`py-1 pr-3 text-right tabular-nums ${tone(c.slice.avgReturnPct)}`}>
+                  {pct(c.slice.avgReturnPct)}
+                </td>
+                <td className="py-1 pr-3 text-right tabular-nums">{volTxt(c.avgRealisedVol20d)}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">
+                  {c.highVolSharePct.toFixed(0)}%
+                </td>
+                <td className="py-1">
+                  <span className="flex flex-wrap items-center gap-1">
+                    <Badge
+                      variant="outline"
+                      className={`px-1 py-0 text-[10px] ${GATE_TONE[c.gate.action] ?? ""}`}
+                    >
+                      {c.gate.action === "trade" ? "full size" : c.gate.action}
+                      {c.gate.action !== "trade" && ` ×${c.gate.mult.toFixed(2)}`}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground">{c.gate.reason}</span>
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 
 function SliceCells({ slice }: { slice: SignalSlice }) {
   if (!slice.trades) {
@@ -83,6 +155,7 @@ export function BreakoutDiagnosticsSection({
   timing?: BreakoutTimingReport;
 }) {
   const [tab, setTab] = useState<"symbols" | "states" | "timing">("symbols");
+  const [openSymbol, setOpenSymbol] = useState<string | null>(null);
   if (!diagnostics.symbols.length && !diagnostics.states.length) return null;
 
   return (
@@ -120,6 +193,8 @@ export function BreakoutDiagnosticsSection({
           ))}
         </ul>
       )}
+
+      {tab !== "timing" && <RegimeVolCells ctx={diagnostics.regimeVol} label="All signals" />}
 
       {tab === "timing" && timing ? (
         <div className="space-y-3" data-testid="breakout-timing-blocks">
@@ -178,34 +253,60 @@ export function BreakoutDiagnosticsSection({
                 <th className="py-1 pr-3 text-right font-normal">Fail win</th>
                 <th className="py-1 pr-3 text-right font-normal">Fail avg</th>
                 <th className="py-1 pr-3 text-right font-normal">Gap</th>
-                <th className="py-1 text-right font-normal">P&amp;L share</th>
+                <th className="py-1 pr-3 text-right font-normal">P&amp;L share</th>
+                <th className="py-1 text-right font-normal">Regime / vol</th>
               </tr>
             </thead>
             <tbody>
-              {diagnostics.symbols.map((s) => (
-                <tr key={s.symbol} className="border-t border-border/40">
-                  <td className="py-1 pr-3">
-                    <span className="flex items-center gap-1">
-                      <span className="font-medium">{s.symbol}</span>
-                      <Badge variant="outline" className={`px-1 py-0 text-[10px] ${ROLE_TONE[s.role]}`}>
-                        {s.role}
-                      </Badge>
-                    </span>
-                  </td>
-                  <SliceCells slice={s.confirmed} />
-                  <SliceCells slice={s.failed} />
-                  <td className={`py-1 pr-3 text-right tabular-nums ${tone(s.avgReturnGapPct)}`}>
-                    {pct(s.avgReturnGapPct)}
-                  </td>
-                  <td className={`py-1 text-right tabular-nums ${tone(s.confirmedContributionPct)}`}>
-                    {s.confirmedContributionPct >= 0 ? "+" : ""}
-                    {s.confirmedContributionPct.toFixed(0)}%
-                  </td>
-                </tr>
-              ))}
+              {diagnostics.symbols.map((s) => {
+                const open = openSymbol === s.symbol;
+                const ctx = s.confirmedRegimeVol.cells.length ? s.confirmedRegimeVol : s.regimeVol;
+                return (
+                  <Fragment key={s.symbol}>
+                    <tr className="border-t border-border/40">
+                      <td className="py-1 pr-3">
+                        <button
+                          type="button"
+                          onClick={() => setOpenSymbol(open ? null : s.symbol)}
+                          aria-expanded={open}
+                          className="flex items-center gap-1 text-left"
+                        >
+                          <span className="text-muted-foreground">{open ? "▾" : "▸"}</span>
+                          <span className="font-medium">{s.symbol}</span>
+                          <Badge variant="outline" className={`px-1 py-0 text-[10px] ${ROLE_TONE[s.role]}`}>
+                            {s.role}
+                          </Badge>
+                        </button>
+                      </td>
+                      <SliceCells slice={s.confirmed} />
+                      <SliceCells slice={s.failed} />
+                      <td className={`py-1 pr-3 text-right tabular-nums ${tone(s.avgReturnGapPct)}`}>
+                        {pct(s.avgReturnGapPct)}
+                      </td>
+                      <td className={`py-1 pr-3 text-right tabular-nums ${tone(s.confirmedContributionPct)}`}>
+                        {s.confirmedContributionPct >= 0 ? "+" : ""}
+                        {s.confirmedContributionPct.toFixed(0)}%
+                      </td>
+                      <td className="py-1 text-right text-[11px] text-muted-foreground">
+                        {s.regimeVol.sidewaysSharePct.toFixed(0)}% side ·{" "}
+                        {volTxt(s.regimeVol.avgRealisedVol20d)} ·{" "}
+                        {s.regimeVol.highVolSharePct.toFixed(0)}% hi-vol
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="border-t border-border/20">
+                        <td colSpan={10} className="pb-2">
+                          <RegimeVolCells ctx={ctx} label={`${s.symbol} confirmed cells`} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
+
       ) : (
         <div className="space-y-3" data-testid="breakout-state-blocks">
           {diagnostics.states.map((st) => (
@@ -256,6 +357,7 @@ export function BreakoutDiagnosticsSection({
                   </tbody>
                 </table>
               </div>
+              <RegimeVolCells ctx={st.regimeVol} label={`${st.cohort} regime cells`} />
             </div>
           ))}
         </div>
