@@ -496,7 +496,9 @@ export function driverConfidence(input: {
       : clamp01(input.tradeSharePct / absContribution);
 
   const basisFactor = input.lead === "expectancy gap" ? 0.85 : 1;
-  const score = clamp01((0.55 * sampleScore + 0.45 * breadthScore) * basisFactor);
+  // Multiplicative so a thin sample alone can drag the row to "low" even when
+  // its P&L is perfectly broad-based, and vice versa.
+  const score = clamp01((0.35 + 0.65 * sampleScore) * (0.4 + 0.6 * breadthScore) * basisFactor);
   const label: DriverConfidenceLabel = score >= 0.66 ? "high" : score >= 0.4 ? "medium" : "low";
 
   const reasons: string[] = [];
