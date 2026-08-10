@@ -154,7 +154,7 @@ describe("buildBreakoutDecisionAudit", () => {
       vix: null,
       realisedVol20d: null,
     });
-    expect(base.explanation).toContain("no measured history");
+    expect(base.explanation).toContain("No measured history");
     expect(explainBreakoutDecision(base)).toBe(base.explanation);
   });
 });
