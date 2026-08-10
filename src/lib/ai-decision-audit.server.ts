@@ -53,6 +53,12 @@ export interface AuditContext {
    * the exact sizing multiplier that was applied to the ticket.
    */
   sectorBySymbol?: Record<string, unknown> | null;
+  /**
+   * Per-symbol breakout gate evidence: the (cohort x regime) expectancy cell,
+   * the volatility inputs that were read, the signal-age band, and the exact
+   * skip / downsize reason applied to the ticket.
+   */
+  breakoutBySymbol?: Record<string, unknown> | null;
 }
 
 // Classify the source of a buy/sell into a coarse bucket so consumers can
@@ -141,6 +147,9 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
   const sectorMap = ctx.sectorBySymbol ?? {};
   const sectorFor = (sym: string) => sectorMap[sym] ?? null;
 
+  const breakoutMap = ctx.breakoutBySymbol ?? {};
+  const breakoutFor = (sym: string) => breakoutMap[sym] ?? null;
+
   const rows: AuditInsert[] = [];
 
   const sellSymbols = new Set<string>();
@@ -181,6 +190,7 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
         features: featureBlock,
         regime: regimeSlim,
         sector: sectorFor(sym),
+        breakout: breakoutFor(sym),
         run_rationale: ctx.rationale ?? null,
       }),
       order_id: orderId,

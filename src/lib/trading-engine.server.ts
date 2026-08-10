@@ -154,6 +154,10 @@ import {
   buildSectorDecisionAudit,
   type SectorDecisionAudit,
 } from "./sector-cycle";
+import {
+  buildBreakoutDecisionAudit,
+  type BreakoutDecisionAudit,
+} from "./breakout-decision-audit";
 import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
 import {
@@ -789,6 +793,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Per-symbol sector evidence captured at sizing time so the audit trail can
   // replay exactly which phase/momentum/multiplier applied to each decision.
   const sectorAuditBySymbol = new Map<string, SectorDecisionAudit>();
+  // Per-symbol breakout gate evidence (expectancy cell, vol inputs, age band
+  // and the exact skip / downsize reason) captured at decision time.
+  const breakoutAuditBySymbol = new Map<string, BreakoutDecisionAudit>();
 
   // Measured trading edge (rolling signal_performance) — feeds Kelly sizing
   // instead of the old hardcoded 2% assumption. Falls back to the prior when
@@ -1712,16 +1719,27 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       // a breakout chase only runs at full size when THIS regime has measured
       // positive expectancy for the cohort. Sideways and high-vol tape are cut
       // or skipped outright regardless of how clean the break looks.
+      const brkVix = options?.vix ?? effectiveRegime.signals.vix_level ?? null;
+      const brkRealisedVol = effectiveRegime.signals.spy_vol_20d ?? null;
       const brkRegime = breakoutRegimeAction({
         breakout: featForVote?.breakout ?? null,
         side: order.side,
         regime: effectiveRegime.regime,
-        vol: {
-          vix: options?.vix ?? effectiveRegime.signals.vix_level ?? null,
-          realisedVol20d: effectiveRegime.signals.spy_vol_20d ?? null,
-        },
+        vol: { vix: brkVix, realisedVol20d: brkRealisedVol },
         table: breakoutExpectancy,
       });
+      breakoutAuditBySymbol.set(
+        String(meta.symbol).toUpperCase(),
+        buildBreakoutDecisionAudit({
+          decision: brkRegime,
+          breakout: featForVote?.breakout ?? null,
+          regime: effectiveRegime.regime,
+          vix: brkVix,
+          realisedVol20d: brkRealisedVol,
+          tableSource: breakoutExpectancy?.source ?? null,
+          tableAsOf: breakoutExpectancy?.asOf ?? null,
+        }),
+      );
       if (brkRegime.action === "skip") {
         executed.push({
           symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
@@ -1730,6 +1748,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         continue;
       }
       const brk = { mult: brkRegime.mult, note: brkRegime.note };
+
 
       const haircuts = combineHaircuts([
         { label: "calib", mult: calibration.global_size_mult },
@@ -2978,6 +2997,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             }),
         ],
       ),
+      breakoutBySymbol: Object.fromEntries(breakoutAuditBySymbol.entries()),
     });
   } catch (e) {
     srvLog.warn("ai_decision_audit skipped", portfolioId, e);
