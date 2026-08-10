@@ -254,30 +254,55 @@ export function BreakoutDiagnosticsSection({
               </tr>
             </thead>
             <tbody>
-              {diagnostics.symbols.map((s) => (
-                <tr key={s.symbol} className="border-t border-border/40">
-                  <td className="py-1 pr-3">
-                    <span className="flex items-center gap-1">
-                      <span className="font-medium">{s.symbol}</span>
-                      <Badge variant="outline" className={`px-1 py-0 text-[10px] ${ROLE_TONE[s.role]}`}>
-                        {s.role}
-                      </Badge>
-                    </span>
-                  </td>
-                  <SliceCells slice={s.confirmed} />
-                  <SliceCells slice={s.failed} />
-                  <td className={`py-1 pr-3 text-right tabular-nums ${tone(s.avgReturnGapPct)}`}>
-                    {pct(s.avgReturnGapPct)}
-                  </td>
-                  <td className={`py-1 text-right tabular-nums ${tone(s.confirmedContributionPct)}`}>
-                    {s.confirmedContributionPct >= 0 ? "+" : ""}
-                    {s.confirmedContributionPct.toFixed(0)}%
-                  </td>
-                </tr>
-              ))}
+              {diagnostics.symbols.map((s) => {
+                const open = openSymbol === s.symbol;
+                const ctx = s.confirmedRegimeVol.cells.length ? s.confirmedRegimeVol : s.regimeVol;
+                return (
+                  <>
+                    <tr key={s.symbol} className="border-t border-border/40">
+                      <td className="py-1 pr-3">
+                        <button
+                          type="button"
+                          onClick={() => setOpenSymbol(open ? null : s.symbol)}
+                          aria-expanded={open}
+                          className="flex items-center gap-1 text-left"
+                        >
+                          <span className="text-muted-foreground">{open ? "▾" : "▸"}</span>
+                          <span className="font-medium">{s.symbol}</span>
+                          <Badge variant="outline" className={`px-1 py-0 text-[10px] ${ROLE_TONE[s.role]}`}>
+                            {s.role}
+                          </Badge>
+                        </button>
+                      </td>
+                      <SliceCells slice={s.confirmed} />
+                      <SliceCells slice={s.failed} />
+                      <td className={`py-1 pr-3 text-right tabular-nums ${tone(s.avgReturnGapPct)}`}>
+                        {pct(s.avgReturnGapPct)}
+                      </td>
+                      <td className={`py-1 pr-3 text-right tabular-nums ${tone(s.confirmedContributionPct)}`}>
+                        {s.confirmedContributionPct >= 0 ? "+" : ""}
+                        {s.confirmedContributionPct.toFixed(0)}%
+                      </td>
+                      <td className="py-1 text-right text-[11px] text-muted-foreground">
+                        {s.regimeVol.sidewaysSharePct.toFixed(0)}% side ·{" "}
+                        {volTxt(s.regimeVol.avgRealisedVol20d)} ·{" "}
+                        {s.regimeVol.highVolSharePct.toFixed(0)}% hi-vol
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr key={`${s.symbol}-cells`} className="border-t border-border/20">
+                        <td colSpan={10} className="pb-2">
+                          <RegimeVolCells ctx={ctx} label={`${s.symbol} confirmed cells`} />
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>
+
       ) : (
         <div className="space-y-3" data-testid="breakout-state-blocks">
           {diagnostics.states.map((st) => (
