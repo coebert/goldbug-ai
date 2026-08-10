@@ -255,19 +255,21 @@ export function runCostedReplay(
   };
 
   plan.signals.forEach((s, i) => {
-    const at = dateRank.get(s.date) ?? 0;
+    const at = dateRank.get(String(s?.date ?? "")) ?? 0;
     release(at, i);
 
-    if (s.size > 0) {
+    const rawSize = Number.isFinite(s?.size) ? s.size : 0;
+    if (rawSize > 0) {
       // Fee-aware fill: shrink to the notional cash can fund including costs.
       const perUnit = 1 + (costs.slippageBps + costs.commissionBps) / 10_000;
       const affordable = Math.max(0, (fromMicros(cashMicros) - costs.minFee) / perUnit);
-      const sizeMicros = Math.max(0, Math.min(toMicros(s.size), Math.floor(toMicros(affordable))));
+      const sizeMicros = Math.max(0, Math.min(toMicros(rawSize), Math.floor(toMicros(affordable))));
       const { feeMicros, slipMicros } = legsFor(sizeMicros);
       if (sizeMicros > 0 && sizeMicros + feeMicros + slipMicros <= cashMicros) {
         cashMicros -= sizeMicros;
         book({ step: i, side: "entry", symbol: s.symbol, fillStep: i, feeMicros, slipMicros });
-        const releaseRank = at + Math.max(1, rows[i].barsHeld);
+        const releaseRank = at + holdBars(rows[i]);
+
         open.push({ releaseRank, symbol: s.symbol, sizeMicros, fillStep: i, seq: seq++ });
         fills.push({ fillStep: i, symbol: s.symbol, sizeMicros, releaseRank });
         summary.filledCount += 1;
