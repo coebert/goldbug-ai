@@ -154,6 +154,10 @@ import {
   buildSectorDecisionAudit,
   type SectorDecisionAudit,
 } from "./sector-cycle";
+import {
+  buildBreakoutDecisionAudit,
+  type BreakoutDecisionAudit,
+} from "./breakout-decision-audit";
 import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
 import {
