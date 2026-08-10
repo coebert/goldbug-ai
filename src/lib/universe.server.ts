@@ -46,6 +46,11 @@ export const UNIVERSE: UniverseSymbol[] = [
   { symbol: "VMID.L", name: "Vanguard FTSE 250 ETF", asset_class: "etf" },
   { symbol: "VWRL.L", name: "Vanguard FTSE All-World ETF", asset_class: "etf" },
   { symbol: "VUSA.L", name: "Vanguard S&P 500 ETF (LON)", asset_class: "etf" },
+  // Short sleeve — cash-funded inverse (-1x) UCITS ETFs. Buying these is how
+  // the AI expresses a bearish view without margin or borrowing; see
+  // src/lib/short-sleeve.ts for the gross/sleeve caps that govern them.
+  { symbol: "XUKS.L", name: "Xtrackers FTSE 100 Short Daily ETF", asset_class: "etf" },
+  { symbol: "XSPS.L", name: "Xtrackers S&P 500 Inverse Daily ETF", asset_class: "etf" },
   // Japan — Tokyo Stock Exchange (Yahoo `.T` suffix → Saxo TSE_JP). Curated
   // large-cap, high-liquidity names plus a Nikkei 225 ETF so JPY exposure
   // is reachable via either single stocks or a broad index wrapper. Saxo
@@ -278,6 +283,12 @@ export type RiskConfig = {
   cash_policy_enabled: boolean;
   /** Optional user target invested share of NAV (0..1). null = regime table. */
   target_invested_pct: number | null;
+  // Short sleeve (src/lib/short-sleeve.ts). Shorts are expressed by buying
+  // cash-funded inverse ETFs — never on margin. Longs + shorts may never
+  // exceed NAV, and the sleeve itself is capped at short_sleeve_max_pct.
+  shorts_enabled: boolean;
+  /** Max share of NAV (0..1) that may sit in inverse ETFs. */
+  short_sleeve_max_pct: number;
 
 };
 
@@ -359,6 +370,8 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   swing_min_hold_days: 2,
   cash_policy_enabled: true,
   target_invested_pct: null,
+  shorts_enabled: true,
+  short_sleeve_max_pct: 0.5,
 
 
 };
@@ -487,6 +500,10 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("swing_min_hold_days", 0, 30);
   bool("alpha_bonus_enabled");
   bool("cash_policy_enabled");
+  bool("shorts_enabled");
+  if (Number.isFinite(Number(r.short_sleeve_max_pct))) {
+    out.short_sleeve_max_pct = Math.max(0, Math.min(1, Number(r.short_sleeve_max_pct)));
+  }
   // Explicit `null` clears the user target and reverts to the regime table.
   if (r.target_invested_pct === null) {
     out.target_invested_pct = null;
