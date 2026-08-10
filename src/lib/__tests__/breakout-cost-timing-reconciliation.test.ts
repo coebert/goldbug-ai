@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { applySizingLimits, type LimitedPlan } from "@/lib/breakout-sizing-limits";
 import {
-  applySizingLimits,
-  resolveSizingLimits,
-  type LimitedPlan,
-  type SizingLimits,
-} from "@/lib/breakout-sizing-limits";
+  randomCosts,
+  randomLimits,
+  randomRows,
+  runCostedReplay,
+  type CostLeg,
+  type Costs,
+  type Replay,
+} from "./costed-replay-harness";
 import { announceFuzzSeed, caseSeed, reproCommand, resolveFuzzSeed, rng } from "./fuzz-seed";
+
 
 /**
  * Cost *timing* reconciliation: when frictions are deducted vs what the
