@@ -1341,13 +1341,44 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
 
 
-  // Commodity-tradability validator (cache-only, no network). Runs per
-  // proposed buy of a commodity ETC/ETF to confirm the symbol is Saxo-routable
-  // and that we have the market data the sizing pipeline expects.
+  // Broker environment MUST follow the portfolio, not the process-wide
+  // SAXO_ENV: instrument-cache rows are keyed by env, so a live_sim portfolio
+  // checked against env=live (or vice versa) misses every row and blocks the
+  // buy for a symbol that is perfectly routable.
+  const validationEnv = portfolio.mode === "live_prod" ? "live" : "sim";
+  // Lazily-built adapter used only when a cache row is missing or stale, so a
+  // clean run never pays a broker round-trip.
+  let instrumentResolver: ((symbol: string) => Promise<{ assetType: string } | null>) | undefined;
+  if (portfolio.mode === "live_prod" || portfolio.mode === "live_sim") {
+    instrumentResolver = async (symbol: string) => {
+      const { buildSaxoAdapter } = await import("./brokers/saxo.server");
+      const adapter = await buildSaxoAdapter({
+        userId: portfolio.user_id,
+        portfolioId,
+        envOverride: validationEnv,
+        accountKey: portfolio.broker_account_id ?? null,
+      });
+      try {
+        const hit = await adapter.lookupUic(symbol);
+        return hit ? { assetType: String(hit.assetType) } : null;
+      } catch (e) {
+        // "not found" is a definitive block; anything else is transient and
+        // must bubble so the validator fails open.
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/not found|no matching|not routable|cannot trade/i.test(msg)) return null;
+        throw e;
+      }
+    };
+  }
+
+  // Commodity-tradability validator. Runs per proposed buy of a commodity
+  // ETC/ETF to confirm the symbol is Saxo-routable and that we have the
+  // market data the sizing pipeline expects.
   const { makeCommodityValidator } = await import("./commodity-validation.server");
   const validateCommodity = makeCommodityValidator({
     supabaseAdmin,
-    env: (process.env.SAXO_ENV as string) || "sim",
+    env: validationEnv,
+    resolveInstrument: instrumentResolver,
   });
   // Same shape for the crypto ETP sleeve — confirms Saxo-routability of
   // physically-backed ETPs before a buy is sized. Spot pairs (BTC-USD) are
@@ -1355,8 +1386,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const { makeCryptoValidator } = await import("./crypto-validation.server");
   const validateCrypto = makeCryptoValidator({
     supabaseAdmin,
-    env: (process.env.SAXO_ENV as string) || "sim",
+    env: validationEnv,
+    resolveInstrument: instrumentResolver,
   });
+
 
   for (const order of sorted) {
     const sym = order.symbol.toUpperCase();
