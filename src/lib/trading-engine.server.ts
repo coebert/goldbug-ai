@@ -1745,8 +1745,61 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         const p = holdingLivePrice(priceMap, h);
         return s + p * Number(h.quantity);
       }, 0);
+
+      // Live long / short split for this order, recomputed each iteration so a
+      // multi-order tick can never breach the caps in aggregate.
+      const liveExposure = splitExposure(
+        Array.from(holdingsByS.values()).map((h) => ({
+          symbol: h.symbol,
+          value: holdingLivePrice(priceMap, h) * Number(h.quantity),
+        })),
+        totalValue,
+      );
+      const buyingShortProxy = isShortProxy(meta.symbol);
+
+      // Short sleeve: shorts are expressed by BUYING a cash-funded inverse
+      // ETF. Never on margin; longs + shorts may never exceed account value.
+      if (buyingShortProxy) {
+        const sleeve = gateShortSleeveBuy({
+          nav: totalValue,
+          spendableCash: Math.max(0, workingCash - cashFloor),
+          longValue: liveExposure.longValue,
+          shortValue: liveExposure.shortValue,
+          proposedSpend: spend,
+          maxSleevePct: cfg.short_sleeve_max_pct,
+          enabled: cfg.shorts_enabled,
+        });
+        if (!sleeve.ok) {
+          executed.push({
+            symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+            reason: order.reason, rejected: sleeve.rejected ?? "short sleeve blocked",
+          });
+          continue;
+        }
+        if (sleeve.allowedSpend < spend) {
+          spend = sleeve.allowedSpend;
+          sizingNotes.push(sleeve.note);
+        }
+      } else {
+        // Long buys must also respect the hard gross cap once a short sleeve
+        // exists: money staked (longs + shorts) never exceeds account value.
+        const grossRoomAbs = Math.max(0, totalValue - liveExposure.grossValue);
+        if (liveExposure.shortValue > 0 && spend > grossRoomAbs) {
+          if (grossRoomAbs <= 0) {
+            executed.push({
+              symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+              reason: order.reason,
+              rejected: `gross exposure cap: longs + shorts already ${((liveExposure.grossValue / (totalValue || 1)) * 100).toFixed(0)}% of account value`,
+            });
+            continue;
+          }
+          spend = grossRoomAbs;
+          sizingNotes.push("gross≤100% NAV (long+short)");
+        }
+      }
+
       const gross = grossExposureLimit(totalValue, currentHoldingsValue, effectiveRegime);
-      if (gross.target_pct < 1) {
+      if (!buyingShortProxy && gross.target_pct < 1) {
         if (gross.room <= 0) {
           executed.push({
             symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
@@ -1768,7 +1821,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         regime: effectiveRegime.regime,
         riskLevel: portfolio.risk_level,
         totalValue,
-        holdingsValue: currentHoldingsValue,
+        // Net-aware: a short sleeve hedges the book, so the invested-% ceiling
+        // is measured on net exposure (long - short). The absolute stake stays
+        // bounded by the gross cap enforced above.
+        holdingsValue: netAwareInvestedValue(liveExposure.longValue, liveExposure.shortValue),
         cashFloorPct: configuredCashFloorPct,
         portfolioDrawdownPct: ddSizing.drawdown_pct,
         maxDrawdownHaltPct: cfg.max_drawdown_halt_pct,
