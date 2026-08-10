@@ -61,6 +61,7 @@ function AnalyticsPage() {
         <AlgoRegimeCalibrationCard portfolioId={id} />
         <AlgoRegimeRiskEnvelopeCard portfolioId={id} />
         <AlgoRegimeBacktestCard portfolioId={id} />
+        <BreakoutOrderLogCard portfolioId={id} />
         <BreakoutBacktestCard portfolioId={id} />
         <BreakoutOverlayCard portfolioId={id} />
         <BreakoutParamSweepCard portfolioId={id} />
