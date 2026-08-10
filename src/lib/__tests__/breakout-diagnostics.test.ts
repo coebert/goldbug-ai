@@ -4,6 +4,8 @@ import {
   buildBreakoutDiagnostics,
   regimeGateVerdict,
   regimeVolContext,
+  symbolDiagnostics,
+  topDrivers,
   qualityBucket,
   signalStateDiagnostics,
   summarizeSlice,
@@ -256,3 +258,60 @@ describe("regime + vol context", () => {
   });
 });
 
+
+describe("top drivers", () => {
+  const many = (n: number, over: Partial<Parameters<typeof trade>[0]>, from = 1) =>
+    Array.from({ length: n }, (_, i) =>
+      trade({ ...over, date: `2025-04-${String(from + i).padStart(2, "0")}` }),
+    );
+
+  it("ranks positive and negative contributors on opposite sides", () => {
+    const trades = [
+      ...many(8, { symbol: "GOOD", returnPct: 5 }),
+      ...many(8, { symbol: "BAD", returnPct: -5 }, 10),
+    ];
+    const d = buildBreakoutDiagnostics(trades);
+    expect(d.topDrivers.positive[0]!.symbol).toBe("GOOD");
+    expect(d.topDrivers.negative[0]!.symbol).toBe("BAD");
+    expect(d.topDrivers.positive[0]!.score).toBeGreaterThan(0);
+    expect(d.topDrivers.negative[0]!.score).toBeLessThan(0);
+  });
+
+  it("surfaces a small-share name when its expectancy gap is large", () => {
+    const symbols = symbolDiagnostics([
+      ...many(30, { symbol: "BIG", returnPct: 1 }),
+      ...many(4, { symbol: "EDGE", returnPct: 6 }, 1),
+      ...many(4, { symbol: "EDGE", cohort: "failed", returnPct: -8 }, 6),
+    ]);
+    const ranked = topDrivers(symbols);
+    const edge = ranked.positive.find((r) => r.symbol === "EDGE")!;
+    expect(edge.lead).toBe("expectancy gap");
+    expect(edge.expectancyGapPct).toBeGreaterThan(10);
+  });
+
+  it("ignores names below the confirmed-signal floor", () => {
+    const ranked = topDrivers(symbolDiagnostics(many(2, { symbol: "THIN", returnPct: 9 })), {
+      minConfirmed: 3,
+    });
+    expect(ranked.positive).toEqual([]);
+    expect(ranked.negative).toEqual([]);
+    expect(ranked.summary).toContain("Not enough");
+  });
+
+  it("respects the per-side limit and gap weight", () => {
+    const symbols = symbolDiagnostics([
+      ...many(4, { symbol: "A", returnPct: 4 }),
+      ...many(4, { symbol: "B", returnPct: 3 }, 6),
+      ...many(4, { symbol: "C", returnPct: 2 }, 11),
+    ]);
+    const ranked = topDrivers(symbols, { limit: 2, gapWeight: 0 });
+    expect(ranked.positive.map((r) => r.symbol)).toEqual(["A", "B"]);
+    expect(ranked.gapWeight).toBe(0);
+    expect(ranked.positive.every((r) => r.lead === "P&L share")).toBe(true);
+  });
+
+  it("is empty-safe", () => {
+    expect(topDrivers([])).toMatchObject({ positive: [], negative: [] });
+    expect(buildBreakoutDiagnostics([]).topDrivers.positive).toEqual([]);
+  });
+});

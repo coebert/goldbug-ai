@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { BreakoutTopDrivers } from "@/components/breakout-top-drivers";
 import type {
   BreakoutDiagnostics,
   RegimeVolContext,
@@ -193,6 +194,8 @@ export function BreakoutDiagnosticsSection({
           ))}
         </ul>
       )}
+
+      {tab !== "timing" && <BreakoutTopDrivers drivers={diagnostics.topDrivers} />}
 
       {tab !== "timing" && <RegimeVolCells ctx={diagnostics.regimeVol} label="All signals" />}
 
