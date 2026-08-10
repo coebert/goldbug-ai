@@ -442,6 +442,11 @@ function ExecutionImpact({
         </tbody>
       </table>
       <p className="mt-1 text-[11px] text-muted-foreground">{grid.summary}</p>
+      <p className="mt-1 text-[11px] text-muted-foreground" data-testid="driver-sizing-limits">
+        Safety limits: max {grid.limits.maxPositionSize.toFixed(2)}× per position ·{" "}
+        {grid.limits.maxConcurrentSignals} concurrent · {grid.limits.maxTotalDeployedPct.toFixed(0)}%
+        capital deployed. {cell.limits.summary}
+      </p>
     </div>
   );
 }
