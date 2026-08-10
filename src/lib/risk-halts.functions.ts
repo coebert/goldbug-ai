@@ -40,7 +40,7 @@ export const getPortfolioRiskHalts = createServerFn({ method: "POST" })
     const asOf = formatUk(new Date(), { year: "numeric", month: "2-digit", day: "2-digit" })
       .split("/").reverse().join("-"); // dd/mm/yyyy → yyyy-mm-dd
     const stats = await loadEquityStats(supabase, data.portfolioId, asOf).catch(
-      () => ({ priorCloseEquity: null, peakEquity: null }),
+      () => ({ priorCloseEquity: null, peakEquity: null, netExternalFlow: 0 }),
     );
 
     return evaluateRiskHalts({

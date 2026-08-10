@@ -1041,7 +1041,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // stop-losses above) still fire so the portfolio can de-risk.
   const { evaluateRiskHalts, loadEquityStats } = await import("./risk-halts.server");
   const equityStats = await loadEquityStats(supabaseAdmin, portfolioId, asOf).catch(
-    () => ({ priorCloseEquity: null, peakEquity: null }),
+    () => ({ priorCloseEquity: null, peakEquity: null, netExternalFlow: 0 }),
   );
   const halts = evaluateRiskHalts({
     startingEquity: Number(portfolio.starting_cash) || totalValue,
