@@ -370,13 +370,21 @@ describe("negative controls — the epsilons are tight enough to catch real bugs
     );
   });
 
-  it("rounding the base price instead of the quoted price leaves the venue grid", () => {
-    // Converting first and snapping afterwards produces a price the venue
-    // cannot fill; the resulting quoted price is off its own tick grid.
-    const inst = bySymbol.get("HSBA.L")!;
+  it("rounding the base price instead of the quoted price gives a different fill", () => {
+    // Converting first and snapping to the base minor unit afterwards produces
+    // a different price from snapping on the venue's tick grid — the book and
+    // the venue would then disagree by more than the reconciliation epsilon.
+    const inst = bySymbol.get("HSBA.L")!; // 0.05p tick
     const quoted = 942.63;
-    const wrong = Number((Math.round(quoteToBase(inst, quoted) / 0.01) * 0.01).toFixed(10)) * 100;
-    expect(onGrid(wrong, inst.tick), "base-first rounding must not land on the venue tick grid").toBe(false);
+    const correct = roundToTick(quoted, inst.tick); // 942.65
+    const baseFirst = Number((Math.round(quoteToBase(inst, quoted) / 0.01) * 0.01).toFixed(10)) * 100; // 943
+    expect(onGrid(correct, inst.tick), "quote-first rounding must stay on the tick grid").toBe(true);
+    expect(baseFirst, "base-first rounding must not reproduce the venue price").not.toBeCloseTo(correct, 6);
+    const qty = 500;
+    const gap = Math.abs(quoteToBase(inst, correct) * qty - quoteToBase(inst, baseFirst) * qty);
+    expect(gap, "the ordering difference must exceed the booking epsilon").toBeGreaterThan(
+      TOLERANCE.perBookingGbp * qty,
+    );
   });
 
   it("one micro-pound of injected drift per booking is detected at the total", () => {
