@@ -156,7 +156,7 @@ import {
   evaluateEventBlackout,
   reentryLockoutDays,
 } from "./exits";
-import { scoreUniverse, formatAlphaPriorsForPrompt } from "./alpha";
+import { scoreUniverse, formatAlphaPriorsForPrompt, formatBreakoutBlock } from "./alpha";
 import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
 import {
   planOrderSlices,
@@ -737,7 +737,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     effectiveRegime.regime,
   );
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
-  const alphaPriors = formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10);
+  const alphaPriors = [
+    formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10),
+    "",
+    formatBreakoutBlock(
+      features as unknown as Parameters<typeof formatBreakoutBlock>[0],
+      8,
+    ),
+  ].join("\n");
 
   // Sector cycle: classify every sector as growing / stagnating / shrinking
   // from its 30d vs 90d momentum relative to the cross-sector median. Feeds
