@@ -182,6 +182,30 @@ export function expectedHoldingDelta(fill: LedgerFill): number {
   return fill.side === "buy" ? fill.quantity : -fill.quantity;
 }
 
+/** Zero-filled leg map, or null when the fill itemised nothing at all. */
+export function normaliseFeeLegs(fill: LedgerFill): Record<FeeLegKey, number> | null {
+  const legs = fill.feeLegs;
+  if (!legs) return null;
+  const present = FEE_LEG_KEYS.some((k) => legs[k] !== undefined);
+  if (!present) return null;
+  const out = {} as Record<FeeLegKey, number>;
+  for (const k of FEE_LEG_KEYS) out[k] = legs[k] ?? 0;
+  return out;
+}
+
+/** Sum of the itemised legs in micro-units (each leg rounded independently). */
+export function feeLegTotalMicros(legs: Record<FeeLegKey, number>): number {
+  let total = 0;
+  for (const k of FEE_LEG_KEYS) total += toMicros(legs[k]);
+  return total;
+}
+
+/** Sum of the itemised legs, or null when the fill itemised nothing. */
+export function sumFeeLegs(fill: LedgerFill): number | null {
+  const legs = normaliseFeeLegs(fill);
+  return legs ? fromMicros(feeLegTotalMicros(legs)) : null;
+}
+
 // ---------------------------------------------------------------------------
 // The walk
 // ---------------------------------------------------------------------------
