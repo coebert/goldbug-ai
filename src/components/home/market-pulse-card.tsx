@@ -234,13 +234,26 @@ function ToneGauge({ score, tone }: { score: number; tone: MarketPulse["tone"] }
 export function MarketPulseCard() {
   const fetchPulse = useServerFn(getMarketPulse);
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(90);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
   const query = useQuery({
     queryKey: ["market-pulse", days],
     queryFn: () => fetchPulse({ data: { comparisonDays: days } }),
     staleTime: 5 * 60_000,
     gcTime: 15 * 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: autoRefresh ? REFRESH_MS : false,
   });
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const secondsLeft = query.dataUpdatedAt
+    ? Math.max(0, Math.ceil((query.dataUpdatedAt + REFRESH_MS - now) / 1000))
+    : REFRESH_MS / 1000;
+
 
   const pulse = query.data;
   const grouped = useMemo(() => {
