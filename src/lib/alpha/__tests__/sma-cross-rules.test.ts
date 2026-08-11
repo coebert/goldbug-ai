@@ -119,9 +119,14 @@ describe("smaCrossBuyRule", () => {
       regimeUnknown: false,
       warnings: [],
     };
-    const r = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2 }));
+    const r = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2, maxSizeMult: 2 }));
     expect(r.sizeMultiplier).toBeCloseTo(1.32, 6);
     expect(r.reason).toMatch(/SMA20/);
+
+    // With the risk profile's ceiling in force, the stack is clamped to it.
+    const bounded = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2, maxSizeMult: 1.25 }));
+    expect(bounded.sizeMultiplier).toBeCloseTo(1.25, 10);
+    expect(bounded.sizing?.clamped).toBe(true);
   });
 
   it("cuts size proportionally when the fast trend rolls over inside a golden regime", () => {
