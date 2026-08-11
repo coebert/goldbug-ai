@@ -297,6 +297,21 @@ export function toggleSmaFavorite(current: readonly string[], symbol: string): s
     : [...current, symbol];
 }
 
+/** Move a pinned market to an explicit index (drag-and-drop reordering). */
+export function reorderSmaFavorites(
+  current: readonly string[],
+  symbol: string,
+  toIndex: number,
+): string[] {
+  const from = current.indexOf(symbol);
+  if (from === -1) return [...current];
+  const next = [...current];
+  next.splice(from, 1);
+  const clamped = Math.max(0, Math.min(next.length, toIndex));
+  next.splice(clamped, 0, symbol);
+  return next;
+}
+
 /** Move a pinned market one slot up or down in the pinned sequence. */
 export function moveSmaFavorite(
   current: readonly string[],
