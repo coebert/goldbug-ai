@@ -54,6 +54,7 @@ import {
   resolveTrendBasis,
   serialiseSmaPeriods,
   type TrendBasis,
+  type TrendPercentiles,
 } from "@/lib/sma-display";
 
 export const TONE_CLASS = {
