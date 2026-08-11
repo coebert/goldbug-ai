@@ -165,3 +165,62 @@ export function brokerCoverage(fills: readonly { feeSource: string | null }[]): 
   const covered = fills.filter((f) => f.feeSource === "broker").length;
   return covered / fills.length;
 }
+
+/**
+ * Some Saxo report variants state LSE charges in pence rather than pounds.
+ * Treated as a currency, not a magnitude, so it can never be double-scaled.
+ */
+export function normaliseChargeCurrency(currency: string): { code: string; scale: number } {
+  const raw = String(currency ?? "").trim().toUpperCase();
+  if (raw === "GBX" || raw === "GBP.GBX") return { code: "GBP", scale: 0.01 };
+  if (raw === "ZAC") return { code: "ZAR", scale: 0.01 };
+  return { code: raw || "GBP", scale: 1 };
+}
+
+export type ChargeLegs = {
+  commission: number;
+  exchangeFee: number;
+  tax: number;
+  other: number;
+  total: number;
+};
+
+/**
+ * Convert an update's itemised legs into the fill's currency.
+ *
+ * Two invariants the drilldown depends on:
+ *  - the legs always sum to the total, so commission/spread/tax columns can
+ *    never disagree with the headline number;
+ *  - a broker total that exceeds its own itemisation lands in `other` rather
+ *    than being dropped, because unattributed money is still money paid.
+ */
+export async function convertChargeLegs(
+  u: Pick<ChargeUpdate, "currency" | "commission" | "exchangeFee" | "tax" | "other" | "total">,
+  targetCurrency: string,
+  convert: (amount: number, from: string, to: string) => Promise<number>,
+): Promise<ChargeLegs> {
+  const src = normaliseChargeCurrency(u.currency || targetCurrency);
+  const dst = normaliseChargeCurrency(targetCurrency);
+  const clean = (n: number) => (Number.isFinite(n) && n > 0 ? n : 0);
+
+  const scale = async (amount: number): Promise<number> => {
+    const v = clean(amount) * src.scale;
+    if (v === 0) return 0;
+    if (src.code === dst.code) return v / dst.scale;
+    const out = await convert(v, src.code, dst.code);
+    return (Number.isFinite(out) ? out : v) / dst.scale;
+  };
+
+  const [commission, exchangeFee, tax, other] = await Promise.all([
+    scale(u.commission),
+    scale(u.exchangeFee),
+    scale(u.tax),
+    scale(u.other),
+  ]);
+  const declared = await scale(u.total);
+  const itemised = commission + exchangeFee + tax + other;
+  // Trust the larger of the two: a partial itemisation understates cost.
+  const residual = declared > itemised ? declared - itemised : 0;
+  const legs = { commission, exchangeFee, tax, other: other + residual };
+  return { ...legs, total: legs.commission + legs.exchangeFee + legs.tax + legs.other };
+}
