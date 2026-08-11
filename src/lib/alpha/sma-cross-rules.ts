@@ -60,6 +60,27 @@ export type SmaCrossRuleConfig = {
    * newly listed symbol with <200 bars. Never blocks; just sizes down.
    */
   unknownRegimeSizeMult: number;
+
+  // ---- Dynamic (conviction-scaled) sizing -----------------------------
+  /**
+   * Separation at which regime conviction saturates. Between
+   * `regimeSeparationPct` and this, the golden/death size effect ramps
+   * proportionally instead of switching on as a step.
+   */
+  regimeSaturationPct: number;
+  /** Separation at which fast-cross conviction saturates. */
+  fastSaturationPct: number;
+  /**
+   * How much a cross's size effect decays as it ages towards
+   * `maxCrossAgeBars`. 0 = no decay, 0.6 = a stale cross keeps 40% of it.
+   */
+  freshnessWeight: number;
+  /** Buy multiplier floor when a fast bear cross fires at full conviction. */
+  fastBearBuyMult: number;
+  /** Lower bound on the combined SMA size multiplier for this risk level. */
+  minSizeMult: number;
+  /** Upper bound on the combined SMA size multiplier for this risk level. */
+  maxSizeMult: number;
 };
 
 export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
@@ -80,6 +101,12 @@ export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
   maxDroppedFraction: 0.2,
   maxStaleFraction: 0.5,
   unknownRegimeSizeMult: 0.75,
+  regimeSaturationPct: 0.06,
+  fastSaturationPct: 0.025,
+  freshnessWeight: 0.5,
+  fastBearBuyMult: 0.5,
+  minSizeMult: 0.35,
+  maxSizeMult: 1.3,
 };
 
 /** How much of the model is trustworthy for this symbol. */
