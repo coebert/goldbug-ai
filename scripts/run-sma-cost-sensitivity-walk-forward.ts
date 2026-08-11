@@ -508,6 +508,30 @@ async function main() {
     const lost = meanOf(base.get(v)!) - meanOf(quad.get(v)!);
     console.log(`  ${v.padEnd(14)} ${(lost / 15).toFixed(3)} pp/bp  (${lost.toFixed(2)}pp over +15bp)`);
   }
+
+  console.log("\nCalibrated-model sensitivity (calibrated → 3x calibrated costs):");
+  const cal = perScenario.get("calibrated");
+  const cal3 = perScenario.get("calibrated 3x");
+  if (cal && cal3) {
+    for (const v of VARIANTS) {
+      const a = meanOf(cal.get(v)!);
+      const b = meanOf(cal3.get(v)!);
+      console.log(
+        `  ${v.padEnd(14)} ${a.toFixed(2)}% → ${b.toFixed(2)}% `
+        + `(${(b - a).toFixed(2)}pp for 3x execution costs)`,
+      );
+    }
+    console.log("\nCalibrated vs hand-picked scenarios (mean OOS return per fold):");
+    for (const v of VARIANTS) {
+      const c = meanOf(cal.get(v)!);
+      const live = meanOf(perScenario.get("live baseline")!.get(v)!);
+      const saxo = meanOf(perScenario.get("saxo-like tiered")!.get(v)!);
+      console.log(
+        `  ${v.padEnd(14)} calibrated ${c.toFixed(2)}%  vs live-baseline ${live.toFixed(2)}%`
+        + `  vs saxo-like ${saxo.toFixed(2)}%`,
+      );
+    }
+  }
 }
 
 main().catch((e) => {
