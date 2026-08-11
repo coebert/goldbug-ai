@@ -243,12 +243,26 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
       return;
     }
 
+    const legs = normaliseFeeLegs(fill);
+    if (legs && FEE_LEG_KEYS.some((k) => !Number.isFinite(legs[k]))) {
+      push({
+        code: "invalid_fee_leg",
+        message: `fill ${fill.id} carries a non-finite fee leg — the itemised costs cannot be reconciled`,
+        index,
+        fill,
+        expected: 0,
+        actual: Number.NaN,
+        step: null,
+      });
+      return;
+    }
+
     const cashBeforeMicros = cashMicros;
     const holdBeforeMicros = bookMicros.get(fill.symbol) ?? 0;
 
-    const wantCashMicros =
-      (fill.side === "buy" ? -1 : 1) * toMicros(fill.price * fill.quantity) -
-      toMicros(fill.fees ?? 0);
+    const notionalMicros = toMicros(fill.price * fill.quantity);
+    const feesMicros = toMicros(fill.fees ?? 0);
+    const wantCashMicros = (fill.side === "buy" ? -1 : 1) * notionalMicros - feesMicros;
     const wantQtyMicros = (fill.side === "buy" ? 1 : -1) * toMicroQty(fill.quantity);
 
     cashMicros = cashBeforeMicros + wantCashMicros;
@@ -258,6 +272,8 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
 
     const holdings: Record<string, number> = {};
     for (const [symbol, q] of bookMicros) holdings[symbol] = fromMicros(q);
+
+    const legTotalMicros = legs ? feeLegTotalMicros(legs) : null;
 
     const step: LedgerStep = {
       index,
@@ -271,6 +287,9 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
       holdingDelta: fromMicros(wantQtyMicros),
       expectedHoldingDelta: expectedHoldingDelta(fill),
       holdings,
+      feesCharged: fromMicros(feesMicros),
+      feeLegTotal: legTotalMicros === null ? null : fromMicros(legTotalMicros),
+      feeLegs: legs,
     };
     steps.push(step);
 
@@ -296,6 +315,78 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
         step,
       });
     }
+
+    // ---- fee-leg decomposition ------------------------------------------
+    if (legs === null) {
+      if (options.requireFeeLegs && feesMicros !== 0) {
+        push({
+          code: "missing_fee_legs",
+          message: `step ${index} (${fill.id}) charged ${money(step.feesCharged)} of fees with no commission/exchange/stamp breakdown`,
+          index,
+          fill,
+          expected: step.feesCharged,
+          actual: 0,
+          step,
+        });
+      }
+    } else {
+      if (!options.allowNegativeFeeLegs) {
+        for (const key of FEE_LEG_KEYS) {
+          if (toMicros(legs[key]) < 0) {
+            push({
+              code: "negative_fee_leg",
+              message: `step ${index} (${fill.id}) booked a negative ${key} leg of ${money(legs[key])} — a sign flip here hides cost drag inside another leg`,
+              index,
+              fill,
+              expected: 0,
+              actual: legs[key],
+              step,
+              leg: key,
+            });
+          }
+        }
+      }
+
+      // Legs must reconstruct the charged fee to the micro-unit: no rounding
+      // slack, no leg quietly absorbed into the notional.
+      if (legTotalMicros !== feesMicros) {
+        const breakdown = FEE_LEG_KEYS.filter((k) => legs[k] !== 0)
+          .map((k) => `${k} ${money(legs[k])}`)
+          .join(" + ");
+        push({
+          code: "fee_leg_sum_mismatch",
+          message: `step ${index} (${fill.id}) itemised ${breakdown || "nothing"} = ${money(
+            fromMicros(legTotalMicros!),
+          )} but charged ${money(step.feesCharged)} (off by ${money(
+            fromMicros(legTotalMicros! - feesMicros),
+          )})`,
+          index,
+          fill,
+          expected: step.feesCharged,
+          actual: fromMicros(legTotalMicros!),
+          step,
+        });
+      }
+
+      // And the legs must explain the cash movement directly, independently of
+      // `fees`: cash delta = ±notional - Σ legs, exactly, in micro-units.
+      const legImpliedCashMicros =
+        (fill.side === "buy" ? -1 : 1) * notionalMicros - legTotalMicros!;
+      if (legImpliedCashMicros !== wantCashMicros) {
+        push({
+          code: "fee_leg_cash_mismatch",
+          message: `step ${index} (${fill.id}) moved cash by ${money(step.cashDelta)} but ±notional minus the itemised legs implies ${money(
+            fromMicros(legImpliedCashMicros),
+          )}`,
+          index,
+          fill,
+          expected: fromMicros(legImpliedCashMicros),
+          actual: step.cashDelta,
+          step,
+        });
+      }
+    }
+
     if (!options.allowNegativeCash && cashMicros < -epsMicros) {
       push({
         code: "negative_cash",
