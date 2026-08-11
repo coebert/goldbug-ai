@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Receipt } from "lucide-react";
 import { getFrictionReport } from "@/lib/friction-kpi.functions";
 import { FrictionCostDrilldown } from "@/components/friction-cost-drilldown";
+import { FeeSyncStatusStrip } from "@/components/fee-sync-status-strip";
 import { backfillBrokerChargesFn } from "@/lib/broker-cost-backfill.functions";
 import { formatMoney } from "@/lib/format-money";
 import { POLL } from "@/lib/query-keys";
@@ -308,6 +309,7 @@ export function FrictionKpiCard({
                     : "Your broker hasn't reported charges for these trades yet, so this is our estimate of what they cost."}
             </p>
 
+            {report?.feeSync && <FeeSyncStatusStrip summary={report.feeSync} />}
           </>
         )}
 

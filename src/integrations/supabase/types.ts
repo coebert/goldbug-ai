@@ -1506,6 +1506,9 @@ export type Database = {
           fee_exchange: number | null
           fee_other: number | null
           fee_source: string
+          fee_sync_attempted_at: string | null
+          fee_sync_reason: string | null
+          fee_sync_status: string
           fee_synced_at: string | null
           fee_tax: number | null
           fill_price: number
@@ -1528,6 +1531,9 @@ export type Database = {
           fee_exchange?: number | null
           fee_other?: number | null
           fee_source?: string
+          fee_sync_attempted_at?: string | null
+          fee_sync_reason?: string | null
+          fee_sync_status?: string
           fee_synced_at?: string | null
           fee_tax?: number | null
           fill_price: number
@@ -1550,6 +1556,9 @@ export type Database = {
           fee_exchange?: number | null
           fee_other?: number | null
           fee_source?: string
+          fee_sync_attempted_at?: string | null
+          fee_sync_reason?: string | null
+          fee_sync_status?: string
           fee_synced_at?: string | null
           fee_tax?: number | null
           fill_price?: number
