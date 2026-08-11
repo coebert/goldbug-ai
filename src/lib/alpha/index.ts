@@ -33,3 +33,14 @@ export type {
   BreakoutAgeBand,
   BreakoutAgeDecision,
 } from "./breakout-age-policy";
+export {
+  computeModelMultipliers,
+  applyAdaptiveWeights,
+  describeAdaptiveWeights,
+  multiplierFor,
+  credibility,
+  performanceSignal,
+  type ModelPerformance,
+  type ModelMultiplier,
+  type AdaptiveWeightRow,
+} from "./adaptive-weights";

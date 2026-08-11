@@ -244,6 +244,56 @@ export type Database = {
           },
         ]
       }
+      alpha_model_performance: {
+        Row: {
+          as_of: string
+          avg_edge_bps: number | null
+          created_at: string
+          hit_rate: number | null
+          hits: number
+          id: string
+          model_kind: string
+          portfolio_id: string
+          samples: number
+          updated_at: string
+          window_days: number
+        }
+        Insert: {
+          as_of: string
+          avg_edge_bps?: number | null
+          created_at?: string
+          hit_rate?: number | null
+          hits?: number
+          id?: string
+          model_kind: string
+          portfolio_id: string
+          samples?: number
+          updated_at?: string
+          window_days?: number
+        }
+        Update: {
+          as_of?: string
+          avg_edge_bps?: number | null
+          created_at?: string
+          hit_rate?: number | null
+          hits?: number
+          id?: string
+          model_kind?: string
+          portfolio_id?: string
+          samples?: number
+          updated_at?: string
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alpha_model_performance_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backtest_runs: {
         Row: {
           created_at: string
@@ -2872,6 +2922,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "signal_performance_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_weight_history: {
+        Row: {
+          as_of: string
+          base_weight: number
+          created_at: string
+          effective_weight: number
+          id: string
+          model_kind: string
+          multiplier: number
+          portfolio_id: string
+          reason: string | null
+          regime: string
+        }
+        Insert: {
+          as_of: string
+          base_weight: number
+          created_at?: string
+          effective_weight: number
+          id?: string
+          model_kind: string
+          multiplier: number
+          portfolio_id: string
+          reason?: string | null
+          regime?: string
+        }
+        Update: {
+          as_of?: string
+          base_weight?: number
+          created_at?: string
+          effective_weight?: number
+          id?: string
+          model_kind?: string
+          multiplier?: number
+          portfolio_id?: string
+          reason?: string | null
+          regime?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_weight_history_portfolio_id_fkey"
             columns: ["portfolio_id"]
             isOneToOne: false
             referencedRelation: "portfolios"
