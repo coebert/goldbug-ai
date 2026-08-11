@@ -220,6 +220,8 @@ describe("heatmap rendering", () => {
   it("prints one fixed-width row per pair plus a stress strip", () => {
     const out = formatResidualHeatmap(report, report.structures[0]!, { columns: 30 });
     const rows = out.split("\n").filter((l) => l.includes("|"));
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(rows, null, 1));
     expect(rows).toHaveLength(report.structures[0]!.pairs.length + 1);
     for (const r of rows) {
       expect(r.split("|")[1]).toHaveLength(30);
