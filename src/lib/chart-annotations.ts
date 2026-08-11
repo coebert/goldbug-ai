@@ -258,19 +258,25 @@ export function newsNearEvent(
     .slice(0, limit);
 }
 
-/** Merge AI-written notes onto detected events, falling back per event. */
+/**
+ * Merge AI-written notes onto detected events, falling back per event, and
+ * attach the same nearby headlines the model was shown as visible evidence.
+ */
 export function mergeAnnotations(
   events: ChartEvent[],
   notes: Record<string, string>,
   model: string | null,
+  news: AnnotationNewsItem[] = [],
 ): ChartAnnotation[] {
   return events.map((e) => {
     const ai = (notes[e.id] ?? "").trim();
+    const sources = newsNearEvent(news, e.date);
     return ai
-      ? { ...e, note: ai.slice(0, 320), model }
-      : { ...e, note: e.fallbackNote, model: null };
+      ? { ...e, note: ai.slice(0, 320), model, sources }
+      : { ...e, note: e.fallbackNote, model: null, sources };
   });
 }
+
 
 export function buildAnnotationPrompt(
   label: string,
