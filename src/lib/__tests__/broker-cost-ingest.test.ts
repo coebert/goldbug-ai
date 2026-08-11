@@ -31,7 +31,7 @@ function charge(over: Partial<BrokerTradeCharge> = {}): BrokerTradeCharge {
     tax: 0,
     other: 0,
     total: 6,
-    bookedAt: "2026-08-20T14:00:00.000Z",
+    tradedAt: "2026-08-20T14:00:00.000Z",
     ...over,
   } as BrokerTradeCharge;
 }
@@ -69,7 +69,7 @@ describe("matchChargesToFills", () => {
   it("falls back to symbol/side/qty/time when the report carries no ids", () => {
     const res = matchChargesToFills({
       fills: [fill()],
-      charges: [charge({ brokerTradeId: "T-7", bookedAt: "2026-08-21T00:00:00.000Z" })],
+      charges: [charge({ brokerTradeId: "T-7", tradedAt: "2026-08-21T00:00:00.000Z" })],
     });
     expect(res.updates[0]?.matchedBy).toBe("attributes");
     expect(res.updates[0]?.brokerTradeId).toBe("T-7");
@@ -96,7 +96,7 @@ describe("matchChargesToFills", () => {
     expect(wrongSide.updates).toHaveLength(0);
     const stale = matchChargesToFills({
       fills: [fill()],
-      charges: [charge({ bookedAt: "2026-07-01T00:00:00.000Z" })],
+      charges: [charge({ tradedAt: "2026-07-01T00:00:00.000Z" })],
     });
     expect(stale.updates).toHaveLength(0);
   });
