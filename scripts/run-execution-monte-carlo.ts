@@ -69,6 +69,11 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  formatResidualTimeline,
+  residualTimeline,
+  type TimelineStructureKind,
+} from "../src/lib/execution-residual-timeline";
+import {
   DEFAULT_BLEND_GRID,
   formatRegimeBlendSweep,
   sweepRegimeBlend,
@@ -351,6 +356,16 @@ const calibStressAllCells = argv.includes("--calib-stress-all");
 const regimeBlendMode = argv.includes("--regime-blend-sweep");
 const regimeBlendGrid = arg("regime-blend-sweep", DEFAULT_BLEND_GRID.join(","))
   .split(",").map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n >= 0);
+
+// --residual-timeline: keeps the time axis on the residual diagnostics. A
+// cluster-pair × time heatmap of implied − realised ρ for each structure, so
+// you can see *when* the blocks/contagion approximation breaks and *which*
+// pair breaks it, instead of a tape-wide average that hides both.
+const residualTimelineMode = argv.includes("--residual-timeline");
+const residualKinds = arg("residual-timeline", "blocks,contagion")
+  .split(",").map((s) => s.trim()).filter(Boolean) as TimelineStructureKind[];
+const residualColumns = Number(arg("residual-columns", "64"));
+const residualEpisodes = Number(arg("residual-episodes", "8"));
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
@@ -886,6 +901,27 @@ async function main() {
     console.log(describeCalibration(diag.calibration));
     console.log();
     console.log(formatCalibrationDiagnostics(diag));
+    if (!spilloverMode && !attributionMode) return;
+    console.log();
+  }
+
+  // ------------------------------------------------- residual timeline
+  // --residual-timeline: where and when the coupling assumption deviates.
+  if (residualTimelineMode) {
+    const timeline = residualTimeline(seriesBySymbol, {
+      ...calibOpts,
+      volZ,
+      kinds: residualKinds,
+      dates: bars.map((b) => b.date),
+      structures: loadedSnapshot
+        ? new Map([[loadedSnapshot.structure.kind as TimelineStructureKind,
+          loadedSnapshot.structure]])
+        : undefined,
+    });
+    console.log(formatResidualTimeline(timeline, {
+      columns: residualColumns,
+      episodes: residualEpisodes,
+    }));
     if (!spilloverMode && !attributionMode) return;
     console.log();
   }
