@@ -347,8 +347,10 @@ async function main() {
     }));
   }
   const fallback = calibrateSymbolExecution({ symbol: "UNKNOWN", bars: [] });
+  const volZ = marketVolZScores(seriesBySymbol, 20);
   const ctx: Ctx = {
     seriesBySymbol,
+    volZ,
     costFor: (sym, notional, slipMult) =>
       executionCostFor(calibs.get(sym) ?? fallback, notional, "normal", slipMult).total,
   };
@@ -374,7 +376,14 @@ async function main() {
     `Execution draw: slippage lognormal σ=${simCfg.slippageSigma} `
     + `(+${(simCfg.tailProb * 100).toFixed(1)}% tail × ${simCfg.tailMult}), `
     + `fills full ${(simCfg.fullFillProb * 100).toFixed(0)}% / `
-    + `none ${(simCfg.noFillProb * 100).toFixed(0)}% / partial rest ≥${simCfg.minFillRatio}\n`,
+    + `none ${(simCfg.noFillProb * 100).toFixed(0)}% / partial rest ≥${simCfg.minFillRatio}`,
+  );
+  console.log(
+    `Correlated shocks: cross-symbol log-slippage ρ=${simCfg.rho}, `
+    + `stress regime enter ${(simCfg.stressEnterProb * 100).toFixed(1)}%/bar `
+    + `(mean length ${(1 / Math.max(1e-9, simCfg.stressExitProb)).toFixed(1)} bars, `
+    + `forced when vol z ≥ ${simCfg.volStressZ}), `
+    + `slippage ×${simCfg.stressSlippageMult} and no-fill ×${simCfg.stressNoFillMult} while stressed\n`,
   );
 
   for (const variant of SMA_VARIANTS) {
@@ -412,15 +421,26 @@ async function main() {
     let missed = 0;
     let partial = 0;
     let totalOrders = 0;
+    let stressOrders = 0;
+    let stressMissed = 0;
+    let stressBars = 0;
+    let allBars = 0;
+    // Share of a path's total execution cost incurred on stressed bars — the
+    // clean read on joint (rather than average) execution risk.
+    const pathStressCostShare: number[] = [];
 
     for (let pth = 0; pth < paths; pth++) {
-      const sampler = makeExecutionSampler(simCfg, baseSeed + pth * 7919 + variant.length * 104729);
+      const sampler = makeCorrelatedExecutionSampler(
+        simCfg,
+        baseSeed + pth * 7919 + variant.length * 104729,
+      );
       const rets: number[] = [];
       let worstFold = Infinity;
       let ddSum = 0;
       let deepestDd = 0;
       let shSum = 0;
       let costSum = 0;
+      let stressCostSum = 0;
       for (let k = 0; k < folds.length; k++) {
         const f = folds[k]!;
         const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler);
@@ -430,10 +450,16 @@ async function main() {
         deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
         shSum += r.sharpe;
         costSum += r.costs;
+        stressCostSum += r.stressCosts;
         missed += r.missedOrders;
         partial += r.partialFills;
         totalOrders += r.fills + r.missedOrders;
+        stressOrders += r.stressOrders;
+        stressMissed += r.stressMissed;
+        stressBars += r.stressBars;
+        allBars += f.testEnd - f.testStart + 1;
       }
+      pathStressCostShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
       pathMeanRet.push(meanOf(rets));
       pathWorstFold.push(worstFold);
       pathMaxDd.push(ddSum / folds.length);
@@ -449,6 +475,7 @@ async function main() {
     const breaches = drawdownBreachProbabilities(pathDeepestDd, ddThresholds);
     const sh = percentileStats(pathSharpe);
     const cost = percentileStats(pathCosts);
+    const stressShare = percentileStats(pathStressCostShare);
 
     console.log(`=== ${variant} ===`);
     console.log(
@@ -469,6 +496,13 @@ async function main() {
     console.log(statLine("deepest DD %", deepDd));
     console.log(statLine("Sharpe", sh));
     console.log(statLine("costs £/fold", cost));
+    console.log(statLine("stress cost %", stressShare));
+    console.log(
+      `stressed bars ${((stressBars / Math.max(1, allBars)) * 100).toFixed(1)}% of tape · `
+      + `${((stressOrders / Math.max(1, totalOrders)) * 100).toFixed(1)}% of orders sent into stress · `
+      + `unfilled in stress ${((stressMissed / Math.max(1, stressOrders)) * 100).toFixed(1)}% `
+      + `vs calm ${(((missed - stressMissed) / Math.max(1, totalOrders - stressOrders)) * 100).toFixed(1)}%`,
+    );
     console.log(
       "P(deepest drawdown ≥ X): "
       + breaches
@@ -482,6 +516,8 @@ async function main() {
   console.log("p5 is the 1-in-20 bad-execution-luck year; CVaR5 is the average of those.");
   console.log("'deepest DD %' is the worst single fold on each path; the breach line reads");
   console.log("as the chance a lifetime touches that drawdown depth at least once.");
+  console.log("Shocks are correlated: on a stressed bar every symbol widens and every order");
+  console.log("struggles together, so these tails are joint outcomes, not averaged-away ones.");
 }
 
 main().catch((e) => {
