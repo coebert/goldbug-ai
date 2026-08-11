@@ -206,6 +206,25 @@ export function FrictionKpiCard({
                 year.
               </p>
             )}
+
+            <p className="text-xs text-muted-foreground">
+              {kpi.tickets === 0
+                ? "Nothing to price yet."
+                : kpi.brokerCoverage >= 0.999
+                  ? `Every figure here is your broker's own charge${
+                      kpi.realisedRatio == null
+                        ? ""
+                        : ` — ${kpi.realisedRatio.toFixed(2)}x what we estimated`
+                    }.`
+                  : kpi.brokerCoverage > 0
+                    ? `${formatMoney(kpi.realisedFrictionBase, report?.currency ?? currency, 2)} of this is your broker's actual charges (${kpi.brokerBookedTickets} of ${kpi.tickets} trades); the rest is estimated${
+                        kpi.realisedRatio == null
+                          ? ""
+                          : `, and where we can compare, the real bill is ${kpi.realisedRatio.toFixed(2)}x our estimate`
+                      }.`
+                    : "Your broker hasn't reported charges for these trades yet, so this is our estimate of what they cost."}
+            </p>
+
           </>
         )}
 
@@ -254,13 +273,11 @@ export function FrictionKpiCard({
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               Change in cost: {signedBps(report.attribution.deltas.frictionBpsPer30d)} per 30 days.{" "}
-              {report.kpi.brokerCoverage >= 0.999
-                ? "Every trade here is priced from the broker's own charge report."
-                : report.kpi.brokerCoverage > 0
-                  ? `${Math.round(report.kpi.brokerCoverage * 100)}% of trades are priced from the broker's charge report; the rest use our cost model.`
-                  : "Costs are modelled — the broker has not reported fees on these trades yet."}{" "}
-              {report.overlay.degraded ? "" : report.overlay.note}
+              {report.overlay.degraded
+                ? "Graded against our cost model until the broker reports fees for these trades."
+                : `Graded against booked broker fees on ${report.overlay.sampleFills} of ${report.overlay.totalFills} trades: ${report.overlay.note}.`}
             </p>
+
 
           </div>
         )}

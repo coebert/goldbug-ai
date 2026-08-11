@@ -115,11 +115,29 @@ export type FrictionKpi = {
    * every number is invoiced.
    */
   brokerCoverage: number;
+  /** Charged friction on invoiced tickets only — money the broker actually took. */
+  realisedFrictionBase: number;
+  /** Charged friction on the remaining tickets, still our estimate. */
+  estimatedFrictionBase: number;
   daily: FrictionDailyPoint[];
+
 
   /** Annualised drag implied by the window's spend, in percent of NAV. */
   annualisedDragPct: number | null;
 };
+
+/**
+ * Whether this fill's cost came off a broker invoice rather than the model.
+ *
+ * `fee_source` is authoritative once ingestion has run, but the tape predates
+ * that column, so a positive booked fee also counts — otherwise historical
+ * rows with real charges would be graded as estimates.
+ */
+export function isInvoiced(f: FrictionFill): boolean {
+  if (f.feeSource === "broker") return true;
+  if (f.feeSource === "model" || f.feeSource === "none") return false;
+  return Number.isFinite(f.feeReportedBase) && f.feeReportedBase > 0;
+}
 
 /** Charged friction for one fill: the broker's number or ours, whichever is larger. */
 export function chargedFriction(f: FrictionFill): number {
@@ -127,6 +145,7 @@ export function chargedFriction(f: FrictionFill): number {
   const modelled = Number.isFinite(f.feeModelledBase) ? Math.max(0, f.feeModelledBase) : 0;
   return Math.max(reported, modelled);
 }
+
 
 function dayKey(iso: string): string {
   const t = Date.parse(iso);
@@ -186,6 +205,15 @@ export function computeFrictionKpi(args: {
   let turnoverBase = 0;
   let reportedBase = 0;
   let modelledBase = 0;
+  let realisedFrictionBase = 0;
+  let estimatedFrictionBase = 0;
+  let brokerBookedTickets = 0;
+  // Ratio and coverage are read off invoiced tickets only. Averaging booked
+  // fees over the whole tape would divide real charges by modelled costs the
+  // broker never billed against, and report the model as twice as expensive
+  // as reality purely because half the rows have not been synced yet.
+  let invoicedReported = 0;
+  let invoicedModelled = 0;
   const components: FrictionComponents = { commissionBase: 0, spreadBase: 0, taxBase: 0 };
   const byDay = new Map<string, { frictionBase: number; tickets: number }>();
 
@@ -195,6 +223,16 @@ export function computeFrictionKpi(args: {
     turnoverBase += Math.max(0, f.notionalBase);
     reportedBase += Math.max(0, f.feeReportedBase) || 0;
     modelledBase += Math.max(0, f.feeModelledBase) || 0;
+
+    if (isInvoiced(f)) {
+      brokerBookedTickets += 1;
+      realisedFrictionBase += charged;
+      invoicedReported += Math.max(0, f.feeReportedBase) || 0;
+      invoicedModelled += Math.max(0, f.feeModelledBase) || 0;
+    } else {
+      estimatedFrictionBase += charged;
+    }
+
     const c = scaleComponents(f, charged);
     components.commissionBase += c.commissionBase;
     components.spreadBase += c.spreadBase;
@@ -225,7 +263,7 @@ export function computeFrictionKpi(args: {
 
   const frictionBps = bpsOfNav(frictionBase);
   const tickets = ordered.length;
-  const brokerBookedTickets = ordered.filter((f) => f.feeSource === "broker").length;
+
 
   return {
     windowDays,
@@ -243,9 +281,12 @@ export function computeFrictionKpi(args: {
     components,
     reportedBase,
     modelledBase,
-    realisedRatio: reportedBase > 0 && modelledBase > 0 ? reportedBase / modelledBase : null,
+    realisedRatio:
+      invoicedReported > 0 && invoicedModelled > 0 ? invoicedReported / invoicedModelled : null,
     brokerBookedTickets,
     brokerCoverage: tickets > 0 ? brokerBookedTickets / tickets : 0,
+    realisedFrictionBase,
+    estimatedFrictionBase,
     daily,
     annualisedDragPct:
       frictionBps == null || windowDays <= 0
@@ -265,6 +306,11 @@ export function computeFrictionKpi(args: {
  * broker actually charged relative to the model, and any friction the model
  * could not attribute to a named leg is carried as a flat `extraBps` on
  * notional so it cannot quietly vanish from the ladder.
+ *
+ * Fitted on invoiced fills only. Including un-synced fills would put real
+ * charges over the whole tape's modelled cost and halve the multiplier for no
+ * reason other than incomplete ingestion — the ladder would then be told
+ * trading is cheaper than the broker's own invoice says.
  */
 export type RealisedCostOverlay = {
   label: string;
@@ -272,9 +318,13 @@ export type RealisedCostOverlay = {
   spreadMult: number;
   impactMult: number;
   extraBps: number;
-  /** Fills the overlay was fitted on. */
+  /** Invoiced fills the overlay was fitted on. */
   sampleFills: number;
-  /** True when the broker booked no fees at all and the model stands unchallenged. */
+  /** Fills in the tape, invoiced or not — the denominator behind `coverage`. */
+  totalFills: number;
+  /** Share of the tape (0..1) carrying broker-booked fees. */
+  coverage: number;
+  /** True only when no fill carries a broker fee, so the model stands unchallenged. */
   degraded: boolean;
   note: string;
 };
@@ -289,13 +339,15 @@ export function realisedCostOverlay(args: {
 }): RealisedCostOverlay {
   const label = args.label ?? "realised";
   const fills = args.fills.filter((f) => Number.isFinite(f.notionalBase) && f.notionalBase > 0);
+  const invoiced = fills.filter((f) => isInvoiced(f) && (Math.max(0, f.feeReportedBase) || 0) > 0);
+  const coverage = fills.length > 0 ? invoiced.length / fills.length : 0;
 
   let reportedCommission = 0;
   let modelledCommission = 0;
   let notional = 0;
   let unexplained = 0;
 
-  for (const f of fills) {
+  for (const f of invoiced) {
     notional += f.notionalBase;
     const reported = Math.max(0, f.feeReportedBase) || 0;
     const modelledFee = Math.max(0, f.commissionModelledBase) + Math.max(0, f.taxModelledBase);
@@ -313,7 +365,9 @@ export function realisedCostOverlay(args: {
       spreadMult: 1,
       impactMult: 1,
       extraBps: 0,
-      sampleFills: fills.length,
+      sampleFills: invoiced.length,
+      totalFills: fills.length,
+      coverage,
       degraded: true,
       note: "broker booked no fees on this tape — ladder runs on modelled costs",
     };
@@ -329,13 +383,19 @@ export function realisedCostOverlay(args: {
     spreadMult: 1,
     impactMult: 1,
     extraBps,
-    sampleFills: fills.length,
+    sampleFills: invoiced.length,
+    totalFills: fills.length,
+    coverage,
     degraded: false,
     note:
       `broker commission ran ${raw.toFixed(2)}x the model` +
-      (extraBps > 0.01 ? `, plus ${extraBps.toFixed(1)}bps unattributed` : ""),
+      (extraBps > 0.01 ? `, plus ${extraBps.toFixed(1)}bps unattributed` : "") +
+      (coverage < 0.999
+        ? ` (fitted on ${invoiced.length} of ${fills.length} trades with booked fees)`
+        : ""),
   };
 }
+
 
 // ---------------------------------------------------------------------------
 // Item 18 — before/after attribution

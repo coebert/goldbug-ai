@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chargeSymbolKey, matchChargesToFills, type IngestFill } from "@/lib/broker-cost-ingest";
 import type { BrokerTradeCharge } from "@/lib/brokers/adapter";
-import { computeFrictionKpi, type FrictionFill } from "@/lib/friction-kpi";
+import { computeFrictionKpi, realisedCostOverlay, type FrictionFill } from "@/lib/friction-kpi";
 
 function fill(over: Partial<IngestFill> = {}): IngestFill {
   return {
@@ -175,5 +175,69 @@ describe("friction KPI with broker-booked charges", () => {
     expect(kpi.brokerCoverage).toBe(0);
     expect(kpi.components.commissionBase).toBeCloseTo(2, 6);
     expect(kpi.components.spreadBase).toBeCloseTo(1, 6);
+  });
+});
+
+describe("realisedCostOverlay with partial broker coverage", () => {
+  it("fits only on invoiced fills so un-synced rows cannot dilute the multiplier", () => {
+    // Two identical tickets; only one has an invoice, and it came in at 2x the
+    // model. Averaging over both would report 1x and tell the ladder trading
+    // is cheaper than the broker's own bill.
+    const invoicedOnly = realisedCostOverlay({
+      fills: [kpiFill({ feeSource: "broker", feeReportedBase: 6 })],
+    });
+    const mixed = realisedCostOverlay({
+      fills: [
+        kpiFill({ feeSource: "broker", feeReportedBase: 6 }),
+        kpiFill({ feeSource: "none", feeReportedBase: 0 }),
+      ],
+    });
+    expect(invoicedOnly.commissionMult).toBeCloseTo(2, 6);
+    expect(mixed.commissionMult).toBeCloseTo(invoicedOnly.commissionMult, 6);
+    expect(mixed.degraded).toBe(false);
+    expect(mixed.coverage).toBeCloseTo(0.5, 6);
+    expect(mixed.sampleFills).toBe(1);
+    expect(mixed.totalFills).toBe(2);
+    expect(mixed.note).toContain("1 of 2");
+  });
+
+  it("stays degraded only while no fill carries a booked fee", () => {
+    const none = realisedCostOverlay({ fills: [kpiFill(), kpiFill()] });
+    expect(none.degraded).toBe(true);
+    expect(none.coverage).toBe(0);
+    expect(none.commissionMult).toBe(1);
+  });
+
+  it("carries cost above every modelled leg as flat extra bps", () => {
+    const o = realisedCostOverlay({
+      fills: [kpiFill({ feeSource: "broker", feeReportedBase: 14, notionalBase: 10_000 })],
+    });
+    // 14 booked vs 4 modelled all-in => 10 unattributed on 10k = 10bps.
+    expect(o.extraBps).toBeCloseTo(10, 6);
+  });
+});
+
+describe("realised vs estimated friction split", () => {
+  it("separates broker-billed money from our estimate and grades on invoices only", () => {
+    const kpi = computeFrictionKpi({
+      navBase: 100_000,
+      fills: [
+        kpiFill({ feeSource: "broker", feeReportedBase: 8 }),
+        kpiFill({ feeSource: "none" }),
+      ],
+    });
+    expect(kpi.realisedFrictionBase).toBeCloseTo(8, 6);
+    expect(kpi.estimatedFrictionBase).toBeCloseTo(4, 6);
+    // 8 booked over 4 modelled on the invoiced ticket only, not 8/8 over the tape.
+    expect(kpi.realisedRatio).toBeCloseTo(2, 6);
+  });
+
+  it("treats a legacy fill with a positive fee as invoiced despite a missing source", () => {
+    const kpi = computeFrictionKpi({
+      navBase: 100_000,
+      fills: [kpiFill({ feeReportedBase: 7 })],
+    });
+    expect(kpi.brokerCoverage).toBe(1);
+    expect(kpi.realisedFrictionBase).toBeCloseTo(7, 6);
   });
 });
