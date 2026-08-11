@@ -76,7 +76,7 @@ describe("selectable SMA periods", () => {
   const rows = Array.from({ length: 260 }, (_, i) => {
     const d = new Date(Date.UTC(2025, 0, 1));
     d.setUTCDate(d.getUTCDate() + i);
-    return { price_date: d.toISOString().slice(0, 10), close: 100 + i };
+    return { symbol: "SPY", price_date: d.toISOString().slice(0, 10), close: 100 + i };
   });
 
   const history = buildSymbolHistory("SPY", rows, 30);
