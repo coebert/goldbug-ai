@@ -45,7 +45,7 @@ describe("buildCoverageTrend", () => {
       fills: [fill("p1", -1, "invoiced")],
       portfolios,
       days: 3,
-      windowDays: 1,
+      windowDays: 2,
       now: NOW,
     });
     expect(t.overall.points[0]?.coveragePct).toBeNull();
