@@ -25,7 +25,12 @@ type ChartResponse = {
         >;
       };
       indicators?: {
-        quote?: Array<{ close?: (number | null)[]; volume?: (number | null)[] }>;
+        quote?: Array<{
+          close?: (number | null)[];
+          volume?: (number | null)[];
+          high?: (number | null)[];
+          low?: (number | null)[];
+        }>;
         adjclose?: Array<{ adjclose?: (number | null)[] }>;
       };
     }>;
@@ -82,6 +87,8 @@ export async function fetchSymbolHistory(
   const div = unitDivisor(result.meta?.currency);
   const closes = result.indicators?.quote?.[0]?.close ?? [];
   const volumes = result.indicators?.quote?.[0]?.volume ?? [];
+  const highs = result.indicators?.quote?.[0]?.high ?? [];
+  const lows = result.indicators?.quote?.[0]?.low ?? [];
   const adj = result.indicators?.adjclose?.[0]?.adjclose ?? [];
 
   const bars: RawDailyBar[] = [];
@@ -89,11 +96,15 @@ export async function fetchSymbolHistory(
     const close = closes[i];
     if (close == null || !Number.isFinite(close) || close <= 0) continue;
     const a = adj[i];
+    const hi = highs[i];
+    const lo = lows[i];
     bars.push({
       date: isoDay(result.timestamp[i]!),
       close: close / div,
       adjClose: a != null && Number.isFinite(a) && a > 0 ? a / div : null,
       volume: volumes[i] ?? null,
+      high: hi != null && Number.isFinite(hi) && hi > 0 ? hi / div : null,
+      low: lo != null && Number.isFinite(lo) && lo > 0 ? lo / div : null,
     });
   }
 

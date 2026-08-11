@@ -21,6 +21,12 @@
 import { fetchUniverseHistory } from "../src/lib/real-market-tape.server";
 import { buildRealTape, type PriceMode } from "../src/lib/real-market-tape";
 import type { BacktestBar } from "../src/lib/backtest-runner";
+import {
+  calibrateSymbolExecution,
+  executionCostFor,
+  type SymbolExecutionCalibration,
+} from "../src/lib/execution-calibration-from-bars";
+import type { AssetClass } from "../src/lib/universe.server";
 
 const argv = process.argv.slice(2);
 const arg = (name: string, fallback: string) => {
@@ -62,9 +68,14 @@ type CostModel = {
   slippageBps: number;
   /** Minimum ticket the cost governor will place, £. */
   minTicket: number;
+  /**
+   * Calibrated models price each fill per symbol (own spread, own venue
+   * commission, own ADV-driven impact) instead of one flat bps assumption.
+   */
+  perSymbol?: (symbol: string, notional: number) => number;
 };
 
-const SCENARIOS: CostModel[] = [
+const BASE_SCENARIOS: CostModel[] = [
   { label: "frictionless", commissionBps: 0, commissionMin: 0, flatFee: 0, slippageBps: 0, minTicket: 0 },
   { label: "live baseline", commissionBps: 8, commissionMin: 3, flatFee: 0, slippageBps: 5, minTicket: 250 },
   { label: "2x slippage", commissionBps: 8, commissionMin: 3, flatFee: 0, slippageBps: 10, minTicket: 250 },
@@ -75,10 +86,15 @@ const SCENARIOS: CostModel[] = [
   { label: "punitive", commissionBps: 25, commissionMin: 10, flatFee: 0, slippageBps: 40, minTicket: 250 },
 ];
 
-const costOf = (m: CostModel, notional: number) =>
-  Math.max(m.commissionMin, (notional * m.commissionBps) / 10_000)
-  + m.flatFee
-  + (notional * m.slippageBps) / 10_000;
+/** Populated in main() once the calibration step has run. */
+let SCENARIOS: CostModel[] = BASE_SCENARIOS;
+
+const costOf = (m: CostModel, notional: number, symbol: string) =>
+  m.perSymbol
+    ? m.perSymbol(symbol, notional)
+    : Math.max(m.commissionMin, (notional * m.commissionBps) / 10_000)
+      + m.flatFee
+      + (notional * m.slippageBps) / 10_000;
 
 // ---------------------------------------------------------------- indicators
 
@@ -186,7 +202,7 @@ function simulate(
     for (const sym of exits) {
       const qty = shares.get(sym)!;
       const notional = qty * priceAt(sym, i);
-      const c = costOf(cost, notional);
+      const c = costOf(cost, notional, sym);
       cash += notional - c;
       costs += c;
       trades++;
@@ -201,7 +217,7 @@ function simulate(
         const price = priceAt(sym, i);
         const notional = Math.min(target, cash * 0.98);
         if (notional < cost.minTicket) continue;
-        const c = costOf(cost, notional);
+        const c = costOf(cost, notional, sym);
         const qty = (notional - c) / price;
         if (!(qty > 0)) continue;
         cash -= notional;
@@ -217,7 +233,7 @@ function simulate(
   let finalEquity = cash;
   for (const [sym, qty] of shares) {
     const notional = qty * priceAt(sym, end);
-    finalEquity += notional - costOf(cost, notional);
+    finalEquity += notional - costOf(cost, notional, sym);
   }
 
   const rets: number[] = [];
@@ -287,6 +303,90 @@ async function main() {
   }
   console.log(`Tape: ${bars.length} bars, ${seriesBySymbol.size} usable symbols\n`);
 
+  // ------------------------------------------------ execution calibration
+  // Estimate each symbol's real execution profile from its own recent bars
+  // (Corwin-Schultz high/low spread, median traded value, realised vol) and
+  // pair it with the actual Saxo venue commission tier. Notionals are treated
+  // as trade-currency for the ADV/participation comparison — a reasonable
+  // approximation for a £10k book in £/$ mega-caps.
+  const guessClass = (sym: string): AssetClass => {
+    if (/^(GLD|SGLN|IAU|SLV)/i.test(sym)) return "commodity";
+    if (/^(SPY|QQQ|VOO|IVV|VUKE|ISF|EQQQ|XU|VWRL)/i.test(sym)) return "etf";
+    if (/(BTC|ETH)/i.test(sym)) return "crypto";
+    return "stock";
+  };
+
+  const calibs = new Map<string, SymbolExecutionCalibration>();
+  for (const h of histories) {
+    if (!seriesBySymbol.has(h.symbol)) continue;
+    calibs.set(
+      h.symbol,
+      calibrateSymbolExecution({
+        symbol: h.symbol,
+        bars: h.bars,
+        currency: h.currency,
+        assetClass: guessClass(h.symbol),
+        window: Math.min(756, h.bars.length),
+      }),
+    );
+  }
+
+  console.log("=== CALIBRATED EXECUTION MODEL (per symbol, from recent bars) ===");
+  const calHead = [
+    "symbol".padEnd(8),
+    "ccy".padEnd(4),
+    "class".padEnd(10),
+    "half-spread bps".padStart(16),
+    "source".padStart(16),
+    "ATR%".padStart(7),
+    "ADV (m)".padStart(9),
+    "comm bps/min".padStart(13),
+    "£1k cost bps".padStart(13),
+    "£2k cost bps".padStart(13),
+  ].join(" ");
+  console.log(calHead);
+  console.log("-".repeat(calHead.length));
+  for (const c of calibs.values()) {
+    console.log(
+      [
+        c.symbol.padEnd(8),
+        c.currency.padEnd(4),
+        c.assetClass.padEnd(10),
+        c.halfSpreadBps.toFixed(1).padStart(16),
+        c.spreadSource.padStart(16),
+        (c.atrPct * 100).toFixed(2).padStart(7),
+        (c.adv20d / 1e6).toFixed(1).padStart(9),
+        `${c.commissionRateBps.toFixed(0)}/${c.commissionMin}`.padStart(13),
+        executionCostFor(c, 1000).totalBps.toFixed(1).padStart(13),
+        executionCostFor(c, 2000).totalBps.toFixed(1).padStart(13),
+      ].join(" "),
+    );
+  }
+  const fallbackCalib = calibrateSymbolExecution({ symbol: "UNKNOWN", bars: [] });
+  const calibratedCost = (scale: number) => (sym: string, notional: number) =>
+    executionCostFor(calibs.get(sym) ?? fallbackCalib, notional, "normal", scale).total;
+
+  SCENARIOS = [
+    ...BASE_SCENARIOS,
+    {
+      label: "calibrated",
+      commissionBps: 0, commissionMin: 0, flatFee: 0, slippageBps: 0, minTicket: 250,
+      perSymbol: calibratedCost(1),
+    },
+    {
+      label: "calibrated 1.5x",
+      commissionBps: 0, commissionMin: 0, flatFee: 0, slippageBps: 0, minTicket: 250,
+      perSymbol: calibratedCost(1.5),
+    },
+    {
+      label: "calibrated 3x",
+      commissionBps: 0, commissionMin: 0, flatFee: 0, slippageBps: 0, minTicket: 250,
+      perSymbol: calibratedCost(3),
+    },
+  ];
+  console.log();
+
+
   const warm = 220;
   const folds: Array<{ trainStart: number; trainEnd: number; testStart: number; testEnd: number }> = [];
   let cursor = warm;
@@ -328,8 +428,11 @@ async function main() {
     }
 
     console.log(`=== ${cost.label} `
-      + `(comm ${cost.commissionBps}bps/min £${cost.commissionMin}`
-      + `${cost.flatFee ? ` + £${cost.flatFee} flat` : ""}, slip ${cost.slippageBps}bps) ===`);
+      + (cost.perSymbol
+        ? "(per-symbol calibrated spread/commission/impact)"
+        : `(comm ${cost.commissionBps}bps/min £${cost.commissionMin}`
+          + `${cost.flatFee ? ` + £${cost.flatFee} flat` : ""}, slip ${cost.slippageBps}bps)`)
+      + " ===");
     const header = [
       "variant".padEnd(14),
       "mean ret%".padStart(10),
@@ -404,6 +507,30 @@ async function main() {
   for (const v of VARIANTS) {
     const lost = meanOf(base.get(v)!) - meanOf(quad.get(v)!);
     console.log(`  ${v.padEnd(14)} ${(lost / 15).toFixed(3)} pp/bp  (${lost.toFixed(2)}pp over +15bp)`);
+  }
+
+  console.log("\nCalibrated-model sensitivity (calibrated → 3x calibrated costs):");
+  const cal = perScenario.get("calibrated");
+  const cal3 = perScenario.get("calibrated 3x");
+  if (cal && cal3) {
+    for (const v of VARIANTS) {
+      const a = meanOf(cal.get(v)!);
+      const b = meanOf(cal3.get(v)!);
+      console.log(
+        `  ${v.padEnd(14)} ${a.toFixed(2)}% → ${b.toFixed(2)}% `
+        + `(${(b - a).toFixed(2)}pp for 3x execution costs)`,
+      );
+    }
+    console.log("\nCalibrated vs hand-picked scenarios (mean OOS return per fold):");
+    for (const v of VARIANTS) {
+      const c = meanOf(cal.get(v)!);
+      const live = meanOf(perScenario.get("live baseline")!.get(v)!);
+      const saxo = meanOf(perScenario.get("saxo-like tiered")!.get(v)!);
+      console.log(
+        `  ${v.padEnd(14)} calibrated ${c.toFixed(2)}%  vs live-baseline ${live.toFixed(2)}%`
+        + `  vs saxo-like ${saxo.toFixed(2)}%`,
+      );
+    }
   }
 }
 

@@ -28,6 +28,9 @@ export type RawDailyBar = {
   adjClose?: number | null;
   /** Traded volume in units, when available. */
   volume?: number | null;
+  /** Session high/low in the same units as `close`, when the provider gives them. */
+  high?: number | null;
+  low?: number | null;
 };
 
 export type CorporateAction = {
