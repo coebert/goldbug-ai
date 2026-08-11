@@ -37,13 +37,23 @@ export interface ChartAnnotation extends ChartEvent {
   note: string;
   /** Model id that wrote `note`, or null when the deterministic text was used. */
   model: string | null;
+  /**
+   * The exact headlines shown to the model as candidate drivers for this
+   * event, so the wording can be checked against its evidence.
+   */
+  sources: AnnotationNewsItem[];
 }
 
 export interface AnnotationNewsItem {
+  /** Publication day (YYYY-MM-DD) as stored in the news cache. */
   date: string;
   headline: string;
   source?: string | null;
+  url?: string | null;
+  /** Ingest timestamp (ISO), used for the displayed time. */
+  at?: string | null;
 }
+
 
 const MAX_EVENTS = 6;
 
