@@ -33,6 +33,25 @@ export interface CompareSeries {
   last: number | null;
 }
 
+export interface CorrelationCell {
+  /** Pearson correlation of daily returns, or null when too few points. */
+  value: number | null;
+  /** Number of overlapping return observations behind `value`. */
+  n: number;
+}
+
+export interface CorrelationMatrix {
+  symbols: string[];
+  labels: string[];
+  /** Row-major matrix aligned to `symbols`; diagonal is 1. */
+  cells: CorrelationCell[][];
+  /** Return observations available in the shared window. */
+  observations: number;
+}
+
+/** Minimum overlapping daily returns before a correlation is worth showing. */
+export const MIN_CORRELATION_POINTS = 10;
+
 export interface Comparison {
   /** Dates common to every selected symbol, ascending. */
   dates: string[];
@@ -40,6 +59,8 @@ export interface Comparison {
   series: CompareSeries[];
   from: string | null;
   to: string | null;
+  /** Return correlations between every selected symbol over the shared window. */
+  correlation: CorrelationMatrix;
 }
 
 /** Parse the `compare` search param (comma separated) into a clean list. */
@@ -72,6 +93,67 @@ export function toggleCompareSymbol(current: string[], symbol: string): string[]
   return [...current, symbol];
 }
 
+function pearson(a: (number | null)[], b: (number | null)[]): CorrelationCell {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < a.length && i < b.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x == null || y == null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+    xs.push(x);
+    ys.push(y);
+  }
+  const n = xs.length;
+  if (n < MIN_CORRELATION_POINTS) return { value: null, n };
+
+  const mx = xs.reduce((s, v) => s + v, 0) / n;
+  const my = ys.reduce((s, v) => s + v, 0) / n;
+  let cov = 0;
+  let vx = 0;
+  let vy = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx;
+    const dy = ys[i] - my;
+    cov += dx * dy;
+    vx += dx * dx;
+    vy += dy * dy;
+  }
+  if (vx <= 0 || vy <= 0) return { value: null, n };
+  const r = cov / Math.sqrt(vx * vy);
+  return { value: Math.max(-1, Math.min(1, Number(r.toFixed(4)))), n };
+}
+
+/**
+ * Correlation of daily returns between every pair, computed only on dates
+ * where both symbols moved — a flat/missing day is dropped rather than
+ * counted as a zero return, which would bias correlations toward zero.
+ */
+export function buildCorrelationMatrix(
+  symbols: string[],
+  labels: string[],
+  returnsBySymbol: Map<string, (number | null)[]>,
+): CorrelationMatrix {
+  const cells = symbols.map((rowSym) =>
+    symbols.map((colSym) => {
+      if (rowSym === colSym) {
+        const own = (returnsBySymbol.get(rowSym) ?? []).filter(
+          (v) => v != null && Number.isFinite(v),
+        );
+        return { value: own.length >= MIN_CORRELATION_POINTS ? 1 : null, n: own.length };
+      }
+      return pearson(returnsBySymbol.get(rowSym) ?? [], returnsBySymbol.get(colSym) ?? []);
+    }),
+  );
+
+  let observations = 0;
+  for (const s of symbols) {
+    const n = (returnsBySymbol.get(s) ?? []).filter((v) => v != null).length;
+    observations = Math.max(observations, n);
+  }
+
+  return { symbols, labels, cells, observations };
+}
+
 function intersectDates(histories: SymbolHistory[]): string[] {
   if (!histories.length) return [];
   let common: string[] = histories[0].points.map((p) => p.date);
@@ -91,13 +173,22 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
   const dates = intersectDates(usable);
 
   if (dates.length < 2) {
-    return { dates: [], points: [], series: [], from: null, to: null };
+    return {
+      dates: [],
+      points: [],
+      series: [],
+      from: null,
+      to: null,
+      correlation: { symbols: [], labels: [], cells: [], observations: 0 },
+    };
   }
 
   const dateSet = new Set(dates);
   const points: ComparePoint[] = dates.map((date) => ({ date }) as ComparePoint);
   const index = new Map(dates.map((d, i) => [d, i]));
   const series: CompareSeries[] = [];
+  // symbol -> daily returns aligned to `dates` (index 0 has no prior close).
+  const returnsBySymbol = new Map<string, (number | null)[]>();
 
   usable.forEach((h, i) => {
     const rows = h.points.filter((p) => dateSet.has(p.date));
@@ -109,6 +200,7 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
     let runningPeak = 0;
     let maxDd: number | null = null;
     const rets: number[] = [];
+    const aligned: (number | null)[] = dates.map(() => null);
 
     for (let j = 0; j < rows.length; j++) {
       const close = rows[j].close;
@@ -123,8 +215,14 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
         const dd = ((close - runningPeak) / runningPeak) * 100;
         maxDd = maxDd == null ? dd : Math.min(maxDd, dd);
       }
-      if (j > 0 && rows[j - 1].close > 0) rets.push(close / rows[j - 1].close - 1);
+      if (j > 0 && rows[j - 1].close > 0) {
+        const ret = close / rows[j - 1].close - 1;
+        rets.push(ret);
+        if (at != null) aligned[at] = ret;
+      }
     }
+
+    returnsBySymbol.set(h.symbol, aligned);
 
     let volatilityPct: number | null = null;
     if (rets.length >= 5) {
@@ -155,5 +253,10 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
     series,
     from: dates[0] ?? null,
     to: dates[dates.length - 1] ?? null,
+    correlation: buildCorrelationMatrix(
+      series.map((s) => s.symbol),
+      series.map((s) => s.label),
+      returnsBySymbol,
+    ),
   };
 }

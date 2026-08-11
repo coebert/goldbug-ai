@@ -27,6 +27,7 @@ import {
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
+import { CorrelationHeatmap } from "@/components/market/correlation-heatmap";
 import { MAX_COMPARE_SYMBOLS, type Comparison } from "@/lib/market-compare";
 import { rangeLabel, symbolMeta, type HistoryRange } from "@/lib/market-symbol-history";
 
@@ -216,6 +217,12 @@ export function CompareOverlay({
               </tbody>
             </table>
           </div>
+
+          <CorrelationHeatmap
+            correlation={comparison.correlation}
+            from={comparison.from}
+            to={comparison.to}
+          />
 
           <p className="text-[11px] text-muted-foreground">
             Shared window {comparison.from} → {comparison.to}. Best/worst are the highest and lowest
