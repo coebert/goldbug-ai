@@ -1,5 +1,5 @@
-// Home-dashboard SMA card: one market's price with its 50- and 200-day
-// averages, over a selectable window. Same data path as the drill-down page
+// Home-dashboard SMA card: one market's price with a chosen set of moving
+// averages (20/50/100/200-day), over a selectable window. Same data path as the drill-down page
 // (`getSymbolHistory`), so the two never disagree.
 
 import { useEffect, useMemo, useState } from "react";
@@ -51,11 +51,35 @@ import {
   isKnownSymbol,
   rangeLabel,
   symbolMeta,
+  SMA_PERIODS,
+  isSmaPeriod,
+  smaKey,
   type HistoryRange,
+  type SmaPeriod,
 } from "@/lib/market-symbol-history";
 
 const SYMBOL_KEY = "home-sma-symbol";
 const RANGE_KEY = "home-sma-range";
+const PERIODS_KEY = "home-sma-periods";
+const DEFAULT_PERIODS: SmaPeriod[] = [50, 200];
+
+/** One stroke style per period so overlapping averages stay distinguishable. */
+const PERIOD_STYLE: Record<SmaPeriod, { stroke: string; dash: string }> = {
+  20: { stroke: CHART_ROLE.positive, dash: "6 2" },
+  50: { stroke: CHART_ROLE.benchmark, dash: "4 3" },
+  100: { stroke: CHART_ROLE.warning ?? CHART_ROLE.benchmark, dash: "1 3" },
+  200: { stroke: CHART_ROLE.highlight, dash: "2 4" },
+};
+
+function parsePeriods(raw: string | null): SmaPeriod[] {
+  if (!raw) return DEFAULT_PERIODS;
+  const picked = raw
+    .split(",")
+    .map((v) => Number(v.trim()))
+    .filter((v) => Number.isFinite(v) && isSmaPeriod(v)) as SmaPeriod[];
+  const unique = SMA_PERIODS.filter((p) => picked.includes(p));
+  return unique.length ? unique : DEFAULT_PERIODS;
+}
 const DEFAULT_SYMBOL = HISTORY_SYMBOLS.includes("SPY") ? "SPY" : (HISTORY_SYMBOLS[0] ?? "");
 
 function num(v: number | null | undefined, digits = 2) {
@@ -68,12 +92,20 @@ function pct(v: number | null | undefined, digits = 1) {
   return `${v > 0 ? "+" : ""}${v.toFixed(digits)}%`;
 }
 
-/** Plain-English read of where price sits against its two averages. */
-function trendVerdict(above50: boolean | null, above200: boolean | null) {
-  if (above50 == null && above200 == null) return { text: "Not enough history", tone: "muted" as const };
-  if (above50 && above200) return { text: "Uptrend — above both averages", tone: "up" as const };
-  if (above50 === false && above200 === false)
-    return { text: "Downtrend — below both averages", tone: "down" as const };
+/** Plain-English read of where price sits against the chosen averages. */
+function trendVerdict(above: Array<boolean | null>) {
+  const known = above.filter((v): v is boolean => v != null);
+  if (!known.length) return { text: "Not enough history", tone: "muted" as const };
+  if (known.every(Boolean))
+    return {
+      text: known.length === 1 ? "Above its average" : "Uptrend — above every average",
+      tone: "up" as const,
+    };
+  if (known.every((v) => !v))
+    return {
+      text: known.length === 1 ? "Below its average" : "Downtrend — below every average",
+      tone: "down" as const,
+    };
   return { text: "Mixed — between its averages", tone: "muted" as const };
 }
 
@@ -96,6 +128,7 @@ function groupedSymbols() {
 export function SmaTrendCard() {
   const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [range, setRange] = useState<HistoryRange>(DEFAULT_RANGE);
+  const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_PERIODS);
   const fetchHistory = useServerFn(getSymbolHistory);
 
   // Restore the last view after hydration so SSR markup stays stable.
@@ -105,6 +138,7 @@ export function SmaTrendCard() {
       if (s && isKnownSymbol(s)) setSymbol(s);
       const r = window.localStorage.getItem(RANGE_KEY);
       if (r) setRange(coerceRange(Number(r)));
+      setPeriods(parsePeriods(window.localStorage.getItem(PERIODS_KEY)));
     } catch {
       /* storage unavailable — defaults are fine */
     }
@@ -128,6 +162,21 @@ export function SmaTrendCard() {
     }
   };
 
+  // Keep at least one average on the chart; the card is about averages.
+  const togglePeriod = (p: SmaPeriod) => {
+    setPeriods((prev) => {
+      const next = prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p];
+      const ordered = SMA_PERIODS.filter((x) => next.includes(x));
+      const final = ordered.length ? ordered : prev;
+      try {
+        window.localStorage.setItem(PERIODS_KEY, final.join(","));
+      } catch {
+        /* ignore */
+      }
+      return final;
+    });
+  };
+
   const query = useQuery({
     queryKey: ["symbol-history", symbol, range],
     queryFn: () => fetchHistory({ data: { symbol, days: range } }),
@@ -139,7 +188,8 @@ export function SmaTrendCard() {
 
   const history = query.data;
   const { markets, sectors } = useMemo(groupedSymbols, []);
-  const verdict = trendVerdict(history?.aboveSma50 ?? null, history?.aboveSma200 ?? null);
+  const verdict = trendVerdict(periods.map((p) => history?.aboveSma?.[p] ?? null));
+  const periodsLabel = periods.map((p) => `${p}`).join("/");
 
   return (
     <Card>
@@ -151,7 +201,7 @@ export function SmaTrendCard() {
               trend
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Price against its 50- and 200-day averages
+              Price against its {periodsLabel}-day average{periods.length > 1 ? "s" : ""}
               {history?.asOf ? ` · prices to ${history.asOf}` : ""}
             </p>
           </div>
@@ -188,6 +238,30 @@ export function SmaTrendCard() {
               )}
             </SelectContent>
           </Select>
+
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Moving-average periods">
+            {SMA_PERIODS.map((p) => {
+              const on = periods.includes(p);
+              return (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant={on ? "secondary" : "ghost"}
+                  className="h-7 px-2 text-xs"
+                  aria-pressed={on}
+                  aria-label={`${p}-day moving average`}
+                  onClick={() => togglePeriod(p)}
+                >
+                  <span
+                    className="mr-1.5 inline-block h-0.5 w-3 rounded"
+                    style={{ background: PERIOD_STYLE[p].stroke, opacity: on ? 1 : 0.4 }}
+                    aria-hidden="true"
+                  />
+                  {p}d
+                </Button>
+              );
+            })}
+          </div>
 
           <div className="flex flex-wrap gap-1" role="group" aria-label="Chart time range">
             {HISTORY_RANGES.map((r) => (
@@ -276,41 +350,34 @@ export function SmaTrendCard() {
                     dot={false}
                     isAnimationActive={false}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="sma50"
-                    name="50-day average"
-                    stroke={CHART_ROLE.benchmark}
-                    strokeWidth={1.5}
-                    strokeDasharray="4 3"
-                    dot={false}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="sma200"
-                    name="200-day average"
-                    stroke={CHART_ROLE.highlight}
-                    strokeWidth={1.5}
-                    strokeDasharray="2 4"
-                    dot={false}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
+                  {periods.map((p) => (
+                    <Line
+                      key={p}
+                      type="monotone"
+                      dataKey={smaKey(p)}
+                      name={`${p}-day average`}
+                      stroke={PERIOD_STYLE[p].stroke}
+                      strokeWidth={1.5}
+                      strokeDasharray={PERIOD_STYLE[p].dash}
+                      dot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             </ChartFrame>
 
             <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <div className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2">
-                <dt className="text-muted-foreground">50-day avg</dt>
-                <dd className="tabular-nums">{num(history.sma50)}</dd>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2">
-                <dt className="text-muted-foreground">200-day avg</dt>
-                <dd className="tabular-nums">{num(history.sma200)}</dd>
-              </div>
+              {periods.map((p) => (
+                <div
+                  key={p}
+                  className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2"
+                >
+                  <dt className="text-muted-foreground">{p}-day avg</dt>
+                  <dd className="tabular-nums">{num(history.smaLatest?.[p] ?? null)}</dd>
+                </div>
+              ))}
               <div className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2">
                 <dt className="text-muted-foreground">Volatility</dt>
                 <dd className="tabular-nums">{pct(history.volatilityPct, 0)}</dd>
