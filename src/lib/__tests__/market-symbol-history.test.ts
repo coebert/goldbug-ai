@@ -3,6 +3,7 @@ import {
   buildSymbolHistory,
   coerceRange,
   computeTrendStrength,
+  computeTrendStrengthSeries,
   detectSmaCrossovers,
   isKnownSymbol,
   rangeLabel,
@@ -216,5 +217,34 @@ describe("computeTrendStrength", () => {
     expect(s!.direction).toBe("flat");
     expect(Math.abs(s!.score)).toBeLessThan(10);
     expect(computeTrendStrength(series([100, 101, 102], () => 100), [50])).toBeNull();
+  });
+});
+
+describe("computeTrendStrengthSeries", () => {
+  const mk = (n: number, f: (i: number) => number) =>
+    Array.from({ length: n }, (_, i) => ({
+      date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10),
+      close: f(i),
+      indexed: 100,
+      sma20: null,
+      sma50: f(i),
+      sma100: null,
+      sma200: null,
+    }));
+
+  it("returns one score per trailing window and flips sign with the trend", () => {
+    const pts = [
+      ...mk(40, (i) => 100 * 1.003 ** i),
+      ...mk(40, (i) => 100 * 1.003 ** 39 * 0.997 ** i),
+    ].map((p, i) => ({ ...p, date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10) }));
+    const series = computeTrendStrengthSeries(pts, [50], 20);
+    expect(series).toHaveLength(pts.length - 20 + 1);
+    expect(series[0].score).toBeGreaterThan(0);
+    expect(series[series.length - 1].score).toBeLessThan(0);
+    expect(series[series.length - 1].date).toBe(pts[pts.length - 1].date);
+  });
+
+  it("returns nothing when there is too little history", () => {
+    expect(computeTrendStrengthSeries(mk(5, () => 100), [50], 30)).toEqual([]);
   });
 });

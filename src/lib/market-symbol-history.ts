@@ -373,3 +373,28 @@ export function computeTrendStrength(
 
   return { period, slopeAnnualPct, volatilityPct, ratio, score, direction, label, samples: n };
 }
+
+export interface TrendStrengthPoint {
+  date: string;
+  score: number;
+}
+
+/**
+ * Rolling trend-strength score: re-runs `computeTrendStrength` over a trailing
+ * window at each bar so the score can be drawn as a sparkline.
+ */
+export function computeTrendStrengthSeries(
+  points: HistoryPoint[],
+  periods: readonly SmaPeriod[],
+  window = 30,
+): TrendStrengthPoint[] {
+  const w = Math.max(10, Math.min(window, points.length));
+  if (points.length < w) return [];
+  const out: TrendStrengthPoint[] = [];
+  for (let end = w; end <= points.length; end++) {
+    const slice = points.slice(end - w, end);
+    const s = computeTrendStrength(slice, periods);
+    if (s) out.push({ date: slice[slice.length - 1].date, score: s.score });
+  }
+  return out;
+}
