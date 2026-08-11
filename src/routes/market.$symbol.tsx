@@ -307,7 +307,7 @@ function MarketSymbolPage() {
     void navigate({
       to: "/market/$symbol",
       params: { symbol },
-      search: (prev) => ({ ...prev, sma: serialiseSmaPeriods(next) }),
+      search: { range, compare: compareParam, sma: serialiseSmaPeriods(next) },
       replace: true,
     });
   };
