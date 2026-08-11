@@ -143,6 +143,13 @@ const sweepPaths = Number(arg("sweep-paths", String(Math.max(40, Math.round(path
 // Threshold headlined in the sweep matrix; the full breach table still prints.
 const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? ddThresholds[0] ?? 15)));
 
+// Conditional ("worst-stress regime") tail statistics: keep the paths whose
+// share of execution cost paid in stress is at or above this quantile, then
+// take the CVaR of the worst `--stress-tail` fraction inside that subset.
+const stressQuantile = Number(arg("stress-quantile", "0.8"));
+const stressTailFrac = Number(arg("stress-tail", "0.2"));
+
+
 
 const GRID: SmaVariantParams[] = [];
 for (const separationPct of [0, 0.002, 0.005, 0.01]) {
