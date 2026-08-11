@@ -306,6 +306,11 @@ export function computeFrictionKpi(args: {
  * broker actually charged relative to the model, and any friction the model
  * could not attribute to a named leg is carried as a flat `extraBps` on
  * notional so it cannot quietly vanish from the ladder.
+ *
+ * Fitted on invoiced fills only. Including un-synced fills would put real
+ * charges over the whole tape's modelled cost and halve the multiplier for no
+ * reason other than incomplete ingestion — the ladder would then be told
+ * trading is cheaper than the broker's own invoice says.
  */
 export type RealisedCostOverlay = {
   label: string;
@@ -313,9 +318,13 @@ export type RealisedCostOverlay = {
   spreadMult: number;
   impactMult: number;
   extraBps: number;
-  /** Fills the overlay was fitted on. */
+  /** Invoiced fills the overlay was fitted on. */
   sampleFills: number;
-  /** True when the broker booked no fees at all and the model stands unchallenged. */
+  /** Fills in the tape, invoiced or not — the denominator behind `coverage`. */
+  totalFills: number;
+  /** Share of the tape (0..1) carrying broker-booked fees. */
+  coverage: number;
+  /** True only when no fill carries a broker fee, so the model stands unchallenged. */
   degraded: boolean;
   note: string;
 };
@@ -330,13 +339,15 @@ export function realisedCostOverlay(args: {
 }): RealisedCostOverlay {
   const label = args.label ?? "realised";
   const fills = args.fills.filter((f) => Number.isFinite(f.notionalBase) && f.notionalBase > 0);
+  const invoiced = fills.filter((f) => isInvoiced(f) && (Math.max(0, f.feeReportedBase) || 0) > 0);
+  const coverage = fills.length > 0 ? invoiced.length / fills.length : 0;
 
   let reportedCommission = 0;
   let modelledCommission = 0;
   let notional = 0;
   let unexplained = 0;
 
-  for (const f of fills) {
+  for (const f of invoiced) {
     notional += f.notionalBase;
     const reported = Math.max(0, f.feeReportedBase) || 0;
     const modelledFee = Math.max(0, f.commissionModelledBase) + Math.max(0, f.taxModelledBase);
@@ -354,7 +365,9 @@ export function realisedCostOverlay(args: {
       spreadMult: 1,
       impactMult: 1,
       extraBps: 0,
-      sampleFills: fills.length,
+      sampleFills: invoiced.length,
+      totalFills: fills.length,
+      coverage,
       degraded: true,
       note: "broker booked no fees on this tape — ladder runs on modelled costs",
     };
@@ -370,13 +383,19 @@ export function realisedCostOverlay(args: {
     spreadMult: 1,
     impactMult: 1,
     extraBps,
-    sampleFills: fills.length,
+    sampleFills: invoiced.length,
+    totalFills: fills.length,
+    coverage,
     degraded: false,
     note:
       `broker commission ran ${raw.toFixed(2)}x the model` +
-      (extraBps > 0.01 ? `, plus ${extraBps.toFixed(1)}bps unattributed` : ""),
+      (extraBps > 0.01 ? `, plus ${extraBps.toFixed(1)}bps unattributed` : "") +
+      (coverage < 0.999
+        ? ` (fitted on ${invoiced.length} of ${fills.length} trades with booked fees)`
+        : ""),
   };
 }
+
 
 // ---------------------------------------------------------------------------
 // Item 18 — before/after attribution
