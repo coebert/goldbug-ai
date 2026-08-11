@@ -332,6 +332,28 @@ export function SmaTrendCard() {
             ))}
           </div>
 
+          {sort !== "selection" && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Then by
+              <select
+                className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                value={sort2}
+                onChange={(e) => pickSort2(e.target.value as TrendSort)}
+                aria-label="Secondary sort (tie-breaker)"
+              >
+                <option value="selection">None</option>
+                <option value="strongest">Strongest score</option>
+                <option value="weakest">Weakest score</option>
+                <option value="slope-desc">Slope ↓</option>
+                <option value="slope-asc">Slope ↑</option>
+                <option value="vol-desc">Vol ↓</option>
+                <option value="vol-asc">Vol ↑</option>
+              </select>
+            </label>
+          )}
+
+
+
           <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by trend strength">
             {(
               [
