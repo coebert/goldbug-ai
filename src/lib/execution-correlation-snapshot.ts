@@ -80,7 +80,7 @@ export function tapeFingerprint(
     push(sym);
     push("|");
     for (const v of seriesBySymbol.get(sym)!) {
-      push(String(quantise(v)));
+      push(String(quantise(v, precision)));
       push(",");
     }
     push(";");
