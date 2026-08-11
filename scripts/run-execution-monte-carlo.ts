@@ -174,6 +174,15 @@ import {
   makeLimitOrderSampler,
   type LimitOrderSampler,
 } from "../src/lib/execution-limit-orders";
+import {
+  DEFAULT_RISK_GRID_OPTIONS,
+  formatRiskGrid,
+  riskGridLevels,
+  riskGridReport,
+  riskSizingFor,
+  type RiskGridRow,
+  type RiskSizing,
+} from "../src/lib/execution-risk-grid";
 
 const argv = process.argv.slice(2);
 // A flag's value is the next token, unless that token is itself a flag — so
@@ -432,6 +441,20 @@ const regimeOosMinRun = Number(arg("regime-oos-min-run", "3"));
 /** Segments shorter than this are unbacktestable (all entry cost, no signal). */
 const regimeOosMinSegment = Number(arg("regime-oos-min-segment", "15"));
 
+// --risk-grid: tune the single risk-level dial on the same OOS folds and report
+// the profit/drawdown Pareto frontier. Scored on TEST windows only.
+const riskGridMode = argv.includes("--risk-grid");
+const riskGridSteps = Number(arg("risk-grid-steps", "7"));
+const riskGridPaths = Number(arg("risk-grid-paths", String(Math.max(30, Math.round(paths / 4)))));
+const riskGridLo = Number(arg("risk-grid-lo", "0"));
+const riskGridHi = Number(arg("risk-grid-hi", "1"));
+const riskGridOpts = {
+  maxPositionsAtLow: Number(arg("risk-grid-slots-lo", String(DEFAULT_RISK_GRID_OPTIONS.maxPositionsAtLow))),
+  maxPositionsAtHigh: Number(arg("risk-grid-slots-hi", String(DEFAULT_RISK_GRID_OPTIONS.maxPositionsAtHigh))),
+  exposureAtLow: Number(arg("risk-grid-deploy-lo", String(DEFAULT_RISK_GRID_OPTIONS.exposureAtLow))),
+  exposureAtHigh: Number(arg("risk-grid-deploy-hi", String(DEFAULT_RISK_GRID_OPTIONS.exposureAtHigh))),
+};
+
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
 const spilloverMode = process.argv.includes("--spillover");
@@ -516,6 +539,11 @@ function simulate(
    * decomposition swaps in a permissive policy to price what the rules cost.
    */
   policy: RebalancePolicyOverrides = { minTicket, abandonPartialFraction: 0.2 },
+  /**
+   * Position sizing. Defaults to the live book's shape; the risk-level grid
+   * search swaps in each candidate risk level's expansion.
+   */
+  risk: RiskSizing = { maxPositions, exposureFraction: 0.98 },
 ): SegmentResult {
   const { seriesBySymbol, costFor, volZ, volBpsBySymbol } = ctx;
   let cash = startingCash;
@@ -617,13 +645,15 @@ function simulate(
       else shares.delete(sym);
     }
 
-    const openSlots = maxPositions - shares.size;
+    const openSlots = risk.maxPositions - shares.size;
     if (openSlots > 0 && wanted.length) {
       const equityNow = cash + [...shares].reduce((a, [s, q]) => a + q * priceAt(s, i), 0);
-      const target = equityNow / maxPositions;
+      // Only the deployable part of equity is spread across the slots, so a
+      // low risk level holds cash back instead of just holding more names.
+      const target = (equityNow * risk.exposureFraction) / risk.maxPositions;
       for (const sym of wanted.slice(0, openSlots)) {
         const price = priceAt(sym, i);
-        const requested = Math.min(target, cash * 0.98);
+        const requested = Math.min(target, cash * risk.exposureFraction);
         if (requested < policy.minTicket) continue;
         const d = order(sym, i);
         if (stressedBar) stressOrders++;
