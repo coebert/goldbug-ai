@@ -159,6 +159,15 @@ export function SmaTrendCard() {
     });
   };
 
+  const moveFavorite = (symbol: string, direction: "up" | "down") => {
+    setFavorites((prev) => {
+      const next = moveSmaFavorite(prev, symbol, direction);
+      storeSmaFavorites(next);
+      return next;
+    });
+  };
+
+
   const pickSort = (s: TrendSort) => {
     setSort(s);
     try {
