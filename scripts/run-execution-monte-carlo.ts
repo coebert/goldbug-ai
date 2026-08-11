@@ -159,9 +159,40 @@ const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? d
 const stressQuantile = Number(arg("stress-quantile", "0.8"));
 const stressTailFrac = Number(arg("stress-tail", "0.2"));
 
+// ------------------------------------------------ correlation-structure choice
+// --corr-structure blocks --within-rho 0.7 --across-rho 0.2
+// --structure-sweep independent,global,blocks,contagion
+// A single global ρ says every name widens with every other name equally. That
+// is one assumption among several; these flags let you re-estimate the joint
+// drawdown tail under sector-clustered coupling, or under contagion where the
+// clusters merge exactly when the tape is stressed.
+const clusters = clusterMap(symbols);
+const structureArgs = {
+  rho: simCfg.rho,
+  withinRho: argOrUndef("within-rho"),
+  acrossRho: argOrUndef("across-rho"),
+  stressWithinRho: argOrUndef("stress-within-rho"),
+  stressAcrossRho: argOrUndef("stress-across-rho"),
+  groups: clusters,
+};
+function argOrUndef(name: string): number | undefined {
+  const v = arg(name, "");
+  return v === "" ? undefined : Number(v);
+}
+const buildStructure = (kind: CorrelationStructureKind) =>
+  makeCorrelationStructure({ ...structureArgs, kind });
+
+const structureSweep = arg("structure-sweep", "")
+  .split(",").map((s) => s.trim()).filter(Boolean) as CorrelationStructureKind[];
+simCfg.structure = buildStructure(
+  (arg("corr-structure", "global") as CorrelationStructureKind),
+);
+
 // --attribution: Shapley breakdown of the tail into slippage / fill-rate / stress.
 const attributionMode = process.argv.includes("--attribution");
 const attribPaths = Number(arg("attrib-paths", String(Math.max(30, Math.round(paths / 4)))));
+
+
 
 
 
