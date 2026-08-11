@@ -1186,7 +1186,9 @@ function PortfolioPage() {
                 )}
                 {p && (
                   <div className="mb-4">
-                    <CoverageTrendCard />
+                    <div id="coverage-trend" className="scroll-mt-24">
+                      <CoverageTrendCard />
+                    </div>
                   </div>
                 )}
 
