@@ -102,6 +102,50 @@ export function resolveTrendBasis(
   return ordered[ordered.length - 1] ?? null;
 }
 
+/** Sort / filter modes for the home card's trend-strength ranking. */
+export type TrendSort = "selection" | "strongest" | "weakest";
+export type TrendFilter = "all" | "up" | "down" | "significant";
+
+export const TREND_SORT_KEY = "home-sma-trend-sort";
+export const TREND_FILTER_KEY = "home-sma-trend-filter";
+
+/** Scores at or beyond this magnitude count as a meaningful trend. */
+export const TREND_SIGNIFICANT_SCORE = 20;
+
+export function parseTrendSort(raw: string | null | undefined): TrendSort {
+  return raw === "strongest" || raw === "weakest" ? raw : "selection";
+}
+
+export function parseTrendFilter(raw: string | null | undefined): TrendFilter {
+  return raw === "up" || raw === "down" || raw === "significant" ? raw : "all";
+}
+
+/**
+ * Order and filter symbols by trend-strength score. Entries with no score yet
+ * (still loading, or too little history) keep their selection order and are
+ * never filtered out, so the card never silently hides a chosen market.
+ */
+export function rankByTrendStrength<T extends { symbol: string; score: number | null }>(
+  entries: readonly T[],
+  sort: TrendSort,
+  filter: TrendFilter,
+): T[] {
+  const kept = entries.filter((e) => {
+    if (e.score == null) return true;
+    if (filter === "up") return e.score > 0;
+    if (filter === "down") return e.score < 0;
+    if (filter === "significant") return Math.abs(e.score) >= TREND_SIGNIFICANT_SCORE;
+    return true;
+  });
+  if (sort === "selection") return kept;
+  const scored = kept.filter((e) => e.score != null);
+  const unscored = kept.filter((e) => e.score == null);
+  scored.sort((a, b) =>
+    sort === "strongest" ? (b.score as number) - (a.score as number) : (a.score as number) - (b.score as number),
+  );
+  return [...scored, ...unscored];
+}
+
 /** Home card can chart up to this many markets side by side. */
 export const MAX_SMA_SYMBOLS = 4;
 
