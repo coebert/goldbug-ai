@@ -25,6 +25,20 @@ export type FeatureLike = {
   vw_momentum_10d: number | null;
   weekly_trend_up: boolean;
   weekly_rsi14: number | null;
+  /**
+   * Stochastic oscillator (14/3/3) used for entry timing — see
+   * src/lib/signals-extended.server.ts. Null when history is too short.
+   */
+  stochastic?: {
+    k: number;
+    d: number;
+    oversold: boolean;
+    overbought: boolean;
+    bull_cross: boolean;
+    bear_cross: boolean;
+    bull_cross_from_oversold: boolean;
+    rising: boolean;
+  } | null;
   news_score: number | null;
   news_contributors: number;
   news_momentum: unknown | null;
