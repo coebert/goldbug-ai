@@ -363,7 +363,7 @@ describe("split replays", () => {
 describe("fuzzed action-stream reconciliation", () => {
   it("conserves cost basis plus cash in lieu for every split, at every step", () => {
     for (let c = 0; c < 200; c++) {
-      const seed = caseSeed(BASE_SEED, c);
+      const seed = caseSeed(BASE_SEED, "split", c);
       const rnd = rng(seed);
       const inst = INSTRUMENTS[Math.floor(rnd() * INSTRUMENTS.length)]!;
       const qty =
@@ -404,7 +404,7 @@ describe("fuzzed action-stream reconciliation", () => {
 
   it("keeps dividend credits equal to an independent per-share reconstruction", () => {
     for (let c = 0; c < 200; c++) {
-      const seed = caseSeed(BASE_SEED, c + 10_000);
+      const seed = caseSeed(BASE_SEED, "dividend", c);
       const rnd = rng(seed);
       const inst = INSTRUMENTS[Math.floor(rnd() * INSTRUMENTS.length)]!;
       const qty = inst.lot === 1 ? Math.max(1, Math.floor(rnd() * 4_000)) : Number((rnd() * 2).toFixed(6));
