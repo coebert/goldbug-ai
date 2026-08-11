@@ -164,49 +164,34 @@ export function smaDynamicSizeMultiplier(
   const notes: string[] = [];
   const fmt = (v: number) => `${(v * 100).toFixed(2)}%`;
 
-  const baseMult = state.regimeUnknown ? Math.max(0, cfg.unknownRegimeSizeMult) : 1;
+  const baseMult = regimeDataMultiplier(state, cfg);
   if (state.regimeUnknown) {
-    notes.push(`no SMA200 (${state.bars} bars) — base ×${baseMult.toFixed(2)}`);
+    notes.push(
+      `no SMA200 yet (${state.bars}/${Math.max(1, cfg.minBarsRegime)} bars) — base ×${baseMult.toFixed(2)}`,
+    );
   }
 
   // ---- Regime leg (SMA50 vs SMA200) ----------------------------------
-  let regimeConviction = 0;
+  // Continuous: exposure scales with signed regime strength, so a marginal
+  // golden cross barely upsizes, a marginal death cross barely downsizes,
+  // and only a decisive one moves size to the profile's limit.
+  const strength = regimeStrength(state, cfg);
+  const regimeConviction = Math.abs(strength);
   let regimeMult = 1;
-  if (!state.regimeUnknown && state.regime) {
-    regimeConviction = separationConviction(
-      state.regimeSeparationPct,
-      cfg.regimeSeparationPct,
-      cfg.regimeSaturationPct,
-    );
-    // A fresh regime cross carries more information than a long-standing
-    // one, but the regime itself never fully decays — it is a state, not a
-    // trigger — so freshness only modulates the top half of the ramp.
-    const fresh =
-      state.regimeCross != null
-        ? crossFreshness(state.regimeCrossAgeBars, cfg.maxCrossAgeBars, cfg.freshnessWeight)
-        : 1;
-    const conviction = clamp01(regimeConviction * (0.5 + 0.5 * fresh));
-    regimeConviction = conviction;
-
-    if (state.regime === "golden") {
-      regimeMult = 1 + (Math.max(1, cfg.goldenSizeMult) - 1) * conviction;
-      notes.push(
-        `${state.regimeCross === "golden" ? "fresh golden cross" : "golden regime"} ${fmt(
-          state.regimeSeparationPct ?? 0,
-        )} → ×${regimeMult.toFixed(2)} (conviction ${(conviction * 100).toFixed(0)}%)`,
-      );
+  if (!state.regimeUnknown && state.regime && regimeConviction > 0) {
+    if (strength > 0) {
+      regimeMult = 1 + (Math.max(1, cfg.goldenSizeMult) - 1) * strength;
     } else {
-      // Death regime that is allowed to trade: cut proportionally towards
-      // `deathSizeMult` as the spread deepens.
       const floorMult = Math.max(0, Math.min(1, cfg.deathSizeMult));
-      regimeMult = 1 - (1 - floorMult) * conviction;
-      notes.push(
-        `death regime ${fmt(state.regimeSeparationPct ?? 0)} → ×${regimeMult.toFixed(2)} (conviction ${(
-          conviction * 100
-        ).toFixed(0)}%)`,
-      );
+      regimeMult = 1 - (1 - floorMult) * regimeConviction;
     }
+    notes.push(
+      `${strength > 0 ? "golden" : "death"} regime strength ${(strength * 100).toFixed(0)}% at ${fmt(
+        state.regimeSeparationPct ?? 0,
+      )} → ×${regimeMult.toFixed(2)}`,
+    );
   }
+
 
   // ---- Fast leg (SMA20 vs SMA50) -------------------------------------
   let fastConviction = 0;
