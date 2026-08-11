@@ -2,8 +2,9 @@
 // and unpin actions. Pin state itself lives in the SMA card, which owns
 // persistence; this panel is a pure view over it.
 
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, ChevronUp, LineChart, Star, StarOff } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, LineChart, Star, StarOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +40,7 @@ export function FavoritesPanel({
   favorites,
   onUnpin,
   onMove,
+  onReorder,
   metrics,
 }: {
   favorites: readonly string[];
@@ -46,7 +48,22 @@ export function FavoritesPanel({
   metrics?: Record<string, FavoriteMetric | undefined>;
   onUnpin: (symbol: string) => void;
   onMove: (symbol: string, direction: "up" | "down") => void;
+  /** Drop `symbol` at `toIndex` in the pinned sequence. */
+  onReorder?: (symbol: string, toIndex: number) => void;
 }) {
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  const endDrag = () => {
+    setDragging(null);
+    setOverIndex(null);
+  };
+
+  const drop = (index: number) => {
+    if (dragging && onReorder) onReorder(dragging, index);
+    endDrag();
+  };
+
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -59,7 +76,7 @@ export function FavoritesPanel({
         <SheetHeader>
           <SheetTitle>Pinned markets</SheetTitle>
           <SheetDescription>
-            Jump straight to a chart, reorder the sequence, or unpin.
+            Drag to reorder, jump straight to a chart, or unpin. Order is saved.
           </SheetDescription>
         </SheetHeader>
 
@@ -75,9 +92,36 @@ export function FavoritesPanel({
             return (
               <div
                 key={s}
-                className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5"
+                draggable={Boolean(onReorder)}
+                onDragStart={(e) => {
+                  setDragging(s);
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", s);
+                }}
+                onDragOver={(e) => {
+                  if (!dragging) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setOverIndex(i);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  drop(i);
+                }}
+                onDragEnd={endDrag}
+                className={`flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors ${
+                  dragging === s
+                    ? "border-primary/60 bg-primary/5 opacity-70"
+                    : overIndex === i && dragging
+                      ? "border-primary/60 bg-primary/5"
+                      : "border-border"
+                }`}
               >
-                <span className="w-5 shrink-0 text-xs tabular-nums text-muted-foreground">
+                <GripVertical
+                  className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing"
+                  aria-hidden="true"
+                />
+                <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">
                   {i + 1}
                 </span>
                 <Link
