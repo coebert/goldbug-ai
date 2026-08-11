@@ -250,6 +250,18 @@ const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.
 const calibDiagnosticsMode = argv.includes("--calib-diagnostics");
 const calibBootResamples = Number(arg("calib-resamples", "800"));
 
+// --oos-corr: out-of-sample comparison of calibrated coupling against fixed
+// parameters. Each fold calibrates on TRAIN bars only, then the untouched TEST
+// window is scored twice: how well the structure predicts the coupling actually
+// realised there, and what it does to the shock/tail metrics on common random
+// numbers. Fixed baselines (independent / global ρ / hand-set blocks and
+// contagion) go through identical code, so the comparison is like-for-like.
+const oosCorrMode = argv.includes("--oos-corr");
+const oosPaths = Number(arg("oos-paths", String(Math.max(30, Math.round(paths / 3)))));
+const oosArms = arg("oos-arms", "independent,global,blocks,contagion,calib-blocks,calib-contagion")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+
+
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
 const spilloverMode = process.argv.includes("--spillover");
