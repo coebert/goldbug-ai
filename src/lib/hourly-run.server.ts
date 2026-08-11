@@ -582,6 +582,17 @@ async function runHourlyCycleInner(
                   reason: costs.reason ?? null,
                 },
               });
+
+              // Beyond this single pass: is coverage over the last three
+              // 7-day windows below the floor, or sliding two windows running?
+              const { maybeNotifyCoverageTrend } = await import(
+                "@/lib/coverage-trend-alert.server"
+              );
+              maybeNotifyCoverageTrend({
+                portfolioId: p.id,
+                userId: p.user_id as string,
+                portfolioName: p.name ?? null,
+              });
             } catch (e) {
               srvLog.warn("hourly-run: broker cost ingest failed", p.id, e);
               const { maybeNotifyCostSyncHealth } = await import("@/lib/cost-sync-alert.server");

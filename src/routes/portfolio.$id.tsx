@@ -141,6 +141,7 @@ import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { CostSyncAlertBanner } from "@/components/cost-sync-alert-banner";
+import { CoverageTrendAlertBanner } from "@/components/coverage-trend-alert-banner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AdvancedSection } from "@/components/advanced-section";
@@ -1031,6 +1032,7 @@ function PortfolioPage() {
                 <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
                 <CostSyncAlertBanner portfolioId={id} className="mb-4" />
+                <CoverageTrendAlertBanner portfolioId={id} className="mb-4" />
 
                 <ValuationConsistencyAlert portfolioId={id} className="mb-4" />
                 <InstrumentCcyAlert portfolioId={id} className="mb-4" />
