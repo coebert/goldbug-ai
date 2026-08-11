@@ -206,6 +206,25 @@ export function FrictionKpiCard({
                 year.
               </p>
             )}
+
+            <p className="text-xs text-muted-foreground">
+              {kpi.tickets === 0
+                ? "Nothing to price yet."
+                : kpi.brokerCoverage >= 0.999
+                  ? `Every figure here is your broker's own charge${
+                      kpi.realisedRatio == null
+                        ? ""
+                        : ` — ${kpi.realisedRatio.toFixed(2)}x what we estimated`
+                    }.`
+                  : kpi.brokerCoverage > 0
+                    ? `${formatMoney(kpi.realisedFrictionBase, report?.currency ?? currency, 2)} of this is your broker's actual charges (${kpi.brokerBookedTickets} of ${kpi.tickets} trades); the rest is estimated${
+                        kpi.realisedRatio == null
+                          ? ""
+                          : `, and where we can compare, the real bill is ${kpi.realisedRatio.toFixed(2)}x our estimate`
+                      }.`
+                    : "Your broker hasn't reported charges for these trades yet, so this is our estimate of what they cost."}
+            </p>
+
           </>
         )}
 
