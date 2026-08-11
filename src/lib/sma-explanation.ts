@@ -255,7 +255,15 @@ export function buildSmaExplanation(args: {
     },
     strength,
     strengthLabel: strengthLabel(strength),
-    influence: { kind, sizeMultiplier, sellFraction, headline, detail },
+    influence: {
+      kind,
+      sizeMultiplier,
+      sellFraction,
+      headline,
+      // Bar counts are relative to the decision bar, not to now — keep the
+      // wording clock-free so the panel stays deterministic over time.
+      detail: detail.replace(/(\d+)d ago\b/g, "$1 bars before the trade"),
+    },
     quality: {
       tier: state.quality,
       bars: state.bars,

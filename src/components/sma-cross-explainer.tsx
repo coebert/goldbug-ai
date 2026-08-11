@@ -17,17 +17,17 @@ function fmtPct(v: number | null) {
 }
 
 function DirectionIcon({ direction }: { direction: SmaExplanation["fast"]["direction"] }) {
-  if (direction === "bull") return <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400" />;
-  if (direction === "bear") return <ArrowDownRight className="h-3.5 w-3.5 text-rose-400" />;
+  if (direction === "bull") return <ArrowUpRight className="h-3.5 w-3.5 text-[hsl(var(--chart-up,var(--primary)))]" />;
+  if (direction === "bear") return <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />;
   return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
 }
 
 const INFLUENCE_TONE: Record<SmaExplanation["influence"]["kind"], string> = {
-  blocked: "border-rose-500/40 bg-rose-500/10 text-rose-300",
-  exit: "border-rose-500/40 bg-rose-500/10 text-rose-300",
-  trim: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-  downsized: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-  upsized: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+  blocked: "border-destructive/40 bg-destructive/10 text-destructive",
+  exit: "border-destructive/40 bg-destructive/10 text-destructive",
+  trim: "border-warning/40 bg-warning/10 text-warning",
+  downsized: "border-warning/40 bg-warning/10 text-warning",
+  upsized: "border-primary/40 bg-primary/10 text-primary",
   neutral: "border-border bg-muted/40 text-muted-foreground",
   unavailable: "border-border bg-muted/40 text-muted-foreground",
 };
