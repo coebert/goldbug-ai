@@ -759,6 +759,7 @@ async function main() {
       pathWorstFold.push(worstFold);
       pathMaxDd.push(ddSum / folds.length);
       pathDeepestDd.push(deepestDd);
+      pathDeepestInStress.push(deepestInStress);
       pathSharpe.push(shSum / folds.length);
       pathCosts.push(costSum / folds.length);
     }
@@ -767,11 +768,21 @@ async function main() {
     const worst = percentileStats(pathWorstFold);
     const dd = percentileStats(pathMaxDd);
     const deepDd = percentileStats(pathDeepestDd);
-    const breaches = drawdownBreachProbabilities(pathDeepestDd, ddThresholds);
+    const breaches = jointDrawdownBreachProbabilities(
+      pathDeepestDd, pathDeepestInStress, ddThresholds);
     const sh = percentileStats(pathSharpe);
     const cost = percentileStats(pathCosts);
     const stressShare = percentileStats(pathStressCostShare);
     const driftShare = percentileStats(pathDriftShare);
+    // Conditional tails on the worst-stress paths: the outcome distribution
+    // given the tape actually turned ugly, rather than averaged over calm ones.
+    const condRet = conditionalTailStats(
+      pathMeanRet, pathStressCostShare, stressQuantile, stressTailFrac);
+    const condWorstFold = conditionalTailStats(
+      pathWorstFold, pathStressCostShare, stressQuantile, stressTailFrac);
+    const condDd = conditionalTailStats(
+      pathDeepestDd, pathStressCostShare, stressQuantile, stressTailFrac);
+
 
     console.log(`=== ${variant} ===`);
     console.log(
