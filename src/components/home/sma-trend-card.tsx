@@ -182,7 +182,13 @@ export function SmaTrendCard() {
   const entries = symbols.map((s, i) => {
     const history = queries[i]?.data as SymbolHistory | undefined;
     const strength = history ? computeTrendStrength(history.points, periods, basis) : null;
-    return { symbol: s, index: i, score: strength ? strength.score : null };
+    return {
+      symbol: s,
+      index: i,
+      score: strength ? strength.score : null,
+      slope: strength ? strength.slopeAnnualPct : null,
+      volatility: strength ? strength.volatilityPct : null,
+    };
   });
   const visible = rankByTrendStrength(entries, sort, filter);
   const hidden = entries.length - visible.length;
@@ -259,6 +265,10 @@ export function SmaTrendCard() {
                 ["selection", "My order"],
                 ["strongest", "Strongest"],
                 ["weakest", "Weakest"],
+                ["slope-desc", "Slope ↓"],
+                ["slope-asc", "Slope ↑"],
+                ["vol-desc", "Vol ↓"],
+                ["vol-asc", "Vol ↑"],
               ] as [TrendSort, string][]
             ).map(([value, label]) => (
               <Button
