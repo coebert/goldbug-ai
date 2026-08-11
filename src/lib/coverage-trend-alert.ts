@@ -1,3 +1,5 @@
+export const COVERAGE_TREND_ALERT_CATEGORY = "broker_cost_coverage_trend";
+
 // Grading of the broker-charge coverage *trend*, as opposed to the current
 // coverage snapshot the status strip already shows.
 //
