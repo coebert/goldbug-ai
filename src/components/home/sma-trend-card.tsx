@@ -6,9 +6,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueries, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, LineChart as LineChartIcon, Plus } from "lucide-react";
+import { Check, LineChart as LineChartIcon, Plus, Star } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -35,10 +34,12 @@ import {
 import {
   DEFAULT_SMA_PERIODS,
   MAX_SMA_SYMBOLS,
+  SMA_FAVORITES_KEY,
   SMA_SYMBOLS_KEY,
   TREND_FILTER_KEY,
   TREND_SIGNIFICANT_SCORE,
   TREND_SORT_KEY,
+  parseSmaFavorites,
   parseSmaSymbols,
   parseTrendFilter,
   parseTrendSort,
@@ -50,7 +51,9 @@ import {
   type TrendBasis,
   type TrendFilter,
   type TrendSort,
+  storeSmaFavorites,
   storeSmaPeriods,
+  toggleSmaFavorite,
   toggleSmaPeriod,
   toggleSmaSymbol,
 } from "@/lib/sma-display";
@@ -80,6 +83,7 @@ export function SmaTrendCard() {
   const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
   const [sort, setSort] = useState<TrendSort>("selection");
   const [filter, setFilter] = useState<TrendFilter>("all");
+  const [favorites, setFavorites] = useState<string[]>([]);
   const fetchHistory = useServerFn(getSymbolHistory);
 
   // Restore the last view after hydration so SSR markup stays stable.
@@ -100,6 +104,9 @@ export function SmaTrendCard() {
       setTrendBasis(readStoredTrendBasis());
       setSort(parseTrendSort(window.localStorage.getItem(TREND_SORT_KEY)));
       setFilter(parseTrendFilter(window.localStorage.getItem(TREND_FILTER_KEY)));
+      setFavorites(
+        parseSmaFavorites(window.localStorage.getItem(SMA_FAVORITES_KEY), isKnownSymbol),
+      );
     } catch {
       /* storage unavailable — defaults are fine */
     }
@@ -135,6 +142,14 @@ export function SmaTrendCard() {
   const pickTrendBasis = (b: TrendBasis) => {
     setTrendBasis(b);
     storeTrendBasis(b);
+  };
+
+  const toggleFavorite = (symbol: string) => {
+    setFavorites((prev) => {
+      const next = toggleSmaFavorite(prev, symbol);
+      storeSmaFavorites(next);
+      return next;
+    });
   };
 
   const pickSort = (s: TrendSort) => {
@@ -186,6 +201,7 @@ export function SmaTrendCard() {
       symbol: s,
       index: i,
       score: strength ? strength.score : null,
+      favorite: favorites.includes(s),
       slope: strength ? strength.slopeAnnualPct : null,
       volatility: strength ? strength.volatilityPct : null,
     };
@@ -248,11 +264,27 @@ export function SmaTrendCard() {
           </DropdownMenu>
 
           <div className="flex flex-wrap gap-1">
-            {symbols.map((s) => (
-              <Badge key={s} variant="outline" className="text-xs font-normal">
-                {symbolMeta(s)?.label ?? s}
-              </Badge>
-            ))}
+            {symbols.map((s) => {
+              const pinned = favorites.includes(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={pinned}
+                  aria-label={`${pinned ? "Unpin" : "Pin"} ${symbolMeta(s)?.label ?? s}`}
+                  onClick={() => toggleFavorite(s)}
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-normal transition-colors ${
+                    pinned ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Star
+                    className={`mr-1 h-3 w-3 ${pinned ? "fill-primary text-primary" : ""}`}
+                    aria-hidden="true"
+                  />
+                  {symbolMeta(s)?.label ?? s}
+                </button>
+              );
+            })}
           </div>
 
           <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
