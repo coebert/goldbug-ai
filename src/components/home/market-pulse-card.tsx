@@ -4,7 +4,9 @@ import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
+  AlertTriangle,
   ArrowDownRight,
+  BellRing,
   ArrowUpRight,
   ChevronRight,
   Minus,
@@ -22,6 +24,7 @@ import {
 } from "recharts";
 
 import { getMarketPulse } from "@/lib/market-pulse.functions";
+import type { PulseAlert } from "@/lib/market-pulse-alerts";
 import { DEFAULT_RANGE, isKnownSymbol } from "@/lib/market-symbol-history";
 import {
   groupLabel,
@@ -147,6 +150,65 @@ function QuoteRow({ q }: { q: PulseQuote }) {
   );
 }
 
+/** Tripped watch rules, each with the metric's live value and its threshold. */
+function PulseAlerts({ alerts }: { alerts: PulseAlert[] }) {
+  if (!alerts.length) return null;
+  return (
+    <section className="space-y-2" aria-label="Market pulse alerts">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <BellRing className="h-3.5 w-3.5" aria-hidden="true" /> Alerts ({alerts.length})
+      </div>
+      <ul className="space-y-2">
+        {alerts.map((a) => {
+          const critical = a.severity === "critical";
+          const tone = critical
+            ? "border-destructive/40 bg-destructive/10"
+            : "border-amber-500/40 bg-amber-500/10";
+          const inner = (
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle
+                    className={`h-4 w-4 shrink-0 ${critical ? "text-destructive" : "text-amber-500"}`}
+                    aria-hidden="true"
+                  />
+                  <span className="text-sm font-semibold">{a.title}</span>
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {critical ? "Critical" : "Warning"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{a.body}</p>
+              </div>
+              <div className="shrink-0 text-right tabular-nums">
+                <div className="text-sm font-semibold">{a.valueText}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {a.metric} · alert at {a.thresholdText}
+                </div>
+              </div>
+            </div>
+          );
+          return (
+            <li key={`${a.id}-${a.severity}`}>
+              {a.symbol ? (
+                <SymbolLink
+                  symbol={a.symbol}
+                  ariaLabel={`View full chart for ${a.metric}`}
+                  className={`block rounded-xl border p-3 ${tone}`}
+                >
+                  {inner}
+                </SymbolLink>
+              ) : (
+                <div className={`rounded-xl border p-3 ${tone}`}>{inner}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+
 function ToneGauge({ score, tone }: { score: number; tone: MarketPulse["tone"] }) {
   const color =
     tone === "risk_on" ? "bg-emerald-500" : tone === "risk_off" ? "bg-destructive" : "bg-amber-500";
@@ -247,6 +309,8 @@ export function MarketPulseCard() {
       </CardHeader>
 
       <CardContent className="space-y-6">
+        <PulseAlerts alerts={pulse.alerts ?? []} />
+
         {/* Headline read */}
         <section className="grid gap-4 rounded-xl border border-border/70 bg-surface-2 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div className="space-y-3">

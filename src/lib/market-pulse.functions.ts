@@ -32,7 +32,7 @@ export const getMarketPulse = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
-    return computeMarketPulse(
+    const pulse = computeMarketPulse(
       (rows ?? []).map((r) => ({
         symbol: r.symbol as string,
         price_date: r.price_date as string,
@@ -40,4 +40,14 @@ export const getMarketPulse = createServerFn({ method: "POST" })
       })),
       data.comparisonDays,
     );
+
+    const { evaluatePulseAlerts } = await import("./market-pulse-alerts");
+    const alerts = evaluatePulseAlerts(pulse);
+
+    if (alerts.length) {
+      const { maybeNotifyPulseAlerts } = await import("./market-pulse-alerts.server");
+      await maybeNotifyPulseAlerts({ userId: context.userId, alerts, asOf: pulse.asOf });
+    }
+
+    return { ...pulse, alerts };
   });
