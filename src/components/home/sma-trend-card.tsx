@@ -82,7 +82,9 @@ export function SmaTrendCard() {
   const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_SMA_PERIODS);
   const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
   const [sort, setSort] = useState<TrendSort>("selection");
+  const [sort2, setSort2] = useState<TrendSort>("selection");
   const [filter, setFilter] = useState<TrendFilter>("all");
+
   const [favorites, setFavorites] = useState<string[]>([]);
   const fetchHistory = useServerFn(getSymbolHistory);
 
