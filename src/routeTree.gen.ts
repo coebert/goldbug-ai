@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TradesRouteImport } from './routes/trades'
+import { Route as SpilloverRouteImport } from './routes/spillover'
 import { Route as SimulationReportRouteImport } from './routes/simulation-report'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
@@ -56,6 +57,11 @@ import { Route as ApiPublicHooksAiGatewayHealthRouteImport } from './routes/api/
 const TradesRoute = TradesRouteImport.update({
   id: '/trades',
   path: '/trades',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SpilloverRoute = SpilloverRouteImport.update({
+  id: '/spillover',
+  path: '/spillover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SimulationReportRoute = SimulationReportRouteImport.update({
@@ -299,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
   '/simulation-report': typeof SimulationReportRoute
+  '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -344,6 +351,7 @@ export interface FileRoutesByTo {
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
   '/simulation-report': typeof SimulationReportRoute
+  '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -390,6 +398,7 @@ export interface FileRoutesById {
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
   '/simulation-report': typeof SimulationReportRoute
+  '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
@@ -437,6 +446,7 @@ export interface FileRouteTypes {
     | '/saxo-status'
     | '/settings'
     | '/simulation-report'
+    | '/spillover'
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -482,6 +492,7 @@ export interface FileRouteTypes {
     | '/saxo-status'
     | '/settings'
     | '/simulation-report'
+    | '/spillover'
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -527,6 +538,7 @@ export interface FileRouteTypes {
     | '/saxo-status'
     | '/settings'
     | '/simulation-report'
+    | '/spillover'
     | '/trades'
     | '/long-horizon/$id'
     | '/portfolio/$id'
@@ -573,6 +585,7 @@ export interface RootRouteChildren {
   SaxoStatusRoute: typeof SaxoStatusRoute
   SettingsRoute: typeof SettingsRoute
   SimulationReportRoute: typeof SimulationReportRoute
+  SpilloverRoute: typeof SpilloverRoute
   TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
@@ -608,6 +621,13 @@ declare module '@tanstack/react-router' {
       path: '/trades'
       fullPath: '/trades'
       preLoaderRoute: typeof TradesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/spillover': {
+      id: '/spillover'
+      path: '/spillover'
+      fullPath: '/spillover'
+      preLoaderRoute: typeof SpilloverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/simulation-report': {
@@ -940,6 +960,7 @@ const rootRouteChildren: RootRouteChildren = {
   SaxoStatusRoute: SaxoStatusRoute,
   SettingsRoute: SettingsRoute,
   SimulationReportRoute: SimulationReportRoute,
+  SpilloverRoute: SpilloverRoute,
   TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
@@ -973,13 +994,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
