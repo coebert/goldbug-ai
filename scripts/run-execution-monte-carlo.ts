@@ -711,6 +711,7 @@ async function main() {
       let worstFold = Infinity;
       let ddSum = 0;
       let deepestDd = 0;
+      let deepestInStress = false;
       let shSum = 0;
       let costSum = 0;
       let stressCostSum = 0;
@@ -721,7 +722,13 @@ async function main() {
         rets.push(r.returnPct);
         worstFold = Math.min(worstFold, r.returnPct);
         ddSum += r.maxDrawdownPct;
-        deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
+        if (r.maxDrawdownPct < deepestDd) {
+          deepestDd = r.maxDrawdownPct;
+          // "In stress" = the trough bar was stressed, or the peak→trough slide
+          // ran through stressed bars at all.
+          deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+        }
+
         shSum += r.sharpe;
         costSum += r.costs;
         stressCostSum += r.stressCosts;
