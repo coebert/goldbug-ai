@@ -25,6 +25,27 @@
  * invariant — usually one or two trades out of hundreds.
  */
 
+/**
+ * Itemised cost legs for a fill. When present the checker asserts the legs
+ * reconstruct `fees` exactly in micro-units, so a fee can never be "rounded
+ * into" the notional or silently netted away between legs.
+ */
+export type LedgerFeeLegs = {
+  /** Broker commission (Saxo tiered ticket, minimum floors, ...). */
+  commission?: number;
+  /** Venue/exchange and clearing charges. */
+  exchange?: number;
+  /** UK stamp duty / PTM levy — buy side only in practice. */
+  stamp?: number;
+  /** FX conversion fee booked on the base-currency leg. */
+  fx?: number;
+  /** Anything else the broker itemised. */
+  other?: number;
+};
+
+export const FEE_LEG_KEYS = ["commission", "exchange", "stamp", "fx", "other"] as const;
+export type FeeLegKey = (typeof FEE_LEG_KEYS)[number];
+
 export type LedgerFill = {
   /** Stable identifier used in reports. */
   id: string;
@@ -36,6 +57,8 @@ export type LedgerFill = {
   price: number;
   /** Total costs for this fill, always a cash outflow on both sides. */
   fees?: number;
+  /** Itemised breakdown of `fees`; checked when supplied. */
+  feeLegs?: LedgerFeeLegs;
   /** Optional label surfaced in the report (venue, order id, step, ...). */
   note?: string;
 };
@@ -54,6 +77,12 @@ export type LedgerStep = {
   expectedHoldingDelta: number;
   /** Snapshot of the whole book after this step (non-zero positions only). */
   holdings: Record<string, number>;
+  /** Total costs charged to cash on this step. */
+  feesCharged: number;
+  /** Sum of the itemised legs, or null when the fill supplied none. */
+  feeLegTotal: number | null;
+  /** Per-leg amounts (zero-filled) when the fill supplied a breakdown. */
+  feeLegs: Record<FeeLegKey, number> | null;
 };
 
 export type ViolationCode =
@@ -63,7 +92,12 @@ export type ViolationCode =
   | "holding_delta_mismatch"
   | "final_cash_mismatch"
   | "final_holdings_mismatch"
-  | "invalid_input";
+  | "invalid_input"
+  | "invalid_fee_leg"
+  | "negative_fee_leg"
+  | "fee_leg_sum_mismatch"
+  | "fee_leg_cash_mismatch"
+  | "missing_fee_legs";
 
 export type LedgerViolation = {
   code: ViolationCode;
@@ -76,6 +110,8 @@ export type LedgerViolation = {
   /** actual - expected, in base currency or shares. */
   delta: number;
   step: LedgerStep | null;
+  /** Populated for fee-leg violations. */
+  leg?: FeeLegKey;
 };
 
 export type LedgerCheckOptions = {
@@ -92,6 +128,16 @@ export type LedgerCheckOptions = {
   allowNegativeCash?: boolean;
   /** Set only for engines that model true shorts. */
   allowNegativeHoldings?: boolean;
+  /**
+   * Require every fill that charges a fee to itemise it. Off by default so
+   * existing callers keep working; on for broker-sourced reconciliations.
+   */
+  requireFeeLegs?: boolean;
+  /**
+   * Allow negative (rebate) legs. Off by default — a negative commission is
+   * almost always a sign-flip bug rather than a real rebate.
+   */
+  allowNegativeFeeLegs?: boolean;
 };
 
 export type LedgerCheckResult = {
@@ -136,6 +182,30 @@ export function expectedHoldingDelta(fill: LedgerFill): number {
   return fill.side === "buy" ? fill.quantity : -fill.quantity;
 }
 
+/** Zero-filled leg map, or null when the fill itemised nothing at all. */
+export function normaliseFeeLegs(fill: LedgerFill): Record<FeeLegKey, number> | null {
+  const legs = fill.feeLegs;
+  if (!legs) return null;
+  const present = FEE_LEG_KEYS.some((k) => legs[k] !== undefined);
+  if (!present) return null;
+  const out = {} as Record<FeeLegKey, number>;
+  for (const k of FEE_LEG_KEYS) out[k] = legs[k] ?? 0;
+  return out;
+}
+
+/** Sum of the itemised legs in micro-units (each leg rounded independently). */
+export function feeLegTotalMicros(legs: Record<FeeLegKey, number>): number {
+  let total = 0;
+  for (const k of FEE_LEG_KEYS) total += toMicros(legs[k]);
+  return total;
+}
+
+/** Sum of the itemised legs, or null when the fill itemised nothing. */
+export function sumFeeLegs(fill: LedgerFill): number | null {
+  const legs = normaliseFeeLegs(fill);
+  return legs ? fromMicros(feeLegTotalMicros(legs)) : null;
+}
+
 // ---------------------------------------------------------------------------
 // The walk
 // ---------------------------------------------------------------------------
@@ -173,12 +243,26 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
       return;
     }
 
+    const legs = normaliseFeeLegs(fill);
+    if (legs && FEE_LEG_KEYS.some((k) => !Number.isFinite(legs[k]))) {
+      push({
+        code: "invalid_fee_leg",
+        message: `fill ${fill.id} carries a non-finite fee leg — the itemised costs cannot be reconciled`,
+        index,
+        fill,
+        expected: 0,
+        actual: Number.NaN,
+        step: null,
+      });
+      return;
+    }
+
     const cashBeforeMicros = cashMicros;
     const holdBeforeMicros = bookMicros.get(fill.symbol) ?? 0;
 
-    const wantCashMicros =
-      (fill.side === "buy" ? -1 : 1) * toMicros(fill.price * fill.quantity) -
-      toMicros(fill.fees ?? 0);
+    const notionalMicros = toMicros(fill.price * fill.quantity);
+    const feesMicros = toMicros(fill.fees ?? 0);
+    const wantCashMicros = (fill.side === "buy" ? -1 : 1) * notionalMicros - feesMicros;
     const wantQtyMicros = (fill.side === "buy" ? 1 : -1) * toMicroQty(fill.quantity);
 
     cashMicros = cashBeforeMicros + wantCashMicros;
@@ -188,6 +272,8 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
 
     const holdings: Record<string, number> = {};
     for (const [symbol, q] of bookMicros) holdings[symbol] = fromMicros(q);
+
+    const legTotalMicros = legs ? feeLegTotalMicros(legs) : null;
 
     const step: LedgerStep = {
       index,
@@ -201,6 +287,9 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
       holdingDelta: fromMicros(wantQtyMicros),
       expectedHoldingDelta: expectedHoldingDelta(fill),
       holdings,
+      feesCharged: fromMicros(feesMicros),
+      feeLegTotal: legTotalMicros === null ? null : fromMicros(legTotalMicros),
+      feeLegs: legs,
     };
     steps.push(step);
 
@@ -226,6 +315,78 @@ function walk(fills: readonly LedgerFill[], options: LedgerCheckOptions) {
         step,
       });
     }
+
+    // ---- fee-leg decomposition ------------------------------------------
+    if (legs === null) {
+      if (options.requireFeeLegs && feesMicros !== 0) {
+        push({
+          code: "missing_fee_legs",
+          message: `step ${index} (${fill.id}) charged ${money(step.feesCharged)} of fees with no commission/exchange/stamp breakdown`,
+          index,
+          fill,
+          expected: step.feesCharged,
+          actual: 0,
+          step,
+        });
+      }
+    } else {
+      if (!options.allowNegativeFeeLegs) {
+        for (const key of FEE_LEG_KEYS) {
+          if (toMicros(legs[key]) < 0) {
+            push({
+              code: "negative_fee_leg",
+              message: `step ${index} (${fill.id}) booked a negative ${key} leg of ${money(legs[key])} — a sign flip here hides cost drag inside another leg`,
+              index,
+              fill,
+              expected: 0,
+              actual: legs[key],
+              step,
+              leg: key,
+            });
+          }
+        }
+      }
+
+      // Legs must reconstruct the charged fee to the micro-unit: no rounding
+      // slack, no leg quietly absorbed into the notional.
+      if (legTotalMicros !== feesMicros) {
+        const breakdown = FEE_LEG_KEYS.filter((k) => legs[k] !== 0)
+          .map((k) => `${k} ${money(legs[k])}`)
+          .join(" + ");
+        push({
+          code: "fee_leg_sum_mismatch",
+          message: `step ${index} (${fill.id}) itemised ${breakdown || "nothing"} = ${money(
+            fromMicros(legTotalMicros!),
+          )} but charged ${money(step.feesCharged)} (off by ${money(
+            fromMicros(legTotalMicros! - feesMicros),
+          )})`,
+          index,
+          fill,
+          expected: step.feesCharged,
+          actual: fromMicros(legTotalMicros!),
+          step,
+        });
+      }
+
+      // And the legs must explain the cash movement directly, independently of
+      // `fees`: cash delta = ±notional - Σ legs, exactly, in micro-units.
+      const legImpliedCashMicros =
+        (fill.side === "buy" ? -1 : 1) * notionalMicros - legTotalMicros!;
+      if (legImpliedCashMicros !== wantCashMicros) {
+        push({
+          code: "fee_leg_cash_mismatch",
+          message: `step ${index} (${fill.id}) moved cash by ${money(step.cashDelta)} but ±notional minus the itemised legs implies ${money(
+            fromMicros(legImpliedCashMicros),
+          )}`,
+          index,
+          fill,
+          expected: fromMicros(legImpliedCashMicros),
+          actual: step.cashDelta,
+          step,
+        });
+      }
+    }
+
     if (!options.allowNegativeCash && cashMicros < -epsMicros) {
       push({
         code: "negative_cash",
@@ -367,6 +528,11 @@ function describeStep(step: LedgerStep): string {
     `  #${String(step.index).padStart(4, " ")} ${f.id.padEnd(10)} ${f.side.toUpperCase().padEnd(4)} ${f.symbol.padEnd(8)}`,
     `qty ${qty(f.quantity).padStart(10)} @ ${money(f.price)}`,
     `fees ${money(f.fees ?? 0)}`,
+    step.feeLegs
+      ? `legs [${FEE_LEG_KEYS.filter((k) => step.feeLegs![k] !== 0)
+          .map((k) => `${k} ${money(step.feeLegs![k])}`)
+          .join(" ")}] = ${money(step.feeLegTotal ?? 0)}`
+      : "",
     `cash ${money(step.cashBefore)} -> ${money(step.cashAfter)} (${money(step.cashDelta)})`,
     `pos ${qty(step.holdingBefore)} -> ${qty(step.holdingAfter)}`,
     book ? `book [${book}]` : "book []",
