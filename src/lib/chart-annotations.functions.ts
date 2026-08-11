@@ -40,7 +40,7 @@ export const getChartAnnotations = createServerFn({ method: "POST" })
         .limit(4000),
       context.supabase
         .from("news_cache")
-        .select("news_date, headline, source, relevance_score")
+        .select("news_date, headline, source, url, fetched_at, relevance_score")
         .gte("news_date", windowStartIso)
         .order("relevance_score", { ascending: false, nullsFirst: false })
         .limit(300),
@@ -70,6 +70,8 @@ export const getChartAnnotations = createServerFn({ method: "POST" })
         date: n.news_date as string,
         headline: n.headline as string,
         source: (n.source as string | null) ?? null,
+        url: (n.url as string | null) ?? null,
+        at: (n.fetched_at as string | null) ?? null,
       })),
     });
 
