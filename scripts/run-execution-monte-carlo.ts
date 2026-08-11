@@ -346,8 +346,10 @@ const calibStressAllCells = argv.includes("--calib-stress-all");
 // widened into a ramp and reports how the fitted ρs, their stability and the
 // residual errors respond. Numbers that slide with the blend are artefacts of
 // the labelling rule, not measurements of the tape.
-const regimeBlendMode = argv.includes("--regime-blend");
-const regimeBlendGrid = arg("regime-blend", DEFAULT_BLEND_GRID.join(","))
+// The grid entries are ramp half-widths in z units, matching --regime-ramp-lo/hi:
+// 0 is the `binary` setting, 0.5 is a ramp over stressZ ± 0.5.
+const regimeBlendMode = argv.includes("--regime-blend-sweep");
+const regimeBlendGrid = arg("regime-blend-sweep", DEFAULT_BLEND_GRID.join(","))
   .split(",").map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n >= 0);
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
@@ -889,7 +891,7 @@ async function main() {
   }
 
   // ------------------------------------------------ regime-blend sensitivity
-  // --regime-blend 0,0.1,0.25,0.5,1: refit once per boundary softness and
+  // --regime-blend-sweep 0,0.1,0.25,0.5,1: refit once per boundary softness and
   // report the spread each fitted number inherits purely from that choice.
   if (regimeBlendMode) {
     const sweep = sweepRegimeBlend(seriesBySymbol, {

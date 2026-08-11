@@ -42,7 +42,14 @@ export type BlendResidual = {
 };
 
 export type BlendSweepPoint = {
+  /**
+   * Regime-blend half-width in z units. 0 is the sampler's `binary` setting;
+   * h > 0 is the `ramp` setting over `stressZ ± h`, the same band the shock
+   * sampler ramps its coupling across.
+   */
   blend: number;
+  /** How the setting reads on the command line: `binary` or `ramp ±h`. */
+  setting: string;
   /** Windows in the rolling fit (identical across blends — only labels move). */
   windows: number;
   /** Windows whose stress weight is ≥ 0.5 — the hard-label count. */
@@ -206,6 +213,7 @@ export function sweepRegimeBlend(
 
     return {
       blend,
+      setting: blend > 0 ? `ramp ±${blend.toFixed(2)}z` : "binary",
       windows: rows.length,
       stressWindows: rows.filter((r) => r.stressed).length,
       stressMass: cal.stressMass,
@@ -335,14 +343,15 @@ export function formatRegimeBlendSweep(s: RegimeBlendSweep): string {
   const lines: string[] = [];
 
   lines.push("Regime-blend sensitivity — fitted coupling per boundary softness");
+  lines.push("(blend 0 = the sampler's `binary` regime; h > 0 = `ramp` over stressZ ± h)");
   lines.push([
-    "blend".padStart(6), "stressW".padStart(8), "mass".padStart(7), "partial".padStart(8),
+    "setting".padStart(11), "stressW".padStart(8), "mass".padStart(7), "partial".padStart(8),
     "calmIn".padStart(7), "calmX".padStart(7), "strIn".padStart(7), "strX".padStart(7),
     "sepX".padStart(7), "effN".padStart(6),
   ].join(" "));
   for (const p of s.points) {
     lines.push([
-      p.blend.toFixed(2).padStart(6), String(p.stressWindows).padStart(8),
+      p.setting.padStart(11), String(p.stressWindows).padStart(8),
       p.stressMass.toFixed(1).padStart(7), String(p.partialWindows).padStart(8),
       num(p.calmWithin).padStart(7), num(p.calmAcross).padStart(7),
       num(p.stressWithin).padStart(7), num(p.stressAcross).padStart(7),
@@ -353,7 +362,7 @@ export function formatRegimeBlendSweep(s: RegimeBlendSweep): string {
   lines.push("");
   lines.push("Stability and fit error per blend");
   lines.push([
-    "blend".padStart(6), "strSd".padStart(7), "strCV".padStart(7), "drift".padStart(7),
+    "setting".padStart(11), "strSd".padStart(7), "strCV".padStart(7), "drift".padStart(7),
     "calmSd".padStart(7), "sepCI".padStart(17), "rmseBlk".padStart(8), "rmseCtg".padStart(8),
     "best".padStart(10), "contagion".padStart(10),
   ].join(" "));
@@ -361,7 +370,7 @@ export function formatRegimeBlendSweep(s: RegimeBlendSweep): string {
     const blk = p.residuals.find((r) => r.kind === "blocks");
     const ctg = p.residuals.find((r) => r.kind === "contagion");
     lines.push([
-      p.blend.toFixed(2).padStart(6), num(p.stressWithinSd).padStart(7),
+      p.setting.padStart(11), num(p.stressWithinSd).padStart(7),
       num(p.stressWithinCoefVar, 2).padStart(7), num(p.stressWithinDrift).padStart(7),
       num(p.calmWithinSd).padStart(7),
       `[${num(p.acrossSeparationLo)}, ${num(p.acrossSeparationHi)}]`.padStart(17),
