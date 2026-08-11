@@ -173,7 +173,7 @@ import {
 } from "./exits";
 import { scoreUniverseWithDiagnostics, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutRegimeAction } from "./alpha";
 import { unifiedVolSize } from "./sizing/unified-vol-size";
-import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
+import { alphaConvictionBonus } from "./alpha/sizing";
 import {
   planOrderSlices,
   todExecutionAdjustment,
