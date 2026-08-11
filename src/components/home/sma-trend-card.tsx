@@ -46,6 +46,7 @@ import {
   parseTrendFilter,
   parseTrendSort,
   rankByTrendStrength,
+  trendPercentiles,
   readStoredSmaPeriods,
   readStoredTrendBasis,
   resolveTrendBasis,
