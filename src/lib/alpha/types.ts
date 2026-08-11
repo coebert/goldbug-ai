@@ -10,6 +10,8 @@ export type FeatureLike = {
   price: number;
   sma20: number | null;
   sma50: number | null;
+  /** 200-day simple moving average; null until 200 candles exist. */
+  sma200?: number | null;
   rsi14: number | null;
   change5d: number | null;
   change30d: number | null;
