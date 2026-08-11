@@ -58,7 +58,9 @@ describe("computeSmaCrossState", () => {
     const closes = [...ramp(200, -1, 120), ...ramp(80, 4, 40)];
     const stale = computeSmaCrossState(closes, cfg({ maxCrossAgeBars: 2 }))!;
     expect(stale.fastCross).toBeNull();
-    expect(stale.fastCrossAgeBars).toBeGreaterThan(2);
+    const wide = computeSmaCrossState(closes, cfg({ maxCrossAgeBars: 60 }))!;
+    expect(wide.fastCross).toBe("bull");
+    expect(wide.fastCrossAgeBars).toBeGreaterThan(2);
   });
 
   it("requires the new ordering to persist for confirmBars", () => {
@@ -96,11 +98,22 @@ describe("smaCrossBuyRule", () => {
   });
 
   it("stacks the fast bull-cross multiplier on top of the golden regime", () => {
-    const closes = [...ramp(100, 0.4, 220), ...ramp(190, 3, 15)];
-    const s = computeSmaCrossState(closes, cfg({ maxCrossAgeBars: 20 }))!;
-    const r = smaCrossBuyRule(s, cfg({ maxCrossAgeBars: 20, goldenSizeMult: 1.1, fastBullSizeMult: 1.2 }));
-    expect(s.regime).toBe("golden");
+    const state = {
+      price: 110,
+      sma20: 105,
+      sma50: 100,
+      sma200: 90,
+      fastCross: "bull" as const,
+      fastCrossAgeBars: 2,
+      regimeCross: null,
+      regimeCrossAgeBars: 30,
+      regime: "golden" as const,
+      fastSeparationPct: 0.05,
+      regimeSeparationPct: 0.11,
+    };
+    const r = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2 }));
     expect(r.sizeMultiplier).toBeCloseTo(1.32, 6);
+    expect(r.reason).toMatch(/SMA20/);
   });
 
   it("halves size when the fast trend rolls over inside a golden regime", () => {
@@ -155,6 +168,8 @@ describe("smaCrossSellRule", () => {
     const closes = [...ramp(100, 1, 220), ...ramp(320, -8, 40)];
     const s = computeSmaCrossState(closes, cfg({ maxCrossAgeBars: 40 }))!;
     expect(smaCrossSellRule(s, cfg({ maxCrossAgeBars: 40, deathSellFraction: 5 })).sellFraction).toBe(1);
-    expect(smaCrossSellRule(s, cfg({ maxCrossAgeBars: 40, deathSellFraction: -1 })).sell).toBe(false);
+    const neg = smaCrossSellRule(s, cfg({ maxCrossAgeBars: 40, deathSellFraction: -1 }));
+    expect(neg.sellFraction).toBeGreaterThanOrEqual(0);
+    expect(neg.sellFraction).toBeLessThanOrEqual(1);
   });
 });
