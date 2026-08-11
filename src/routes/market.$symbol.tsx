@@ -389,6 +389,16 @@ function MarketSymbolPage() {
                 loading={annotationQuery.isLoading || annotationQuery.isFetching}
               />
 
+              <CompareOverlay
+                symbol={symbol}
+                range={range}
+                compare={compare}
+                options={HISTORY_SYMBOLS}
+                comparison={comparison}
+                loading={compareLoading}
+                onToggle={(s) => setCompare(toggleCompareSymbol(compare, s))}
+                onClear={() => setCompare([])}
+              />
 
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
