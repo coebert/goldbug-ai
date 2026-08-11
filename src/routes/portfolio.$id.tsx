@@ -1156,6 +1156,15 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
+                {p && (
+                  <div className="mb-4">
+                    <RelativeStrengthCard
+                      portfolioId={id}
+                      currency={String(p.currency ?? "GBP")}
+                      enabled={ready}
+                    />
+                  </div>
+                )}
                   </AdvancedSection>
                   <AdvancedSection
                     title="What changed your value"
