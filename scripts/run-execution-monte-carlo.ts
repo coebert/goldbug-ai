@@ -4,6 +4,8 @@
 //   bun run scripts/run-execution-monte-carlo.ts
 //   bun run scripts/run-execution-monte-carlo.ts --paths 400 --from 2015-01-01
 //   bun run scripts/run-execution-monte-carlo.ts --sigma 0.8 --full-fill 0.6 --no-fill 0.05
+//   bun run scripts/run-execution-monte-carlo.ts --rho-sweep 0,0.3,0.6,0.9 --vol-z-sweep 1,1.5,2,99
+
 //
 // The cost-sensitivity sweep answers "what if costs are higher?" with a single
 // point estimate per scenario. This script answers the different question the
@@ -123,6 +125,21 @@ const limitCfg = {
   adverseSelectionBeta: Number(arg("adverse-beta", String(DEFAULT_LIMIT_ORDER.adverseSelectionBeta))),
   waitDriftBeta: Number(arg("wait-drift-beta", String(DEFAULT_LIMIT_ORDER.waitDriftBeta))),
 };
+
+// ------------------------------------------------- joint-risk sensitivity sweep
+// --rho-sweep 0,0.3,0.6,0.9 --vol-z-sweep 1,1.5,2,99
+// Runs the same walk-forward Monte-Carlo across a grid of cross-symbol
+// correlation (ρ) × realised-vol stress trigger (z), so you can see how the
+// *joint* worst case moves with each assumption instead of trusting one cell.
+const parseList = (raw: string) =>
+  raw.split(",").map((s) => Number(s.trim())).filter((v) => Number.isFinite(v));
+const rhoSweep = parseList(arg("rho-sweep", ""));
+const volZSweep = parseList(arg("vol-z-sweep", ""));
+const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0;
+const sweepPaths = Number(arg("sweep-paths", String(Math.max(40, Math.round(paths / 3)))));
+// Threshold headlined in the sweep matrix; the full breach table still prints.
+const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? ddThresholds[0] ?? 15)));
+
 
 const GRID: SmaVariantParams[] = [];
 for (const separationPct of [0, 0.002, 0.005, 0.01]) {
@@ -478,10 +495,11 @@ async function main() {
   }
   console.log();
 
-  for (const variant of SMA_VARIANTS) {
-    // 1. Tune on TRAIN with deterministic execution (the strategy cannot know
-    //    which fills will go badly, so it must not be tuned against them).
-    const tuned = folds.map((f) => {
+  // Tuning is deterministic (it never sees the random draws), so it is done
+  // once per variant and reused by every sweep cell — otherwise the grid would
+  // confound parameter drift with shock sensitivity.
+  const tuneVariant = (variant: SmaVariant) =>
+    folds.map((f) => {
       let best: SmaVariantParams = GRID[0]!;
       let bestScore = -Infinity;
       for (const p of GRID) {
@@ -494,6 +512,104 @@ async function main() {
       }
       return best;
     });
+
+  if (sweepMode) {
+    const rhos = rhoSweep.length ? rhoSweep : [simCfg.rho];
+    const zs = volZSweep.length ? volZSweep : [simCfg.volStressZ];
+    console.log(
+      `Sensitivity sweep: ρ ∈ {${rhos.join(", ")}} × vol-z trigger ∈ {${zs.join(", ")}} `
+      + `· ${sweepPaths} paths/cell · headline breach threshold ${sweepThreshold}%`,
+    );
+    console.log();
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      console.log(`=== ${variant} ===`);
+      const header = [
+        "rho".padStart(5),
+        "volZ".padStart(6),
+        "med ret%".padStart(9),
+        "p5 ret%".padStart(9),
+        "med DD%".padStart(9),
+        "p5 DD%".padStart(9),
+        "worstDD%".padStart(9),
+        `P(DD≥${sweepThreshold}%)`.padStart(11),
+        "stress%".padStart(8),
+        "cost£".padStart(9),
+      ].join(" ");
+      console.log(header);
+      console.log("-".repeat(header.length));
+
+      for (const rho of rhos) {
+        for (const z of zs) {
+          const cfg = { ...simCfg, rho, volStressZ: z };
+          const pathRet: number[] = [];
+          const pathDeepestDd: number[] = [];
+          const pathStressShare: number[] = [];
+          const pathCosts: number[] = [];
+          let stressBars = 0;
+          let allBars = 0;
+
+          for (let pth = 0; pth < sweepPaths; pth++) {
+            const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+            const sampler = makeCorrelatedExecutionSampler(cfg, pathSeed);
+            const limit = execModel === "limit"
+              ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+              : null;
+            const rets: number[] = [];
+            let deepestDd = 0;
+            let costSum = 0;
+            let stressCostSum = 0;
+            for (let k = 0; k < folds.length; k++) {
+              const f = folds[k]!;
+              const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
+              rets.push(r.returnPct);
+              deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
+              costSum += r.costs;
+              stressCostSum += r.stressCosts;
+              stressBars += r.stressBars;
+              allBars += f.testEnd - f.testStart + 1;
+            }
+            pathRet.push(meanOf(rets));
+            pathDeepestDd.push(deepestDd);
+            pathCosts.push(costSum / folds.length);
+            pathStressShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
+          }
+
+          const ret = percentileStats(pathRet);
+          const deep = percentileStats(pathDeepestDd);
+          const cost = percentileStats(pathCosts);
+          const stress = percentileStats(pathStressShare);
+          const breach = drawdownBreachProbabilities(pathDeepestDd, [sweepThreshold])[0]!;
+          console.log([
+            fmt(rho, 2).padStart(5),
+            fmt(z, 2).padStart(6),
+            fmt(ret.median).padStart(9),
+            fmt(ret.p5).padStart(9),
+            fmt(deep.median).padStart(9),
+            fmt(deep.p5).padStart(9),
+            fmt(deep.worst).padStart(9),
+            `${(breach.prob * 100).toFixed(1)}%`.padStart(11),
+            fmt(stress.median, 1).padStart(8),
+            fmt(cost.median, 0).padStart(9),
+          ].join(" "));
+        }
+      }
+      console.log();
+    }
+
+    console.log("Reading: each row is one joint-risk assumption. ρ controls how much every");
+    console.log("symbol's slippage moves together; the vol-z trigger is how readily a volatile");
+    console.log("tape is treated as a stress regime (lower z = more stressed bars, z=99 = off).");
+    console.log("'p5 DD%' and 'worstDD%' are the joint worst cases: read across a row to see");
+    console.log("how much of your drawdown budget is an assumption rather than a measurement.");
+    return;
+  }
+  for (const variant of SMA_VARIANTS) {
+    // 1. Tune on TRAIN with deterministic execution (the strategy cannot know
+    //    which fills will go badly, so it must not be tuned against them).
+    const tuned = tuneVariant(variant);
+
 
     // 2. Deterministic OOS baseline.
     const detFolds = folds.map((f, k) =>
