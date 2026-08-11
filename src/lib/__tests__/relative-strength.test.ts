@@ -30,7 +30,8 @@ describe("pickBenchmark", () => {
     expect(pickBenchmark("MKS:xlon").symbol).toBe("ISF.L");
     expect(pickBenchmark("AAPL").symbol).toBe("SPY");
     expect(pickBenchmark("V:xnys").symbol).toBe("SPY");
-    expect(pickBenchmark("BTCE.DE").symbol).toBe("EFA");
+    expect(pickBenchmark("SAP.DE").symbol).toBe("EFA");
+    expect(pickBenchmark("BTCE.DE").symbol).toBe("BTC-USD");
     expect(pickBenchmark("ETH-USD").symbol).toBe("BTC-USD");
     expect(pickBenchmark("GLD", "commodity").symbol).toBe("GLD");
   });
