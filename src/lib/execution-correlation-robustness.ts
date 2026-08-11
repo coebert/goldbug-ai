@@ -494,7 +494,7 @@ export function stressTestCalibration(
   const notes: string[] = [];
   if (windowSensitive) {
     notes.push(
-      `Window length moves calm ρ_within by ${windowEffect.toFixed(3)} on average — `
+      `Window length moves the fitted ρs by up to ${windowEffect.toFixed(3)} on average — `
       + "the level is partly a smoothing choice, so pin the window in the snapshot.",
     );
   }
@@ -505,7 +505,7 @@ export function stressTestCalibration(
       Number.isFinite(pearson) && Number.isFinite(spearman) && pearson > spearman + 0.05
         ? `Pearson (${pearson.toFixed(3)}) sits above Spearman (${spearman.toFixed(3)}): `
           + "outlier bars are paying for the coupling — prefer the winsorised or rank fit."
-        : `Estimator choice moves calm ρ_within by ${estimatorEffect.toFixed(3)}.`,
+        : `Estimator choice moves the fitted ρs by up to ${estimatorEffect.toFixed(3)}.`,
     );
   }
   const boot = baseline.bootstrap;
