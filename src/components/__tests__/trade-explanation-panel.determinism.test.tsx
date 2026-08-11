@@ -58,8 +58,27 @@ const ENTRY: AuditEntry = {
     { headline: "M&S lifts guidance", source: "Reuters", sentiment: 0.4, alignment: "aligned" },
     { headline: "UK retail footfall slips", source: "FT", sentiment: -0.2, alignment: "opposing" },
   ],
-  guardrails: { maxPositionPct: 12 },
+  guardrails: { maxPositionPct: 12, risk_level: "balanced" },
   portfolioValue: 10300,
+  riskLevel: "balanced",
+  smaCross: {
+    price: 3.42,
+    sma20: 3.36,
+    sma50: 3.28,
+    sma200: 3.05,
+    fastCross: "bull",
+    fastCrossAgeBars: 3,
+    regimeCross: null,
+    regimeCrossAgeBars: 40,
+    regime: "golden",
+    fastSeparationPct: 0.0244,
+    regimeSeparationPct: 0.0754,
+    bars: 320,
+    droppedBars: 0,
+    quality: "full",
+    regimeUnknown: false,
+    warnings: [],
+  },
 };
 
 const SAMPLES: CalibrationSample[] = Array.from({ length: 24 }, (_, i) => ({

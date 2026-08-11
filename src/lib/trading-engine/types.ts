@@ -51,4 +51,7 @@ export type ExecutedTrade = {
   // Phase 6 — execution alpha telemetry.
   slice_plan?: { childCount: number; childNotional: number; advParticipationPct: number | null; reason: string };
   tod?: { multiplier: number; allow: boolean; reason: string };
+  // SMA trend telemetry — the snapshot the crossover rules saw for this
+  // symbol at decision time, so the UI can explain the trend influence.
+  sma_cross?: import("../alpha/sma-cross-rules").SmaCrossState | null;
 };

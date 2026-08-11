@@ -178,6 +178,7 @@ import {
 } from "./alpha/execution-alpha";
 import { stochasticEntryTiming } from "./alpha/stochastic-timing";
 import { smaCrossBuyRule, smaCrossSellRule } from "./alpha/sma-cross-rules";
+import { smaRulesForRisk } from "./alpha/sma-risk-profiles";
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -1010,8 +1011,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       if (timing.multiplier < 1) adjNotional = adjNotional * timing.multiplier;
 
       // SMA crossover rules — death-cross regime vetoes new longs, a fresh
-      // golden / SMA20↑SMA50 cross upsizes them.
-      const crossRule = smaCrossBuyRule(featureBySymbol.get(symbol)?.sma_cross ?? null);
+      // golden / SMA20↑SMA50 cross upsizes them. Thresholds follow risk level.
+      const crossRule = smaCrossBuyRule(
+        featureBySymbol.get(symbol)?.sma_cross ?? null,
+        smaRulesForRisk(portfolio.risk_level),
+      );
       if (!crossRule.allow) {
         return {
           allow: false,
@@ -1252,7 +1256,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
 
     // 6. SMA crossover exit — fresh death cross closes, SMA20↓SMA50 trims.
     if (!trigger) {
-      const cross = smaCrossSellRule(featureBySymbol.get(sym)?.sma_cross ?? null);
+      const cross = smaCrossSellRule(
+        featureBySymbol.get(sym)?.sma_cross ?? null,
+        smaRulesForRisk(portfolio.risk_level),
+      );
       if (cross.sell) {
         trigger = cross.reason;
         triggerKind = "trail";
@@ -2611,6 +2618,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     srvLog.warn("tail hedge apply skipped:", e);
   }
 
+  // Attach the SMA trend snapshot each symbol had at decision time to every
+  // executed/rejected order, so the trade explanation panel can show the
+  // exact SMA values, cross direction and rule influence after the fact.
+  for (const t of executed) {
+    if (t.sma_cross !== undefined) continue;
+    t.sma_cross = featureBySymbol.get(engineSymbolKey(t.symbol))?.sma_cross ?? null;
+  }
 
   if (!isLivePortfolio) {
     // Insert trades (only executed ones with quantity > 0)
