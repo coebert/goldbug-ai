@@ -42,6 +42,7 @@ export async function buildCandidateFeatures(
     price: number;
     sma20: number | null;
     sma50: number | null;
+    sma200: number | null;
     rsi14: number | null;
     change5d: number | null;
     change30d: number | null;
