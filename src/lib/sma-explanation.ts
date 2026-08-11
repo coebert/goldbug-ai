@@ -152,8 +152,8 @@ export function buildSmaExplanation(args: {
 
   const fastLabel = state.fastCross
     ? state.fastCross === "bull"
-      ? `SMA20 crossed above SMA50${state.fastCrossAgeBars != null ? ` ${state.fastCrossAgeBars} session${state.fastCrossAgeBars === 1 ? "" : "s"} ago` : ""}`
-      : `SMA20 crossed below SMA50${state.fastCrossAgeBars != null ? ` ${state.fastCrossAgeBars} session${state.fastCrossAgeBars === 1 ? "" : "s"} ago` : ""}`
+      ? `SMA20 crossed above SMA50${state.fastCrossAgeBars != null ? ` ${state.fastCrossAgeBars} session${state.fastCrossAgeBars === 1 ? "" : "s"} earlier` : ""}`
+      : `SMA20 crossed below SMA50${state.fastCrossAgeBars != null ? ` ${state.fastCrossAgeBars} session${state.fastCrossAgeBars === 1 ? "" : "s"} earlier` : ""}`
     : fastSpreadPct == null
       ? "Not enough history for SMA20/50"
       : fastSpreadPct > 0
@@ -167,7 +167,7 @@ export function buildSmaExplanation(args: {
     regimeState === "unknown"
       ? `No SMA200 yet — only ${state.bars} bars of history`
       : state.regimeCross
-        ? `Fresh ${state.regimeCross} cross${state.regimeCrossAgeBars != null ? ` ${state.regimeCrossAgeBars} session${state.regimeCrossAgeBars === 1 ? "" : "s"} ago` : ""}`
+        ? `Fresh ${state.regimeCross} cross${state.regimeCrossAgeBars != null ? ` ${state.regimeCrossAgeBars} session${state.regimeCrossAgeBars === 1 ? "" : "s"} earlier` : ""}`
         : regimeState === "golden"
           ? "Golden regime — SMA50 above SMA200"
           : "Death regime — SMA50 below SMA200";
