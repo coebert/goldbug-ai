@@ -171,7 +171,8 @@ const maybeRho = z.number().nullable();
 const pooledSchema = z.object({
   rho: maybeRho,
   sd: finite,
-  windows: z.number().int().nonnegative(),
+  // Fractional under a soft regime blend: a window can be 0.3 stressed.
+  windows: z.number().nonnegative(),
 });
 
 const windowSchema = z.object({
@@ -182,6 +183,8 @@ const windowSchema = z.object({
   withinPairs: z.number().int().nonnegative(),
   acrossPairs: z.number().int().nonnegative(),
   stressShare: finite,
+  /** Missing in snapshots written before soft blending — derive from the label. */
+  stressWeight: finite.optional(),
   stressed: z.boolean(),
 });
 
@@ -202,6 +205,8 @@ const optionsSchema = z.object({
   shrink: finite,
   stressZ: finite,
   minStressShare: finite,
+  /** Regime-boundary softness; absent in pre-blend snapshots, which were hard. */
+  blend: finite.default(0),
 });
 
 const foldSchema = z.object({
@@ -244,6 +249,8 @@ export const calibrationSnapshotSchema = z.object({
     calm: z.object({ within: pooledSchema, across: pooledSchema }),
     stress: z.object({ within: pooledSchema, across: pooledSchema }),
     stressShare: finite,
+    /** Σ stress weight; falls back to the hard count for old snapshots. */
+    stressMass: finite.optional(),
     clusters: z.array(z.string()),
   }),
   /** Omitted with `includeWindows: false` to keep big files small. */
@@ -277,6 +284,7 @@ const encodeWindow = (w: RollingCorrelationWindow) => ({
 });
 const decodeWindow = (w: z.infer<typeof windowSchema>): RollingCorrelationWindow => ({
   ...w,
+  stressWeight: w.stressWeight ?? (w.stressed ? 1 : 0),
   withinRho: nullToNan(w.withinRho),
   acrossRho: nullToNan(w.acrossRho),
 });
@@ -393,6 +401,7 @@ export function buildCalibrationSnapshot(input: BuildSnapshotInput): Calibration
         across: encodePooled(cal.stress.across),
       },
       stressShare: cal.stressShare,
+      stressMass: cal.stressMass,
       clusters: cal.clusters,
     },
     ...(input.includeWindows === false
