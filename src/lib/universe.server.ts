@@ -217,6 +217,16 @@ export type RiskConfig = {
   atr_scaled_stop_enabled: boolean;
   /** Lower bound for the ATR-scaled hard stop so noise can't trigger exits. */
   atr_scaled_stop_floor_pct: number;
+  /** Master switch for the take-profit leg. False = let winners run. */
+  take_profit_enabled: boolean;
+  /** Size the profit target in ATRs rather than a flat percentage. */
+  atr_take_profit_enabled: boolean;
+  /** ATR multiple defining the profit target (e.g. 4 = 4×ATR). */
+  take_profit_atr_mult: number;
+  /** Lower bound for the ATR take-profit so targets sit outside daily noise. */
+  atr_take_profit_floor_pct: number;
+  /** Upper bound so a volatile name's target stays reachable. */
+  atr_take_profit_cap_pct: number;
   scale_out_enabled: boolean;
   scale_out_levels: Array<{ r: number; frac: number }>;
   time_stop_enabled: boolean;
@@ -335,6 +345,11 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   initial_stop_atr_mult: 2.5,
   atr_scaled_stop_enabled: true,
   atr_scaled_stop_floor_pct: 0.03,
+  take_profit_enabled: true,
+  atr_take_profit_enabled: true,
+  take_profit_atr_mult: 4,
+  atr_take_profit_floor_pct: 0.06,
+  atr_take_profit_cap_pct: 0.40,
   scale_out_enabled: true,
   scale_out_levels: [{ r: 1, frac: 0.25 }, { r: 2, frac: 0.25 }],
   time_stop_enabled: true,
@@ -473,6 +488,11 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   num("initial_stop_atr_mult", 0.25, 10);
   bool("atr_scaled_stop_enabled");
   num("atr_scaled_stop_floor_pct", 0, 0.5);
+  bool("take_profit_enabled");
+  bool("atr_take_profit_enabled");
+  num("take_profit_atr_mult", 0, 20);
+  num("atr_take_profit_floor_pct", 0, 2);
+  num("atr_take_profit_cap_pct", 0, 5);
   bool("scale_out_enabled");
   if (Array.isArray(r.scale_out_levels)) {
     const lvls = (r.scale_out_levels as unknown[])

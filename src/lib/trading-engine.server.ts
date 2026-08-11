@@ -162,6 +162,7 @@ import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
 import {
   atrScaledStopPct,
+  atrTakeProfitPct,
   evaluateChandelier,
   evaluateScaleOut,
   evaluateTimeStop,
@@ -1173,11 +1174,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       floorPct: cfg.atr_scaled_stop_floor_pct,
       enabled: cfg.atr_scaled_stop_enabled,
     });
+    // Take-profit is optional and, when armed, volatility-adjusted: the target
+    // is k×ATR (clamped) so every name aims at a comparable risk-adjusted
+    // payoff instead of one flat percentage.
+    const takeProfit = atrTakeProfitPct({
+      takeProfitEnabled: cfg.take_profit_enabled,
+      fixedTakeProfitPct: cfg.take_profit_pct,
+      atrPct,
+      atrMult: cfg.take_profit_atr_mult,
+      floorPct: cfg.atr_take_profit_floor_pct,
+      capPct: cfg.atr_take_profit_cap_pct,
+      atrScalingEnabled: cfg.atr_take_profit_enabled,
+    });
     if (hardStop.effectiveStopPct > 0 && change <= -hardStop.effectiveStopPct) {
       trigger = `stop-loss triggered (${(change * 100).toFixed(2)}% ≤ -${(hardStop.effectiveStopPct * 100).toFixed(2)}%) — ${hardStop.note}`;
       triggerKind = "stop";
-    } else if (cfg.take_profit_pct > 0 && change >= cfg.take_profit_pct) {
-      trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(cfg.take_profit_pct * 100).toFixed(1)}%)`;
+    } else if (takeProfit.effectiveTakeProfitPct > 0 && change >= takeProfit.effectiveTakeProfitPct) {
+      trigger = `take-profit triggered (+${(change * 100).toFixed(2)}% ≥ +${(takeProfit.effectiveTakeProfitPct * 100).toFixed(2)}%) — ${takeProfit.note}`;
       triggerKind = "take_profit";
     } else if (cfg.chandelier_enabled && atrPct > 0) {
       // 2. Chandelier trail — replaces the fixed atr_trailing_mult check when enabled.

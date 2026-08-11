@@ -37,6 +37,23 @@ export type RiskDialConfig = {
   trading_style?: "position" | "swing";
   /** Swing only: minimum sessions held before a discretionary sell. */
   swing_min_hold_days?: number;
+  // ---- Volatility-adjusted exits ----
+  /** Tighten the hard stop to k×ATR (never wider than `stop_loss_pct`). */
+  atr_scaled_stop_enabled: boolean;
+  /** ATR multiple defining 1R of initial risk. */
+  initial_stop_atr_mult: number;
+  /** Lower bound for the ATR-scaled stop so noise can't trigger exits. */
+  atr_scaled_stop_floor_pct: number;
+  /** Master switch for the take-profit leg. False = let winners run. */
+  take_profit_enabled: boolean;
+  /** Size the profit target in ATRs rather than a flat percentage. */
+  atr_take_profit_enabled: boolean;
+  /** ATR multiple defining the profit target. */
+  take_profit_atr_mult: number;
+  /** Lower bound for the ATR profit target. */
+  atr_take_profit_floor_pct: number;
+  /** Upper bound for the ATR profit target. */
+  atr_take_profit_cap_pct: number;
 };
 
 export const RISK_DIAL_DEFAULTS: RiskDialConfig = {
@@ -54,6 +71,14 @@ export const RISK_DIAL_DEFAULTS: RiskDialConfig = {
   commodity_min_adv_usd: 250_000,
   commodity_max_atr_pct: 0.06,
   fx_currency_limits: {},
+  atr_scaled_stop_enabled: true,
+  initial_stop_atr_mult: 2.5,
+  atr_scaled_stop_floor_pct: 0.03,
+  take_profit_enabled: true,
+  atr_take_profit_enabled: true,
+  take_profit_atr_mult: 4,
+  atr_take_profit_floor_pct: 0.06,
+  atr_take_profit_cap_pct: 0.4,
 };
 
 /**
@@ -69,6 +94,11 @@ export const SWING_DIAL_OVERRIDES = {
   volatility_sizing: true,
   vol_target_pct: 0.018,
   swing_min_hold_days: 2,
+  initial_stop_atr_mult: 2,
+  atr_scaled_stop_floor_pct: 0.02,
+  take_profit_atr_mult: 2.5,
+  atr_take_profit_floor_pct: 0.04,
+  atr_take_profit_cap_pct: 0.2,
 } satisfies Partial<RiskDialConfig>;
 
 export type RiskPreset = { name: string; blurb: string; cfg: RiskDialConfig };
@@ -83,6 +113,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "Low risk",
     blurb: "Capital preservation. Tight stops, small positions, mostly ETFs.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.3, etf: 0.9, crypto: 0.02, commodity: 0.15, fx: 0.15 },
       per_symbol_limit_pct: 0.05,
       stop_loss_pct: 0.05,
@@ -105,6 +136,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "Cautious",
     blurb: "Slow and steady growth with limited crypto/commodity exposure.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.5, etf: 0.85, crypto: 0.05, commodity: 0.2, fx: 0.2 },
       per_symbol_limit_pct: 0.08,
       stop_loss_pct: 0.07,
@@ -137,6 +169,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "Growth",
     blurb: "Larger positions, wider stops, more crypto/commodity room.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.75, etf: 0.75, crypto: 0.3, commodity: 0.4, fx: 0.4 },
       per_symbol_limit_pct: 0.2,
       stop_loss_pct: 0.15,
@@ -159,6 +192,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "High risk",
     blurb: "Aggressive concentration, wide stops, run winners hard.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.9, etf: 0.6, crypto: 0.5, commodity: 0.5, fx: 0.5 },
       per_symbol_limit_pct: 0.35,
       stop_loss_pct: 0.25,
