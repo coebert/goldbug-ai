@@ -191,7 +191,7 @@ export function SmaTrendPanel({
             <Badge variant="outline" className={TONE_CLASS[verdict.tone]}>
               {verdict.text}
             </Badge>
-            <TrendStrengthBadge strength={strength} />
+            <TrendStrengthBadge strength={strength} percentiles={percentiles} />
           </div>
 
           <ChartFrame className={compact ? "h-44 w-full" : "h-64 w-full"}>
