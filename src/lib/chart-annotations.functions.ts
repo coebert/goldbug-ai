@@ -103,5 +103,9 @@ export const getChartAnnotations = createServerFn({ method: "POST" })
       })),
     });
 
-    return { symbol: data.symbol, days: data.days, annotations };
+    return {
+      symbol: data.symbol,
+      days: data.days,
+      annotations: linkDecisionsToAnnotations(annotations, data.symbol, decisionRecords),
+    };
   });
