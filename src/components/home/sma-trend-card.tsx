@@ -41,6 +41,7 @@ import {
   TREND_SORT_KEY,
   TREND_SORT2_KEY,
 
+  moveSmaFavorite,
   parseSmaFavorites,
   parseSmaSymbols,
   parseTrendFilter,
