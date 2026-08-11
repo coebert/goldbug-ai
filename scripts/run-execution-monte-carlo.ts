@@ -57,6 +57,14 @@ import {
   type CorrelatedExecutionSampler,
 } from "../src/lib/execution-correlated-shocks";
 import {
+  EXECUTION_CHANNELS,
+  channelSubsets,
+  subsetKey,
+  shapleyAttribution,
+  type ExecutionChannel,
+} from "../src/lib/execution-attribution";
+
+import {
   DEFAULT_LIMIT_ORDER,
   barVolBpsSeries,
   limitFillOdds,
