@@ -75,7 +75,22 @@ function parseCfg(raw: unknown): RiskConfig {
     const n = Number(v);
     if (Number.isFinite(n)) groups[g] = Math.max(0, Math.min(1, n));
   }
+  const bool = (k: string, d: boolean) => (typeof r[k] === "boolean" ? (r[k] as boolean) : d);
+  const num = (k: string, d: number, min: number, max: number) => {
+    const n = Number(r[k]);
+    return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : d;
+  };
   return {
+    // Volatility-adjusted exits — clamped on read so a stored value can never
+    // widen risk past the hard bounds the engine enforces.
+    atr_scaled_stop_enabled: bool("atr_scaled_stop_enabled", DEFAULTS.atr_scaled_stop_enabled),
+    initial_stop_atr_mult: num("initial_stop_atr_mult", DEFAULTS.initial_stop_atr_mult, 0.25, 10),
+    atr_scaled_stop_floor_pct: num("atr_scaled_stop_floor_pct", DEFAULTS.atr_scaled_stop_floor_pct, 0, 0.5),
+    take_profit_enabled: bool("take_profit_enabled", DEFAULTS.take_profit_enabled),
+    atr_take_profit_enabled: bool("atr_take_profit_enabled", DEFAULTS.atr_take_profit_enabled),
+    take_profit_atr_mult: num("take_profit_atr_mult", DEFAULTS.take_profit_atr_mult, 0, 20),
+    atr_take_profit_floor_pct: num("atr_take_profit_floor_pct", DEFAULTS.atr_take_profit_floor_pct, 0, 2),
+    atr_take_profit_cap_pct: num("atr_take_profit_cap_pct", DEFAULTS.atr_take_profit_cap_pct, 0, 5),
     asset_class_limits: {
       ...DEFAULTS.asset_class_limits,
       ...(r.asset_class_limits as Partial<Record<AssetClass, number>>),
@@ -1059,20 +1074,34 @@ export function RiskControlsCard({
                   </div>
                   {cfg.atr_take_profit_enabled && (
                     <>
-                      {numInput(
-                        "Profit target, in ATRs",
-                        "e.g. 4 = exit when the gain reaches four average daily ranges",
-                        cfg.take_profit_atr_mult,
-                        (v) => setCfg((c) => ({ ...c, take_profit_atr_mult: v })),
-                        0,
-                        20,
-                      )}
+                      <div>
+                        <Label className="text-xs">Profit target, in ATRs</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            className="w-24"
+                            min={0}
+                            max={20}
+                            step={0.5}
+                            value={cfg.take_profit_atr_mult}
+                            onChange={(e) =>
+                              setCfg((c) => ({
+                                ...c,
+                                take_profit_atr_mult: Math.max(0, Math.min(20, Number(e.target.value) || 0)),
+                              }))
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            × ATR — e.g. 4 = exit when the gain reaches four average daily ranges
+                          </span>
+                        </div>
+                      </div>
                       {pctInput(
                         "Smallest allowed target",
                         "Keeps quiet names from taking profit inside daily noise",
                         cfg.atr_take_profit_floor_pct,
                         (v) => setCfg((c) => ({ ...c, atr_take_profit_floor_pct: v })),
-                        0,
+                        0.5,
                         100,
                       )}
                       {pctInput(
@@ -1080,7 +1109,7 @@ export function RiskControlsCard({
                         "Keeps volatile names from aiming at a gain that never arrives",
                         cfg.atr_take_profit_cap_pct,
                         (v) => setCfg((c) => ({ ...c, atr_take_profit_cap_pct: v })),
-                        0,
+                        1,
                         200,
                       )}
                     </>
