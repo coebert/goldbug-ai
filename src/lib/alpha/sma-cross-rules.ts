@@ -38,6 +38,28 @@ export type SmaCrossRuleConfig = {
   deathSellFraction: number;
   /** Only sell on a bear cross when price is also below SMA50. */
   requirePriceConfirmationOnSell: boolean;
+
+  // ---- Missing-data / normalization handling -------------------------
+  /** Minimum usable bars before any cross signal is produced. */
+  minBarsFast: number;
+  /** Bars needed for the SMA50/200 regime. Below this, regime is unknown. */
+  minBarsRegime: number;
+  /**
+   * Maximum share of the raw series that may be dropped as invalid
+   * (non-finite, <= 0, duplicated timestamps) before the series is treated
+   * as untrustworthy and all signals are suppressed.
+   */
+  maxDroppedFraction: number;
+  /**
+   * Maximum share of the recent window that may be flat repeats (a stale
+   * price feed) before cross detection is suppressed.
+   */
+  maxStaleFraction: number;
+  /**
+   * Buy size multiplier when the long-term regime is unknown — typically a
+   * newly listed symbol with <200 bars. Never blocks; just sizes down.
+   */
+  unknownRegimeSizeMult: number;
 };
 
 export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
@@ -53,7 +75,15 @@ export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
   fastBearSellFraction: 0.5,
   deathSellFraction: 1,
   requirePriceConfirmationOnSell: true,
+  minBarsFast: 50,
+  minBarsRegime: 200,
+  maxDroppedFraction: 0.2,
+  maxStaleFraction: 0.5,
+  unknownRegimeSizeMult: 0.75,
 };
+
+/** How much of the model is trustworthy for this symbol. */
+export type SmaDataQuality = "full" | "partial" | "insufficient";
 
 export type SmaCrossState = {
   price: number;
@@ -67,18 +97,66 @@ export type SmaCrossState = {
   /** Fresh confirmed regime cross, if any. */
   regimeCross: "golden" | "death" | null;
   regimeCrossAgeBars: number | null;
-  /** Current regime, independent of freshness. */
+  /** Current regime; null when history is too short (newly listed). */
   regime: "golden" | "death" | null;
   fastSeparationPct: number | null;
   regimeSeparationPct: number | null;
+
+  // ---- Data-quality telemetry ----------------------------------------
+  /** Usable bars after normalization. */
+  bars: number;
+  /** Bars dropped from the raw input as invalid. */
+  droppedBars: number;
+  quality: SmaDataQuality;
+  /** True when there is not enough history for SMA200. */
+  regimeUnknown: boolean;
+  /** Human-readable notes on why signals were degraded/suppressed. */
+  warnings: string[];
 };
+
+/**
+ * Coerce an arbitrary close series into a clean, strictly positive, finite
+ * number array. Accepts numbers, numeric strings and null/undefined holes —
+ * price caches, broker payloads and backfills all produce these.
+ * Ordering is preserved (oldest → newest); holes are dropped, not filled,
+ * so an SMA is never smeared with a fabricated price.
+ */
+export function normalizeCloses(input: unknown): { closes: number[]; dropped: number } {
+  if (!Array.isArray(input)) return { closes: [], dropped: 0 };
+  const closes: number[] = [];
+  let dropped = 0;
+  for (const raw of input) {
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string" && raw.trim() !== ""
+          ? Number(raw)
+          : NaN;
+    if (Number.isFinite(n) && n > 0) closes.push(n);
+    else dropped++;
+  }
+  return { closes, dropped };
+}
+
+/** Fraction of the last `window` bars that repeat the previous close exactly. */
+function staleFraction(closes: number[], window: number): number {
+  const start = Math.max(1, closes.length - window);
+  let repeats = 0;
+  let counted = 0;
+  for (let i = start; i < closes.length; i++) {
+    counted++;
+    if (closes[i] === closes[i - 1]) repeats++;
+  }
+  return counted > 0 ? repeats / counted : 0;
+}
 
 function smaAt(closes: number[], period: number, offsetFromEnd: number): number | null {
   const end = closes.length - offsetFromEnd;
   if (end < period) return null;
   let sum = 0;
   for (let i = end - period; i < end; i++) sum += closes[i]!;
-  return sum / period;
+  const avg = sum / period;
+  return Number.isFinite(avg) && avg > 0 ? avg : null;
 }
 
 /**
@@ -120,22 +198,73 @@ function detectCross(
   return { dir: above ? "up" : "down", ageBars, separation };
 }
 
-/** Build the crossover state from a close series (oldest → newest). */
+/**
+ * Build the crossover state from a close series (oldest → newest).
+ *
+ * Degrades instead of throwing: messy input is normalized, short history
+ * yields a `partial` state with `regimeUnknown = true`, and genuinely
+ * unusable input returns null so callers fall back to neutral behaviour.
+ */
 export function computeSmaCrossState(
-  closes: number[],
+  input: unknown,
   cfg: SmaCrossRuleConfig = DEFAULT_SMA_CROSS_RULES,
 ): SmaCrossState | null {
-  if (!Array.isArray(closes) || closes.length < 50) return null;
-  const price = closes[closes.length - 1]!;
-  if (!Number.isFinite(price) || price <= 0) return null;
+  const { closes, dropped } = normalizeCloses(input);
+  const rawLen = Array.isArray(input) ? input.length : 0;
+  const bars = closes.length;
+  if (bars === 0) return null;
+
+  const price = closes[bars - 1]!;
+  const warnings: string[] = [];
+
+  // Too much of the raw series was unusable — don't trust any SMA from it.
+  if (rawLen > 0 && dropped / rawLen > cfg.maxDroppedFraction) {
+    return {
+      price, sma20: null, sma50: null, sma200: null,
+      fastCross: null, fastCrossAgeBars: null,
+      regimeCross: null, regimeCrossAgeBars: null, regime: null,
+      fastSeparationPct: null, regimeSeparationPct: null,
+      bars, droppedBars: dropped, quality: "insufficient", regimeUnknown: true,
+      warnings: [`${dropped}/${rawLen} bars invalid — SMA signals suppressed`],
+    };
+  }
+  if (dropped > 0) warnings.push(`${dropped} invalid bar(s) dropped`);
+
+  const minFast = Math.max(20, cfg.minBarsFast);
+  if (bars < minFast) {
+    return {
+      price, sma20: smaAt(closes, 20, 0), sma50: smaAt(closes, 50, 0), sma200: null,
+      fastCross: null, fastCrossAgeBars: null,
+      regimeCross: null, regimeCrossAgeBars: null, regime: null,
+      fastSeparationPct: null, regimeSeparationPct: null,
+      bars, droppedBars: dropped, quality: "insufficient", regimeUnknown: true,
+      warnings: [...warnings, `only ${bars} bars (<${minFast}) — newly listed / sparse history`],
+    };
+  }
+
+  // A stale feed repeats the last close; SMAs converge and cross spuriously.
+  const stale = staleFraction(closes, Math.min(bars, 60));
+  if (stale > cfg.maxStaleFraction) {
+    warnings.push(`${(stale * 100).toFixed(0)}% flat closes — cross detection suppressed`);
+  }
+  const staleSuppressed = stale > cfg.maxStaleFraction;
 
   const lookback = Math.max(cfg.maxCrossAgeBars, cfg.confirmBars) + 2;
-  const fast = detectCross(closes, 20, 50, cfg.fastSeparationPct, cfg.confirmBars, lookback);
-  const regime = detectCross(closes, 50, 200, cfg.regimeSeparationPct, cfg.confirmBars, lookback);
+  const fast = staleSuppressed
+    ? { dir: null, ageBars: null, separation: null as number | null }
+    : detectCross(closes, 20, 50, cfg.fastSeparationPct, cfg.confirmBars, lookback);
+
+  const hasRegimeHistory = bars >= Math.max(200, cfg.minBarsRegime);
+  const regime = hasRegimeHistory && !staleSuppressed
+    ? detectCross(closes, 50, 200, cfg.regimeSeparationPct, cfg.confirmBars, lookback)
+    : { dir: null, ageBars: null, separation: null as number | null };
 
   const sma20 = smaAt(closes, 20, 0);
   const sma50 = smaAt(closes, 50, 0);
-  const sma200 = smaAt(closes, 200, 0);
+  const sma200 = hasRegimeHistory ? smaAt(closes, 200, 0) : null;
+  if (!hasRegimeHistory) {
+    warnings.push(`${bars} bars — no SMA200 yet, long-term regime unknown`);
+  }
 
   const fresh = (age: number | null) => age != null && age <= cfg.maxCrossAgeBars;
 
@@ -157,7 +286,13 @@ export function computeSmaCrossState(
         : null,
     fastSeparationPct: fast.separation,
     regimeSeparationPct: regime.separation,
+    bars,
+    droppedBars: dropped,
+    quality: hasRegimeHistory && !staleSuppressed ? "full" : "partial",
+    regimeUnknown: !hasRegimeHistory,
+    warnings,
   };
+}
 }
 
 export type SmaCrossBuyRule = {
