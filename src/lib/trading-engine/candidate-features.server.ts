@@ -15,6 +15,8 @@ import {
   averageDailyVolume,
   volumeWeightedMomentum,
   weeklySnapshot,
+  stochastic,
+  type StochasticSnapshot,
 } from "../signals-extended.server";
 import type { SentimentMomentum } from "../sentiment.server";
 import type { SymbolEventFeatures } from "../market-events";
