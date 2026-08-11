@@ -572,6 +572,146 @@ async function main() {
       return best;
     });
 
+  // ------------------------------------------------ channel attribution mode
+  // --attribution: run the 2^3 ablation lattice (slippage × fill-rate × stress)
+  // on common random numbers and Shapley-split each tail metric, so the worst
+  // case comes with a cause breakdown instead of just a number.
+  if (attributionMode) {
+    console.log(
+      `Channel attribution: 2^${EXECUTION_CHANNELS.length} ablations `
+      + `(${EXECUTION_CHANNELS.join(" × ")}) · ${attribPaths} paths/ablation · `
+      + `common random numbers · breach threshold ${sweepThreshold}%`,
+    );
+    console.log();
+
+    type PathMetrics = {
+      ret: number[];
+      worstFold: number[];
+      deepestDd: number[];
+      cost: number[];
+    };
+
+    const runAblation = (
+      variant: SmaVariant,
+      tuned: SmaVariantParams[],
+      subset: readonly ExecutionChannel[],
+    ): PathMetrics => {
+      const on = new Set(subset);
+      const mask = { slippage: on.has("slippage"), fillRate: on.has("fillRate") };
+      // Stress is switched off by neutralising its multipliers, not by removing
+      // the regime: the Markov chain still rolls and still consumes the same
+      // random numbers, so all eight ablations stay perfectly paired.
+      const cfg = on.has("stress")
+        ? simCfg
+        : {
+          ...simCfg,
+          stressSlippageMult: 1,
+          stressSigmaMult: 1,
+          stressNoFillMult: 1,
+          stressFullFillMult: 1,
+          volSlippageBeta: 0,
+        };
+      const out: PathMetrics = { ret: [], worstFold: [], deepestDd: [], cost: [] };
+      for (let pth = 0; pth < attribPaths; pth++) {
+        const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+        const sampler = makeCorrelatedExecutionSampler(cfg, pathSeed);
+        const limit = execModel === "limit"
+          ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+          : null;
+        const rets: number[] = [];
+        let worstFold = Infinity;
+        let deepestDd = 0;
+        let costSum = 0;
+        for (let k = 0; k < folds.length; k++) {
+          const f = folds[k]!;
+          const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit, mask);
+          rets.push(r.returnPct);
+          worstFold = Math.min(worstFold, r.returnPct);
+          if (r.maxDrawdownPct < deepestDd) deepestDd = r.maxDrawdownPct;
+          costSum += r.costs;
+        }
+        out.ret.push(meanOf(rets));
+        out.worstFold.push(worstFold);
+        out.deepestDd.push(deepestDd);
+        out.cost.push(costSum / folds.length);
+      }
+      return out;
+    };
+
+    // Every metric is oriented so that "more damage" is a more negative number,
+    // except cost and breach probability which are damage-positive; the sign is
+    // handled in the label rather than the maths.
+    const METRICS: Array<{
+      label: string;
+      unit: string;
+      of: (m: PathMetrics) => number;
+    }> = [
+      { label: "p5 return", unit: "%/fold", of: (m) => percentileStats(m.ret).p5 },
+      { label: "CVaR5 return", unit: "%/fold", of: (m) => percentileStats(m.ret).cvar5 },
+      { label: "median return", unit: "%/fold", of: (m) => percentileStats(m.ret).median },
+      { label: "CVaR5 worst fold", unit: "%", of: (m) => percentileStats(m.worstFold).cvar5 },
+      { label: "worst deepest DD", unit: "%", of: (m) => percentileStats(m.deepestDd).worst },
+      { label: "p5 deepest DD", unit: "%", of: (m) => percentileStats(m.deepestDd).p5 },
+      {
+        label: `P(DD≥${sweepThreshold}%)`,
+        unit: "pp",
+        of: (m) => drawdownBreachProbabilities(m.deepestDd, [sweepThreshold])[0]!.prob * 100,
+      },
+      { label: "cost/fold", unit: "£", of: (m) => percentileStats(m.cost).median },
+    ];
+
+    const header = [
+      "metric".padEnd(18),
+      "no shocks".padStart(10),
+      "full".padStart(9),
+      "total".padStart(9),
+      "slippage".padStart(20),
+      "fill-rate".padStart(20),
+      "stress".padStart(20),
+      "interact".padStart(9),
+    ].join(" ");
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      // Run each ablation once and reuse it for every metric.
+      const byKey = new Map<string, PathMetrics>();
+      for (const subset of channelSubsets()) {
+        byKey.set(subsetKey(subset), runAblation(variant, tuned, subset));
+      }
+
+      console.log(`=== ${variant} ===`);
+      console.log(header);
+      console.log("-".repeat(header.length));
+      for (const metric of METRICS) {
+        const a = shapleyAttribution((_subset, key) => metric.of(byKey.get(key)!));
+        const cell = (c: (typeof a.contributions)[number]) =>
+          `${fmt(c.shapley).padStart(8)} (${(c.share * 100).toFixed(0).padStart(4)}%)`
+            .padStart(20);
+        console.log([
+          `${metric.label} ${metric.unit}`.padEnd(18),
+          fmt(a.baseline).padStart(10),
+          fmt(a.full).padStart(9),
+          fmt(a.total).padStart(9),
+          ...a.contributions.map(cell),
+          fmt(a.interaction).padStart(9),
+        ].join(" "));
+      }
+      console.log();
+    }
+
+    console.log("Reading: 'no shocks' is the metric with perfect execution; 'full' is the same");
+    console.log("metric with all three channels live. 'total' is the damage being split, and the");
+    console.log("three channel columns are Shapley shares that add back to it exactly.");
+    console.log("slippage = you traded at a worse price · fill-rate = you did not get the size");
+    console.log("(or missed the trade entirely) · stress = the correlated regime amplifying both.");
+    console.log("'interact' is total minus the sum of solo effects: negative on a return metric");
+    console.log("means the channels compound — the joint tail is worse than the parts summed.");
+    console.log("Stress cannot act alone, so its solo effect is ~0 while its Shapley share is not:");
+    console.log("that gap is exactly the amplification it lends to the other two.");
+    return;
+  }
+
+
   if (sweepMode) {
     const rhos = rhoSweep.length ? rhoSweep : [simCfg.rho];
     const zs = volZSweep.length ? volZSweep : [simCfg.volStressZ];
