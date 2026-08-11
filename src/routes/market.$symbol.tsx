@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
@@ -26,10 +26,22 @@ import {
   HISTORY_SYMBOLS,
   coerceRange,
   rangeLabel,
+  smaKey,
   symbolMeta,
   type HistoryRange,
+  type SmaPeriod,
   type SymbolHistory,
 } from "@/lib/market-symbol-history";
+import {
+  DEFAULT_SMA_PERIODS,
+  PERIOD_STYLE,
+  parseSmaPeriods,
+  readStoredSmaPeriods,
+  serialiseSmaPeriods,
+  storeSmaPeriods,
+  toggleSmaPeriod,
+} from "@/lib/sma-display";
+import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import {
   buildComparison,
   parseCompareParam,
@@ -58,9 +70,10 @@ import {
 export const Route = createFileRoute("/market/$symbol")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { range: HistoryRange; compare?: string | undefined } => ({
+  ): { range: HistoryRange; compare?: string | undefined; sma?: string | undefined } => ({
     range: coerceRange(search.range),
     compare: serialiseCompareParam(parseCompareParam(search.compare)),
+    sma: typeof search.sma === "string" ? serialiseSmaPeriods(parseSmaPeriods(search.sma)) : undefined,
   }),
 
   head: () => ({
