@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,6 +14,8 @@ import {
 } from "recharts";
 
 import { getSymbolHistory } from "@/lib/market-symbol-history.functions";
+import { getChartAnnotations } from "@/lib/chart-annotations.functions";
+import type { ChartAnnotation } from "@/lib/chart-annotations";
 import {
   HISTORY_RANGES,
   coerceRange,
@@ -34,6 +37,7 @@ import {
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
+
 
 export const Route = createFileRoute("/market/$symbol")({
   validateSearch: (search: Record<string, unknown>): { range: HistoryRange } => ({
@@ -84,11 +88,75 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
   );
 }
 
+const ANNOTATION_TONE: Record<string, string> = {
+  spike_up: CHART_ROLE.positive,
+  spike_down: CHART_ROLE.negative,
+  golden_cross: CHART_ROLE.positive,
+  death_cross: CHART_ROLE.negative,
+  drawdown_trough: CHART_ROLE.negative,
+  vol_regime: CHART_ROLE.highlight,
+  range_high: CHART_ROLE.benchmark,
+  range_low: CHART_ROLE.benchmark,
+};
+
+
+function AnnotationList({
+  annotations,
+  loading,
+}: {
+  annotations: ChartAnnotation[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+      </div>
+    );
+  }
+  if (!annotations.length) return null;
+
+  return (
+    <section className="space-y-2">
+      <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" /> What moved this chart
+      </h2>
+      <ol className="space-y-2">
+        {annotations.map((a, i) => (
+          <li
+            key={a.id}
+            className="flex gap-3 rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5"
+          >
+            <span
+              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border text-[11px] font-semibold tabular-nums"
+              aria-hidden="true"
+            >
+              {i + 1}
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs text-muted-foreground">
+                {a.date} · {a.label}
+              </div>
+              <p className="mt-0.5 text-sm">{a.note}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="text-[11px] text-muted-foreground">
+        Notable moves are detected from the price series; the wording is AI-generated and may miss
+        the real driver. Not financial advice.
+      </p>
+    </section>
+  );
+}
+
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
   const { range } = Route.useSearch();
   const meta = symbolMeta(symbol);
   const fetchHistory = useServerFn(getSymbolHistory);
+  const fetchAnnotations = useServerFn(getChartAnnotations);
 
   const query = useQuery({
     queryKey: ["symbol-history", symbol, range],
@@ -98,8 +166,20 @@ function MarketSymbolPage() {
     refetchOnWindowFocus: false,
   });
 
+  const annotationQuery = useQuery({
+    queryKey: ["symbol-annotations", symbol, range],
+    queryFn: () => fetchAnnotations({ data: { symbol, days: range } }),
+    enabled: Boolean(meta) && (query.data?.points.length ?? 0) > 4,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
   const history = query.data;
+  const annotations = annotationQuery.data?.annotations ?? [];
   const up = (history?.changePct ?? 0) >= 0;
+
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6">
@@ -226,9 +306,35 @@ function MarketSymbolPage() {
                       connectNulls
                       isAnimationActive={false}
                     />
+                    {annotations.map((a, i) => (
+                      <ReferenceDot
+                        key={a.id}
+                        x={a.date}
+                        y={a.close}
+                        r={9}
+                        fill={ANNOTATION_TONE[a.kind] ?? CHART_ROLE.highlight}
+                        stroke="hsl(var(--background))"
+                        strokeWidth={1.5}
+                        isFront
+                        label={{
+                          value: String(i + 1),
+                          fill: "hsl(var(--background))",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          position: "center",
+                        }}
+                      />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
               </ChartFrame>
+
+              <AnnotationList
+                annotations={annotations}
+                loading={annotationQuery.isLoading || annotationQuery.isFetching}
+              />
+
+
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Stat label={`Change (${rangeLabel(range)})`} value={pct(history.changePct)} tone={up ? "up" : "down"} />
