@@ -135,7 +135,9 @@ const limitCfg = {
 // correlation (ρ) × realised-vol stress trigger (z), so you can see how the
 // *joint* worst case moves with each assumption instead of trusting one cell.
 const parseList = (raw: string) =>
-  raw.split(",").map((s) => Number(s.trim())).filter((v) => Number.isFinite(v));
+  raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+    .map(Number).filter((v) => Number.isFinite(v));
+
 const rhoSweep = parseList(arg("rho-sweep", ""));
 const volZSweep = parseList(arg("vol-z-sweep", ""));
 const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0;
