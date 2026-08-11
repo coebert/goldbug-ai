@@ -61,6 +61,34 @@ export const getChartAnnotations = createServerFn({ method: "POST" })
     const meta = symbolMeta(data.symbol);
     const events = detectChartEvents(history.points, meta?.label ?? data.symbol);
 
+    const { linkDecisionsToAnnotations, LINK_WINDOW_DAYS } = await import(
+      "./annotation-decision-link"
+    );
+
+    const decisionsSince = new Date(`${windowStartIso}T00:00:00Z`);
+    decisionsSince.setUTCDate(decisionsSince.getUTCDate() - LINK_WINDOW_DAYS);
+
+    const audit = await context.supabase
+      .from("ai_decision_audit")
+      .select(
+        "id, symbol, action, outcome, decided_at, run_date, notional, instrument_ccy, rationale",
+      )
+      .gte("run_date", decisionsSince.toISOString().slice(0, 10))
+      .order("decided_at", { ascending: false })
+      .limit(1500);
+
+    const decisionRecords = (audit.data ?? []).map((d) => ({
+      id: d.id as string,
+      symbol: (d.symbol as string) ?? "",
+      action: (d.action as string) ?? "hold",
+      outcome: (d.outcome as string) ?? "pending",
+      decidedAt: (d.decided_at as string) ?? `${d.run_date as string}T00:00:00Z`,
+      runDate: d.run_date as string,
+      notional: d.notional === null || d.notional === undefined ? null : Number(d.notional),
+      instrumentCcy: (d.instrument_ccy as string | null) ?? null,
+      rationale: (d.rationale as string | null) ?? null,
+    }));
+
     const annotations = await explainChartEvents({
       label: meta?.label ?? data.symbol,
       symbol: data.symbol,
