@@ -373,6 +373,16 @@ const oosPaths = Number(arg("oos-paths", String(Math.max(30, Math.round(paths / 
 const oosArms = arg("oos-arms", "independent,global,blocks,contagion,calib-blocks,calib-contagion")
   .split(",").map((s) => s.trim()).filter(Boolean);
 
+// --friction-ladder: re-price the whole OOS comparison under progressively
+// harsher transaction costs and slippage. Same tape, same folds, same random
+// draws — only the cost overlay changes — so it answers whether the "coupling
+// assumption does not move the tail" result survives real trading frictions.
+const frictionLadderMode = argv.includes("--friction-ladder");
+const frictionScenarios = parseFrictionLadder(arg("friction", ""));
+/** Arm-to-arm difference (pp) below which the tail counts as insensitive. */
+const frictionTolerancePp = Number(arg("friction-tolerance", "1"));
+
+
 
 // --calib-stress: how much of the fitted coupling is the estimator? Refits the
 // calm/stress ρs across a window × estimator grid and moving-block bootstraps
