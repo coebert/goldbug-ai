@@ -107,7 +107,16 @@ export type FrictionKpi = {
    * is a data gap rather than evidence the model is wrong.
    */
   realisedRatio: number | null;
+  /** Tickets whose costs came from the broker's own report. */
+  brokerBookedTickets: number;
+  /**
+   * Share of tickets (0..1) carrying broker-booked costs. Below 1 the KPI is
+   * partly the model grading itself — the card says so rather than implying
+   * every number is invoiced.
+   */
+  brokerCoverage: number;
   daily: FrictionDailyPoint[];
+
   /** Annualised drag implied by the window's spend, in percent of NAV. */
   annualisedDragPct: number | null;
 };
