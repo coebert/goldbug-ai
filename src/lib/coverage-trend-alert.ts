@@ -26,6 +26,23 @@ const MIN_DAYS_PER_WINDOW = 3;
 
 export type CoverageTrendAlertReason = "below_floor" | "deteriorating" | "both";
 
+/** One comparison window, carrying the dates and counts behind its number. */
+export type CoverageWindowSummary = {
+  /** 0 = most recent window, 1 = the one before it. */
+  index: number;
+  /** First day included, YYYY-MM-DD. */
+  startDate: string | null;
+  /** Last day included, YYYY-MM-DD. */
+  endDate: string | null;
+  /** Mean daily coverage across the graded days, 0..100, or null. */
+  coveragePct: number | null;
+  /** Days in the window that had gradeable fills. */
+  gradedDays: number;
+  /** Fills invoiced / gradeable on the final day of the window. */
+  invoiced: number;
+  total: number;
+};
+
 export type CoverageTrendAlert = {
   shouldAlert: boolean;
   reason: CoverageTrendAlertReason | null;
@@ -36,6 +53,8 @@ export type CoverageTrendAlert = {
   priorPct: number | null;
   /** Mean coverage over the window before that. */
   earlierPct: number | null;
+  /** The last two windows used in the comparison, newest first. */
+  windows: [CoverageWindowSummary, CoverageWindowSummary];
   title: string;
   body: string;
 };
@@ -46,18 +65,28 @@ function mean(values: number[]): number | null {
   return Math.round((sum / values.length) * 10) / 10;
 }
 
-/** Mean coverage of the nth-most-recent window (0 = latest). */
-function windowMean(series: CoverageSeries, index: number, windowDays: number): number | null {
+/** Summarise the nth-most-recent window (0 = latest). */
+function windowSummary(
+  series: CoverageSeries,
+  index: number,
+  windowDays: number,
+): CoverageWindowSummary {
   const pts = series.points;
   const end = pts.length - index * windowDays;
   const start = end - windowDays;
-  if (end <= 0) return null;
-  const slice = pts.slice(Math.max(0, start), end);
-  const graded = slice
-    .filter((p) => p.coveragePct != null && p.total > 0)
-    .map((p) => p.coveragePct as number);
-  if (graded.length < MIN_DAYS_PER_WINDOW) return null;
-  return mean(graded);
+  const slice = end <= 0 ? [] : pts.slice(Math.max(0, start), end);
+  const graded = slice.filter((p) => p.coveragePct != null && p.total > 0);
+  const last = graded[graded.length - 1];
+  return {
+    index,
+    startDate: slice[0]?.date ?? null,
+    endDate: slice[slice.length - 1]?.date ?? null,
+    coveragePct:
+      graded.length < MIN_DAYS_PER_WINDOW ? null : mean(graded.map((p) => p.coveragePct as number)),
+    gradedDays: graded.length,
+    invoiced: last?.invoiced ?? 0,
+    total: last?.total ?? 0,
+  };
 }
 
 export function evaluateCoverageTrendAlert(
@@ -68,9 +97,13 @@ export function evaluateCoverageTrendAlert(
   const step = opts.stepPct ?? COVERAGE_TREND_STEP_PCT;
   const windowDays = Math.max(1, Math.trunc(opts.windowDays ?? COVERAGE_TREND_WINDOW_DAYS));
 
-  const recentPct = windowMean(series, 0, windowDays);
-  const priorPct = windowMean(series, 1, windowDays);
-  const earlierPct = windowMean(series, 2, windowDays);
+  const recent = windowSummary(series, 0, windowDays);
+  const prior = windowSummary(series, 1, windowDays);
+  const earlier = windowSummary(series, 2, windowDays);
+  const recentPct = recent.coveragePct;
+  const priorPct = prior.coveragePct;
+  const earlierPct = earlier.coveragePct;
+  const windows: [CoverageWindowSummary, CoverageWindowSummary] = [recent, prior];
 
   const quiet: CoverageTrendAlert = {
     shouldAlert: false,
@@ -79,6 +112,7 @@ export function evaluateCoverageTrendAlert(
     recentPct,
     priorPct,
     earlierPct,
+    windows,
     title: "Broker charge coverage steady",
     body:
       recentPct == null
@@ -116,7 +150,20 @@ export function evaluateCoverageTrendAlert(
     recentPct,
     priorPct,
     earlierPct,
+    windows,
     title: belowFloor ? "Broker charge coverage below floor" : "Broker charge coverage degrading",
     body,
   };
 }
+
+/** "01 Jul – 07 Jul" for a window, for banners and notification bodies. */
+export function formatCoverageWindow(w: CoverageWindowSummary): string {
+  const fmt = (d: string | null) => {
+    const t = d ? Date.parse(d) : Number.NaN;
+    return Number.isFinite(t)
+      ? new Date(t).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
+      : "—";
+  };
+  return `${fmt(w.startDate)} – ${fmt(w.endDate)}`;
+}
+
