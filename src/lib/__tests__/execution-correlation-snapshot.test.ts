@@ -267,6 +267,29 @@ describe("verifySnapshotAgainstTape", () => {
     expect(describeTapeCheck(check)).toContain("reproduction");
   });
 
+  it("tolerates provider re-rounding noise in the 7th figure", () => {
+    // Two fetches of the same history come back differing by ~1e-7 relative;
+    // that must still count as a reproduction or the check is useless.
+    const r = rng(99);
+    const requoted = new Map(
+      [...series.entries()].map(([s, v]) => [s, v.map((x) => x * (1 + (r() - 0.5) * 4e-7))]),
+    );
+    const check = verifySnapshotAgainstTape(snap, requoted, meta);
+    expect(check.fingerprintMatches).toBe(false);
+    expect(check.worstDigestDrift).toBeLessThan(1e-5);
+    expect(check.matches).toBe(true);
+    expect(describeTapeCheck(check)).toContain("provider rounding");
+  });
+
+  it("flags one genuinely changed bar", () => {
+    const oneBar = new Map([...series.entries()].map(([s, v]) => [s, [...v]]));
+    oneBar.get("A1")![300] = oneBar.get("A1")![300]! * 1.01;
+    const check = verifySnapshotAgainstTape(snap, oneBar, meta);
+    expect(check.matches).toBe(false);
+    expect(check.worstDigestDrift).toBeGreaterThan(1e-5);
+    expect(check.reasons.join(" ")).toMatch(/A1\.meanAbsRet/);
+  });
+
   it("flags a changed price with the same shape", () => {
     const tweaked = new Map([...series.entries()].map(([s, v]) => [s, [...v]]));
     tweaked.get("A2")![50] = tweaked.get("A2")![50]! * 1.05;
