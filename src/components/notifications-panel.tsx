@@ -135,7 +135,24 @@ export function NotificationsPanel() {
                               read {fmtWhen(n.read_at)}
                             </span>
                           )}
-                          {n.portfolio_id && <span className="font-mono">pf {n.portfolio_id.slice(0, 8)}</span>}
+                          {n.portfolio_id && (
+                            // Take me to the thing the alert is about, not just its id.
+                            <Link
+                              to="/portfolio/$id"
+                              params={{ id: n.portfolio_id }}
+                              hash={
+                                n.category === "broker_cost_coverage_trend"
+                                  ? "coverage-trend"
+                                  : undefined
+                              }
+                              className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-2 hover:opacity-80"
+                            >
+                              View portfolio
+                              <span className="font-mono opacity-70">
+                                {n.portfolio_id.slice(0, 8)}
+                              </span>
+                            </Link>
+                          )}
                           {n.slice_id && <span className="font-mono">slice {n.slice_id.slice(0, 8)}</span>}
                         </div>
                       </div>
