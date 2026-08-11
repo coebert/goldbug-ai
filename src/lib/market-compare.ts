@@ -208,6 +208,7 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
       from: null,
       to: null,
       correlation: { symbols: [], labels: [], cells: [], observations: 0 },
+      returns: {},
     };
   }
 
