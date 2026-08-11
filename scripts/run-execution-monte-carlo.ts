@@ -326,6 +326,8 @@ function simulate(
     }
 
     equityCurve.push(cash + [...shares].reduce((a, [s, q]) => a + q * priceAt(s, i), 0));
+    stressedCurve.push(stressedBar);
+
   }
 
   let finalEquity = cash;
