@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useMemo } from "react";
 import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
@@ -18,11 +19,20 @@ import { getChartAnnotations } from "@/lib/chart-annotations.functions";
 import type { ChartAnnotation } from "@/lib/chart-annotations";
 import {
   HISTORY_RANGES,
+  HISTORY_SYMBOLS,
   coerceRange,
   rangeLabel,
   symbolMeta,
   type HistoryRange,
+  type SymbolHistory,
 } from "@/lib/market-symbol-history";
+import {
+  buildComparison,
+  parseCompareParam,
+  serialiseCompareParam,
+  toggleCompareSymbol,
+} from "@/lib/market-compare";
+import { CompareOverlay } from "@/components/market/compare-overlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,9 +50,13 @@ import {
 
 
 export const Route = createFileRoute("/market/$symbol")({
-  validateSearch: (search: Record<string, unknown>): { range: HistoryRange } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { range: HistoryRange; compare?: string | undefined } => ({
     range: coerceRange(search.range),
+    compare: serialiseCompareParam(parseCompareParam(search.compare)),
   }),
+
   head: () => ({
     meta: [
       { title: "Market chart | Price history & trend" },
@@ -153,10 +167,16 @@ function AnnotationList({
 
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
-  const { range } = Route.useSearch();
+  const { range, compare: compareParam } = Route.useSearch();
+  const navigate = useNavigate();
   const meta = symbolMeta(symbol);
   const fetchHistory = useServerFn(getSymbolHistory);
   const fetchAnnotations = useServerFn(getChartAnnotations);
+
+  const compare = useMemo(
+    () => parseCompareParam(compareParam, symbol),
+    [compareParam, symbol],
+  );
 
   const query = useQuery({
     queryKey: ["symbol-history", symbol, range],
@@ -176,9 +196,39 @@ function MarketSymbolPage() {
     retry: false,
   });
 
+  const compareQueries = useQueries({
+    queries: compare.map((s) => ({
+      queryKey: ["symbol-history", s, range],
+      queryFn: () => fetchHistory({ data: { symbol: s, days: range } }),
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    })),
+  });
+
   const history = query.data;
   const annotations = annotationQuery.data?.annotations ?? [];
   const up = (history?.changePct ?? 0) >= 0;
+
+  const compareLoading = compareQueries.some((q) => q.isLoading);
+  const compareData = compareQueries
+    .map((q) => q.data)
+    .filter((d): d is SymbolHistory => Boolean(d));
+  const comparison = useMemo(
+    () => buildComparison(history ? [history, ...compareData] : compareData),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [history, compareData.map((d) => d.symbol).join(","), compareData.length, range],
+  );
+
+  const setCompare = (next: string[]) => {
+    void navigate({
+      to: "/market/$symbol",
+      params: { symbol },
+      search: { range, compare: serialiseCompareParam(next) },
+      replace: true,
+    });
+  };
+
+
 
 
   return (
@@ -208,7 +258,12 @@ function MarketSymbolPage() {
                 variant={r === range ? "secondary" : "ghost"}
                 className="h-7 px-2 text-xs"
               >
-                <Link to="/market/$symbol" params={{ symbol }} search={{ range: r }}>
+                <Link
+                  to="/market/$symbol"
+                  params={{ symbol }}
+                  search={{ range: r, compare: compareParam }}
+                >
+
                   {rangeLabel(r)}
                 </Link>
               </Button>
@@ -334,6 +389,16 @@ function MarketSymbolPage() {
                 loading={annotationQuery.isLoading || annotationQuery.isFetching}
               />
 
+              <CompareOverlay
+                symbol={symbol}
+                range={range}
+                compare={compare}
+                options={HISTORY_SYMBOLS}
+                comparison={comparison}
+                loading={compareLoading}
+                onToggle={(s) => setCompare(toggleCompareSymbol(compare, s))}
+                onClear={() => setCompare([])}
+              />
 
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
