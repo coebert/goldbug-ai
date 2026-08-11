@@ -36,15 +36,24 @@ import {
   DEFAULT_SMA_PERIODS,
   MAX_SMA_SYMBOLS,
   SMA_SYMBOLS_KEY,
+  TREND_FILTER_KEY,
+  TREND_SORT_KEY,
   parseSmaSymbols,
+  parseTrendFilter,
+  parseTrendSort,
+  rankByTrendStrength,
   readStoredSmaPeriods,
   readStoredTrendBasis,
+  resolveTrendBasis,
   storeTrendBasis,
   type TrendBasis,
+  type TrendFilter,
+  type TrendSort,
   storeSmaPeriods,
   toggleSmaPeriod,
   toggleSmaSymbol,
 } from "@/lib/sma-display";
+import { computeTrendStrength } from "@/lib/market-symbol-history";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import { SmaTrendPanel } from "@/components/home/sma-trend-panel";
