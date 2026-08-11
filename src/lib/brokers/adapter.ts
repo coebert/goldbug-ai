@@ -33,8 +33,12 @@ export interface BrokerOrderRequest {
   symbol: string;
   side: "buy" | "sell";
   quantity: number;
-  orderType: "market" | "limit";
+  orderType: "market" | "limit" | "stop";
   limitPrice?: number;
+  /** Trigger price for `orderType: "stop"` (broker-side protective stop). */
+  stopPrice?: number;
+  /** Resting orders (stops) should outlive the session. Defaults to day. */
+  duration?: "day" | "gtc";
   clientOrderId: string; // idempotency key
 }
 
