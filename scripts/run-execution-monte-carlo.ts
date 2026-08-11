@@ -826,6 +826,24 @@ async function main() {
         .map((b) => `${b.thresholdPct}% ${(b.prob * 100).toFixed(1)}% (${b.count}/${paths})`)
         .join("  ·  "),
     );
+    console.log(
+      "P(breach ≥ X ∧ in stress): "
+      + breaches
+        .map((b) => `${b.thresholdPct}% ${(b.jointProb * 100).toFixed(1)}%`
+          + ` [${Number.isFinite(b.probStressGivenBreach)
+            ? (b.probStressGivenBreach * 100).toFixed(0)
+            : "n/a"}% of breaches]`)
+        .join("  ·  "),
+    );
+    console.log(
+      `worst-stress ${((1 - stressQuantile) * 100).toFixed(0)}% of paths `
+      + `(cost-in-stress ≥ ${condRet.cutoff.toFixed(1)}%, n=${condRet.count}): `
+      + `return median ${fmt(condRet.median)}% vs ${fmt(ret.median)}% overall · `
+      + `conditional CVaR${(stressTailFrac * 100).toFixed(0)} ${fmt(condRet.cvar)}% `
+      + `(unconditional CVaR5 ${fmt(ret.cvar5)}%) · `
+      + `worst fold CVaR ${fmt(condWorstFold.cvar)}% · `
+      + `deepest DD CVaR ${fmt(condDd.cvar)}% (worst ${fmt(condDd.worst)}%)`,
+    );
     console.log();
   }
 
@@ -839,6 +857,11 @@ async function main() {
   }
   console.log("Shocks are correlated: on a stressed bar every symbol widens and every order");
   console.log("struggles together, so these tails are joint outcomes, not averaged-away ones.");
+  console.log("The joint line splits each breach into the part that happened while the tape was");
+  console.log("stressed — that share is execution risk you cannot trade out of; the rest is signal.");
+  console.log("The worst-stress line conditions on the ugliest tapes instead of averaging them in:");
+  console.log("it is the drawdown budget you need when the stress regime shows up, not on average.");
+
 }
 
 main().catch((e) => {
