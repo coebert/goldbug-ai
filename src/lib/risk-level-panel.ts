@@ -4,6 +4,20 @@
 // book) and groups them by risk level so the dashboard can verify at a glance
 // that low / balanced / high behave differently — more risk should mean more
 // volatility and deeper drawdowns, not identical numbers.
+//
+// Two things have to happen before any group total is meaningful:
+//
+//   1. FX. Portfolios are booked in their own currency (EUR sims alongside
+//      GBP live books). Summing them raw and stamping "£" on the result is
+//      simply a wrong number, and it also distorts which group looks larger.
+//      Every portfolio therefore carries an `fxRate` multiplier into the
+//      panel's display currency, applied to equity, cash and holdings.
+//   2. External flows. Deposits, withdrawals and broker cash re-syncs move
+//      the capital base without any trading happening. Left in, a mid-window
+//      cash correction reads as a ~-46% "drawdown" and pushes annualised
+//      volatility into the hundreds of percent. Each portfolio's curve is
+//      restated onto its current capital base first, so the risk stats
+//      describe trading only.
 
 import {
   computeMaxDrawdown,
@@ -12,6 +26,13 @@ import {
   dailyReturns,
   type EquityPoint,
 } from "@/lib/backtest-metrics";
+import {
+  detectExternalFlows,
+  flowAdjustedSeries,
+  mergeFlows,
+  type EquityPoint as FlowEquityPoint,
+  type ExternalFlow,
+} from "@/lib/equity-external-flows";
 
 export type RiskLevelKey = "low" | "balanced" | "high" | "unknown";
 
@@ -24,6 +45,15 @@ export type RiskPanelHolding = {
   price: number;
 };
 
+/**
+ * A snapshot. `cash` / `holdingsValue` are optional but required for external
+ * flow detection — without the split we cannot tell a deposit from a rally.
+ */
+export type RiskPanelEquityPoint = EquityPoint & {
+  cash?: number;
+  holdingsValue?: number;
+};
+
 export type RiskPanelPortfolio = {
   id: string;
   name: string;
@@ -32,8 +62,16 @@ export type RiskPanelPortfolio = {
   currency: string | null;
   cash: number;
   holdings: RiskPanelHolding[];
-  /** Chronological equity history (oldest → newest). */
-  equity: EquityPoint[];
+  /** Chronological equity history (oldest → newest), in `currency`. */
+  equity: RiskPanelEquityPoint[];
+  /**
+   * Multiplier from `currency` into the panel's display currency. Defaults to
+   * 1 (same currency). `null` means the rate could not be resolved — the
+   * portfolio is still counted but the group is flagged as not comparable.
+   */
+  fxRate?: number | null;
+  /** Known deposits/withdrawals, in `currency`, if the caller has them. */
+  recordedFlows?: ExternalFlow[];
 };
 
 export type RiskLevelMetrics = {
@@ -65,6 +103,14 @@ export type RiskLevelMetrics = {
   investedPct: number;
   /** Data points behind the risk stats — fewer than ~5 means "not yet meaningful". */
   observations: number;
+  /** Deposit/withdrawal steps netted out of the risk stats. */
+  flowEvents: number;
+  /** Net external flow over the window, display currency. */
+  netExternalFlow: number;
+  /** Distinct booking currencies rolled into this group. */
+  currencies: string[];
+  /** False when some portfolio's FX rate was unavailable — totals unreliable. */
+  fxComplete: boolean;
 };
 
 export function normaliseRiskLevel(value: string | null | undefined): RiskLevelKey {
@@ -74,6 +120,69 @@ export function normaliseRiskLevel(value: string | null | undefined): RiskLevelK
   if (v === "high" || v === "aggressive") return "high";
   return "unknown";
 }
+
+/**
+ * Restates one portfolio into the display currency with external flows netted
+ * out. Everything downstream (aggregation, weights, cash share) consumes the
+ * normalised form, so no call site can accidentally mix bases again.
+ */
+export function normalisePortfolio(p: RiskPanelPortfolio): {
+  portfolio: RiskPanelPortfolio;
+  flowEvents: number;
+  netFlow: number;
+  fxKnown: boolean;
+} {
+  const rate = typeof p.fxRate === "number" && p.fxRate > 0 ? p.fxRate : 1;
+
+
+  const hasSplit = p.equity.some(
+    (e) => typeof e.cash === "number" && typeof e.holdingsValue === "number",
+  );
+  let flows: ExternalFlow[] = p.recordedFlows ?? [];
+  if (hasSplit) {
+    const flowPoints: FlowEquityPoint[] = p.equity.map((e) => ({
+      date: e.snapshot_date,
+      totalValue: Number(e.total_value) || 0,
+      cash: Number(e.cash) || 0,
+      holdingsValue: Number(e.holdingsValue) || 0,
+    }));
+    flows = mergeFlows(p.recordedFlows ?? [], detectExternalFlows(flowPoints));
+  }
+
+  const adjusted = flows.length
+    ? flowAdjustedSeries(
+        p.equity.map((e) => ({
+          date: e.snapshot_date,
+          totalValue: Number(e.total_value) || 0,
+          cash: Number(e.cash) || 0,
+          holdingsValue: Number(e.holdingsValue) || 0,
+        })),
+        flows,
+      )
+    : null;
+
+  const equity: RiskPanelEquityPoint[] = adjusted
+    ? adjusted.map((r) => ({ snapshot_date: r.date, total_value: r.adjusted * rate }))
+    : p.equity.map((e) => ({
+        snapshot_date: e.snapshot_date,
+        total_value: (Number(e.total_value) || 0) * rate,
+      }));
+
+  return {
+    portfolio: {
+      ...p,
+      cash: (Number(p.cash) || 0) * rate,
+      holdings: p.holdings.map((h) => ({ ...h, price: (Number(h.price) || 0) * rate })),
+      equity,
+      fxRate: 1,
+      recordedFlows: [],
+    },
+    flowEvents: flows.length,
+    netFlow: flows.reduce((s, f) => s + f.amount, 0) * rate,
+    fxKnown: p.fxRate !== null,
+  };
+}
+
 
 /** Sum equity curves across portfolios onto a shared, sorted date axis. */
 export function aggregateEquity(portfolios: RiskPanelPortfolio[]): EquityPoint[] {
@@ -128,8 +237,11 @@ function weightsFrom(portfolios: RiskPanelPortfolio[]): {
 /** Metrics for one risk-level group. */
 export function computeRiskLevelMetrics(
   riskLevel: RiskLevelKey,
-  portfolios: RiskPanelPortfolio[],
+  input: RiskPanelPortfolio[],
 ): RiskLevelMetrics {
+  const normalised = input.map(normalisePortfolio);
+  const portfolios = normalised.map((n) => n.portfolio);
+
   const curve = aggregateEquity(portfolios);
   const rets = dailyReturns(curve);
   const dd = computeMaxDrawdown(curve);
@@ -154,6 +266,10 @@ export function computeRiskLevelMetrics(
     }
   }
 
+  const currencies = [
+    ...new Set(input.map((p) => (p.currency ?? "").toUpperCase()).filter(Boolean)),
+  ].sort();
+
   return {
     riskLevel,
     portfolioCount: portfolios.length,
@@ -173,8 +289,13 @@ export function computeRiskLevelMetrics(
     cashPct: totalEquity > 0 ? (cash / totalEquity) * 100 : 0,
     investedPct: totalEquity > 0 ? (invested / totalEquity) * 100 : 0,
     observations: curve.length,
+    flowEvents: normalised.reduce((s, n) => s + n.flowEvents, 0),
+    netExternalFlow: normalised.reduce((s, n) => s + n.netFlow, 0),
+    currencies,
+    fxComplete: normalised.every((n) => n.fxKnown),
   };
 }
+
 
 /** Group portfolios by risk level and score each group. */
 export function computeRiskLevelPanel(
@@ -193,13 +314,22 @@ export function computeRiskLevelPanel(
 }
 
 export type RiskLadderWarning = {
-  kind: "drawdown-inversion" | "vol-inversion" | "identical-metrics" | "thin-diversification";
+  kind:
+    | "drawdown-inversion"
+    | "vol-inversion"
+    | "identical-metrics"
+    | "thin-diversification"
+    | "fx-unavailable";
   message: string;
 };
 
 /**
  * Sanity checks over the ladder — surfaced in the panel so an operator can
  * verify at a glance that the risk levels are actually behaving differently.
+ *
+ * Comparisons are skipped for any group whose FX conversion failed: two
+ * groups measured in different currencies cannot be ranked, and shouting
+ * "inversion" about them is a false alarm, not a finding.
  */
 export function checkRiskLadder(rows: RiskLevelMetrics[]): RiskLadderWarning[] {
   const warnings: RiskLadderWarning[] = [];
@@ -212,11 +342,22 @@ export function checkRiskLadder(rows: RiskLevelMetrics[]): RiskLadderWarning[] {
   const pairs: Array<[RiskLevelKey, RiskLevelKey]> = [];
   for (let i = 0; i < ladder.length - 1; i++) pairs.push([ladder[i], ladder[i + 1]]);
 
+  for (const r of rows) {
+    if (!r.fxComplete) {
+      warnings.push({
+        kind: "fx-unavailable",
+        message: `${r.riskLevel} risk mixes ${r.currencies.join(" / ") || "multiple"} books but a live FX rate was unavailable — its totals are not comparable yet.`,
+      });
+    }
+  }
+
   for (const [lower, upper] of pairs) {
     const a = by.get(lower);
     const b = by.get(upper);
     if (!a || !b) continue;
     if (a.observations < 3 || b.observations < 3) continue;
+    if (!a.fxComplete || !b.fxComplete) continue;
+
 
     if (Math.abs(a.maxDrawdownPct) > Math.abs(b.maxDrawdownPct) + 0.01) {
       warnings.push({
