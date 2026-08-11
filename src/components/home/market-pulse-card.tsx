@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
+  ChevronRight,
   Minus,
   RefreshCw,
 } from "lucide-react";
@@ -20,6 +22,7 @@ import {
 } from "recharts";
 
 import { getMarketPulse } from "@/lib/market-pulse.functions";
+import { DEFAULT_RANGE, isKnownSymbol } from "@/lib/market-symbol-history";
 import {
   groupLabel,
   toneBlurb,
@@ -86,9 +89,39 @@ function HeatBar({ value, max }: { value: number | null; max: number }) {
   );
 }
 
+/** Wraps children in a drill-down link to the full chart for `symbol`. */
+function SymbolLink({
+  symbol,
+  className,
+  children,
+  ariaLabel,
+}: {
+  symbol: string;
+  className?: string;
+  children: React.ReactNode;
+  ariaLabel: string;
+}) {
+  if (!isKnownSymbol(symbol)) return <div className={className}>{children}</div>;
+  return (
+    <Link
+      to="/market/$symbol"
+      params={{ symbol }}
+      search={{ range: DEFAULT_RANGE }}
+      aria-label={ariaLabel}
+      className={`${className ?? ""} cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function QuoteRow({ q }: { q: PulseQuote }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 odd:bg-muted/20">
+    <SymbolLink
+      symbol={q.symbol}
+      ariaLabel={`View full chart for ${q.label}`}
+      className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 odd:bg-muted/20"
+    >
       <div className="min-w-0">
         <div className="truncate text-sm font-medium">{q.label}</div>
         <div className="text-[11px] text-muted-foreground">
@@ -108,8 +141,9 @@ function QuoteRow({ q }: { q: PulseQuote }) {
           5d {pct(q.changePct5d)}
         </div>
         <div className="w-16 text-xs text-muted-foreground">1m {pct(q.changePct1m)}</div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
       </div>
-    </div>
+    </SymbolLink>
   );
 }
 
@@ -249,6 +283,7 @@ export function MarketPulseCard() {
               pulse.quotes.find((q) => q.symbol === "^VIX")?.close.toFixed(1) ?? "—"
             }
             sub={pct(pulse.quotes.find((q) => q.symbol === "^VIX")?.changePct1d)}
+            symbol="^VIX"
           />
         </section>
 
@@ -313,14 +348,19 @@ export function MarketPulseCard() {
           </ChartFrame>
           <div className="flex flex-wrap gap-3" style={LEGEND_STYLE}>
             {pulse.comparison.keys.map((k, i) => (
-              <span key={k.symbol} className="flex items-center gap-1.5 text-xs">
+              <SymbolLink
+                key={k.symbol}
+                symbol={k.symbol}
+                ariaLabel={`View full chart for ${k.label}`}
+                className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs underline-offset-2 hover:underline"
+              >
                 <span
                   className="inline-block h-2 w-4 rounded-full"
                   style={{ background: CHART_SEQUENCE[i % CHART_SEQUENCE.length] }}
                   aria-hidden="true"
                 />
                 {k.label}
-              </span>
+              </SymbolLink>
             ))}
             <span className="text-xs text-muted-foreground">
               All lines start at 100 — the value shown is the % change since then.
@@ -353,13 +393,18 @@ export function MarketPulseCard() {
             </p>
             <div className="space-y-1.5">
               {sortedSectors.map((s) => (
-                <div key={s.symbol} className="grid grid-cols-[7.5rem_1fr_3.5rem] items-center gap-3 sm:grid-cols-[10rem_1fr_4rem]">
+                <SymbolLink
+                  key={s.symbol}
+                  symbol={s.symbol}
+                  ariaLabel={`View full chart for ${s.label}`}
+                  className="grid grid-cols-[7.5rem_1fr_3.5rem] items-center gap-3 rounded-lg px-1 py-1 sm:grid-cols-[10rem_1fr_4rem]"
+                >
                   <span className="truncate text-xs">{s.label}</span>
                   <HeatBar value={s.changePct1m} max={sectorMax} />
                   <span className={`text-right text-xs font-medium tabular-nums ${moveClass(s.changePct1m)}`}>
                     {pct(s.changePct1m)}
                   </span>
-                </div>
+                </SymbolLink>
               ))}
             </div>
           </section>
@@ -369,12 +414,31 @@ export function MarketPulseCard() {
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5">
+function Stat({
+  label,
+  value,
+  sub,
+  symbol,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  symbol?: string;
+}) {
+  const body = (
+    <>
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-0.5 font-display text-lg font-bold tabular-nums">{value}</div>
       {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
-    </div>
+    </>
   );
+  const cls = "block rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5";
+  if (symbol && isKnownSymbol(symbol)) {
+    return (
+      <SymbolLink symbol={symbol} ariaLabel={`View full chart for ${label}`} className={cls}>
+        {body}
+      </SymbolLink>
+    );
+  }
+  return <div className={cls}>{body}</div>;
 }
