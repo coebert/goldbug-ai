@@ -1054,6 +1054,67 @@ export class SaxoAdapter implements BrokerAdapter {
   }
 
 
+  /**
+   * Booked trade charges for a date range — the broker's invoice, which is
+   * what the friction KPI needs in order to stop grading our own cost model.
+   *
+   * Saxo exposes this under several service groups depending on environment
+   * and entitlement, and SIM commonly exposes none of them. We probe in
+   * descending order of fidelity and report which one answered; 400/403/404
+   * are expected outcomes here, not errors, so they stay out of the broker
+   * log rather than filling it with one row per hourly tick.
+   */
+  async getTradeCharges(args: { fromIso: string; toIso: string }): Promise<BrokerChargeReport> {
+    const fromDate = args.fromIso.slice(0, 10);
+    const toDate = args.toIso.slice(0, 10);
+    const clientKey = await this.getClientKey();
+
+    const candidates: Array<{ path: string; query: Record<string, string | number> }> = [
+      ...(clientKey
+        ? [{
+            path: `/cs/v1/reports/trades/${encodeURIComponent(clientKey)}`,
+            query: { FromDate: fromDate, ToDate: toDate, $top: 1000 },
+          }]
+        : []),
+      { path: "/cs/v1/reports/trades/me", query: { FromDate: fromDate, ToDate: toDate, $top: 1000 } },
+      {
+        path: "/cs/v1/audit/activities",
+        query: {
+          FromDateTime: args.fromIso,
+          ToDateTime: args.toIso,
+          ActivityTypes: "Trades",
+          $top: 1000,
+        },
+      },
+    ];
+
+    const attempts: string[] = [];
+    for (const c of candidates) {
+      try {
+        const res = await this.req<{ Data?: unknown[] } | unknown[]>("GET", c.path, {
+          query: c.query,
+          silentStatuses: [400, 403, 404],
+          maxAttempts: 2,
+        });
+        const rows = Array.isArray(res) ? res : (res?.Data ?? []);
+        const { mapSaxoChargeRows } = await import("./saxo-charges");
+        return { supported: true, endpoint: c.path, charges: mapSaxoChargeRows(rows) };
+      } catch (e) {
+        attempts.push(`${c.path}: ${redactedError(e).message}`);
+      }
+    }
+
+    return {
+      supported: false,
+      endpoint: null,
+      charges: [],
+      reason: `no Saxo cost report available on ${this.env} (${attempts.join(" | ")})`,
+    };
+  }
+
+
+
+
 
   /**
    * Look up a single historical (closed) order by id. Returns null if Saxo
