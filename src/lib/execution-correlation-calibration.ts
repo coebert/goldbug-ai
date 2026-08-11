@@ -28,6 +28,7 @@ import {
   defaultCluster,
   type CorrelationStructure,
   type CorrelationStructureKind,
+  regimeRamp,
 } from "./execution-correlation-structures";
 
 export type CalibrationBasis = "returns" | "absReturns";
@@ -49,6 +50,20 @@ export type CalibrationOptions = {
   basis?: CalibrationBasis;
   /** Multiply the estimated correlations by this before use, 0…1. */
   shrink?: number;
+  /**
+   * Softness of the calm→stress boundary, ≥ 0. Zero reproduces the hard
+   * threshold exactly: a bar is stressed iff its z ≥ `stressZ`, and a window
+   * is stressed iff its stressed share ≥ `minStressShare`.
+   *
+   * Above zero the boundary becomes a ramp on both levels — bars ramp over
+   * `stressZ ± blend` z-units, and windows ramp over `minStressShare ×
+   * (1 ± blend)` — so a window near the threshold contributes partially to
+   * both regimes instead of being assigned wholesale to one. This matters
+   * because a hard split throws away the windows that are most informative
+   * about the transition and lets a single bar flip a window's entire
+   * contribution.
+   */
+  blend?: number;
 };
 
 const DEFAULTS = {
@@ -58,6 +73,7 @@ const DEFAULTS = {
   minStressShare: 0.25,
   basis: "absReturns" as CalibrationBasis,
   shrink: 1,
+  blend: 0,
 };
 
 export type RollingCorrelationWindow = {
@@ -70,8 +86,15 @@ export type RollingCorrelationWindow = {
   acrossRho: number;
   withinPairs: number;
   acrossPairs: number;
-  /** Share of the window's bars whose vol z-score breached `stressZ`. */
+  /**
+   * Share of the window's bars in the stress regime. With `blend` at 0 this is
+   * the plain share of bars over `stressZ`; above 0 it is the mean of the
+   * per-bar ramp, so a near-miss bar counts fractionally.
+   */
   stressShare: number;
+  /** Window's membership in the stress regime, 0…1. Binary when `blend` is 0. */
+  stressWeight: number;
+  /** `stressWeight >= 0.5` — the hard label, kept for callers that need one. */
   stressed: boolean;
 };
 
@@ -80,7 +103,7 @@ export type PooledRho = {
   rho: number;
   /** Standard deviation of the per-window estimates (raw correlation space). */
   sd: number;
-  /** Windows contributing to the estimate. */
+  /** Windows contributing to the estimate (fractional under a soft blend). */
   windows: number;
 };
 
@@ -89,14 +112,18 @@ export type CorrelationCalibration = {
   window: number;
   step: number;
   shrink: number;
+  /** Regime-boundary softness the fit used. */
+  blend: number;
   symbols: string[];
   clusters: string[];
   /** Every rolling window, in order — the time series of the coupling. */
   windows: RollingCorrelationWindow[];
   calm: { within: PooledRho; across: PooledRho };
   stress: { within: PooledRho; across: PooledRho };
-  /** Share of windows classified stressed. */
+  /** Share of windows classified stressed (weight ≥ 0.5). */
   stressShare: number;
+  /** Σ stress weight over windows — the fractional stress sample size. */
+  stressMass: number;
 };
 
 // ------------------------------------------------------------------ plumbing
@@ -121,11 +148,91 @@ const stdev = (xs: readonly number[]): number => {
   return Math.sqrt(u.reduce((a, b) => a + (b - m) ** 2, 0) / (u.length - 1));
 };
 
-const pool = (rhos: readonly number[]): PooledRho => ({
-  rho: fisherMean(rhos),
-  sd: stdev(rhos),
-  windows: rhos.filter((r) => Number.isFinite(r)).length,
-});
+/** Fisher-z mean weighted by regime membership; NaN when no weight lands. */
+export function fisherWeightedMean(
+  rhos: readonly number[],
+  weights: readonly number[],
+): number {
+  let wz = 0;
+  let w = 0;
+  for (let i = 0; i < rhos.length; i++) {
+    const r = rhos[i]!;
+    const wi = weights[i] ?? 0;
+    if (!Number.isFinite(r) || !(wi > 0)) continue;
+    wz += wi * atanh(r);
+    w += wi;
+  }
+  return w > 0 ? Math.tanh(wz / w) : Number.NaN;
+}
+
+const weightedStdev = (xs: readonly number[], ws: readonly number[]): number => {
+  let w = 0;
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < xs.length; i++) {
+    const x = xs[i]!;
+    const wi = ws[i] ?? 0;
+    if (!Number.isFinite(x) || !(wi > 0)) continue;
+    w += wi;
+    sum += wi * x;
+    n++;
+  }
+  if (n < 2 || !(w > 0)) return 0;
+  const m = sum / w;
+  let acc = 0;
+  for (let i = 0; i < xs.length; i++) {
+    const x = xs[i]!;
+    const wi = ws[i] ?? 0;
+    if (!Number.isFinite(x) || !(wi > 0)) continue;
+    acc += wi * (x - m) ** 2;
+  }
+  // Reliability-weighted variance: reduces to the n−1 estimator at unit weights.
+  return Math.sqrt(acc / (w * (1 - 1 / n)));
+};
+
+const pool = (rhos: readonly number[], weights?: readonly number[]): PooledRho => {
+  if (!weights) {
+    return {
+      rho: fisherMean(rhos),
+      sd: stdev(rhos),
+      windows: rhos.filter((r) => Number.isFinite(r)).length,
+    };
+  }
+  let mass = 0;
+  for (let i = 0; i < rhos.length; i++) {
+    if (Number.isFinite(rhos[i]!)) mass += weights[i] ?? 0;
+  }
+  return {
+    rho: fisherWeightedMean(rhos, weights),
+    sd: weightedStdev(rhos, weights),
+    windows: mass,
+  };
+};
+
+/**
+ * Per-bar stress membership. At `blend` 0 this is the original hard test;
+ * above it, the bar ramps from calm to stressed over `stressZ ± blend`.
+ */
+export function barStressWeight(z: number, stressZ: number, blend: number): number {
+  if (!Number.isFinite(z)) return 0;
+  if (!(blend > 0)) return z >= stressZ ? 1 : 0;
+  return regimeRamp(z, stressZ - blend, stressZ + blend);
+}
+
+/**
+ * Per-window stress membership from its (soft) stressed share. At `blend` 0
+ * this is the original step at `minStressShare`.
+ */
+export function windowStressWeight(
+  share: number,
+  minStressShare: number,
+  blend: number,
+): number {
+  if (!(blend > 0)) return share >= minStressShare ? 1 : 0;
+  const lo = minStressShare * (1 - Math.min(1, blend));
+  const hi = minStressShare * (1 + blend);
+  return regimeRamp(share, lo, hi);
+}
 
 /** Pearson correlation over a slice; NaN if either leg is flat. */
 export function sliceCorr(a: readonly number[], b: readonly number[], from: number, to: number): number {
@@ -196,6 +303,7 @@ export function rollingCorrelationWindows(
   const step = Math.max(1, Math.floor(opts.step ?? DEFAULTS.step));
   const stressZ = opts.stressZ ?? DEFAULTS.stressZ;
   const minStressShare = opts.minStressShare ?? DEFAULTS.minStressShare;
+  const blend = Math.max(0, opts.blend ?? DEFAULTS.blend);
   const rets = returnSeries(seriesBySymbol, opts.basis ?? DEFAULTS.basis);
   const symbols = [...rets.keys()];
   if (symbols.length < 2) return [];
@@ -226,9 +334,10 @@ export function rollingCorrelationWindows(
       const z = volZ[i + 1];
       if (z === undefined) continue;
       counted++;
-      if (z >= stressZ) stressBars++;
+      stressBars += barStressWeight(z, stressZ, blend);
     }
     const stressShare = counted ? stressBars / counted : 0;
+    const stressWeight = windowStressWeight(stressShare, minStressShare, blend);
     rows.push({
       endIndex: end,
       bars: window,
@@ -237,7 +346,8 @@ export function rollingCorrelationWindows(
       withinPairs: within.length,
       acrossPairs: across.length,
       stressShare,
-      stressed: stressShare >= minStressShare,
+      stressWeight,
+      stressed: stressWeight >= 0.5,
     });
   }
   return rows;
@@ -257,12 +367,17 @@ export function calibrateCorrelations(
   const window = Math.max(5, Math.floor(opts.window ?? DEFAULTS.window));
   const step = Math.max(1, Math.floor(opts.step ?? DEFAULTS.step));
   const shrink = Math.min(1, Math.max(0, opts.shrink ?? DEFAULTS.shrink));
-  const rows = rollingCorrelationWindows(seriesBySymbol, { ...opts, basis, window, step });
+  const blend = Math.max(0, opts.blend ?? DEFAULTS.blend);
+  const rows = rollingCorrelationWindows(seriesBySymbol, { ...opts, basis, window, step, blend });
   const symbols = [...seriesBySymbol.keys()];
   const groups = opts.groups ?? new Map(symbols.map((s) => [s, defaultCluster(s)]));
 
-  const calmRows = rows.filter((r) => !r.stressed);
-  const stressRows = rows.filter((r) => r.stressed);
+  // Under a soft blend every window contributes to both regimes, weighted by
+  // its membership; at blend 0 the weights are 0/1 and this is the old split.
+  const stressW = rows.map((r) => r.stressWeight);
+  const calmW = rows.map((r) => 1 - r.stressWeight);
+  const withinRhos = rows.map((r) => r.withinRho);
+  const acrossRhos = rows.map((r) => r.acrossRho);
   const scale = (p: PooledRho): PooledRho => ({
     ...p,
     rho: Number.isFinite(p.rho) ? p.rho * shrink : p.rho,
@@ -274,18 +389,20 @@ export function calibrateCorrelations(
     window,
     step,
     shrink,
+    blend,
     symbols,
     clusters: [...new Set(symbols.map((s) => groups.get(s) ?? "other"))].sort(),
     windows: rows,
     calm: {
-      within: scale(pool(calmRows.map((r) => r.withinRho))),
-      across: scale(pool(calmRows.map((r) => r.acrossRho))),
+      within: scale(pool(withinRhos, calmW)),
+      across: scale(pool(acrossRhos, calmW)),
     },
     stress: {
-      within: scale(pool(stressRows.map((r) => r.withinRho))),
-      across: scale(pool(stressRows.map((r) => r.acrossRho))),
+      within: scale(pool(withinRhos, stressW)),
+      across: scale(pool(acrossRhos, stressW)),
     },
-    stressShare: rows.length ? stressRows.length / rows.length : 0,
+    stressShare: rows.length ? rows.filter((r) => r.stressed).length / rows.length : 0,
+    stressMass: stressW.reduce((a, b) => a + b, 0),
   };
 }
 

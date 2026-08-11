@@ -22,6 +22,7 @@
 
 import {
   fisherMean,
+  fisherWeightedMean,
   returnSeries,
   rollingCorrelationWindows,
   sliceCorr,
@@ -38,7 +39,9 @@ export type SpilloverCell = {
   delta: number;
   /** Symbol pairs contributing to the cell. */
   pairs: number;
+  /** Window mass behind the calm estimate (fractional under a soft blend). */
   calmWindows: number;
+  /** Window mass behind the stress estimate. */
   stressWindows: number;
 };
 
@@ -107,17 +110,20 @@ export function clusterSpilloverMatrix(
   // Reuse the calibration's window slicing and regime labels so the heatmap
   // and the scalar calibration always describe the same set of windows.
   const rows = rollingCorrelationWindows(seriesBySymbol, { ...opts, basis, window, step });
-  const stressedByEnd = new Map(rows.map((r) => [r.endIndex, r.stressed]));
+  // The heatmap pools with the same regime weights as the scalar calibration,
+  // so a soft blend softens both consistently rather than leaving the
+  // residual comparison scored against a differently-labelled tape.
+  const weightByEnd = new Map(rows.map((r) => [r.endIndex, r.stressWeight]));
 
   // Per cell, the per-window correlations gathered separately by regime.
-  const calmBuf: number[][][] = clusters.map(() => clusters.map(() => []));
-  const stressBuf: number[][][] = clusters.map(() => clusters.map(() => []));
+  const valBuf: number[][][] = clusters.map(() => clusters.map(() => []));
+  const wBuf: number[][][] = clusters.map(() => clusters.map(() => []));
   const pairCount: number[][] = clusters.map(() => clusters.map(() => 0));
 
   const n = Math.min(...symbols.map((s) => rets.get(s)!.length));
   for (let end = window; end <= n; end += step) {
     const from = end - window;
-    const stressed = stressedByEnd.get(end) ?? false;
+    const stressWeight = weightByEnd.get(end) ?? 0;
     // Pool pairs inside the window first, then pool windows: a cluster pair
     // with 40 symbol pairs must not outvote one with 2 at the regime level.
     const perCell: number[][][] = clusters.map(() => clusters.map(() => []));
@@ -138,24 +144,30 @@ export function clusterSpilloverMatrix(
         const vals = perCell[a]![b]!;
         if (!vals.length) continue;
         pairCount[a]![b] = Math.max(pairCount[a]![b]!, vals.length);
-        (stressed ? stressBuf : calmBuf)[a]![b]!.push(fisherMean(vals));
+        valBuf[a]![b]!.push(fisherMean(vals));
+        wBuf[a]![b]!.push(stressWeight);
       }
     }
   }
 
   for (let a = 0; a < clusters.length; a++) {
     for (let b = 0; b < clusters.length; b++) {
-      const calmVals = calmBuf[a]![b]!;
-      const stressVals = stressBuf[a]![b]!;
-      const calm = calmVals.length ? fisherMean(calmVals) : Number.NaN;
-      const stress = stressVals.length ? fisherMean(stressVals) : Number.NaN;
+      const vals = valBuf[a]![b]!;
+      const sw = wBuf[a]![b]!;
+      const cw = sw.map((w) => 1 - w);
+      const massOf = (ws: readonly number[]) =>
+        vals.reduce((acc, v, i) => (Number.isFinite(v) ? acc + (ws[i] ?? 0) : acc), 0);
+      const calmMass = massOf(cw);
+      const stressMass = massOf(sw);
+      const calm = calmMass > 0 ? fisherWeightedMean(vals, cw) : Number.NaN;
+      const stress = stressMass > 0 ? fisherWeightedMean(vals, sw) : Number.NaN;
       cells[a]![b] = {
         calm,
         stress,
         delta: Number.isFinite(calm) && Number.isFinite(stress) ? stress - calm : Number.NaN,
         pairs: pairCount[a]![b]!,
-        calmWindows: calmVals.length,
-        stressWindows: stressVals.length,
+        calmWindows: calmMass,
+        stressWindows: stressMass,
       };
     }
   }
@@ -165,7 +177,7 @@ export function clusterSpilloverMatrix(
     cells,
     members,
     windows: rows.length,
-    stressWindows: rows.filter((r) => r.stressed).length,
+    stressWindows: rows.reduce((a, r) => a + r.stressWeight, 0),
     window,
     step,
     basis,

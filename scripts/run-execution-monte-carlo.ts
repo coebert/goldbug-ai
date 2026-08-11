@@ -69,6 +69,11 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  DEFAULT_BLEND_GRID,
+  formatRegimeBlendSweep,
+  sweepRegimeBlend,
+} from "../src/lib/execution-regime-blend-sweep";
+import {
   stressTestCalibration,
   formatCalibrationRobustness,
   ALL_ESTIMATORS,
@@ -277,6 +282,7 @@ const calibOpts = {
   shrink: Number(arg("calib-shrink", "1")),
   stressZ: Number(arg("calib-stress-z", String(simCfg.volStressZ))),
   minStressShare: Number(arg("calib-min-stress", "0.25")),
+  blend: Number(arg("calib-blend", "0")),
   groups: clusters,
 };
 
@@ -333,6 +339,18 @@ const calibStressEstimators = arg("calib-stress-estimators", ALL_ESTIMATORS.join
   .split(",").map((s) => s.trim()).filter(Boolean) as CorrelationEstimator[];
 const calibStressResamples = Number(arg("calib-stress-resamples", "200"));
 const calibStressAllCells = argv.includes("--calib-stress-all");
+
+// --regime-blend: sensitivity sweep over the calm→stress boundary softness.
+// The hard threshold (bar z ≥ stressZ, window ≥ minStressShare of stressed
+// bars) is an arbitrary cliff; this refits the calibration with the cliff
+// widened into a ramp and reports how the fitted ρs, their stability and the
+// residual errors respond. Numbers that slide with the blend are artefacts of
+// the labelling rule, not measurements of the tape.
+// The grid entries are ramp half-widths in z units, matching --regime-ramp-lo/hi:
+// 0 is the `binary` setting, 0.5 is a ramp over stressZ ± 0.5.
+const regimeBlendMode = argv.includes("--regime-blend-sweep");
+const regimeBlendGrid = arg("regime-blend-sweep", DEFAULT_BLEND_GRID.join(","))
+  .split(",").map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n >= 0);
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
@@ -868,6 +886,22 @@ async function main() {
     console.log(describeCalibration(diag.calibration));
     console.log();
     console.log(formatCalibrationDiagnostics(diag));
+    if (!spilloverMode && !attributionMode) return;
+    console.log();
+  }
+
+  // ------------------------------------------------ regime-blend sensitivity
+  // --regime-blend-sweep 0,0.1,0.25,0.5,1: refit once per boundary softness and
+  // report the spread each fitted number inherits purely from that choice.
+  if (regimeBlendMode) {
+    const sweep = sweepRegimeBlend(seriesBySymbol, {
+      ...calibOpts,
+      volZ,
+      blends: regimeBlendGrid.length ? regimeBlendGrid : DEFAULT_BLEND_GRID,
+      resamples: calibBootResamples,
+      seed: baseSeed,
+    });
+    console.log(formatRegimeBlendSweep(sweep));
     if (!spilloverMode && !attributionMode) return;
     console.log();
   }
