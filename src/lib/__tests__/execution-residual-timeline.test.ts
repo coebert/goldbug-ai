@@ -157,6 +157,7 @@ describe("residualTimeline", () => {
     expect(report.contagionEdgeByWindow).toHaveLength(report.windows.length);
     expect(report.contagionWinRate).toBeGreaterThanOrEqual(0);
     expect(report.contagionWinRate).toBeLessThanOrEqual(1);
+    expect(report.contagionTieRate).toBeGreaterThan(0);
     expect(report.contagionEdgeStress).toBeGreaterThan(report.contagionEdgeCalm);
   });
 
@@ -243,6 +244,6 @@ describe("heatmap rendering", () => {
     expect(out).toContain("Residual heatmap — contagion");
     expect(out).toContain("Worst windows — contagion");
     expect(out).toContain("Blocks vs contagion, per window");
-    expect(out).toMatch(/contagion fits better in \d+% of windows/);
+    expect(out).toMatch(/contagion fits better in \d+% of decisive windows/);
   });
 });

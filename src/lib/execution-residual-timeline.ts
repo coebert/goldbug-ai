@@ -130,8 +130,14 @@ export type ResidualTimeline = {
    * Positive means contagion fits that window better.
    */
   contagionEdgeByWindow: number[];
-  /** Share of windows where contagion fits better. */
+  /**
+   * Share of *decisive* windows where contagion fits better. Calm windows are
+   * usually exact ties — the two structures share their calm parameters — so
+   * counting them would drown the comparison in noise-free draws.
+   */
   contagionWinRate: number;
+  /** Share of windows where the two structures are indistinguishable. */
+  contagionTieRate: number;
   /**
    * Does contagion's advantage come from the stressed windows, as its story
    * requires, or is it a flat offset that says nothing about regimes?
@@ -366,6 +372,8 @@ export function residualTimeline(
     })
     : [];
   const observedEdge = edge.filter(Number.isFinite);
+  const TIE = 1e-9;
+  const decisive = observedEdge.filter((v) => Math.abs(v) > TIE);
 
   return {
     clusters,
@@ -375,8 +383,11 @@ export function residualTimeline(
     basis,
     structures,
     contagionEdgeByWindow: edge,
-    contagionWinRate: observedEdge.length
-      ? observedEdge.filter((v) => v > 0).length / observedEdge.length
+    contagionWinRate: decisive.length
+      ? decisive.filter((v) => v > 0).length / decisive.length
+      : Number.NaN,
+    contagionTieRate: observedEdge.length
+      ? (observedEdge.length - decisive.length) / observedEdge.length
       : Number.NaN,
     contagionEdgeCalm: weightedMean(edge, windows.map((w) => 1 - w.stressWeight)),
     contagionEdgeStress: weightedMean(edge, windows.map((w) => w.stressWeight)),
@@ -529,7 +540,8 @@ export function formatResidualTimeline(
   if (Number.isFinite(t.contagionWinRate)) {
     out.push("Blocks vs contagion, per window");
     out.push(
-      `  contagion fits better in ${(t.contagionWinRate * 100).toFixed(0)}% of windows · `
+      `  contagion fits better in ${(t.contagionWinRate * 100).toFixed(0)}% of decisive windows `
+      + `(${(t.contagionTieRate * 100).toFixed(0)}% are ties) · `
       + `mean edge calm ${t.contagionEdgeCalm.toFixed(3)} / stress ${t.contagionEdgeStress.toFixed(3)}`,
     );
     out.push(
