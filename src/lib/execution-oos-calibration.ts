@@ -27,6 +27,11 @@ import {
 } from "./execution-correlation-calibration";
 import { clusterSpilloverMatrix } from "./execution-cluster-spillover";
 import { residualCorrelationErrors, type ResidualReport } from "./execution-correlation-diagnostics";
+import {
+  governedStructureFromCalibration,
+  type StressRhoGovernorOptions,
+} from "./execution-stress-rho-governor";
+
 import type {
   CorrelationStructure,
   CorrelationStructureKind,
