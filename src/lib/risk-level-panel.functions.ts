@@ -21,6 +21,8 @@ export interface RiskLevelPanelResult {
 }
 
 const LOOKBACK_DAYS = 90;
+/** Everything is rolled up into the operator's home currency. */
+const DISPLAY_CURRENCY = "GBP";
 
 export const getRiskLevelPanel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -53,7 +55,7 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
         .in("portfolio_id", ids),
       context.supabase
         .from("equity_snapshots")
-        .select("portfolio_id, snapshot_date, total_value")
+        .select("portfolio_id, snapshot_date, total_value, cash, holdings_value")
         .in("portfolio_id", ids)
         .gte("snapshot_date", since)
         .order("snapshot_date", { ascending: true }),
@@ -78,9 +80,35 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
       list.push({
         snapshot_date: s.snapshot_date,
         total_value: Number(s.total_value) || 0,
+        cash: Number(s.cash) || 0,
+        holdingsValue: Number(s.holdings_value) || 0,
       });
       equityBy.set(s.portfolio_id, list);
     }
+
+    // Portfolios are booked in their own currency (EUR sims sit next to GBP
+    // live books). Resolve every rate into the display currency up front; a
+    // missing rate is passed through as null so the panel can say "not
+    // comparable" instead of silently adding euros to pounds.
+    const { getFxRate } = await import("@/lib/fx.server");
+    const currencies = [
+      ...new Set(list.map((p) => (p.currency ?? DISPLAY_CURRENCY).toUpperCase())),
+    ];
+    const rates = new Map<string, number | null>();
+    await Promise.all(
+      currencies.map(async (ccy) => {
+        if (ccy === DISPLAY_CURRENCY) {
+          rates.set(ccy, 1);
+          return;
+        }
+        try {
+          const fx = await getFxRate(ccy, DISPLAY_CURRENCY);
+          rates.set(ccy, fx.rate > 0 && fx.source !== "identity" ? fx.rate : null);
+        } catch {
+          rates.set(ccy, null);
+        }
+      }),
+    );
 
     const inputs: RiskPanelPortfolio[] = list.map((p) => ({
       id: p.id,
@@ -91,6 +119,7 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
       cash: Number(p.current_cash) || 0,
       holdings: holdingsBy.get(p.id) ?? [],
       equity: equityBy.get(p.id) ?? [],
+      fxRate: rates.get((p.currency ?? DISPLAY_CURRENCY).toUpperCase()) ?? null,
     }));
 
     const rows = computeRiskLevelPanel(inputs);
@@ -99,6 +128,6 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
       lookbackDays: LOOKBACK_DAYS,
       rows,
       warnings: checkRiskLadder(rows),
-      currency: list[0]?.currency ?? "GBP",
+      currency: DISPLAY_CURRENCY,
     };
   });
