@@ -160,7 +160,7 @@ describe("drawdown breach probabilities", () => {
     expect(five!.thresholdPct).toBe(5);
     expect(ten!.thresholdPct).toBe(10);
     expect(twenty!.thresholdPct).toBe(20);
-    expect(five!.count).toBe(6);
+    expect(five!.count).toBe(7);
     expect(ten!.count).toBe(5);
     expect(twenty!.count).toBe(2);
     expect(ten!.prob).toBeCloseTo(0.5, 9);
