@@ -413,6 +413,7 @@ export function SmaTrendCard() {
                 loading={Boolean(q?.isLoading)}
                 error={Boolean(q?.isError)}
                 compact={compact}
+                percentiles={ranks[s]}
                 onRetry={() => void q?.refetch()}
                 onRemove={
                   symbols.length > 1
