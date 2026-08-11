@@ -202,7 +202,7 @@ function simulate(
     for (const sym of exits) {
       const qty = shares.get(sym)!;
       const notional = qty * priceAt(sym, i);
-      const c = costOf(cost, notional);
+      const c = costOf(cost, notional, sym);
       cash += notional - c;
       costs += c;
       trades++;
@@ -217,7 +217,7 @@ function simulate(
         const price = priceAt(sym, i);
         const notional = Math.min(target, cash * 0.98);
         if (notional < cost.minTicket) continue;
-        const c = costOf(cost, notional);
+        const c = costOf(cost, notional, sym);
         const qty = (notional - c) / price;
         if (!(qty > 0)) continue;
         cash -= notional;
@@ -233,7 +233,7 @@ function simulate(
   let finalEquity = cash;
   for (const [sym, qty] of shares) {
     const notional = qty * priceAt(sym, end);
-    finalEquity += notional - costOf(cost, notional);
+    finalEquity += notional - costOf(cost, notional, sym);
   }
 
   const rets: number[] = [];
