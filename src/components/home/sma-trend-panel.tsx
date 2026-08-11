@@ -49,7 +49,12 @@ import {
   TrendStrengthSparkline,
   TrendStrengthStat,
 } from "@/components/market/trend-strength-badge";
-import { PERIOD_STYLE, serialiseSmaPeriods } from "@/lib/sma-display";
+import {
+  PERIOD_STYLE,
+  resolveTrendBasis,
+  serialiseSmaPeriods,
+  type TrendBasis,
+} from "@/lib/sma-display";
 
 export const TONE_CLASS = {
   up: "border-emerald-500/40 text-emerald-500",
@@ -88,6 +93,7 @@ export function SmaTrendPanel({
   symbol,
   range,
   periods,
+  trendBasis = "auto",
   history,
   loading,
   error,
@@ -98,6 +104,8 @@ export function SmaTrendPanel({
   symbol: string;
   range: HistoryRange;
   periods: SmaPeriod[];
+  /** Which average the trend-strength score is measured on. */
+  trendBasis?: TrendBasis;
   history: SymbolHistory | undefined;
   loading: boolean;
   error: boolean;
@@ -110,13 +118,14 @@ export function SmaTrendPanel({
     () => (history ? detectSmaCrossovers(history.points, periods) : []),
     [history, periods],
   );
+  const basis = resolveTrendBasis(trendBasis, periods);
   const strength = useMemo(
-    () => (history ? computeTrendStrength(history.points, periods) : null),
-    [history, periods],
+    () => (history ? computeTrendStrength(history.points, periods, basis) : null),
+    [history, periods, basis],
   );
   const strengthSeries = useMemo(
-    () => (history ? computeTrendStrengthSeries(history.points, periods) : []),
-    [history, periods],
+    () => (history ? computeTrendStrengthSeries(history.points, periods, 30, basis) : []),
+    [history, periods, basis],
   );
   const verdict = trendVerdict(periods.map((p) => history?.aboveSma?.[p] ?? null));
   const periodsLabel = periods.join("/");
@@ -260,7 +269,9 @@ export function SmaTrendPanel({
             </div>
             <TrendStrengthStat strength={strength} />
             <div className="col-span-2 rounded-lg border border-border/60 bg-surface-2 px-2.5 py-1.5">
-              <dt className="text-muted-foreground">Trend strength over time</dt>
+              <dt className="text-muted-foreground">
+                Trend strength over time{strength ? ` · ${strength.period}-day basis` : ""}
+              </dt>
               <dd>
                 <TrendStrengthSparkline series={strengthSeries} className="h-10 w-full" />
               </dd>
