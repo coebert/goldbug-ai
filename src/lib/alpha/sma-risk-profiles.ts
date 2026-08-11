@@ -35,7 +35,8 @@ const OVERRIDES: Record<SmaRiskLevel, Partial<SmaCrossRuleConfig>> = {
     deathSellFraction: 1,
     unknownRegimeSizeMult: 0.5,
     // Conviction has to build further before size moves, and the band it can
-    // move within is narrow: at most +8% and never below 45% of intent.
+    // move within is narrow: at most +8%, and a buy is dropped once regime
+    // strength scales it below 60% of intent.
     regimeSaturationPct: 0.09,
     fastSaturationPct: 0.035,
     freshnessWeight: 0.65,
