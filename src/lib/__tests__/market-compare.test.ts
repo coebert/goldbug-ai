@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_COMPARE_SYMBOLS,
   buildComparison,
+  buildRollingCorrelation,
   parseCompareParam,
   serialiseCompareParam,
   toggleCompareSymbol,
