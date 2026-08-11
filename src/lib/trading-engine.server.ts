@@ -176,6 +176,7 @@ import {
   inferVenueFromSymbol,
   resolveVenueTodConfig,
 } from "./alpha/execution-alpha";
+import { stochasticEntryTiming } from "./alpha/stochastic-timing";
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -992,6 +993,20 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       tod = todExecutionAdjustment({ venue, ...venueCfg });
       if (!tod.allow) return { allow: false, adjNotional: 0, tod };
       if (tod.multiplier < 1) adjNotional = adjNotional * tod.multiplier;
+    }
+
+    // Stochastic entry timing — never applied to protective/exit orders.
+    if (!opts.protective) {
+      const stoch = featureBySymbol.get(symbol)?.stochastic ?? null;
+      const timing = stochasticEntryTiming(stoch);
+      if (!timing.allow) {
+        return {
+          allow: false,
+          adjNotional: 0,
+          tod: tod ?? { multiplier: 0, allow: false, reason: timing.reason },
+        };
+      }
+      if (timing.multiplier < 1) adjNotional = adjNotional * timing.multiplier;
     }
 
     const slicePlan = cfg.execution_slicing_enabled && adjNotional > 0

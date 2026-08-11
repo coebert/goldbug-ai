@@ -194,3 +194,76 @@ export function returnCorrelation(a: number[], b: number[]): number | null {
 }
 
 export { ema };
+
+// ---------------------------------------------------------------------------
+// Stochastic oscillator (%K / %D) — entry timing.
+// %K = 100 * (close - lowestLow(n)) / (highestHigh(n) - lowestLow(n))
+// %D = SMA(smoothD) of the smoothed %K series. Classic settings 14/3/3.
+// ---------------------------------------------------------------------------
+
+export type StochasticSnapshot = {
+  k: number; // 0..100 smoothed %K
+  d: number; // 0..100 signal line
+  oversold: boolean; // %K < 20
+  overbought: boolean; // %K > 80
+  bull_cross: boolean; // %K crossed above %D on the latest bar
+  bear_cross: boolean; // %K crossed below %D on the latest bar
+  /** %K crossed up from below 20 — the classic timing trigger. */
+  bull_cross_from_oversold: boolean;
+  rising: boolean; // %K higher than the prior bar
+};
+
+function rawStochSeries(candles: Candle[], period: number): number[] {
+  const out: number[] = [];
+  for (let i = period - 1; i < candles.length; i++) {
+    const win = candles.slice(i - period + 1, i + 1);
+    const hh = Math.max(...win.map((c) => c.high));
+    const ll = Math.min(...win.map((c) => c.low));
+    const range = hh - ll;
+    // Flat range (halted / illiquid bar): treat as mid-range rather than NaN.
+    out.push(range > 0 ? ((candles[i].close - ll) / range) * 100 : 50);
+  }
+  return out;
+}
+
+function smaSeries(values: number[], period: number): number[] {
+  const out: number[] = [];
+  for (let i = period - 1; i < values.length; i++) {
+    let s = 0;
+    for (let j = i - period + 1; j <= i; j++) s += values[j];
+    out.push(s / period);
+  }
+  return out;
+}
+
+export function stochastic(
+  candles: Candle[],
+  period = 14,
+  smoothK = 3,
+  smoothD = 3,
+): StochasticSnapshot | null {
+  if (candles.length < period + smoothK + smoothD) return null;
+  const raw = rawStochSeries(candles, period);
+  const kSeries = smaSeries(raw, smoothK);
+  const dSeries = smaSeries(kSeries, smoothD);
+  if (kSeries.length < 2 || dSeries.length < 2) return null;
+
+  const k = kSeries[kSeries.length - 1];
+  const kPrev = kSeries[kSeries.length - 2];
+  const d = dSeries[dSeries.length - 1];
+  const dPrev = dSeries[dSeries.length - 2];
+  if (![k, kPrev, d, dPrev].every(Number.isFinite)) return null;
+
+  const bullCross = kPrev <= dPrev && k > d;
+  const bearCross = kPrev >= dPrev && k < d;
+  return {
+    k,
+    d,
+    oversold: k < 20,
+    overbought: k > 80,
+    bull_cross: bullCross,
+    bear_cross: bearCross,
+    bull_cross_from_oversold: bullCross && kPrev < 20,
+    rising: k > kPrev,
+  };
+}

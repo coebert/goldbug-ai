@@ -24,6 +24,19 @@ vi.mock("../../signals-extended.server", () => ({
   averageDailyVolume: () => 1_000_000,
   volumeWeightedMomentum: () => 0.03,
   weeklySnapshot: (c: Array<unknown>) => (c.length >= 30 ? { weekly_trend_up: true, weekly_rsi14: 61 } : null),
+  stochastic: (c: Array<unknown>) =>
+    c.length >= 30
+      ? {
+          k: 24,
+          d: 20,
+          oversold: false,
+          overbought: false,
+          bull_cross: true,
+          bear_cross: false,
+          bull_cross_from_oversold: true,
+          rising: true,
+        }
+      : null,
 }));
 
 import { classesFromUniverse, buildCandidateFeatures } from "../candidate-features.server";

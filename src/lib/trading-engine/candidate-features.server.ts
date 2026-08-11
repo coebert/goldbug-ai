@@ -15,6 +15,8 @@ import {
   averageDailyVolume,
   volumeWeightedMomentum,
   weeklySnapshot,
+  stochastic,
+  type StochasticSnapshot,
 } from "../signals-extended.server";
 import type { SentimentMomentum } from "../sentiment.server";
 import type { SymbolEventFeatures } from "../market-events";
@@ -56,6 +58,8 @@ export async function buildCandidateFeatures(
     vw_momentum_10d: number | null;
     weekly_trend_up: boolean;
     weekly_rsi14: number | null;
+    // Stochastic oscillator (14/3/3) — entry timing.
+    stochastic: StochasticSnapshot | null;
     // Evidence-based range-breakout state (Donchian base + ATR penetration
     // + volume confirmation + failure history).
     breakout: BreakoutEvidence | null;
@@ -103,6 +107,7 @@ export async function buildCandidateFeatures(
         vw_momentum_10d: volumeWeightedMomentum(candles, 10),
         weekly_trend_up: wk?.weekly_trend_up ?? false,
         weekly_rsi14: wk?.weekly_rsi14 ?? null,
+        stochastic: stochastic(candles),
         breakout: detectBreakout(candles),
         news_score: null,
         news_contributors: 0,
