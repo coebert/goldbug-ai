@@ -48,6 +48,8 @@ const data: SpilloverHeatmapResponse = {
 const cells = () => Array.from(document.querySelectorAll("td button"));
 
 describe("SpilloverHeatmapViewer", () => {
+  afterEach(cleanup);
+
   it("renders a square grid with one button per cluster pair", () => {
     render(<SpilloverHeatmapViewer data={data} />);
     expect(cells()).toHaveLength(9);
