@@ -132,8 +132,8 @@ export function normalisePortfolio(p: RiskPanelPortfolio): {
   netFlow: number;
   fxKnown: boolean;
 } {
-  const fxKnown = p.fxRate == null ? (p.currency ?? "") === "" || p.fxRate === undefined : true;
   const rate = typeof p.fxRate === "number" && p.fxRate > 0 ? p.fxRate : 1;
+
 
   const hasSplit = p.equity.some(
     (e) => typeof e.cash === "number" && typeof e.holdingsValue === "number",
