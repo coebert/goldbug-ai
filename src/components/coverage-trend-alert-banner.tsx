@@ -67,24 +67,32 @@ export function CoverageTrendAlertBanner({
 
   if (dismissed || !alert?.shouldAlert) return null;
 
-  const severe = alert.severity === "warning" || alert.severity === "critical";
+  const critical = alert.severity === "critical";
+  const severe = critical || alert.severity === "warning";
   const [recent, prior] = alert.windows;
 
   return (
     <Alert
       variant="destructive"
       className={cn(
-        severe
-          ? "border-amber-500/50 bg-amber-500/5 text-amber-100"
-          : "border-sky-500/50 bg-sky-500/5 text-sky-100",
+        critical
+          ? "border-red-500/60 bg-red-500/10 text-red-100"
+          : severe
+            ? "border-amber-500/50 bg-amber-500/5 text-amber-100"
+            : "border-sky-500/50 bg-sky-500/5 text-sky-100",
         className,
       )}
     >
       <TrendingDown className="h-4 w-4" />
       <AlertTitle className="flex items-center justify-between gap-2">
-        <span>
-          {alert.title}
-          {series?.label ? ` — ${series.label}` : ""}
+        <span className="flex items-center gap-2">
+          <span className="rounded-sm border border-current/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+            {alert.severity}
+          </span>
+          <span>
+            {alert.title}
+            {series?.label ? ` — ${series.label}` : ""}
+          </span>
         </span>
         <Button
           type="button"

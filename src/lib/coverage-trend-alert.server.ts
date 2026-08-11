@@ -60,6 +60,8 @@ export function maybeNotifyCoverageTrend(params: {
         portfolio_id: portfolioId,
         details: {
           reason: alert.reason,
+          severity: alert.severity,
+          gap_pct: alert.gapPct,
           recent_pct: alert.recentPct,
           prior_pct: alert.priorPct,
           earlier_pct: alert.earlierPct,
@@ -98,6 +100,7 @@ export function maybeNotifyCoverageTrend(params: {
           portfolioName: portfolioName ?? null,
           severity: alert.severity,
           reason: alert.reason,
+          gapPct: alert.gapPct,
           recentPct: alert.recentPct,
           priorPct: alert.priorPct,
           earlierPct: alert.earlierPct,
