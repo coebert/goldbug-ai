@@ -254,10 +254,14 @@ export function FrictionKpiCard({
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               Change in cost: {signedBps(report.attribution.deltas.frictionBpsPer30d)} per 30 days.{" "}
-              {report.overlay.degraded
-                ? "Costs are modelled — the broker reported no fees on these trades."
-                : report.overlay.note}
+              {report.kpi.brokerCoverage >= 0.999
+                ? "Every trade here is priced from the broker's own charge report."
+                : report.kpi.brokerCoverage > 0
+                  ? `${Math.round(report.kpi.brokerCoverage * 100)}% of trades are priced from the broker's charge report; the rest use our cost model.`
+                  : "Costs are modelled — the broker has not reported fees on these trades yet."}{" "}
+              {report.overlay.degraded ? "" : report.overlay.note}
             </p>
+
           </div>
         )}
       </CardContent>
