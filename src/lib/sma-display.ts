@@ -125,6 +125,9 @@ const TREND_SORTS: readonly TrendSort[] = [
 
 export const TREND_SORT_KEY = "home-sma-trend-sort";
 export const TREND_FILTER_KEY = "home-sma-trend-filter";
+/** Optional tie-breaker sort applied after the primary sort. */
+export const TREND_SORT2_KEY = "home-sma-trend-sort2";
+
 
 /** Scores at or beyond this magnitude count as a meaningful trend. */
 export const TREND_SIGNIFICANT_SCORE = 20;
