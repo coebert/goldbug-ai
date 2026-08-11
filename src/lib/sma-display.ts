@@ -179,6 +179,8 @@ export function rankByTrendStrength<T extends TrendRankEntry>(
   entries: readonly T[],
   sort: TrendSort,
   filter: TrendFilter,
+  /** Optional tie-breaker applied when the primary values are equal. */
+  secondary: TrendSort = "selection",
 ): T[] {
   const kept = entries.filter((e) => {
     if (e.favorite) return true;
@@ -191,17 +193,35 @@ export function rankByTrendStrength<T extends TrendRankEntry>(
   const spec = trendSortSpec(sort);
   const pin = (list: T[]) => [...list.filter((e) => e.favorite), ...list.filter((e) => !e.favorite)];
   if (!spec) return pin(kept);
-  const value = (e: T) =>
-    spec.field === "score" ? e.score : spec.field === "slope" ? (e.slope ?? null) : (e.volatility ?? null);
-  const ranked = kept.filter((e) => value(e) != null);
-  const unranked = kept.filter((e) => value(e) == null);
+
+  const read = (e: T, field: "score" | "slope" | "volatility") =>
+    field === "score" ? e.score : field === "slope" ? (e.slope ?? null) : (e.volatility ?? null);
+  const primary = (e: T) => read(e, spec.field);
+  const tie = trendSortSpec(secondary);
+
+  const ranked = kept.filter((e) => primary(e) != null);
+  const unranked = kept.filter((e) => primary(e) == null);
+  // Index map keeps the sort stable on a full tie (selection order wins).
+  const order = new Map(kept.map((e, i) => [e, i] as const));
   ranked.sort((a, b) => {
-    const av = value(a) as number;
-    const bv = value(b) as number;
-    return spec.desc ? bv - av : av - bv;
+    const d = spec.desc
+      ? (primary(b) as number) - (primary(a) as number)
+      : (primary(a) as number) - (primary(b) as number);
+    if (d !== 0) return d;
+    if (tie && tie.field !== spec.field) {
+      const av = read(a, tie.field);
+      const bv = read(b, tie.field);
+      if (av != null && bv != null) {
+        const t = tie.desc ? bv - av : av - bv;
+        if (t !== 0) return t;
+      } else if (av != null) return -1;
+      else if (bv != null) return 1;
+    }
+    return (order.get(a) ?? 0) - (order.get(b) ?? 0);
   });
   return pin([...ranked, ...unranked]);
 }
+
 
 /** Storage key for pinned markets on the home card. */
 export const SMA_FAVORITES_KEY = "home-sma-favorites";
