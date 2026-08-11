@@ -113,6 +113,47 @@ const ANNOTATION_TONE: Record<string, string> = {
   range_low: CHART_ROLE.benchmark,
 };
 
+function AnnotationSources({ sources }: { sources: ChartAnnotation["sources"] }) {
+  if (!sources?.length) {
+    return (
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        No stored headlines within 2 days of this date — the wording comes from the price move alone.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        Headlines the AI saw
+      </div>
+      <ul className="space-y-1">
+        {sources.map((n, i) => (
+          <li key={`${n.date}-${i}`} className="text-xs leading-snug">
+            <span className="tabular-nums text-muted-foreground">
+              {n.at ? formatUkDateTime(n.at) : formatUkDate(`${n.date}T00:00:00Z`)}
+            </span>
+            {n.source ? <span className="text-muted-foreground"> · {n.source}</span> : null}
+            <br />
+            {n.url ? (
+              <a
+                href={n.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-primary"
+              >
+                {n.headline}
+              </a>
+            ) : (
+              <span>{n.headline}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 
 function AnnotationList({
   annotations,
