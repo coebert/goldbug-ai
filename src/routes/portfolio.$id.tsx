@@ -202,6 +202,7 @@ import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidit
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
 import { RelativeStrengthCard } from "@/components/relative-strength-card";
+import { FrictionKpiCard } from "@/components/friction-kpi-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { capitalAt, EquityPctChart } from "@/components/equity-pct-chart";
@@ -1160,6 +1161,15 @@ function PortfolioPage() {
                 {p && (
                   <div className="mb-4">
                     <RelativeStrengthCard
+                      portfolioId={id}
+                      currency={String(p.currency ?? "GBP")}
+                      enabled={ready}
+                    />
+                  </div>
+                )}
+                {p && (
+                  <div className="mb-4">
+                    <FrictionKpiCard
                       portfolioId={id}
                       currency={String(p.currency ?? "GBP")}
                       enabled={ready}

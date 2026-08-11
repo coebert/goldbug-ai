@@ -1,0 +1,163 @@
+/**
+ * Server-side loader for the Phase 4 friction KPI.
+ *
+ * Reads the realised fill tape and prices each fill twice: what the broker
+ * booked, and what our model says it should have cost. Both numbers travel to
+ * the client so the card can say "the broker charged X, we modelled Y" rather
+ * than presenting one of them as truth.
+ */
+
+import { estimateTradeCosts } from "./trade-viability-gate";
+import { convertAmount } from "./fx.server";
+import {
+  computeFrictionKpi,
+  beforeAfterAttribution,
+  realisedCostOverlay,
+  FRICTION_WINDOW_DAYS,
+  type BeforeAfterAttribution,
+  type FrictionFill,
+  type FrictionKpi,
+  type RealisedCostOverlay,
+} from "./friction-kpi";
+
+/**
+ * When the Phase 1 cost governor (min ticket, friction budget, daily cap,
+ * per-symbol cooldown) started gating live routing. Fills before this instant
+ * are the ungoverned tape the plan was written against.
+ */
+export const COST_GOVERNOR_CUTOVER_ISO = "2026-08-11T00:00:00.000Z";
+
+/** How much tape the before/after split looks at. Long enough to have a "before". */
+const ATTRIBUTION_DAYS = 90;
+
+export type FrictionReport = {
+  kpi: FrictionKpi;
+  attribution: BeforeAfterAttribution;
+  overlay: RealisedCostOverlay;
+  currency: string;
+  asOf: string;
+};
+
+type DbClient = { from: (t: string) => any };
+
+async function makeConverter(baseCcy: string) {
+  const cache = new Map<string, number>();
+  return async (amount: number, ccy: string): Promise<number> => {
+    const from = (ccy || baseCcy).toUpperCase();
+    if (!Number.isFinite(amount) || amount === 0) return 0;
+    if (from === baseCcy) return amount;
+    let rate = cache.get(from);
+    if (rate === undefined) {
+      try {
+        const res = await convertAmount(1, from, baseCcy);
+        rate = Number.isFinite(res.amount) && res.amount > 0 ? res.amount : 1;
+      } catch {
+        rate = 1;
+      }
+      cache.set(from, rate);
+    }
+    return amount * rate;
+  };
+}
+
+export async function loadFrictionReport(args: {
+  db: DbClient;
+  portfolioId: string;
+  baseCcy?: string;
+  windowDays?: number;
+  cutoverIso?: string;
+  now?: Date;
+}): Promise<FrictionReport> {
+  const base = (args.baseCcy || "GBP").toUpperCase();
+  const windowDays = args.windowDays ?? FRICTION_WINDOW_DAYS;
+  const now = args.now ?? new Date();
+  const toBase = await makeConverter(base);
+
+  let navBase = 0;
+  try {
+    const snap = await args.db
+      .from("equity_snapshots")
+      .select("total_value")
+      .eq("portfolio_id", args.portfolioId)
+      .order("snapshot_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    navBase = Number(snap?.data?.total_value ?? 0) || 0;
+  } catch {
+    navBase = 0;
+  }
+
+  const sinceAttribution = new Date(now.getTime() - ATTRIBUTION_DAYS * 86_400_000).toISOString();
+  let rows: Array<Record<string, unknown>> = [];
+  try {
+    const res = await args.db
+      .from("live_fills")
+      .select("symbol, side, quantity, fill_price, fee, currency, filled_at")
+      .eq("portfolio_id", args.portfolioId)
+      .gte("filled_at", sinceAttribution)
+      .order("filled_at", { ascending: true })
+      .limit(5000);
+    rows = (res?.data ?? []) as Array<Record<string, unknown>>;
+  } catch {
+    rows = [];
+  }
+
+  const all: FrictionFill[] = [];
+  for (const r of rows) {
+    const symbol = String(r["symbol"] ?? "");
+    const side = String(r["side"] ?? "").toLowerCase() === "sell" ? "sell" : "buy";
+    const quantity = Number(r["quantity"] ?? 0);
+    const price = Number(r["fill_price"] ?? 0);
+    const filledAt = String(r["filled_at"] ?? "");
+    if (!symbol || !(quantity > 0) || !(price > 0) || !filledAt) continue;
+    const ccy = String(r["currency"] ?? base).toUpperCase();
+    const c = estimateTradeCosts({ symbol, side, quantity, price });
+    const reported = Number(r["fee"] ?? 0);
+
+    all.push({
+      symbol,
+      side,
+      notionalBase: await toBase(c.notional, ccy),
+      feeReportedBase: await toBase(Number.isFinite(reported) ? Math.max(0, reported) : 0, ccy),
+      feeModelledBase: await toBase(c.oneWayCost, ccy),
+      commissionModelledBase: await toBase(c.commission, ccy),
+      spreadModelledBase: await toBase(c.halfSpread, ccy),
+      taxModelledBase: await toBase(c.stampDuty + c.ptmLevy, ccy),
+      filledAt: new Date(Date.parse(filledAt)).toISOString(),
+    });
+  }
+
+  const windowStart = now.getTime() - windowDays * 86_400_000;
+  const windowFills = all.filter((f) => Date.parse(f.filledAt) >= windowStart);
+
+  let equity: Array<{ date: string; totalValue: number }> = [];
+  try {
+    const res = await args.db
+      .from("equity_snapshots")
+      .select("snapshot_date, total_value")
+      .eq("portfolio_id", args.portfolioId)
+      .gte("snapshot_date", sinceAttribution.slice(0, 10))
+      .order("snapshot_date", { ascending: true })
+      .limit(400);
+    equity = ((res?.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
+      date: String(e["snapshot_date"] ?? ""),
+      totalValue: Number(e["total_value"] ?? 0),
+    }));
+  } catch {
+    equity = [];
+  }
+
+  return {
+    kpi: computeFrictionKpi({ fills: windowFills, navBase, windowDays }),
+    attribution: beforeAfterAttribution({
+      fills: all,
+      cutoverIso: args.cutoverIso ?? COST_GOVERNOR_CUTOVER_ISO,
+      navBase,
+      equity,
+      toIso: now.toISOString(),
+    }),
+    overlay: realisedCostOverlay({ fills: all }),
+    currency: base,
+    asOf: now.toISOString(),
+  };
+}
