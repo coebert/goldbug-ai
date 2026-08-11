@@ -26,7 +26,7 @@ export async function explainChartEvents(args: {
   if (!events.length) return [];
 
   const key = process.env["LOVABLE_API_KEY"];
-  if (!key) return mergeAnnotations(events, {}, null);
+  if (!key) return mergeAnnotations(events, {}, null, news);
 
   try {
     const gateway = createLovableAiGatewayProvider(key);
@@ -35,9 +35,9 @@ export async function explainChartEvents(args: {
       prompt: buildAnnotationPrompt(label, symbol, days, events, news),
     });
     const notes = parseAnnotationReply(text ?? "");
-    return mergeAnnotations(events, notes, MODEL);
+    return mergeAnnotations(events, notes, MODEL, news);
   } catch (err) {
     console.warn("explainChartEvents: falling back to deterministic notes", err);
-    return mergeAnnotations(events, {}, null);
+    return mergeAnnotations(events, {}, null, news);
   }
 }

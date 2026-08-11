@@ -120,3 +120,41 @@ describe("buildAnnotationPrompt", () => {
     expect(prompt).toContain("JSON only");
   });
 });
+
+describe("annotation evidence", () => {
+  it("attaches the nearby headlines used for each event", () => {
+    const event = {
+      id: "e1",
+      kind: "spike_up" as const,
+      index: 3,
+      date: "2026-03-10",
+      close: 100,
+      magnitudePct: 4.2,
+      label: "Jump",
+      fallbackNote: "Rose 4.2% in a day.",
+    };
+    const news = [
+      { date: "2026-03-09", headline: "Rate cut hopes lift stocks", source: "Reuters", url: "https://x", at: "2026-03-09T08:00:00Z" },
+      { date: "2026-01-01", headline: "Unrelated", source: "AP" },
+    ];
+    const [annotation] = mergeAnnotations([event], { e1: "Jumped on rate-cut hopes." }, "m", news);
+    expect(annotation.sources).toHaveLength(1);
+    expect(annotation.sources[0].headline).toBe("Rate cut hopes lift stocks");
+    expect(annotation.sources[0].at).toBe("2026-03-09T08:00:00Z");
+  });
+
+  it("returns an empty source list when no headlines are near", () => {
+    const event = {
+      id: "e2",
+      kind: "range_low" as const,
+      index: 1,
+      date: "2026-03-10",
+      close: 90,
+      magnitudePct: null,
+      label: "Low",
+      fallbackNote: "Lowest point in range.",
+    };
+    const [annotation] = mergeAnnotations([event], {}, null, []);
+    expect(annotation.sources).toEqual([]);
+  });
+});
