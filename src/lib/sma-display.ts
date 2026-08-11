@@ -102,9 +102,26 @@ export function resolveTrendBasis(
   return ordered[ordered.length - 1] ?? null;
 }
 
-/** Sort / filter modes for the home card's trend-strength ranking. */
-export type TrendSort = "selection" | "strongest" | "weakest";
+/** Sort / filter modes for the home card's trend ranking. */
+export type TrendSort =
+  | "selection"
+  | "strongest"
+  | "weakest"
+  | "slope-desc"
+  | "slope-asc"
+  | "vol-desc"
+  | "vol-asc";
 export type TrendFilter = "all" | "up" | "down" | "significant";
+
+const TREND_SORTS: readonly TrendSort[] = [
+  "selection",
+  "strongest",
+  "weakest",
+  "slope-desc",
+  "slope-asc",
+  "vol-desc",
+  "vol-asc",
+];
 
 export const TREND_SORT_KEY = "home-sma-trend-sort";
 export const TREND_FILTER_KEY = "home-sma-trend-filter";
@@ -113,19 +130,50 @@ export const TREND_FILTER_KEY = "home-sma-trend-filter";
 export const TREND_SIGNIFICANT_SCORE = 20;
 
 export function parseTrendSort(raw: string | null | undefined): TrendSort {
-  return raw === "strongest" || raw === "weakest" ? raw : "selection";
+  return TREND_SORTS.includes(raw as TrendSort) ? (raw as TrendSort) : "selection";
 }
 
 export function parseTrendFilter(raw: string | null | undefined): TrendFilter {
   return raw === "up" || raw === "down" || raw === "significant" ? raw : "all";
 }
 
+/** Metric a sort mode reads, and whether it runs high→low. */
+export function trendSortSpec(
+  sort: TrendSort,
+): { field: "score" | "slope" | "volatility"; desc: boolean } | null {
+  switch (sort) {
+    case "strongest":
+      return { field: "score", desc: true };
+    case "weakest":
+      return { field: "score", desc: false };
+    case "slope-desc":
+      return { field: "slope", desc: true };
+    case "slope-asc":
+      return { field: "slope", desc: false };
+    case "vol-desc":
+      return { field: "volatility", desc: true };
+    case "vol-asc":
+      return { field: "volatility", desc: false };
+    default:
+      return null;
+  }
+}
+
+export type TrendRankEntry = {
+  symbol: string;
+  score: number | null;
+  /** Annualised slope of the basis average, in % per year. */
+  slope?: number | null;
+  /** Annualised volatility, in % per year. */
+  volatility?: number | null;
+};
+
 /**
- * Order and filter symbols by trend-strength score. Entries with no score yet
- * (still loading, or too little history) keep their selection order and are
- * never filtered out, so the card never silently hides a chosen market.
+ * Order and filter symbols by trend metrics. Entries with no value yet (still
+ * loading, or too little history) keep their selection order at the end and
+ * are never filtered out, so the card never silently hides a chosen market.
  */
-export function rankByTrendStrength<T extends { symbol: string; score: number | null }>(
+export function rankByTrendStrength<T extends TrendRankEntry>(
   entries: readonly T[],
   sort: TrendSort,
   filter: TrendFilter,
@@ -137,13 +185,18 @@ export function rankByTrendStrength<T extends { symbol: string; score: number | 
     if (filter === "significant") return Math.abs(e.score) >= TREND_SIGNIFICANT_SCORE;
     return true;
   });
-  if (sort === "selection") return kept;
-  const scored = kept.filter((e) => e.score != null);
-  const unscored = kept.filter((e) => e.score == null);
-  scored.sort((a, b) =>
-    sort === "strongest" ? (b.score as number) - (a.score as number) : (a.score as number) - (b.score as number),
-  );
-  return [...scored, ...unscored];
+  const spec = trendSortSpec(sort);
+  if (!spec) return kept;
+  const value = (e: T) =>
+    spec.field === "score" ? e.score : spec.field === "slope" ? (e.slope ?? null) : (e.volatility ?? null);
+  const ranked = kept.filter((e) => value(e) != null);
+  const unranked = kept.filter((e) => value(e) == null);
+  ranked.sort((a, b) => {
+    const av = value(a) as number;
+    const bv = value(b) as number;
+    return spec.desc ? bv - av : av - bv;
+  });
+  return [...ranked, ...unranked];
 }
 
 /** Home card can chart up to this many markets side by side. */
