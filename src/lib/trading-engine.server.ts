@@ -3183,6 +3183,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     srvLog.warn("Signal-decay update skipped:", e),
   );
 
+  // Phase 3 item 11 — same measurement on the live alpha taxonomy; feeds
+  // next run's adaptive weight multipliers.
+  import("./alpha/model-performance.server")
+    .then((m) => m.updateAlphaModelPerformance(portfolioId, asOf))
+    .catch((e) => srvLog.warn("Alpha-model performance update skipped:", e));
+
   // K. Calibration loop: recompute Brier score & global sizing multiplier for next cycle.
   computeAndPersistCalibration(portfolioId, asOf).catch((e) =>
     srvLog.warn("Calibration update skipped:", e),
