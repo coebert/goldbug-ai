@@ -1044,6 +1044,10 @@ async function main() {
     if (!spilloverMode && !attributionMode) return;
   }
 
+  // Any run that did not go through --oos-corr still saves its full-tape fit.
+  writeCalibrationSnapshot();
+
+
   if (spilloverMode) {
 
     const spill = clusterSpilloverMatrix(seriesBySymbol, { ...calibOpts, volZ });
