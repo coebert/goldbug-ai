@@ -19,6 +19,13 @@ import type { CoverageSeries } from "./fee-coverage-trend";
 
 /** Coverage floor, in percentage points, for the trailing 7-day window. */
 export const COVERAGE_TREND_FLOOR_PCT = 70;
+/**
+ * Points below the floor at which a shortfall stops being a nuisance and
+ * becomes critical: at floor-25 (45% by default) most of the recent tape is
+ * modelled rather than invoiced, so the friction KPI can no longer be read as
+ * a measurement at all.
+ */
+export const COVERAGE_TREND_CRITICAL_GAP_PCT = 25;
 /** Points of decline that count as a real deterioration rather than noise. */
 export const COVERAGE_TREND_STEP_PCT = 5;
 /** Days per comparison window. */
@@ -27,6 +34,8 @@ export const COVERAGE_TREND_WINDOW_DAYS = 7;
 const MIN_DAYS_PER_WINDOW = 3;
 
 export type CoverageTrendAlertReason = "below_floor" | "deteriorating" | "both";
+export type CoverageTrendSeverity = "info" | "warning" | "critical";
+
 
 /** One comparison window, carrying the dates and counts behind its number. */
 export type CoverageWindowSummary = {
@@ -48,7 +57,10 @@ export type CoverageWindowSummary = {
 export type CoverageTrendAlert = {
   shouldAlert: boolean;
   reason: CoverageTrendAlertReason | null;
-  severity: "info" | "warning" | "critical";
+  severity: CoverageTrendSeverity;
+  /** Points below the floor (positive = shortfall), null when not below it. */
+  gapPct: number | null;
+
   /** Mean coverage over the most recent window, 0..100, or null. */
   recentPct: number | null;
   /** Mean coverage over the preceding window. */
@@ -93,10 +105,11 @@ function windowSummary(
 
 export function evaluateCoverageTrendAlert(
   series: CoverageSeries,
-  opts: { floorPct?: number; stepPct?: number; windowDays?: number } = {},
+  opts: { floorPct?: number; stepPct?: number; windowDays?: number; criticalGapPct?: number } = {},
 ): CoverageTrendAlert {
   const floor = opts.floorPct ?? COVERAGE_TREND_FLOOR_PCT;
   const step = opts.stepPct ?? COVERAGE_TREND_STEP_PCT;
+  const criticalGap = opts.criticalGapPct ?? COVERAGE_TREND_CRITICAL_GAP_PCT;
   const windowDays = Math.max(1, Math.trunc(opts.windowDays ?? COVERAGE_TREND_WINDOW_DAYS));
 
   const recent = windowSummary(series, 0, windowDays);
@@ -111,6 +124,7 @@ export function evaluateCoverageTrendAlert(
     shouldAlert: false,
     reason: null,
     severity: "info",
+    gapPct: null,
     recentPct,
     priorPct,
     earlierPct,
@@ -136,26 +150,56 @@ export function evaluateCoverageTrendAlert(
   const reason: CoverageTrendAlertReason =
     belowFloor && deteriorating ? "both" : belowFloor ? "below_floor" : "deteriorating";
 
+  const gapPct = belowFloor ? Math.round((floor - recentPct) * 10) / 10 : null;
+
+  // Severity ladder:
+  //   info     — still above the floor, but sliding two windows running.
+  //   warning  — under the floor, or the slide has become steep (>= 2 steps
+  //              per window) even while above it.
+  //   critical — a deep shortfall (>= criticalGap below the floor), or under
+  //              the floor *and* still falling, which means it will get worse.
+  const steepSlide =
+    priorPct != null && earlierPct != null && recentPct <= priorPct - 2 * step && priorPct <= earlierPct - 2 * step;
+  let severity: CoverageTrendSeverity;
+  if (gapPct != null && (gapPct >= criticalGap || deteriorating)) severity = "critical";
+  else if (belowFloor || steepSlide) severity = "warning";
+  else severity = "info";
+
   const slide =
     priorPct != null && earlierPct != null
       ? ` It has fallen across two consecutive windows: ${earlierPct}% → ${priorPct}% → ${recentPct}%.`
       : "";
 
+  const severityNote =
+    severity === "critical"
+      ? gapPct != null && gapPct >= criticalGap
+        ? ` That is ${gapPct} points below the floor — treat the friction KPI as an estimate, not a measurement.`
+        : " It is below the floor and still falling, so expect it to worsen without a fix."
+      : "";
+
   const body = belowFloor
-    ? `Only ${recentPct}% of the last ${windowDays} days of fills carry a booked Saxo charge, below the ${floor}% floor. Trading costs for the rest are modelled, so the friction figure is a projection.${deteriorating ? slide : ""}`
+    ? `Only ${recentPct}% of the last ${windowDays} days of fills carry a booked Saxo charge, below the ${floor}% floor. Trading costs for the rest are modelled, so the friction figure is a projection.${deteriorating ? slide : ""}${severityNote}`
     : `Broker charge coverage is sliding.${slide} It is still above the ${floor}% floor, but the trend points at charges that are no longer matching.`;
+
+  const title = belowFloor
+    ? severity === "critical"
+      ? "Broker charge coverage critically low"
+      : "Broker charge coverage below floor"
+    : "Broker charge coverage degrading";
 
   return {
     shouldAlert: true,
     reason,
-    severity: belowFloor ? "warning" : "info",
+    severity,
+    gapPct,
     recentPct,
     priorPct,
     earlierPct,
     windows,
-    title: belowFloor ? "Broker charge coverage below floor" : "Broker charge coverage degrading",
+    title,
     body,
   };
+
 }
 
 /** "01 Jul – 07 Jul" for a window, for banners and notification bodies. */

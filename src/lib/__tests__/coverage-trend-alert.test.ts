@@ -112,3 +112,50 @@ describe("coverage window summaries", () => {
     expect(a.windows[1].coveragePct).toBeNull();
   });
 });
+
+describe("severity ladder", () => {
+  const flatN = (v: number, n: number) => Array.from({ length: n }, () => v);
+
+  it("grades a shallow shortfall as warning with the gap in points", () => {
+    const a = evaluateCoverageTrendAlert(series([...flatN(95, 14), ...flatN(60, 7)]));
+    expect(a.severity).toBe("warning");
+    expect(a.gapPct).toBe(10);
+    expect(a.title).toBe("Broker charge coverage below floor");
+  });
+
+  it("grades a deep shortfall as critical", () => {
+    const a = evaluateCoverageTrendAlert(series([...flatN(95, 14), ...flatN(30, 7)]));
+    expect(a.severity).toBe("critical");
+    expect(a.gapPct).toBe(40);
+    expect(a.title).toMatch(/critically low/);
+    expect(a.body).toMatch(/40 points below the floor/);
+  });
+
+  it("grades below-floor-and-still-falling as critical even when shallow", () => {
+    const a = evaluateCoverageTrendAlert(
+      series([...flatN(80, 7), ...flatN(72, 7), ...flatN(64, 7)]),
+    );
+    expect(a.reason).toBe("both");
+    expect(a.severity).toBe("critical");
+    expect(a.body).toMatch(/still falling/);
+  });
+
+  it("keeps a gentle above-floor slide at info", () => {
+    const a = evaluateCoverageTrendAlert(series([...flatN(99, 7), ...flatN(90, 7), ...flatN(85, 7)]));
+    expect(a.shouldAlert).toBe(true);
+    expect(a.severity).toBe("info");
+    expect(a.gapPct).toBeNull();
+  });
+
+  it("escalates a steep above-floor slide to warning", () => {
+    const a = evaluateCoverageTrendAlert(series([...flatN(99, 7), ...flatN(88, 7), ...flatN(75, 7)]));
+    expect(a.severity).toBe("warning");
+  });
+
+  it("respects a custom critical gap threshold", () => {
+    const a = evaluateCoverageTrendAlert(series([...flatN(95, 14), ...flatN(60, 7)]), {
+      criticalGapPct: 5,
+    });
+    expect(a.severity).toBe("critical");
+  });
+});
