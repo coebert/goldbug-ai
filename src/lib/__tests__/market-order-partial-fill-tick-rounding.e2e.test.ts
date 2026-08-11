@@ -318,8 +318,11 @@ describe("market-order partial fills with tick rounding — fuzzed replays", () 
           0,
         );
         const v = venueOf(o.symbol);
+        // Derive the quote→settlement scale from the production normaliser
+        // rather than assuming it: some LSE lines settle in pounds, not pence.
+        const scale = settlePrice(o.symbol, 1);
         // Any divergence is bounded by half a tick per share.
-        const bound = (v.tick / v.quoteDivisor / 2) * qty + 1e-6;
+        const bound = (v.tick * scale) / 2 * qty + 1e-6;
         expect(Math.abs(viaAverage - viaPrints), `${msg} @${o.id}`).toBeLessThanOrEqual(bound);
       }
     }
