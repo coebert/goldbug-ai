@@ -117,7 +117,8 @@ describe("rules under degraded data", () => {
     const s = computeSmaCrossState(ramp(100, 0.5, 120))!;
     const r = smaCrossBuyRule(s, cfg({ unknownRegimeSizeMult: 0.6, fastBullSizeMult: 1 }));
     expect(r.allow).toBe(true);
-    expect(r.sizeMultiplier).toBeCloseTo(0.6, 10);
+    // 120/200 bars of history → the haircut has already partly recovered.
+    expect(r.sizeMultiplier).toBeCloseTo(0.6 + 0.4 * (120 / 200), 10);
     expect(r.reason).toMatch(/no SMA200/);
   });
 
@@ -131,8 +132,9 @@ describe("rules under degraded data", () => {
     );
     // 0.8 base × a fast-bull boost that scales with conviction, so it lands
     // above the unknown-regime haircut but no higher than the full 0.8×1.25.
-    expect(r.sizeMultiplier).toBeGreaterThan(0.8);
-    expect(r.sizeMultiplier).toBeLessThanOrEqual(0.8 * 1.25 + 1e-9);
+    const base = 0.8 + 0.2 * (s.bars / 200);
+    expect(r.sizeMultiplier).toBeGreaterThan(base);
+    expect(r.sizeMultiplier).toBeLessThanOrEqual(base * 1.25 + 1e-9);
   });
 
   it("never sells off insufficient or unusable history", () => {

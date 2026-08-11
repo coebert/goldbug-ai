@@ -78,19 +78,31 @@ describe("computeSmaCrossState", () => {
 });
 
 describe("smaCrossBuyRule", () => {
-  it("blocks new buys in a death-cross regime by default", () => {
+  it("scales a decisive death regime below the minimum tradeable size", () => {
     const s = computeSmaCrossState(ramp(300, -0.5, 260))!;
     const r = smaCrossBuyRule(s);
     expect(r.allow).toBe(false);
     expect(r.sizeMultiplier).toBe(0);
-    expect(r.reason).toMatch(/death cross/);
+    expect(r.reason).toMatch(/below the ×/);
+    // The sizing itself is still reported so the skip is explainable.
+    expect(r.sizing!.mult).toBeLessThan(DEFAULT_SMA_CROSS_RULES.minTradeableSizeMult);
   });
 
-  it("allows a haircut buy in death regime when deathSizeMult > 0", () => {
+  it("keeps trading a death regime while size stays above the floor", () => {
     const s = computeSmaCrossState(ramp(300, -0.5, 260))!;
-    const r = smaCrossBuyRule(s, cfg({ deathSizeMult: 0.4 }));
+    const r = smaCrossBuyRule(s, cfg({ deathSizeMult: 0.4, minTradeableSizeMult: 0.2 }));
     expect(r.allow).toBe(true);
     expect(r.sizeMultiplier).toBeCloseTo(0.4, 10);
+  });
+
+  it("sizes down continuously rather than gating on the regime flip", () => {
+    const shallow = computeSmaCrossState(ramp(300, -0.02, 260))!;
+    const deep = computeSmaCrossState(ramp(300, -0.5, 260))!;
+    const c = cfg({ deathSizeMult: 0.2, minTradeableSizeMult: 0 });
+    const shallowMult = smaCrossBuyRule(shallow, c).sizeMultiplier;
+    const deepMult = smaCrossBuyRule(deep, c).sizeMultiplier;
+    expect(shallowMult).toBeGreaterThan(deepMult);
+    expect(shallowMult).toBeLessThan(1);
   });
 
   it("upsizes buys in a golden regime", () => {

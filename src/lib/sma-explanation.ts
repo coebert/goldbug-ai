@@ -185,8 +185,8 @@ export function buildSmaExplanation(args: {
     sizeMultiplier = rule.sizeMultiplier;
     if (!rule.allow) {
       kind = "blocked";
-      headline = "Trend rules blocked new buys";
-      detail = `Under the ${riskLevel} setting, ${rule.reason}. Any buy you see here came from a protective or rebalancing path that bypasses the trend veto.`;
+      headline = "Trend strength sized the buy out";
+      detail = `Under the ${riskLevel} setting, ${rule.reason}. Exposure scales with SMA200 regime strength rather than switching off at the cross, so the trade was dropped only because the scaled ticket was too small to be worth placing. Any buy you see here came from a protective or rebalancing path.`;
     } else if (rule.sizeMultiplier > 1.001) {
       kind = "upsized";
       headline = `Buy upsized ×${rule.sizeMultiplier.toFixed(2)}`;
@@ -223,7 +223,9 @@ export function buildSmaExplanation(args: {
     `SMA20 vs SMA50 spread ${fmtPct(fastSpreadPct)} — threshold ${(cfg.fastSeparationPct * 100).toFixed(2)}%`,
     regimeState === "unknown"
       ? "SMA200 unavailable — regime filter skipped, size reduced instead of guessed"
-      : `SMA50 vs SMA200 spread ${fmtPct(regimeSpreadPct)} — threshold ${(cfg.regimeSeparationPct * 100).toFixed(2)}%`,
+      : `SMA50 vs SMA200 spread ${fmtPct(regimeSpreadPct)} — knee ${(cfg.regimeSeparationPct * 100).toFixed(
+          2,
+        )}%, full strength at ${(cfg.regimeSaturationPct * 100).toFixed(1)}%`,
     `Signal strength ${strength}/100 (${strengthLabel(strength)})`,
   ];
   if (args.side === "buy") {
@@ -232,7 +234,9 @@ export function buildSmaExplanation(args: {
       bullets.push(
         `Sizing conviction — regime ${(sizing.components.regimeConviction * 100).toFixed(0)}%, fast cross ${(
           sizing.components.fastConviction * 100
-        ).toFixed(0)}% → ×${sizing.mult.toFixed(2)} (allowed ×${cfg.minSizeMult.toFixed(2)}-×${cfg.maxSizeMult.toFixed(2)})`,
+        ).toFixed(0)}% → ×${sizing.mult.toFixed(2)} (allowed ×${cfg.minSizeMult.toFixed(2)}-×${cfg.maxSizeMult.toFixed(
+          2,
+        )}, buys below ×${cfg.minTradeableSizeMult.toFixed(2)} are skipped)`,
       );
     }
   }

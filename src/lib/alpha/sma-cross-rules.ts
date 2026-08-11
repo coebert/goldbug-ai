@@ -5,8 +5,9 @@
 //   • Fast system — SMA20 vs SMA50. Short-horizon trend flips used to time
 //     entries (bull cross) and to trim/exit stale positions (bear cross).
 //   • Regime system — SMA50 vs SMA200 (the classic golden / death cross).
-//     Slow, structural. A death cross blocks new buys outright and can force
-//     a defensive exit; a golden cross upsizes buys.
+//     Slow, structural. Regime strength scales buy exposure continuously —
+//     deeper death spreads size down until the ticket is no longer worth
+//     placing — and a fresh death cross can force a defensive exit.
 //
 // Every threshold is configurable so the rules can be tuned per risk profile
 // and swept by the parameter optimiser. Crosses must clear a *separation*
@@ -33,7 +34,12 @@ export type SmaCrossRuleConfig = {
   fastBullSizeMult: number;
   /** Extra buy size multiplier while SMA50 > SMA200 (golden regime). */
   goldenSizeMult: number;
-  /** Buy size multiplier while SMA50 < SMA200 (death regime). 0 = block. */
+  /**
+   * Buy size multiplier floor at *full* death-regime strength. Exposure
+   * scales continuously towards this as the SMA50/200 spread deepens; it is
+   * not a gate. Buys stop only when the scaled size falls below
+   * `minTradeableSizeMult`.
+   */
   deathSizeMult: number;
   /** Fraction of a position sold on a confirmed fast bear cross. */
   fastBearSellFraction: number;
@@ -80,6 +86,18 @@ export type SmaCrossRuleConfig = {
   freshnessWeight: number;
   /** Buy multiplier floor when a fast bear cross fires at full conviction. */
   fastBearBuyMult: number;
+  /**
+   * Conviction attributed to a spread sitting exactly on
+   * `regimeSeparationPct`. Gives the regime ramp a soft knee instead of a
+   * dead zone, so size responds smoothly either side of the crossover.
+   */
+  regimeKneeFraction: number;
+  /**
+   * Size multiplier below which a buy is not worth placing. Replaces the old
+   * binary death-cross veto: a shallow death regime merely sizes down, a
+   * decisive one scales exposure under this floor and the buy is skipped.
+   */
+  minTradeableSizeMult: number;
   /** Lower bound on the combined SMA size multiplier for this risk level. */
   minSizeMult: number;
   /** Upper bound on the combined SMA size multiplier for this risk level. */
@@ -95,7 +113,7 @@ export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
   requirePriceConfirmation: true,
   fastBullSizeMult: 1.15,
   goldenSizeMult: 1.1,
-  deathSizeMult: 0,
+  deathSizeMult: 0.2,
   fastBearSellFraction: 0.5,
   deathSellFraction: 1,
   requirePriceConfirmationOnSell: true,
@@ -108,7 +126,9 @@ export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
   fastSaturationPct: 0.025,
   freshnessWeight: 0.5,
   fastBearBuyMult: 0.5,
-  minSizeMult: 0.35,
+  regimeKneeFraction: 0.35,
+  minTradeableSizeMult: 0.45,
+  minSizeMult: 0.15,
   maxSizeMult: 1.3,
 };
 
@@ -335,9 +355,10 @@ export type SmaCrossBuyRule = {
 };
 
 /**
- * Buy-side rule: a death regime vetoes new longs (unless the risk profile
- * allows reduced size), and everything else is sized by conviction —
- * separation depth and cross freshness — inside the risk profile's bounds.
+ * Buy-side rule: everything is sized by conviction — SMA200 regime strength,
+ * fast-cross separation depth and freshness — inside the risk profile's
+ * bounds. A buy is refused only when that sizing drops below
+ * `minTradeableSizeMult`.
  */
 export function smaCrossBuyRule(
   state: SmaCrossState | null | undefined,
@@ -358,21 +379,22 @@ export function smaCrossBuyRule(
     };
   }
 
-  // 1. Regime veto — a death cross blocks discretionary longs outright when
-  // the profile sets `deathSizeMult` to 0. Profiles that allow reduced size
-  // fall through to the conviction sizer, which scales the cut by how deep
-  // the death cross actually is.
-  if (state.regime === "death" && !(cfg.deathSizeMult > 0)) {
+  // 1. Regime response is continuous: size scales with SMA200 regime
+  // strength, and a buy is skipped only when that scaling takes it below the
+  // profile's minimum tradeable size — no binary death-cross gate.
+  const sizing = smaDynamicSizeMultiplier(state, cfg);
+  const floor = Math.max(0, cfg.minTradeableSizeMult);
+  if (sizing.mult < floor) {
     const sep = ((state.regimeSeparationPct ?? 0) * 100).toFixed(2);
     return {
       allow: false,
       sizeMultiplier: 0,
-      reason: `death cross regime (SMA50 ${sep}% vs SMA200) — new buys blocked`,
-      sizing: null,
+      reason: `trend strength scales size to ×${sizing.mult.toFixed(2)}, below the ×${floor.toFixed(
+        2,
+      )} minimum (SMA50 ${sep}% vs SMA200) — buy skipped`,
+      sizing,
     };
   }
-
-  const sizing = smaDynamicSizeMultiplier(state, cfg);
   return {
     allow: true,
     sizeMultiplier: sizing.mult,
