@@ -89,15 +89,16 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
 }
 
 const ANNOTATION_TONE: Record<string, string> = {
-  spike_up: CHART_ROLE.positive ?? CHART_ROLE.highlight,
-  spike_down: CHART_ROLE.negative ?? CHART_ROLE.highlight,
-  golden_cross: CHART_ROLE.positive ?? CHART_ROLE.benchmark,
-  death_cross: CHART_ROLE.negative ?? CHART_ROLE.benchmark,
-  drawdown_trough: CHART_ROLE.negative ?? CHART_ROLE.highlight,
+  spike_up: CHART_ROLE.positive,
+  spike_down: CHART_ROLE.negative,
+  golden_cross: CHART_ROLE.positive,
+  death_cross: CHART_ROLE.negative,
+  drawdown_trough: CHART_ROLE.negative,
   vol_regime: CHART_ROLE.highlight,
   range_high: CHART_ROLE.benchmark,
   range_low: CHART_ROLE.benchmark,
 };
+
 
 function AnnotationList({
   annotations,
