@@ -25,6 +25,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
+import { Route as MarketSymbolRouteImport } from './routes/market.$symbol'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
 import { Route as PortfolioIdSmaReportRouteImport } from './routes/portfolio.$id.sma-report'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
@@ -132,6 +133,11 @@ const WalkForwardIdRoute = WalkForwardIdRouteImport.update({
 const PortfolioIdRoute = PortfolioIdRouteImport.update({
   id: '/portfolio/$id',
   path: '/portfolio/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketSymbolRoute = MarketSymbolRouteImport.update({
+  id: '/market/$symbol',
+  path: '/market/$symbol',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
@@ -308,6 +314,7 @@ export interface FileRoutesByFullPath {
   '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
+  '/market/$symbol': typeof MarketSymbolRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
@@ -354,6 +361,7 @@ export interface FileRoutesByTo {
   '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
+  '/market/$symbol': typeof MarketSymbolRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
@@ -401,6 +409,7 @@ export interface FileRoutesById {
   '/spillover': typeof SpilloverRoute
   '/trades': typeof TradesRoute
   '/long-horizon/$id': typeof LongHorizonIdRoute
+  '/market/$symbol': typeof MarketSymbolRoute
   '/portfolio/$id': typeof PortfolioIdRouteWithChildren
   '/walk-forward/$id': typeof WalkForwardIdRoute
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
@@ -449,6 +458,7 @@ export interface FileRouteTypes {
     | '/spillover'
     | '/trades'
     | '/long-horizon/$id'
+    | '/market/$symbol'
     | '/portfolio/$id'
     | '/walk-forward/$id'
     | '/api/broker-blocks/clear'
@@ -495,6 +505,7 @@ export interface FileRouteTypes {
     | '/spillover'
     | '/trades'
     | '/long-horizon/$id'
+    | '/market/$symbol'
     | '/portfolio/$id'
     | '/walk-forward/$id'
     | '/api/broker-blocks/clear'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
     | '/spillover'
     | '/trades'
     | '/long-horizon/$id'
+    | '/market/$symbol'
     | '/portfolio/$id'
     | '/walk-forward/$id'
     | '/api/broker-blocks/clear'
@@ -588,6 +600,7 @@ export interface RootRouteChildren {
   SpilloverRoute: typeof SpilloverRoute
   TradesRoute: typeof TradesRoute
   LongHorizonIdRoute: typeof LongHorizonIdRoute
+  MarketSymbolRoute: typeof MarketSymbolRoute
   PortfolioIdRoute: typeof PortfolioIdRouteWithChildren
   WalkForwardIdRoute: typeof WalkForwardIdRoute
   ApiBrokerBlocksClearRoute: typeof ApiBrokerBlocksClearRoute
@@ -726,6 +739,13 @@ declare module '@tanstack/react-router' {
       path: '/portfolio/$id'
       fullPath: '/portfolio/$id'
       preLoaderRoute: typeof PortfolioIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/market/$symbol': {
+      id: '/market/$symbol'
+      path: '/market/$symbol'
+      fullPath: '/market/$symbol'
+      preLoaderRoute: typeof MarketSymbolRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/long-horizon/$id': {
@@ -963,6 +983,7 @@ const rootRouteChildren: RootRouteChildren = {
   SpilloverRoute: SpilloverRoute,
   TradesRoute: TradesRoute,
   LongHorizonIdRoute: LongHorizonIdRoute,
+  MarketSymbolRoute: MarketSymbolRoute,
   PortfolioIdRoute: PortfolioIdRouteWithChildren,
   WalkForwardIdRoute: WalkForwardIdRoute,
   ApiBrokerBlocksClearRoute: ApiBrokerBlocksClearRoute,
