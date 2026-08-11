@@ -33,6 +33,12 @@ export const SWING_STYLE_OVERRIDES: Partial<RiskConfig> = {
   initial_stop_atr_mult: 2.0,
   atr_scaled_stop_enabled: true,
   atr_scaled_stop_floor_pct: 0.02,
+  // Swing targets are hit in days, so aim for a nearer ATR multiple.
+  take_profit_enabled: true,
+  atr_take_profit_enabled: true,
+  take_profit_atr_mult: 2.5,
+  atr_take_profit_floor_pct: 0.04,
+  atr_take_profit_cap_pct: 0.20,
   chandelier_enabled: true,
   chandelier_k_base: 2.2,
   chandelier_k_tight: 1.0,
