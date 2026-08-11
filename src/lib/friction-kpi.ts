@@ -45,9 +45,19 @@ export type FrictionFill = {
   spreadModelledBase: number;
   /** Modelled stamp duty + levies, base currency. */
   taxModelledBase: number;
+  /**
+   * The broker's own itemisation, when the cost report supplied one. Present
+   * only for fills whose charges were ingested; when set it is what the
+   * component split is drawn from, because the invoice beats the model's
+   * guess at how the money was divided up.
+   */
+  reportedComponents?: FrictionComponents;
+  /** Where the fee number came from. Drives the KPI's coverage figure. */
+  feeSource?: "broker" | "model" | "none";
   /** ISO instant the fill printed. */
   filledAt: string;
 };
+
 
 /** Governor budget: 40bps of NAV per trailing 30 days. */
 export const FRICTION_BUDGET_BPS = 40;
