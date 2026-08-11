@@ -37,6 +37,26 @@ export function scoreMeanReversion(f: FeatureLike): AlphaScore {
     }
   }
 
+  // Stochastic timing leg — a %K/%D upturn out of oversold is the classic
+  // low-risk dip entry; overbought and rolling over is the worst one.
+  const st = f.stochastic;
+  if (st && Number.isFinite(st.k)) {
+    if (st.bull_cross_from_oversold) {
+      parts.push(1);
+      notes.push(`stoch %K ${st.k.toFixed(0)} cross out of oversold`);
+    } else if (st.oversold && st.rising) {
+      parts.push(0.6);
+      notes.push(`stoch %K ${st.k.toFixed(0)} turning up`);
+    } else if (st.overbought && !st.rising) {
+      parts.push(-0.8);
+      notes.push(`stoch %K ${st.k.toFixed(0)} overbought rollover`);
+    } else if (st.overbought) {
+      parts.push(-0.4);
+    } else {
+      parts.push(0);
+    }
+  }
+
   if (f.macd_bear_cross) {
     parts.push(-0.5);
     notes.push("MACD↓cross veto");
