@@ -45,7 +45,15 @@ export type CalibratableKind = Extract<CorrelationStructureKind, "blocks" | "con
 export type OosCalibrationOptions = CalibrationOptions & {
   /** Per-bar realised-vol z-scores for the whole tape; sliced per fold. */
   volZ?: readonly number[];
+  /**
+   * Stress ρ_within risk control. Each fold's stress lift is scaled by the
+   * bootstrap credibility of that fold's own stress estimate, so a fold with a
+   * thin stress bucket cannot hand the simulator a confident contagion number.
+   * Pass `{ enabled: false }` to use the raw fitted stress ρ.
+   */
+  rhoGovernor?: StressRhoGovernorOptions;
 };
+
 
 /**
  * Bar-window slice of every symbol's series, inclusive of both ends.
