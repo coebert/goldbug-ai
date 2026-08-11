@@ -205,6 +205,8 @@ import { PerformanceDashboardCard } from "@/components/performance-dashboard-car
 import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
 import { RelativeStrengthCard } from "@/components/relative-strength-card";
 import { FrictionKpiCard } from "@/components/friction-kpi-card";
+import { CoverageTrendCard } from "@/components/coverage-trend-card";
+
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { capitalAt, EquityPctChart } from "@/components/equity-pct-chart";
@@ -1180,6 +1182,12 @@ function PortfolioPage() {
                     />
                   </div>
                 )}
+                {p && (
+                  <div className="mb-4">
+                    <CoverageTrendCard />
+                  </div>
+                )}
+
                   </AdvancedSection>
                   <AdvancedSection
                     title="What changed your value"
