@@ -62,7 +62,10 @@ import {
   SMA_PERIODS,
   isSmaPeriod,
   smaKey,
+  crossoverLabel,
+  detectSmaCrossovers,
   type HistoryRange,
+  type SmaCrossover,
   type SmaPeriod,
 } from "@/lib/market-symbol-history";
 
@@ -196,6 +199,10 @@ export function SmaTrendCard() {
 
   const history = query.data;
   const { markets, sectors } = useMemo(groupedSymbols, []);
+  const crossovers = useMemo(
+    () => (history ? detectSmaCrossovers(history.points, periods) : []),
+    [history, periods],
+  );
   const verdict = trendVerdict(periods.map((p) => history?.aboveSma?.[p] ?? null));
   const periodsLabel = periods.map((p) => `${p}`).join("/");
 
@@ -372,6 +379,19 @@ export function SmaTrendCard() {
                       isAnimationActive={false}
                     />
                   ))}
+                  {crossovers.map((c) => (
+                    <ReferenceDot
+                      key={c.id}
+                      x={c.date}
+                      y={c.close}
+                      r={5}
+                      fill={c.direction === "golden" ? CHART_ROLE.positive : CHART_ROLE.negative}
+                      stroke={CHART_ROLE.neutral}
+                      strokeWidth={1}
+                      isFront
+                      ifOverflow="extendDomain"
+                    />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             </ChartFrame>
@@ -395,6 +415,46 @@ export function SmaTrendCard() {
                 <dd className="tabular-nums">{pct(history.maxDrawdownPct)}</dd>
               </div>
             </dl>
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                Crossovers in this window
+                {crossovers.length ? ` (${crossovers.length})` : ""}
+              </p>
+              {crossovers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {periods.length < 2
+                    ? "Pick two or more averages to track crossovers."
+                    : `No ${periodsLabel}-day crossovers over ${rangeLabel(range)}.`}
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {crossovers.slice(0, 6).map((c: SmaCrossover) => {
+                    const up = c.direction === "golden";
+                    const Icon = up ? TrendingUp : TrendingDown;
+                    return (
+                      <li
+                        key={c.id}
+                        className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-surface-2 px-2.5 py-1.5 text-xs"
+                      >
+                        <Icon
+                          className={`h-3.5 w-3.5 shrink-0 ${up ? "text-emerald-500" : "text-destructive"}`}
+                          aria-hidden="true"
+                        />
+                        <span className="tabular-nums text-muted-foreground">{c.date}</span>
+                        <span className="font-medium">{crossoverLabel(c)}</span>
+                        <Badge variant="outline" className={up ? TONE_CLASS.up : TONE_CLASS.down}>
+                          {up ? "Golden cross" : "Death cross"}
+                        </Badge>
+                        <span className="ml-auto tabular-nums text-muted-foreground">
+                          {c.barsAgo === 0 ? "latest bar" : `${c.barsAgo} bars ago`} · {pct(c.sinceChangePct)} since
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </>
         )}
       </CardContent>
