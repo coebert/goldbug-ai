@@ -603,25 +603,11 @@ async function main() {
     console.log("how much of your drawdown budget is an assumption rather than a measurement.");
     return;
   }
-
-
-
   for (const variant of SMA_VARIANTS) {
     // 1. Tune on TRAIN with deterministic execution (the strategy cannot know
     //    which fills will go badly, so it must not be tuned against them).
-    const tuned = folds.map((f) => {
-      let best: SmaVariantParams = GRID[0]!;
-      let bestScore = -Infinity;
-      for (const p of GRID) {
-        const r = simulate(ctx, variant, f.trainStart, f.trainEnd, p, null, null);
-        const score = r.returnPct + r.sharpe * 5 + r.maxDrawdownPct * 0.5;
-        if (score > bestScore) {
-          bestScore = score;
-          best = p;
-        }
-      }
-      return best;
-    });
+    const tuned = tuneVariant(variant);
+
 
     // 2. Deterministic OOS baseline.
     const detFolds = folds.map((f, k) =>
