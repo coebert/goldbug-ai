@@ -98,6 +98,7 @@ export function SmaTrendPanel({
   loading,
   error,
   compact,
+  percentiles,
   onRetry,
   onRemove,
 }: {
@@ -111,6 +112,8 @@ export function SmaTrendPanel({
   error: boolean;
   /** Side-by-side mode: shorter chart, trimmed crossover list. */
   compact: boolean;
+  /** Slope/vol percentile ranks within the compared markets. */
+  percentiles?: TrendPercentiles | null;
   onRetry: () => void;
   onRemove?: () => void;
 }) {
