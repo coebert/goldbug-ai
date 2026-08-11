@@ -54,6 +54,7 @@ import {
   resolveTrendBasis,
   serialiseSmaPeriods,
   type TrendBasis,
+  type TrendPercentiles,
 } from "@/lib/sma-display";
 
 export const TONE_CLASS = {
@@ -98,6 +99,7 @@ export function SmaTrendPanel({
   loading,
   error,
   compact,
+  percentiles,
   onRetry,
   onRemove,
 }: {
@@ -111,6 +113,8 @@ export function SmaTrendPanel({
   error: boolean;
   /** Side-by-side mode: shorter chart, trimmed crossover list. */
   compact: boolean;
+  /** Slope/vol percentile ranks within the compared markets. */
+  percentiles?: TrendPercentiles | null;
   onRetry: () => void;
   onRemove?: () => void;
 }) {
@@ -187,7 +191,7 @@ export function SmaTrendPanel({
             <Badge variant="outline" className={TONE_CLASS[verdict.tone]}>
               {verdict.text}
             </Badge>
-            <TrendStrengthBadge strength={strength} />
+            <TrendStrengthBadge strength={strength} percentiles={percentiles} />
           </div>
 
           <ChartFrame className={compact ? "h-44 w-full" : "h-64 w-full"}>

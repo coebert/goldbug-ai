@@ -22,6 +22,7 @@ import {
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
+import type { TrendPercentiles } from "@/lib/sma-display";
 import type { TrendStrength, TrendStrengthPoint } from "@/lib/market-symbol-history";
 
 const TONE = {
@@ -40,8 +41,23 @@ function signed(v: number, digits = 0) {
   return `${v > 0 ? "+" : ""}${v.toFixed(digits)}`;
 }
 
-export function TrendStrengthBadge({ strength }: { strength: TrendStrength | null }) {
+function ordinal(p: number) {
+  const rem100 = p % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${p}th`;
+  const rem10 = p % 10;
+  return `${p}${rem10 === 1 ? "st" : rem10 === 2 ? "nd" : rem10 === 3 ? "rd" : "th"}`;
+}
+
+export function TrendStrengthBadge({
+  strength,
+  percentiles,
+}: {
+  strength: TrendStrength | null;
+  /** Rank of this market's slope/vol within the currently compared markets. */
+  percentiles?: TrendPercentiles | null;
+}) {
   if (!strength) return null;
+  const rank = percentiles && percentiles.count > 1 ? percentiles : null;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
@@ -51,16 +67,25 @@ export function TrendStrengthBadge({ strength }: { strength: TrendStrength | nul
               Trend strength {signed(strength.score)} · {strength.label}
             </Badge>
             <span className="text-xs tabular-nums text-muted-foreground">
-              slope {signed(strength.slopeAnnualPct)}%/yr · vol{" "}
-              {strength.volatilityPct.toFixed(0)}%/yr · {strength.period}d basis
+              slope {signed(strength.slopeAnnualPct)}%/yr
+              {rank?.slope != null ? ` (${ordinal(rank.slope)} pct)` : ""} · vol{" "}
+              {strength.volatilityPct.toFixed(0)}%/yr
+              {rank?.volatility != null ? ` (${ordinal(rank.volatility)} pct)` : ""} ·{" "}
+              {strength.period}d basis
             </span>
           </span>
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs text-xs">{explain(strength)}</TooltipContent>
+        <TooltipContent className="max-w-xs text-xs">
+          {explain(strength)}
+          {rank && (rank.slope != null || rank.volatility != null)
+            ? ` Percentiles rank this market against the ${rank.count} markets you're comparing (100th = highest).`
+            : ""}
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
 }
+
 
 
 /** Compact meter + numbers for stat grids. */

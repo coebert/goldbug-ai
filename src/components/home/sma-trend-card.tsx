@@ -46,6 +46,7 @@ import {
   parseTrendFilter,
   parseTrendSort,
   rankByTrendStrength,
+  trendPercentiles,
   readStoredSmaPeriods,
   readStoredTrendBasis,
   resolveTrendBasis,
@@ -222,6 +223,7 @@ export function SmaTrendCard() {
       volatility: strength ? strength.volatilityPct : null,
     };
   });
+  const ranks = trendPercentiles(entries);
   const visible = rankByTrendStrength(entries, sort, filter, sort2);
   const hidden = entries.length - visible.length;
 
@@ -413,6 +415,7 @@ export function SmaTrendCard() {
                 loading={Boolean(q?.isLoading)}
                 error={Boolean(q?.isError)}
                 compact={compact}
+                percentiles={ranks[s]}
                 onRetry={() => void q?.refetch()}
                 onRemove={
                   symbols.length > 1
