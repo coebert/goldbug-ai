@@ -281,9 +281,12 @@ export function computeFrictionKpi(args: {
     components,
     reportedBase,
     modelledBase,
-    realisedRatio: reportedBase > 0 && modelledBase > 0 ? reportedBase / modelledBase : null,
+    realisedRatio:
+      invoicedReported > 0 && invoicedModelled > 0 ? invoicedReported / invoicedModelled : null,
     brokerBookedTickets,
     brokerCoverage: tickets > 0 ? brokerBookedTickets / tickets : 0,
+    realisedFrictionBase,
+    estimatedFrictionBase,
     daily,
     annualisedDragPct:
       frictionBps == null || windowDays <= 0
