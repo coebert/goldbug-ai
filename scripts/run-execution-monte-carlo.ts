@@ -773,16 +773,24 @@ async function main() {
   if (sweepMode) {
     const rhos = rhoSweep.length ? rhoSweep : [simCfg.rho];
     const zs = volZSweep.length ? volZSweep : [simCfg.volStressZ];
+    // Each structure is a different answer to "what couples with what?".
+    // Sweeping them shows how much of the joint tail is the coupling assumption.
+    const structs: CorrelationStructure[] = structureSweep.length
+      ? structureSweep.map(buildStructure)
+      : [simCfg.structure!];
     console.log(
       `Sensitivity sweep: ρ ∈ {${rhos.join(", ")}} × vol-z trigger ∈ {${zs.join(", ")}} `
+      + `× structure ∈ {${structs.map((s) => s.kind).join(", ")}} `
       + `· ${sweepPaths} paths/cell · headline breach threshold ${sweepThreshold}%`,
     );
+    for (const s of structs) console.log(`  · ${describeStructure(s)}`);
     console.log();
 
     for (const variant of SMA_VARIANTS) {
       const tuned = tuneVariant(variant);
       console.log(`=== ${variant} ===`);
       const header = [
+        "structure".padEnd(12),
         "rho".padStart(5),
         "volZ".padStart(6),
         "med ret%".padStart(9),
@@ -800,9 +808,20 @@ async function main() {
       console.log(header);
       console.log("-".repeat(header.length));
 
+      for (const structure of structs) {
       for (const rho of rhos) {
         for (const z of zs) {
-          const cfg = { ...simCfg, rho, volStressZ: z };
+          // A bare --rho-sweep still means the global structure: rebuild the
+          // structure at this ρ so the sweep axis actually bites.
+          const cfg = {
+            ...simCfg,
+            rho,
+            volStressZ: z,
+            structure: rhoSweep.length && structure.kind === "global"
+              ? makeCorrelationStructure({ kind: "global", rho })
+              : structure,
+          };
+
           const pathRet: number[] = [];
           const pathDeepestDd: number[] = [];
           /** Did the path's deepest drawdown happen inside the stress regime? */
