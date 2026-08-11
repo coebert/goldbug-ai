@@ -348,6 +348,7 @@ export function optionsFromSnapshot(
     shrink: snap.options.shrink,
     stressZ: snap.options.stressZ,
     minStressShare: snap.options.minStressShare,
+    blend: snap.options.blend,
     ...(groups ? { groups } : {}),
   };
 }
@@ -389,6 +390,7 @@ export function buildCalibrationSnapshot(input: BuildSnapshotInput): Calibration
       shrink: cal.shrink,
       stressZ: input.stressZ,
       minStressShare: input.minStressShare,
+      blend: cal.blend,
     },
     structure: encodeStructure(input.structure),
     pooled: {
