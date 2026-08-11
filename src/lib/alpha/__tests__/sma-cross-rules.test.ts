@@ -18,8 +18,11 @@ const cfg = (o: Partial<SmaCrossRuleConfig> = {}): SmaCrossRuleConfig => ({
 });
 
 describe("computeSmaCrossState", () => {
-  it("returns null with insufficient history", () => {
-    expect(computeSmaCrossState(ramp(100, 0.1, 40))).toBeNull();
+  it("degrades to an insufficient, signal-free state with short history", () => {
+    const s = computeSmaCrossState(ramp(100, 0.1, 40))!;
+    expect(s.quality).toBe("insufficient");
+    expect(s.fastCross).toBeNull();
+    expect(s.regime).toBeNull();
   });
 
   it("detects a fresh bullish SMA20/50 cross after a downtrend reverses", () => {
@@ -110,6 +113,11 @@ describe("smaCrossBuyRule", () => {
       regime: "golden" as const,
       fastSeparationPct: 0.05,
       regimeSeparationPct: 0.11,
+      bars: 260,
+      droppedBars: 0,
+      quality: "full" as const,
+      regimeUnknown: false,
+      warnings: [],
     };
     const r = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2 }));
     expect(r.sizeMultiplier).toBeCloseTo(1.32, 6);
