@@ -314,13 +314,22 @@ export function computeRiskLevelPanel(
 }
 
 export type RiskLadderWarning = {
-  kind: "drawdown-inversion" | "vol-inversion" | "identical-metrics" | "thin-diversification";
+  kind:
+    | "drawdown-inversion"
+    | "vol-inversion"
+    | "identical-metrics"
+    | "thin-diversification"
+    | "fx-unavailable";
   message: string;
 };
 
 /**
  * Sanity checks over the ladder — surfaced in the panel so an operator can
  * verify at a glance that the risk levels are actually behaving differently.
+ *
+ * Comparisons are skipped for any group whose FX conversion failed: two
+ * groups measured in different currencies cannot be ranked, and shouting
+ * "inversion" about them is a false alarm, not a finding.
  */
 export function checkRiskLadder(rows: RiskLevelMetrics[]): RiskLadderWarning[] {
   const warnings: RiskLadderWarning[] = [];
@@ -333,11 +342,22 @@ export function checkRiskLadder(rows: RiskLevelMetrics[]): RiskLadderWarning[] {
   const pairs: Array<[RiskLevelKey, RiskLevelKey]> = [];
   for (let i = 0; i < ladder.length - 1; i++) pairs.push([ladder[i], ladder[i + 1]]);
 
+  for (const r of rows) {
+    if (!r.fxComplete) {
+      warnings.push({
+        kind: "fx-unavailable",
+        message: `${r.riskLevel} risk mixes ${r.currencies.join(" / ") || "multiple"} books but a live FX rate was unavailable — its totals are not comparable yet.`,
+      });
+    }
+  }
+
   for (const [lower, upper] of pairs) {
     const a = by.get(lower);
     const b = by.get(upper);
     if (!a || !b) continue;
     if (a.observations < 3 || b.observations < 3) continue;
+    if (!a.fxComplete || !b.fxComplete) continue;
+
 
     if (Math.abs(a.maxDrawdownPct) > Math.abs(b.maxDrawdownPct) + 0.01) {
       warnings.push({
