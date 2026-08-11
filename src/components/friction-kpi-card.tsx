@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   CartesianGrid,
@@ -13,9 +14,10 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Receipt } from "lucide-react";
+import { Loader2, Receipt } from "lucide-react";
 import { getFrictionReport } from "@/lib/friction-kpi.functions";
 import { FrictionCostDrilldown } from "@/components/friction-cost-drilldown";
+import { backfillBrokerChargesFn } from "@/lib/broker-cost-backfill.functions";
 import { formatMoney } from "@/lib/format-money";
 import { POLL } from "@/lib/query-keys";
 import {
@@ -84,6 +86,19 @@ export function FrictionKpiCard({
     staleTime: 60 * 1000,
   });
 
+  const runBackfill = useServerFn(backfillBrokerChargesFn);
+  // Backfill only ever overwrites a fill's charge with the broker's own number,
+  // so re-running is safe; refetch afterwards so coverage updates in place.
+  const sync = useMutation({
+    mutationFn: () => runBackfill({ data: { portfolioId } }),
+    onSuccess: async (res) => {
+      toast.success(res.message);
+      await q.refetch();
+    },
+    onError: (e: unknown) =>
+      toast.error(`Couldn't sync broker charges: ${e instanceof Error ? e.message : String(e)}`),
+  });
+
   const report = q.data;
   const kpi = report?.kpi;
   const [range, setRange] = useState<Range>(30);
@@ -128,6 +143,15 @@ export function FrictionKpiCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <Receipt className="h-4 w-4 text-muted-foreground" aria-hidden />
           What trading is costing you
+          <button
+            type="button"
+            onClick={() => sync.mutate()}
+            disabled={sync.isPending}
+            className="ml-auto inline-flex items-center gap-1 rounded border border-border/60 px-2 py-0.5 text-xs font-normal text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+          >
+            {sync.isPending && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
+            {sync.isPending ? "Syncing…" : "Sync broker charges"}
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
