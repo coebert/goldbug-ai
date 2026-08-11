@@ -228,6 +228,14 @@ export const calibrationSnapshotSchema = z.object({
     to: z.string().optional(),
     priceMode: z.string().optional(),
     fingerprint: z.string(),
+    /** Tolerant per-symbol summary; the exact hash flips on provider
+     *  re-rounding, this is what decides "same tape". */
+    digest: z.record(z.string(), z.object({
+      first: finite,
+      last: finite,
+      meanAbsRet: finite,
+    })).default({}),
+
   }),
   options: optionsSchema,
   /** The structure the run actually used, derived from the pooled estimates. */
