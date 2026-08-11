@@ -590,7 +590,13 @@ export function describeSnapshot(snap: CalibrationSnapshot): string {
 }
 
 export function describeTapeCheck(check: SnapshotTapeCheck): string {
-  if (check.matches) return "tape matches the snapshot fingerprint — run is a reproduction";
+  if (check.matches) {
+    return check.fingerprintMatches
+      ? "tape matches the snapshot fingerprint — run is a reproduction"
+      : "tape matches the snapshot to within provider rounding "
+        + `(worst drift ${(check.worstDigestDrift * 100).toPrecision(2)}%) — run is a reproduction`;
+  }
+
   return `tape DIFFERS from the snapshot: ${check.reasons.join("; ")}`
     + " — the coupling is pinned but the rest of the run is not a reproduction";
 }
