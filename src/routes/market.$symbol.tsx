@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,6 +14,8 @@ import {
 } from "recharts";
 
 import { getSymbolHistory } from "@/lib/market-symbol-history.functions";
+import { getChartAnnotations } from "@/lib/chart-annotations.functions";
+import type { ChartAnnotation } from "@/lib/chart-annotations";
 import {
   HISTORY_RANGES,
   coerceRange,
@@ -34,6 +37,7 @@ import {
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
+
 
 export const Route = createFileRoute("/market/$symbol")({
   validateSearch: (search: Record<string, unknown>): { range: HistoryRange } => ({
