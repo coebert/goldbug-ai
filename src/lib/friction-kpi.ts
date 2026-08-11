@@ -685,3 +685,202 @@ export function frictionTimeSeries(args: {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Drilldown — realised vs modelled cost by asset and by venue
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a symbol trades, as far as costs are concerned.
+ *
+ * Venue is the right axis for a cost drilldown because the three legs are
+ * charged by different parties: commission scales with the broker's per-market
+ * tier, the buy/sell gap with that market's liquidity, and stamp duty exists
+ * only on a handful of exchanges (0.5% on UK shares, nothing on US ones). A
+ * per-asset view alone would hide that a single venue is doing the damage.
+ */
+export function venueOf(symbol: string): string {
+  const s = String(symbol ?? "").trim().toUpperCase();
+  if (!s) return "UNKNOWN";
+  // Broker-native form (`AAPL:XNAS`) carries the MIC outright.
+  const colon = s.lastIndexOf(":");
+  if (colon > 0) {
+    const mic = s.slice(colon + 1).replace(/[^A-Z0-9]/g, "");
+    if (mic.length >= 3) return mic;
+  }
+  if (/(^|[-/])(BTC|ETH|SOL|XRP|ADA|DOGE)([-/]|$)/.test(s) || s.includes("-USD")) return "CRYPTO";
+  const suffix = s.includes(".") ? s.slice(s.lastIndexOf(".") + 1) : "";
+  const bySuffix: Record<string, string> = {
+    L: "XLON",
+    DE: "XETR",
+    PA: "XPAR",
+    AS: "XAMS",
+    MI: "XMIL",
+    SW: "XSWX",
+    MC: "XMAD",
+    ST: "XSTO",
+    CO: "XCSE",
+    OL: "XOSL",
+    HE: "XHEL",
+    TO: "XTSE",
+    HK: "XHKG",
+    T: "XTKS",
+    AX: "XASX",
+  };
+  if (suffix && bySuffix[suffix]) return bySuffix[suffix]!;
+  return "US";
+}
+
+export type FrictionBreakdownRow = {
+  /** Symbol or venue code, depending on the grouping. */
+  key: string;
+  tickets: number;
+  turnoverBase: number;
+  /** Charged friction (broker's number or ours, whichever is larger). */
+  chargedBase: number;
+  /** Charged friction as bps of the group's own turnover. */
+  chargedBpsOfTurnover: number | null;
+  /** Sum of broker-booked fees on this group. */
+  reportedBase: number;
+  /** Sum of modelled one-way friction on this group. */
+  modelledBase: number;
+  /** Reported ÷ modelled across invoiced tickets only. `null` with no invoices. */
+  realisedRatio: number | null;
+  /** Tickets on this group carrying broker-booked costs. */
+  invoicedTickets: number;
+  /** Share of this group's tickets that are invoiced (0..1). */
+  brokerCoverage: number;
+  /** Charged split into broker charges / buy-sell gap / stamp duty. */
+  components: FrictionComponents;
+  /** The model's own split, for the realised-vs-modelled comparison. */
+  modelledComponents: FrictionComponents;
+};
+
+export type FrictionBreakdown = {
+  by: "asset" | "venue";
+  rows: FrictionBreakdownRow[];
+  totals: FrictionBreakdownRow;
+};
+
+function emptyRow(key: string): FrictionBreakdownRow {
+  return {
+    key,
+    tickets: 0,
+    turnoverBase: 0,
+    chargedBase: 0,
+    chargedBpsOfTurnover: null,
+    reportedBase: 0,
+    modelledBase: 0,
+    realisedRatio: null,
+    invoicedTickets: 0,
+    brokerCoverage: 0,
+    components: { commissionBase: 0, spreadBase: 0, taxBase: 0 },
+    modelledComponents: { commissionBase: 0, spreadBase: 0, taxBase: 0 },
+  };
+}
+
+/**
+ * Realised vs modelled cost, split by asset or by venue.
+ *
+ * Same charging rule as the headline KPI (`chargedFriction`), so the rows sum
+ * to the card's total rather than telling a second story. Ratio and coverage
+ * are computed on invoiced tickets only for the same reason as the KPI: a
+ * group whose fees have not synced yet is missing data, not a cheap venue.
+ */
+export function frictionBreakdown(args: {
+  fills: readonly FrictionFill[];
+  by: "asset" | "venue";
+  /** Rows to keep, largest charged cost first. The rest fold into "Other". */
+  limit?: number;
+}): FrictionBreakdown {
+  const limit = args.limit ?? 12;
+  const groups = new Map<string, FrictionBreakdownRow>();
+  const invoicedSums = new Map<string, { reported: number; modelled: number }>();
+  const totals = emptyRow("all");
+  let totalInvoicedReported = 0;
+  let totalInvoicedModelled = 0;
+
+  for (const f of args.fills) {
+    if (!(Number.isFinite(f.notionalBase) && f.notionalBase > 0)) continue;
+    const key = args.by === "venue" ? venueOf(f.symbol) : String(f.symbol || "UNKNOWN");
+    const row = groups.get(key) ?? emptyRow(key);
+    const charged = chargedFriction(f);
+    const reported = Math.max(0, f.feeReportedBase) || 0;
+    const modelled = Math.max(0, f.feeModelledBase) || 0;
+    const comp = scaleComponents(f, charged);
+
+    for (const target of [row, totals]) {
+      target.tickets += 1;
+      target.turnoverBase += f.notionalBase;
+      target.chargedBase += charged;
+      target.reportedBase += reported;
+      target.modelledBase += modelled;
+      target.components.commissionBase += comp.commissionBase;
+      target.components.spreadBase += comp.spreadBase;
+      target.components.taxBase += comp.taxBase;
+      target.modelledComponents.commissionBase += Math.max(0, f.commissionModelledBase) || 0;
+      target.modelledComponents.spreadBase += Math.max(0, f.spreadModelledBase) || 0;
+      target.modelledComponents.taxBase += Math.max(0, f.taxModelledBase) || 0;
+    }
+
+    if (isInvoiced(f)) {
+      row.invoicedTickets += 1;
+      totals.invoicedTickets += 1;
+      const s = invoicedSums.get(key) ?? { reported: 0, modelled: 0 };
+      s.reported += reported;
+      s.modelled += modelled;
+      invoicedSums.set(key, s);
+      totalInvoicedReported += reported;
+      totalInvoicedModelled += modelled;
+    }
+
+    groups.set(key, row);
+  }
+
+  const finish = (row: FrictionBreakdownRow, inv: { reported: number; modelled: number }) => {
+    row.chargedBpsOfTurnover =
+      row.turnoverBase > 0 ? (row.chargedBase / row.turnoverBase) * 10_000 : null;
+    row.realisedRatio = inv.reported > 0 && inv.modelled > 0 ? inv.reported / inv.modelled : null;
+    row.brokerCoverage = row.tickets > 0 ? row.invoicedTickets / row.tickets : 0;
+    return row;
+  };
+
+  const all = [...groups.values()]
+    .map((r) => finish(r, invoicedSums.get(r.key) ?? { reported: 0, modelled: 0 }))
+    .sort((a, b) => b.chargedBase - a.chargedBase);
+
+  let rows = all;
+  if (all.length > limit) {
+    const head = all.slice(0, limit - 1);
+    const tail = all.slice(limit - 1);
+    const other = emptyRow("Other");
+    let oReported = 0;
+    let oModelled = 0;
+    for (const r of tail) {
+      other.tickets += r.tickets;
+      other.turnoverBase += r.turnoverBase;
+      other.chargedBase += r.chargedBase;
+      other.reportedBase += r.reportedBase;
+      other.modelledBase += r.modelledBase;
+      other.invoicedTickets += r.invoicedTickets;
+      other.components.commissionBase += r.components.commissionBase;
+      other.components.spreadBase += r.components.spreadBase;
+      other.components.taxBase += r.components.taxBase;
+      other.modelledComponents.commissionBase += r.modelledComponents.commissionBase;
+      other.modelledComponents.spreadBase += r.modelledComponents.spreadBase;
+      other.modelledComponents.taxBase += r.modelledComponents.taxBase;
+      const s = invoicedSums.get(r.key);
+      if (s) {
+        oReported += s.reported;
+        oModelled += s.modelled;
+      }
+    }
+    rows = [...head, finish(other, { reported: oReported, modelled: oModelled })];
+  }
+
+  return {
+    by: args.by,
+    rows,
+    totals: finish(totals, { reported: totalInvoicedReported, modelled: totalInvoicedModelled }),
+  };
+}
