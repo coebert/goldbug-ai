@@ -9,14 +9,17 @@
 // Pure module: no IO, no broker types. Price units are whatever the caller
 // passes in (GBX or GBP), because the cap is multiplicative.
 
-import { estimateSpreadSlippage, type AssetClass } from "./spread-slippage";
+import { estimateSpreadSlippage } from "./spread-slippage";
+
+/** Asset class label as used by the spread model ("stock" | "etf" | ...). */
+export type MarketableAssetClass = string;
 
 export type MarketableLimitInput = {
   side: "buy" | "sell";
   /** Reference (last/mid) price in the instrument's own quote units. */
   referencePrice: number;
   /** Optional asset class + currency to size the half-spread realistically. */
-  assetClass?: AssetClass;
+  assetClass?: MarketableAssetClass;
   currency?: string;
   /** Recent ATR as a fraction of price (0.02 = 2%), if known. */
   atrPct?: number;
@@ -26,6 +29,8 @@ export type MarketableLimitInput = {
   maxSlackBps?: number;
   /** Floor on the slack so tiny modelled spreads still fill. Default 8bps. */
   minSlackBps?: number;
+  /** Ticket notional, used to size the impact/spread estimate. */
+  notional?: number;
   /** Quote tick size in the same units as `referencePrice`. */
   tickSize?: number;
 };
@@ -65,7 +70,8 @@ export function planMarketableLimit(input: MarketableLimitInput): MarketableLimi
   let halfSpreadBps = 0;
   try {
     const est = estimateSpreadSlippage({
-      assetClass: input.assetClass ?? "equity",
+      assetClass: (input.assetClass ?? "stock") as never,
+      notional: input.notional ?? 1000,
       ...(input.currency ? { currency: input.currency } : {}),
       ...(input.atrPct != null ? { atrPct: input.atrPct } : {}),
       urgency: "normal",
