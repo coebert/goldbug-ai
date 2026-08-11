@@ -72,6 +72,17 @@ import {
   diagnoseCalibrationFit,
   formatCalibrationDiagnostics,
 } from "../src/lib/execution-correlation-diagnostics";
+import {
+  calibrateFoldStructures,
+  compareFoldFits,
+  evaluateFoldFit,
+  formatFitComparisons,
+  formatFitSummaries,
+  summariseFoldFits,
+  type CalibratableKind,
+  type FoldFit,
+} from "../src/lib/execution-oos-calibration";
+
 
 import {
   clusterMap,
@@ -249,6 +260,18 @@ const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.
 // per-cluster-pair residual errors for the blocks and contagion structures.
 const calibDiagnosticsMode = argv.includes("--calib-diagnostics");
 const calibBootResamples = Number(arg("calib-resamples", "800"));
+
+// --oos-corr: out-of-sample comparison of calibrated coupling against fixed
+// parameters. Each fold calibrates on TRAIN bars only, then the untouched TEST
+// window is scored twice: how well the structure predicts the coupling actually
+// realised there, and what it does to the shock/tail metrics on common random
+// numbers. Fixed baselines (independent / global ρ / hand-set blocks and
+// contagion) go through identical code, so the comparison is like-for-like.
+const oosCorrMode = argv.includes("--oos-corr");
+const oosPaths = Number(arg("oos-paths", String(Math.max(30, Math.round(paths / 3)))));
+const oosArms = arg("oos-arms", "independent,global,blocks,contagion,calib-blocks,calib-contagion")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
@@ -738,7 +761,174 @@ async function main() {
   // coupling (calm, stress, and the stress uplift), then a leave-one-cluster-
   // out simulation on common random numbers that says which of those clusters
   // actually pays for the joint drawdown tail.
+  // -------------------------------------------- out-of-sample coupling test
+  // --oos-corr: does calibrating the coupling actually pay off out of sample?
+  // Two tables on one experiment. First a *fit* table — per fold, calibrate on
+  // TRAIN only, then measure the residual error of the implied coupling against
+  // the correlations realised in the untouched TEST window, alongside fixed
+  // baselines scored the same way. Then the usual shock/tail table, with each
+  // arm's structure driving the sampler on common random numbers, so any
+  // difference in the tail is the coupling assumption and nothing else.
+  if (oosCorrMode) {
+    const oosFolds = folds.map((f) => ({ ...f }));
+    const calOpts = { ...calibOpts, volZ };
+
+    // Per-fold calibrated structures: fitted on train bars, never on test bars.
+    const calibrated = new Map<CalibratableKind, ReturnType<typeof calibrateFoldStructures>>();
+    for (const kind of ["blocks", "contagion"] as const) {
+      if (oosArms.includes(`calib-${kind}`)) {
+        calibrated.set(kind, calibrateFoldStructures(seriesBySymbol, oosFolds, kind, calOpts));
+      }
+    }
+
+    type Arm = { label: string; structureFor: (fold: number) => CorrelationStructure };
+    const arms: Arm[] = [];
+    for (const name of oosArms) {
+      if (name.startsWith("calib-")) {
+        const kind = name.slice("calib-".length) as CalibratableKind;
+        const rows = calibrated.get(kind);
+        if (!rows) continue;
+        arms.push({ label: name, structureFor: (i) => rows[i]!.structure });
+      } else {
+        const fixed = buildStructure(name as CorrelationStructureKind);
+        arms.push({ label: `fixed-${name}`, structureFor: () => fixed });
+      }
+    }
+    if (!arms.length) throw new Error("--oos-arms selected no usable arms");
+
+    console.log(
+      `Out-of-sample coupling test: ${oosFolds.length} folds `
+      + `(calibrate on ${trainDays}d train → score ${testDays}d test), `
+      + `${oosPaths} paths/arm · common random numbers · `
+      + `breach threshold ${sweepThreshold}%`,
+    );
+    for (const rows of calibrated.values()) {
+      const starved = rows.filter((r) => r.stressStarved).length;
+      const avgStress = meanOf(rows.map((r) => r.trainStressWindows));
+      console.log(
+        `  calib-${rows[0]?.kind}: ${avgStress.toFixed(1)} stressed windows/fold on average`
+        + (starved ? `, ${starved}/${rows.length} folds had none to learn from` : ""),
+      );
+    }
+    console.log();
+
+    // ---- 1. fit: how well does each arm predict the TEST-window coupling?
+    const fitsByArm = new Map<string, FoldFit[]>();
+    for (const arm of arms) {
+      fitsByArm.set(arm.label, evaluateFoldFit(seriesBySymbol, oosFolds, arm.structureFor, calOpts));
+    }
+    console.log("Coupling forecast error (weighted residual RMSE vs realised cluster correlations)");
+    console.log(formatFitSummaries(arms.map((a) => summariseFoldFits(a.label, fitsByArm.get(a.label)!))));
+
+    const refLabel = arms.find((a) => a.label === "fixed-global")?.label ?? arms[0]!.label;
+    const others = arms.filter((a) => a.label !== refLabel);
+    if (others.length) {
+      console.log();
+      console.log("Paired per-fold comparison (negative Δ = better out-of-sample forecast)");
+      console.log(formatFitComparisons(others.map((a) => compareFoldFits(
+        a.label, fitsByArm.get(a.label)!, refLabel, fitsByArm.get(refLabel)!,
+      ))));
+    }
+
+    // ---- 2. tail: the same arms, same shocks, same metrics as the sweep.
+    const header = [
+      "arm".padEnd(18),
+      "med ret%".padStart(9),
+      "p5 ret%".padStart(9),
+      "CVaR5%".padStart(9),
+      "med DD%".padStart(9),
+      "p5 DD%".padStart(9),
+      "worstDD%".padStart(9),
+      `P(DD≥${sweepThreshold}%)`.padStart(11),
+      "∧stress".padStart(9),
+      "cCVaR%".padStart(9),
+      "cost£".padStart(9),
+    ].join(" ");
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      console.log(`\n=== ${variant} (out-of-sample test windows only) ===`);
+      console.log(header);
+      console.log("-".repeat(header.length));
+
+      for (const arm of arms) {
+        const pathRet: number[] = [];
+        const pathDeepestDd: number[] = [];
+        const pathDeepestInStress: boolean[] = [];
+        const pathStressShare: number[] = [];
+        const pathCosts: number[] = [];
+
+        for (let pth = 0; pth < oosPaths; pth++) {
+          const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+          const limit = execModel === "limit"
+            ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+            : null;
+          const rets: number[] = [];
+          let deepestDd = 0;
+          let deepestInStress = false;
+          let costSum = 0;
+          let stressCostSum = 0;
+          for (let k = 0; k < oosFolds.length; k++) {
+            const f = oosFolds[k]!;
+            // A fresh sampler per fold, because a calibrated arm changes
+            // structure at each fold boundary. The seed depends only on the
+            // path and the fold, never on the arm, so every arm sees the same
+            // random numbers — the comparison is paired draw by draw.
+            const sampler = makeCorrelatedExecutionSampler(
+              { ...simCfg, structure: arm.structureFor(k) },
+              pathSeed + k * 31337,
+            );
+            const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
+            rets.push(r.returnPct);
+            if (r.maxDrawdownPct < deepestDd) {
+              deepestDd = r.maxDrawdownPct;
+              deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+            }
+            costSum += r.costs;
+            stressCostSum += r.stressCosts;
+          }
+          pathRet.push(meanOf(rets));
+          pathDeepestDd.push(deepestDd);
+          pathDeepestInStress.push(deepestInStress);
+          pathCosts.push(costSum / oosFolds.length);
+          pathStressShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
+        }
+
+        const ret = percentileStats(pathRet);
+        const deep = percentileStats(pathDeepestDd);
+        const cost = percentileStats(pathCosts);
+        const breach = jointDrawdownBreachProbabilities(
+          pathDeepestDd, pathDeepestInStress, [sweepThreshold])[0]!;
+        const condRet = conditionalTailStats(
+          pathRet, pathStressShare, stressQuantile, stressTailFrac);
+        console.log([
+          arm.label.padEnd(18),
+          fmt(ret.median).padStart(9),
+          fmt(ret.p5).padStart(9),
+          fmt(ret.cvar5).padStart(9),
+          fmt(deep.median).padStart(9),
+          fmt(deep.p5).padStart(9),
+          fmt(deep.worst).padStart(9),
+          `${(breach.prob * 100).toFixed(1)}%`.padStart(11),
+          `${(breach.jointProb * 100).toFixed(1)}%`.padStart(9),
+          fmt(condRet.cvar).padStart(9),
+          fmt(cost.median, 0).padStart(9),
+        ].join(" "));
+      }
+    }
+
+    console.log("\nReading: the first table is a forecast test — each arm's implied cluster");
+    console.log("coupling is scored against the correlations that actually showed up in the");
+    console.log("test window it never saw. Lower RMSE means the assumption describes the");
+    console.log("future, not just the past; a positive bias means it over-couples, which");
+    console.log("inflates the simulated tail. The second table is the price of that error in");
+    console.log("P&L terms: identical strategy, identical random draws, only the coupling");
+    console.log("assumption differs, so the spread across rows is model risk you are carrying.");
+    if (!spilloverMode && !attributionMode) return;
+  }
+
   if (spilloverMode) {
+
     const spill = clusterSpilloverMatrix(seriesBySymbol, { ...calibOpts, volZ });
     console.log("Sector spillover — rolling-window coupling by cluster pair");
     console.log(
