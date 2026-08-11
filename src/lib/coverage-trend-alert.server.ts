@@ -69,6 +69,44 @@ export function maybeNotifyCoverageTrend(params: {
           })),
         },
       });
+      // Outbound webhook: retried with backoff and logged either way, so a
+      // silently broken integration shows up in the delivery strip.
+      const url =
+        process.env["COVERAGE_TREND_ALERT_WEBHOOK_URL"] ??
+        process.env["COST_SYNC_ALERT_WEBHOOK_URL"] ??
+        process.env["PRECHECK_ALERT_WEBHOOK_URL"] ??
+        null;
+      const token =
+        process.env["COVERAGE_TREND_ALERT_WEBHOOK_TOKEN"] ??
+        process.env["COST_SYNC_ALERT_WEBHOOK_TOKEN"] ??
+        process.env["PRECHECK_ALERT_WEBHOOK_TOKEN"] ??
+        null;
+      const { deliverAlertWebhook } = await import("./alert-webhook.server");
+      await deliverAlertWebhook({
+        url,
+        token,
+        category: COVERAGE_TREND_ALERT_CATEGORY,
+        event: "broker.cost_coverage_trend_degraded",
+        userId,
+        portfolioId,
+        payload: {
+          portfolioId,
+          portfolioName: portfolioName ?? null,
+          severity: alert.severity,
+          reason: alert.reason,
+          recentPct: alert.recentPct,
+          priorPct: alert.priorPct,
+          earlierPct: alert.earlierPct,
+          windows: alert.windows.map((w) => ({
+            index: w.index,
+            startDate: w.startDate,
+            endDate: w.endDate,
+            coveragePct: w.coveragePct,
+            gradedDays: w.gradedDays,
+          })),
+          at: new Date().toISOString(),
+        },
+      });
     } catch (e) {
       console.warn("coverage-trend-alert failed", e instanceof Error ? e.message : String(e));
     }
