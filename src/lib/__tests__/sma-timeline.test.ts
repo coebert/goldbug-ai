@@ -68,7 +68,7 @@ describe("buildSmaSymbolReport", () => {
   it("annotates each decision with the trend state at the time", () => {
     const bars = vShape(500);
     const r = buildSmaSymbolReport("AAPL", bars, [
-      { date: dateAt(bars, 150), side: "buy", quantity: 10, price: 125, value: 1250, reason: "dip" },
+      { date: dateAt(bars, 240), side: "buy", quantity: 10, price: 125, value: 1250, reason: "dip" },
       { date: dateAt(bars, 400), side: "buy", quantity: 10, price: 200, value: 2000 },
       { date: dateAt(bars, 450), side: "sell", quantity: 5, price: 230, value: 1150 },
     ]);
@@ -139,7 +139,7 @@ describe("buildSmaSymbolReport", () => {
     for (let i = 0; i < 200; i++) {
       bars.push({
         date: new Date(Date.UTC(2021, 0, 1) + i * 86400000).toISOString().slice(0, 10),
-        close: 100 + (i % 2 === 0 ? 0.01 : -0.01),
+        close: 100 + Math.sin(i / 7) * 0.05,
       });
     }
     const r = buildSmaSymbolReport("AAPL", bars, [], {
