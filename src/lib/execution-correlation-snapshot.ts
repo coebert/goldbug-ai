@@ -91,6 +91,47 @@ export function tapeFingerprint(
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
+/**
+ * A tolerant per-symbol summary of the tape.
+ *
+ * `meanAbsRet` is the discriminating field: it is the average |log return| the
+ * correlation estimator actually consumes, so it barely moves under provider
+ * re-rounding (the noise is a random walk over thousands of tiny errors) but
+ * shifts far outside tolerance the moment a single real bar changes, a split
+ * is re-applied, or the price mode differs. `first`/`last` catch a shifted
+ * date range that happens to keep the same bar count.
+ */
+export type SymbolDigest = { first: number; last: number; meanAbsRet: number };
+
+export function tapeDigest(
+  seriesBySymbol: ReadonlyMap<string, readonly number[]>,
+): Record<string, SymbolDigest> {
+  const out: Record<string, SymbolDigest> = {};
+  for (const sym of [...seriesBySymbol.keys()].sort()) {
+    const s = seriesBySymbol.get(sym)!;
+    let sumAbs = 0;
+    let n = 0;
+    for (let i = 1; i < s.length; i++) {
+      const a = s[i - 1]!;
+      const b = s[i]!;
+      if (a > 0 && b > 0 && Number.isFinite(a) && Number.isFinite(b)) {
+        sumAbs += Math.abs(Math.log(b / a));
+        n++;
+      }
+    }
+    out[sym] = {
+      first: s[0] ?? 0,
+      last: s[s.length - 1] ?? 0,
+      meanAbsRet: n ? sumAbs / n : 0,
+    };
+  }
+  return out;
+}
+
+/** Relative tolerance for the digest comparison. Provider re-rounding moves
+ *  these by ~1e-6 or less; one changed bar moves `meanAbsRet` by ~1e-3. */
+export const TAPE_DIGEST_TOLERANCE = 1e-5;
+
 export type TapeIdentity = {
   symbols: string[];
   bars: number;
@@ -99,6 +140,7 @@ export type TapeIdentity = {
   to?: string;
   priceMode?: string;
   fingerprint: string;
+  digest: Record<string, SymbolDigest>;
 };
 
 export function tapeIdentity(
@@ -114,8 +156,10 @@ export function tapeIdentity(
     ...(meta.to ? { to: meta.to } : {}),
     ...(meta.priceMode ? { priceMode: meta.priceMode } : {}),
     fingerprint: tapeFingerprint(seriesBySymbol),
+    digest: tapeDigest(seriesBySymbol),
   };
 }
+
 
 // ---------------------------------------------------------------------- schema
 
