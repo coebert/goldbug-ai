@@ -36,22 +36,32 @@ function explain(s: TrendStrength) {
   ).toFixed(0)}%/yr against ${s.volatilityPct.toFixed(0)}% annual volatility (${s.samples} bars). Score = slope ÷ volatility, scaled to ±100.`;
 }
 
+function signed(v: number, digits = 0) {
+  return `${v > 0 ? "+" : ""}${v.toFixed(digits)}`;
+}
+
 export function TrendStrengthBadge({ strength }: { strength: TrendStrength | null }) {
   if (!strength) return null;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
-      <TooltipTrigger asChild>
-        <Badge variant="outline" className={`${TONE[strength.direction]} tabular-nums`}>
-          Trend strength {strength.score > 0 ? "+" : ""}
-          {strength.score} · {strength.label}
-        </Badge>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs text-xs">{explain(strength)}</TooltipContent>
+        <TooltipTrigger asChild>
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className={`${TONE[strength.direction]} tabular-nums`}>
+              Trend strength {signed(strength.score)} · {strength.label}
+            </Badge>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              slope {signed(strength.slopeAnnualPct)}%/yr · vol{" "}
+              {strength.volatilityPct.toFixed(0)}%/yr · {strength.period}d basis
+            </span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{explain(strength)}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
 }
+
 
 /** Compact meter + numbers for stat grids. */
 export function TrendStrengthStat({ strength }: { strength: TrendStrength | null }) {
