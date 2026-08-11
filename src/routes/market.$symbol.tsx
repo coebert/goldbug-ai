@@ -454,7 +454,9 @@ function MarketSymbolPage() {
                 >
                   {pct(history.changePct)} over {rangeLabel(range)}
                 </Badge>
+                <TrendStrengthBadge strength={strength} />
               </div>
+
 
               <ChartFrame className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
