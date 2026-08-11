@@ -83,6 +83,16 @@ export type CorrelatedExecutionConfig = ExecutionSimConfig & {
   regimeRampHiZ: number;
   /** Minimum blend applied once the Markov chain says the bar is stressed. */
   stressBlendFloor: number;
+
+  /**
+   * Symbols exempted from the shock process: they draw purely idiosyncratic
+   * slippage at calm parameters, ignoring the market/cluster factors and the
+   * stress regime. The regime still rolls and the same random numbers are
+   * consumed in the same order, so a decoupled run stays perfectly paired with
+   * the base run — which is what makes leave-one-cluster-out tail attribution
+   * (`execution-cluster-spillover.ts`) an apples-to-apples comparison.
+   */
+  decoupledSymbols?: ReadonlySet<string>;
 };
 
 export const DEFAULT_CORRELATED_EXECUTION: CorrelatedExecutionConfig = {
@@ -228,19 +238,25 @@ export function makeCorrelatedExecutionSampler(
     return bar;
   };
 
+  const decoupled = c.decoupledSymbols;
   const draw = (symbol?: string): ExecutionDraw => {
-    const sigma = c.slippageSigma * (bar.stressed ? c.stressSigmaMult : 1);
+    const off = decoupled ? decoupled.has(symbol ?? "") : false;
+    const stressed = bar.stressed && !off;
+    const sigma = c.slippageSigma * (stressed ? c.stressSigmaMult : 1);
     // Market + cluster + idiosyncratic decomposition. With a global structure
     // the cluster loading is zero and this reduces to the original two terms.
     const w = weightsFor(symbol ?? "", bar.stressT);
     const gz = bar.clusterZ.get(w.group) ?? 0;
-    const z = w.market * bar.commonZ + w.cluster * gz + w.idio * standardNormal(rng);
-    let mult = Math.exp(z * sigma) * bar.regimeMult;
+    // A decoupled symbol still burns the same idio draw, keeping the streams
+    // aligned; it just stops loading on the shared factors.
+    const idioZ = standardNormal(rng);
+    const z = off ? idioZ : w.market * bar.commonZ + w.cluster * gz + w.idio * idioZ;
+    let mult = Math.exp(z * sigma) * (off ? 1 : bar.regimeMult);
     if (rng() < c.tailProb) mult *= c.tailMult;
     mult = Math.min(c.maxSlippageMult, Math.max(0, mult));
 
-    const noFill = Math.min(1, c.noFillProb * (bar.stressed ? c.stressNoFillMult : 1));
-    const fullFill = Math.max(0, Math.min(1 - noFill, c.fullFillProb * (bar.stressed ? c.stressFullFillMult : 1)));
+    const noFill = Math.min(1, c.noFillProb * (stressed ? c.stressNoFillMult : 1));
+    const fullFill = Math.max(0, Math.min(1 - noFill, c.fullFillProb * (stressed ? c.stressFullFillMult : 1)));
     const partial = Math.max(0, 1 - noFill - fullFill);
 
     let fillRatio = 1;
