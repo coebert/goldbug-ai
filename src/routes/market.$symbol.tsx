@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useMemo } from "react";
 import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
@@ -18,11 +19,20 @@ import { getChartAnnotations } from "@/lib/chart-annotations.functions";
 import type { ChartAnnotation } from "@/lib/chart-annotations";
 import {
   HISTORY_RANGES,
+  HISTORY_SYMBOLS,
   coerceRange,
   rangeLabel,
   symbolMeta,
   type HistoryRange,
+  type SymbolHistory,
 } from "@/lib/market-symbol-history";
+import {
+  buildComparison,
+  parseCompareParam,
+  serialiseCompareParam,
+  toggleCompareSymbol,
+} from "@/lib/market-compare";
+import { CompareOverlay } from "@/components/market/compare-overlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,9 +50,13 @@ import {
 
 
 export const Route = createFileRoute("/market/$symbol")({
-  validateSearch: (search: Record<string, unknown>): { range: HistoryRange } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { range: HistoryRange; compare?: string | undefined } => ({
     range: coerceRange(search.range),
+    compare: serialiseCompareParam(parseCompareParam(search.compare)),
   }),
+
   head: () => ({
     meta: [
       { title: "Market chart | Price history & trend" },
