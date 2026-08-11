@@ -722,7 +722,7 @@ async function main() {
       ...calibOpts,
       volZ,
       resamples: calibBootResamples,
-      seed,
+      seed: baseSeed,
     });
     console.log("Calibration diagnostics — rolling fit, confidence, residuals");
     console.log(describeCalibration(diag.calibration));
