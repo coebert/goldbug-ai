@@ -10,6 +10,7 @@ import { scoreQuality } from "./quality";
 import { scoreTrend } from "./trend";
 import { scoreBreakout } from "./breakout";
 import { effectiveWeightsForRegime, type StrategyWeights } from "./regime-matrix";
+import { orthogonaliseScores, describeOrthogonalisation, type OrthogonalisationDiagnostic } from "./orthogonalise";
 import { clamp1, type AlphaModelKind, type AlphaScore, type CompositeScore, type FeatureLike } from "./types";
 
 const MODELS: Array<(f: FeatureLike) => AlphaScore> = [
@@ -57,8 +58,61 @@ export function scoreUniverse(
   features: FeatureLike[],
   regime: string | null | undefined,
   weightsOverride?: StrategyWeights | null,
+  opts?: { orthogonalise?: boolean },
 ): CompositeScore[] {
-  return features.map((f) => scoreCandidate(f, regime, weightsOverride));
+  return scoreUniverseWithDiagnostics(features, regime, weightsOverride, opts).scores;
+}
+
+/**
+ * Phase 3 item 13 — score the universe, strip the overlap between correlated
+ * models cross-sectionally, then re-blend. Orthogonalisation is on by default
+ * because raw trend/breakout/mean-reversion scores double-count the same move.
+ */
+export function scoreUniverseWithDiagnostics(
+  features: FeatureLike[],
+  regime: string | null | undefined,
+  weightsOverride?: StrategyWeights | null,
+  opts?: { orthogonalise?: boolean },
+): { scores: CompositeScore[]; orthogonalisation: OrthogonalisationDiagnostic[]; note: string } {
+  const weights = weightsOverride ?? effectiveWeightsForRegime(regime);
+  const raw = features.map((f) => scoreCandidate(f, regime, weights));
+  if (opts?.orthogonalise === false) {
+    return { scores: raw, orthogonalisation: [], note: "orthogonalisation disabled" };
+  }
+
+  const { rows, diagnostics } = orthogonaliseScores(raw.map((r) => r.perModel));
+  if (!diagnostics.some((d) => d.applied)) {
+    return { scores: raw, orthogonalisation: diagnostics, note: describeOrthogonalisation(diagnostics) };
+  }
+
+  const scores = raw.map((r, i) => reblend(r, rows[i] ?? r.perModel, weights));
+  return { scores, orthogonalisation: diagnostics, note: describeOrthogonalisation(diagnostics) };
+}
+
+/** Recompute the composite and top driver from residualised per-model scores. */
+function reblend(
+  original: CompositeScore,
+  perModel: Partial<Record<AlphaModelKind, number>>,
+  weights: StrategyWeights,
+): CompositeScore {
+  let composite = 0;
+  let topKind: AlphaModelKind | null = null;
+  let topContribAbs = 0;
+  for (const kind of Object.keys(perModel) as AlphaModelKind[]) {
+    const contrib = (weights[kind] ?? 0) * (perModel[kind] ?? 0);
+    composite += contrib;
+    if (Math.abs(contrib) > topContribAbs) {
+      topContribAbs = Math.abs(contrib);
+      topKind = kind;
+    }
+  }
+  return {
+    ...original,
+    perModel,
+    composite: clamp1(composite),
+    top_driver: topKind ?? original.top_driver,
+    reason: topKind === original.top_driver ? original.reason : `${topKind}(${(perModel[topKind as AlphaModelKind] ?? 0).toFixed(2)}) after orthogonalisation`,
+  };
 }
 
 // Compact prompt block for the LLM adjudicator. Keeps only the top-N
