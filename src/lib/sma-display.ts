@@ -173,6 +173,43 @@ export type TrendRankEntry = {
   volatility?: number | null;
 };
 
+/** Percentile ranks of one market's metrics within the compared set. */
+export type TrendPercentiles = { slope: number | null; volatility: number | null; count: number };
+
+/**
+ * Percentile rank (0-100) of `value` within `values`, counting ties as half.
+ * Needs at least two comparable markets to mean anything.
+ */
+export function percentileRank(value: number, values: readonly number[]): number | null {
+  const pool = values.filter((v) => Number.isFinite(v));
+  if (pool.length < 2) return null;
+  let below = 0;
+  let equal = 0;
+  for (const v of pool) {
+    if (v < value) below += 1;
+    else if (v === value) equal += 1;
+  }
+  return Math.round(((below + equal / 2) / pool.length) * 100);
+}
+
+/** Percentile ranks for each symbol's slope and volatility across the set. */
+export function trendPercentiles(
+  entries: readonly TrendRankEntry[],
+): Record<string, TrendPercentiles> {
+  const slopes = entries.map((e) => e.slope).filter((v): v is number => v != null);
+  const vols = entries.map((e) => e.volatility).filter((v): v is number => v != null);
+  const out: Record<string, TrendPercentiles> = {};
+  for (const e of entries) {
+    out[e.symbol] = {
+      slope: e.slope != null ? percentileRank(e.slope, slopes) : null,
+      volatility: e.volatility != null ? percentileRank(e.volatility, vols) : null,
+      count: entries.length,
+    };
+  }
+  return out;
+}
+
+
 /**
  * Order and filter symbols by trend metrics. Entries with no value yet (still
  * loading, or too little history) keep their selection order at the end and
