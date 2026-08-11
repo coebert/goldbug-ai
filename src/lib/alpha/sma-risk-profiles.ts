@@ -29,6 +29,14 @@ const OVERRIDES: Record<SmaRiskLevel, Partial<SmaCrossRuleConfig>> = {
     fastBearSellFraction: 0.6,
     deathSellFraction: 1,
     unknownRegimeSizeMult: 0.5,
+    // Conviction has to build further before size moves, and the band it can
+    // move within is narrow: at most +8% and never below 45% of intent.
+    regimeSaturationPct: 0.09,
+    fastSaturationPct: 0.035,
+    freshnessWeight: 0.65,
+    fastBearBuyMult: 0.4,
+    minSizeMult: 0.45,
+    maxSizeMult: 1.08,
   },
   balanced: {},
   aggressive: {
@@ -43,6 +51,14 @@ const OVERRIDES: Record<SmaRiskLevel, Partial<SmaCrossRuleConfig>> = {
     fastBearSellFraction: 0.35,
     deathSellFraction: 0.75,
     unknownRegimeSizeMult: 0.85,
+    // Reacts to shallower spreads, decays slower with age, and is allowed a
+    // wider sizing band in both directions.
+    regimeSaturationPct: 0.04,
+    fastSaturationPct: 0.018,
+    freshnessWeight: 0.35,
+    fastBearBuyMult: 0.6,
+    minSizeMult: 0.25,
+    maxSizeMult: 1.45,
   },
 };
 
@@ -64,5 +80,9 @@ export function smaRiskSummary(risk: unknown): string {
     cfg.deathSizeMult <= 0 ? "death cross blocks new buys" : `death cross sizes buys ×${cfg.deathSizeMult.toFixed(2)}`;
   return `${level}: crosses need ${sep}% separation and ${cfg.confirmBars} bar${
     cfg.confirmBars === 1 ? "" : "s"
-  } of confirmation, act within ${cfg.maxCrossAgeBars} sessions, ${death}.`;
+  } of confirmation, act within ${cfg.maxCrossAgeBars} sessions, ${death}. Size scales with conviction between ×${cfg.minSizeMult.toFixed(
+    2,
+  )} and ×${cfg.maxSizeMult.toFixed(2)}, saturating at a ${(cfg.regimeSaturationPct * 100).toFixed(
+    1,
+  )}% SMA50/200 spread.`;
 }
