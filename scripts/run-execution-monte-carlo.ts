@@ -44,6 +44,9 @@ import {
   DETERMINISTIC_DRAW,
   percentileStats,
   drawdownBreachProbabilities,
+  jointDrawdownBreachProbabilities,
+  conditionalTailStats,
+
   DEFAULT_DRAWDOWN_THRESHOLDS,
   type PercentileStats,
 } from "../src/lib/execution-monte-carlo";
