@@ -40,13 +40,17 @@ import {
 import {
   DEFAULT_EXECUTION_SIM,
   DETERMINISTIC_DRAW,
-  makeExecutionSampler,
   percentileStats,
   drawdownBreachProbabilities,
   DEFAULT_DRAWDOWN_THRESHOLDS,
-  type ExecutionSampler,
   type PercentileStats,
 } from "../src/lib/execution-monte-carlo";
+import {
+  DEFAULT_CORRELATED_EXECUTION,
+  makeCorrelatedExecutionSampler,
+  marketVolZScores,
+  type CorrelatedExecutionSampler,
+} from "../src/lib/execution-correlated-shocks";
 
 const argv = process.argv.slice(2);
 const arg = (name: string, fallback: string) => {
@@ -81,6 +85,19 @@ const simCfg = {
   fullFillProb: Number(arg("full-fill", String(DEFAULT_EXECUTION_SIM.fullFillProb))),
   minFillRatio: Number(arg("min-fill", String(DEFAULT_EXECUTION_SIM.minFillRatio))),
   noFillProb: Number(arg("no-fill", String(DEFAULT_EXECUTION_SIM.noFillProb))),
+  // Cross-symbol coupling: on a stressed bar every name widens together and
+  // every order struggles to fill together, so a rebalance pays the bad tail
+  // on all legs at once. --rho 0 --stress-enter 0 --vol-stress-z 99 recovers
+  // the old independent-draw behaviour.
+  rho: Number(arg("rho", String(DEFAULT_CORRELATED_EXECUTION.rho))),
+  stressEnterProb: Number(arg("stress-enter", String(DEFAULT_CORRELATED_EXECUTION.stressEnterProb))),
+  stressExitProb: Number(arg("stress-exit", String(DEFAULT_CORRELATED_EXECUTION.stressExitProb))),
+  stressSlippageMult: Number(arg("stress-slip", String(DEFAULT_CORRELATED_EXECUTION.stressSlippageMult))),
+  stressSigmaMult: DEFAULT_CORRELATED_EXECUTION.stressSigmaMult,
+  stressNoFillMult: Number(arg("stress-no-fill", String(DEFAULT_CORRELATED_EXECUTION.stressNoFillMult))),
+  stressFullFillMult: DEFAULT_CORRELATED_EXECUTION.stressFullFillMult,
+  volStressZ: Number(arg("vol-stress-z", String(DEFAULT_CORRELATED_EXECUTION.volStressZ))),
+  volSlippageBeta: DEFAULT_CORRELATED_EXECUTION.volSlippageBeta,
 };
 
 const GRID: SmaVariantParams[] = [];
@@ -101,10 +118,20 @@ type SegmentResult = {
   /** Fills that delivered less than the requested size. */
   partialFills: number;
   costs: number;
+  /** Orders sent on a bar the correlated sampler flagged as stressed. */
+  stressOrders: number;
+  /** Orders that got nothing, on a stressed bar. */
+  stressMissed: number;
+  /** Execution costs paid on stressed bars. */
+  stressCosts: number;
+  /** Bars in the segment the sampler flagged as stressed. */
+  stressBars: number;
 };
 
 type Ctx = {
   seriesBySymbol: Map<string, number[]>;
+  /** Cross-sectional realised-vol z-score per bar; drives the stress regime. */
+  volZ: number[];
   costFor: (symbol: string, notional: number, slipMult: number) => number;
 };
 
@@ -115,9 +142,9 @@ function simulate(
   end: number,
   p: SmaVariantParams,
   /** null = deterministic execution (the point estimate). */
-  sampler: ExecutionSampler | null,
+  sampler: CorrelatedExecutionSampler | null,
 ): SegmentResult {
-  const { seriesBySymbol, costFor } = ctx;
+  const { seriesBySymbol, costFor, volZ } = ctx;
   let cash = startingCash;
   const shares = new Map<string, number>();
   const equityCurve: number[] = [];
@@ -125,11 +152,20 @@ function simulate(
   let missedOrders = 0;
   let partialFills = 0;
   let costs = 0;
+  let stressOrders = 0;
+  let stressMissed = 0;
+  let stressCosts = 0;
+  let stressBars = 0;
 
-  const draw = () => (sampler ? sampler() : DETERMINISTIC_DRAW);
+  const draw = () => (sampler ? sampler.draw() : DETERMINISTIC_DRAW);
+  let stressedBar = false;
   const priceAt = (sym: string, i: number) => seriesBySymbol.get(sym)![i]!;
 
   for (let i = start; i <= end; i++) {
+    // One regime roll per bar, shared by every order on that bar — that shared
+    // draw is what makes the legs of a rebalance fail together.
+    stressedBar = sampler ? sampler.beginBar(volZ[i] ?? 0).stressed : false;
+    if (stressedBar) stressBars++;
     const wanted: string[] = [];
     const exits: string[] = [];
     for (const sym of seriesBySymbol.keys()) {
@@ -145,8 +181,10 @@ function simulate(
     for (const sym of exits) {
       const qty = shares.get(sym)!;
       const d = draw();
+      if (stressedBar) stressOrders++;
       if (d.fillRatio <= 0) {
         missedOrders++;
+        if (stressedBar) stressMissed++;
         continue;
       }
       const soldQty = qty * d.fillRatio;
@@ -154,6 +192,7 @@ function simulate(
       const c = costFor(sym, notional, d.slippageMult);
       cash += notional - c;
       costs += c;
+      if (stressedBar) stressCosts += c;
       fills++;
       if (d.fillRatio < 1) partialFills++;
       const rest = qty - soldQty;
@@ -170,8 +209,10 @@ function simulate(
         const requested = Math.min(target, cash * 0.98);
         if (requested < minTicket) continue;
         const d = draw();
+        if (stressedBar) stressOrders++;
         if (d.fillRatio <= 0) {
           missedOrders++;
+          if (stressedBar) stressMissed++;
           continue;
         }
         const notional = requested * d.fillRatio;
@@ -179,6 +220,7 @@ function simulate(
         // partial fill is strictly worse in bps than the full ticket.
         if (notional < minTicket * 0.2) {
           missedOrders++;
+          if (stressedBar) stressMissed++;
           continue;
         }
         const c = costFor(sym, notional, d.slippageMult);
@@ -186,6 +228,7 @@ function simulate(
         if (!(qty > 0)) continue;
         cash -= notional;
         costs += c;
+        if (stressedBar) stressCosts += c;
         fills++;
         if (d.fillRatio < 1) partialFills++;
         shares.set(sym, qty);
@@ -224,6 +267,10 @@ function simulate(
     missedOrders,
     partialFills,
     costs,
+    stressOrders,
+    stressMissed,
+    stressCosts,
+    stressBars,
   };
 }
 
