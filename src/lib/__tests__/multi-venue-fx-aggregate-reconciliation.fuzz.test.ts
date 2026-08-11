@@ -230,7 +230,9 @@ function replayExact(s: Scenario): ExactBook {
     USD: { notionalLocalMicros: 0, feeLocalMicros: 0 },
     EUR: { notionalLocalMicros: 0, feeLocalMicros: 0 },
   };
-  const lots = new Map<string, number>();
+  // Per-symbol open lots and the basis carried against them, so a sell
+  // relieves basis proportionally instead of leaving buys stranded.
+  const lots = new Map<string, { qty: number; basis: number }>();
 
   for (const l of s.legs) {
     const inst = bySymbol(l.symbol);
@@ -239,21 +241,24 @@ function replayExact(s: Scenario): ExactBook {
     const commission = toMicros(l.commissionLocal * FX[inst.ccy]);
     const fee = toMicros(fxFee);
     const qtyLots = Math.round(l.quantity / inst.lot);
-    const have = lots.get(l.symbol) ?? 0;
+    const pos = lots.get(l.symbol) ?? { qty: 0, basis: 0 };
 
     if (l.side === "buy") {
-      lots.set(l.symbol, have + qtyLots);
+      pos.qty += qtyLots;
+      pos.basis += notional;
       basisMicros += notional;
       cashMicros -= notional;
       byCcy[inst.ccy].notionalLocalMicros -= toMicros(localNotional);
     } else {
-      const sold = Math.min(qtyLots, have);
-      const relieved = have > 0 ? Math.round((basisMicros * 0) + 0) : 0; // basis relief handled below
-      void relieved;
-      lots.set(l.symbol, have - sold);
+      const sold = Math.min(qtyLots, pos.qty);
+      const relieved = pos.qty > 0 ? Math.round((pos.basis * sold) / pos.qty) : 0;
+      pos.qty -= sold;
+      pos.basis = pos.qty === 0 ? 0 : pos.basis - relieved;
+      basisMicros -= pos.qty === 0 ? relieved + (pos.basis - 0) * 0 : relieved;
       cashMicros += notional;
       byCcy[inst.ccy].notionalLocalMicros += toMicros(localNotional);
     }
+    lots.set(l.symbol, pos);
 
     cashMicros -= commission + fee;
     commissionMicros += commission;
