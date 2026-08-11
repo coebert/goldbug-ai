@@ -268,25 +268,22 @@ export function SmaTrendCard() {
             {symbols.map((s) => {
               const pinned = favorites.includes(s);
               return (
-                <Badge
+                <button
                   key={s}
-                  asChild
-                  variant="outline"
-                  className="cursor-pointer text-xs font-normal"
+                  type="button"
+                  aria-pressed={pinned}
+                  aria-label={`${pinned ? "Unpin" : "Pin"} ${symbolMeta(s)?.label ?? s}`}
+                  onClick={() => toggleFavorite(s)}
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-normal transition-colors ${
+                    pinned ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <button
-                    type="button"
-                    aria-pressed={pinned}
-                    aria-label={`${pinned ? "Unpin" : "Pin"} ${symbolMeta(s)?.label ?? s}`}
-                    onClick={() => toggleFavorite(s)}
-                  >
-                    <Star
-                      className={`mr-1 h-3 w-3 ${pinned ? "fill-primary text-primary" : "text-muted-foreground"}`}
-                      aria-hidden="true"
-                    />
-                    {symbolMeta(s)?.label ?? s}
-                  </button>
-                </Badge>
+                  <Star
+                    className={`mr-1 h-3 w-3 ${pinned ? "fill-primary text-primary" : ""}`}
+                    aria-hidden="true"
+                  />
+                  {symbolMeta(s)?.label ?? s}
+                </button>
               );
             })}
           </div>
