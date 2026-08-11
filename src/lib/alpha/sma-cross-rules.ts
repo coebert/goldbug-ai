@@ -14,6 +14,9 @@
 // *fresh* (within `maxCrossAgeBars`) to act on, so we don't chase a cross
 // that happened months ago.
 
+import { smaDynamicSizeMultiplier, type SmaSizeResult } from "./sma-position-sizing";
+
+
 export type SmaCrossRuleConfig = {
   enabled: boolean;
   /** Minimum |SMA20-SMA50|/SMA50 for a fast cross to count. 0.002 = 0.2%. */
