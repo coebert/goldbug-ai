@@ -153,6 +153,17 @@ export function SmaTrendCard() {
     .sort()
     .pop();
 
+  // Score every selected market on the same basis the panels display, then
+  // rank/filter. Panels keep rendering their own strength; this only reorders.
+  const basis = resolveTrendBasis(trendBasis, periods);
+  const entries = symbols.map((s, i) => {
+    const history = queries[i]?.data as SymbolHistory | undefined;
+    const strength = history ? computeTrendStrength(history.points, periods, basis) : null;
+    return { symbol: s, index: i, score: strength ? strength.score : null };
+  });
+  const visible = rankByTrendStrength(entries, sort, filter);
+  const hidden = entries.length - visible.length;
+
   const renderOption = (s: string) => {
     const on = symbols.includes(s);
     return (
