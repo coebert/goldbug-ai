@@ -528,6 +528,11 @@ function describeStep(step: LedgerStep): string {
     `  #${String(step.index).padStart(4, " ")} ${f.id.padEnd(10)} ${f.side.toUpperCase().padEnd(4)} ${f.symbol.padEnd(8)}`,
     `qty ${qty(f.quantity).padStart(10)} @ ${money(f.price)}`,
     `fees ${money(f.fees ?? 0)}`,
+    step.feeLegs
+      ? `legs [${FEE_LEG_KEYS.filter((k) => step.feeLegs![k] !== 0)
+          .map((k) => `${k} ${money(step.feeLegs![k])}`)
+          .join(" ")}] = ${money(step.feeLegTotal ?? 0)}`
+      : "",
     `cash ${money(step.cashBefore)} -> ${money(step.cashAfter)} (${money(step.cashDelta)})`,
     `pos ${qty(step.holdingBefore)} -> ${qty(step.holdingAfter)}`,
     book ? `book [${book}]` : "book []",
