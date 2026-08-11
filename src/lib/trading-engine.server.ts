@@ -1413,7 +1413,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const earningsBySymbol = await (async () => {
     try {
       const { fetchEarningsDates } = await import("./events/earnings-cache.server");
-      return await fetchEarningsDates(admin, buySymbols);
+      return await fetchEarningsDates(supabaseAdmin, buySymbols);
     } catch {
       return new Map<string, { next_earnings_date: string | null; confidence: string }>();
     }
