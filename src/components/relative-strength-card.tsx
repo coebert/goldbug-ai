@@ -104,7 +104,7 @@ export function RelativeStrengthCard({
                 <span>
                   Value vs index:{" "}
                   <span className={toneClass(data.totalExcessValue)}>
-                    {formatMoney(data.totalExcessValue, currency)}
+                    {formatMoneySigned(data.totalExcessValue, currency)}
                   </span>
                 </span>
                 <span>{data.leaders} ahead</span>
