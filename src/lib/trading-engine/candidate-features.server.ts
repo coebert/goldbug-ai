@@ -56,6 +56,8 @@ export async function buildCandidateFeatures(
     vw_momentum_10d: number | null;
     weekly_trend_up: boolean;
     weekly_rsi14: number | null;
+    // Stochastic oscillator (14/3/3) — entry timing.
+    stochastic: StochasticSnapshot | null;
     // Evidence-based range-breakout state (Donchian base + ATR penetration
     // + volume confirmation + failure history).
     breakout: BreakoutEvidence | null;
