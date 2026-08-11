@@ -4,7 +4,9 @@ import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
+  AlertTriangle,
   ArrowDownRight,
+  BellRing,
   ArrowUpRight,
   ChevronRight,
   Minus,
@@ -22,6 +24,7 @@ import {
 } from "recharts";
 
 import { getMarketPulse } from "@/lib/market-pulse.functions";
+import type { PulseAlert } from "@/lib/market-pulse-alerts";
 import { DEFAULT_RANGE, isKnownSymbol } from "@/lib/market-symbol-history";
 import {
   groupLabel,
@@ -306,6 +309,8 @@ export function MarketPulseCard() {
       </CardHeader>
 
       <CardContent className="space-y-6">
+        <PulseAlerts alerts={pulse.alerts ?? []} />
+
         {/* Headline read */}
         <section className="grid gap-4 rounded-xl border border-border/70 bg-surface-2 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div className="space-y-3">
