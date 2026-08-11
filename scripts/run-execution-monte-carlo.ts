@@ -138,6 +138,17 @@ import {
 } from "../src/lib/execution-shock-generators";
 
 import {
+  TAIL_DRIVERS,
+  TAIL_DRIVER_NOTES,
+  dominantDriver,
+  formatTailDecomposition,
+  tailDecompositionReport,
+  tailDriverArms,
+  type RebalancePolicyOverrides,
+  type TailDriverArmResult,
+} from "../src/lib/execution-tail-decomposition";
+
+import {
   EXECUTION_CHANNELS,
   channelSubsets,
   subsetKey,
@@ -388,6 +399,13 @@ const shockPaths = Number(arg("shock-paths", String(Math.max(30, Math.round(path
 const shockFocus = arg("shock-focus", "worstDrawdownPct") as ShockMetricKey;
 const shockOrder = arg("shock-order", "")
   .split(",").map((s) => s.trim()).filter(Boolean) as ShockIngredientKey[];
+
+// --tail-decomposition: attribute joint drawdown, CVaR5 and cost damage to
+// volatility scaling vs event shocks vs our own rebalancing rules. Same 2^3
+// Shapley machinery as --attribution, but the factors are decision-relevant
+// (two you forecast, one you control) rather than statistical ingredients.
+const tailDecompMode = argv.includes("--tail-decomposition");
+const tailDecompPaths = Number(arg("tail-decomp-paths", String(Math.max(30, Math.round(paths / 4)))));
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
@@ -1533,6 +1551,94 @@ async function main() {
     console.log("neighbour is that ingredient's contribution to the tail. The ladder measures");
     console.log("it on the way up, leave-one-out on the way down; when the two disagree the");
     console.log(`ingredient interacts with the others ('interact' column). P(breach) is at ${sweepThreshold}%.`);
+    return;
+  }
+
+
+  // ------------------------------------------------ tail-metric decomposition
+  if (tailDecompMode) {
+    const livePolicy: RebalancePolicyOverrides = { minTicket, abandonPartialFraction: 0.2 };
+    const arms = tailDriverArms(livePolicy);
+    console.log("Tail-metric decomposition — volatility scaling vs event shocks vs rebalancing rules");
+    console.log(`  coupling: ${describeStructure(simCfg.structure!)} (pinned across arms)`);
+    console.log(`  ${tailDecompPaths} paths/arm · common random numbers · live min ticket £${minTicket}`);
+    for (const d of TAIL_DRIVERS) console.log(`  · ${d} — ${TAIL_DRIVER_NOTES[d]}`);
+    console.log();
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      console.log(`=== ${variant} ===`);
+      const results: TailDriverArmResult[] = [];
+
+      for (const arm of arms) {
+        // Only the disabled drivers' shock fields are overridden; the
+        // calibrated `rho`/`structure` survive untouched.
+        const cfg = { ...simCfg, ...arm.shock };
+        const pathRet: number[] = [];
+        const pathDeepestDd: number[] = [];
+        const pathDeepestInStress: boolean[] = [];
+        const pathCosts: number[] = [];
+
+        for (let pth = 0; pth < tailDecompPaths; pth++) {
+          // Seed depends only on path and variant, never on the arm.
+          const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+          const sampler = makeCorrelatedExecutionSampler(cfg, pathSeed);
+          const limit = execModel === "limit"
+            ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+            : null;
+          const rets: number[] = [];
+          let deepestDd = 0;
+          let deepestInStress = false;
+          let costSum = 0;
+          for (let k = 0; k < folds.length; k++) {
+            const f = folds[k]!;
+            const r = simulate(
+              ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit,
+              { slippage: true, fillRate: true }, arm.policy,
+            );
+            rets.push(r.returnPct);
+            if (r.maxDrawdownPct < deepestDd) {
+              deepestDd = r.maxDrawdownPct;
+              deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+            }
+            costSum += r.costs;
+          }
+          pathRet.push(meanOf(rets));
+          pathDeepestDd.push(deepestDd);
+          pathDeepestInStress.push(deepestInStress);
+          pathCosts.push(costSum / folds.length);
+        }
+
+        const ret = percentileStats(pathRet);
+        const deep = percentileStats(pathDeepestDd);
+        const cost = percentileStats(pathCosts);
+        const breach = jointDrawdownBreachProbabilities(
+          pathDeepestDd, pathDeepestInStress, [sweepThreshold])[0]!;
+        results.push({
+          arm,
+          metrics: {
+            jointBreachProb: breach.jointProb,
+            worstDrawdownPct: deep.worst,
+            cvar5ReturnPct: ret.cvar5,
+            meanCost: cost.median,
+          },
+        });
+      }
+
+      const report = tailDecompositionReport(results);
+      console.log(formatTailDecomposition(report));
+      console.log();
+      for (const m of report.metrics) {
+        console.log(`  headline: ${m.label} is driven mostly by ${dominantDriver(m)}`);
+      }
+      console.log();
+    }
+
+    console.log("Reading: each arm neutralises the drivers it does not list, on identical draws.");
+    console.log("'shapley' splits the baseline→full move fairly across drivers and sums to 'total';");
+    console.log("'solo' is the driver alone and 'marginal' is it added last, so a solo/marginal gap");
+    console.log("is interaction — typically the ticket floor being cheap in calm tape and expensive");
+    console.log(`in a gapping one. P(joint breach) is at ${sweepThreshold}% with the trough in stress.`);
     return;
   }
 
