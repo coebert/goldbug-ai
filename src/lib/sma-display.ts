@@ -162,6 +162,8 @@ export function trendSortSpec(
 export type TrendRankEntry = {
   symbol: string;
   score: number | null;
+  /** Pinned markets stay visible and sort ahead of everything else. */
+  favorite?: boolean;
   /** Annualised slope of the basis average, in % per year. */
   slope?: number | null;
   /** Annualised volatility, in % per year. */
@@ -179,6 +181,7 @@ export function rankByTrendStrength<T extends TrendRankEntry>(
   filter: TrendFilter,
 ): T[] {
   const kept = entries.filter((e) => {
+    if (e.favorite) return true;
     if (e.score == null) return true;
     if (filter === "up") return e.score > 0;
     if (filter === "down") return e.score < 0;
@@ -186,7 +189,8 @@ export function rankByTrendStrength<T extends TrendRankEntry>(
     return true;
   });
   const spec = trendSortSpec(sort);
-  if (!spec) return kept;
+  const pin = (list: T[]) => [...list.filter((e) => e.favorite), ...list.filter((e) => !e.favorite)];
+  if (!spec) return pin(kept);
   const value = (e: T) =>
     spec.field === "score" ? e.score : spec.field === "slope" ? (e.slope ?? null) : (e.volatility ?? null);
   const ranked = kept.filter((e) => value(e) != null);
@@ -196,7 +200,37 @@ export function rankByTrendStrength<T extends TrendRankEntry>(
     const bv = value(b) as number;
     return spec.desc ? bv - av : av - bv;
   });
-  return [...ranked, ...unranked];
+  return pin([...ranked, ...unranked]);
+}
+
+/** Storage key for pinned markets on the home card. */
+export const SMA_FAVORITES_KEY = "home-sma-favorites";
+
+export function parseSmaFavorites(
+  raw: string | null | undefined,
+  isKnown: (s: string) => boolean,
+): string[] {
+  if (!raw) return [];
+  const out: string[] = [];
+  for (const part of String(raw).split(",")) {
+    const s = part.trim();
+    if (s && isKnown(s) && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
+export function toggleSmaFavorite(current: readonly string[], symbol: string): string[] {
+  return current.includes(symbol)
+    ? current.filter((s) => s !== symbol)
+    : [...current, symbol];
+}
+
+export function storeSmaFavorites(favorites: readonly string[]): void {
+  try {
+    window.localStorage.setItem(SMA_FAVORITES_KEY, favorites.join(","));
+  } catch {
+    /* storage unavailable — in-memory pins still work */
+  }
 }
 
 /** Home card can chart up to this many markets side by side. */
