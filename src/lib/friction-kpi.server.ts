@@ -13,11 +13,13 @@ import {
   computeFrictionKpi,
   beforeAfterAttribution,
   realisedCostOverlay,
+  frictionTimeSeries,
   FRICTION_WINDOW_DAYS,
   type BeforeAfterAttribution,
   type FrictionFill,
   type FrictionKpi,
   type RealisedCostOverlay,
+  type FrictionSeriesPoint,
 } from "./friction-kpi";
 
 /**
@@ -32,6 +34,14 @@ const ATTRIBUTION_DAYS = 90;
 
 export type FrictionReport = {
   kpi: FrictionKpi;
+  /**
+   * Trailing-30d friction for each of the last 90 calendar days. The card
+   * slices this to 30 or 90 days client-side, so switching range is instant
+   * and cannot disagree with the headline number.
+   */
+  series: FrictionSeriesPoint[];
+  /** Days of history the series covers. */
+  seriesDays: number;
   attribution: BeforeAfterAttribution;
   overlay: RealisedCostOverlay;
   currency: string;
@@ -180,8 +190,23 @@ export async function loadFrictionReport(args: {
     equity = [];
   }
 
+  const navByDay = new Map<string, number>();
+  for (const e of equity) {
+    const d = e.date.slice(0, 10);
+    if (d && Number.isFinite(e.totalValue) && e.totalValue > 0) navByDay.set(d, e.totalValue);
+  }
+
   return {
     kpi: computeFrictionKpi({ fills: windowFills, navBase, windowDays }),
+    series: frictionTimeSeries({
+      fills: all,
+      navBase,
+      navByDay,
+      days: ATTRIBUTION_DAYS,
+      windowDays,
+      now,
+    }),
+    seriesDays: ATTRIBUTION_DAYS,
     attribution: beforeAfterAttribution({
       fills: all,
       cutoverIso: args.cutoverIso ?? COST_GOVERNOR_CUTOVER_ISO,
