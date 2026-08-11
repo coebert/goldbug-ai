@@ -26,6 +26,7 @@ import {
 import { getMarketPulse } from "@/lib/market-pulse.functions";
 import type { PulseAlert } from "@/lib/market-pulse-alerts";
 import { DEFAULT_RANGE, isKnownSymbol } from "@/lib/market-symbol-history";
+import { formatUkTime } from "@/lib/uk-time";
 import {
   groupLabel,
   toneBlurb,
