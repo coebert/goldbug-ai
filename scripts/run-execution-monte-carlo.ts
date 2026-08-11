@@ -118,7 +118,10 @@ const simCfg = {
   stressFullFillMult: DEFAULT_CORRELATED_EXECUTION.stressFullFillMult,
   volStressZ: Number(arg("vol-stress-z", String(DEFAULT_CORRELATED_EXECUTION.volStressZ))),
   volSlippageBeta: DEFAULT_CORRELATED_EXECUTION.volSlippageBeta,
+  // Set below, once the coupling assumption is resolved from the CLI.
+  structure: undefined as CorrelationStructure | undefined,
 };
+
 
 // --exec-model market  → every order crosses (the legacy behaviour).
 // --exec-model limit   → orders rest first: maker/taker odds, queue fill
