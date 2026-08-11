@@ -69,6 +69,23 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  buildCalibrationSnapshot,
+  describeSnapshot,
+  describeTapeCheck,
+  foldStructuresFromSnapshot,
+  optionsFromSnapshot,
+  structureFromSnapshot,
+  tapeIdentity,
+  verifySnapshotAgainstTape,
+  type CalibrationSnapshot,
+  type SnapshotFoldWindow,
+
+} from "../src/lib/execution-correlation-snapshot";
+import {
+  loadCalibrationSnapshotFile,
+  saveCalibrationSnapshotFile,
+} from "../src/lib/execution-correlation-snapshot.server";
+import {
   diagnoseCalibrationFit,
   formatCalibrationDiagnostics,
 } from "../src/lib/execution-correlation-diagnostics";
@@ -80,7 +97,9 @@ import {
   formatFitSummaries,
   summariseFoldFits,
   type CalibratableKind,
+  type FoldCalibration,
   type FoldFit,
+
 } from "../src/lib/execution-oos-calibration";
 
 
@@ -109,10 +128,15 @@ import {
 } from "../src/lib/execution-limit-orders";
 
 const argv = process.argv.slice(2);
+// A flag's value is the next token, unless that token is itself a flag — so
+// `--calibrate-corr --save-calib out.json` reads as "calibrate with the default
+// kind", not "calibrate with kind '--save-calib'".
 const arg = (name: string, fallback: string) => {
   const i = argv.indexOf(`--${name}`);
-  return i >= 0 && argv[i + 1] ? argv[i + 1]! : fallback;
+  const next = i >= 0 ? argv[i + 1] : undefined;
+  return next && !next.startsWith("--") ? next : fallback;
 };
+
 
 const DEFAULT_SYMBOLS = ["AAPL", "MSFT", "NVDA", "JPM", "XOM", "JNJ", "KO", "PG", "SPY", "GLD"];
 
@@ -249,6 +273,25 @@ const calibOpts = {
   minStressShare: Number(arg("calib-min-stress", "0.25")),
   groups: clusters,
 };
+
+// ------------------------------------------------ calibration state on disk
+// --save-calib runs/coupling-2026-08.json   write the fitted parameters out
+// --load-calib runs/coupling-2026-08.json   reuse them instead of re-fitting
+//
+// A snapshot carries the pooled calm/stress ρ, the derived structure, the
+// estimator settings and a fingerprint of the tape it was fitted on, so a later
+// run can be pinned to the exact calibration state. Loading also replaces the
+// --calib-* estimator settings with the saved ones, because a ρ estimated with
+// a 60-bar window is not the same measurement as one estimated with 120.
+// A tape whose fingerprint no longer matches is reported and, unless
+// --allow-tape-drift is passed, refused: silently replaying an old coupling on
+// new bars is exactly the kind of drift these files exist to prevent.
+const saveCalibPath = arg("save-calib", "");
+const loadCalibPath = arg("load-calib", "");
+const calibLabel = arg("calib-label", "");
+/** Drop the per-window series from the saved file (smaller, less inspectable). */
+const calibSlim = argv.includes("--calib-slim");
+const allowTapeDrift = argv.includes("--allow-tape-drift");
 
 // Any of the three axes puts the run into the sweep report.
 const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.length > 0;
@@ -632,8 +675,33 @@ async function main() {
   const fallback = calibrateSymbolExecution({ symbol: "UNKNOWN", bars: [] });
   const volZ = marketVolZScores(seriesBySymbol, 20);
 
-  if (calibrateCorr) {
+  const tapeMeta = { from, to, priceMode };
+
+  // ---- calibration state: load a pinned one, or fit and (optionally) save it.
+  let loadedSnapshot: CalibrationSnapshot | null = null;
+  let fittedCalibration: ReturnType<typeof calibrateCorrelations> | null = null;
+
+  if (loadCalibPath) {
+    loadedSnapshot = loadCalibrationSnapshotFile(loadCalibPath);
+    console.log(`\nLoaded calibration from ${loadCalibPath}`);
+    console.log(describeSnapshot(loadedSnapshot));
+    const check = verifySnapshotAgainstTape(loadedSnapshot, seriesBySymbol, tapeMeta);
+    console.log(describeTapeCheck(check));
+    if (!check.matches && !allowTapeDrift) {
+      throw new Error(
+        "Refusing to replay a calibration fitted on a different tape. "
+        + "Re-fit with --calibrate-corr --save-calib, or pass --allow-tape-drift "
+        + "to pin the coupling anyway and accept that the run is not a reproduction.",
+      );
+    }
+    // The estimator settings travel with the fit: anything downstream that
+    // re-estimates (diagnostics, per-fold OOS) must use the saved ones.
+    Object.assign(calibOpts, optionsFromSnapshot(loadedSnapshot));
+    simCfg.structure = structureFromSnapshot(loadedSnapshot, clusters);
+    console.log(`Using pinned structure: ${describeStructure(simCfg.structure)}\n`);
+  } else if (calibrateCorr || saveCalibPath) {
     const cal = calibrateCorrelations(seriesBySymbol, { ...calibOpts, volZ });
+    fittedCalibration = cal;
     console.log("\nCalibrated coupling (rolling-window historical correlation)");
     console.log(describeCalibration(cal));
     // A short time series of the estimate: coupling is not a constant, and the
@@ -655,6 +723,37 @@ async function main() {
     simCfg.structure = structureFromCalibration(cal, calibKind, clusters);
     console.log(`Using calibrated structure: ${describeStructure(simCfg.structure)}\n`);
   }
+
+  /**
+   * Writes the current calibration state out. Called once — after the OOS block
+   * when there are per-fold structures worth keeping, otherwise straight after
+   * the fit — so the file always holds everything the run actually used.
+   */
+  let snapshotWritten = false;
+  const writeCalibrationSnapshot = (
+    folds?: Array<{ calibration: FoldCalibration; window: SnapshotFoldWindow }>,
+  ) => {
+    if (!saveCalibPath || snapshotWritten || !fittedCalibration || !simCfg.structure) return;
+    const snap = buildCalibrationSnapshot({
+      calibration: fittedCalibration,
+      structure: simCfg.structure,
+      tape: tapeIdentity(seriesBySymbol, tapeMeta),
+      stressZ: calibOpts.stressZ,
+      minStressShare: calibOpts.minStressShare,
+      ...(calibLabel ? { label: calibLabel } : {}),
+      includeWindows: !calibSlim,
+      ...(folds?.length ? { folds } : {}),
+    });
+    saveCalibrationSnapshotFile(saveCalibPath, snap);
+    snapshotWritten = true;
+    console.log(
+      `Saved calibration state → ${saveCalibPath} `
+      + `(fingerprint ${snap.tape.fingerprint}`
+      + (folds?.length ? `, ${folds.length} per-fold structures` : "")
+      + `). Replay with --load-calib ${saveCalibPath}\n`,
+    );
+  };
+
   const volBpsBySymbol = new Map<string, number[]>();
   for (const [sym, closes] of seriesBySymbol) volBpsBySymbol.set(sym, barVolBpsSeries(closes, 20));
   const ctx: Ctx = {
@@ -774,11 +873,20 @@ async function main() {
     const calOpts = { ...calibOpts, volZ };
 
     // Per-fold calibrated structures: fitted on train bars, never on test bars.
+    // With --load-calib the saved per-fold structures are used verbatim, so the
+    // OOS comparison replays exactly the fit the snapshot was taken from.
+    const pinnedFolds = loadedSnapshot ? foldStructuresFromSnapshot(loadedSnapshot, clusters) : null;
+    const pinnedKind = loadedSnapshot?.folds?.[0]?.kind;
     const calibrated = new Map<CalibratableKind, ReturnType<typeof calibrateFoldStructures>>();
     for (const kind of ["blocks", "contagion"] as const) {
-      if (oosArms.includes(`calib-${kind}`)) {
-        calibrated.set(kind, calibrateFoldStructures(seriesBySymbol, oosFolds, kind, calOpts));
-      }
+      if (!oosArms.includes(`calib-${kind}`)) continue;
+      if (pinnedFolds?.size && pinnedKind === kind) continue;
+      calibrated.set(kind, calibrateFoldStructures(seriesBySymbol, oosFolds, kind, calOpts));
+    }
+    if (pinnedFolds?.size) {
+      console.log(
+        `Per-fold structures pinned from the snapshot (${pinnedFolds.size} folds, ${pinnedKind}).`,
+      );
     }
 
     type Arm = { label: string; structureFor: (fold: number) => CorrelationStructure };
@@ -786,6 +894,11 @@ async function main() {
     for (const name of oosArms) {
       if (name.startsWith("calib-")) {
         const kind = name.slice("calib-".length) as CalibratableKind;
+        if (pinnedFolds?.size && pinnedKind === kind) {
+          const fallbackStruct = simCfg.structure!;
+          arms.push({ label: name, structureFor: (i) => pinnedFolds.get(i) ?? fallbackStruct });
+          continue;
+        }
         const rows = calibrated.get(kind);
         if (!rows) continue;
         arms.push({ label: name, structureFor: (i) => rows[i]!.structure });
@@ -795,6 +908,15 @@ async function main() {
       }
     }
     if (!arms.length) throw new Error("--oos-arms selected no usable arms");
+
+    // Saving from an OOS run keeps the per-fold structures too, so the whole
+    // walk-forward calibration state — not just the full-tape fit — replays.
+    const saveKind: CalibratableKind = calibrated.has("contagion") ? "contagion" : "blocks";
+    const saveRows = calibrated.get(saveKind);
+    writeCalibrationSnapshot(
+      saveRows?.map((calibration, i) => ({ calibration, window: oosFolds[i]! })),
+    );
+
 
     console.log(
       `Out-of-sample coupling test: ${oosFolds.length} folds `
@@ -926,6 +1048,10 @@ async function main() {
     console.log("assumption differs, so the spread across rows is model risk you are carrying.");
     if (!spilloverMode && !attributionMode) return;
   }
+
+  // Any run that did not go through --oos-corr still saves its full-tape fit.
+  writeCalibrationSnapshot();
+
 
   if (spilloverMode) {
 
