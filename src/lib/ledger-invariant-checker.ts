@@ -77,6 +77,12 @@ export type LedgerStep = {
   expectedHoldingDelta: number;
   /** Snapshot of the whole book after this step (non-zero positions only). */
   holdings: Record<string, number>;
+  /** Total costs charged to cash on this step. */
+  feesCharged: number;
+  /** Sum of the itemised legs, or null when the fill supplied none. */
+  feeLegTotal: number | null;
+  /** Per-leg amounts (zero-filled) when the fill supplied a breakdown. */
+  feeLegs: Record<FeeLegKey, number> | null;
 };
 
 export type ViolationCode =
@@ -86,7 +92,12 @@ export type ViolationCode =
   | "holding_delta_mismatch"
   | "final_cash_mismatch"
   | "final_holdings_mismatch"
-  | "invalid_input";
+  | "invalid_input"
+  | "invalid_fee_leg"
+  | "negative_fee_leg"
+  | "fee_leg_sum_mismatch"
+  | "fee_leg_cash_mismatch"
+  | "missing_fee_legs";
 
 export type LedgerViolation = {
   code: ViolationCode;
@@ -99,6 +110,8 @@ export type LedgerViolation = {
   /** actual - expected, in base currency or shares. */
   delta: number;
   step: LedgerStep | null;
+  /** Populated for fee-leg violations. */
+  leg?: FeeLegKey;
 };
 
 export type LedgerCheckOptions = {
@@ -115,6 +128,16 @@ export type LedgerCheckOptions = {
   allowNegativeCash?: boolean;
   /** Set only for engines that model true shorts. */
   allowNegativeHoldings?: boolean;
+  /**
+   * Require every fill that charges a fee to itemise it. Off by default so
+   * existing callers keep working; on for broker-sourced reconciliations.
+   */
+  requireFeeLegs?: boolean;
+  /**
+   * Allow negative (rebate) legs. Off by default — a negative commission is
+   * almost always a sign-flip bug rather than a real rebate.
+   */
+  allowNegativeFeeLegs?: boolean;
 };
 
 export type LedgerCheckResult = {
