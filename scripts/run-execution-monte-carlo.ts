@@ -665,8 +665,33 @@ async function main() {
   const fallback = calibrateSymbolExecution({ symbol: "UNKNOWN", bars: [] });
   const volZ = marketVolZScores(seriesBySymbol, 20);
 
-  if (calibrateCorr) {
+  const tapeMeta = { from, to, priceMode };
+
+  // ---- calibration state: load a pinned one, or fit and (optionally) save it.
+  let loadedSnapshot: CalibrationSnapshot | null = null;
+  let fittedCalibration: ReturnType<typeof calibrateCorrelations> | null = null;
+
+  if (loadCalibPath) {
+    loadedSnapshot = loadCalibrationSnapshotFile(loadCalibPath);
+    console.log(`\nLoaded calibration from ${loadCalibPath}`);
+    console.log(describeSnapshot(loadedSnapshot));
+    const check = verifySnapshotAgainstTape(loadedSnapshot, seriesBySymbol, tapeMeta);
+    console.log(describeTapeCheck(check));
+    if (!check.matches && !allowTapeDrift) {
+      throw new Error(
+        "Refusing to replay a calibration fitted on a different tape. "
+        + "Re-fit with --calibrate-corr --save-calib, or pass --allow-tape-drift "
+        + "to pin the coupling anyway and accept that the run is not a reproduction.",
+      );
+    }
+    // The estimator settings travel with the fit: anything downstream that
+    // re-estimates (diagnostics, per-fold OOS) must use the saved ones.
+    Object.assign(calibOpts, optionsFromSnapshot(loadedSnapshot));
+    simCfg.structure = structureFromSnapshot(loadedSnapshot, clusters);
+    console.log(`Using pinned structure: ${describeStructure(simCfg.structure)}\n`);
+  } else if (calibrateCorr || saveCalibPath) {
     const cal = calibrateCorrelations(seriesBySymbol, { ...calibOpts, volZ });
+    fittedCalibration = cal;
     console.log("\nCalibrated coupling (rolling-window historical correlation)");
     console.log(describeCalibration(cal));
     // A short time series of the estimate: coupling is not a constant, and the
@@ -688,6 +713,37 @@ async function main() {
     simCfg.structure = structureFromCalibration(cal, calibKind, clusters);
     console.log(`Using calibrated structure: ${describeStructure(simCfg.structure)}\n`);
   }
+
+  /**
+   * Writes the current calibration state out. Called once — after the OOS block
+   * when there are per-fold structures worth keeping, otherwise straight after
+   * the fit — so the file always holds everything the run actually used.
+   */
+  let snapshotWritten = false;
+  const writeCalibrationSnapshot = (
+    folds?: Array<{ calibration: FoldCalibration; window: SnapshotFoldWindow }>,
+  ) => {
+    if (!saveCalibPath || snapshotWritten || !fittedCalibration || !simCfg.structure) return;
+    const snap = buildCalibrationSnapshot({
+      calibration: fittedCalibration,
+      structure: simCfg.structure,
+      tape: tapeIdentity(seriesBySymbol, tapeMeta),
+      stressZ: calibOpts.stressZ,
+      minStressShare: calibOpts.minStressShare,
+      ...(calibLabel ? { label: calibLabel } : {}),
+      includeWindows: !calibSlim,
+      ...(folds?.length ? { folds } : {}),
+    });
+    saveCalibrationSnapshotFile(saveCalibPath, snap);
+    snapshotWritten = true;
+    console.log(
+      `Saved calibration state → ${saveCalibPath} `
+      + `(fingerprint ${snap.tape.fingerprint}`
+      + (folds?.length ? `, ${folds.length} per-fold structures` : "")
+      + `). Replay with --load-calib ${saveCalibPath}\n`,
+    );
+  };
+
   const volBpsBySymbol = new Map<string, number[]>();
   for (const [sym, closes] of seriesBySymbol) volBpsBySymbol.set(sym, barVolBpsSeries(closes, 20));
   const ctx: Ctx = {
