@@ -22,6 +22,7 @@ import {
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
+import type { TrendPercentiles } from "@/lib/sma-display";
 import type { TrendStrength, TrendStrengthPoint } from "@/lib/market-symbol-history";
 
 const TONE = {
