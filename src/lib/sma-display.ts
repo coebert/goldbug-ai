@@ -221,6 +221,8 @@ export function rankByTrendStrength<T extends TrendRankEntry>(
   filter: TrendFilter,
   /** Optional tie-breaker applied when the primary values are equal. */
   secondary: TrendSort = "selection",
+  /** Explicit sequence for pinned markets; unlisted pins keep their order after. */
+  pinnedOrder: readonly string[] = [],
 ): T[] {
   const kept = entries.filter((e) => {
     if (e.favorite) return true;
@@ -231,8 +233,18 @@ export function rankByTrendStrength<T extends TrendRankEntry>(
     return true;
   });
   const spec = trendSortSpec(sort);
-  const pin = (list: T[]) => [...list.filter((e) => e.favorite), ...list.filter((e) => !e.favorite)];
+  const pinRank = (e: T) => {
+    const i = pinnedOrder.indexOf(e.symbol);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const pin = (list: T[]) => {
+    const pinned = list.filter((e) => e.favorite);
+    const stable = new Map(pinned.map((e, i) => [e, i] as const));
+    pinned.sort((a, b) => pinRank(a) - pinRank(b) || (stable.get(a) ?? 0) - (stable.get(b) ?? 0));
+    return [...pinned, ...list.filter((e) => !e.favorite)];
+  };
   if (!spec) return pin(kept);
+
 
   const read = (e: T, field: "score" | "slope" | "volatility") =>
     field === "score" ? e.score : field === "slope" ? (e.slope ?? null) : (e.volatility ?? null);
