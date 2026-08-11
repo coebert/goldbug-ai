@@ -690,6 +690,9 @@ async function main() {
     // Share of a path's total execution cost incurred on stressed bars — the
     // clean read on joint (rather than average) execution risk.
     const pathStressCostShare: number[] = [];
+    /** Whether each path's deepest drawdown ran through the stress regime. */
+    const pathDeepestInStress: boolean[] = [];
+
     // Passive-execution accounting across all paths.
     let makerFills = 0;
     let takerFills = 0;
