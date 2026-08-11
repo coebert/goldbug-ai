@@ -22,7 +22,12 @@ export type GovernorInputs = {
   buysAlreadyToday: number;
   lastBuyDaysAgo: Record<string, number>;
   windowDays: number;
+  /** Current gross exposure per sector key (base currency), for concentration budgeting. */
+  sectorExposureBase: Record<string, number>;
+  /** Symbols currently held (upper-cased), so adds can be told apart from new entries. */
+  heldSymbols: Set<string>;
 };
+
 
 const WINDOW_DAYS = 30;
 
