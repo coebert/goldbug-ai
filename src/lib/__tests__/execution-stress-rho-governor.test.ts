@@ -72,7 +72,8 @@ describe("stress rho governor", () => {
   it("passes a tight, well-sampled stress estimate through at full strength", () => {
     const g = governStressWithinRho(
       makeCal({ calmWithin: 0.30, stressWithin: 0.705, stressRhos: tight }),
-      { seed: 7 },
+      { seed: 7, maxLift: 0.6 },
+
     );
     expect(g.ciWidth).toBeLessThan(0.10);
     expect(g.credibility).toBeCloseTo(1, 5);
