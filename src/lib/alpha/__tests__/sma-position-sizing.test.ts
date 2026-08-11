@@ -80,7 +80,10 @@ describe("smaDynamicSizeMultiplier", () => {
     const mid = smaDynamicSizeMultiplier(state({ regimeSeparationPct: 0.0325 }), c);
     const deep = smaDynamicSizeMultiplier(state({ regimeSeparationPct: 0.09 }), c);
 
-    expect(shallow.mult).toBeCloseTo(1, 2);
+    // Soft knee: a spread barely past the threshold nudges size rather than
+    // stepping it, and there is no discontinuity at the threshold itself.
+    expect(shallow.mult).toBeGreaterThan(1);
+    expect(shallow.mult).toBeLessThan(1.1);
     expect(mid.mult).toBeGreaterThan(shallow.mult);
     expect(deep.mult).toBeGreaterThan(mid.mult);
     // At saturation the boost equals the legacy constant exactly.
@@ -133,7 +136,7 @@ describe("smaDynamicSizeMultiplier", () => {
     expect(r.notes.join(" ")).toMatch(/unconfirmed/);
   });
 
-  it("applies the unknown-regime haircut as the base and still scales the fast leg", () => {
+  it("ramps the unknown-regime base with available history and scales the fast leg", () => {
     const c = cfg({ unknownRegimeSizeMult: 0.6, fastBullSizeMult: 1.5, maxSizeMult: 2 });
     const flat = smaDynamicSizeMultiplier(state({ regimeUnknown: true, regime: null, bars: 120 }), c);
     const bull = smaDynamicSizeMultiplier(
@@ -147,8 +150,9 @@ describe("smaDynamicSizeMultiplier", () => {
       }),
       c,
     );
-    expect(flat.mult).toBeCloseTo(0.6, 10);
-    expect(bull.mult).toBeCloseTo(0.9, 10);
+    // 120 of the 200 bars needed → 0.6 + 0.4 × 0.6 = 0.84, not a flat 0.6.
+    expect(flat.mult).toBeCloseTo(0.84, 10);
+    expect(bull.mult).toBeCloseTo(0.84 * 1.5, 10);
   });
 
   it("clamps to the configured bounds and reports it", () => {
@@ -204,7 +208,7 @@ describe("risk-level consistency", () => {
     expect(bal).toBeGreaterThan(cons);
   });
 
-  it("still vetoes death-regime buys for conservative and balanced, sizes down for aggressive", () => {
+  it("skips death-regime buys for conservative and balanced, sizes down for aggressive", () => {
     const death = state({ regime: "death", regimeSeparationPct: -0.05 });
     expect(smaCrossBuyRule(death, smaRulesForRisk("conservative")).allow).toBe(false);
     expect(smaCrossBuyRule(death, smaRulesForRisk("balanced")).allow).toBe(false);
