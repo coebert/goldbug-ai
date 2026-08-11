@@ -46,12 +46,6 @@ export type InvariantReport = {
  */
 export const MONEY_EPS = 1e-6;
 
-/**
- * Tolerance for "did this buy spend more than it had". Sizing to the last
- * penny divides by price and multiplies back, which leaves noise a hair above
- * MONEY_EPS; a hundredth of a penny still catches every real overdraft.
- */
-export const SPEND_SLACK = 1e-4;
 
 function isFiniteNum(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -203,11 +197,7 @@ export function checkExecutionInvariants(args: {
         // Relative slack alongside the absolute epsilon: quantity x price
         // accumulates float error proportional to the notional, so a fixed
         // 1e-6 tolerance produced spurious violations on larger trades.
-        // Sizing a buy to the last penny of cash divides then re-multiplies,
-        // so the recomputed spend can exceed the balance by a hair even on a
-        // tiny pot. Anything under a hundredth of a penny is float noise, not
-        // borrowing; real overdrafts are orders of magnitude larger.
-        const slack = Math.max(SPEND_SLACK, Math.abs(prevCash) * 1e-7);
+        const slack = Math.max(MONEY_EPS, Math.abs(prevCash) * 1e-7);
         if (spend > prevCash + slack) {
           violations.push({
             code: "BUY_EXCEEDS_PRIOR_CASH",
