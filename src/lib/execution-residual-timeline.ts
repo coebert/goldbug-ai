@@ -476,7 +476,7 @@ export function formatResidualHeatmap(
   lines.push(`${" ".repeat(17)} ${first.padEnd(Math.max(1, buckets.length - first.length))}${last}`);
   lines.push(
     `  over-coupled ${POS.join("")} / under-coupled ${NEG.join("")} · `
-    + `saturates at |err| ${scale.toFixed(3)} · ${t.windows.length} windows`
+    + `saturates at ±${scale.toFixed(3)} · ${t.windows.length} windows`
     + ` of ${t.window} bars, step ${t.step}`,
   );
   return lines.join("\n");
