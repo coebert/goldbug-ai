@@ -234,7 +234,7 @@ export function SmaTrendCard() {
     };
   });
   const ranks = trendPercentiles(entries);
-  const visible = rankByTrendStrength(entries, sort, filter, sort2);
+  const visible = rankByTrendStrength(entries, sort, filter, sort2, favorites);
   const hidden = entries.length - visible.length;
 
   const renderOption = (s: string) => {
