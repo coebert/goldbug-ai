@@ -182,3 +182,114 @@ function rowsFor(lowCurve: number[], highCurve: number[]) {
     }),
   ]);
 }
+
+describe("currency normalisation", () => {
+  it("converts every book into the display currency before summing", () => {
+    const [row] = computeRiskLevelPanel([
+      pf({
+        id: "eur",
+        currency: "EUR",
+        fxRate: 0.85,
+        cash: 1000,
+        holdings: [{ symbol: "SAP", quantity: 10, price: 100 }],
+        equity: curve([2000, 2000]),
+      }),
+      pf({
+        id: "gbp",
+        currency: "GBP",
+        fxRate: 1,
+        cash: 500,
+        holdings: [{ symbol: "AZN", quantity: 5, price: 100 }],
+        equity: curve([1000, 1000]),
+      }),
+    ]);
+    // 2000 EUR * 0.85 + 1000 GBP, not the raw 3000.
+    expect(row.totalEquity).toBeCloseTo(2700, 6);
+    expect(row.currencies).toEqual(["EUR", "GBP"]);
+    expect(row.fxComplete).toBe(true);
+    // Invested: 1000 EUR * 0.85 = 850, plus 500 GBP.
+    expect(row.topSymbol).toBe("SAP");
+    expect(row.topWeightPct).toBeCloseTo((850 / 1350) * 100, 6);
+  });
+
+  it("flags a group whose FX rate could not be resolved", () => {
+    const rows = computeRiskLevelPanel([
+      pf({ id: "eur", currency: "EUR", fxRate: null, equity: curve([100, 120, 90]) }),
+    ]);
+    expect(rows[0].fxComplete).toBe(false);
+    const warnings = checkRiskLadder(rows);
+    expect(warnings.some((w) => w.kind === "fx-unavailable")).toBe(true);
+  });
+
+  it("does not rank two rungs against each other when one has no FX rate", () => {
+    const rows = computeRiskLevelPanel([
+      pf({ id: "b", riskLevel: "balanced", currency: "EUR", fxRate: null, equity: curve([100, 50, 60, 55]) }),
+      pf({ id: "h", riskLevel: "high", currency: "GBP", fxRate: 1, equity: curve([100, 101, 102, 103]) }),
+    ]);
+    const kinds = checkRiskLadder(rows).map((w) => w.kind);
+    expect(kinds).not.toContain("drawdown-inversion");
+    expect(kinds).not.toContain("vol-inversion");
+    expect(kinds).toContain("fx-unavailable");
+  });
+});
+
+describe("external flow netting", () => {
+  const split = (rows: Array<[number, number]>) =>
+    rows.map(([cash, holdings], i) => ({
+      snapshot_date: `2026-07-${String(i + 1).padStart(2, "0")}`,
+      total_value: cash + holdings,
+      cash,
+      holdingsValue: holdings,
+    }));
+
+  it("a mid-window cash withdrawal is not a drawdown", () => {
+    const [row] = computeRiskLevelPanel([
+      pf({
+        id: "a",
+        equity: split([
+          [800_000, 200_000],
+          [800_000, 201_000],
+          // Broker cash re-sync removes 500k of cash — holdings untouched.
+          [300_000, 201_500],
+          [300_000, 202_000],
+        ]),
+      }),
+    ]);
+    expect(row.flowEvents).toBe(1);
+    expect(row.netExternalFlow).toBeCloseTo(-500_000, 6);
+    expect(Math.abs(row.maxDrawdownPct)).toBeLessThan(0.5);
+    expect(row.annualisedVolPct).toBeLessThan(50);
+    expect(row.returnPct).toBeGreaterThan(0);
+  });
+
+  it("a deposit does not count as performance", () => {
+    const [row] = computeRiskLevelPanel([
+      pf({
+        id: "a",
+        equity: split([
+          [100_000, 0],
+          [1_100_000, 0],
+          [1_100_000, 0],
+        ]),
+      }),
+    ]);
+    expect(row.flowEvents).toBe(1);
+    expect(row.returnPct).toBeCloseTo(0, 6);
+  });
+
+  it("real trading moves are left alone", () => {
+    const [row] = computeRiskLevelPanel([
+      pf({
+        id: "a",
+        equity: split([
+          [50_000, 50_000],
+          // Sold holdings into cash: both lines move, so it is not a flow.
+          [90_000, 10_000],
+          [90_000, 9_000],
+        ]),
+      }),
+    ]);
+    expect(row.flowEvents).toBe(0);
+    expect(row.returnPct).toBeCloseTo(-1, 6);
+  });
+});
