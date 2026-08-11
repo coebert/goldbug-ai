@@ -4,7 +4,7 @@
 // of coverage over the last three 7-day windows, so a slow slide raises an
 // alert even when every individual pass looked survivable.
 
-import { evaluateCoverageTrendAlert } from "./coverage-trend-alert";
+import { evaluateCoverageTrendAlert, formatCoverageWindow } from "./coverage-trend-alert";
 
 export const COVERAGE_TREND_ALERT_CATEGORY = "broker_cost_coverage_trend";
 const COOLDOWN_HOURS = 24;
@@ -41,12 +41,18 @@ export function maybeNotifyCoverageTrend(params: {
       if (recent && recent.length > 0) return;
 
       const label = portfolioName ? ` (${portfolioName})` : "";
+      const [recent, prior] = alert.windows;
+      // Spell out the two windows in the body so the bell entry is
+      // self-explanatory without opening the chart.
+      const windowLine =
+        ` Windows compared: ${formatCoverageWindow(recent)} ${recent.coveragePct ?? "—"}% vs ` +
+        `${formatCoverageWindow(prior)} ${prior.coveragePct ?? "—"}%.`;
       await supabaseAdmin.from("notifications").insert({
         user_id: userId,
         category: COVERAGE_TREND_ALERT_CATEGORY,
         severity: alert.severity,
         title: `${alert.title}${label}`,
-        body: alert.body,
+        body: `${alert.body}${windowLine}`,
         portfolio_id: portfolioId,
         details: {
           reason: alert.reason,
@@ -54,6 +60,13 @@ export function maybeNotifyCoverageTrend(params: {
           prior_pct: alert.priorPct,
           earlier_pct: alert.earlierPct,
           window_days: 7,
+          windows: alert.windows.map((w) => ({
+            index: w.index,
+            start_date: w.startDate,
+            end_date: w.endDate,
+            coverage_pct: w.coveragePct,
+            graded_days: w.gradedDays,
+          })),
         },
       });
     } catch (e) {
