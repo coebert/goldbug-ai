@@ -167,6 +167,16 @@ export function SmaTrendCard() {
     }
   };
 
+  const pickSort2 = (s: TrendSort) => {
+    setSort2(s);
+    try {
+      window.localStorage.setItem(TREND_SORT2_KEY, s);
+    } catch {
+      /* ignore */
+    }
+  };
+
+
   const pickFilter = (f: TrendFilter) => {
     setFilter(f);
     try {
