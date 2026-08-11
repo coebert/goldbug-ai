@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Receipt } from "lucide-react";
 import { getFrictionReport } from "@/lib/friction-kpi.functions";
+import { FrictionCostDrilldown } from "@/components/friction-cost-drilldown";
 import { formatMoney } from "@/lib/format-money";
 import { POLL } from "@/lib/query-keys";
 import {
@@ -284,6 +285,14 @@ export function FrictionKpiCard({
             </p>
 
           </>
+        )}
+
+        {report?.breakdown && (
+          <FrictionCostDrilldown
+            byAsset={report.breakdown.byAsset}
+            byVenue={report.breakdown.byVenue}
+            currency={report.currency}
+          />
         )}
 
         {report?.attribution && (
