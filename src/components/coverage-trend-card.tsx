@@ -40,7 +40,7 @@ const RANGES = [30, 90] as const;
 type Range = (typeof RANGES)[number];
 
 const LINE_COLORS = [
-  SAXO_COLOR.primary,
+  SAXO_COLOR.up,
   "hsl(var(--chart-2, 199 89% 60%))",
   "hsl(var(--chart-3, 43 96% 56%))",
   "hsl(var(--chart-4, 322 81% 66%))",
@@ -89,7 +89,7 @@ export function CoverageTrendCard() {
   const { data, isLoading } = useQuery({
     queryKey: ["coverage-trend"],
     queryFn: () => fetchTrend({ data: { days: 90 } }),
-    refetchInterval: POLL?.slow ?? 300_000,
+    refetchInterval: POLL.SLOW,
   });
 
   const series: CoverageSeries[] = useMemo(() => {
@@ -163,7 +163,7 @@ export function CoverageTrendCard() {
                     labelStyle={SAXO_TOOLTIP_LABEL}
                     cursor={SAXO_TOOLTIP_CURSOR}
                     labelFormatter={(l) => shortDate(String(l))}
-                    formatter={(v: number | null, name: string) => [pct(v), name]}
+                    formatter={(v, name) => [pct(typeof v === "number" ? v : null), String(name)]}
                   />
                   {series.map((s, i) => (
                     <Line
@@ -175,7 +175,7 @@ export function CoverageTrendCard() {
                       strokeWidth={s.portfolioId == null ? 2.5 : 1.5}
                       strokeDasharray={s.portfolioId == null ? undefined : "4 3"}
                       dot={false}
-                      activeDot={saxoActiveDot}
+                      activeDot={saxoActiveDot(LINE_COLORS[i % LINE_COLORS.length])}
                       connectNulls
                       isAnimationActive={false}
                     />
