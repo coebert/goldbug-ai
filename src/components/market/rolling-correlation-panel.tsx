@@ -91,7 +91,7 @@ export function RollingCorrelationPanel({
         </p>
       ) : (
         <>
-          <ChartFrame height={200}>
+          <ChartFrame className="h-52 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -18 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
