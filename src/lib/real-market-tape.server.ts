@@ -25,7 +25,12 @@ type ChartResponse = {
         >;
       };
       indicators?: {
-        quote?: Array<{ close?: (number | null)[]; volume?: (number | null)[] }>;
+        quote?: Array<{
+          close?: (number | null)[];
+          volume?: (number | null)[];
+          high?: (number | null)[];
+          low?: (number | null)[];
+        }>;
         adjclose?: Array<{ adjclose?: (number | null)[] }>;
       };
     }>;
