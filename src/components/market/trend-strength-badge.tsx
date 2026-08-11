@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { TrendStrength } from "@/lib/market-symbol-history";
@@ -24,7 +25,8 @@ function explain(s: TrendStrength) {
 export function TrendStrengthBadge({ strength }: { strength: TrendStrength | null }) {
   if (!strength) return null;
   return (
-    <Tooltip>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
       <TooltipTrigger asChild>
         <Badge variant="outline" className={`${TONE[strength.direction]} tabular-nums`}>
           Trend strength {strength.score > 0 ? "+" : ""}
@@ -32,7 +34,8 @@ export function TrendStrengthBadge({ strength }: { strength: TrendStrength | nul
         </Badge>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs text-xs">{explain(strength)}</TooltipContent>
-    </Tooltip>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
