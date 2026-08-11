@@ -88,7 +88,7 @@ describe("smaDynamicSizeMultiplier", () => {
   });
 
   it("scales the death-regime cut with spread depth when trading is allowed", () => {
-    const c = cfg({ deathSizeMult: 0.25, regimeSaturationPct: 0.06 });
+    const c = cfg({ deathSizeMult: 0.25, regimeSaturationPct: 0.06, minSizeMult: 0.2 });
     const shallow = smaDynamicSizeMultiplier(
       state({ regime: "death", regimeSeparationPct: -0.006 }),
       c,
