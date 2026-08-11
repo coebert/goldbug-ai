@@ -232,6 +232,49 @@ export function SmaTrendCard() {
 
           <TrendBasisSelect basis={trendBasis} periods={periods} onChange={pickTrendBasis} />
 
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Sort by trend strength">
+            {(
+              [
+                ["selection", "My order"],
+                ["strongest", "Strongest"],
+                ["weakest", "Weakest"],
+              ] as [TrendSort, string][]
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={value === sort ? "secondary" : "ghost"}
+                className="h-7 px-2 text-xs"
+                aria-pressed={value === sort}
+                onClick={() => pickSort(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by trend strength">
+            {(
+              [
+                ["all", "All"],
+                ["up", "Up"],
+                ["down", "Down"],
+                ["significant", `|score| ≥ ${TREND_SIGNIFICANT_SCORE}`],
+              ] as [TrendFilter, string][]
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={value === filter ? "secondary" : "ghost"}
+                className="h-7 px-2 text-xs"
+                aria-pressed={value === filter}
+                onClick={() => pickFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap gap-1" role="group" aria-label="Chart time range">
             {HISTORY_RANGES.map((r) => (
               <Button
