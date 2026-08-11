@@ -566,9 +566,39 @@ async function runHourlyCycleInner(
               } else if (!costs.supported) {
                 srvLog.warn("hourly-run: broker cost report unavailable", p.id, costs.reason);
               }
+              // Raise an in-app alert (and optional webhook) when the report
+              // failed or left too many fills on modelled costs, so the
+              // friction KPI is never silently a projection.
+              const { maybeNotifyCostSyncHealth } = await import("@/lib/cost-sync-alert.server");
+              maybeNotifyCostSyncHealth({
+                portfolioId: p.id,
+                userId: p.user_id as string,
+                portfolioName: p.name ?? null,
+                result: {
+                  supported: costs.supported,
+                  fillsConsidered: costs.fillsConsidered,
+                  fillsUpdated: costs.fillsUpdated,
+                  unmatchedFills: costs.unmatchedFills,
+                  reason: costs.reason ?? null,
+                },
+              });
             } catch (e) {
               srvLog.warn("hourly-run: broker cost ingest failed", p.id, e);
+              const { maybeNotifyCostSyncHealth } = await import("@/lib/cost-sync-alert.server");
+              maybeNotifyCostSyncHealth({
+                portfolioId: p.id,
+                userId: p.user_id as string,
+                portfolioName: p.name ?? null,
+                result: {
+                  supported: false,
+                  fillsConsidered: 0,
+                  fillsUpdated: 0,
+                  unmatchedFills: 0,
+                  error: e instanceof Error ? e.message : String(e),
+                },
+              });
             }
+
           } catch (e) {
             srvLog.warn("hourly-run: order reconcile failed", p.id, e);
           }
