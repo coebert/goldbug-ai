@@ -16,7 +16,9 @@ function history(symbol: string, series: Array<[string, number]>): SymbolHistory
     date,
     close,
     indexed: 100,
+    sma20: null,
     sma50: null,
+    sma100: null,
     sma200: null,
   }));
   return {
@@ -37,6 +39,8 @@ function history(symbol: string, series: Array<[string, number]>): SymbolHistory
     sma200: null,
     aboveSma50: null,
     aboveSma200: null,
+    smaLatest: { 20: null, 50: null, 100: null, 200: null },
+    aboveSma: { 20: null, 50: null, 100: null, 200: null },
   };
 }
 

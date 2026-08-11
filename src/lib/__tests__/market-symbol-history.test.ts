@@ -5,6 +5,8 @@ import {
   isKnownSymbol,
   rangeLabel,
   symbolMeta,
+  SMA_PERIODS,
+  smaKey,
 } from "../market-symbol-history";
 
 function tape(days: number, start = 100, step = 1) {
@@ -67,5 +69,41 @@ describe("market-symbol-history", () => {
     expect(h.last).toBeNull();
     expect(h.changePct).toBeNull();
     expect(h.volatilityPct).toBeNull();
+  });
+});
+
+describe("selectable SMA periods", () => {
+  const rows = Array.from({ length: 260 }, (_, i) => {
+    const d = new Date(Date.UTC(2025, 0, 1));
+    d.setUTCDate(d.getUTCDate() + i);
+    return { symbol: "SPY", price_date: d.toISOString().slice(0, 10), close: 100 + i };
+  });
+
+  const history = buildSymbolHistory("SPY", rows, 30);
+
+  it("computes every supported average on each point", () => {
+    const lastPoint = history.points[history.points.length - 1];
+    for (const p of SMA_PERIODS) {
+      const value = lastPoint[smaKey(p)];
+      expect(value).not.toBeNull();
+      // On a +1/day ramp the trailing mean sits (p-1)/2 below the last close.
+      expect(value).toBeCloseTo(lastPoint.close - (p - 1) / 2, 6);
+    }
+  });
+
+  it("summarises latest values and above/below flags per period", () => {
+    for (const p of SMA_PERIODS) {
+      expect(history.smaLatest[p]).toBeCloseTo(history.points.at(-1)![smaKey(p)]!, 6);
+      expect(history.aboveSma[p]).toBe(true);
+    }
+    expect(history.smaLatest[50]).toBe(history.sma50);
+    expect(history.smaLatest[200]).toBe(history.sma200);
+  });
+
+  it("returns nulls for periods longer than the available tape", () => {
+    const short = buildSymbolHistory("SPY", rows.slice(0, 30), 30);
+    expect(short.smaLatest[20]).not.toBeNull();
+    expect(short.smaLatest[100]).toBeNull();
+    expect(short.aboveSma[200]).toBeNull();
   });
 });

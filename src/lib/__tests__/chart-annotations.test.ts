@@ -10,7 +10,7 @@ import {
 import type { HistoryPoint } from "../market-symbol-history";
 
 function pt(date: string, close: number, sma50: number | null = null, sma200: number | null = null): HistoryPoint {
-  return { date, close, indexed: 100, sma50, sma200 };
+  return { date, close, indexed: 100, sma20: null, sma50, sma100: null, sma200 };
 }
 
 function series(closes: number[], start = "2026-01-01"): HistoryPoint[] {
