@@ -872,6 +872,7 @@ async function main() {
           // the worst-stress 20% of paths.
           const condRet = conditionalTailStats(pathRet, pathStressShare, stressQuantile, stressTailFrac);
           console.log([
+            structure.kind.padEnd(12),
             fmt(rho, 2).padStart(5),
             fmt(z, 2).padStart(6),
             fmt(ret.median).padStart(9),
@@ -887,8 +888,14 @@ async function main() {
           ].join(" "));
         }
       }
+      }
       console.log();
     }
+
+    console.log("'structure' is the coupling assumption: independent = no cross-symbol link,");
+    console.log("global = one ρ for every pair, blocks = ρ within a sector cluster and a lower ρ");
+    console.log("across clusters, contagion = blocks in calm that converge toward 1 under stress.");
+
 
 
     console.log("Reading: each row is one joint-risk assumption. ρ controls how much every");
