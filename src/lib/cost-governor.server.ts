@@ -127,5 +127,41 @@ export async function loadGovernorInputs(args: {
     /* degrade to no memory */
   }
 
-  return { navBase, trailingCostBase, buysAlreadyToday, lastBuyDaysAgo, windowDays };
+  // Sector exposure of the *existing* book, valued at cost when no live price
+  // is to hand. Cost basis understates winners slightly, which is the safe
+  // direction for a concentration cap (it never over-admits by much).
+  const sectorExposureBase: Record<string, number> = {};
+  const heldSymbols = new Set<string>();
+  try {
+    const { symbolSector } = await import("./sector-rotation.server");
+    const holdings = await args.supabaseAdmin
+      .from("holdings")
+      .select("symbol, quantity, avg_cost, instrument_ccy")
+      .eq("portfolio_id", args.portfolioId)
+      .gt("quantity", 0);
+    for (const h of (holdings?.data ?? []) as Array<Record<string, unknown>>) {
+      const symbol = String(h["symbol"] ?? "").toUpperCase();
+      const qty = Number(h["quantity"] ?? 0);
+      const cost = Number(h["avg_cost"] ?? 0);
+      if (!symbol || !(qty > 0) || !(cost > 0)) continue;
+      heldSymbols.add(symbol);
+      const ccy = String(h["instrument_ccy"] ?? base).toUpperCase();
+      const value = await toBase(qty * cost, ccy);
+      const key = symbolSector(symbol) ?? "__unknown__";
+      sectorExposureBase[key] = (sectorExposureBase[key] ?? 0) + Math.max(0, value);
+    }
+  } catch {
+    /* concentration budget degrades to "no existing exposure" */
+  }
+
+  return {
+    navBase,
+    trailingCostBase,
+    buysAlreadyToday,
+    lastBuyDaysAgo,
+    windowDays,
+    sectorExposureBase,
+    heldSymbols,
+  };
+
 }
