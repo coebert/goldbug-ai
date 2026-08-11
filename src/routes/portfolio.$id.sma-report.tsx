@@ -21,7 +21,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
-  AXIS_LABEL,
   AXIS_LINE,
   AXIS_TICK,
   CHART_NEUTRAL_SERIES,
@@ -30,6 +29,9 @@ import {
   LEGEND_STYLE,
   OKABE_ITO,
   TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_ITEM_STYLE,
+  TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
 
 export const Route = createFileRoute("/portfolio/$id/sma-report")({
@@ -205,7 +207,7 @@ function SmaReportPage() {
                         axisLine={AXIS_LINE}
                         tickLine={TICK_LINE}
                         minTickGap={48}
-                        label={{ value: "Date", position: "insideBottom", offset: -12, ...AXIS_LABEL }}
+                        label={{ value: "Date", position: "insideBottom", offset: -12, fontSize: 12, fill: "var(--foreground)" }}
                       />
                       <YAxis
                         tick={AXIS_TICK}
@@ -213,11 +215,13 @@ function SmaReportPage() {
                         tickLine={TICK_LINE}
                         domain={["auto", "auto"]}
                         width={64}
-                        label={{ value: "Price", angle: -90, position: "insideLeft", ...AXIS_LABEL }}
+                        label={{ value: "Price", angle: -90, position: "insideLeft", fontSize: 12, fill: "var(--foreground)" }}
                       />
                       <Tooltip
                         formatter={(v: unknown, name) => [num(Number(v)), String(name)]}
-                        contentStyle={{ fontSize: 12 }}
+                        contentStyle={TOOLTIP_CONTENT_STYLE}
+                        labelStyle={TOOLTIP_LABEL_STYLE}
+                        itemStyle={TOOLTIP_ITEM_STYLE}
                       />
                       <Legend wrapperStyle={LEGEND_STYLE} />
                       <Line
