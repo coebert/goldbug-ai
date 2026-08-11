@@ -868,11 +868,20 @@ async function main() {
     const calOpts = { ...calibOpts, volZ };
 
     // Per-fold calibrated structures: fitted on train bars, never on test bars.
+    // With --load-calib the saved per-fold structures are used verbatim, so the
+    // OOS comparison replays exactly the fit the snapshot was taken from.
+    const pinnedFolds = loadedSnapshot ? foldStructuresFromSnapshot(loadedSnapshot, clusters) : null;
+    const pinnedKind = loadedSnapshot?.folds?.[0]?.kind;
     const calibrated = new Map<CalibratableKind, ReturnType<typeof calibrateFoldStructures>>();
     for (const kind of ["blocks", "contagion"] as const) {
-      if (oosArms.includes(`calib-${kind}`)) {
-        calibrated.set(kind, calibrateFoldStructures(seriesBySymbol, oosFolds, kind, calOpts));
-      }
+      if (!oosArms.includes(`calib-${kind}`)) continue;
+      if (pinnedFolds?.size && pinnedKind === kind) continue;
+      calibrated.set(kind, calibrateFoldStructures(seriesBySymbol, oosFolds, kind, calOpts));
+    }
+    if (pinnedFolds?.size) {
+      console.log(
+        `Per-fold structures pinned from the snapshot (${pinnedFolds.size} folds, ${pinnedKind}).`,
+      );
     }
 
     type Arm = { label: string; structureFor: (fold: number) => CorrelationStructure };
@@ -880,6 +889,11 @@ async function main() {
     for (const name of oosArms) {
       if (name.startsWith("calib-")) {
         const kind = name.slice("calib-".length) as CalibratableKind;
+        if (pinnedFolds?.size && pinnedKind === kind) {
+          const fallbackStruct = simCfg.structure!;
+          arms.push({ label: name, structureFor: (i) => pinnedFolds.get(i) ?? fallbackStruct });
+          continue;
+        }
         const rows = calibrated.get(kind);
         if (!rows) continue;
         arms.push({ label: name, structureFor: (i) => rows[i]!.structure });
@@ -889,6 +903,15 @@ async function main() {
       }
     }
     if (!arms.length) throw new Error("--oos-arms selected no usable arms");
+
+    // Saving from an OOS run keeps the per-fold structures too, so the whole
+    // walk-forward calibration state — not just the full-tape fit — replays.
+    const saveKind: CalibratableKind = calibrated.has("contagion") ? "contagion" : "blocks";
+    const saveRows = calibrated.get(saveKind);
+    writeCalibrationSnapshot(
+      saveRows?.map((calibration, i) => ({ calibration, window: oosFolds[i]! })),
+    );
+
 
     console.log(
       `Out-of-sample coupling test: ${oosFolds.length} folds `
