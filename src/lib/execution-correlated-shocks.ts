@@ -83,6 +83,16 @@ export type CorrelatedExecutionConfig = ExecutionSimConfig & {
   regimeRampHiZ: number;
   /** Minimum blend applied once the Markov chain says the bar is stressed. */
   stressBlendFloor: number;
+
+  /**
+   * Symbols exempted from the shock process: they draw purely idiosyncratic
+   * slippage at calm parameters, ignoring the market/cluster factors and the
+   * stress regime. The regime still rolls and the same random numbers are
+   * consumed in the same order, so a decoupled run stays perfectly paired with
+   * the base run — which is what makes leave-one-cluster-out tail attribution
+   * (`execution-cluster-spillover.ts`) an apples-to-apples comparison.
+   */
+  decoupledSymbols?: ReadonlySet<string>;
 };
 
 export const DEFAULT_CORRELATED_EXECUTION: CorrelatedExecutionConfig = {
@@ -228,26 +238,49 @@ export function makeCorrelatedExecutionSampler(
     return bar;
   };
 
+  const decoupled = c.decoupledSymbols;
+  // Decoupled symbols draw their (calm, idiosyncratic) outcome off a side
+  // stream while still consuming exactly the numbers the coupled run would
+  // have consumed from the main stream. That keeps every *other* symbol on
+  // the path bit-identical, which is what makes leave-one-cluster-out
+  // attribution a like-for-like comparison instead of a reshuffle.
+  const offRng = mulberry32((seed ^ 0x2545f491) >>> 0);
   const draw = (symbol?: string): ExecutionDraw => {
-    const sigma = c.slippageSigma * (bar.stressed ? c.stressSigmaMult : 1);
+    const off = decoupled ? decoupled.has(symbol ?? "") : false;
+    const stressed = bar.stressed;
+    const sigma = c.slippageSigma * (stressed ? c.stressSigmaMult : 1);
     // Market + cluster + idiosyncratic decomposition. With a global structure
     // the cluster loading is zero and this reduces to the original two terms.
     const w = weightsFor(symbol ?? "", bar.stressT);
     const gz = bar.clusterZ.get(w.group) ?? 0;
-    const z = w.market * bar.commonZ + w.cluster * gz + w.idio * standardNormal(rng);
+    const idioZ = standardNormal(rng);
+    const z = w.market * bar.commonZ + w.cluster * gz + w.idio * idioZ;
     let mult = Math.exp(z * sigma) * bar.regimeMult;
     if (rng() < c.tailProb) mult *= c.tailMult;
     mult = Math.min(c.maxSlippageMult, Math.max(0, mult));
 
-    const noFill = Math.min(1, c.noFillProb * (bar.stressed ? c.stressNoFillMult : 1));
-    const fullFill = Math.max(0, Math.min(1 - noFill, c.fullFillProb * (bar.stressed ? c.stressFullFillMult : 1)));
+    const noFill = Math.min(1, c.noFillProb * (stressed ? c.stressNoFillMult : 1));
+    const fullFill = Math.max(0, Math.min(1 - noFill, c.fullFillProb * (stressed ? c.stressFullFillMult : 1)));
     const partial = Math.max(0, 1 - noFill - fullFill);
 
     let fillRatio = 1;
     const u = rng();
     if (u < noFill) fillRatio = 0;
     else if (u < noFill + partial) fillRatio = c.minFillRatio + rng() * (1 - c.minFillRatio);
-    return { slippageMult: mult, fillRatio };
+    if (!off) return { slippageMult: mult, fillRatio };
+
+    // Same order, no shared factors, no stress amplification.
+    let offMult = Math.exp(standardNormal(offRng) * c.slippageSigma);
+    if (offRng() < c.tailProb) offMult *= c.tailMult;
+    offMult = Math.min(c.maxSlippageMult, Math.max(0, offMult));
+    const offNoFill = Math.min(1, c.noFillProb);
+    const offFull = Math.max(0, Math.min(1 - offNoFill, c.fullFillProb));
+    const offPartial = Math.max(0, 1 - offNoFill - offFull);
+    let offRatio = 1;
+    const ou = offRng();
+    if (ou < offNoFill) offRatio = 0;
+    else if (ou < offNoFill + offPartial) offRatio = c.minFillRatio + offRng() * (1 - c.minFillRatio);
+    return { slippageMult: offMult, fillRatio: offRatio };
   };
 
 

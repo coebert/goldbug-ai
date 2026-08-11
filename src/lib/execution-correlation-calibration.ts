@@ -128,7 +128,7 @@ const pool = (rhos: readonly number[]): PooledRho => ({
 });
 
 /** Pearson correlation over a slice; NaN if either leg is flat. */
-function sliceCorr(a: readonly number[], b: readonly number[], from: number, to: number): number {
+export function sliceCorr(a: readonly number[], b: readonly number[], from: number, to: number): number {
   let n = 0;
   let sa = 0;
   let sb = 0;

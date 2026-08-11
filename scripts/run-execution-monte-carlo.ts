@@ -57,6 +57,13 @@ import {
   type CorrelatedExecutionSampler,
 } from "../src/lib/execution-correlated-shocks";
 import {
+  clusterSpilloverMatrix,
+  clusterTailContributions,
+  formatSpilloverHeatmap,
+  formatTailContributions,
+  topSpilloverPairs,
+} from "../src/lib/execution-cluster-spillover";
+import {
   calibrateCorrelations,
   describeCalibration,
   structureFromCalibration,
@@ -231,6 +238,11 @@ const calibOpts = {
 const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.length > 0;
 
 
+
+// --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
+// attribution, i.e. which sectors drive the joint worst case under contagion.
+const spilloverMode = process.argv.includes("--spillover");
+const spilloverPaths = Number(arg("spillover-paths", String(Math.max(30, Math.round(paths / 4)))));
 
 // --attribution: Shapley breakdown of the tail into slippage / fill-rate / stress.
 const attributionMode = process.argv.includes("--attribution");
@@ -686,6 +698,132 @@ async function main() {
       }
       return best;
     });
+
+  // ---------------------------------------------------- sector spillover mode
+  // --spillover: two views of contagion. First the measured cluster × cluster
+  // coupling (calm, stress, and the stress uplift), then a leave-one-cluster-
+  // out simulation on common random numbers that says which of those clusters
+  // actually pays for the joint drawdown tail.
+  if (spilloverMode) {
+    const spill = clusterSpilloverMatrix(seriesBySymbol, { ...calibOpts, volZ });
+    console.log("Sector spillover — rolling-window coupling by cluster pair");
+    console.log(
+      `basis=${spill.basis} window=${spill.window} step=${spill.step} · `
+      + `${spill.windows} windows (${spill.stressWindows} stressed)`,
+    );
+    for (const c of spill.clusters) {
+      console.log(`  ${c.padEnd(12)} ${(spill.members.get(c) ?? []).join(" ")}`);
+    }
+    for (const layer of ["calm", "stress", "delta"] as const) {
+      console.log();
+      console.log(`${layer.toUpperCase()} coupling`);
+      console.log(formatSpilloverHeatmap(spill, layer));
+    }
+    const top = topSpilloverPairs(spill, 8);
+    if (top.length) {
+      console.log("\nBiggest stress uplift (contagion channels):");
+      for (const t of top) {
+        console.log(
+          `  ${`${t.a}↔${t.b}`.padEnd(26)} calm ${t.calm.toFixed(2)} → `
+          + `stress ${t.stress.toFixed(2)}  (Δ ${t.delta >= 0 ? "+" : ""}${t.delta.toFixed(2)})`,
+        );
+      }
+    }
+
+    console.log(
+      `\nTail contribution: leave-one-cluster-out · ${spilloverPaths} paths/ablation · `
+      + `common random numbers · structure ${describeStructure(simCfg.structure!)}`,
+    );
+
+    const symbolsByCluster = new Map<string, string[]>();
+    for (const [sym] of seriesBySymbol) {
+      const g = clusters.get(sym) ?? "other";
+      const list = symbolsByCluster.get(g) ?? [];
+      list.push(sym);
+      symbolsByCluster.set(g, list);
+    }
+    const clusterNames = [...symbolsByCluster.keys()].sort();
+
+    type Tail = { retCvar: number; deepestP5: number; cost: number };
+    const runPaths = (
+      variant: SmaVariant,
+      tuned: SmaVariantParams[],
+      decoupledSymbols?: ReadonlySet<string>,
+    ): Tail => {
+      const cfg = decoupledSymbols ? { ...simCfg, decoupledSymbols } : simCfg;
+      const rets: number[] = [];
+      const dds: number[] = [];
+      const costs: number[] = [];
+      for (let pth = 0; pth < spilloverPaths; pth++) {
+        const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+        const sampler = makeCorrelatedExecutionSampler(cfg, pathSeed);
+        const limit = execModel === "limit"
+          ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+          : null;
+        const foldRets: number[] = [];
+        let deepest = 0;
+        let cost = 0;
+        for (let k = 0; k < folds.length; k++) {
+          const f = folds[k]!;
+          const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
+          foldRets.push(r.returnPct);
+          if (r.maxDrawdownPct < deepest) deepest = r.maxDrawdownPct;
+          cost += r.costs;
+        }
+        rets.push(meanOf(foldRets));
+        dds.push(deepest);
+        costs.push(cost / folds.length);
+      }
+      return {
+        retCvar: percentileStats(rets).cvar5,
+        deepestP5: percentileStats(dds).p5,
+        cost: percentileStats(costs).mean,
+      };
+    };
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      const base = runPaths(variant, tuned);
+      const ablations = clusterNames.map((name) => {
+        const syms = symbolsByCluster.get(name)!;
+        const out = runPaths(variant, tuned, new Set(syms));
+        return { name, syms: syms.length, out };
+      });
+
+      console.log(`\n=== ${variant} ===`);
+      console.log(formatTailContributions(
+        clusterTailContributions(
+          base.deepestP5,
+          ablations.map((a) => ({ cluster: a.name, metric: a.out.deepestP5, symbols: a.syms })),
+          "lowerIsWorse",
+        ),
+        { label: "  deepest drawdown p5 (joint worst case)", unit: "%", baseline: base.deepestP5 },
+      ));
+      console.log(formatTailContributions(
+        clusterTailContributions(
+          base.retCvar,
+          ablations.map((a) => ({ cluster: a.name, metric: a.out.retCvar, symbols: a.syms })),
+          "lowerIsWorse",
+        ),
+        { label: "  return CVaR5 (mean of worst 5% of lifetimes)", unit: "%", baseline: base.retCvar },
+      ));
+      console.log(formatTailContributions(
+        clusterTailContributions(
+          base.cost,
+          ablations.map((a) => ({ cluster: a.name, metric: a.out.cost, symbols: a.syms })),
+          "higherIsWorse",
+        ),
+        { label: "  mean execution cost per fold", unit: "", baseline: base.cost },
+      ));
+    }
+
+    console.log("\nHow to read this: an ablation decouples one cluster from the market and");
+    console.log("cluster shock factors and from the stress regime, on identical random draws.");
+    console.log("'damage' is how much the joint tail improves once that cluster stops");
+    console.log("co-moving, so a large share means the cluster is the contagion channel that");
+    console.log("costs money — not merely the one with the highest correlation.");
+    return;
+  }
 
   // ------------------------------------------------ channel attribution mode
   // --attribution: run the 2^3 ablation lattice (slippage × fill-rate × stress)
