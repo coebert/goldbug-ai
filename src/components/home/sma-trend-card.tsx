@@ -67,7 +67,7 @@ const DEFAULT_PERIODS: SmaPeriod[] = [50, 200];
 const PERIOD_STYLE: Record<SmaPeriod, { stroke: string; dash: string }> = {
   20: { stroke: CHART_ROLE.positive, dash: "6 2" },
   50: { stroke: CHART_ROLE.benchmark, dash: "4 3" },
-  100: { stroke: CHART_ROLE.warning ?? CHART_ROLE.benchmark, dash: "1 3" },
+  100: { stroke: CHART_ROLE.warning, dash: "1 3" },
   200: { stroke: CHART_ROLE.highlight, dash: "2 4" },
 };
 
