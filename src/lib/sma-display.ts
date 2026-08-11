@@ -62,3 +62,34 @@ export function toggleSmaPeriod(
   const ordered = SMA_PERIODS.filter((p) => next.includes(p));
   return ordered.length ? ordered : [...current];
 }
+
+/** Home card can chart up to this many markets side by side. */
+export const MAX_SMA_SYMBOLS = 4;
+
+/** Storage key for the home card's selected markets. */
+export const SMA_SYMBOLS_KEY = "home-sma-symbols";
+
+/** Parse a stored "SPY,QQQ" list, keeping only known symbols, max four. */
+export function parseSmaSymbols(
+  raw: string | null | undefined,
+  isKnown: (s: string) => boolean,
+): string[] {
+  if (!raw) return [];
+  const out: string[] = [];
+  for (const part of String(raw).split(",")) {
+    const s = part.trim();
+    if (s && isKnown(s) && !out.includes(s)) out.push(s);
+    if (out.length >= MAX_SMA_SYMBOLS) break;
+  }
+  return out;
+}
+
+/** Add/remove a market; keeps at least one and never exceeds the cap. */
+export function toggleSmaSymbol(current: readonly string[], symbol: string): string[] {
+  if (current.includes(symbol)) {
+    const next = current.filter((s) => s !== symbol);
+    return next.length ? next : [...current];
+  }
+  if (current.length >= MAX_SMA_SYMBOLS) return [...current];
+  return [...current, symbol];
+}

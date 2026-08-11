@@ -9,6 +9,7 @@ import {
   SMA_PERIODS,
   smaKey,
 } from "../market-symbol-history";
+import { parseSmaSymbols, toggleSmaSymbol } from "../sma-display";
 
 function tape(days: number, start = 100, step = 1) {
   const rows = [];
@@ -145,5 +146,32 @@ describe("detectSmaCrossovers", () => {
       pt("2026-01-02", 101, 101, 100),
     ];
     expect(detectSmaCrossovers(missing, [50, 200])).toEqual([]);
+  });
+});
+
+describe("sma symbol selection", () => {
+  const known = (s: string) => ["SPY", "QQQ", "IWM", "DIA", "EFA"].includes(s);
+
+  it("parses, dedupes and caps at four markets", () => {
+    expect(parseSmaSymbols("SPY,QQQ,SPY,IWM,DIA,EFA", known)).toEqual([
+      "SPY",
+      "QQQ",
+      "IWM",
+      "DIA",
+    ]);
+    expect(parseSmaSymbols("NOPE", known)).toEqual([]);
+    expect(parseSmaSymbols(null, known)).toEqual([]);
+  });
+
+  it("toggles without dropping the last market or exceeding the cap", () => {
+    expect(toggleSmaSymbol(["SPY"], "QQQ")).toEqual(["SPY", "QQQ"]);
+    expect(toggleSmaSymbol(["SPY", "QQQ"], "SPY")).toEqual(["QQQ"]);
+    expect(toggleSmaSymbol(["SPY"], "SPY")).toEqual(["SPY"]);
+    expect(toggleSmaSymbol(["SPY", "QQQ", "IWM", "DIA"], "EFA")).toEqual([
+      "SPY",
+      "QQQ",
+      "IWM",
+      "DIA",
+    ]);
   });
 });
