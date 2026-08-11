@@ -173,6 +173,11 @@ type SegmentResult = {
   takerFills: number;
   /** Fee + adverse-selection + waiting-drift cost, in currency. */
   driftCosts: number;
+  /** True when the segment's max-drawdown trough bar was in the stress regime. */
+  maxDdTroughStressed: boolean;
+  /** % of bars in the peak→trough drawdown window that were stressed. */
+  maxDdWindowStressShare: number;
+
 };
 
 type Ctx = {
