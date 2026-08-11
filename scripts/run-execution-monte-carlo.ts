@@ -57,6 +57,14 @@ import {
   type CorrelatedExecutionSampler,
 } from "../src/lib/execution-correlated-shocks";
 import {
+  clusterMap,
+  describeStructure,
+  makeCorrelationStructure,
+  type CorrelationStructure,
+  type CorrelationStructureKind,
+} from "../src/lib/execution-correlation-structures";
+
+import {
   EXECUTION_CHANNELS,
   channelSubsets,
   subsetKey,
