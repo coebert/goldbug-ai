@@ -125,6 +125,25 @@ function dayKey(iso: string): string {
 }
 
 function scaleComponents(f: FrictionFill, charged: number): FrictionComponents {
+  // Broker itemisation wins when we have it. Note the asymmetry: an invoice
+  // bills commission, exchange fees and stamp duty but never the half-spread,
+  // so any charge above the invoiced legs is exactly the implicit spread cost
+  // the model priced — book the excess there rather than inflating commission.
+  const rc = f.reportedComponents;
+  if (rc) {
+    const commission = Math.max(0, rc.commissionBase);
+    const tax = Math.max(0, rc.taxBase);
+    const spread = Math.max(0, rc.spreadBase);
+    const invoiced = commission + tax + spread;
+    if (invoiced > 0) {
+      if (charged <= invoiced) {
+        const k = charged / invoiced;
+        return { commissionBase: commission * k, spreadBase: spread * k, taxBase: tax * k };
+      }
+      return { commissionBase: commission, spreadBase: spread + (charged - invoiced), taxBase: tax };
+    }
+  }
+
   const modelled =
     Math.max(0, f.commissionModelledBase) +
     Math.max(0, f.spreadModelledBase) +
@@ -139,6 +158,7 @@ function scaleComponents(f: FrictionFill, charged: number): FrictionComponents {
     taxBase: Math.max(0, f.taxModelledBase) * k,
   };
 }
+
 
 export function computeFrictionKpi(args: {
   fills: readonly FrictionFill[];
