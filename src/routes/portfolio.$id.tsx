@@ -201,6 +201,7 @@ import { CryptoBacktestCard } from "@/components/crypto-backtest-card";
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
+import { RelativeStrengthCard } from "@/components/relative-strength-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { capitalAt, EquityPctChart } from "@/components/equity-pct-chart";
