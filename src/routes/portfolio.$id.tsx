@@ -140,6 +140,8 @@ import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
+import { CostSyncAlertBanner } from "@/components/cost-sync-alert-banner";
+
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
@@ -1026,6 +1028,8 @@ function PortfolioPage() {
                 />
                 <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
+                <CostSyncAlertBanner portfolioId={id} className="mb-4" />
+
                 <ValuationConsistencyAlert portfolioId={id} className="mb-4" />
                 <InstrumentCcyAlert portfolioId={id} className="mb-4" />
                 <ReconcileFillsCard portfolioId={id} className="mb-4" />
