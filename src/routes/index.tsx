@@ -62,6 +62,9 @@ const TickerWatchCard = lazy(() =>
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
 );
+const MarketPulseCard = lazy(() =>
+  import("@/components/home/market-pulse-card").then((m) => ({ default: m.MarketPulseCard })),
+);
 const MarketHoursCard = lazy(() =>
   import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
 );
@@ -286,6 +289,14 @@ function Home() {
         </div>
 
         <NewHereBanner />
+
+        {/* Market pulse — the state of the wider market, above your own money
+            so the numbers below can be read in context. */}
+        <section className="mb-6">
+          <Suspense fallback={<div className="h-72 rounded-2xl border bg-card/50" aria-hidden="true" />}>
+            <MarketPulseCard />
+          </Suspense>
+        </section>
 
         {/* Portfolios — real money first, practice money folded away */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
