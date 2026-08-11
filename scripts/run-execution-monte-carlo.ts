@@ -174,6 +174,15 @@ import {
   makeLimitOrderSampler,
   type LimitOrderSampler,
 } from "../src/lib/execution-limit-orders";
+import {
+  DEFAULT_RISK_GRID_OPTIONS,
+  formatRiskGrid,
+  riskGridLevels,
+  riskGridReport,
+  riskSizingFor,
+  type RiskGridRow,
+  type RiskSizing,
+} from "../src/lib/execution-risk-grid";
 
 const argv = process.argv.slice(2);
 // A flag's value is the next token, unless that token is itself a flag — so
@@ -432,6 +441,20 @@ const regimeOosMinRun = Number(arg("regime-oos-min-run", "3"));
 /** Segments shorter than this are unbacktestable (all entry cost, no signal). */
 const regimeOosMinSegment = Number(arg("regime-oos-min-segment", "15"));
 
+// --risk-grid: tune the single risk-level dial on the same OOS folds and report
+// the profit/drawdown Pareto frontier. Scored on TEST windows only.
+const riskGridMode = argv.includes("--risk-grid");
+const riskGridSteps = Number(arg("risk-grid-steps", "7"));
+const riskGridPaths = Number(arg("risk-grid-paths", String(Math.max(30, Math.round(paths / 4)))));
+const riskGridLo = Number(arg("risk-grid-lo", "0"));
+const riskGridHi = Number(arg("risk-grid-hi", "1"));
+const riskGridOpts = {
+  maxPositionsAtLow: Number(arg("risk-grid-slots-lo", String(DEFAULT_RISK_GRID_OPTIONS.maxPositionsAtLow))),
+  maxPositionsAtHigh: Number(arg("risk-grid-slots-hi", String(DEFAULT_RISK_GRID_OPTIONS.maxPositionsAtHigh))),
+  exposureAtLow: Number(arg("risk-grid-deploy-lo", String(DEFAULT_RISK_GRID_OPTIONS.exposureAtLow))),
+  exposureAtHigh: Number(arg("risk-grid-deploy-hi", String(DEFAULT_RISK_GRID_OPTIONS.exposureAtHigh))),
+};
+
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
 const spilloverMode = process.argv.includes("--spillover");
@@ -516,6 +539,11 @@ function simulate(
    * decomposition swaps in a permissive policy to price what the rules cost.
    */
   policy: RebalancePolicyOverrides = { minTicket, abandonPartialFraction: 0.2 },
+  /**
+   * Position sizing. Defaults to the live book's shape; the risk-level grid
+   * search swaps in each candidate risk level's expansion.
+   */
+  risk: RiskSizing = { maxPositions, exposureFraction: 0.98 },
 ): SegmentResult {
   const { seriesBySymbol, costFor, volZ, volBpsBySymbol } = ctx;
   let cash = startingCash;
@@ -617,13 +645,15 @@ function simulate(
       else shares.delete(sym);
     }
 
-    const openSlots = maxPositions - shares.size;
+    const openSlots = risk.maxPositions - shares.size;
     if (openSlots > 0 && wanted.length) {
       const equityNow = cash + [...shares].reduce((a, [s, q]) => a + q * priceAt(s, i), 0);
-      const target = equityNow / maxPositions;
+      // Only the deployable part of equity is spread across the slots, so a
+      // low risk level holds cash back instead of just holding more names.
+      const target = (equityNow * risk.exposureFraction) / risk.maxPositions;
       for (const sym of wanted.slice(0, openSlots)) {
         const price = priceAt(sym, i);
-        const requested = Math.min(target, cash * 0.98);
+        const requested = Math.min(target, cash * risk.exposureFraction);
         if (requested < policy.minTicket) continue;
         const d = order(sym, i);
         if (stressedBar) stressOrders++;
@@ -1664,6 +1694,106 @@ async function main() {
     console.log("'solo' is the driver alone and 'marginal' is it added last, so a solo/marginal gap");
     console.log("is interaction — typically the ticket floor being cheap in calm tape and expensive");
     console.log(`in a gapping one. P(joint breach) is at ${sweepThreshold}% with the trough in stress.`);
+    return;
+  }
+
+
+  // -------------------------------------------------- risk-level grid search
+  // --risk-grid: turn the one dial the live engine exposes (risk level) across
+  // a small grid and score every setting on the SAME out-of-sample folds, same
+  // paths, same draws. Nothing is fitted on the test windows — the risk level
+  // is a policy choice applied to them, so this is an honest OOS comparison.
+  // Output is the Pareto frontier of profit vs drawdown: the settings that no
+  // other setting beats on both axes at once.
+  if (riskGridMode) {
+    const oosFolds = folds.map((f) => ({ ...f }));
+    const levels = riskGridLevels(riskGridSteps, riskGridLo, riskGridHi);
+    const structure = simCfg.structure!;
+
+    console.log("Risk-level grid search — out-of-sample profit vs drawdown");
+    console.log(
+      `  ${levels.length} risk levels ∈ [${riskGridLo}, ${riskGridHi}] · ${oosFolds.length} folds `
+      + `(${testDays}d test each) · ${riskGridPaths} paths/level · common random numbers`,
+    );
+    console.log(
+      `  dial: ${riskGridOpts.maxPositionsAtLow}→${riskGridOpts.maxPositionsAtHigh} slots, `
+      + `${(riskGridOpts.exposureAtLow * 100).toFixed(0)}%→${(riskGridOpts.exposureAtHigh * 100).toFixed(0)}% deployed · `
+      + `coupling ${structure.kind} · min ticket £${minTicket}`,
+    );
+    console.log();
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      console.log(`=== ${variant} ===`);
+      const rows: RiskGridRow[] = [];
+
+      for (const level of levels) {
+        const sizing: RiskSizing = riskSizingFor(level, riskGridOpts);
+        const pathRet: number[] = [];
+        const pathDd: number[] = [];
+        const pathCost: number[] = [];
+        const pathFills: number[] = [];
+
+        for (let pth = 0; pth < riskGridPaths; pth++) {
+          // Seed depends on path and variant only — never on the risk level —
+          // so every level trades the identical tape and identical shocks and
+          // the frontier reflects sizing, not luck.
+          const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+          const limit = execModel === "limit"
+            ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+            : null;
+          let ret = 0;
+          let cost = 0;
+          let fills = 0;
+          let worstDd = 0;
+
+          for (let k = 0; k < oosFolds.length; k++) {
+            const f = oosFolds[k]!;
+            const sampler = makeCorrelatedExecutionSampler(
+              { ...simCfg, structure },
+              pathSeed + k * 31337,
+            );
+            const r = simulate(
+              ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit,
+              { slippage: true, fillRate: true },
+              { minTicket, abandonPartialFraction: 0.2 },
+              sizing,
+            );
+            ret += r.returnPct;
+            cost += r.costs;
+            fills += r.fills;
+            if (r.maxDrawdownPct < worstDd) worstDd = r.maxDrawdownPct;
+          }
+          pathRet.push(ret / oosFolds.length);
+          pathDd.push(worstDd);
+          pathCost.push(cost / oosFolds.length);
+          pathFills.push(fills / oosFolds.length);
+        }
+
+        const ret = percentileStats(pathRet);
+        const dd = percentileStats(pathDd);
+        rows.push({
+          risk: level,
+          sizing,
+          returnPct: ret.median,
+          cvar5Pct: ret.cvar5,
+          drawdownPct: dd.median,
+          worstDrawdownPct: dd.worst,
+          breachProb: pathDd.filter((d) => d <= -sweepThreshold).length / Math.max(1, pathDd.length),
+          cost: percentileStats(pathCost).median,
+          fills: percentileStats(pathFills).median,
+        });
+      }
+
+      console.log(formatRiskGrid(riskGridReport(rows, sweepThreshold)));
+      console.log();
+    }
+
+    console.log("Reading: 'return' is the median per-fold OOS return and 'medDD' the median of each");
+    console.log("path's worst drawdown, so the frontier trades typical profit against typical pain.");
+    console.log("A level marked ✓ is not beaten on both axes by any other level; ★ is the best");
+    console.log("return per unit of drawdown among the profitable frontier points. Levels off the");
+    console.log("frontier are strictly worse — there is no reason to run the book there.");
     return;
   }
 
