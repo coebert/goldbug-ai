@@ -76,8 +76,8 @@ export const FRICTION_LADDER: readonly FrictionScenario[] = [
     impactMult: 2,
     slippageSigmaMult: 1.5,
     stressSlippageMult: 1.35,
-    urgency: "urgent",
-    note: "spread and impact doubled, slippage draw 1.5x wider, urgent fills",
+    urgency: "aggressive",
+    note: "spread and impact doubled, slippage draw 1.5x wider, aggressive fills",
   },
   {
     ...base,
@@ -88,7 +88,7 @@ export const FRICTION_LADDER: readonly FrictionScenario[] = [
     extraBps: 5,
     slippageSigmaMult: 2,
     stressSlippageMult: 1.6,
-    urgency: "urgent",
+    urgency: "aggressive",
     note: "crisis liquidity: 3x spread, 4x impact, +5bps fee drag",
   },
 ];
