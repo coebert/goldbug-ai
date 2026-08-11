@@ -121,10 +121,14 @@ export function RiskLevelMetricsCard() {
           Risk levels at a glance
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Return, drawdown and volatility exclude deposits, withdrawals and cash re-syncs; all
-          figures converted to {q.data?.currency ?? "GBP"}. Per risk level
+          Risk, drawdown and diversification per risk level
           {q.data ? ` · last ${q.data.lookbackDays} days · ${formatUk(q.data.computedAt)}` : ""}
         </p>
+        <p className="text-[11px] text-muted-foreground">
+          Return, drawdown and volatility exclude deposits, withdrawals and broker cash re-syncs.
+          All figures converted to {q.data?.currency ?? "GBP"}.
+        </p>
+
       </CardHeader>
       <CardContent className="space-y-3">
         {q.isLoading && <Skeleton className="h-28 w-full" />}
