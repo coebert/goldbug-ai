@@ -87,6 +87,8 @@ import { logCounterfactual, evaluatePendingCounterfactuals } from "./counterfact
 import { ensembleVote } from "./ensemble.server";
 import { unifiedScore } from "./alpha/unified-score";
 import { combineHaircuts } from "./sizing-haircuts";
+import { combineBoosts } from "./sizing/multiplier-ceiling";
+import { earningsGate } from "./events/earnings-gate";
 import { loadMeasuredEdge } from "./measured-edge.server";
 import { computeAndPersistCalibration, getLatestCalibration, formatCalibrationBlock } from "./calibration.server";
 import {
@@ -766,13 +768,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   // Alpha priors: composite scores per symbol, blended by regime. We hoist
   // these out of the AI-decision IIFE so the sizing pipeline can also
   // reference them (Phase 2 bonus + Phase 5 risk parity).
+  // Phase 3 item 11 — realised per-model performance turns the static regime
+  // prior into a bounded (0.5x-1.5x) adaptive blend. Falls back to the prior
+  // whenever there is not enough measurement.
+  const adaptiveWeights = await (async () => {
+    try {
+      const { resolveAdaptiveWeights } = await import("./alpha/adaptive-weights.server");
+      return await resolveAdaptiveWeights({
+        portfolioId: portfolio.id,
+        regime: effectiveRegime.regime,
+        asOf,
+      });
+    } catch {
+      return null;
+    }
+  })();
+  if (adaptiveWeights?.adapted) srvLog.info(adaptiveWeights.note);
+
   const alphaScores = scoreUniverse(
     features as unknown as Parameters<typeof scoreUniverse>[0],
     effectiveRegime.regime,
+    adaptiveWeights?.weights ?? null,
   );
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
   const alphaPriors = [
-    formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10),
+    formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10, adaptiveWeights?.weights ?? null),
+    adaptiveWeights?.adapted ? `(${adaptiveWeights.note})` : "",
     "",
     formatBreakoutBlock(
       features as unknown as Parameters<typeof formatBreakoutBlock>[0],
@@ -1388,6 +1409,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     const penalty = ev.impact === "high" ? 0.5 : ev.impact === "medium" ? 0.75 : 0.9;
     eventPenaltyBySymbol.set(key, Math.min(eventPenaltyBySymbol.get(key) ?? 1, penalty));
   }
+  // Phase 3 item 12 — scheduled-earnings blackout for fresh entries.
+  const earningsBySymbol = await (async () => {
+    try {
+      const { fetchEarningsDates } = await import("./events/earnings-cache.server");
+      return await fetchEarningsDates(admin, buySymbols);
+    } catch {
+      return new Map<string, { next_earnings_date: string | null; confidence: string }>();
+    }
+  })();
+
   // Broad macro event within window applies a mild across-the-board penalty
   const macroPenalty = events.some((e) => !e.symbol && (e.impact === "high" || e.impact === "medium"))
     ? 0.85
@@ -1715,6 +1746,10 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
 
+      // Phase 3 item 15 — boosts are collected and capped as one stack
+      // (see sizing/multiplier-ceiling) rather than multiplied ad hoc.
+      let alphaBonusMult = 1;
+
       // Phase 2 — two-sided sizing bonus. Lifts spend (up to cap) when the
       // regime-blended alpha prior and AI conviction both strongly agree with
       // the trade side. Never shrinks below the current spend.
@@ -1728,7 +1763,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
           enabled: true,
         });
         if (bonus.mult > 1) {
-          spend *= bonus.mult;
+          alphaBonusMult = bonus.mult;
           if (bonus.note) sizingNotes.push(bonus.note);
         }
       }
@@ -1803,6 +1838,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }));
       const evPenalty = (eventPenaltyBySymbol.get(meta.symbol) ?? 1) * macroPenalty;
 
+      // Scheduled earnings: veto new entries inside a confirmed blackout,
+      // haircut them just outside it. Exits are never gated.
+      const earnRow = earningsBySymbol.get(String(meta.symbol).toUpperCase());
+      const earnGate = earningsGate({
+        side: order.side,
+        asOf,
+        nextEarningsDate: earnRow?.next_earnings_date ?? null,
+        confidence: earnRow?.confidence ?? null,
+      });
+      if (earnGate.veto) {
+        executed.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason, rejected: earnGate.note ?? "earnings blackout",
+        });
+        continue;
+      }
+
       // Range-breakout evidence: lean into confirmed, volume-backed expansions
       // and cut size on unconfirmed / failed / stale ones.
       //
@@ -1850,6 +1902,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         { label: "sector", mult: secMult.mult },
         phaseMult.mult < 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
         { label: "event", mult: evPenalty },
+        earnGate.mult < 1 ? { label: "earnings", mult: earnGate.mult } : null,
         fundGate.mult < 1 ? { label: "financials", mult: fundGate.mult } : null,
         brk.mult < 1 ? { label: "breakout", mult: brk.mult } : null,
 
@@ -1860,10 +1913,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         if (systematic.note) sizingNotes.push(systematic.note);
         if (haircuts.floored) sizingNotes.push("haircut floor applied");
       }
-      if (phaseMult.mult > 1) {
-        spend *= phaseMult.mult;
+      const boosts = combineBoosts([
+        alphaBonusMult > 1 ? { label: "alpha\u00d7conv", mult: alphaBonusMult } : null,
+        phaseMult.mult > 1 ? { label: "sectorcycle", mult: phaseMult.mult } : null,
+        brk.mult > 1 ? { label: "breakout", mult: brk.mult } : null,
+      ]);
+      if (boosts.mult > 1) {
+        spend *= boosts.mult;
+        if (boosts.note) sizingNotes.push(boosts.note);
       }
-      if (brk.mult > 1) spend *= brk.mult;
       if (brk.note) sizingNotes.push(brk.note);
       if (phaseMult.note) sizingNotes.push(phaseMult.note);
       if (fundGate.note) sizingNotes.push(fundGate.note);
@@ -2827,6 +2885,12 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     raw: asJson({
       orders: decision.orders,
       executed,
+      alpha_scores: alphaScores.map((a) => ({
+        symbol: a.symbol,
+        composite: a.composite,
+        perModel: a.perModel,
+        top_driver: a.top_driver,
+      })),
       signals: features,
       news: scoredNews.slice(0, 12),
       guardrails: {
