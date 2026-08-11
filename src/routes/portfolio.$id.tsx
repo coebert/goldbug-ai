@@ -2309,6 +2309,12 @@ function PortfolioPage() {
                         Icon: BarChart3,
                       },
                       {
+                        to: "/portfolio/$id/sma-report",
+                        label: "SMA crossover report",
+                        desc: "Per-symbol SMA20/50 crosses, golden/death regime and the trades taken against that trend.",
+                        Icon: BarChart3,
+                      },
+                      {
                         to: "/portfolio/$id/report",
                         label: "Report",
                         desc: "Downloadable performance report for this portfolio.",

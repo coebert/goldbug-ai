@@ -25,6 +25,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as WalkForwardIdRouteImport } from './routes/walk-forward.$id'
 import { Route as PortfolioIdRouteImport } from './routes/portfolio.$id'
 import { Route as LongHorizonIdRouteImport } from './routes/long-horizon.$id'
+import { Route as PortfolioIdSmaReportRouteImport } from './routes/portfolio.$id.sma-report'
 import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.report'
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
@@ -131,6 +132,11 @@ const LongHorizonIdRoute = LongHorizonIdRouteImport.update({
   id: '/long-horizon/$id',
   path: '/long-horizon/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioIdSmaReportRoute = PortfolioIdSmaReportRouteImport.update({
+  id: '/sma-report',
+  path: '/sma-report',
+  getParentRoute: () => PortfolioIdRoute,
 } as any)
 const PortfolioIdReportRoute = PortfolioIdReportRouteImport.update({
   id: '/report',
@@ -304,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -348,6 +355,7 @@ export interface FileRoutesByTo {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -393,6 +401,7 @@ export interface FileRoutesById {
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
   '/portfolio/$id/report': typeof PortfolioIdReportRoute
+  '/portfolio/$id/sma-report': typeof PortfolioIdSmaReportRoute
   '/api/public/hooks/ai-gateway-health': typeof ApiPublicHooksAiGatewayHealthRoute
   '/api/public/hooks/backfill-daily-equity-changes': typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   '/api/public/hooks/backfill-intraday-equity': typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -439,6 +448,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/portfolio/$id/sma-report'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
@@ -483,6 +493,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/portfolio/$id/sma-report'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
@@ -527,6 +538,7 @@ export interface FileRouteTypes {
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
     | '/portfolio/$id/report'
+    | '/portfolio/$id/sma-report'
     | '/api/public/hooks/ai-gateway-health'
     | '/api/public/hooks/backfill-daily-equity-changes'
     | '/api/public/hooks/backfill-intraday-equity'
@@ -702,6 +714,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/long-horizon/$id'
       preLoaderRoute: typeof LongHorizonIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/portfolio/$id/sma-report': {
+      id: '/portfolio/$id/sma-report'
+      path: '/sma-report'
+      fullPath: '/portfolio/$id/sma-report'
+      preLoaderRoute: typeof PortfolioIdSmaReportRouteImport
+      parentRoute: typeof PortfolioIdRoute
     }
     '/portfolio/$id/report': {
       id: '/portfolio/$id/report'
@@ -893,6 +912,7 @@ interface PortfolioIdRouteChildren {
   PortfolioIdAttributionRoute: typeof PortfolioIdAttributionRoute
   PortfolioIdOptimizerRoute: typeof PortfolioIdOptimizerRoute
   PortfolioIdReportRoute: typeof PortfolioIdReportRoute
+  PortfolioIdSmaReportRoute: typeof PortfolioIdSmaReportRoute
 }
 
 const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
@@ -900,6 +920,7 @@ const PortfolioIdRouteChildren: PortfolioIdRouteChildren = {
   PortfolioIdAttributionRoute: PortfolioIdAttributionRoute,
   PortfolioIdOptimizerRoute: PortfolioIdOptimizerRoute,
   PortfolioIdReportRoute: PortfolioIdReportRoute,
+  PortfolioIdSmaReportRoute: PortfolioIdSmaReportRoute,
 }
 
 const PortfolioIdRouteWithChildren = PortfolioIdRoute._addFileChildren(
