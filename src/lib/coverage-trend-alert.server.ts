@@ -4,9 +4,13 @@
 // of coverage over the last three 7-day windows, so a slow slide raises an
 // alert even when every individual pass looked survivable.
 
-import { evaluateCoverageTrendAlert, formatCoverageWindow } from "./coverage-trend-alert";
+import {
+  COVERAGE_TREND_ALERT_CATEGORY,
+  evaluateCoverageTrendAlert,
+  formatCoverageWindow,
+} from "./coverage-trend-alert";
 
-export const COVERAGE_TREND_ALERT_CATEGORY = "broker_cost_coverage_trend";
+export { COVERAGE_TREND_ALERT_CATEGORY };
 const COOLDOWN_HOURS = 24;
 
 export function maybeNotifyCoverageTrend(params: {

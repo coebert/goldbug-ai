@@ -24,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { ChartFrame } from "@/components/chart-frame";
 import { getCoverageTrend } from "@/lib/fee-coverage-trend.functions";
+import { COVERAGE_TREND_ALERT_CATEGORY } from "@/lib/coverage-trend-alert";
+import { WebhookDeliveryStatusStrip } from "@/components/webhook-delivery-status-strip";
 import type { CoverageDirection, CoverageSeries } from "@/lib/fee-coverage-trend";
 import { POLL } from "@/lib/query-keys";
 import {
