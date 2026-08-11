@@ -222,7 +222,7 @@ export function SmaTrendCard() {
       volatility: strength ? strength.volatilityPct : null,
     };
   });
-  const visible = rankByTrendStrength(entries, sort, filter);
+  const visible = rankByTrendStrength(entries, sort, filter, sort2);
   const hidden = entries.length - visible.length;
 
   const renderOption = (s: string) => {
