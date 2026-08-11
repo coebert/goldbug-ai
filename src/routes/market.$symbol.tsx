@@ -33,6 +33,7 @@ import {
   toggleCompareSymbol,
 } from "@/lib/market-compare";
 import { CompareOverlay } from "@/components/market/compare-overlay";
+import { formatUkDate, formatUkDateTime } from "@/lib/uk-time";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
