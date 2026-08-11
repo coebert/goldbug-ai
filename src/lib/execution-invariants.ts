@@ -192,20 +192,18 @@ export function checkExecutionInvariants(args: {
     //    fee outweighs its proceeds also drains cash, and charging it the
     //    buy budget test compares its notional against money it never spent.
     if (s.side === "BUY" && s.fillQuantity > 0 && s.fillPrice >= 0 && s.fee >= 0) {
-      {
-        const spend = s.fillQuantity * s.fillPrice + s.fee;
-        // Relative slack alongside the absolute epsilon: quantity x price
-        // accumulates float error proportional to the notional, so a fixed
-        // 1e-6 tolerance produced spurious violations on larger trades.
-        const slack = Math.max(MONEY_EPS, Math.abs(prevCash) * 1e-7);
-        if (spend > prevCash + slack) {
-          violations.push({
-            code: "BUY_EXCEEDS_PRIOR_CASH",
-            step: s.step,
-            message: `buy spent ${spend} but only ${prevCash} was available`,
-            detail: { spend, priorCash: prevCash, fillQuantity: s.fillQuantity, fillPrice: s.fillPrice, fee: s.fee },
-          });
-        }
+      const spend = s.fillQuantity * s.fillPrice + s.fee;
+      // Relative slack alongside the absolute epsilon: quantity x price
+      // accumulates float error proportional to the notional, so a fixed
+      // 1e-6 tolerance produced spurious violations on larger trades.
+      const slack = Math.max(MONEY_EPS, Math.abs(prevCash) * 1e-7);
+      if (spend > prevCash + slack) {
+        violations.push({
+          code: "BUY_EXCEEDS_PRIOR_CASH",
+          step: s.step,
+          message: `buy spent ${spend} but only ${prevCash} was available`,
+          detail: { spend, priorCash: prevCash, fillQuantity: s.fillQuantity, fillPrice: s.fillPrice, fee: s.fee },
+        });
       }
     }
 
