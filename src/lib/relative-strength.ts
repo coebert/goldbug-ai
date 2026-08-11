@@ -90,6 +90,7 @@ export const VERDICT_BAND_PP = 1;
 
 const LSE = /\.L$|:xlon$/i;
 const CRYPTO = /-USD$|^BTC|^ETH|^SOL/i;
+const US_MIC = /:(xnas|xnys|arcx|bats|xngs|iexg)$/i;
 const EURO = /\.(DE|PA|AS|MI|MC|SW|ST|CO|HE|OL)$|:(xetr|xpar|xams|xmil|xmad|xswx|xsto|xcse|xhel|xose)$/i;
 
 /** The world tracker we fall back to when a venue-specific index is missing. */
@@ -106,6 +107,7 @@ export function pickBenchmark(symbol: string, assetClass?: string | null): Bench
   if (assetClass === "commodity") return { symbol: "GLD", label: "Gold" };
   if (LSE.test(s)) return { symbol: "ISF.L", label: "FTSE 100" };
   if (EURO.test(s)) return { symbol: "EFA", label: "Developed ex-US" };
+  if (US_MIC.test(s)) return { symbol: "SPY", label: "S&P 500" };
   if (/[.:]/.test(s)) return FALLBACK_BENCHMARK;
   return { symbol: "SPY", label: "S&P 500" };
 }
