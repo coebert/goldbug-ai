@@ -126,12 +126,26 @@ export type FrictionKpi = {
   annualisedDragPct: number | null;
 };
 
+/**
+ * Whether this fill's cost came off a broker invoice rather than the model.
+ *
+ * `fee_source` is authoritative once ingestion has run, but the tape predates
+ * that column, so a positive booked fee also counts — otherwise historical
+ * rows with real charges would be graded as estimates.
+ */
+export function isInvoiced(f: FrictionFill): boolean {
+  if (f.feeSource === "broker") return true;
+  if (f.feeSource === "model" || f.feeSource === "none") return false;
+  return Number.isFinite(f.feeReportedBase) && f.feeReportedBase > 0;
+}
+
 /** Charged friction for one fill: the broker's number or ours, whichever is larger. */
 export function chargedFriction(f: FrictionFill): number {
   const reported = Number.isFinite(f.feeReportedBase) ? Math.max(0, f.feeReportedBase) : 0;
   const modelled = Number.isFinite(f.feeModelledBase) ? Math.max(0, f.feeModelledBase) : 0;
   return Math.max(reported, modelled);
 }
+
 
 function dayKey(iso: string): string {
   const t = Date.parse(iso);
