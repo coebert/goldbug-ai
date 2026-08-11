@@ -72,6 +72,17 @@ import {
   diagnoseCalibrationFit,
   formatCalibrationDiagnostics,
 } from "../src/lib/execution-correlation-diagnostics";
+import {
+  calibrateFoldStructures,
+  compareFoldFits,
+  evaluateFoldFit,
+  formatFitComparisons,
+  formatFitSummaries,
+  summariseFoldFits,
+  type CalibratableKind,
+  type FoldFit,
+} from "../src/lib/execution-oos-calibration";
+
 
 import {
   clusterMap,
