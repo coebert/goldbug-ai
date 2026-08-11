@@ -153,7 +153,9 @@ function AnnotationList({
                 {a.date} · {a.label}
               </div>
               <p className="mt-0.5 text-sm">{a.note}</p>
+              <AnnotationSources sources={a.sources} />
             </div>
+
           </li>
         ))}
       </ol>
