@@ -204,6 +204,9 @@ function simulate(
   let cash = startingCash;
   const shares = new Map<string, number>();
   const equityCurve: number[] = [];
+  /** Stress flag per equity-curve bar, so drawdowns can be attributed. */
+  const stressedCurve: boolean[] = [];
+
   let fills = 0;
   let missedOrders = 0;
   let partialFills = 0;
