@@ -44,6 +44,9 @@ import {
   DETERMINISTIC_DRAW,
   percentileStats,
   drawdownBreachProbabilities,
+  jointDrawdownBreachProbabilities,
+  conditionalTailStats,
+
   DEFAULT_DRAWDOWN_THRESHOLDS,
   type PercentileStats,
 } from "../src/lib/execution-monte-carlo";
@@ -132,13 +135,22 @@ const limitCfg = {
 // correlation (ρ) × realised-vol stress trigger (z), so you can see how the
 // *joint* worst case moves with each assumption instead of trusting one cell.
 const parseList = (raw: string) =>
-  raw.split(",").map((s) => Number(s.trim())).filter((v) => Number.isFinite(v));
+  raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+    .map(Number).filter((v) => Number.isFinite(v));
+
 const rhoSweep = parseList(arg("rho-sweep", ""));
 const volZSweep = parseList(arg("vol-z-sweep", ""));
 const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0;
 const sweepPaths = Number(arg("sweep-paths", String(Math.max(40, Math.round(paths / 3)))));
 // Threshold headlined in the sweep matrix; the full breach table still prints.
 const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? ddThresholds[0] ?? 15)));
+
+// Conditional ("worst-stress regime") tail statistics: keep the paths whose
+// share of execution cost paid in stress is at or above this quantile, then
+// take the CVaR of the worst `--stress-tail` fraction inside that subset.
+const stressQuantile = Number(arg("stress-quantile", "0.8"));
+const stressTailFrac = Number(arg("stress-tail", "0.2"));
+
 
 
 const GRID: SmaVariantParams[] = [];
@@ -173,6 +185,11 @@ type SegmentResult = {
   takerFills: number;
   /** Fee + adverse-selection + waiting-drift cost, in currency. */
   driftCosts: number;
+  /** True when the segment's max-drawdown trough bar was in the stress regime. */
+  maxDdTroughStressed: boolean;
+  /** % of bars in the peak→trough drawdown window that were stressed. */
+  maxDdWindowStressShare: number;
+
 };
 
 type Ctx = {
@@ -199,6 +216,9 @@ function simulate(
   let cash = startingCash;
   const shares = new Map<string, number>();
   const equityCurve: number[] = [];
+  /** Stress flag per equity-curve bar, so drawdowns can be attributed. */
+  const stressedCurve: boolean[] = [];
+
   let fills = 0;
   let missedOrders = 0;
   let partialFills = 0;
@@ -318,6 +338,8 @@ function simulate(
     }
 
     equityCurve.push(cash + [...shares].reduce((a, [s, q]) => a + q * priceAt(s, i), 0));
+    stressedCurve.push(stressedBar);
+
   }
 
   let finalEquity = cash;
@@ -335,12 +357,31 @@ function simulate(
   const sd = Math.sqrt(varr);
   const sharpe = sd > 0 ? (mean / sd) * Math.sqrt(252) : 0;
 
+  // Drawdown, plus where it happened: a trough reached while the tape is in
+  // the correlated stress regime is an execution tail, not just a signal tail.
   let peak = -Infinity;
+  let peakIdx = 0;
   let maxDd = 0;
-  for (const e of equityCurve) {
-    peak = Math.max(peak, e);
-    maxDd = Math.min(maxDd, e / peak - 1);
+  let ddPeakIdx = 0;
+  let ddTroughIdx = 0;
+  for (let i = 0; i < equityCurve.length; i++) {
+    const e = equityCurve[i]!;
+    if (e > peak) {
+      peak = e;
+      peakIdx = i;
+    }
+    const dd = e / peak - 1;
+    if (dd < maxDd) {
+      maxDd = dd;
+      ddPeakIdx = peakIdx;
+      ddTroughIdx = i;
+    }
   }
+  let windowStressBars = 0;
+  for (let i = ddPeakIdx; i <= ddTroughIdx && i < stressedCurve.length; i++) {
+    if (stressedCurve[i]) windowStressBars++;
+  }
+  const windowLen = Math.max(1, ddTroughIdx - ddPeakIdx + 1);
 
   return {
     returnPct: (finalEquity / startingCash - 1) * 100,
@@ -357,6 +398,9 @@ function simulate(
     makerFills,
     takerFills,
     driftCosts,
+    maxDdTroughStressed: stressedCurve[ddTroughIdx] === true,
+    maxDdWindowStressShare: (windowStressBars / windowLen) * 100,
+
   };
 }
 
@@ -534,8 +578,11 @@ async function main() {
         "p5 DD%".padStart(9),
         "worstDD%".padStart(9),
         `P(DD≥${sweepThreshold}%)`.padStart(11),
+        "∧stress".padStart(9),
+        "cCVaR%".padStart(9),
         "stress%".padStart(8),
         "cost£".padStart(9),
+
       ].join(" ");
       console.log(header);
       console.log("-".repeat(header.length));
@@ -545,6 +592,8 @@ async function main() {
           const cfg = { ...simCfg, rho, volStressZ: z };
           const pathRet: number[] = [];
           const pathDeepestDd: number[] = [];
+          /** Did the path's deepest drawdown happen inside the stress regime? */
+          const pathDeepestInStress: boolean[] = [];
           const pathStressShare: number[] = [];
           const pathCosts: number[] = [];
           let stressBars = 0;
@@ -558,13 +607,17 @@ async function main() {
               : null;
             const rets: number[] = [];
             let deepestDd = 0;
+            let deepestInStress = false;
             let costSum = 0;
             let stressCostSum = 0;
             for (let k = 0; k < folds.length; k++) {
               const f = folds[k]!;
               const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
               rets.push(r.returnPct);
-              deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
+              if (r.maxDrawdownPct < deepestDd) {
+                deepestDd = r.maxDrawdownPct;
+                deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+              }
               costSum += r.costs;
               stressCostSum += r.stressCosts;
               stressBars += r.stressBars;
@@ -572,6 +625,7 @@ async function main() {
             }
             pathRet.push(meanOf(rets));
             pathDeepestDd.push(deepestDd);
+            pathDeepestInStress.push(deepestInStress);
             pathCosts.push(costSum / folds.length);
             pathStressShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
           }
@@ -580,7 +634,11 @@ async function main() {
           const deep = percentileStats(pathDeepestDd);
           const cost = percentileStats(pathCosts);
           const stress = percentileStats(pathStressShare);
-          const breach = drawdownBreachProbabilities(pathDeepestDd, [sweepThreshold])[0]!;
+          const breach = jointDrawdownBreachProbabilities(
+            pathDeepestDd, pathDeepestInStress, [sweepThreshold])[0]!;
+          // Conditional CVaR: the average bad year *given* the tape was one of
+          // the worst-stress 20% of paths.
+          const condRet = conditionalTailStats(pathRet, pathStressShare, stressQuantile, stressTailFrac);
           console.log([
             fmt(rho, 2).padStart(5),
             fmt(z, 2).padStart(6),
@@ -590,6 +648,8 @@ async function main() {
             fmt(deep.p5).padStart(9),
             fmt(deep.worst).padStart(9),
             `${(breach.prob * 100).toFixed(1)}%`.padStart(11),
+            `${(breach.jointProb * 100).toFixed(1)}%`.padStart(9),
+            fmt(condRet.cvar).padStart(9),
             fmt(stress.median, 1).padStart(8),
             fmt(cost.median, 0).padStart(9),
           ].join(" "));
@@ -598,11 +658,17 @@ async function main() {
       console.log();
     }
 
+
     console.log("Reading: each row is one joint-risk assumption. ρ controls how much every");
     console.log("symbol's slippage moves together; the vol-z trigger is how readily a volatile");
     console.log("tape is treated as a stress regime (lower z = more stressed bars, z=99 = off).");
     console.log("'p5 DD%' and 'worstDD%' are the joint worst cases: read across a row to see");
     console.log("how much of your drawdown budget is an assumption rather than a measurement.");
+    console.log("'∧stress' is P(breach AND the drawdown ran through stressed bars) — the part");
+    console.log(`of the tail you cannot trade out of. 'cCVaR%' is the mean return of the worst`);
+    console.log(`${(stressTailFrac * 100).toFixed(0)}% of paths within the worst-stress `
+      + `${((1 - stressQuantile) * 100).toFixed(0)}% of paths.`);
+
     return;
   }
   for (const variant of SMA_VARIANTS) {
@@ -636,6 +702,9 @@ async function main() {
     // Share of a path's total execution cost incurred on stressed bars — the
     // clean read on joint (rather than average) execution risk.
     const pathStressCostShare: number[] = [];
+    /** Whether each path's deepest drawdown ran through the stress regime. */
+    const pathDeepestInStress: boolean[] = [];
+
     // Passive-execution accounting across all paths.
     let makerFills = 0;
     let takerFills = 0;
@@ -657,6 +726,7 @@ async function main() {
       let worstFold = Infinity;
       let ddSum = 0;
       let deepestDd = 0;
+      let deepestInStress = false;
       let shSum = 0;
       let costSum = 0;
       let stressCostSum = 0;
@@ -667,7 +737,13 @@ async function main() {
         rets.push(r.returnPct);
         worstFold = Math.min(worstFold, r.returnPct);
         ddSum += r.maxDrawdownPct;
-        deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
+        if (r.maxDrawdownPct < deepestDd) {
+          deepestDd = r.maxDrawdownPct;
+          // "In stress" = the trough bar was stressed, or the peak→trough slide
+          // ran through stressed bars at all.
+          deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+        }
+
         shSum += r.sharpe;
         costSum += r.costs;
         stressCostSum += r.stressCosts;
@@ -695,6 +771,7 @@ async function main() {
       pathWorstFold.push(worstFold);
       pathMaxDd.push(ddSum / folds.length);
       pathDeepestDd.push(deepestDd);
+      pathDeepestInStress.push(deepestInStress);
       pathSharpe.push(shSum / folds.length);
       pathCosts.push(costSum / folds.length);
     }
@@ -703,11 +780,21 @@ async function main() {
     const worst = percentileStats(pathWorstFold);
     const dd = percentileStats(pathMaxDd);
     const deepDd = percentileStats(pathDeepestDd);
-    const breaches = drawdownBreachProbabilities(pathDeepestDd, ddThresholds);
+    const breaches = jointDrawdownBreachProbabilities(
+      pathDeepestDd, pathDeepestInStress, ddThresholds);
     const sh = percentileStats(pathSharpe);
     const cost = percentileStats(pathCosts);
     const stressShare = percentileStats(pathStressCostShare);
     const driftShare = percentileStats(pathDriftShare);
+    // Conditional tails on the worst-stress paths: the outcome distribution
+    // given the tape actually turned ugly, rather than averaged over calm ones.
+    const condRet = conditionalTailStats(
+      pathMeanRet, pathStressCostShare, stressQuantile, stressTailFrac);
+    const condWorstFold = conditionalTailStats(
+      pathWorstFold, pathStressCostShare, stressQuantile, stressTailFrac);
+    const condDd = conditionalTailStats(
+      pathDeepestDd, pathStressCostShare, stressQuantile, stressTailFrac);
+
 
     console.log(`=== ${variant} ===`);
     console.log(
@@ -751,6 +838,24 @@ async function main() {
         .map((b) => `${b.thresholdPct}% ${(b.prob * 100).toFixed(1)}% (${b.count}/${paths})`)
         .join("  ·  "),
     );
+    console.log(
+      "P(breach ≥ X ∧ in stress): "
+      + breaches
+        .map((b) => `${b.thresholdPct}% ${(b.jointProb * 100).toFixed(1)}%`
+          + ` [${Number.isFinite(b.probStressGivenBreach)
+            ? (b.probStressGivenBreach * 100).toFixed(0)
+            : "n/a"}% of breaches]`)
+        .join("  ·  "),
+    );
+    console.log(
+      `worst-stress ${((1 - stressQuantile) * 100).toFixed(0)}% of paths `
+      + `(cost-in-stress ≥ ${condRet.cutoff.toFixed(1)}%, n=${condRet.count}): `
+      + `return median ${fmt(condRet.median)}% vs ${fmt(ret.median)}% overall · `
+      + `conditional CVaR${(stressTailFrac * 100).toFixed(0)} ${fmt(condRet.cvar)}% `
+      + `(unconditional CVaR5 ${fmt(ret.cvar5)}%) · `
+      + `worst fold CVaR ${fmt(condWorstFold.cvar)}% · `
+      + `deepest DD CVaR ${fmt(condDd.cvar)}% (worst ${fmt(condDd.worst)}%)`,
+    );
     console.log();
   }
 
@@ -764,6 +869,11 @@ async function main() {
   }
   console.log("Shocks are correlated: on a stressed bar every symbol widens and every order");
   console.log("struggles together, so these tails are joint outcomes, not averaged-away ones.");
+  console.log("The joint line splits each breach into the part that happened while the tape was");
+  console.log("stressed — that share is execution risk you cannot trade out of; the rest is signal.");
+  console.log("The worst-stress line conditions on the ugliest tapes instead of averaging them in:");
+  console.log("it is the drawdown budget you need when the stress regime shows up, not on average.");
+
 }
 
 main().catch((e) => {

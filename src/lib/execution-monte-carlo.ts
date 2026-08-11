@@ -196,3 +196,108 @@ export function drawdownBreachProbabilities(
 }
 
 export const DEFAULT_DRAWDOWN_THRESHOLDS = [5, 10, 15, 20, 25, 30] as const;
+
+// ------------------------------------------------- joint (stress) tail stats
+//
+// A drawdown that happens on a calm tape is a signal problem; the same depth
+// reached while every symbol is gapping and half the exits will not fill is an
+// execution problem you cannot trade out of. These helpers separate the two.
+
+export type JointDrawdownBreach = DrawdownBreach & {
+  /** P(deepest drawdown breaches AND the breach happened in a stress regime). */
+  jointProb: number;
+  /** Paths that breached inside stress. */
+  jointCount: number;
+  /** P(the breach was in stress | it breached) — how "execution-driven" the tail is. */
+  probStressGivenBreach: number;
+};
+
+/**
+ * Breach probabilities split by whether the breach occurred while the market
+ * was in the correlated stress regime. `inStress[i]` describes path `i`'s
+ * deepest drawdown (typically: the trough bar, or its peak→trough window,
+ * overlapped a stressed bar). Lengths must match; extra entries are ignored.
+ */
+export function jointDrawdownBreachProbabilities(
+  drawdownsPct: readonly number[],
+  inStress: readonly boolean[],
+  thresholdsPct: readonly number[],
+): JointDrawdownBreach[] {
+  const rows = drawdownsPct
+    .map((v, i) => ({ v, stressed: inStress[i] === true }))
+    .filter((r) => Number.isFinite(r.v));
+  const n = rows.length;
+  return [...thresholdsPct]
+    .map((t) => Math.abs(t))
+    .sort((a, b) => a - b)
+    .map((thresholdPct) => {
+      const breached = rows.filter((r) => -r.v >= thresholdPct - 1e-12);
+      const joint = breached.filter((r) => r.stressed);
+      return {
+        thresholdPct,
+        prob: n ? breached.length / n : NaN,
+        count: breached.length,
+        jointProb: n ? joint.length / n : NaN,
+        jointCount: joint.length,
+        probStressGivenBreach: breached.length ? joint.length / breached.length : NaN,
+      };
+    });
+}
+
+export type ConditionalTailStats = {
+  /** Paths kept by the condition. */
+  count: number;
+  /** Share of all finite paths kept. */
+  share: number;
+  /** Exposure cut-off used to select the subset (the quantile value). */
+  cutoff: number;
+  mean: number;
+  median: number;
+  worst: number;
+  /** Mean of the worst `tailFrac` of the *conditioned* subset. */
+  cvar: number;
+};
+
+/**
+ * Conditional tail statistics on the worst-stress paths: keep the paths whose
+ * `exposure` (e.g. share of execution cost paid in stress, or share of bars
+ * stressed) sits at or above the `quantile` of the exposure distribution, then
+ * report the tail of `values` (returns or drawdowns) *within that subset*.
+ *
+ * This is the "conditional CVaR on the worst-stress regime" number: not the
+ * unconditional 1-in-20 path, but the average bad outcome given the tape was
+ * one of the ugly ones.
+ */
+export function conditionalTailStats(
+  values: readonly number[],
+  exposure: readonly number[],
+  quantile = 0.8,
+  tailFrac = 0.2,
+): ConditionalTailStats {
+  const rows = values
+    .map((v, i) => ({ v, e: exposure[i] ?? NaN }))
+    .filter((r) => Number.isFinite(r.v) && Number.isFinite(r.e));
+  const empty: ConditionalTailStats = {
+    count: 0, share: 0, cutoff: NaN, mean: NaN, median: NaN, worst: NaN, cvar: NaN,
+  };
+  if (!rows.length) return empty;
+  const sortedExposure = rows.map((r) => r.e).sort((a, b) => a - b);
+  const cutoff = percentile(sortedExposure, Math.min(1, Math.max(0, quantile)));
+  let subset = rows.filter((r) => r.e >= cutoff - 1e-12);
+  // Degenerate exposure (all equal, or a cut-off above every value) must still
+  // yield a usable tail rather than an empty one.
+  if (!subset.length) subset = rows;
+  const vals = subset.map((r) => r.v).sort((a, b) => a - b);
+  const k = Math.max(1, Math.round(vals.length * Math.min(1, Math.max(0, tailFrac))));
+  const tail = vals.slice(0, k);
+  return {
+    count: subset.length,
+    share: subset.length / rows.length,
+    cutoff,
+    mean: subset.reduce((a, r) => a + r.v, 0) / subset.length,
+    median: percentile(vals, 0.5),
+    worst: vals[0]!,
+    cvar: tail.reduce((a, b) => a + b, 0) / tail.length,
+  };
+}
+
