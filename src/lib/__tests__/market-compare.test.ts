@@ -126,3 +126,42 @@ describe("buildComparison", () => {
     expect(cmp.series).toEqual([]);
   });
 });
+
+describe("correlation matrix", () => {
+  const hist = (symbol: string, closes: number[]) => ({
+    symbol,
+    label: symbol,
+    kind: "index",
+    points: closes.map((close, i) => ({
+      date: `2026-01-${String(i + 1).padStart(2, "0")}`,
+      close,
+    })),
+  }) as never;
+
+  const wave = (n: number, sign: number, base = 100) =>
+    Array.from({ length: n }, (_, i) => base * (1 + sign * 0.01 * (i % 2 === 0 ? 1 : -1) * (1 + i / 50)));
+
+  it("returns +1 on the diagonal and −1 for mirrored series", () => {
+    const a = wave(30, 1);
+    const b = wave(30, -1);
+    const { correlation } = buildComparison([hist("A", a), hist("B", b)]);
+    expect(correlation.symbols).toEqual(["A", "B"]);
+    expect(correlation.cells[0][0].value).toBe(1);
+    expect(correlation.cells[0][1].value).toBeLessThan(-0.9);
+    expect(correlation.cells[0][1].value).toBe(correlation.cells[1][0].value);
+  });
+
+  it("suppresses correlations with too few overlapping returns", () => {
+    const { correlation } = buildComparison([
+      hist("A", [100, 101, 102, 103]),
+      hist("B", [50, 51, 50, 52]),
+    ]);
+    expect(correlation.cells[0][1].value).toBeNull();
+    expect(correlation.cells[0][1].n).toBeLessThan(10);
+  });
+
+  it("is empty when there is no shared window", () => {
+    const { correlation } = buildComparison([]);
+    expect(correlation.cells).toEqual([]);
+  });
+});
