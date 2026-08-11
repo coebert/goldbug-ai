@@ -81,6 +81,11 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  formatStressRhoGovernance,
+  governedStructureFromCalibration,
+} from "../src/lib/execution-stress-rho-governor";
+
+import {
   formatResidualTimeline,
   residualTimeline,
   type TimelineStructureKind,
@@ -343,6 +348,21 @@ const calibOpts = {
   blend: Number(arg("calib-blend", "0")),
   groups: clusters,
 };
+
+// ------------------------------------------------ stress ρ_within risk control
+// On by default: the fitted stress ρ_within is only allowed to act in
+// proportion to how tightly it is estimated (bootstrap CI width and effective
+// stressed-sample size). --no-rho-governor restores the raw estimate.
+const rhoGovernorOpts = {
+  enabled: !argv.includes("--no-rho-governor"),
+  tightWidth: Number(arg("rho-gov-tight", "0.10")),
+  fullWidth: Number(arg("rho-gov-full", "0.35")),
+  minEffN: Number(arg("rho-gov-min-effn", "6")),
+  maxLift: Number(arg("rho-gov-max-lift", "0.35")),
+  resamples: Number(arg("rho-gov-resamples", "800")),
+  seed: Number(arg("seed", "12345")),
+};
+
 
 // ------------------------------------------------ calibration state on disk
 // --save-calib runs/coupling-2026-08.json   write the fitted parameters out
@@ -893,7 +913,10 @@ async function main() {
         ].join(" "));
       }
     }
-    simCfg.structure = structureFromCalibration(cal, calibKind, clusters);
+    const governed = governedStructureFromCalibration(cal, calibKind, clusters, rhoGovernorOpts);
+    simCfg.structure = governed.structure;
+    console.log(formatStressRhoGovernance(governed.governance));
+
     console.log(`Using calibrated structure: ${describeStructure(simCfg.structure)}\n`);
   }
 

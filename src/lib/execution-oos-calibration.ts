@@ -27,6 +27,11 @@ import {
 } from "./execution-correlation-calibration";
 import { clusterSpilloverMatrix } from "./execution-cluster-spillover";
 import { residualCorrelationErrors, type ResidualReport } from "./execution-correlation-diagnostics";
+import {
+  governedStructureFromCalibration,
+  type StressRhoGovernorOptions,
+} from "./execution-stress-rho-governor";
+
 import type {
   CorrelationStructure,
   CorrelationStructureKind,
@@ -45,7 +50,15 @@ export type CalibratableKind = Extract<CorrelationStructureKind, "blocks" | "con
 export type OosCalibrationOptions = CalibrationOptions & {
   /** Per-bar realised-vol z-scores for the whole tape; sliced per fold. */
   volZ?: readonly number[];
+  /**
+   * Stress ρ_within risk control. Each fold's stress lift is scaled by the
+   * bootstrap credibility of that fold's own stress estimate, so a fold with a
+   * thin stress bucket cannot hand the simulator a confident contagion number.
+   * Pass `{ enabled: false }` to use the raw fitted stress ρ.
+   */
+  rhoGovernor?: StressRhoGovernorOptions;
 };
+
 
 /**
  * Bar-window slice of every symbol's series, inclusive of both ends.
@@ -111,7 +124,13 @@ export function calibrateFoldStructures(
     return {
       fold: i,
       kind,
-      structure: structureFromCalibration(calibration, kind, opts.groups),
+      structure: governedStructureFromCalibration(
+        calibration,
+        kind,
+        opts.groups,
+        opts.rhoGovernor,
+      ).structure,
+
       calibration,
       trainWindows: calibration.windows.length,
       trainStressWindows: stressWindows,
