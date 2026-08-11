@@ -149,6 +149,17 @@ import {
 } from "../src/lib/execution-tail-decomposition";
 
 import {
+  classifyRegimes,
+  fitRegimeClassifier,
+  formatRegimeBacktest,
+  regimeBacktestReport,
+  regimeSegments,
+  regimeSeparation,
+  type RegimeArmMetrics,
+  type RegimeName,
+} from "../src/lib/execution-regime-classifier";
+
+import {
   EXECUTION_CHANNELS,
   channelSubsets,
   subsetKey,
@@ -406,6 +417,20 @@ const shockOrder = arg("shock-order", "")
 // (two you forecast, one you control) rather than statistical ingredients.
 const tailDecompMode = argv.includes("--tail-decomposition");
 const tailDecompPaths = Number(arg("tail-decomp-paths", String(Math.max(30, Math.round(paths / 4)))));
+
+// --regime-oos: label the untouched TEST bars calm/stress with a classifier
+// fitted on TRAIN bars only, then re-run the backtest separately on each
+// regime's segments. Answers "when does the calibrated coupling actually
+// matter?" instead of blending the answer across a mostly-calm tape.
+const regimeOosMode = argv.includes("--regime-oos");
+const regimeOosPaths = Number(arg("regime-oos-paths", String(Math.max(30, Math.round(paths / 4)))));
+const regimeOosArms = arg("regime-oos-arms", "global,contagion,calib-contagion")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+const regimeOosQuantile = Number(arg("regime-oos-quantile", "0.85"));
+const regimeOosHysteresis = Number(arg("regime-oos-hysteresis", "0.5"));
+const regimeOosMinRun = Number(arg("regime-oos-min-run", "3"));
+/** Segments shorter than this are unbacktestable (all entry cost, no signal). */
+const regimeOosMinSegment = Number(arg("regime-oos-min-segment", "15"));
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
@@ -1639,6 +1664,154 @@ async function main() {
     console.log("'solo' is the driver alone and 'marginal' is it added last, so a solo/marginal gap");
     console.log("is interaction — typically the ticket floor being cheap in calm tape and expensive");
     console.log(`in a gapping one. P(joint breach) is at ${sweepThreshold}% with the trough in stress.`);
+    return;
+  }
+
+
+  // ------------------------------------------- out-of-sample regime backtest
+  if (regimeOosMode) {
+    const oosFolds = folds.map((f) => ({ ...f }));
+    const calOpts = { ...calibOpts, volZ };
+
+    // Calibrated arms fit on TRAIN bars only, exactly as --oos-corr does.
+    const calibrated = new Map<CalibratableKind, ReturnType<typeof calibrateFoldStructures>>();
+    for (const kind of ["blocks", "contagion"] as const) {
+      if (!regimeOosArms.includes(`calib-${kind}`)) continue;
+      calibrated.set(kind, calibrateFoldStructures(seriesBySymbol, oosFolds, kind, calOpts));
+    }
+    type Arm = { label: string; structureFor: (fold: number) => CorrelationStructure };
+    const arms: Arm[] = [];
+    for (const name of regimeOosArms) {
+      if (name.startsWith("calib-")) {
+        const rows = calibrated.get(name.slice("calib-".length) as CalibratableKind);
+        if (rows) arms.push({ label: name, structureFor: (i) => rows[i]!.structure });
+      } else {
+        const fixed = buildStructure(name as CorrelationStructureKind);
+        arms.push({ label: `fixed-${name}`, structureFor: () => fixed });
+      }
+    }
+    if (!arms.length) throw new Error("--regime-oos-arms selected no usable arms");
+
+    // One classifier per fold, fitted on that fold's train bars, applied to its
+    // test bars. Nothing about the test window informs the thresholds.
+    const perFold = oosFolds.map((f) => {
+      const clf = fitRegimeClassifier(volZ.slice(f.trainStart, f.trainEnd + 1), {
+        stressQuantile: regimeOosQuantile,
+        hysteresis: regimeOosHysteresis,
+        minRunBars: regimeOosMinRun,
+      });
+      const testZ = volZ.slice(f.testStart, f.testEnd + 1);
+      const labels = classifyRegimes(clf, testZ);
+      return {
+        fold: f,
+        classifier: clf,
+        labels,
+        separation: regimeSeparation(labels, testZ),
+        segments: regimeSegments(labels, f.testStart, regimeOosMinSegment),
+      };
+    });
+
+    // Pooled view of the labelling, so the report can say up front whether the
+    // split is real before anyone reads P&L off it.
+    const allLabels = perFold.flatMap((p) => p.labels);
+    const allZ = oosFolds.flatMap((f) => volZ.slice(f.testStart, f.testEnd + 1));
+    const pooledSeparation = regimeSeparation(allLabels, allZ);
+
+    console.log("Out-of-sample regime backtest — calm vs stress, classifier fitted on train bars only");
+    console.log(`  coupling arms: ${arms.map((a) => a.label).join(", ")}`);
+    console.log(
+      `  ${oosFolds.length} folds · ${regimeOosPaths} paths/arm · common random numbers · `
+      + `min segment ${regimeOosMinSegment} bars · breach threshold ${sweepThreshold}%`,
+    );
+    const usable = perFold.reduce((a, p) => a + p.segments.length, 0);
+    console.log(`  ${usable} backtestable segments after the min-length filter`);
+    console.log();
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      console.log(`=== ${variant} ===`);
+      const rows: RegimeArmMetrics[] = [];
+
+      for (const arm of arms) {
+        // Per-regime accumulators, one entry per path.
+        const acc: Record<RegimeName, {
+          ret: number[]; dd: number[]; cost: number[]; bars: number; segs: number;
+        }> = {
+          calm: { ret: [], dd: [], cost: [], bars: 0, segs: 0 },
+          stress: { ret: [], dd: [], cost: [], bars: 0, segs: 0 },
+        };
+
+        for (let pth = 0; pth < regimeOosPaths; pth++) {
+          // Seed depends only on path/variant/fold, never on the arm, so every
+          // arm trades the same draws in the same regime segments.
+          const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+          const limit = execModel === "limit"
+            ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+            : null;
+          const tally: Record<RegimeName, { ret: number; bars: number; cost: number; dd: number }> = {
+            calm: { ret: 0, bars: 0, cost: 0, dd: 0 },
+            stress: { ret: 0, bars: 0, cost: 0, dd: 0 },
+          };
+
+          for (let k = 0; k < perFold.length; k++) {
+            const sampler = makeCorrelatedExecutionSampler(
+              { ...simCfg, structure: arm.structureFor(k) },
+              pathSeed + k * 31337,
+            );
+            for (const seg of perFold[k]!.segments) {
+              const r = simulate(ctx, variant, seg.start, seg.end, tuned[k]!, sampler, limit);
+              const t = tally[seg.regime];
+              // Bar-weighted so a long calm stretch is not compared to a short
+              // stress burst as if they were the same amount of exposure.
+              t.ret += r.returnPct;
+              t.bars += seg.bars;
+              t.cost += r.costs;
+              if (r.maxDrawdownPct < t.dd) t.dd = r.maxDrawdownPct;
+            }
+          }
+
+          for (const regime of ["calm", "stress"] as const) {
+            const t = tally[regime];
+            if (!t.bars) continue;
+            acc[regime].ret.push((t.ret / t.bars) * 100);
+            acc[regime].cost.push((t.cost / t.bars) * 100);
+            acc[regime].dd.push(t.dd);
+          }
+        }
+
+        for (const regime of ["calm", "stress"] as const) {
+          const segs = perFold.flatMap((p) => p.segments).filter((s) => s.regime === regime);
+          const a = acc[regime];
+          if (!a.ret.length) continue;
+          const ret = percentileStats(a.ret);
+          const dd = percentileStats(a.dd);
+          const cost = percentileStats(a.cost);
+          rows.push({
+            arm: arm.label,
+            regime,
+            bars: segs.reduce((x, s) => x + s.bars, 0),
+            segments: segs.length,
+            returnPer100Bars: ret.median,
+            cvar5Per100Bars: ret.cvar5,
+            worstDrawdownPct: dd.worst,
+            breachProb: a.dd.filter((d) => d <= -sweepThreshold).length / a.dd.length,
+            costPer100Bars: cost.median,
+          });
+        }
+      }
+
+      const baseline = rows.find((r) => r.arm.startsWith("fixed-"))?.arm ?? rows[0]!.arm;
+      console.log(formatRegimeBacktest(
+        regimeBacktestReport(perFold[0]!.classifier, pooledSeparation, rows, baseline),
+      ));
+      console.log();
+    }
+
+    console.log("Reading: the classifier never sees a test bar before labelling it, so the calm");
+    console.log("and stress tables are an honest split of out-of-sample time. Metrics are per");
+    console.log("100 bars because the regimes differ in length. If an arm's edge over the fixed");
+    console.log("baseline is ~0 in calm and material in stress, calibrated coupling is a tail");
+    console.log("insurance policy, not a return improvement — price it accordingly.");
     return;
   }
 
