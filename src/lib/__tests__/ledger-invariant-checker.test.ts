@@ -53,7 +53,17 @@ function buildCleanRun(seed: number) {
     fills.push(f);
   }
   for (const [k, q] of held) if (q === 0) held.delete(k);
-  return { fills, startingCash: 250_000, finalCash: cash, finalHoldings: Object.fromEntries(held) };
+  // Upper bound on each position: lets a subset containing only a sell still
+  // be a legal ledger, so shrinking can't drift onto an artefact of slicing.
+  const bought: Record<string, number> = {};
+  for (const f of fills) if (f.side === "buy") bought[f.symbol] = (bought[f.symbol] ?? 0) + f.quantity;
+  return {
+    fills,
+    startingCash: 250_000,
+    finalCash: cash,
+    finalHoldings: Object.fromEntries(held),
+    bought,
+  };
 }
 
 describe("ledger invariant checker — clean runs", () => {
@@ -126,9 +136,9 @@ describe("ledger invariant checker — exact deltas on failure", () => {
     expect(r.first?.code).toBe("negative_cash");
     expect(r.first?.index).toBe(2);
     expect(r.first?.fill?.id).toBe("BAD");
-    // cash: 1000 - 501 - 401 - 4684 = -3586
-    expect(r.first?.actual).toBeCloseTo(-3_586, 6);
-    expect(r.first?.delta).toBeCloseTo(-3_586, 6);
+    // cash: 1000 - 501 - 401 - 4684 = -4586 (the .L line was booked in pence)
+    expect(r.first?.actual).toBeCloseTo(-4_586, 6);
+    expect(r.first?.delta).toBeCloseTo(-4_586, 6);
     expect(r.report).toContain("LEDGER RECONCILIATION FAILED");
     expect(r.report).toContain("negative_cash");
     expect(r.report).toContain("gbx?");
@@ -203,7 +213,11 @@ describe("ledger invariant checker — smallest violating trade", () => {
       const at = Math.floor(run.fills.length / 2);
       const fills = [...run.fills.slice(0, at), poison, ...run.fills.slice(at)];
 
-      const r = checkLedgerInvariants(fills, { startingCash: run.startingCash, epsilon: 1e-6 });
+      const r = checkLedgerInvariants(fills, {
+        startingCash: run.startingCash,
+        startingHoldings: run.bought,
+        epsilon: 1e-6,
+      });
       expect(r.ok, msg).toBe(false);
       expect(r.first?.code, msg).toBe("negative_holding");
       expect(r.smallestViolating.length, msg).toBe(1);
@@ -258,8 +272,9 @@ describe("ledger invariant checker — smallest violating trade", () => {
         ...run.fills,
         fill({ id: "P", symbol: "QQQQ", side: "sell", quantity: 2, price: 5, fees: 0 }),
       ];
-      const a = checkLedgerInvariants(fills, { startingCash: run.startingCash, epsilon: 1e-6 });
-      const b = checkLedgerInvariants(fills, { startingCash: run.startingCash, epsilon: 1e-6 });
+      const opts = { startingCash: run.startingCash, startingHoldings: run.bought, epsilon: 1e-6 };
+      const a = checkLedgerInvariants(fills, opts);
+      const b = checkLedgerInvariants(fills, opts);
       expect(a.report).toBe(b.report);
       expect(a.smallestViolating).toEqual(b.smallestViolating);
     }
