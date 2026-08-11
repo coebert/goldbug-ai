@@ -34,6 +34,13 @@ import {
 export type CorrelatedExecutionConfig = ExecutionSimConfig & {
   /** Pairwise correlation of log-slippage across symbols on the same bar, 0…1. */
   rho: number;
+  /**
+   * Optional alternative coupling assumption (sector blocks, contagion, …).
+   * When set it fully replaces the single global `rho`; see
+   * `execution-correlation-structures.ts`.
+   */
+  structure?: CorrelationStructure;
+
   /** Probability a calm bar turns stressed (before the volatility override). */
   stressEnterProb: number;
   /** Probability a stressed bar returns to calm — 1/this is the mean stress length. */
