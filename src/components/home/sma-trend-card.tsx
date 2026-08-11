@@ -36,15 +36,25 @@ import {
   DEFAULT_SMA_PERIODS,
   MAX_SMA_SYMBOLS,
   SMA_SYMBOLS_KEY,
+  TREND_FILTER_KEY,
+  TREND_SIGNIFICANT_SCORE,
+  TREND_SORT_KEY,
   parseSmaSymbols,
+  parseTrendFilter,
+  parseTrendSort,
+  rankByTrendStrength,
   readStoredSmaPeriods,
   readStoredTrendBasis,
+  resolveTrendBasis,
   storeTrendBasis,
   type TrendBasis,
+  type TrendFilter,
+  type TrendSort,
   storeSmaPeriods,
   toggleSmaPeriod,
   toggleSmaSymbol,
 } from "@/lib/sma-display";
+import { computeTrendStrength } from "@/lib/market-symbol-history";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import { SmaTrendPanel } from "@/components/home/sma-trend-panel";
@@ -68,6 +78,8 @@ export function SmaTrendCard() {
   const [range, setRange] = useState<HistoryRange>(DEFAULT_RANGE);
   const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_SMA_PERIODS);
   const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
+  const [sort, setSort] = useState<TrendSort>("selection");
+  const [filter, setFilter] = useState<TrendFilter>("all");
   const fetchHistory = useServerFn(getSymbolHistory);
 
   // Restore the last view after hydration so SSR markup stays stable.
@@ -86,6 +98,8 @@ export function SmaTrendCard() {
       if (r) setRange(coerceRange(Number(r)));
       setPeriods(readStoredSmaPeriods());
       setTrendBasis(readStoredTrendBasis());
+      setSort(parseTrendSort(window.localStorage.getItem(TREND_SORT_KEY)));
+      setFilter(parseTrendFilter(window.localStorage.getItem(TREND_FILTER_KEY)));
     } catch {
       /* storage unavailable — defaults are fine */
     }
@@ -123,6 +137,24 @@ export function SmaTrendCard() {
     storeTrendBasis(b);
   };
 
+  const pickSort = (s: TrendSort) => {
+    setSort(s);
+    try {
+      window.localStorage.setItem(TREND_SORT_KEY, s);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const pickFilter = (f: TrendFilter) => {
+    setFilter(f);
+    try {
+      window.localStorage.setItem(TREND_FILTER_KEY, f);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const queries = useQueries({
     queries: symbols.map((s) => ({
       queryKey: ["symbol-history", s, range],
@@ -143,6 +175,17 @@ export function SmaTrendCard() {
     .filter((d): d is string => Boolean(d))
     .sort()
     .pop();
+
+  // Score every selected market on the same basis the panels display, then
+  // rank/filter. Panels keep rendering their own strength; this only reorders.
+  const basis = resolveTrendBasis(trendBasis, periods);
+  const entries = symbols.map((s, i) => {
+    const history = queries[i]?.data as SymbolHistory | undefined;
+    const strength = history ? computeTrendStrength(history.points, periods, basis) : null;
+    return { symbol: s, index: i, score: strength ? strength.score : null };
+  });
+  const visible = rankByTrendStrength(entries, sort, filter);
+  const hidden = entries.length - visible.length;
 
   const renderOption = (s: string) => {
     const on = symbols.includes(s);
@@ -210,6 +253,49 @@ export function SmaTrendCard() {
 
           <TrendBasisSelect basis={trendBasis} periods={periods} onChange={pickTrendBasis} />
 
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Sort by trend strength">
+            {(
+              [
+                ["selection", "My order"],
+                ["strongest", "Strongest"],
+                ["weakest", "Weakest"],
+              ] as [TrendSort, string][]
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={value === sort ? "secondary" : "ghost"}
+                className="h-7 px-2 text-xs"
+                aria-pressed={value === sort}
+                onClick={() => pickSort(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by trend strength">
+            {(
+              [
+                ["all", "All"],
+                ["up", "Up"],
+                ["down", "Down"],
+                ["significant", `|score| ≥ ${TREND_SIGNIFICANT_SCORE}`],
+              ] as [TrendFilter, string][]
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={value === filter ? "secondary" : "ghost"}
+                className="h-7 px-2 text-xs"
+                aria-pressed={value === filter}
+                onClick={() => pickFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap gap-1" role="group" aria-label="Chart time range">
             {HISTORY_RANGES.map((r) => (
               <Button
@@ -228,8 +314,13 @@ export function SmaTrendCard() {
       </CardHeader>
 
       <CardContent>
+        {hidden > 0 && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            {hidden} market{hidden > 1 ? "s" : ""} hidden by the trend filter.
+          </p>
+        )}
         <div className={compact ? "grid gap-3 lg:grid-cols-2" : "space-y-3"}>
-          {symbols.map((s, i) => {
+          {visible.map(({ symbol: s, index: i }) => {
             const q = queries[i];
             return (
               <SmaTrendPanel
