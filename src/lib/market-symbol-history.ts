@@ -54,12 +54,27 @@ export function isKnownSymbol(symbol: string): boolean {
   return META.has(symbol);
 }
 
+/** Simple-moving-average periods available on charts, in trading days. */
+export const SMA_PERIODS = [20, 50, 100, 200] as const;
+export type SmaPeriod = (typeof SMA_PERIODS)[number];
+
+/** Chart series key for a period, e.g. 50 -> "sma50". */
+export function smaKey(period: SmaPeriod): `sma${SmaPeriod}` {
+  return `sma${period}` as `sma${SmaPeriod}`;
+}
+
+export function isSmaPeriod(value: number): value is SmaPeriod {
+  return (SMA_PERIODS as readonly number[]).includes(value);
+}
+
 export interface HistoryPoint {
   date: string;
   close: number;
   /** Indexed to 100 at the start of the selected window. */
   indexed: number;
+  sma20: number | null;
   sma50: number | null;
+  sma100: number | null;
   sma200: number | null;
 }
 
@@ -83,6 +98,10 @@ export interface SymbolHistory {
   sma200: number | null;
   aboveSma50: boolean | null;
   aboveSma200: boolean | null;
+  /** Latest value of every supported average, keyed by period. */
+  smaLatest: Record<SmaPeriod, number | null>;
+  /** Whether the last close sits above each average; null when unavailable. */
+  aboveSma: Record<SmaPeriod, boolean | null>;
 }
 
 function cleanSorted(rows: PriceRow[]): PriceRow[] {
@@ -128,7 +147,9 @@ export function buildSymbolHistory(
       date: all[i].price_date,
       close: all[i].close,
       indexed: base && base > 0 ? Number(((all[i].close / base) * 100).toFixed(3)) : 100,
+      sma20: trailingAverage(closes, i, 20),
       sma50: trailingAverage(closes, i, 50),
+      sma100: trailingAverage(closes, i, 100),
       sma200: trailingAverage(closes, i, 200),
     });
   }
@@ -183,5 +204,14 @@ export function buildSymbolHistory(
     sma200: lastPoint?.sma200 ?? null,
     aboveSma50: lastPoint?.sma50 != null && last != null ? last > lastPoint.sma50 : null,
     aboveSma200: lastPoint?.sma200 != null && last != null ? last > lastPoint.sma200 : null,
+    smaLatest: Object.fromEntries(
+      SMA_PERIODS.map((p) => [p, lastPoint?.[smaKey(p)] ?? null]),
+    ) as Record<SmaPeriod, number | null>,
+    aboveSma: Object.fromEntries(
+      SMA_PERIODS.map((p) => {
+        const avg = lastPoint?.[smaKey(p)] ?? null;
+        return [p, avg != null && last != null ? last > avg : null];
+      }),
+    ) as Record<SmaPeriod, boolean | null>,
   };
 }
