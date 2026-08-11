@@ -344,6 +344,21 @@ const calibOpts = {
   groups: clusters,
 };
 
+// ------------------------------------------------ stress ρ_within risk control
+// On by default: the fitted stress ρ_within is only allowed to act in
+// proportion to how tightly it is estimated (bootstrap CI width and effective
+// stressed-sample size). --no-rho-governor restores the raw estimate.
+const rhoGovernorOpts = {
+  enabled: !argv.includes("--no-rho-governor"),
+  tightWidth: Number(arg("rho-gov-tight", "0.10")),
+  fullWidth: Number(arg("rho-gov-full", "0.35")),
+  minEffN: Number(arg("rho-gov-min-effn", "6")),
+  maxLift: Number(arg("rho-gov-max-lift", "0.35")),
+  resamples: Number(arg("rho-gov-resamples", "800")),
+  seed: Number(arg("seed", "12345")),
+};
+
+
 // ------------------------------------------------ calibration state on disk
 // --save-calib runs/coupling-2026-08.json   write the fitted parameters out
 // --load-calib runs/coupling-2026-08.json   reuse them instead of re-fitting
