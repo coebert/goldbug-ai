@@ -4,6 +4,8 @@
 //   bun run scripts/run-execution-monte-carlo.ts
 //   bun run scripts/run-execution-monte-carlo.ts --paths 400 --from 2015-01-01
 //   bun run scripts/run-execution-monte-carlo.ts --sigma 0.8 --full-fill 0.6 --no-fill 0.05
+//   bun run scripts/run-execution-monte-carlo.ts --rho-sweep 0,0.3,0.6,0.9 --vol-z-sweep 1,1.5,2,99
+
 //
 // The cost-sensitivity sweep answers "what if costs are higher?" with a single
 // point estimate per scenario. This script answers the different question the
