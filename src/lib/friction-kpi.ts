@@ -45,9 +45,19 @@ export type FrictionFill = {
   spreadModelledBase: number;
   /** Modelled stamp duty + levies, base currency. */
   taxModelledBase: number;
+  /**
+   * The broker's own itemisation, when the cost report supplied one. Present
+   * only for fills whose charges were ingested; when set it is what the
+   * component split is drawn from, because the invoice beats the model's
+   * guess at how the money was divided up.
+   */
+  reportedComponents?: FrictionComponents;
+  /** Where the fee number came from. Drives the KPI's coverage figure. */
+  feeSource?: "broker" | "model" | "none";
   /** ISO instant the fill printed. */
   filledAt: string;
 };
+
 
 /** Governor budget: 40bps of NAV per trailing 30 days. */
 export const FRICTION_BUDGET_BPS = 40;
@@ -97,7 +107,16 @@ export type FrictionKpi = {
    * is a data gap rather than evidence the model is wrong.
    */
   realisedRatio: number | null;
+  /** Tickets whose costs came from the broker's own report. */
+  brokerBookedTickets: number;
+  /**
+   * Share of tickets (0..1) carrying broker-booked costs. Below 1 the KPI is
+   * partly the model grading itself — the card says so rather than implying
+   * every number is invoiced.
+   */
+  brokerCoverage: number;
   daily: FrictionDailyPoint[];
+
   /** Annualised drag implied by the window's spend, in percent of NAV. */
   annualisedDragPct: number | null;
 };
@@ -115,6 +134,25 @@ function dayKey(iso: string): string {
 }
 
 function scaleComponents(f: FrictionFill, charged: number): FrictionComponents {
+  // Broker itemisation wins when we have it. Note the asymmetry: an invoice
+  // bills commission, exchange fees and stamp duty but never the half-spread,
+  // so any charge above the invoiced legs is exactly the implicit spread cost
+  // the model priced — book the excess there rather than inflating commission.
+  const rc = f.reportedComponents;
+  if (rc) {
+    const commission = Math.max(0, rc.commissionBase);
+    const tax = Math.max(0, rc.taxBase);
+    const spread = Math.max(0, rc.spreadBase);
+    const invoiced = commission + tax + spread;
+    if (invoiced > 0) {
+      if (charged <= invoiced) {
+        const k = charged / invoiced;
+        return { commissionBase: commission * k, spreadBase: spread * k, taxBase: tax * k };
+      }
+      return { commissionBase: commission, spreadBase: spread + (charged - invoiced), taxBase: tax };
+    }
+  }
+
   const modelled =
     Math.max(0, f.commissionModelledBase) +
     Math.max(0, f.spreadModelledBase) +
@@ -129,6 +167,7 @@ function scaleComponents(f: FrictionFill, charged: number): FrictionComponents {
     taxBase: Math.max(0, f.taxModelledBase) * k,
   };
 }
+
 
 export function computeFrictionKpi(args: {
   fills: readonly FrictionFill[];
@@ -186,6 +225,7 @@ export function computeFrictionKpi(args: {
 
   const frictionBps = bpsOfNav(frictionBase);
   const tickets = ordered.length;
+  const brokerBookedTickets = ordered.filter((f) => f.feeSource === "broker").length;
 
   return {
     windowDays,
@@ -204,6 +244,8 @@ export function computeFrictionKpi(args: {
     reportedBase,
     modelledBase,
     realisedRatio: reportedBase > 0 && modelledBase > 0 ? reportedBase / modelledBase : null,
+    brokerBookedTickets,
+    brokerCoverage: tickets > 0 ? brokerBookedTickets / tickets : 0,
     daily,
     annualisedDragPct:
       frictionBps == null || windowDays <= 0

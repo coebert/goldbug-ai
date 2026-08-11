@@ -92,7 +92,9 @@ export async function loadFrictionReport(args: {
   try {
     const res = await args.db
       .from("live_fills")
-      .select("symbol, side, quantity, fill_price, fee, currency, filled_at")
+      .select(
+        "symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, currency, filled_at",
+      )
       .eq("portfolio_id", args.portfolioId)
       .gte("filled_at", sinceAttribution)
       .order("filled_at", { ascending: true })
@@ -113,6 +115,20 @@ export async function loadFrictionReport(args: {
     const ccy = String(r["currency"] ?? base).toUpperCase();
     const c = estimateTradeCosts({ symbol, side, quantity, price });
     const reported = Number(r["fee"] ?? 0);
+    const rawSource = String(r["fee_source"] ?? "none");
+    const feeSource: "broker" | "model" | "none" =
+      rawSource === "broker" ? "broker" : rawSource === "model" ? "model" : "none";
+
+    // The broker itemises commission, exchange fees and duty — never the
+    // half-spread, which stays modelled. Carry its split through so the
+    // component breakdown reflects the invoice where one exists.
+    const brokerCommission = Number(r["fee_commission"] ?? 0);
+    const brokerExchange = Number(r["fee_exchange"] ?? 0);
+    const brokerTax = Number(r["fee_tax"] ?? 0);
+    const brokerOther = Number(r["fee_other"] ?? 0);
+    const hasBrokerSplit =
+      feeSource === "broker" &&
+      [brokerCommission, brokerExchange, brokerTax, brokerOther].some((v) => Number.isFinite(v) && v > 0);
 
     all.push({
       symbol,
@@ -123,9 +139,26 @@ export async function loadFrictionReport(args: {
       commissionModelledBase: await toBase(c.commission, ccy),
       spreadModelledBase: await toBase(c.halfSpread, ccy),
       taxModelledBase: await toBase(c.stampDuty + c.ptmLevy, ccy),
+      feeSource,
+      ...(hasBrokerSplit
+        ? {
+            reportedComponents: {
+              // Exchange/clearing fees are a commission-like charge, not a
+              // tax: grouping them with duty would misattribute a cost the
+              // governor can actually influence by trading less often.
+              commissionBase:
+                (await toBase(Math.max(0, brokerCommission), ccy)) +
+                (await toBase(Math.max(0, brokerExchange), ccy)) +
+                (await toBase(Math.max(0, brokerOther), ccy)),
+              spreadBase: 0,
+              taxBase: await toBase(Math.max(0, brokerTax), ccy),
+            },
+          }
+        : {}),
       filledAt: new Date(Date.parse(filledAt)).toISOString(),
     });
   }
+
 
   const windowStart = now.getTime() - windowDays * 86_400_000;
   const windowFills = all.filter((f) => Date.parse(f.filledAt) >= windowStart);

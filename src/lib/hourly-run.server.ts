@@ -543,10 +543,37 @@ async function runHourlyCycleInner(
               adapter,
               lookbackHours: 72,
             });
+
+            // Pull the broker's booked charges onto the fill tape. Runs after
+            // reconciliation so fills written this tick are already present.
+            // Until this lands, live_fills.fee is 0 and the friction KPI is
+            // grading our own cost model rather than the invoice.
+            try {
+              const { ingestBrokerCostsForPortfolio } = await import(
+                "@/lib/broker-cost-ingest.server"
+              );
+              const costs = await ingestBrokerCostsForPortfolio({
+                portfolioId: p.id,
+                userId: p.user_id as string,
+                adapter,
+              });
+              if (costs.supported && costs.fillsUpdated > 0) {
+                srvLog.info(
+                  "hourly-run: broker costs ingested",
+                  p.id,
+                  `${costs.fillsUpdated}/${costs.fillsConsidered} fills`,
+                );
+              } else if (!costs.supported) {
+                srvLog.warn("hourly-run: broker cost report unavailable", p.id, costs.reason);
+              }
+            } catch (e) {
+              srvLog.warn("hourly-run: broker cost ingest failed", p.id, e);
+            }
           } catch (e) {
             srvLog.warn("hourly-run: order reconcile failed", p.id, e);
           }
         }
+
 
         // Intended-vs-executed reconciliation. If the AI wanted to trade
         // but no live_orders rows appeared for two consecutive ticks, we

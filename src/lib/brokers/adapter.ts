@@ -78,6 +78,49 @@ export interface BrokerFxSpotResult extends BrokerOrderResult {
   pairSymbol?: string;
 }
 
+/**
+ * One booked trade charge, as the broker's own cost/activity report states it.
+ *
+ * This is the invoice, not our model: every amount is what the broker actually
+ * debited, in `currency`. Legs the broker doesn't itemise arrive as 0 and the
+ * remainder lands in `other`, so `total` always reconciles.
+ */
+export interface BrokerTradeCharge {
+  /** Broker's trade/transaction id — the stable key for idempotent ingestion. */
+  brokerTradeId: string;
+  /** Broker order id this trade belongs to, when the report exposes it. */
+  brokerOrderId?: string;
+  /** Our idempotency key echoed back (Saxo: ExternalReference). */
+  clientOrderId?: string;
+  symbol?: string;
+  side?: "buy" | "sell";
+  quantity?: number;
+  price?: number;
+  /** ISO instant the trade printed. */
+  tradedAt?: string;
+  /** Currency all the amounts below are expressed in. */
+  currency: string;
+  commission: number;
+  /** Exchange / regulatory / clearing fees. */
+  exchangeFee: number;
+  /** Stamp duty, transaction taxes, statutory levies. */
+  tax: number;
+  /** Anything booked that isn't one of the named legs (FX markup, custody). */
+  other: number;
+  /** commission + exchangeFee + tax + other. */
+  total: number;
+  raw?: unknown;
+}
+
+export interface BrokerChargeReport {
+  /** False when the environment does not expose a cost/activity report at all. */
+  supported: boolean;
+  charges: BrokerTradeCharge[];
+  /** Endpoint that answered, for operator diagnostics. */
+  endpoint?: string | null;
+  reason?: string;
+}
+
 export interface BrokerAdapter {
   readonly name: string;
   readonly env: BrokerEnv;
@@ -91,4 +134,10 @@ export interface BrokerAdapter {
    * it force the executor to fall back to synthetic (wallet-only) FX legs.
    */
   placeFxSpot?(req: BrokerFxSpotRequest): Promise<BrokerFxSpotResult>;
+  /**
+   * Optional: pull booked trade charges for a date range. Adapters without it
+   * leave the friction KPI running on modelled costs.
+   */
+  getTradeCharges?(args: { fromIso: string; toIso: string }): Promise<BrokerChargeReport>;
 }
+
