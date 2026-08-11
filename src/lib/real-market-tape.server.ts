@@ -87,6 +87,8 @@ export async function fetchSymbolHistory(
   const div = unitDivisor(result.meta?.currency);
   const closes = result.indicators?.quote?.[0]?.close ?? [];
   const volumes = result.indicators?.quote?.[0]?.volume ?? [];
+  const highs = result.indicators?.quote?.[0]?.high ?? [];
+  const lows = result.indicators?.quote?.[0]?.low ?? [];
   const adj = result.indicators?.adjclose?.[0]?.adjclose ?? [];
 
   const bars: RawDailyBar[] = [];
