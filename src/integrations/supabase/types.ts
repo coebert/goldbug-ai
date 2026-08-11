@@ -138,6 +138,65 @@ export type Database = {
         }
         Relationships: []
       }
+      alert_webhook_deliveries: {
+        Row: {
+          attempt_log: Json
+          attempts: number
+          category: string
+          created_at: string
+          duration_ms: number | null
+          endpoint_host: string | null
+          error: string | null
+          event: string
+          http_status: number | null
+          id: string
+          payload: Json | null
+          portfolio_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempt_log?: Json
+          attempts?: number
+          category: string
+          created_at?: string
+          duration_ms?: number | null
+          endpoint_host?: string | null
+          error?: string | null
+          event: string
+          http_status?: number | null
+          id?: string
+          payload?: Json | null
+          portfolio_id?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          attempt_log?: Json
+          attempts?: number
+          category?: string
+          created_at?: string
+          duration_ms?: number | null
+          endpoint_host?: string | null
+          error?: string | null
+          event?: string
+          http_status?: number | null
+          id?: string
+          payload?: Json | null
+          portfolio_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_webhook_deliveries_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       algo_regime_config_overrides: {
         Row: {
           config: Json
