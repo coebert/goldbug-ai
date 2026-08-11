@@ -11,12 +11,20 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowUpRight, LineChart as LineChartIcon, RefreshCw } from "lucide-react";
+import {
+  ArrowUpRight,
+  LineChart as LineChartIcon,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
