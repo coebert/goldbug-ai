@@ -21,6 +21,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
+  AXIS_LABEL,
   AXIS_LINE,
   AXIS_TICK,
   CHART_NEUTRAL_SERIES,
@@ -204,7 +205,7 @@ function SmaReportPage() {
                         axisLine={AXIS_LINE}
                         tickLine={TICK_LINE}
                         minTickGap={48}
-                        label={{ value: "Date", position: "insideBottom", offset: -12, ...AXIS_TICK }}
+                        label={{ value: "Date", position: "insideBottom", offset: -12, ...AXIS_LABEL }}
                       />
                       <YAxis
                         tick={AXIS_TICK}
@@ -212,7 +213,7 @@ function SmaReportPage() {
                         tickLine={TICK_LINE}
                         domain={["auto", "auto"]}
                         width={64}
-                        label={{ value: "Price", angle: -90, position: "insideLeft", ...AXIS_TICK }}
+                        label={{ value: "Price", angle: -90, position: "insideLeft", ...AXIS_LABEL }}
                       />
                       <Tooltip
                         formatter={(v: unknown, name) => [num(Number(v)), String(name)]}
