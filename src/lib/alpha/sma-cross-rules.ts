@@ -311,6 +311,33 @@ export function smaCrossBuyRule(
     return { allow: true, sizeMultiplier: 1, reason: "SMA cross rules off / no data" };
   }
 
+  // 0. Missing / untrustworthy data never blocks a trade — the rest of the
+  // stack decides. Sparse names simply get no SMA boost.
+  if (state.quality === "insufficient") {
+    return {
+      allow: true,
+      sizeMultiplier: 1,
+      reason: state.warnings[0] ?? "insufficient SMA history — neutral",
+    };
+  }
+  // Newly listed: no SMA200, so no regime read. Size down rather than guess.
+  if (state.regimeUnknown) {
+    let m = Math.max(0, cfg.unknownRegimeSizeMult);
+    const why: string[] = [`no SMA200 (${state.bars} bars) — size ×${m.toFixed(2)}`];
+    if (state.fastCross === "bull") {
+      const priceOk =
+        !cfg.requirePriceConfirmation || (state.sma20 != null && state.price > state.sma20);
+      if (priceOk) {
+        m *= cfg.fastBullSizeMult;
+        why.push(`SMA20↑SMA50 (${state.fastCrossAgeBars}d ago)`);
+      }
+    } else if (state.fastCross === "bear") {
+      m *= 0.5;
+      why.push("SMA20↓SMA50 — half size");
+    }
+    return { allow: true, sizeMultiplier: m, reason: why.join("; ") };
+  }
+
   // 1. Regime gate first — a death cross vetoes discretionary longs.
   if (state.regime === "death") {
     const mult = Math.max(0, cfg.deathSizeMult);
@@ -376,6 +403,9 @@ export function smaCrossSellRule(
   cfg: SmaCrossRuleConfig = DEFAULT_SMA_CROSS_RULES,
 ): SmaCrossSellRule {
   if (!cfg.enabled || !state) return { sell: false, sellFraction: 0, reason: "" };
+  // Never force an exit off unreliable or incomplete history — a sparse feed
+  // would otherwise liquidate healthy positions on a phantom cross.
+  if (state.quality === "insufficient") return { sell: false, sellFraction: 0, reason: "" };
 
   const clampFrac = (f: number) => Math.max(0, Math.min(1, f));
 

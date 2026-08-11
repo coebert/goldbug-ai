@@ -110,6 +110,11 @@ describe("smaCrossBuyRule", () => {
       regime: "golden" as const,
       fastSeparationPct: 0.05,
       regimeSeparationPct: 0.11,
+      bars: 260,
+      droppedBars: 0,
+      quality: "full" as const,
+      regimeUnknown: false,
+      warnings: [],
     };
     const r = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2 }));
     expect(r.sizeMultiplier).toBeCloseTo(1.32, 6);
