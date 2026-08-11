@@ -468,8 +468,16 @@ export function stressTestCalibration(
 
   // Spread *caused by* each axis: how far the leg moves when only that axis
   // changes, averaged over the other one.
-  const windowEffect = mean(byEstimator.map((a) => a.calmWithin.range));
-  const estimatorEffect = mean(byWindow.map((a) => a.calmWithin.range));
+  // Judge the worst-behaved leg, not the calmest one: a calm ρ that holds
+  // while the stress ρ swings by a third is not a stable calibration.
+  const worst = (ranges: readonly { calmWithin: AxisSpread["calmWithin"]; stressWithin: AxisSpread["calmWithin"]; separationWithin: AxisSpread["calmWithin"] }[]) =>
+    mean(ranges.map((a) => Math.max(
+      a.calmWithin.range,
+      Number.isFinite(a.stressWithin.range) ? a.stressWithin.range : 0,
+      Number.isFinite(a.separationWithin.range) ? a.separationWithin.range : 0,
+    )));
+  const windowEffect = worst(byEstimator);
+  const estimatorEffect = worst(byWindow);
   const LOOSE = 0.1;
   const windowSensitive = windowEffect > LOOSE;
   const estimatorSensitive = estimatorEffect > LOOSE;
@@ -478,6 +486,7 @@ export function stressTestCalibration(
       : windowSensitive ? "window_sensitive"
         : estimatorSensitive ? "estimator_sensitive"
           : "stable";
+
 
   const baseline = cells.find((c) => c.window === baseWindow && c.estimator === baseEstimator)
     ?? cells[0]!;
