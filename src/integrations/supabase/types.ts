@@ -1498,9 +1498,16 @@ export type Database = {
       live_fills: {
         Row: {
           broker_fill_id: string | null
+          broker_trade_id: string | null
           created_at: string
           currency: string
           fee: number
+          fee_commission: number | null
+          fee_exchange: number | null
+          fee_other: number | null
+          fee_source: string
+          fee_synced_at: string | null
+          fee_tax: number | null
           fill_price: number
           filled_at: string
           id: string
@@ -1513,9 +1520,16 @@ export type Database = {
         }
         Insert: {
           broker_fill_id?: string | null
+          broker_trade_id?: string | null
           created_at?: string
           currency?: string
           fee?: number
+          fee_commission?: number | null
+          fee_exchange?: number | null
+          fee_other?: number | null
+          fee_source?: string
+          fee_synced_at?: string | null
+          fee_tax?: number | null
           fill_price: number
           filled_at?: string
           id?: string
@@ -1528,9 +1542,16 @@ export type Database = {
         }
         Update: {
           broker_fill_id?: string | null
+          broker_trade_id?: string | null
           created_at?: string
           currency?: string
           fee?: number
+          fee_commission?: number | null
+          fee_exchange?: number | null
+          fee_other?: number | null
+          fee_source?: string
+          fee_synced_at?: string | null
+          fee_tax?: number | null
           fill_price?: number
           filled_at?: string
           id?: string
