@@ -98,6 +98,12 @@ export async function loadFrictionReport(args: {
   }
 
   const sinceAttribution = new Date(now.getTime() - ATTRIBUTION_DAYS * 86_400_000).toISOString();
+  // The chart's left-hand points are trailing-window reads, so they need one
+  // extra window of tape behind them. Without it the first 30 days of a 90-day
+  // chart would slope up from zero purely because the history was truncated.
+  const sinceSeries = new Date(
+    now.getTime() - (ATTRIBUTION_DAYS + windowDays) * 86_400_000,
+  ).toISOString();
   let rows: Array<Record<string, unknown>> = [];
   try {
     const res = await args.db
@@ -106,7 +112,7 @@ export async function loadFrictionReport(args: {
         "symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, currency, filled_at",
       )
       .eq("portfolio_id", args.portfolioId)
-      .gte("filled_at", sinceAttribution)
+      .gte("filled_at", sinceSeries)
       .order("filled_at", { ascending: true })
       .limit(5000);
     rows = (res?.data ?? []) as Array<Record<string, unknown>>;
@@ -170,6 +176,10 @@ export async function loadFrictionReport(args: {
   }
 
 
+  // Attribution and the overlay keep their original 90-day tape; only the
+  // chart looks further back.
+  const attributionFills = all.filter((f) => Date.parse(f.filledAt) >= Date.parse(sinceAttribution));
+
   const windowStart = now.getTime() - windowDays * 86_400_000;
   const windowFills = all.filter((f) => Date.parse(f.filledAt) >= windowStart);
 
@@ -179,7 +189,7 @@ export async function loadFrictionReport(args: {
       .from("equity_snapshots")
       .select("snapshot_date, total_value")
       .eq("portfolio_id", args.portfolioId)
-      .gte("snapshot_date", sinceAttribution.slice(0, 10))
+      .gte("snapshot_date", sinceSeries.slice(0, 10))
       .order("snapshot_date", { ascending: true })
       .limit(400);
     equity = ((res?.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
@@ -208,13 +218,13 @@ export async function loadFrictionReport(args: {
     }),
     seriesDays: ATTRIBUTION_DAYS,
     attribution: beforeAfterAttribution({
-      fills: all,
+      fills: attributionFills,
       cutoverIso: args.cutoverIso ?? COST_GOVERNOR_CUTOVER_ISO,
       navBase,
       equity,
       toIso: now.toISOString(),
     }),
-    overlay: realisedCostOverlay({ fills: all }),
+    overlay: realisedCostOverlay({ fills: attributionFills }),
     currency: base,
     asOf: now.toISOString(),
   };
