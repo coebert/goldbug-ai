@@ -113,6 +113,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "Low risk",
     blurb: "Capital preservation. Tight stops, small positions, mostly ETFs.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.3, etf: 0.9, crypto: 0.02, commodity: 0.15, fx: 0.15 },
       per_symbol_limit_pct: 0.05,
       stop_loss_pct: 0.05,
@@ -135,6 +136,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "Cautious",
     blurb: "Slow and steady growth with limited crypto/commodity exposure.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.5, etf: 0.85, crypto: 0.05, commodity: 0.2, fx: 0.2 },
       per_symbol_limit_pct: 0.08,
       stop_loss_pct: 0.07,
@@ -167,6 +169,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "Growth",
     blurb: "Larger positions, wider stops, more crypto/commodity room.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.75, etf: 0.75, crypto: 0.3, commodity: 0.4, fx: 0.4 },
       per_symbol_limit_pct: 0.2,
       stop_loss_pct: 0.15,
@@ -189,6 +192,7 @@ export const RISK_PRESETS: Record<number, RiskPreset> = {
     name: "High risk",
     blurb: "Aggressive concentration, wide stops, run winners hard.",
     cfg: {
+      ...RISK_DIAL_DEFAULTS,
       asset_class_limits: { stock: 0.9, etf: 0.6, crypto: 0.5, commodity: 0.5, fx: 0.5 },
       per_symbol_limit_pct: 0.35,
       stop_loss_pct: 0.25,
