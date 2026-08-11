@@ -428,8 +428,11 @@ async function main() {
     }
 
     console.log(`=== ${cost.label} `
-      + `(comm ${cost.commissionBps}bps/min £${cost.commissionMin}`
-      + `${cost.flatFee ? ` + £${cost.flatFee} flat` : ""}, slip ${cost.slippageBps}bps) ===`);
+      + (cost.perSymbol
+        ? "(per-symbol calibrated spread/commission/impact)"
+        : `(comm ${cost.commissionBps}bps/min £${cost.commissionMin}`
+          + `${cost.flatFee ? ` + £${cost.flatFee} flat` : ""}, slip ${cost.slippageBps}bps)`)
+      + " ===");
     const header = [
       "variant".padEnd(14),
       "mean ret%".padStart(10),
