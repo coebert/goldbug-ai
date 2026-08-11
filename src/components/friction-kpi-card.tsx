@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -25,7 +25,11 @@ import {
   SAXO_TOOLTIP_CONTENT,
   SAXO_TOOLTIP_CURSOR,
   SAXO_TOOLTIP_LABEL,
+  saxoActiveDot,
 } from "@/lib/saxo-chart";
+
+const RANGES = [30, 90] as const;
+type Range = (typeof RANGES)[number];
 
 function bps(v: number | null | undefined, digits = 1): string {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -81,14 +85,25 @@ export function FrictionKpiCard({
 
   const report = q.data;
   const kpi = report?.kpi;
+  const [range, setRange] = useState<Range>(30);
 
-  const chartRows = useMemo(() => {
-    if (!kpi) return [];
-    return kpi.daily.map((d) => ({
-      date: d.date.slice(5),
-      cumulativeBps: Number(d.cumulativeBps.toFixed(2)),
-    }));
-  }, [kpi]);
+  // The series arrives at full length; slicing client-side keeps the toggle
+  // instant and guarantees both ranges are the same underlying numbers.
+  const visible = useMemo(() => {
+    const s = report?.series ?? [];
+    return s.slice(Math.max(0, s.length - range));
+  }, [report?.series, range]);
+
+  const chartRows = useMemo(
+    () =>
+      visible.map((d) => ({
+        label: d.date.slice(5),
+        frictionBps: d.frictionBps == null ? null : Number(d.frictionBps.toFixed(2)),
+      })),
+    [visible],
+  );
+
+  const daysOverBudget = useMemo(() => visible.filter((d) => d.breach).length, [visible]);
 
   const headline = useMemo(() => {
     if (!kpi) return null;
@@ -104,7 +119,7 @@ export function FrictionKpiCard({
     return `Trading costs are inside budget: ${bps(kpi.frictionBps)} of ${bps(kpi.budgetBps, 0)} used.`;
   }, [kpi]);
 
-  const barColor = kpi?.breach ? SAXO_COLOR.down : SAXO_COLOR.up;
+  const lineColor = kpi?.breach ? SAXO_COLOR.down : SAXO_COLOR.up;
 
   return (
     <Card>
