@@ -8,6 +8,7 @@
  */
 
 import { estimateTradeCosts } from "./trade-viability-gate";
+import { summariseFeeSync, type FeeSyncSummary } from "./fee-sync-status";
 import { convertAmount } from "./fx.server";
 import {
   computeFrictionKpi,
@@ -51,6 +52,8 @@ export type FrictionReport = {
    */
   breakdown: { byAsset: FrictionBreakdown; byVenue: FrictionBreakdown };
   overlay: RealisedCostOverlay;
+  /** Per-fill broker-pricing state for the KPI window, with reasons. */
+  feeSync: FeeSyncSummary;
   currency: string;
   asOf: string;
 };
@@ -116,7 +119,7 @@ export async function loadFrictionReport(args: {
     const res = await args.db
       .from("live_fills")
       .select(
-        "symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, currency, filled_at",
+        "symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, fee_sync_status, fee_sync_reason, fee_synced_at, fee_sync_attempted_at, currency, filled_at",
       )
       .eq("portfolio_id", args.portfolioId)
       .gte("filled_at", sinceSeries)
@@ -190,6 +193,21 @@ export async function loadFrictionReport(args: {
   const windowStart = now.getTime() - windowDays * 86_400_000;
   const windowFills = all.filter((f) => Date.parse(f.filledAt) >= windowStart);
 
+  // Same window as the headline KPI, so "38 of 40 broker-priced" always refers
+  // to the trades the card is actually reporting on.
+  const feeSync = summariseFeeSync(
+    rows
+      .filter((r) => Date.parse(String(r["filled_at"] ?? "")) >= windowStart)
+      .map((r) => ({
+        feeSyncStatus: r["fee_sync_status"],
+        feeSource: r["fee_source"],
+        fee: Number(r["fee"] ?? 0),
+        feeSyncReason: (r["fee_sync_reason"] as string | null) ?? null,
+        feeSyncedAt: (r["fee_synced_at"] as string | null) ?? null,
+        feeSyncAttemptedAt: (r["fee_sync_attempted_at"] as string | null) ?? null,
+      })),
+  );
+
   let equity: Array<{ date: string; totalValue: number }> = [];
   try {
     const res = await args.db
@@ -214,6 +232,7 @@ export async function loadFrictionReport(args: {
   }
 
   return {
+    feeSync,
     kpi: computeFrictionKpi({ fills: windowFills, navBase, windowDays }),
     series: frictionTimeSeries({
       fills: all,
