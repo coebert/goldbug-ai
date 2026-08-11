@@ -14,6 +14,9 @@
 // *fresh* (within `maxCrossAgeBars`) to act on, so we don't chase a cross
 // that happened months ago.
 
+import { smaDynamicSizeMultiplier, type SmaSizeResult } from "./sma-position-sizing";
+
+
 export type SmaCrossRuleConfig = {
   enabled: boolean;
   /** Minimum |SMA20-SMA50|/SMA50 for a fast cross to count. 0.002 = 0.2%. */
@@ -60,6 +63,27 @@ export type SmaCrossRuleConfig = {
    * newly listed symbol with <200 bars. Never blocks; just sizes down.
    */
   unknownRegimeSizeMult: number;
+
+  // ---- Dynamic (conviction-scaled) sizing -----------------------------
+  /**
+   * Separation at which regime conviction saturates. Between
+   * `regimeSeparationPct` and this, the golden/death size effect ramps
+   * proportionally instead of switching on as a step.
+   */
+  regimeSaturationPct: number;
+  /** Separation at which fast-cross conviction saturates. */
+  fastSaturationPct: number;
+  /**
+   * How much a cross's size effect decays as it ages towards
+   * `maxCrossAgeBars`. 0 = no decay, 0.6 = a stale cross keeps 40% of it.
+   */
+  freshnessWeight: number;
+  /** Buy multiplier floor when a fast bear cross fires at full conviction. */
+  fastBearBuyMult: number;
+  /** Lower bound on the combined SMA size multiplier for this risk level. */
+  minSizeMult: number;
+  /** Upper bound on the combined SMA size multiplier for this risk level. */
+  maxSizeMult: number;
 };
 
 export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
@@ -80,6 +104,12 @@ export const DEFAULT_SMA_CROSS_RULES: SmaCrossRuleConfig = {
   maxDroppedFraction: 0.2,
   maxStaleFraction: 0.5,
   unknownRegimeSizeMult: 0.75,
+  regimeSaturationPct: 0.06,
+  fastSaturationPct: 0.025,
+  freshnessWeight: 0.5,
+  fastBearBuyMult: 0.5,
+  minSizeMult: 0.35,
+  maxSizeMult: 1.3,
 };
 
 /** How much of the model is trustworthy for this symbol. */
@@ -300,15 +330,21 @@ export type SmaCrossBuyRule = {
   /** Size multiplier applied to the intended notional when allowed. */
   sizeMultiplier: number;
   reason: string;
+  /** Conviction breakdown behind the multiplier (null when not sized). */
+  sizing: SmaSizeResult | null;
 };
 
-/** Buy-side rule: golden regime upsizes, death regime blocks (by default). */
+/**
+ * Buy-side rule: a death regime vetoes new longs (unless the risk profile
+ * allows reduced size), and everything else is sized by conviction —
+ * separation depth and cross freshness — inside the risk profile's bounds.
+ */
 export function smaCrossBuyRule(
   state: SmaCrossState | null | undefined,
   cfg: SmaCrossRuleConfig = DEFAULT_SMA_CROSS_RULES,
 ): SmaCrossBuyRule {
   if (!cfg.enabled || !state) {
-    return { allow: true, sizeMultiplier: 1, reason: "SMA cross rules off / no data" };
+    return { allow: true, sizeMultiplier: 1, reason: "SMA cross rules off / no data", sizing: null };
   }
 
   // 0. Missing / untrustworthy data never blocks a trade — the rest of the
@@ -318,75 +354,30 @@ export function smaCrossBuyRule(
       allow: true,
       sizeMultiplier: 1,
       reason: state.warnings[0] ?? "insufficient SMA history — neutral",
+      sizing: null,
     };
   }
-  // Newly listed: no SMA200, so no regime read. Size down rather than guess.
-  if (state.regimeUnknown) {
-    let m = Math.max(0, cfg.unknownRegimeSizeMult);
-    const why: string[] = [`no SMA200 (${state.bars} bars) — size ×${m.toFixed(2)}`];
-    if (state.fastCross === "bull") {
-      const priceOk =
-        !cfg.requirePriceConfirmation || (state.sma20 != null && state.price > state.sma20);
-      if (priceOk) {
-        m *= cfg.fastBullSizeMult;
-        why.push(`SMA20↑SMA50 (${state.fastCrossAgeBars}d ago)`);
-      }
-    } else if (state.fastCross === "bear") {
-      m *= 0.5;
-      why.push("SMA20↓SMA50 — half size");
-    }
-    return { allow: true, sizeMultiplier: m, reason: why.join("; ") };
-  }
 
-  // 1. Regime gate first — a death cross vetoes discretionary longs.
-  if (state.regime === "death") {
-    const mult = Math.max(0, cfg.deathSizeMult);
+  // 1. Regime veto — a death cross blocks discretionary longs outright when
+  // the profile sets `deathSizeMult` to 0. Profiles that allow reduced size
+  // fall through to the conviction sizer, which scales the cut by how deep
+  // the death cross actually is.
+  if (state.regime === "death" && !(cfg.deathSizeMult > 0)) {
     const sep = ((state.regimeSeparationPct ?? 0) * 100).toFixed(2);
-    if (mult <= 0) {
-      return {
-        allow: false,
-        sizeMultiplier: 0,
-        reason: `death cross regime (SMA50 ${sep}% vs SMA200) — new buys blocked`,
-      };
-    }
     return {
-      allow: true,
-      sizeMultiplier: mult,
-      reason: `death cross regime (SMA50 ${sep}% vs SMA200) — size ×${mult.toFixed(2)}`,
+      allow: false,
+      sizeMultiplier: 0,
+      reason: `death cross regime (SMA50 ${sep}% vs SMA200) — new buys blocked`,
+      sizing: null,
     };
   }
 
-  let mult = 1;
-  const notes: string[] = [];
-
-  if (state.regimeCross === "golden" || state.regime === "golden") {
-    mult *= cfg.goldenSizeMult;
-    notes.push(
-      state.regimeCross === "golden"
-        ? `fresh golden cross (${state.regimeCrossAgeBars}d ago)`
-        : "golden regime",
-    );
-  }
-
-  if (state.fastCross === "bull") {
-    const priceOk =
-      !cfg.requirePriceConfirmation || (state.sma20 != null && state.price > state.sma20);
-    if (priceOk) {
-      mult *= cfg.fastBullSizeMult;
-      notes.push(`SMA20↑SMA50 (${state.fastCrossAgeBars}d ago)`);
-    } else {
-      notes.push("SMA20↑SMA50 unconfirmed (px<SMA20)");
-    }
-  } else if (state.fastCross === "bear") {
-    // Fast trend just rolled over inside a golden regime — half size.
-    mult *= 0.5;
-    notes.push("SMA20↓SMA50 — half size");
-  }
-
+  const sizing = smaDynamicSizeMultiplier(state, cfg);
   return {
     allow: true,
-    sizeMultiplier: Math.max(0, mult),
-    reason: notes.length ? notes.join("; ") : "no fresh SMA cross",
+    sizeMultiplier: sizing.mult,
+    reason: sizing.notes.length ? sizing.notes.join("; ") : "no actionable SMA cross — full size",
+    sizing,
   };
 }
 

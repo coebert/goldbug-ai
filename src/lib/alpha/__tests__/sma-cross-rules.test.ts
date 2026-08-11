@@ -107,7 +107,7 @@ describe("smaCrossBuyRule", () => {
       sma50: 100,
       sma200: 90,
       fastCross: "bull" as const,
-      fastCrossAgeBars: 2,
+      fastCrossAgeBars: 0,
       regimeCross: null,
       regimeCrossAgeBars: 30,
       regime: "golden" as const,
@@ -119,18 +119,38 @@ describe("smaCrossBuyRule", () => {
       regimeUnknown: false,
       warnings: [],
     };
-    const r = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2 }));
+    const r = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2, maxSizeMult: 2 }));
     expect(r.sizeMultiplier).toBeCloseTo(1.32, 6);
     expect(r.reason).toMatch(/SMA20/);
+
+    // With the risk profile's ceiling in force, the stack is clamped to it.
+    const bounded = smaCrossBuyRule(state, cfg({ goldenSizeMult: 1.1, fastBullSizeMult: 1.2, maxSizeMult: 1.25 }));
+    expect(bounded.sizeMultiplier).toBeCloseTo(1.25, 10);
+    expect(bounded.sizing?.clamped).toBe(true);
   });
 
-  it("halves size when the fast trend rolls over inside a golden regime", () => {
+  it("cuts size proportionally when the fast trend rolls over inside a golden regime", () => {
     const closes = [...ramp(100, 1, 220), ...ramp(320, -6, 15)];
     const s = computeSmaCrossState(closes, cfg({ maxCrossAgeBars: 20 }))!;
     expect(s.regime).toBe("golden");
     expect(s.fastCross).toBe("bear");
     const r = smaCrossBuyRule(s, cfg({ maxCrossAgeBars: 20, goldenSizeMult: 1 }));
-    expect(r.sizeMultiplier).toBeCloseTo(0.5, 10);
+    // Between the bear-cross floor (0.5) and no cut at all — the exact point
+    // depends on how deep and how fresh the rollover is.
+    expect(r.sizeMultiplier).toBeGreaterThanOrEqual(0.5);
+    expect(r.sizeMultiplier).toBeLessThan(1);
+
+    // A deeper, fresher rollover must cut harder than a shallow one.
+    const shallow = smaCrossBuyRule(
+      { ...s, fastSeparationPct: -0.0025, fastCrossAgeBars: 9 },
+      cfg({ maxCrossAgeBars: 20, goldenSizeMult: 1 }),
+    );
+    const deep = smaCrossBuyRule(
+      { ...s, fastSeparationPct: -0.09, fastCrossAgeBars: 0 },
+      cfg({ maxCrossAgeBars: 20, goldenSizeMult: 1 }),
+    );
+    expect(deep.sizeMultiplier).toBeLessThan(shallow.sizeMultiplier);
+    expect(deep.sizeMultiplier).toBeCloseTo(0.5, 6);
   });
 
   it("is a no-op when disabled or when state is missing", () => {

@@ -129,7 +129,10 @@ describe("rules under degraded data", () => {
       s,
       cfg({ maxCrossAgeBars: 20, unknownRegimeSizeMult: 0.8, fastBullSizeMult: 1.25 }),
     );
-    expect(r.sizeMultiplier).toBeCloseTo(1, 6);
+    // 0.8 base × a fast-bull boost that scales with conviction, so it lands
+    // above the unknown-regime haircut but no higher than the full 0.8×1.25.
+    expect(r.sizeMultiplier).toBeGreaterThan(0.8);
+    expect(r.sizeMultiplier).toBeLessThanOrEqual(0.8 * 1.25 + 1e-9);
   });
 
   it("never sells off insufficient or unusable history", () => {
