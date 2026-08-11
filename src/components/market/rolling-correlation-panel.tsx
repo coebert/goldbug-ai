@@ -16,7 +16,7 @@ import {
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
-import { ChartFrame } from "@/components/charts/chart-frame";
+import { ChartFrame } from "@/components/chart-frame";
 import { CHART_ROLE } from "@/lib/chart-palette";
 import {
   MIN_CORRELATION_POINTS,
