@@ -1698,6 +1698,106 @@ async function main() {
   }
 
 
+  // -------------------------------------------------- risk-level grid search
+  // --risk-grid: turn the one dial the live engine exposes (risk level) across
+  // a small grid and score every setting on the SAME out-of-sample folds, same
+  // paths, same draws. Nothing is fitted on the test windows — the risk level
+  // is a policy choice applied to them, so this is an honest OOS comparison.
+  // Output is the Pareto frontier of profit vs drawdown: the settings that no
+  // other setting beats on both axes at once.
+  if (riskGridMode) {
+    const oosFolds = folds.map((f) => ({ ...f }));
+    const levels = riskGridLevels(riskGridSteps, riskGridLo, riskGridHi);
+    const structure = simCfg.structure!;
+
+    console.log("Risk-level grid search — out-of-sample profit vs drawdown");
+    console.log(
+      `  ${levels.length} risk levels ∈ [${riskGridLo}, ${riskGridHi}] · ${oosFolds.length} folds `
+      + `(${testDays}d test each) · ${riskGridPaths} paths/level · common random numbers`,
+    );
+    console.log(
+      `  dial: ${riskGridOpts.maxPositionsAtLow}→${riskGridOpts.maxPositionsAtHigh} slots, `
+      + `${(riskGridOpts.exposureAtLow * 100).toFixed(0)}%→${(riskGridOpts.exposureAtHigh * 100).toFixed(0)}% deployed · `
+      + `coupling ${structure.kind} · min ticket £${minTicket}`,
+    );
+    console.log();
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      console.log(`=== ${variant} ===`);
+      const rows: RiskGridRow[] = [];
+
+      for (const level of levels) {
+        const sizing: RiskSizing = riskSizingFor(level, riskGridOpts);
+        const pathRet: number[] = [];
+        const pathDd: number[] = [];
+        const pathCost: number[] = [];
+        const pathFills: number[] = [];
+
+        for (let pth = 0; pth < riskGridPaths; pth++) {
+          // Seed depends on path and variant only — never on the risk level —
+          // so every level trades the identical tape and identical shocks and
+          // the frontier reflects sizing, not luck.
+          const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+          const limit = execModel === "limit"
+            ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+            : null;
+          let ret = 0;
+          let cost = 0;
+          let fills = 0;
+          let worstDd = 0;
+
+          for (let k = 0; k < oosFolds.length; k++) {
+            const f = oosFolds[k]!;
+            const sampler = makeCorrelatedExecutionSampler(
+              { ...simCfg, structure },
+              pathSeed + k * 31337,
+            );
+            const r = simulate(
+              ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit,
+              { slippage: true, fillRate: true },
+              { minTicket, abandonPartialFraction: 0.2 },
+              sizing,
+            );
+            ret += r.returnPct;
+            cost += r.costs;
+            fills += r.fills;
+            if (r.maxDrawdownPct < worstDd) worstDd = r.maxDrawdownPct;
+          }
+          pathRet.push(ret / oosFolds.length);
+          pathDd.push(worstDd);
+          pathCost.push(cost / oosFolds.length);
+          pathFills.push(fills / oosFolds.length);
+        }
+
+        const ret = percentileStats(pathRet);
+        const dd = percentileStats(pathDd);
+        rows.push({
+          risk: level,
+          sizing,
+          returnPct: ret.median,
+          cvar5Pct: ret.cvar5,
+          drawdownPct: dd.median,
+          worstDrawdownPct: dd.worst,
+          breachProb: pathDd.filter((d) => d <= -sweepThreshold).length / Math.max(1, pathDd.length),
+          cost: percentileStats(pathCost).median,
+          fills: percentileStats(pathFills).median,
+        });
+      }
+
+      console.log(formatRiskGrid(riskGridReport(rows, sweepThreshold)));
+      console.log();
+    }
+
+    console.log("Reading: 'return' is the median per-fold OOS return and 'medDD' the median of each");
+    console.log("path's worst drawdown, so the frontier trades typical profit against typical pain.");
+    console.log("A level marked ✓ is not beaten on both axes by any other level; ★ is the best");
+    console.log("return per unit of drawdown among the profitable frontier points. Levels off the");
+    console.log("frontier are strictly worse — there is no reason to run the book there.");
+    return;
+  }
+
+
   // ------------------------------------------- out-of-sample regime backtest
   if (regimeOosMode) {
     const oosFolds = folds.map((f) => ({ ...f }));
