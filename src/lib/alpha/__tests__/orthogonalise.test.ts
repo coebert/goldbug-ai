@@ -84,8 +84,18 @@ describe("cross-sectional orthogonalisation", () => {
     }
   });
 
-  it("preserves the target's dispersion so its weight still bites", () => {
+  it("collapses a perfectly collinear model to nothing — it adds no information", () => {
     const rows = collinearUniverse(40);
+    const out = orthogonaliseScores(rows).rows;
+    for (const r of out) expect(Math.abs(r.breakout! - out[0]!.breakout!)).toBeLessThan(1e-6);
+  });
+
+  it("preserves the dispersion of a partially overlapping model", () => {
+    const rows: ModelScoreRow[] = Array.from({ length: 40 }, (_, i) => {
+      const t = -1 + (2 * i) / 39;
+      const idiosyncratic = ((i * 37) % 11) / 11 - 0.5; // deterministic noise
+      return { trend: t, breakout: 0.5 * t + idiosyncratic, quality: 0.1, carry: 0.2 };
+    });
     const sd = (xs: number[]) => {
       const m = xs.reduce((a, b) => a + b, 0) / xs.length;
       return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1));
