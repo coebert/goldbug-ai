@@ -51,6 +51,13 @@ import {
   marketVolZScores,
   type CorrelatedExecutionSampler,
 } from "../src/lib/execution-correlated-shocks";
+import {
+  DEFAULT_LIMIT_ORDER,
+  barVolBpsSeries,
+  limitFillOdds,
+  makeLimitOrderSampler,
+  type LimitOrderSampler,
+} from "../src/lib/execution-limit-orders";
 
 const argv = process.argv.slice(2);
 const arg = (name: string, fallback: string) => {
@@ -100,6 +107,23 @@ const simCfg = {
   volSlippageBeta: DEFAULT_CORRELATED_EXECUTION.volSlippageBeta,
 };
 
+// --exec-model market  → every order crosses (the legacy behaviour).
+// --exec-model limit   → orders rest first: maker/taker odds, queue fill
+//                        probability, adverse selection, then cross on timeout.
+const execModel = arg("exec-model", "limit") as "limit" | "market";
+const limitCfg = {
+  ...DEFAULT_LIMIT_ORDER,
+  limitOffsetBps: Number(arg("limit-offset-bps", String(DEFAULT_LIMIT_ORDER.limitOffsetBps))),
+  touchBeta: Number(arg("touch-beta", String(DEFAULT_LIMIT_ORDER.touchBeta))),
+  queueAheadRatio: Number(arg("queue-ahead", String(DEFAULT_LIMIT_ORDER.queueAheadRatio))),
+  queueTurnoverRatio: Number(arg("queue-turnover", String(DEFAULT_LIMIT_ORDER.queueTurnoverRatio))),
+  crossAfterBars: Number(arg("cross-after", String(DEFAULT_LIMIT_ORDER.crossAfterBars))),
+  makerFeeBps: Number(arg("maker-fee-bps", String(DEFAULT_LIMIT_ORDER.makerFeeBps))),
+  takerFeeBps: Number(arg("taker-fee-bps", String(DEFAULT_LIMIT_ORDER.takerFeeBps))),
+  adverseSelectionBeta: Number(arg("adverse-beta", String(DEFAULT_LIMIT_ORDER.adverseSelectionBeta))),
+  waitDriftBeta: Number(arg("wait-drift-beta", String(DEFAULT_LIMIT_ORDER.waitDriftBeta))),
+};
+
 const GRID: SmaVariantParams[] = [];
 for (const separationPct of [0, 0.002, 0.005, 0.01]) {
   for (const confirmBars of [1, 2, 3]) GRID.push({ separationPct, confirmBars });
@@ -126,10 +150,20 @@ type SegmentResult = {
   stressCosts: number;
   /** Bars in the segment the sampler flagged as stressed. */
   stressBars: number;
+  /** Orders filled passively (resting), i.e. without crossing the spread. */
+  makerFills: number;
+  /** Orders that had to cross. */
+  takerFills: number;
+  /** Orders touched but never cleared the queue. */
+  queueMisses: number;
+  /** Fee + adverse-selection + waiting-drift cost, in currency. */
+  driftCosts: number;
 };
 
 type Ctx = {
   seriesBySymbol: Map<string, number[]>;
+  /** Trailing realised volatility per symbol per bar, in bps. */
+  volBpsBySymbol: Map<string, number[]>;
   /** Cross-sectional realised-vol z-score per bar; drives the stress regime. */
   volZ: number[];
   costFor: (symbol: string, notional: number, slipMult: number) => number;
@@ -143,8 +177,10 @@ function simulate(
   p: SmaVariantParams,
   /** null = deterministic execution (the point estimate). */
   sampler: CorrelatedExecutionSampler | null,
+  /** null = every order crosses; otherwise orders rest first. */
+  limit: LimitOrderSampler | null = null,
 ): SegmentResult {
-  const { seriesBySymbol, costFor, volZ } = ctx;
+  const { seriesBySymbol, costFor, volZ, volBpsBySymbol } = ctx;
   let cash = startingCash;
   const shares = new Map<string, number>();
   const equityCurve: number[] = [];
@@ -156,8 +192,34 @@ function simulate(
   let stressMissed = 0;
   let stressCosts = 0;
   let stressBars = 0;
+  let makerFills = 0;
+  let takerFills = 0;
+  let queueMisses = 0;
+  let driftCosts = 0;
 
-  const draw = () => (sampler ? sampler.draw() : DETERMINISTIC_DRAW);
+  const marketDraw = () => (sampler ? sampler.draw() : DETERMINISTIC_DRAW);
+  // One order = one market-order draw, optionally routed through the passive
+  // limit book first. `extraBps` is fee + adverse selection + waiting drift,
+  // which the calibrated spread model does not know about.
+  const order = (sym: string, i: number, forceTaker = false) => {
+    const base = marketDraw();
+    if (!limit) return { ...base, extraBps: 0, liquidity: "taker" as const };
+    const d = limit.draw({
+      barVolBps: volBpsBySymbol.get(sym)?.[i] ?? 0,
+      stressed: stressedBar,
+      takerSlippageMult: base.slippageMult,
+      takerFillRatio: base.fillRatio,
+      forceTaker,
+    });
+    if (d.liquidity === "maker") makerFills++;
+    else if (d.liquidity === "taker") takerFills++;
+    return {
+      slippageMult: d.slippageMult,
+      fillRatio: d.fillRatio,
+      extraBps: d.feeBps + d.driftBps,
+      liquidity: d.liquidity,
+    };
+  };
   let stressedBar = false;
   const priceAt = (sym: string, i: number) => seriesBySymbol.get(sym)![i]!;
 
@@ -180,7 +242,9 @@ function simulate(
 
     for (const sym of exits) {
       const qty = shares.get(sym)!;
-      const d = draw();
+      // Exits are risk-reducing: they rest, but they are not allowed to sit
+      // forever, so they cross on timeout like a real stop-out would.
+      const d = order(sym, i);
       if (stressedBar) stressOrders++;
       if (d.fillRatio <= 0) {
         missedOrders++;
@@ -189,7 +253,9 @@ function simulate(
       }
       const soldQty = qty * d.fillRatio;
       const notional = soldQty * priceAt(sym, i);
-      const c = costFor(sym, notional, d.slippageMult);
+      const drift = notional * (d.extraBps / 10000);
+      const c = costFor(sym, notional, d.slippageMult) + drift;
+      driftCosts += drift;
       cash += notional - c;
       costs += c;
       if (stressedBar) stressCosts += c;
@@ -208,7 +274,7 @@ function simulate(
         const price = priceAt(sym, i);
         const requested = Math.min(target, cash * 0.98);
         if (requested < minTicket) continue;
-        const d = draw();
+        const d = order(sym, i);
         if (stressedBar) stressOrders++;
         if (d.fillRatio <= 0) {
           missedOrders++;
@@ -223,7 +289,9 @@ function simulate(
           if (stressedBar) stressMissed++;
           continue;
         }
-        const c = costFor(sym, notional, d.slippageMult);
+        const drift = notional * (d.extraBps / 10000);
+        const c = costFor(sym, notional, d.slippageMult) + drift;
+        driftCosts += drift;
         const qty = (notional - c) / price;
         if (!(qty > 0)) continue;
         cash -= notional;
@@ -240,9 +308,10 @@ function simulate(
 
   let finalEquity = cash;
   for (const [sym, qty] of shares) {
-    const d = draw();
+    // End-of-segment liquidation is forced, so it always crosses.
+    const d = order(sym, end, true);
     const notional = qty * priceAt(sym, end);
-    finalEquity += notional - costFor(sym, notional, d.slippageMult);
+    finalEquity += notional - costFor(sym, notional, d.slippageMult) - notional * (d.extraBps / 10000);
   }
 
   const rets: number[] = [];
@@ -271,6 +340,10 @@ function simulate(
     stressMissed,
     stressCosts,
     stressBars,
+    makerFills,
+    takerFills,
+    queueMisses,
+    driftCosts,
   };
 }
 
