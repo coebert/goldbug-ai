@@ -237,8 +237,11 @@ function weightsFrom(portfolios: RiskPanelPortfolio[]): {
 /** Metrics for one risk-level group. */
 export function computeRiskLevelMetrics(
   riskLevel: RiskLevelKey,
-  portfolios: RiskPanelPortfolio[],
+  input: RiskPanelPortfolio[],
 ): RiskLevelMetrics {
+  const normalised = input.map(normalisePortfolio);
+  const portfolios = normalised.map((n) => n.portfolio);
+
   const curve = aggregateEquity(portfolios);
   const rets = dailyReturns(curve);
   const dd = computeMaxDrawdown(curve);
@@ -263,6 +266,10 @@ export function computeRiskLevelMetrics(
     }
   }
 
+  const currencies = [
+    ...new Set(input.map((p) => (p.currency ?? "").toUpperCase()).filter(Boolean)),
+  ].sort();
+
   return {
     riskLevel,
     portfolioCount: portfolios.length,
@@ -282,8 +289,13 @@ export function computeRiskLevelMetrics(
     cashPct: totalEquity > 0 ? (cash / totalEquity) * 100 : 0,
     investedPct: totalEquity > 0 ? (invested / totalEquity) * 100 : 0,
     observations: curve.length,
+    flowEvents: normalised.reduce((s, n) => s + n.flowEvents, 0),
+    netExternalFlow: normalised.reduce((s, n) => s + n.netFlow, 0),
+    currencies,
+    fxComplete: normalised.every((n) => n.fxKnown),
   };
 }
+
 
 /** Group portfolios by risk level and score each group. */
 export function computeRiskLevelPanel(
