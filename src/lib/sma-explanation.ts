@@ -226,6 +226,16 @@ export function buildSmaExplanation(args: {
       : `SMA50 vs SMA200 spread ${fmtPct(regimeSpreadPct)} — threshold ${(cfg.regimeSeparationPct * 100).toFixed(2)}%`,
     `Signal strength ${strength}/100 (${strengthLabel(strength)})`,
   ];
+  if (args.side === "buy") {
+    const sizing = smaCrossBuyRule(state, cfg).sizing;
+    if (sizing) {
+      bullets.push(
+        `Sizing conviction — regime ${(sizing.components.regimeConviction * 100).toFixed(0)}%, fast cross ${(
+          sizing.components.fastConviction * 100
+        ).toFixed(0)}% → ×${sizing.mult.toFixed(2)} (allowed ×${cfg.minSizeMult.toFixed(2)}-×${cfg.maxSizeMult.toFixed(2)})`,
+      );
+    }
+  }
   for (const w of state.warnings) bullets.push(w);
 
   return {
