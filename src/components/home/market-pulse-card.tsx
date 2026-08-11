@@ -225,6 +225,9 @@ function ToneGauge({ score, tone }: { score: number; tone: MarketPulse["tone"] }
     </div>
   );
 }
+/** Auto-refresh cadence for the market pulse dashboard. */
+const REFRESH_MS = 5 * 60_000;
+
 
 /**
  * Home-screen market dashboard: one risk-appetite read, cross-asset moves,
