@@ -293,7 +293,6 @@ export function computeSmaCrossState(
     warnings,
   };
 }
-}
 
 export type SmaCrossBuyRule = {
   /** false = do not open/add to this position at all. */
