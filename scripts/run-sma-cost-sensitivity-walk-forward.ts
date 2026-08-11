@@ -68,9 +68,14 @@ type CostModel = {
   slippageBps: number;
   /** Minimum ticket the cost governor will place, £. */
   minTicket: number;
+  /**
+   * Calibrated models price each fill per symbol (own spread, own venue
+   * commission, own ADV-driven impact) instead of one flat bps assumption.
+   */
+  perSymbol?: (symbol: string, notional: number) => number;
 };
 
-const SCENARIOS: CostModel[] = [
+const BASE_SCENARIOS: CostModel[] = [
   { label: "frictionless", commissionBps: 0, commissionMin: 0, flatFee: 0, slippageBps: 0, minTicket: 0 },
   { label: "live baseline", commissionBps: 8, commissionMin: 3, flatFee: 0, slippageBps: 5, minTicket: 250 },
   { label: "2x slippage", commissionBps: 8, commissionMin: 3, flatFee: 0, slippageBps: 10, minTicket: 250 },
@@ -81,10 +86,15 @@ const SCENARIOS: CostModel[] = [
   { label: "punitive", commissionBps: 25, commissionMin: 10, flatFee: 0, slippageBps: 40, minTicket: 250 },
 ];
 
-const costOf = (m: CostModel, notional: number) =>
-  Math.max(m.commissionMin, (notional * m.commissionBps) / 10_000)
-  + m.flatFee
-  + (notional * m.slippageBps) / 10_000;
+/** Populated in main() once the calibration step has run. */
+let SCENARIOS: CostModel[] = BASE_SCENARIOS;
+
+const costOf = (m: CostModel, notional: number, symbol: string) =>
+  m.perSymbol
+    ? m.perSymbol(symbol, notional)
+    : Math.max(m.commissionMin, (notional * m.commissionBps) / 10_000)
+      + m.flatFee
+      + (notional * m.slippageBps) / 10_000;
 
 // ---------------------------------------------------------------- indicators
 
