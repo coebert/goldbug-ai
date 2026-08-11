@@ -115,7 +115,12 @@ export type FrictionKpi = {
    * every number is invoiced.
    */
   brokerCoverage: number;
+  /** Charged friction on invoiced tickets only — money the broker actually took. */
+  realisedFrictionBase: number;
+  /** Charged friction on the remaining tickets, still our estimate. */
+  estimatedFrictionBase: number;
   daily: FrictionDailyPoint[];
+
 
   /** Annualised drag implied by the window's spend, in percent of NAV. */
   annualisedDragPct: number | null;
