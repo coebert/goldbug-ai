@@ -39,6 +39,8 @@ import {
   TREND_FILTER_KEY,
   TREND_SIGNIFICANT_SCORE,
   TREND_SORT_KEY,
+  TREND_SORT2_KEY,
+
   parseSmaFavorites,
   parseSmaSymbols,
   parseTrendFilter,
@@ -82,7 +84,9 @@ export function SmaTrendCard() {
   const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_SMA_PERIODS);
   const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
   const [sort, setSort] = useState<TrendSort>("selection");
+  const [sort2, setSort2] = useState<TrendSort>("selection");
   const [filter, setFilter] = useState<TrendFilter>("all");
+
   const [favorites, setFavorites] = useState<string[]>([]);
   const fetchHistory = useServerFn(getSymbolHistory);
 
@@ -103,6 +107,8 @@ export function SmaTrendCard() {
       setPeriods(readStoredSmaPeriods());
       setTrendBasis(readStoredTrendBasis());
       setSort(parseTrendSort(window.localStorage.getItem(TREND_SORT_KEY)));
+      setSort2(parseTrendSort(window.localStorage.getItem(TREND_SORT2_KEY)));
+
       setFilter(parseTrendFilter(window.localStorage.getItem(TREND_FILTER_KEY)));
       setFavorites(
         parseSmaFavorites(window.localStorage.getItem(SMA_FAVORITES_KEY), isKnownSymbol),
@@ -161,6 +167,16 @@ export function SmaTrendCard() {
     }
   };
 
+  const pickSort2 = (s: TrendSort) => {
+    setSort2(s);
+    try {
+      window.localStorage.setItem(TREND_SORT2_KEY, s);
+    } catch {
+      /* ignore */
+    }
+  };
+
+
   const pickFilter = (f: TrendFilter) => {
     setFilter(f);
     try {
@@ -206,7 +222,7 @@ export function SmaTrendCard() {
       volatility: strength ? strength.volatilityPct : null,
     };
   });
-  const visible = rankByTrendStrength(entries, sort, filter);
+  const visible = rankByTrendStrength(entries, sort, filter, sort2);
   const hidden = entries.length - visible.length;
 
   const renderOption = (s: string) => {
@@ -315,6 +331,28 @@ export function SmaTrendCard() {
               </Button>
             ))}
           </div>
+
+          {sort !== "selection" && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Then by
+              <select
+                className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                value={sort2}
+                onChange={(e) => pickSort2(e.target.value as TrendSort)}
+                aria-label="Secondary sort (tie-breaker)"
+              >
+                <option value="selection">None</option>
+                <option value="strongest">Strongest score</option>
+                <option value="weakest">Weakest score</option>
+                <option value="slope-desc">Slope ↓</option>
+                <option value="slope-asc">Slope ↑</option>
+                <option value="vol-desc">Vol ↓</option>
+                <option value="vol-asc">Vol ↑</option>
+              </select>
+            </label>
+          )}
+
+
 
           <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by trend strength">
             {(
