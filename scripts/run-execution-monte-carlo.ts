@@ -69,6 +69,20 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  buildCalibrationSnapshot,
+  describeSnapshot,
+  describeTapeCheck,
+  foldStructuresFromSnapshot,
+  structureFromSnapshot,
+  tapeIdentity,
+  verifySnapshotAgainstTape,
+  type CalibrationSnapshot,
+} from "../src/lib/execution-correlation-snapshot";
+import {
+  loadCalibrationSnapshotFile,
+  saveCalibrationSnapshotFile,
+} from "../src/lib/execution-correlation-snapshot.server";
+import {
   diagnoseCalibrationFit,
   formatCalibrationDiagnostics,
 } from "../src/lib/execution-correlation-diagnostics";
