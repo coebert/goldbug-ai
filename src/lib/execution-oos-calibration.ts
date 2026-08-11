@@ -124,7 +124,13 @@ export function calibrateFoldStructures(
     return {
       fold: i,
       kind,
-      structure: structureFromCalibration(calibration, kind, opts.groups),
+      structure: governedStructureFromCalibration(
+        calibration,
+        kind,
+        opts.groups,
+        opts.rhoGovernor,
+      ).structure,
+
       calibration,
       trainWindows: calibration.windows.length,
       trainStressWindows: stressWindows,
