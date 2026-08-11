@@ -140,6 +140,8 @@ import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
+import { CostSyncAlertBanner } from "@/components/cost-sync-alert-banner";
+
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
