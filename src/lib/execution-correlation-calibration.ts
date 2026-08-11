@@ -406,25 +406,38 @@ export function calibrateCorrelations(
   };
 }
 
+/** Post-fit overrides, e.g. a CI-width-governed stress ρ_within. */
+export type StructureOverrides = {
+  stressWithinRho?: number;
+  stressAcrossRho?: number;
+};
+
 /**
  * Turns a calibration into a usable structure. Negative pooled correlations are
  * floored at 0 (the factor decomposition has no meaning below zero), and any
  * regime with no windows falls back to the calm estimate, so a tape with no
  * stress episodes yields `blocks`, not a fabricated contagion.
+ *
+ * `overrides` lets a risk control (see `execution-stress-rho-governor.ts`)
+ * replace the raw stress numbers with credibility-weighted ones without
+ * re-implementing the clamping rules here.
  */
 export function structureFromCalibration(
   cal: CorrelationCalibration,
   kind: Extract<CorrelationStructureKind, "blocks" | "contagion"> = "contagion",
   groups?: ReadonlyMap<string, string>,
+  overrides: StructureOverrides = {},
 ): CorrelationStructure {
   const clean = (v: number, fallback: number) =>
     Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback;
   const within = clean(cal.calm.within.rho, 0.3);
   const across = Math.min(within, clean(cal.calm.across.rho, within * 0.4));
   const hasStress = cal.stress.within.windows > 0 || cal.stress.across.windows > 0;
-  const stressWithin = hasStress ? Math.max(within, clean(cal.stress.within.rho, within)) : within;
+  const rawStressWithin = overrides.stressWithinRho ?? cal.stress.within.rho;
+  const rawStressAcross = overrides.stressAcrossRho ?? cal.stress.across.rho;
+  const stressWithin = hasStress ? Math.max(within, clean(rawStressWithin, within)) : within;
   const stressAcross = hasStress
-    ? Math.min(stressWithin, Math.max(across, clean(cal.stress.across.rho, across)))
+    ? Math.min(stressWithin, Math.max(across, clean(rawStressAcross, across)))
     : across;
 
   return makeCorrelationStructure({
@@ -437,6 +450,7 @@ export function structureFromCalibration(
       ?? new Map(cal.symbols.map((s) => [s, defaultCluster(s)])),
   });
 }
+
 
 const fmt = (p: PooledRho) =>
   Number.isFinite(p.rho)
