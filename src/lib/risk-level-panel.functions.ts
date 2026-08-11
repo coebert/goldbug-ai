@@ -43,7 +43,7 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
       lookbackDays: LOOKBACK_DAYS,
       rows: [],
       warnings: [],
-      currency: list[0]?.currency ?? "GBP",
+      currency: DISPLAY_CURRENCY,
     };
     if (list.length === 0) return empty;
 
@@ -103,7 +103,10 @@ export const getRiskLevelPanel = createServerFn({ method: "GET" })
         }
         try {
           const fx = await getFxRate(ccy, DISPLAY_CURRENCY);
-          rates.set(ccy, fx.rate > 0 && fx.source !== "identity" ? fx.rate : null);
+          // A `fallback:` rate is a hard-coded 1.0 dressed up as FX — treat
+          // it as unknown rather than pretending a euro is a pound.
+          const usable = fx.rate > 0 && !fx.source.startsWith("fallback:");
+          rates.set(ccy, usable ? fx.rate : null);
         } catch {
           rates.set(ccy, null);
         }
