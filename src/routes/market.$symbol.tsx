@@ -131,6 +131,8 @@ function AnnotationList({
   }
   if (!annotations.length) return null;
 
+
+
   return (
     <section className="space-y-2">
       <h2 className="flex items-center gap-1.5 text-sm font-semibold">
