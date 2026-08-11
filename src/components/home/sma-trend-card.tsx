@@ -134,6 +134,24 @@ export function SmaTrendCard() {
     storeTrendBasis(b);
   };
 
+  const pickSort = (s: TrendSort) => {
+    setSort(s);
+    try {
+      window.localStorage.setItem(TREND_SORT_KEY, s);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const pickFilter = (f: TrendFilter) => {
+    setFilter(f);
+    try {
+      window.localStorage.setItem(TREND_FILTER_KEY, f);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const queries = useQueries({
     queries: symbols.map((s) => ({
       queryKey: ["symbol-history", s, range],
