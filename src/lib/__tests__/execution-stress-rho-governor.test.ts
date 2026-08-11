@@ -157,10 +157,10 @@ describe("stress rho governor", () => {
     const gov = governedStructureFromCalibration(cal, "contagion", undefined, { seed: 7 });
     const rawStress = regimeRhos(raw.structure, 1);
     const govStress = regimeRhos(gov.structure, 1);
-    expect(govStress.within).toBeLessThan(rawStress.within);
-    expect(govStress.across).toBeLessThanOrEqual(govStress.within + 1e-12);
+    expect(govStress.withinRho).toBeLessThan(rawStress.withinRho);
+    expect(govStress.acrossRho).toBeLessThanOrEqual(govStress.withinRho + 1e-12);
     // calm regime is untouched by the control
-    expect(regimeRhos(gov.structure, 0).within).toBeCloseTo(regimeRhos(raw.structure, 0).within, 9);
+    expect(regimeRhos(gov.structure, 0).withinRho).toBeCloseTo(regimeRhos(raw.structure, 0).withinRho, 9);
   });
 
   it("formats a readable report", () => {
