@@ -70,6 +70,19 @@ export function CompareOverlay({
   onToggle,
   onClear,
 }: CompareOverlayProps) {
+  const [rollingWindow, setRollingWindow] = useState<RollingWindow>(() => {
+    if (typeof window === "undefined") return 30;
+    const saved = Number(window.localStorage.getItem("market.rollingCorrWindow"));
+    return saved === 30 || saved === 60 || saved === 90 ? saved : 30;
+  });
+
+  const changeRollingWindow = (w: RollingWindow) => {
+    setRollingWindow(w);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("market.rollingCorrWindow", String(w));
+    }
+  };
+
   const addable = options.filter((s) => s !== symbol && !compare.includes(s));
   const full = compare.length >= MAX_COMPARE_SYMBOLS;
 
@@ -233,7 +246,7 @@ export function CompareOverlay({
           <RollingCorrelationPanel
             comparison={comparison}
             window={rollingWindow}
-            onWindowChange={setRollingWindow}
+            onWindowChange={changeRollingWindow}
           />
 
           <p className="text-[11px] text-muted-foreground">

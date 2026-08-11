@@ -165,3 +165,69 @@ describe("correlation matrix", () => {
     expect(correlation.cells).toEqual([]);
   });
 });
+
+describe("rolling correlation", () => {
+  const days = 140;
+  const dates = Array.from({ length: days }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 0, 1));
+    d.setUTCDate(d.getUTCDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+
+  function history(symbol: string, closes: number[]): SymbolHistory {
+    return {
+      symbol,
+      label: symbol,
+      kind: "Market",
+      points: closes.map((close, i) => ({ date: dates[i], close })),
+      changePct: 0,
+      asOf: dates[dates.length - 1],
+    } as unknown as SymbolHistory;
+  }
+
+  // A moves on a fixed wave; B tracks it for the first half then inverts.
+  const a: number[] = [];
+  const b: number[] = [];
+  let pa = 100;
+  let pb = 100;
+  for (let i = 0; i < days; i++) {
+    const step = i % 2 === 0 ? 0.01 : -0.008;
+    pa *= 1 + step;
+    pb *= 1 + (i < days / 2 ? step : -step);
+    a.push(Number(pa.toFixed(4)));
+    b.push(Number(pb.toFixed(4)));
+  }
+
+  const comparison = buildComparison([history("AAA", a), history("BBB", b)]);
+
+  it("exposes aligned returns for rolling analysis", () => {
+    expect(Object.keys(comparison.returns).sort()).toEqual(["AAA", "BBB"]);
+    expect(comparison.returns.AAA).toHaveLength(comparison.dates.length);
+    expect(comparison.returns.AAA[0]).toBeNull();
+  });
+
+  it("tracks a relationship that flips inside the window", () => {
+    const rolling = buildRollingCorrelation(comparison, 30);
+    expect(rolling.window).toBe(30);
+    expect(rolling.pairs).toHaveLength(1);
+
+    const pair = rolling.pairs[0];
+    const early = pair.values.find((v) => v != null)!;
+    expect(early).toBeGreaterThan(0.9);
+    expect(pair.latest).toBeLessThan(-0.9);
+    expect(pair.min).toBeLessThan(pair.max!);
+    expect(rolling.dates).toHaveLength(pair.values.length);
+  });
+
+  it("leaves points blank until the window has enough observations", () => {
+    const rolling = buildRollingCorrelation(comparison, 90);
+    const firstIdx = rolling.pairs[0].values.findIndex((v) => v != null);
+    expect(firstIdx).toBe(0);
+    expect(rolling.dates.length).toBeLessThan(comparison.dates.length);
+  });
+
+  it("returns no pairs for a single symbol", () => {
+    const single = buildComparison([history("AAA", a)]);
+    expect(buildRollingCorrelation(single, 30).pairs).toEqual([]);
+  });
+});
