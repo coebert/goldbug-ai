@@ -18,6 +18,21 @@ export function scoreTrend(f: FeatureLike): AlphaScore {
     parts.push(structural ? 1 : f.price < f.sma50 ? -1 : 0);
     if (structural) notes.push("px>SMA20>SMA50");
   }
+  // Long-term regime: SMA50 vs SMA200 (golden / death cross) plus price side.
+  if (f.sma50 != null && f.sma200 != null && f.sma200 > 0) {
+    const golden = f.sma50 > f.sma200;
+    const above = f.price > f.sma200;
+    if (golden && above) {
+      parts.push(1);
+      notes.push("SMA50>SMA200 (golden)");
+    } else if (!golden && !above) {
+      parts.push(-1);
+      notes.push("SMA50<SMA200 (death)");
+    } else {
+      parts.push(golden ? 0.3 : -0.3);
+      notes.push(golden ? "golden, px<SMA200" : "death, px>SMA200");
+    }
+  }
   if (f.change30d != null) {
     parts.push(Math.tanh(f.change30d * 5)); // 20% move ≈ 0.76
     if (f.change30d > 0.05) notes.push(`+${(f.change30d * 100).toFixed(1)}%/30d`);
