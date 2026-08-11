@@ -225,6 +225,7 @@ export function computeFrictionKpi(args: {
 
   const frictionBps = bpsOfNav(frictionBase);
   const tickets = ordered.length;
+  const brokerBookedTickets = ordered.filter((f) => f.feeSource === "broker").length;
 
   return {
     windowDays,
