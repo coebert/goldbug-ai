@@ -9,15 +9,19 @@ import { scoreMeanReversion } from "./mean-reversion";
 import { scoreQuality } from "./quality";
 import { scoreTrend } from "./trend";
 import { scoreBreakout } from "./breakout";
-import { effectiveWeightsForRegime } from "./regime-matrix";
+import { effectiveWeightsForRegime, type StrategyWeights } from "./regime-matrix";
 import { clamp1, type AlphaModelKind, type AlphaScore, type CompositeScore, type FeatureLike } from "./types";
 
 const MODELS: Array<(f: FeatureLike) => AlphaScore> = [
   scoreTrend, scoreMeanReversion, scoreQuality, scoreCarry, scoreBreakout,
 ];
 
-export function scoreCandidate(f: FeatureLike, regime: string | null | undefined): CompositeScore {
-  const weights = effectiveWeightsForRegime(regime);
+export function scoreCandidate(
+  f: FeatureLike,
+  regime: string | null | undefined,
+  weightsOverride?: StrategyWeights | null,
+): CompositeScore {
+  const weights = weightsOverride ?? effectiveWeightsForRegime(regime);
   const perModel: Partial<Record<AlphaModelKind, number>> = {};
   const rationales: Partial<Record<AlphaModelKind, string>> = {};
   let composite = 0;
@@ -52,8 +56,9 @@ export function scoreCandidate(f: FeatureLike, regime: string | null | undefined
 export function scoreUniverse(
   features: FeatureLike[],
   regime: string | null | undefined,
+  weightsOverride?: StrategyWeights | null,
 ): CompositeScore[] {
-  return features.map((f) => scoreCandidate(f, regime));
+  return features.map((f) => scoreCandidate(f, regime, weightsOverride));
 }
 
 // Compact prompt block for the LLM adjudicator. Keeps only the top-N
@@ -62,8 +67,9 @@ export function formatAlphaPriorsForPrompt(
   scores: CompositeScore[],
   regime: string | null | undefined,
   topN = 10,
+  weightsOverride?: StrategyWeights | null,
 ): string {
-  const weights = effectiveWeightsForRegime(regime);
+  const weights = weightsOverride ?? effectiveWeightsForRegime(regime);
   const sorted = [...scores].sort((a, b) => b.composite - a.composite);
   const longs = sorted.slice(0, topN).filter((s) => s.composite > 0.05);
   const avoids = sorted.slice(-topN).reverse().filter((s) => s.composite < -0.05);
