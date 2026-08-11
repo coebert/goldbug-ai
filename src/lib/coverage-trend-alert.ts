@@ -57,7 +57,10 @@ export type CoverageWindowSummary = {
 export type CoverageTrendAlert = {
   shouldAlert: boolean;
   reason: CoverageTrendAlertReason | null;
-  severity: "info" | "warning" | "critical";
+  severity: CoverageTrendSeverity;
+  /** Points below the floor (positive = shortfall), null when not below it. */
+  gapPct: number | null;
+
   /** Mean coverage over the most recent window, 0..100, or null. */
   recentPct: number | null;
   /** Mean coverage over the preceding window. */
