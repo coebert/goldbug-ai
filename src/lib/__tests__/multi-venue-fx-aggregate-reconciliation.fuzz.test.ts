@@ -251,10 +251,13 @@ function replayExact(s: Scenario): ExactBook {
       byCcy[inst.ccy].notionalLocalMicros -= toMicros(localNotional);
     } else {
       const sold = Math.min(qtyLots, pos.qty);
-      const relieved = pos.qty > 0 ? Math.round((pos.basis * sold) / pos.qty) : 0;
+      // Relieve the whole remaining basis when the position goes flat, so no
+      // rounding residue is left carrying value on a zero holding.
+      const relieved =
+        pos.qty > 0 ? (sold === pos.qty ? pos.basis : Math.round((pos.basis * sold) / pos.qty)) : 0;
       pos.qty -= sold;
-      pos.basis = pos.qty === 0 ? 0 : pos.basis - relieved;
-      basisMicros -= pos.qty === 0 ? relieved + (pos.basis - 0) * 0 : relieved;
+      pos.basis -= relieved;
+      basisMicros -= relieved;
       cashMicros += notional;
       byCcy[inst.ccy].notionalLocalMicros += toMicros(localNotional);
     }
