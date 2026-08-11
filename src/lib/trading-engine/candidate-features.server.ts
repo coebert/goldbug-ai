@@ -107,6 +107,7 @@ export async function buildCandidateFeatures(
         vw_momentum_10d: volumeWeightedMomentum(candles, 10),
         weekly_trend_up: wk?.weekly_trend_up ?? false,
         weekly_rsi14: wk?.weekly_rsi14 ?? null,
+        stochastic: stochastic(candles),
         breakout: detectBreakout(candles),
         news_score: null,
         news_contributors: 0,
