@@ -457,9 +457,12 @@ export function parseCalibrationSnapshot(raw: string | unknown): CalibrationSnap
 // -------------------------------------------------------------- verification
 
 export type SnapshotTapeCheck = {
+  /** True when the tape is the fitted one to within provider rounding noise. */
   matches: boolean;
-  /** Same fingerprint = same bars, same prices, same order. */
+  /** Stricter: byte-identical prices. False on a re-fetch is normal and benign. */
   fingerprintMatches: boolean;
+  /** Largest relative digest deviation across the shared symbols. */
+  worstDigestDrift: number;
   missingSymbols: string[];
   extraSymbols: string[];
   snapshotBars: number;
@@ -487,6 +490,31 @@ export function verifySnapshotAgainstTape(
   const extra = now.symbols.filter((s) => !snapSyms.has(s));
   const fingerprintMatches = now.fingerprint === snap.tape.fingerprint;
 
+  // Tolerant comparison over the shared symbols. Older snapshots carry no
+  // digest; those fall back to the exact hash.
+  const saved = snap.tape.digest ?? {};
+  const hasDigest = Object.keys(saved).length > 0;
+  let worstDigestDrift = 0;
+  let worstField = "";
+  if (hasDigest) {
+    for (const sym of snap.tape.symbols) {
+      const a = saved[sym];
+      const b = now.digest[sym];
+      if (!a || !b) continue;
+      for (const field of ["first", "last", "meanAbsRet"] as const) {
+        const scale = Math.max(Math.abs(a[field]), 1e-12);
+        const drift = Math.abs(a[field] - b[field]) / scale;
+        if (drift > worstDigestDrift) {
+          worstDigestDrift = drift;
+          worstField = `${sym}.${field}`;
+        }
+      }
+    }
+  }
+  const pricesMatch = hasDigest
+    ? worstDigestDrift <= TAPE_DIGEST_TOLERANCE
+    : fingerprintMatches;
+
   const reasons: string[] = [];
   if (missing.length) reasons.push(`missing symbols: ${missing.join(", ")}`);
   if (extra.length) reasons.push(`extra symbols: ${extra.join(", ")}`);
@@ -502,13 +530,17 @@ export function verifySnapshotAgainstTape(
   if (snap.tape.priceMode && meta.priceMode && snap.tape.priceMode !== meta.priceMode) {
     reasons.push(`price mode ${meta.priceMode} vs ${snap.tape.priceMode}`);
   }
-  if (!fingerprintMatches && !reasons.length) {
-    reasons.push("prices differ (same symbols and bar count, different values)");
+  if (!pricesMatch && !reasons.length) {
+    reasons.push(
+      `prices differ (same symbols and bar count; ${worstField} off by `
+      + `${(worstDigestDrift * 100).toPrecision(3)}%)`,
+    );
   }
 
   return {
-    matches: fingerprintMatches && !reasons.length,
+    matches: pricesMatch && !reasons.length,
     fingerprintMatches,
+    worstDigestDrift,
     missingSymbols: missing,
     extraSymbols: extra,
     snapshotBars: snap.tape.bars,
@@ -516,6 +548,7 @@ export function verifySnapshotAgainstTape(
     reasons,
   };
 }
+
 
 // ---------------------------------------------------------------- description
 
