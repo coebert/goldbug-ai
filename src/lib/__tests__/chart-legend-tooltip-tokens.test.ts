@@ -93,7 +93,9 @@ describe("chart legends, tooltips and axis labels use theme tokens", () => {
     });
 
     it(`${name}: every tooltip contentStyle declares background and colour`, () => {
-      const usesConst = /contentStyle=\{TOOLTIP_CONTENT_STYLE\}/.test(src);
+      // Both shared tooltip surfaces carry background + colour: the generic
+      // palette token and the Saxo-themed one.
+      const usesConst = /contentStyle=\{(?:TOOLTIP_CONTENT_STYLE|SAXO_TOOLTIP_CONTENT)\}/.test(src);
       const objects = attrObjects(src, "contentStyle");
       if (!objects.length) {
         // Either no styled tooltip, or the shared constant is used.

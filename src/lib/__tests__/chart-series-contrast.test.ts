@@ -127,11 +127,15 @@ describe("data series contrast", () => {
   });
 });
 
+// Charts whose reference lines ARE the data: per-event hues, and breakout
+// level/target/stop rules that must read as up vs down, not as a neutral rule.
+const SEMANTIC_REFERENCE_CHARTS = ["event-overlay.tsx", "breakout-overlay-chart.tsx"];
+
 describe("reference lines", () => {
   it("every ReferenceLine spreads the shared REFERENCE_LINE token", () => {
     const offenders: string[] = [];
     for (const p of chartFiles) {
-      if (p.endsWith("event-overlay.tsx")) continue; // semantic per-event hues
+      if (SEMANTIC_REFERENCE_CHARTS.some((f) => p.endsWith(f))) continue;
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<ReferenceLine\b[\s\S]*?\/>/g) ?? []) {
         if (!tag.includes("{...REFERENCE_LINE}") && !tag.includes("{...SAXO_REFERENCE_LINE}"))
@@ -144,7 +148,7 @@ describe("reference lines", () => {
   it("no ReferenceLine re-styles its stroke with a weak token", () => {
     const offenders: string[] = [];
     for (const p of chartFiles) {
-      if (p.endsWith("event-overlay.tsx")) continue;
+      if (SEMANTIC_REFERENCE_CHARTS.some((f) => p.endsWith(f))) continue;
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<ReferenceLine\b[\s\S]*?\/>/g) ?? []) {
         if (/\b(stroke|strokeOpacity|opacity)=/.test(tag)) offenders.push(`${rel(p)}: ${tag}`);

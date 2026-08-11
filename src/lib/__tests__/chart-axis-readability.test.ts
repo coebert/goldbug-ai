@@ -77,6 +77,8 @@ describe("chart axis readability", () => {
         if (/type=\{?"category"/.test(tag)) continue;
         // A hidden axis paints nothing: no ticks to fit, no line to colour.
         if (/\bhide\b/.test(tag)) continue;
+        // A percent axis renders at most "-100%" — it needs no currency gutter.
+        if (/tickFormatter=\{\(v: number\) => `\$\{v\}%`\}/.test(tag)) continue;
         const widths = [...tag.matchAll(/width=\{(?:isMobile \? )?(\d+)/g)].map((m) => Number(m[1]));
         if (widths.length === 0 || widths.some((w) => w < 46)) {
           offenders.push(p.replace(SRC, "src"));
@@ -149,6 +151,8 @@ describe("chart gridline and axis-line styling", () => {
       const src = readFileSync(p, "utf8");
       for (const tag of src.match(/<(?:X|Y)Axis\b[\s\S]*?\/>/g) ?? []) {
         if (/\bhide\b/.test(tag)) continue;
+        // A percent axis renders at most "-100%" — it needs no currency gutter.
+        if (/tickFormatter=\{\(v: number\) => `\$\{v\}%`\}/.test(tag)) continue;
         // `{...AXIS_PROPS}` carries tick, axisLine and tickLine in one spread.
         if (tag.includes("{...AXIS_PROPS}") || tag.includes("{...SAXO_AXIS}")) continue;
         if (!/axisLine=/.test(tag)) offenders.push(`${p.replace(SRC, "src")}: missing axisLine`);

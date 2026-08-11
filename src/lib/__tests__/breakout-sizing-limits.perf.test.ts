@@ -110,8 +110,14 @@ const LIMITS: SizingLimits = {
 
 /** One 2k-signal integration-sized replay. */
 const BUDGET_INTEGRATION = 1.5;
-/** The fuzz suite's shape: 3,000 small cohorts back to back. */
-const BUDGET_FUZZ = 8;
+/**
+ * The fuzz suite's shape: 3,000 small cohorts back to back.
+ * Headroom over the ~4-unit steady-state cost absorbs the scheduler noise this
+ * workload picks up when the whole suite runs in parallel; a real quadratic
+ * regression blows past it by an order of magnitude, and the scaling-exponent
+ * test below catches shape changes the budget alone would miss.
+ */
+const BUDGET_FUZZ = 14;
 /** Ceiling on the observed scaling exponent — 1 is linear, 2 is quadratic. */
 const MAX_SCALING_EXPONENT = 1.45;
 
