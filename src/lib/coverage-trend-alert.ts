@@ -123,6 +123,7 @@ export function evaluateCoverageTrendAlert(
     shouldAlert: false,
     reason: null,
     severity: "info",
+    gapPct: null,
     recentPct,
     priorPct,
     earlierPct,
@@ -148,26 +149,56 @@ export function evaluateCoverageTrendAlert(
   const reason: CoverageTrendAlertReason =
     belowFloor && deteriorating ? "both" : belowFloor ? "below_floor" : "deteriorating";
 
+  const gapPct = belowFloor ? Math.round((floor - recentPct) * 10) / 10 : null;
+
+  // Severity ladder:
+  //   info     — still above the floor, but sliding two windows running.
+  //   warning  — under the floor, or the slide has become steep (>= 2 steps
+  //              per window) even while above it.
+  //   critical — a deep shortfall (>= criticalGap below the floor), or under
+  //              the floor *and* still falling, which means it will get worse.
+  const steepSlide =
+    priorPct != null && earlierPct != null && recentPct <= priorPct - 2 * step && priorPct <= earlierPct - 2 * step;
+  let severity: CoverageTrendSeverity;
+  if (gapPct != null && (gapPct >= criticalGap || deteriorating)) severity = "critical";
+  else if (belowFloor || steepSlide) severity = "warning";
+  else severity = "info";
+
   const slide =
     priorPct != null && earlierPct != null
       ? ` It has fallen across two consecutive windows: ${earlierPct}% → ${priorPct}% → ${recentPct}%.`
       : "";
 
+  const severityNote =
+    severity === "critical"
+      ? gapPct != null && gapPct >= criticalGap
+        ? ` That is ${gapPct} points below the floor — treat the friction KPI as an estimate, not a measurement.`
+        : " It is below the floor and still falling, so expect it to worsen without a fix."
+      : "";
+
   const body = belowFloor
-    ? `Only ${recentPct}% of the last ${windowDays} days of fills carry a booked Saxo charge, below the ${floor}% floor. Trading costs for the rest are modelled, so the friction figure is a projection.${deteriorating ? slide : ""}`
+    ? `Only ${recentPct}% of the last ${windowDays} days of fills carry a booked Saxo charge, below the ${floor}% floor. Trading costs for the rest are modelled, so the friction figure is a projection.${deteriorating ? slide : ""}${severityNote}`
     : `Broker charge coverage is sliding.${slide} It is still above the ${floor}% floor, but the trend points at charges that are no longer matching.`;
+
+  const title = belowFloor
+    ? severity === "critical"
+      ? "Broker charge coverage critically low"
+      : "Broker charge coverage below floor"
+    : "Broker charge coverage degrading";
 
   return {
     shouldAlert: true,
     reason,
-    severity: belowFloor ? "warning" : "info",
+    severity,
+    gapPct,
     recentPct,
     priorPct,
     earlierPct,
     windows,
-    title: belowFloor ? "Broker charge coverage below floor" : "Broker charge coverage degrading",
+    title,
     body,
   };
+
 }
 
 /** "01 Jul – 07 Jul" for a window, for banners and notification bodies. */
