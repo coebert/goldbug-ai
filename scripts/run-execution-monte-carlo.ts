@@ -908,7 +908,10 @@ async function main() {
         ].join(" "));
       }
     }
-    simCfg.structure = structureFromCalibration(cal, calibKind, clusters);
+    const governed = governedStructureFromCalibration(cal, calibKind, clusters, rhoGovernorOpts);
+    simCfg.structure = governed.structure;
+    console.log(formatStressRhoGovernance(governed.governance));
+
     console.log(`Using calibrated structure: ${describeStructure(simCfg.structure)}\n`);
   }
 
