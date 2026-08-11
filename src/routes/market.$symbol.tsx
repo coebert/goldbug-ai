@@ -26,6 +26,7 @@ import {
   HISTORY_SYMBOLS,
   coerceRange,
   computeTrendStrength,
+  computeTrendStrengthSeries,
   rangeLabel,
   smaKey,
   symbolMeta,
@@ -33,7 +34,11 @@ import {
   type SmaPeriod,
   type SymbolHistory,
 } from "@/lib/market-symbol-history";
-import { TrendStrengthBadge, TrendStrengthStat } from "@/components/market/trend-strength-badge";
+import {
+  TrendStrengthBadge,
+  TrendStrengthSparkline,
+  TrendStrengthStat,
+} from "@/components/market/trend-strength-badge";
 import {
   DEFAULT_SMA_PERIODS,
   PERIOD_STYLE,
@@ -336,6 +341,11 @@ function MarketSymbolPage() {
     [query.data, periods],
   );
 
+  const strengthSeries = useMemo(
+    () => (query.data ? computeTrendStrengthSeries(query.data.points, periods) : []),
+    [query.data, periods],
+  );
+
   const annotationQuery = useQuery({
     queryKey: ["symbol-annotations", symbol, range],
     queryFn: () => fetchAnnotations({ data: { symbol, days: range } }),
@@ -555,6 +565,10 @@ function MarketSymbolPage() {
                 <dl className="contents">
                   <TrendStrengthStat strength={strength} />
                 </dl>
+                <div className="col-span-2 rounded-xl border border-border/60 bg-surface-2 px-3 py-2 sm:col-span-4">
+                  <p className="text-xs text-muted-foreground">Trend strength over time</p>
+                  <TrendStrengthSparkline series={strengthSeries} className="h-14 w-full" />
+                </div>
                 {periods.map((p) => (
                   <Stat key={p} label={`${p}-day average`} value={num(history.smaLatest?.[p] ?? null)} />
                 ))}

@@ -1,6 +1,15 @@
 // Shared display for the numerical trend-strength score (slope / volatility)
 // measured on the slowest selected moving average.
 
+import {
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip as RTooltip,
+  YAxis,
+} from "recharts";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -8,7 +17,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { TrendStrength } from "@/lib/market-symbol-history";
+import {
+  CHART_ROLE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_LABEL_STYLE,
+} from "@/lib/chart-palette";
+import type { TrendStrength, TrendStrengthPoint } from "@/lib/market-symbol-history";
 
 const TONE = {
   up: "border-emerald-500/40 text-emerald-500",
@@ -60,6 +74,43 @@ export function TrendStrengthStat({ strength }: { strength: TrendStrength | null
           "—"
         )}
       </dd>
+    </div>
+  );
+}
+
+/** Sparkline of the rolling trend-strength score across the selected window. */
+export function TrendStrengthSparkline({
+  series,
+  className = "h-10 w-full",
+}: {
+  series: TrendStrengthPoint[];
+  className?: string;
+}) {
+  if (series.length < 3) return null;
+  const last = series[series.length - 1].score;
+  const stroke =
+    last > 10 ? CHART_ROLE.positive : last < -10 ? CHART_ROLE.negative : CHART_ROLE.neutral;
+  return (
+    <div className={className} aria-label="Trend strength over time">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={series} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+          <YAxis hide domain={[-100, 100]} />
+          <ReferenceLine y={0} stroke={CHART_ROLE.neutral} strokeOpacity={0.35} />
+          <RTooltip
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
+            formatter={(v: number) => [`${v > 0 ? "+" : ""}${v}`, "Trend strength"]}
+          />
+          <Line
+            type="monotone"
+            dataKey="score"
+            stroke={stroke}
+            strokeWidth={1.5}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 }
