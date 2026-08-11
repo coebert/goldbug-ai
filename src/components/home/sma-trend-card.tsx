@@ -56,7 +56,7 @@ import {
 
 const SYMBOL_KEY = "home-sma-symbol";
 const RANGE_KEY = "home-sma-range";
-const DEFAULT_SYMBOL = HISTORY_SYMBOLS.includes("^GSPC") ? "^GSPC" : (HISTORY_SYMBOLS[0] ?? "");
+const DEFAULT_SYMBOL = HISTORY_SYMBOLS.includes("SPY") ? "SPY" : (HISTORY_SYMBOLS[0] ?? "");
 
 function num(v: number | null | undefined, digits = 2) {
   if (v == null || !Number.isFinite(v)) return "—";
