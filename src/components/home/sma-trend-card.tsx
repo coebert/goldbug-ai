@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueries, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, LineChart as LineChartIcon, Plus, Star } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, LineChart as LineChartIcon, Plus, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,7 @@ import {
   TREND_SORT_KEY,
   TREND_SORT2_KEY,
 
+  moveSmaFavorite,
   parseSmaFavorites,
   parseSmaSymbols,
   parseTrendFilter,
@@ -159,6 +160,15 @@ export function SmaTrendCard() {
     });
   };
 
+  const moveFavorite = (symbol: string, direction: "up" | "down") => {
+    setFavorites((prev) => {
+      const next = moveSmaFavorite(prev, symbol, direction);
+      storeSmaFavorites(next);
+      return next;
+    });
+  };
+
+
   const pickSort = (s: TrendSort) => {
     setSort(s);
     try {
@@ -224,7 +234,7 @@ export function SmaTrendCard() {
     };
   });
   const ranks = trendPercentiles(entries);
-  const visible = rankByTrendStrength(entries, sort, filter, sort2);
+  const visible = rankByTrendStrength(entries, sort, filter, sort2, favorites);
   const hidden = entries.length - visible.length;
 
   const renderOption = (s: string) => {
@@ -284,26 +294,55 @@ export function SmaTrendCard() {
           <div className="flex flex-wrap gap-1">
             {symbols.map((s) => {
               const pinned = favorites.includes(s);
+              const pos = favorites.indexOf(s);
+              const label = symbolMeta(s)?.label ?? s;
               return (
-                <button
+                <span
                   key={s}
-                  type="button"
-                  aria-pressed={pinned}
-                  aria-label={`${pinned ? "Unpin" : "Pin"} ${symbolMeta(s)?.label ?? s}`}
-                  onClick={() => toggleFavorite(s)}
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-normal transition-colors ${
-                    pinned ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground"
+                  className={`inline-flex items-center rounded-full border text-xs font-normal transition-colors ${
+                    pinned ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-muted-foreground"
                   }`}
                 >
-                  <Star
-                    className={`mr-1 h-3 w-3 ${pinned ? "fill-primary text-primary" : ""}`}
-                    aria-hidden="true"
-                  />
-                  {symbolMeta(s)?.label ?? s}
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={pinned}
+                    aria-label={`${pinned ? "Unpin" : "Pin"} ${label}`}
+                    onClick={() => toggleFavorite(s)}
+                    className="inline-flex items-center py-0.5 pl-2 pr-1 hover:text-foreground"
+                  >
+                    <Star
+                      className={`mr-1 h-3 w-3 ${pinned ? "fill-primary text-primary" : ""}`}
+                      aria-hidden="true"
+                    />
+                    {label}
+                  </button>
+                  {pinned && favorites.length > 1 && (
+                    <span className="flex items-center pr-1">
+                      <button
+                        type="button"
+                        aria-label={`Move ${label} earlier`}
+                        disabled={pos <= 0}
+                        onClick={() => moveFavorite(s, "up")}
+                        className="px-0.5 disabled:opacity-30 hover:text-primary"
+                      >
+                        <ChevronLeft className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move ${label} later`}
+                        disabled={pos === favorites.length - 1}
+                        onClick={() => moveFavorite(s, "down")}
+                        className="px-0.5 disabled:opacity-30 hover:text-primary"
+                      >
+                        <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    </span>
+                  )}
+                </span>
               );
             })}
           </div>
+
 
           <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
 
