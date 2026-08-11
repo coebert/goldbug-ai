@@ -88,11 +88,74 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
   );
 }
 
+const ANNOTATION_TONE: Record<string, string> = {
+  spike_up: CHART_ROLE.positive ?? CHART_ROLE.highlight,
+  spike_down: CHART_ROLE.negative ?? CHART_ROLE.highlight,
+  golden_cross: CHART_ROLE.positive ?? CHART_ROLE.benchmark,
+  death_cross: CHART_ROLE.negative ?? CHART_ROLE.benchmark,
+  drawdown_trough: CHART_ROLE.negative ?? CHART_ROLE.highlight,
+  vol_regime: CHART_ROLE.highlight,
+  range_high: CHART_ROLE.benchmark,
+  range_low: CHART_ROLE.benchmark,
+};
+
+function AnnotationList({
+  annotations,
+  loading,
+}: {
+  annotations: ChartAnnotation[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+      </div>
+    );
+  }
+  if (!annotations.length) return null;
+
+  return (
+    <section className="space-y-2">
+      <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" /> What moved this chart
+      </h2>
+      <ol className="space-y-2">
+        {annotations.map((a, i) => (
+          <li
+            key={a.id}
+            className="flex gap-3 rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5"
+          >
+            <span
+              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border text-[11px] font-semibold tabular-nums"
+              aria-hidden="true"
+            >
+              {i + 1}
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs text-muted-foreground">
+                {a.date} · {a.label}
+              </div>
+              <p className="mt-0.5 text-sm">{a.note}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="text-[11px] text-muted-foreground">
+        Notable moves are detected from the price series; the wording is AI-generated and may miss
+        the real driver. Not financial advice.
+      </p>
+    </section>
+  );
+}
+
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
   const { range } = Route.useSearch();
   const meta = symbolMeta(symbol);
   const fetchHistory = useServerFn(getSymbolHistory);
+  const fetchAnnotations = useServerFn(getChartAnnotations);
 
   const query = useQuery({
     queryKey: ["symbol-history", symbol, range],
@@ -102,8 +165,20 @@ function MarketSymbolPage() {
     refetchOnWindowFocus: false,
   });
 
+  const annotationQuery = useQuery({
+    queryKey: ["symbol-annotations", symbol, range],
+    queryFn: () => fetchAnnotations({ data: { symbol, days: range } }),
+    enabled: Boolean(meta) && (query.data?.points.length ?? 0) > 4,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
   const history = query.data;
+  const annotations = annotationQuery.data?.annotations ?? [];
   const up = (history?.changePct ?? 0) >= 0;
+
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6">
