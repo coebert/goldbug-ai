@@ -1183,6 +1183,9 @@ async function main() {
     }
 
     // ---- 2. tail: the same arms, same shocks, same metrics as the sweep.
+    // With --friction-ladder the whole table is repeated under each cost
+    // overlay. Seeds never depend on the arm or the scenario, so every cell of
+    // the grid trades the same draws and differences are causal.
     const header = [
       "arm".padEnd(18),
       "med ret%".padStart(9),
@@ -1197,77 +1200,173 @@ async function main() {
       "cost£".padStart(9),
     ].join(" ");
 
+    const scenarios: FrictionScenario[] = frictionLadderMode
+      ? frictionScenarios
+      : [{
+        label: "calibrated",
+        spreadMult: 1,
+        impactMult: 1,
+        commissionMult: 1,
+        extraBps: 0,
+        slippageSigmaMult: 1,
+        stressSlippageMult: 1,
+        urgency: "normal",
+        note: "fitted spread + Saxo commission + sqrt impact",
+      }];
+
+    if (frictionLadderMode) {
+      console.log("\nFriction ladder — the same OOS test repeated under harsher costs:");
+      for (const s of scenarios) console.log(`  ${s.label.padEnd(14)} ${s.note}`);
+      console.log(
+        `Tail counts as insensitive when every arm-to-arm gap stays under `
+        + `${frictionTolerancePp}pp.`,
+      );
+    }
+
+    /** scenario → variant → per-arm metrics, for the sensitivity verdict. */
+    const sensitivity: Array<{ variant: SmaVariant; rows: FrictionSensitivityRow[] }> = [];
+    const dragRows = new Map<SmaVariant, Array<{
+      scenario: string; medianReturnPct: number; meanCostPerPath: number;
+    }>>();
+
     for (const variant of SMA_VARIANTS) {
       const tuned = tuneVariant(variant);
-      console.log(`\n=== ${variant} (out-of-sample test windows only) ===`);
-      console.log(header);
-      console.log("-".repeat(header.length));
+      const perScenario: FrictionSensitivityRow[] = [];
+      const drag: Array<{ scenario: string; medianReturnPct: number; meanCostPerPath: number }> = [];
 
-      for (const arm of arms) {
-        const pathRet: number[] = [];
-        const pathDeepestDd: number[] = [];
-        const pathDeepestInStress: boolean[] = [];
-        const pathStressShare: number[] = [];
-        const pathCosts: number[] = [];
+      for (const scenario of scenarios) {
+        // The cost overlay is a pure re-pricing of the same calibration; the
+        // slippage overlay widens the shock draw. Both are scenario-local.
+        const scenarioCtx: Ctx = {
+          ...ctx,
+          costFor: makeFrictionCostFn(calibs, fallback, scenario),
+        };
+        const scenarioSim = applyFrictionToShocks(simCfg, scenario);
 
-        for (let pth = 0; pth < oosPaths; pth++) {
-          const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
-          const limit = execModel === "limit"
-            ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
-            : null;
-          const rets: number[] = [];
-          let deepestDd = 0;
-          let deepestInStress = false;
-          let costSum = 0;
-          let stressCostSum = 0;
-          for (let k = 0; k < oosFolds.length; k++) {
-            const f = oosFolds[k]!;
-            // A fresh sampler per fold, because a calibrated arm changes
-            // structure at each fold boundary. The seed depends only on the
-            // path and the fold, never on the arm, so every arm sees the same
-            // random numbers — the comparison is paired draw by draw.
-            const sampler = makeCorrelatedExecutionSampler(
-              { ...simCfg, structure: arm.structureFor(k) },
-              pathSeed + k * 31337,
-            );
-            const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
-            rets.push(r.returnPct);
-            if (r.maxDrawdownPct < deepestDd) {
-              deepestDd = r.maxDrawdownPct;
-              deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+        console.log(
+          `\n=== ${variant} · friction: ${scenario.label} `
+          + `(out-of-sample test windows only) ===`,
+        );
+        console.log(header);
+        console.log("-".repeat(header.length));
+
+        const armRows: ArmMetricRow[] = [];
+        for (const arm of arms) {
+          const pathRet: number[] = [];
+          const pathDeepestDd: number[] = [];
+          const pathDeepestInStress: boolean[] = [];
+          const pathStressShare: number[] = [];
+          const pathCosts: number[] = [];
+
+          for (let pth = 0; pth < oosPaths; pth++) {
+            const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+            const limit = execModel === "limit"
+              ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+              : null;
+            const rets: number[] = [];
+            let deepestDd = 0;
+            let deepestInStress = false;
+            let costSum = 0;
+            let stressCostSum = 0;
+            for (let k = 0; k < oosFolds.length; k++) {
+              const f = oosFolds[k]!;
+              // A fresh sampler per fold, because a calibrated arm changes
+              // structure at each fold boundary. The seed depends only on the
+              // path and the fold, never on the arm or the friction scenario,
+              // so every cell sees the same random numbers.
+              const sampler = makeCorrelatedExecutionSampler(
+                { ...scenarioSim, structure: arm.structureFor(k) },
+                pathSeed + k * 31337,
+              );
+              const r = simulate(
+                scenarioCtx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit,
+              );
+              rets.push(r.returnPct);
+              if (r.maxDrawdownPct < deepestDd) {
+                deepestDd = r.maxDrawdownPct;
+                deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+              }
+              costSum += r.costs;
+              stressCostSum += r.stressCosts;
             }
-            costSum += r.costs;
-            stressCostSum += r.stressCosts;
+            pathRet.push(meanOf(rets));
+            pathDeepestDd.push(deepestDd);
+            pathDeepestInStress.push(deepestInStress);
+            pathCosts.push(costSum / oosFolds.length);
+            pathStressShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
           }
-          pathRet.push(meanOf(rets));
-          pathDeepestDd.push(deepestDd);
-          pathDeepestInStress.push(deepestInStress);
-          pathCosts.push(costSum / oosFolds.length);
-          pathStressShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
+
+          const ret = percentileStats(pathRet);
+          const deep = percentileStats(pathDeepestDd);
+          const cost = percentileStats(pathCosts);
+          const breach = jointDrawdownBreachProbabilities(
+            pathDeepestDd, pathDeepestInStress, [sweepThreshold])[0]!;
+          const condRet = conditionalTailStats(
+            pathRet, pathStressShare, stressQuantile, stressTailFrac);
+          console.log([
+            arm.label.padEnd(18),
+            fmt(ret.median).padStart(9),
+            fmt(ret.p5).padStart(9),
+            fmt(ret.cvar5).padStart(9),
+            fmt(deep.median).padStart(9),
+            fmt(deep.p5).padStart(9),
+            fmt(deep.worst).padStart(9),
+            `${(breach.prob * 100).toFixed(1)}%`.padStart(11),
+            `${(breach.jointProb * 100).toFixed(1)}%`.padStart(9),
+            fmt(condRet.cvar).padStart(9),
+            fmt(cost.median, 0).padStart(9),
+          ].join(" "));
+
+          armRows.push({
+            arm: arm.label,
+            medianReturnPct: ret.median,
+            worstDrawdownPct: deep.worst,
+            condCvarPct: condRet.cvar,
+            costPerPath: cost.median,
+          });
         }
 
-        const ret = percentileStats(pathRet);
-        const deep = percentileStats(pathDeepestDd);
-        const cost = percentileStats(pathCosts);
-        const breach = jointDrawdownBreachProbabilities(
-          pathDeepestDd, pathDeepestInStress, [sweepThreshold])[0]!;
-        const condRet = conditionalTailStats(
-          pathRet, pathStressShare, stressQuantile, stressTailFrac);
-        console.log([
-          arm.label.padEnd(18),
-          fmt(ret.median).padStart(9),
-          fmt(ret.p5).padStart(9),
-          fmt(ret.cvar5).padStart(9),
-          fmt(deep.median).padStart(9),
-          fmt(deep.p5).padStart(9),
-          fmt(deep.worst).padStart(9),
-          `${(breach.prob * 100).toFixed(1)}%`.padStart(11),
-          `${(breach.jointProb * 100).toFixed(1)}%`.padStart(9),
-          fmt(condRet.cvar).padStart(9),
-          fmt(cost.median, 0).padStart(9),
-        ].join(" "));
+        perScenario.push(
+          summariseFrictionSensitivity(scenario.label, armRows, frictionTolerancePp),
+        );
+        drag.push({
+          scenario: scenario.label,
+          medianReturnPct: armRows.length
+            ? armRows.reduce((a, r) => a + r.medianReturnPct, 0) / armRows.length
+            : 0,
+          meanCostPerPath: armRows.length
+            ? armRows.reduce((a, r) => a + r.costPerPath, 0) / armRows.length
+            : 0,
+        });
       }
+
+      sensitivity.push({ variant, rows: perScenario });
+      dragRows.set(variant, drag);
     }
+
+    if (frictionLadderMode) {
+      for (const { variant, rows } of sensitivity) {
+        console.log(`\n--- ${variant}: does the coupling assumption matter once you pay? ---`);
+        console.log(formatFrictionSensitivity(rows));
+        const drag = frictionCostDrag(dragRows.get(variant) ?? []);
+        if (drag.length > 1) {
+          console.log("Cost drag vs the frictionless run (arm-averaged):");
+          for (const d of drag) {
+            if (d.scenario === "frictionless") continue;
+            console.log(
+              `  ${d.scenario.padEnd(14)} gives up ${d.returnGivenUpPp.toFixed(2)}pp `
+              + `of median return for £${d.extraCost.toFixed(0)} more cost/path`,
+            );
+          }
+        }
+      }
+      console.log("\nReading the ladder: rows are the friction world, Δ columns are the widest");
+      console.log("gap between coupling arms inside that world. If Δ stays small as costs rise,");
+      console.log("the tail really is insensitive to the coupling assumption and the money is");
+      console.log("being lost to frictions, not to model risk. A row flipping to COUPLING");
+      console.log("MATTERS means the assumption only bites once execution gets expensive.");
+    }
+
 
     console.log("\nReading: the first table is a forecast test — each arm's implied cluster");
     console.log("coupling is scored against the correlations that actually showed up in the");
