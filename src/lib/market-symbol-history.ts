@@ -215,3 +215,76 @@ export function buildSymbolHistory(
     ) as Record<SmaPeriod, boolean | null>,
   };
 }
+
+/**
+ * A moment where a faster average crossed a slower one inside the window.
+ * "golden" = fast crossed above slow (bullish), "death" = fast crossed below.
+ */
+export interface SmaCrossover {
+  /** Stable key for React lists. */
+  id: string;
+  date: string;
+  fast: SmaPeriod;
+  slow: SmaPeriod;
+  direction: "golden" | "death";
+  /** Close on the crossover bar — used to place the chart marker. */
+  close: number;
+  /** Average value where the two lines met. */
+  level: number;
+  /** Sessions since the crossover (0 = latest bar). */
+  barsAgo: number;
+  /** Price change from the crossover bar to the last bar, in %. */
+  sinceChangePct: number | null;
+}
+
+export function crossoverLabel(c: SmaCrossover): string {
+  const kind = c.direction === "golden" ? "crossed above" : "crossed below";
+  return `${c.fast}d ${kind} ${c.slow}d`;
+}
+
+/**
+ * Detect crossovers between every adjacent pair of the selected periods
+ * (e.g. [20,50,200] -> 20/50 and 50/200), newest first.
+ */
+export function detectSmaCrossovers(
+  points: HistoryPoint[],
+  periods: readonly SmaPeriod[],
+): SmaCrossover[] {
+  const ordered = SMA_PERIODS.filter((p) => periods.includes(p));
+  if (ordered.length < 2 || points.length < 2) return [];
+
+  const last = points[points.length - 1];
+  const out: SmaCrossover[] = [];
+
+  for (let k = 0; k + 1 < ordered.length; k++) {
+    const fast = ordered[k];
+    const slow = ordered[k + 1];
+    for (let i = 1; i < points.length; i++) {
+      const prevFast = points[i - 1][smaKey(fast)];
+      const prevSlow = points[i - 1][smaKey(slow)];
+      const curFast = points[i][smaKey(fast)];
+      const curSlow = points[i][smaKey(slow)];
+      if (prevFast == null || prevSlow == null || curFast == null || curSlow == null) continue;
+
+      const prevDiff = prevFast - prevSlow;
+      const diff = curFast - curSlow;
+      if (prevDiff === 0 || diff === 0) continue;
+      if (prevDiff > 0 === diff > 0) continue;
+
+      out.push({
+        id: `${fast}-${slow}-${points[i].date}`,
+        date: points[i].date,
+        fast,
+        slow,
+        direction: diff > 0 ? "golden" : "death",
+        close: points[i].close,
+        level: (curFast + curSlow) / 2,
+        barsAgo: points.length - 1 - i,
+        sinceChangePct:
+          points[i].close > 0 ? ((last.close - points[i].close) / points[i].close) * 100 : null,
+      });
+    }
+  }
+
+  return out.sort((a, b) => (a.date === b.date ? a.fast - b.fast : b.date.localeCompare(a.date)));
+}
