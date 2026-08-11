@@ -7,6 +7,7 @@ import { Gauge, TrendingDown, TrendingUp } from "lucide-react";
 import { getRelativeStrength } from "@/lib/relative-strength.functions";
 import { RS_WINDOWS, type HoldingComparison } from "@/lib/relative-strength";
 import { formatMoneySigned } from "@/lib/format-money";
+import { POLL } from "@/lib/query-keys";
 
 function pp(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -60,7 +61,7 @@ export function RelativeStrengthCard({
     queryKey: ["relative-strength", portfolioId],
     queryFn: () => fetchRs({ data: { portfolioId } }),
     enabled,
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: POLL.SLOW,
     staleTime: 60 * 1000,
   });
 
