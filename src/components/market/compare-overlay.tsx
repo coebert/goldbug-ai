@@ -2,6 +2,7 @@
 // lines plus a side-by-side range-change table.
 
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -28,7 +29,12 @@ import {
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
 import { CorrelationHeatmap } from "@/components/market/correlation-heatmap";
-import { MAX_COMPARE_SYMBOLS, type Comparison } from "@/lib/market-compare";
+import { RollingCorrelationPanel } from "@/components/market/rolling-correlation-panel";
+import {
+  MAX_COMPARE_SYMBOLS,
+  type Comparison,
+  type RollingWindow,
+} from "@/lib/market-compare";
 import { rangeLabel, symbolMeta, type HistoryRange } from "@/lib/market-symbol-history";
 
 function pct(v: number | null | undefined, digits = 1) {
@@ -64,6 +70,19 @@ export function CompareOverlay({
   onToggle,
   onClear,
 }: CompareOverlayProps) {
+  const [rollingWindow, setRollingWindow] = useState<RollingWindow>(() => {
+    if (typeof window === "undefined") return 30;
+    const saved = Number(window.localStorage.getItem("market.rollingCorrWindow"));
+    return saved === 30 || saved === 60 || saved === 90 ? saved : 30;
+  });
+
+  const changeRollingWindow = (w: RollingWindow) => {
+    setRollingWindow(w);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("market.rollingCorrWindow", String(w));
+    }
+  };
+
   const addable = options.filter((s) => s !== symbol && !compare.includes(s));
   const full = compare.length >= MAX_COMPARE_SYMBOLS;
 
@@ -222,6 +241,12 @@ export function CompareOverlay({
             correlation={comparison.correlation}
             from={comparison.from}
             to={comparison.to}
+          />
+
+          <RollingCorrelationPanel
+            comparison={comparison}
+            window={rollingWindow}
+            onWindowChange={changeRollingWindow}
           />
 
           <p className="text-[11px] text-muted-foreground">
