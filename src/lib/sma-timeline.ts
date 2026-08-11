@@ -376,9 +376,19 @@ export function buildSmaSymbolReport(
     const regimeAge =
       regimeEvent && barIndex != null ? barIndex - (regimeEvent.confirmedBarIndex ?? regimeEvent.barIndex) : null;
 
-    // "With trend" = buying while the fast trend is up (or, absent a fast
-    // read, in a golden regime) and selling while it is down.
-    const trendUp = fastDir === "bull" ? true : fastDir === "bear" ? false : regime === "golden" ? true : null;
+    // "With trend" = buying while the fast trend is up and selling while it
+    // is down. With no confirmed fast cross on record (a steady one-way
+    // trend never crosses) the long-term regime stands in for direction.
+    const trendUp =
+      fastDir === "bull"
+        ? true
+        : fastDir === "bear"
+          ? false
+          : regime === "golden"
+            ? true
+            : regime === "death"
+              ? false
+              : null;
     const alignment: SmaDecisionRow["alignment"] =
       trendUp == null
         ? "neutral"
