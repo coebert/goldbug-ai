@@ -25,6 +25,27 @@
  * invariant — usually one or two trades out of hundreds.
  */
 
+/**
+ * Itemised cost legs for a fill. When present the checker asserts the legs
+ * reconstruct `fees` exactly in micro-units, so a fee can never be "rounded
+ * into" the notional or silently netted away between legs.
+ */
+export type LedgerFeeLegs = {
+  /** Broker commission (Saxo tiered ticket, minimum floors, ...). */
+  commission?: number;
+  /** Venue/exchange and clearing charges. */
+  exchange?: number;
+  /** UK stamp duty / PTM levy — buy side only in practice. */
+  stamp?: number;
+  /** FX conversion fee booked on the base-currency leg. */
+  fx?: number;
+  /** Anything else the broker itemised. */
+  other?: number;
+};
+
+export const FEE_LEG_KEYS = ["commission", "exchange", "stamp", "fx", "other"] as const;
+export type FeeLegKey = (typeof FEE_LEG_KEYS)[number];
+
 export type LedgerFill = {
   /** Stable identifier used in reports. */
   id: string;
@@ -36,6 +57,8 @@ export type LedgerFill = {
   price: number;
   /** Total costs for this fill, always a cash outflow on both sides. */
   fees?: number;
+  /** Itemised breakdown of `fees`; checked when supplied. */
+  feeLegs?: LedgerFeeLegs;
   /** Optional label surfaced in the report (venue, order id, step, ...). */
   note?: string;
 };
