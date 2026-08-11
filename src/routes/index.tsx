@@ -65,6 +65,9 @@ const DecisionNewsBreakdown = lazy(() =>
 const MarketPulseCard = lazy(() =>
   import("@/components/home/market-pulse-card").then((m) => ({ default: m.MarketPulseCard })),
 );
+const SmaTrendCard = lazy(() =>
+  import("@/components/home/sma-trend-card").then((m) => ({ default: m.SmaTrendCard })),
+);
 const MarketHoursCard = lazy(() =>
   import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
 );
@@ -295,6 +298,13 @@ function Home() {
         <section className="mb-6">
           <Suspense fallback={<div className="h-72 rounded-2xl border bg-card/50" aria-hidden="true" />}>
             <MarketPulseCard />
+          </Suspense>
+        </section>
+
+        {/* Moving-average trend — pick a market and window without leaving home. */}
+        <section className="mb-6">
+          <Suspense fallback={<div className="h-96 rounded-2xl border bg-card/50" aria-hidden="true" />}>
+            <SmaTrendCard />
           </Suspense>
         </section>
 
