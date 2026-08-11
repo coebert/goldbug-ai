@@ -17,6 +17,10 @@ import {
 import { getSymbolHistory } from "@/lib/market-symbol-history.functions";
 import { getChartAnnotations } from "@/lib/chart-annotations.functions";
 import type { ChartAnnotation } from "@/lib/chart-annotations";
+import type {
+  AnnotationWithDecisions,
+  LinkedDecision,
+} from "@/lib/annotation-decision-link";
 import {
   HISTORY_RANGES,
   HISTORY_SYMBOLS,
@@ -34,6 +38,7 @@ import {
 } from "@/lib/market-compare";
 import { CompareOverlay } from "@/components/market/compare-overlay";
 import { formatUkDate, formatUkDateTime } from "@/lib/uk-time";
+import { formatMoney } from "@/lib/format-money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -156,11 +161,68 @@ function AnnotationSources({ sources }: { sources: ChartAnnotation["sources"] })
 }
 
 
+function DecisionLinks({ decisions }: { decisions: LinkedDecision[] }) {
+  if (!decisions?.length) {
+    return (
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        No trading decision was taken within 3 days of this move.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        Decisions this note fed into
+      </div>
+      <ul className="space-y-1">
+        {decisions.map((d) => {
+          const buy = d.action.toLowerCase() === "buy";
+          const sell = d.action.toLowerCase() === "sell";
+          return (
+            <li key={d.id} className="flex flex-wrap items-baseline gap-x-1.5 text-xs leading-snug">
+              <span
+                className="rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{
+                  color: buy
+                    ? CHART_ROLE.positive
+                    : sell
+                      ? CHART_ROLE.negative
+                      : undefined,
+                }}
+              >
+                {d.action}
+              </span>
+              <span className="font-medium">{d.symbol}</span>
+              {d.notional ? (
+                <span className="tabular-nums text-muted-foreground">
+                  {formatMoney(d.notional, d.instrumentCcy ?? "GBP")}
+                </span>
+              ) : null}
+              <span className="text-muted-foreground">· {d.outcome}</span>
+              <span className="text-muted-foreground">
+                · {formatUkDate(d.decidedAt)}
+                {d.dayGap === 0 ? " (same day)" : ` (${d.dayGap}d away)`}
+              </span>
+              {d.sameInstrument ? (
+                <span className="text-muted-foreground">· this instrument</span>
+              ) : null}
+              {d.rationale ? (
+                <span className="basis-full text-muted-foreground">{d.rationale}</span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function AnnotationList({
   annotations,
   loading,
 }: {
-  annotations: ChartAnnotation[];
+  annotations: AnnotationWithDecisions[];
   loading: boolean;
 }) {
   if (loading) {
@@ -198,6 +260,7 @@ function AnnotationList({
               </div>
               <p className="mt-0.5 text-sm">{a.note}</p>
               <AnnotationSources sources={a.sources} />
+              <DecisionLinks decisions={a.decisions ?? []} />
             </div>
 
           </li>
