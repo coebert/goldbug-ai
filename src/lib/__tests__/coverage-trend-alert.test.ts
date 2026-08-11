@@ -31,7 +31,7 @@ describe("evaluateCoverageTrendAlert", () => {
   it("alerts when the last 7 days sit below the floor", () => {
     const a = evaluateCoverageTrendAlert(series([...flat(95, 14), ...flat(50, 7)]));
     expect(a.shouldAlert).toBe(true);
-    expect(a.reason).toBe("both");
+    expect(a.reason).toBe("below_floor");
     expect(a.severity).toBe("warning");
     expect(a.recentPct).toBe(50);
   });
