@@ -2349,7 +2349,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         quantity: qty,
         price: fillPrice,
         value: outcome.effectiveSpend,
+        // Conviction + sector travel with the order so the cost governor can
+        // rank scarce friction budget by expected edge, and the sector budget
+        // can cap concentration, without re-deriving signals downstream.
+        conviction: Math.max(0, Math.min(1, (systematic.agreement + 1) / 2)),
+        sector: symSector ?? undefined,
         reason: sizingNotes.length ? `${order.reason} [${sizingNotes.join(", ")}]` : order.reason,
+
         liquidity: commodityLiq,
         slice_plan: slicePlan
           ? {

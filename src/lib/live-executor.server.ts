@@ -26,7 +26,12 @@ export interface ExecutedOrderLike {
    * fx_enabled portfolios, and falls back to the portfolio base currency.
    */
   instrument_ccy?: string;
+  /** Conviction in [0,1] from the unified systematic score, when known. */
+  conviction?: number;
+  /** Resolved sector for concentration budgeting, when known. */
+  sector?: string;
 }
+
 
 
 export interface RouteResult {
@@ -159,6 +164,40 @@ export async function routeOrdersToBroker(params: {
     (e) => !e.rejected && e.quantity > 0 && Number.isFinite(e.quantity) && Number.isFinite(e.price),
   );
   if (routable.length === 0) return results;
+
+  // ---------- Intent-level ticket aggregation.
+  // One idea must cost one commission. Collapse same-symbol/same-side tickets
+  // into a single order and net opposing intents in the same name before any
+  // gate or the broker sees them (evidence: MKS.L bought 9 times, VMID.L 5
+  // times, for one position each).
+  {
+    const { aggregateOrders } = await import("./order-aggregation");
+    const agg = aggregateOrders(routable);
+    if (agg.ticketsSaved > 0) {
+      routable = agg.orders;
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_TICKET_AGGREGATION",
+          path: "/reconcile/pre-place/aggregate",
+          status: 200,
+          request: asJson({ asOf, decisionId, before: executed.length }),
+          response: asJson({ after: routable.length, ticketsSaved: agg.ticketsSaved, notes: agg.notes }),
+          error: null,
+        });
+      } catch {
+        /* best-effort log only */
+      }
+    } else {
+      routable = agg.orders;
+    }
+    if (routable.length === 0) return results;
+  }
+
 
   const logGuard = async (method: string, detail: Record<string, unknown>, error: string) => {
     try {
@@ -373,18 +412,26 @@ export async function routeOrdersToBroker(params: {
     }
   }
 
-  // ---------- Portfolio cost governor.
+  // ---------- Portfolio cost governor + sector concentration budget.
   // The per-ticket viability gate is memoryless: fifty individually "viable"
   // small tickets still burn a fortnight's returns in commission floors and
   // stamp duty. This pass adds portfolio memory — a NAV-scaled minimum ticket,
   // a rolling friction budget as a % of NAV, a daily BUY-ticket cap and a
-  // per-symbol re-entry cooldown. SELLs are never gated.
+  // per-symbol re-entry cooldown — plus a per-sector share-of-NAV cap.
+  // SELLs are never gated by either.
+  //
+  // Fail-CLOSED for buys: this used to swallow its own errors and route the
+  // full unfiltered basket, which is precisely the state that produced the
+  // cost bleed. If we cannot prove a buy is affordable, we do not send it.
   try {
     const { loadGovernorInputs } = await import("./cost-governor.server");
     const { planAdmissions, governorForNav } = await import("./cost-governor");
+    const { planSectorAdmissions, DEFAULT_SECTOR_BUDGET } = await import("./sector-concentration");
+    const { resolveChurnPolicy } = await import("./churn-policy");
     const { estimateTradeCosts } = await import("./trade-viability-gate");
     const { convertAmount } = await import("./fx.server");
     const { inferSaxoCurrency } = await import("./saxo-fees");
+    const { symbolSector } = await import("./sector-rotation.server");
 
     const inputs = await loadGovernorInputs({
       supabaseAdmin: supabaseAdmin as never,
@@ -392,91 +439,163 @@ export async function routeOrdersToBroker(params: {
       baseCcy: portfolioCurrency,
     });
 
-    if (inputs.navBase > 0) {
-      const fxCache = new Map<string, number>([[portfolioCurrency, 1]]);
-      const rateTo = async (ccy: string) => {
-        const from = ccy.toUpperCase();
-        const hit = fxCache.get(from);
-        if (hit !== undefined) return hit;
-        let r = 1;
-        try {
-          const res = await convertAmount(1, from, portfolioCurrency);
-          if (Number.isFinite(res.amount) && res.amount > 0) r = res.amount;
-        } catch {
-          r = 1;
-        }
-        fxCache.set(from, r);
-        return r;
-      };
+    if (!(inputs.navBase > 0)) {
+      throw new Error("governor has no NAV to size against");
+    }
 
-      const candidates = [] as Array<{
-        symbol: string;
-        side: "buy" | "sell";
-        notionalBase: number;
-        estCostBase: number;
-      }>;
-      for (const o of routable) {
-        if (preSkips.has(`${o.symbol}:${o.side}`)) continue;
-        const qty = Math.floor(o.quantity);
-        if (qty <= 0) continue;
-        const ccy = o.instrument_ccy?.toUpperCase() ?? inferSaxoCurrency(o.symbol);
-        const fx = await rateTo(ccy);
-        const costs = estimateTradeCosts({
-          symbol: o.symbol,
-          side: o.side === "sell" ? "sell" : "buy",
-          quantity: qty,
-          price: o.price,
-        });
-        candidates.push({
-          symbol: o.symbol,
-          side: o.side === "sell" ? "sell" : "buy",
-          notionalBase: qty * o.price * fx,
-          estCostBase: costs.oneWayCost * fx,
-        });
+    // Style-vs-cost cooldown reconciliation: whichever rests the name longer
+    // wins, so a swing style can never re-enter inside the commission floor.
+    const styleReentryMinDays = (() => {
+      const raw = (portfolio as { risk_config?: unknown }).risk_config;
+      const v = (raw as { reentry_min_days?: unknown } | null)?.reentry_min_days;
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })();
+    const navProfile = governorForNav(inputs.navBase);
+    const churn = resolveChurnPolicy({
+      styleReentryMinDays,
+      governorCooldownDays: navProfile.addCooldownDays,
+      style: (portfolio as { risk_config?: { trading_style?: string } }).risk_config?.trading_style ?? null,
+    });
+
+    const fxCache = new Map<string, number>([[portfolioCurrency, 1]]);
+    const rateTo = async (ccy: string) => {
+      const from = ccy.toUpperCase();
+      const hit = fxCache.get(from);
+      if (hit !== undefined) return hit;
+      let r = 1;
+      try {
+        const res = await convertAmount(1, from, portfolioCurrency);
+        if (Number.isFinite(res.amount) && res.amount > 0) r = res.amount;
+      } catch {
+        r = 1;
       }
+      fxCache.set(from, r);
+      return r;
+    };
 
-      const plan = planAdmissions(candidates, {
-        navBase: inputs.navBase,
-        buysAlreadyToday: inputs.buysAlreadyToday,
-        trailingCostBase: inputs.trailingCostBase,
-        lastBuyDaysAgo: inputs.lastBuyDaysAgo,
-        ...governorForNav(inputs.navBase),
+    const candidates: Array<{
+      symbol: string;
+      side: "buy" | "sell";
+      notionalBase: number;
+      estCostBase: number;
+      isAdd?: boolean;
+      edgeScore?: number;
+    }> = [];
+    const notionalBySymbol = new Map<string, number>();
+    for (const o of routable) {
+      if (preSkips.has(`${o.symbol}:${o.side}`)) continue;
+      const qty = Math.floor(o.quantity);
+      if (qty <= 0) continue;
+      const ccy = o.instrument_ccy?.toUpperCase() ?? inferSaxoCurrency(o.symbol);
+      const fx = await rateTo(ccy);
+      const side = o.side === "sell" ? "sell" : "buy";
+      const costs = estimateTradeCosts({ symbol: o.symbol, side, quantity: qty, price: o.price });
+      const notionalBase = qty * o.price * fx;
+      notionalBySymbol.set(`${o.symbol}:${side}`, notionalBase);
+      candidates.push({
+        symbol: o.symbol,
+        side,
+        notionalBase,
+        estCostBase: costs.oneWayCost * fx,
+        isAdd: inputs.heldSymbols.has(o.symbol.toUpperCase()),
+        edgeScore: Number.isFinite(o.conviction) ? Number(o.conviction) : undefined,
       });
+    }
 
-      const blocked: Array<{ symbol: string; reason: string }> = [];
-      for (const d of plan.decisions) {
-        if (d.kind === "skip") {
-          preSkips.set(`${d.candidate.symbol}:${d.candidate.side}`, d.reason);
-          blocked.push({ symbol: d.candidate.symbol, reason: d.reason });
-        }
-      }
+    const plan = planAdmissions(candidates, {
+      navBase: inputs.navBase,
+      buysAlreadyToday: inputs.buysAlreadyToday,
+      trailingCostBase: inputs.trailingCostBase,
+      lastBuyDaysAgo: inputs.lastBuyDaysAgo,
+      ...navProfile,
+      addCooldownDays: churn.cooldownDays,
+    });
 
-      if (blocked.length > 0) {
-        await supabaseAdmin.from("live_broker_log").insert({
-          portfolio_id: portfolio.id,
-          user_id: userId,
-          broker: "saxo",
-          env: portfolio.mode === "live_prod" ? "live" : "sim",
-          method: "PRE_PLACE_COST_GOVERNOR",
-          path: "/reconcile/pre-place/cost-governor",
-          status: 200,
-          request: asJson({
-            asOf,
-            decisionId,
-            navBase: inputs.navBase,
-            trailingCostBase: inputs.trailingCostBase,
-            windowDays: inputs.windowDays,
-            buysAlreadyToday: inputs.buysAlreadyToday,
-            minTicketBase: plan.minTicketBase,
-          }),
-          response: asJson({ blocked, budgetRemaining: plan.costBudgetRemainingBase }),
-          error: `cost governor blocked ${blocked.length} buy(s)`,
-        });
+    const blocked: Array<{ symbol: string; reason: string }> = [];
+    for (const d of plan.decisions) {
+      if (d.kind === "skip") {
+        preSkips.set(`${d.candidate.symbol}:${d.candidate.side}`, d.reason);
+        blocked.push({ symbol: d.candidate.symbol, reason: d.reason });
       }
     }
-  } catch {
-    /* governor is advisory — never block the tick on its failure */
+
+    // Sector budget runs on what survived the cost governor, so concentration
+    // is measured on the trades we would actually send.
+    const sectorCandidates = plan.decisions
+      .filter((d) => d.kind === "admit" && d.candidate.side === "buy")
+      .map((d) => {
+        const c = (d as { candidate: { symbol: string; notionalBase: number } }).candidate;
+        const held = routable.find((o) => o.symbol === c.symbol && o.side === "buy");
+        return {
+          symbol: c.symbol,
+          sector: held?.sector ?? symbolSector(c.symbol),
+          notionalBase: c.notionalBase,
+        };
+      });
+    const sectorPlan = planSectorAdmissions(sectorCandidates, inputs.sectorExposureBase, {
+      navBase: inputs.navBase,
+      ...DEFAULT_SECTOR_BUDGET,
+    });
+    for (const d of sectorPlan.decisions) {
+      if (d.kind === "skip") {
+        preSkips.set(`${d.candidate.symbol}:buy`, d.reason);
+        blocked.push({ symbol: d.candidate.symbol, reason: d.reason });
+      }
+    }
+
+    if (blocked.length > 0) {
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "PRE_PLACE_COST_GOVERNOR",
+        path: "/reconcile/pre-place/cost-governor",
+        status: 200,
+        request: asJson({
+          asOf,
+          decisionId,
+          navBase: inputs.navBase,
+          trailingCostBase: inputs.trailingCostBase,
+          windowDays: inputs.windowDays,
+          buysAlreadyToday: inputs.buysAlreadyToday,
+          minTicketBase: plan.minTicketBase,
+          cooldownDays: churn.cooldownDays,
+          cooldownBoundBy: churn.boundBy,
+        }),
+        response: asJson({
+          blocked,
+          budgetRemaining: plan.costBudgetRemainingBase,
+          sectorExposureAfter: sectorPlan.exposureAfter,
+        }),
+        error: `cost governor blocked ${blocked.length} buy(s)`,
+      });
+    }
+  } catch (err) {
+    // Fail closed: block every BUY this tick, let SELLs through.
+    const reason = `cost governor unavailable — buys suppressed (${err instanceof Error ? err.message : String(err)})`;
+    for (const o of routable) {
+      if (o.side !== "sell") preSkips.set(`${o.symbol}:${o.side}`, reason);
+    }
+    try {
+      await supabaseAdmin.from("live_broker_log").insert({
+        portfolio_id: portfolio.id,
+        user_id: userId,
+        broker: "saxo",
+        env: portfolio.mode === "live_prod" ? "live" : "sim",
+        method: "PRE_PLACE_COST_GOVERNOR",
+        path: "/reconcile/pre-place/cost-governor",
+        status: 500,
+        request: asJson({ asOf, decisionId }),
+        response: asJson({ failClosed: true }),
+        error: reason,
+      });
+    } catch {
+      /* logging must not mask the fail-closed behaviour */
+    }
   }
+
 
 
 
