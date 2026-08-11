@@ -81,6 +81,11 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  formatStressRhoGovernance,
+  governedStructureFromCalibration,
+} from "../src/lib/execution-stress-rho-governor";
+
+import {
   formatResidualTimeline,
   residualTimeline,
   type TimelineStructureKind,
