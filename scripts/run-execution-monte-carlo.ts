@@ -42,6 +42,8 @@ import {
   DETERMINISTIC_DRAW,
   makeExecutionSampler,
   percentileStats,
+  drawdownBreachProbabilities,
+  DEFAULT_DRAWDOWN_THRESHOLDS,
   type ExecutionSampler,
   type PercentileStats,
 } from "../src/lib/execution-monte-carlo";
@@ -65,6 +67,11 @@ const maxPositions = Number(arg("max-positions", "5"));
 const paths = Number(arg("paths", "300"));
 const minTicket = Number(arg("min-ticket", "250"));
 const baseSeed = Number(arg("seed", "20260811"));
+// Positive depths, e.g. --dd-thresholds 5,10,20 asks "how often do we lose 5/10/20%?"
+const ddThresholds = arg("dd-thresholds", DEFAULT_DRAWDOWN_THRESHOLDS.join(","))
+  .split(",")
+  .map((v) => Math.abs(Number(v.trim())))
+  .filter((v) => Number.isFinite(v) && v > 0);
 
 const simCfg = {
   slippageSigma: Number(arg("sigma", String(DEFAULT_EXECUTION_SIM.slippageSigma))),
@@ -350,6 +357,9 @@ async function main() {
     const pathMeanRet: number[] = [];
     const pathWorstFold: number[] = [];
     const pathMaxDd: number[] = [];
+    // Deepest single-fold drawdown on the path — the number that actually
+    // trips a risk limit, unlike the across-fold average.
+    const pathDeepestDd: number[] = [];
     const pathSharpe: number[] = [];
     const pathCosts: number[] = [];
     let missed = 0;
@@ -361,6 +371,7 @@ async function main() {
       const rets: number[] = [];
       let worstFold = Infinity;
       let ddSum = 0;
+      let deepestDd = 0;
       let shSum = 0;
       let costSum = 0;
       for (let k = 0; k < folds.length; k++) {
@@ -369,6 +380,7 @@ async function main() {
         rets.push(r.returnPct);
         worstFold = Math.min(worstFold, r.returnPct);
         ddSum += r.maxDrawdownPct;
+        deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
         shSum += r.sharpe;
         costSum += r.costs;
         missed += r.missedOrders;
@@ -378,6 +390,7 @@ async function main() {
       pathMeanRet.push(meanOf(rets));
       pathWorstFold.push(worstFold);
       pathMaxDd.push(ddSum / folds.length);
+      pathDeepestDd.push(deepestDd);
       pathSharpe.push(shSum / folds.length);
       pathCosts.push(costSum / folds.length);
     }
@@ -385,6 +398,8 @@ async function main() {
     const ret = percentileStats(pathMeanRet);
     const worst = percentileStats(pathWorstFold);
     const dd = percentileStats(pathMaxDd);
+    const deepDd = percentileStats(pathDeepestDd);
+    const breaches = drawdownBreachProbabilities(pathDeepestDd, ddThresholds);
     const sh = percentileStats(pathSharpe);
     const cost = percentileStats(pathCosts);
 
@@ -404,13 +419,22 @@ async function main() {
     console.log(statLine("return %/fold", ret));
     console.log(statLine("worst fold %", worst));
     console.log(statLine("mean maxDD %", dd));
+    console.log(statLine("deepest DD %", deepDd));
     console.log(statLine("Sharpe", sh));
     console.log(statLine("costs £/fold", cost));
+    console.log(
+      "P(deepest drawdown ≥ X): "
+      + breaches
+        .map((b) => `${b.thresholdPct}% ${(b.prob * 100).toFixed(1)}% (${b.count}/${paths})`)
+        .join("  ·  "),
+    );
     console.log();
   }
 
   console.log("Reading: 'return %/fold' percentiles are over whole strategy lifetimes.");
   console.log("p5 is the 1-in-20 bad-execution-luck year; CVaR5 is the average of those.");
+  console.log("'deepest DD %' is the worst single fold on each path; the breach line reads");
+  console.log("as the chance a lifetime touches that drawdown depth at least once.");
 }
 
 main().catch((e) => {

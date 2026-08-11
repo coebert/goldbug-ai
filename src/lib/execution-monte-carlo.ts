@@ -162,3 +162,37 @@ export function percentileStats(values: readonly number[]): PercentileStats {
     stdev: Math.sqrt(variance),
   };
 }
+
+// ------------------------------------------------- drawdown breach analysis
+
+export type DrawdownBreach = {
+  /** Threshold as a positive percentage depth, e.g. 10 means "a 10% drawdown". */
+  thresholdPct: number;
+  /** Fraction of paths whose worst drawdown reached at least that depth. */
+  prob: number;
+  /** Number of paths that breached. */
+  count: number;
+};
+
+/**
+ * Probability that a path's deepest drawdown breaches each threshold.
+ * `drawdownsPct` are negative percentages (-12.4 = a 12.4% drawdown);
+ * thresholds are given as positive depths and may be passed in any order.
+ * Non-finite paths are ignored, matching `percentileStats`.
+ */
+export function drawdownBreachProbabilities(
+  drawdownsPct: readonly number[],
+  thresholdsPct: readonly number[],
+): DrawdownBreach[] {
+  const xs = drawdownsPct.filter((v) => Number.isFinite(v));
+  const n = xs.length;
+  return [...thresholdsPct]
+    .map((t) => Math.abs(t))
+    .sort((a, b) => a - b)
+    .map((thresholdPct) => {
+      const count = xs.filter((v) => -v >= thresholdPct - 1e-12).length;
+      return { thresholdPct, prob: n ? count / n : NaN, count };
+    });
+}
+
+export const DEFAULT_DRAWDOWN_THRESHOLDS = [5, 10, 15, 20, 25, 30] as const;
