@@ -37,6 +37,7 @@ import {
   MAX_SMA_SYMBOLS,
   SMA_SYMBOLS_KEY,
   TREND_FILTER_KEY,
+  TREND_SIGNIFICANT_SCORE,
   TREND_SORT_KEY,
   parseSmaSymbols,
   parseTrendFilter,
@@ -97,6 +98,8 @@ export function SmaTrendCard() {
       if (r) setRange(coerceRange(Number(r)));
       setPeriods(readStoredSmaPeriods());
       setTrendBasis(readStoredTrendBasis());
+      setSort(parseTrendSort(window.localStorage.getItem(TREND_SORT_KEY)));
+      setFilter(parseTrendFilter(window.localStorage.getItem(TREND_FILTER_KEY)));
     } catch {
       /* storage unavailable — defaults are fine */
     }
