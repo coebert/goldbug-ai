@@ -105,6 +105,8 @@ export function SmaTrendCard() {
       setPeriods(readStoredSmaPeriods());
       setTrendBasis(readStoredTrendBasis());
       setSort(parseTrendSort(window.localStorage.getItem(TREND_SORT_KEY)));
+      setSort2(parseTrendSort(window.localStorage.getItem(TREND_SORT2_KEY)));
+
       setFilter(parseTrendFilter(window.localStorage.getItem(TREND_FILTER_KEY)));
       setFavorites(
         parseSmaFavorites(window.localStorage.getItem(SMA_FAVORITES_KEY), isKnownSymbol),
