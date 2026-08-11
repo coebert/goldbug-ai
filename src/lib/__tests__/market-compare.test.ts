@@ -35,16 +35,12 @@ function history(symbol: string, series: Array<[string, number]>): SymbolHistory
     low: null,
     volatilityPct: null,
     maxDrawdownPct: null,
-    sma20: null,
     sma50: null,
-    sma100: null,
     sma200: null,
     aboveSma50: null,
     aboveSma200: null,
     smaLatest: { 20: null, 50: null, 100: null, 200: null },
     aboveSma: { 20: null, 50: null, 100: null, 200: null },
-  smaLatest: { 20: null, 50: null, 100: null, 200: null },
-  aboveSma: { 20: null, 50: null, 100: null, 200: null },
   };
 }
 
