@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSymbolHistory,
   coerceRange,
+  computeTrendStrength,
   detectSmaCrossovers,
   isKnownSymbol,
   rangeLabel,
@@ -173,5 +174,47 @@ describe("sma symbol selection", () => {
       "IWM",
       "DIA",
     ]);
+  });
+});
+
+describe("computeTrendStrength", () => {
+  const series = (closes: number[], smaFrom: (i: number) => number) =>
+    closes.map((close, i) => ({
+      date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10),
+      close,
+      indexed: 100,
+      sma20: null,
+      sma50: smaFrom(i),
+      sma100: null,
+      sma200: null,
+    }));
+
+  it("scores a steady rise positively and a fall negatively", () => {
+    const up = series(
+      Array.from({ length: 60 }, (_, i) => 100 * 1.002 ** i),
+      (i) => 100 * 1.002 ** i,
+    );
+    const s = computeTrendStrength(up, [50]);
+    expect(s).not.toBeNull();
+    expect(s!.direction).toBe("up");
+    expect(s!.score).toBeGreaterThan(50);
+    expect(s!.period).toBe(50);
+
+    const down = series(
+      Array.from({ length: 60 }, (_, i) => 100 * 0.998 ** i),
+      (i) => 100 * 0.998 ** i,
+    );
+    expect(computeTrendStrength(down, [50])!.score).toBeLessThan(-50);
+  });
+
+  it("reports flat when the average goes nowhere and returns null on short tape", () => {
+    const flat = series(
+      Array.from({ length: 60 }, (_, i) => 100 + (i % 2 === 0 ? 1 : -1)),
+      () => 100,
+    );
+    const s = computeTrendStrength(flat, [50]);
+    expect(s!.direction).toBe("flat");
+    expect(Math.abs(s!.score)).toBeLessThan(10);
+    expect(computeTrendStrength(series([100, 101, 102], () => 100), [50])).toBeNull();
   });
 });

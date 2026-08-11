@@ -288,3 +288,88 @@ export function detectSmaCrossovers(
 
   return out.sort((a, b) => (a.date === b.date ? a.fast - b.fast : b.date.localeCompare(a.date)));
 }
+
+/**
+ * Trend strength = how fast the trend average is rising relative to how noisy
+ * the price is. It is the slope of a least-squares fit through log(SMA),
+ * annualised, divided by annualised return volatility — i.e. a "trend Sharpe".
+ * Scaled to a readable -100..+100 score (±25 raw = ±100).
+ */
+export interface TrendStrength {
+  /** Period whose average the slope was measured on (slowest selected). */
+  period: SmaPeriod;
+  /** Annualised log-slope of the average, in % per year. */
+  slopeAnnualPct: number;
+  /** Annualised volatility of daily returns, in %. */
+  volatilityPct: number;
+  /** slopeAnnual / volatility, unitless. */
+  ratio: number;
+  /** Clamped -100..+100 presentation score. */
+  score: number;
+  direction: "up" | "down" | "flat";
+  label: string;
+  /** Bars used in the fit. */
+  samples: number;
+}
+
+function strengthLabel(score: number): { label: string; direction: "up" | "down" | "flat" } {
+  const a = Math.abs(score);
+  if (a < 10) return { label: "Flat / no trend", direction: "flat" };
+  const dir = score > 0 ? "up" : "down";
+  const word = score > 0 ? "uptrend" : "downtrend";
+  if (a >= 70) return { label: `Very strong ${word}`, direction: dir };
+  if (a >= 40) return { label: `Strong ${word}`, direction: dir };
+  if (a >= 20) return { label: `Moderate ${word}`, direction: dir };
+  return { label: `Weak ${word}`, direction: dir };
+}
+
+export function computeTrendStrength(
+  points: HistoryPoint[],
+  periods: readonly SmaPeriod[],
+): TrendStrength | null {
+  const ordered = SMA_PERIODS.filter((p) => periods.includes(p));
+  const period = ordered[ordered.length - 1];
+  if (!period || points.length < 10) return null;
+
+  // Slope of the trend average, in log space so it reads as % per unit time.
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const v = points[i][smaKey(period)];
+    if (v == null || v <= 0) continue;
+    xs.push(i);
+    ys.push(Math.log(v));
+  }
+  if (xs.length < 10) return null;
+
+  const n = xs.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - mx) * (ys[i] - my);
+    den += (xs[i] - mx) ** 2;
+  }
+  if (den === 0) return null;
+  const slopePerBar = num / den;
+  const slopeAnnualPct = slopePerBar * 252 * 100;
+
+  // Annualised volatility of daily closes over the same window.
+  const rets: number[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1].close;
+    if (prev > 0) rets.push(points[i].close / prev - 1);
+  }
+  if (rets.length < 5) return null;
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length - 1);
+  const volatilityPct = Math.sqrt(variance) * Math.sqrt(252) * 100;
+  if (!(volatilityPct > 0)) return null;
+
+  const ratio = slopeAnnualPct / volatilityPct;
+  const score = Math.max(-100, Math.min(100, Math.round(ratio * 25)));
+  const { label, direction } = strengthLabel(score);
+
+  return { period, slopeAnnualPct, volatilityPct, ratio, score, direction, label, samples: n };
+}
