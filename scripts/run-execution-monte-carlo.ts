@@ -566,8 +566,11 @@ async function main() {
         "p5 DD%".padStart(9),
         "worstDD%".padStart(9),
         `P(DD≥${sweepThreshold}%)`.padStart(11),
+        "∧stress".padStart(9),
+        "cCVaR%".padStart(9),
         "stress%".padStart(8),
         "cost£".padStart(9),
+
       ].join(" ");
       console.log(header);
       console.log("-".repeat(header.length));
