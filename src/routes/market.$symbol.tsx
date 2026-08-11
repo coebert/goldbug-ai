@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
@@ -26,10 +26,22 @@ import {
   HISTORY_SYMBOLS,
   coerceRange,
   rangeLabel,
+  smaKey,
   symbolMeta,
   type HistoryRange,
+  type SmaPeriod,
   type SymbolHistory,
 } from "@/lib/market-symbol-history";
+import {
+  DEFAULT_SMA_PERIODS,
+  PERIOD_STYLE,
+  parseSmaPeriods,
+  readStoredSmaPeriods,
+  serialiseSmaPeriods,
+  storeSmaPeriods,
+  toggleSmaPeriod,
+} from "@/lib/sma-display";
+import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import {
   buildComparison,
   parseCompareParam,
@@ -58,9 +70,10 @@ import {
 export const Route = createFileRoute("/market/$symbol")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { range: HistoryRange; compare?: string | undefined } => ({
+  ): { range: HistoryRange; compare?: string | undefined; sma?: string | undefined } => ({
     range: coerceRange(search.range),
     compare: serialiseCompareParam(parseCompareParam(search.compare)),
+    sma: typeof search.sma === "string" ? serialiseSmaPeriods(parseSmaPeriods(search.sma)) : undefined,
   }),
 
   head: () => ({
@@ -276,7 +289,28 @@ function AnnotationList({
 
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
-  const { range, compare: compareParam } = Route.useSearch();
+  const { range, compare: compareParam, sma: smaParam } = Route.useSearch();
+
+  // Averages default to whatever the home dashboard card is showing, so the
+  // two views stay in sync; an explicit ?sma= wins (shareable links).
+  const [periods, setPeriods] = useState<SmaPeriod[]>(
+    smaParam ? parseSmaPeriods(smaParam) : DEFAULT_SMA_PERIODS,
+  );
+  useEffect(() => {
+    setPeriods(smaParam ? parseSmaPeriods(smaParam) : readStoredSmaPeriods());
+  }, [smaParam]);
+
+  const togglePeriod = (p: SmaPeriod) => {
+    const next = toggleSmaPeriod(periods, p);
+    setPeriods(next);
+    storeSmaPeriods(next);
+    void navigate({
+      to: "/market/$symbol",
+      params: { symbol },
+      search: { range, compare: compareParam, sma: serialiseSmaPeriods(next) },
+      replace: true,
+    });
+  };
   const navigate = useNavigate();
   const meta = symbolMeta(symbol);
   const fetchHistory = useServerFn(getSymbolHistory);
@@ -332,7 +366,7 @@ function MarketSymbolPage() {
     void navigate({
       to: "/market/$symbol",
       params: { symbol },
-      search: { range, compare: serialiseCompareParam(next) },
+      search: { range, compare: serialiseCompareParam(next), sma: smaParam },
       replace: true,
     });
   };
@@ -358,7 +392,8 @@ function MarketSymbolPage() {
               {history?.asOf ? ` · prices to ${history.asOf}` : ""}
             </p>
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
             {HISTORY_RANGES.map((r) => (
               <Button
                 key={r}
@@ -370,7 +405,7 @@ function MarketSymbolPage() {
                 <Link
                   to="/market/$symbol"
                   params={{ symbol }}
-                  search={{ range: r, compare: compareParam }}
+                  search={{ range: r, compare: compareParam, sma: smaParam }}
                 >
 
                   {rangeLabel(r)}
@@ -448,28 +483,20 @@ function MarketSymbolPage() {
                       dot={false}
                       isAnimationActive={false}
                     />
-                    <Line
-                      type="monotone"
-                      dataKey="sma50"
-                      name="50-day average"
-                      stroke={CHART_ROLE.benchmark}
-                      strokeWidth={1.5}
-                      strokeDasharray="4 3"
-                      dot={false}
-                      connectNulls
-                      isAnimationActive={false}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="sma200"
-                      name="200-day average"
-                      stroke={CHART_ROLE.highlight}
-                      strokeWidth={1.5}
-                      strokeDasharray="2 4"
-                      dot={false}
-                      connectNulls
-                      isAnimationActive={false}
-                    />
+                    {periods.map((p) => (
+                      <Line
+                        key={p}
+                        type="monotone"
+                        dataKey={smaKey(p)}
+                        name={`${p}-day average`}
+                        stroke={PERIOD_STYLE[p].stroke}
+                        strokeWidth={1.5}
+                        strokeDasharray={PERIOD_STYLE[p].dash}
+                        dot={false}
+                        connectNulls
+                        isAnimationActive={false}
+                      />
+                    ))}
                     {annotations.map((a, i) => (
                       <ReferenceDot
                         key={a.id}
@@ -516,8 +543,9 @@ function MarketSymbolPage() {
                 <Stat label="Range low" value={num(history.low)} />
                 <Stat label="Volatility (annualised)" value={pct(history.volatilityPct, 0)} />
                 <Stat label="Worst fall in range" value={pct(history.maxDrawdownPct)} />
-                <Stat label="50-day average" value={num(history.sma50)} />
-                <Stat label="200-day average" value={num(history.sma200)} />
+                {periods.map((p) => (
+                  <Stat key={p} label={`${p}-day average`} value={num(history.smaLatest?.[p] ?? null)} />
+                ))}
                 <Stat
                   label="Trend"
                   value={

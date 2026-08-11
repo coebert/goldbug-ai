@@ -59,8 +59,6 @@ import {
   isKnownSymbol,
   rangeLabel,
   symbolMeta,
-  SMA_PERIODS,
-  isSmaPeriod,
   smaKey,
   crossoverLabel,
   detectSmaCrossovers,
@@ -68,29 +66,17 @@ import {
   type SmaCrossover,
   type SmaPeriod,
 } from "@/lib/market-symbol-history";
+import {
+  DEFAULT_SMA_PERIODS,
+  PERIOD_STYLE,
+  readStoredSmaPeriods,
+  storeSmaPeriods,
+  toggleSmaPeriod,
+} from "@/lib/sma-display";
+import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 
 const SYMBOL_KEY = "home-sma-symbol";
 const RANGE_KEY = "home-sma-range";
-const PERIODS_KEY = "home-sma-periods";
-const DEFAULT_PERIODS: SmaPeriod[] = [50, 200];
-
-/** One stroke style per period so overlapping averages stay distinguishable. */
-const PERIOD_STYLE: Record<SmaPeriod, { stroke: string; dash: string }> = {
-  20: { stroke: CHART_ROLE.positive, dash: "6 2" },
-  50: { stroke: CHART_ROLE.benchmark, dash: "4 3" },
-  100: { stroke: CHART_ROLE.warning, dash: "1 3" },
-  200: { stroke: CHART_ROLE.highlight, dash: "2 4" },
-};
-
-function parsePeriods(raw: string | null): SmaPeriod[] {
-  if (!raw) return DEFAULT_PERIODS;
-  const picked = raw
-    .split(",")
-    .map((v) => Number(v.trim()))
-    .filter((v) => Number.isFinite(v) && isSmaPeriod(v)) as SmaPeriod[];
-  const unique = SMA_PERIODS.filter((p) => picked.includes(p));
-  return unique.length ? unique : DEFAULT_PERIODS;
-}
 const DEFAULT_SYMBOL = HISTORY_SYMBOLS.includes("SPY") ? "SPY" : (HISTORY_SYMBOLS[0] ?? "");
 
 function num(v: number | null | undefined, digits = 2) {
@@ -139,7 +125,7 @@ function groupedSymbols() {
 export function SmaTrendCard() {
   const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [range, setRange] = useState<HistoryRange>(DEFAULT_RANGE);
-  const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_PERIODS);
+  const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_SMA_PERIODS);
   const fetchHistory = useServerFn(getSymbolHistory);
 
   // Restore the last view after hydration so SSR markup stays stable.
@@ -149,7 +135,7 @@ export function SmaTrendCard() {
       if (s && isKnownSymbol(s)) setSymbol(s);
       const r = window.localStorage.getItem(RANGE_KEY);
       if (r) setRange(coerceRange(Number(r)));
-      setPeriods(parsePeriods(window.localStorage.getItem(PERIODS_KEY)));
+      setPeriods(readStoredSmaPeriods());
     } catch {
       /* storage unavailable — defaults are fine */
     }
@@ -176,14 +162,8 @@ export function SmaTrendCard() {
   // Keep at least one average on the chart; the card is about averages.
   const togglePeriod = (p: SmaPeriod) => {
     setPeriods((prev) => {
-      const next = prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p];
-      const ordered = SMA_PERIODS.filter((x) => next.includes(x));
-      const final = ordered.length ? ordered : prev;
-      try {
-        window.localStorage.setItem(PERIODS_KEY, final.join(","));
-      } catch {
-        /* ignore */
-      }
+      const final = toggleSmaPeriod(prev, p);
+      storeSmaPeriods(final);
       return final;
     });
   };
@@ -221,7 +201,7 @@ export function SmaTrendCard() {
             </p>
           </div>
           <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-            <Link to="/market/$symbol" params={{ symbol }} search={{ range, compare: undefined }}>
+            <Link to="/market/$symbol" params={{ symbol }} search={{ range, compare: undefined, sma: periods.join(",") }}>
               Full chart <ArrowUpRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
             </Link>
           </Button>
@@ -254,29 +234,7 @@ export function SmaTrendCard() {
             </SelectContent>
           </Select>
 
-          <div className="flex flex-wrap gap-1" role="group" aria-label="Moving-average periods">
-            {SMA_PERIODS.map((p) => {
-              const on = periods.includes(p);
-              return (
-                <Button
-                  key={p}
-                  size="sm"
-                  variant={on ? "secondary" : "ghost"}
-                  className="h-7 px-2 text-xs"
-                  aria-pressed={on}
-                  aria-label={`${p}-day moving average`}
-                  onClick={() => togglePeriod(p)}
-                >
-                  <span
-                    className="mr-1.5 inline-block h-0.5 w-3 rounded"
-                    style={{ background: PERIOD_STYLE[p].stroke, opacity: on ? 1 : 0.4 }}
-                    aria-hidden="true"
-                  />
-                  {p}d
-                </Button>
-              );
-            })}
-          </div>
+          <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
 
           <div className="flex flex-wrap gap-1" role="group" aria-label="Chart time range">
             {HISTORY_RANGES.map((r) => (
