@@ -310,18 +310,48 @@ export function MarketPulseCard() {
             where the money is going.
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className={
-            pulse.tone === "risk_on"
-              ? "border-emerald-500/40 text-emerald-500"
-              : pulse.tone === "risk_off"
-                ? "border-destructive/40 text-destructive"
-                : "border-amber-500/40 text-amber-500"
-          }
-        >
-          {toneLabel(pulse.tone)} · {pulse.toneScore}/100
-        </Badge>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Badge
+            variant="outline"
+            className={
+              pulse.tone === "risk_on"
+                ? "border-emerald-500/40 text-emerald-500"
+                : pulse.tone === "risk_off"
+                  ? "border-destructive/40 text-destructive"
+                  : "border-amber-500/40 text-amber-500"
+            }
+          >
+            {toneLabel(pulse.tone)} · {pulse.toneScore}/100
+          </Badge>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {query.dataUpdatedAt ? `Updated ${formatUkTime(query.dataUpdatedAt)}` : "—"}
+              {autoRefresh ? ` · next in ${formatCountdown(secondsLeft)}` : " · auto off"}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAutoRefresh((v) => !v)}
+              aria-pressed={autoRefresh}
+            >
+              {autoRefresh ? "Pause" : "Auto"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              aria-label="Refresh market pulse"
+            >
+              <RefreshCw
+                className={`mr-1 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              Refresh market pulse
+            </Button>
+          </div>
+        </div>
+
       </CardHeader>
 
       <CardContent className="space-y-6">
