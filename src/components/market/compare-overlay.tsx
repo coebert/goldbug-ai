@@ -2,6 +2,7 @@
 // lines plus a side-by-side range-change table.
 
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -28,7 +29,12 @@ import {
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
 import { CorrelationHeatmap } from "@/components/market/correlation-heatmap";
-import { MAX_COMPARE_SYMBOLS, type Comparison } from "@/lib/market-compare";
+import { RollingCorrelationPanel } from "@/components/market/rolling-correlation-panel";
+import {
+  MAX_COMPARE_SYMBOLS,
+  type Comparison,
+  type RollingWindow,
+} from "@/lib/market-compare";
 import { rangeLabel, symbolMeta, type HistoryRange } from "@/lib/market-symbol-history";
 
 function pct(v: number | null | undefined, digits = 1) {
@@ -222,6 +228,12 @@ export function CompareOverlay({
             correlation={comparison.correlation}
             from={comparison.from}
             to={comparison.to}
+          />
+
+          <RollingCorrelationPanel
+            comparison={comparison}
+            window={rollingWindow}
+            onWindowChange={setRollingWindow}
           />
 
           <p className="text-[11px] text-muted-foreground">
