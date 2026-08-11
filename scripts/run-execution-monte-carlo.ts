@@ -40,13 +40,17 @@ import {
 import {
   DEFAULT_EXECUTION_SIM,
   DETERMINISTIC_DRAW,
-  makeExecutionSampler,
   percentileStats,
   drawdownBreachProbabilities,
   DEFAULT_DRAWDOWN_THRESHOLDS,
-  type ExecutionSampler,
   type PercentileStats,
 } from "../src/lib/execution-monte-carlo";
+import {
+  DEFAULT_CORRELATED_EXECUTION,
+  makeCorrelatedExecutionSampler,
+  marketVolZScores,
+  type CorrelatedExecutionSampler,
+} from "../src/lib/execution-correlated-shocks";
 
 const argv = process.argv.slice(2);
 const arg = (name: string, fallback: string) => {
@@ -81,6 +85,19 @@ const simCfg = {
   fullFillProb: Number(arg("full-fill", String(DEFAULT_EXECUTION_SIM.fullFillProb))),
   minFillRatio: Number(arg("min-fill", String(DEFAULT_EXECUTION_SIM.minFillRatio))),
   noFillProb: Number(arg("no-fill", String(DEFAULT_EXECUTION_SIM.noFillProb))),
+  // Cross-symbol coupling: on a stressed bar every name widens together and
+  // every order struggles to fill together, so a rebalance pays the bad tail
+  // on all legs at once. --rho 0 --stress-enter 0 --vol-stress-z 99 recovers
+  // the old independent-draw behaviour.
+  rho: Number(arg("rho", String(DEFAULT_CORRELATED_EXECUTION.rho))),
+  stressEnterProb: Number(arg("stress-enter", String(DEFAULT_CORRELATED_EXECUTION.stressEnterProb))),
+  stressExitProb: Number(arg("stress-exit", String(DEFAULT_CORRELATED_EXECUTION.stressExitProb))),
+  stressSlippageMult: Number(arg("stress-slip", String(DEFAULT_CORRELATED_EXECUTION.stressSlippageMult))),
+  stressSigmaMult: DEFAULT_CORRELATED_EXECUTION.stressSigmaMult,
+  stressNoFillMult: Number(arg("stress-no-fill", String(DEFAULT_CORRELATED_EXECUTION.stressNoFillMult))),
+  stressFullFillMult: DEFAULT_CORRELATED_EXECUTION.stressFullFillMult,
+  volStressZ: Number(arg("vol-stress-z", String(DEFAULT_CORRELATED_EXECUTION.volStressZ))),
+  volSlippageBeta: DEFAULT_CORRELATED_EXECUTION.volSlippageBeta,
 };
 
 const GRID: SmaVariantParams[] = [];
@@ -101,10 +118,20 @@ type SegmentResult = {
   /** Fills that delivered less than the requested size. */
   partialFills: number;
   costs: number;
+  /** Orders sent on a bar the correlated sampler flagged as stressed. */
+  stressOrders: number;
+  /** Orders that got nothing, on a stressed bar. */
+  stressMissed: number;
+  /** Execution costs paid on stressed bars. */
+  stressCosts: number;
+  /** Bars in the segment the sampler flagged as stressed. */
+  stressBars: number;
 };
 
 type Ctx = {
   seriesBySymbol: Map<string, number[]>;
+  /** Cross-sectional realised-vol z-score per bar; drives the stress regime. */
+  volZ: number[];
   costFor: (symbol: string, notional: number, slipMult: number) => number;
 };
 
@@ -115,9 +142,9 @@ function simulate(
   end: number,
   p: SmaVariantParams,
   /** null = deterministic execution (the point estimate). */
-  sampler: ExecutionSampler | null,
+  sampler: CorrelatedExecutionSampler | null,
 ): SegmentResult {
-  const { seriesBySymbol, costFor } = ctx;
+  const { seriesBySymbol, costFor, volZ } = ctx;
   let cash = startingCash;
   const shares = new Map<string, number>();
   const equityCurve: number[] = [];
@@ -125,11 +152,20 @@ function simulate(
   let missedOrders = 0;
   let partialFills = 0;
   let costs = 0;
+  let stressOrders = 0;
+  let stressMissed = 0;
+  let stressCosts = 0;
+  let stressBars = 0;
 
-  const draw = () => (sampler ? sampler() : DETERMINISTIC_DRAW);
+  const draw = () => (sampler ? sampler.draw() : DETERMINISTIC_DRAW);
+  let stressedBar = false;
   const priceAt = (sym: string, i: number) => seriesBySymbol.get(sym)![i]!;
 
   for (let i = start; i <= end; i++) {
+    // One regime roll per bar, shared by every order on that bar — that shared
+    // draw is what makes the legs of a rebalance fail together.
+    stressedBar = sampler ? sampler.beginBar(volZ[i] ?? 0).stressed : false;
+    if (stressedBar) stressBars++;
     const wanted: string[] = [];
     const exits: string[] = [];
     for (const sym of seriesBySymbol.keys()) {
@@ -145,8 +181,10 @@ function simulate(
     for (const sym of exits) {
       const qty = shares.get(sym)!;
       const d = draw();
+      if (stressedBar) stressOrders++;
       if (d.fillRatio <= 0) {
         missedOrders++;
+        if (stressedBar) stressMissed++;
         continue;
       }
       const soldQty = qty * d.fillRatio;
@@ -154,6 +192,7 @@ function simulate(
       const c = costFor(sym, notional, d.slippageMult);
       cash += notional - c;
       costs += c;
+      if (stressedBar) stressCosts += c;
       fills++;
       if (d.fillRatio < 1) partialFills++;
       const rest = qty - soldQty;
@@ -170,8 +209,10 @@ function simulate(
         const requested = Math.min(target, cash * 0.98);
         if (requested < minTicket) continue;
         const d = draw();
+        if (stressedBar) stressOrders++;
         if (d.fillRatio <= 0) {
           missedOrders++;
+          if (stressedBar) stressMissed++;
           continue;
         }
         const notional = requested * d.fillRatio;
@@ -179,6 +220,7 @@ function simulate(
         // partial fill is strictly worse in bps than the full ticket.
         if (notional < minTicket * 0.2) {
           missedOrders++;
+          if (stressedBar) stressMissed++;
           continue;
         }
         const c = costFor(sym, notional, d.slippageMult);
@@ -186,6 +228,7 @@ function simulate(
         if (!(qty > 0)) continue;
         cash -= notional;
         costs += c;
+        if (stressedBar) stressCosts += c;
         fills++;
         if (d.fillRatio < 1) partialFills++;
         shares.set(sym, qty);
@@ -224,6 +267,10 @@ function simulate(
     missedOrders,
     partialFills,
     costs,
+    stressOrders,
+    stressMissed,
+    stressCosts,
+    stressBars,
   };
 }
 
@@ -300,8 +347,10 @@ async function main() {
     }));
   }
   const fallback = calibrateSymbolExecution({ symbol: "UNKNOWN", bars: [] });
+  const volZ = marketVolZScores(seriesBySymbol, 20);
   const ctx: Ctx = {
     seriesBySymbol,
+    volZ,
     costFor: (sym, notional, slipMult) =>
       executionCostFor(calibs.get(sym) ?? fallback, notional, "normal", slipMult).total,
   };
@@ -327,7 +376,14 @@ async function main() {
     `Execution draw: slippage lognormal σ=${simCfg.slippageSigma} `
     + `(+${(simCfg.tailProb * 100).toFixed(1)}% tail × ${simCfg.tailMult}), `
     + `fills full ${(simCfg.fullFillProb * 100).toFixed(0)}% / `
-    + `none ${(simCfg.noFillProb * 100).toFixed(0)}% / partial rest ≥${simCfg.minFillRatio}\n`,
+    + `none ${(simCfg.noFillProb * 100).toFixed(0)}% / partial rest ≥${simCfg.minFillRatio}`,
+  );
+  console.log(
+    `Correlated shocks: cross-symbol log-slippage ρ=${simCfg.rho}, `
+    + `stress regime enter ${(simCfg.stressEnterProb * 100).toFixed(1)}%/bar `
+    + `(mean length ${(1 / Math.max(1e-9, simCfg.stressExitProb)).toFixed(1)} bars, `
+    + `forced when vol z ≥ ${simCfg.volStressZ}), `
+    + `slippage ×${simCfg.stressSlippageMult} and no-fill ×${simCfg.stressNoFillMult} while stressed\n`,
   );
 
   for (const variant of SMA_VARIANTS) {
@@ -365,15 +421,26 @@ async function main() {
     let missed = 0;
     let partial = 0;
     let totalOrders = 0;
+    let stressOrders = 0;
+    let stressMissed = 0;
+    let stressBars = 0;
+    let allBars = 0;
+    // Share of a path's total execution cost incurred on stressed bars — the
+    // clean read on joint (rather than average) execution risk.
+    const pathStressCostShare: number[] = [];
 
     for (let pth = 0; pth < paths; pth++) {
-      const sampler = makeExecutionSampler(simCfg, baseSeed + pth * 7919 + variant.length * 104729);
+      const sampler = makeCorrelatedExecutionSampler(
+        simCfg,
+        baseSeed + pth * 7919 + variant.length * 104729,
+      );
       const rets: number[] = [];
       let worstFold = Infinity;
       let ddSum = 0;
       let deepestDd = 0;
       let shSum = 0;
       let costSum = 0;
+      let stressCostSum = 0;
       for (let k = 0; k < folds.length; k++) {
         const f = folds[k]!;
         const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler);
@@ -383,10 +450,16 @@ async function main() {
         deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
         shSum += r.sharpe;
         costSum += r.costs;
+        stressCostSum += r.stressCosts;
         missed += r.missedOrders;
         partial += r.partialFills;
         totalOrders += r.fills + r.missedOrders;
+        stressOrders += r.stressOrders;
+        stressMissed += r.stressMissed;
+        stressBars += r.stressBars;
+        allBars += f.testEnd - f.testStart + 1;
       }
+      pathStressCostShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
       pathMeanRet.push(meanOf(rets));
       pathWorstFold.push(worstFold);
       pathMaxDd.push(ddSum / folds.length);
@@ -402,6 +475,7 @@ async function main() {
     const breaches = drawdownBreachProbabilities(pathDeepestDd, ddThresholds);
     const sh = percentileStats(pathSharpe);
     const cost = percentileStats(pathCosts);
+    const stressShare = percentileStats(pathStressCostShare);
 
     console.log(`=== ${variant} ===`);
     console.log(
@@ -422,6 +496,13 @@ async function main() {
     console.log(statLine("deepest DD %", deepDd));
     console.log(statLine("Sharpe", sh));
     console.log(statLine("costs £/fold", cost));
+    console.log(statLine("stress cost %", stressShare));
+    console.log(
+      `stressed bars ${((stressBars / Math.max(1, allBars)) * 100).toFixed(1)}% of tape · `
+      + `${((stressOrders / Math.max(1, totalOrders)) * 100).toFixed(1)}% of orders sent into stress · `
+      + `unfilled in stress ${((stressMissed / Math.max(1, stressOrders)) * 100).toFixed(1)}% `
+      + `vs calm ${(((missed - stressMissed) / Math.max(1, totalOrders - stressOrders)) * 100).toFixed(1)}%`,
+    );
     console.log(
       "P(deepest drawdown ≥ X): "
       + breaches
@@ -435,6 +516,8 @@ async function main() {
   console.log("p5 is the 1-in-20 bad-execution-luck year; CVaR5 is the average of those.");
   console.log("'deepest DD %' is the worst single fold on each path; the breach line reads");
   console.log("as the chance a lifetime touches that drawdown depth at least once.");
+  console.log("Shocks are correlated: on a stressed bar every symbol widens and every order");
+  console.log("struggles together, so these tails are joint outcomes, not averaged-away ones.");
 }
 
 main().catch((e) => {
