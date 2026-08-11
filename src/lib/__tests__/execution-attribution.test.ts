@@ -13,7 +13,7 @@ describe("channelSubsets / subsetKey", () => {
     expect(subsets).toHaveLength(2 ** EXECUTION_CHANNELS.length);
     expect(subsets[0]).toEqual([]);
     expect(subsets.at(-1)).toEqual([...EXECUTION_CHANNELS]);
-    expect(new Set(subsets.map(subsetKey)).size).toBe(subsets.length);
+    expect(new Set(subsets.map((s) => subsetKey(s))).size).toBe(subsets.length);
   });
 
   it("keys are canonical regardless of input order or duplicates", () => {
