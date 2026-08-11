@@ -17,7 +17,7 @@ function fmtPct(v: number | null) {
 }
 
 function DirectionIcon({ direction }: { direction: SmaExplanation["fast"]["direction"] }) {
-  if (direction === "bull") return <ArrowUpRight className="h-3.5 w-3.5 text-[hsl(var(--chart-up,var(--primary)))]" />;
+  if (direction === "bull") return <ArrowUpRight className="h-3.5 w-3.5 text-primary" />;
   if (direction === "bear") return <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />;
   return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
 }
