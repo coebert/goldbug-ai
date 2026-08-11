@@ -49,16 +49,18 @@ export const CALIBRATION_SNAPSHOT_VERSION = 1 as const;
 // ------------------------------------------------------------------ fingerprint
 
 /**
- * Prices are hashed at 4 significant figures, deliberately loose.
+ * Prices are hashed at 6 significant figures: enough to survive a JSON float
+ * round-trip, tight enough that the hash means "byte-identical tape".
  *
- * Adjusted closes are recomputed by the data provider on every pull, so the
- * same historical bar comes back differing in the 6th figure from one fetch to
- * the next. Hashing at full precision would mark every run as a different tape
- * and make the check useless. Four figures ignores that rounding noise while
- * still catching anything that could move a correlation: a changed bar, a
- * split adjustment, a different price mode, a shifted date range.
+ * The hash alone is NOT the verdict. Adjusted closes are recomputed by the
+ * data provider on every pull, so the same historical bar comes back differing
+ * around the 7th figure between two fetches minutes apart. Over thousands of
+ * bars, some of those land on a rounding boundary and flip the hash, so an
+ * exact hash marks a genuinely identical tape as changed. `tapeDigest` below
+ * is the tolerant check that decides whether a run is a reproduction; the hash
+ * is kept as a cheap "bit-for-bit identical" signal and as a file label.
  */
-const FINGERPRINT_PRECISION = 4;
+const FINGERPRINT_PRECISION = 6;
 const quantise = (v: number, precision: number) =>
   (Number.isFinite(v) ? Number(v.toPrecision(precision)) : 0);
 
@@ -68,6 +70,7 @@ export function tapeFingerprint(
   seriesBySymbol: ReadonlyMap<string, readonly number[]>,
   precision: number = FINGERPRINT_PRECISION,
 ): string {
+
 
   let h = 0x811c9dc5;
   const push = (s: string) => {
