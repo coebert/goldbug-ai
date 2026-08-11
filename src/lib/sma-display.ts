@@ -63,6 +63,45 @@ export function toggleSmaPeriod(
   return ordered.length ? ordered : [...current];
 }
 
+/**
+ * Which average the trend-strength score is measured on. "auto" tracks the
+ * slowest average currently on the chart.
+ */
+export type TrendBasis = SmaPeriod | "auto";
+
+export const TREND_BASIS_KEY = "home-sma-trend-basis";
+
+export function parseTrendBasis(raw: string | null | undefined): TrendBasis {
+  const n = Number(raw);
+  return Number.isFinite(n) && isSmaPeriod(n) ? (n as SmaPeriod) : "auto";
+}
+
+export function readStoredTrendBasis(): TrendBasis {
+  try {
+    return parseTrendBasis(window.localStorage.getItem(TREND_BASIS_KEY));
+  } catch {
+    return "auto";
+  }
+}
+
+export function storeTrendBasis(basis: TrendBasis): void {
+  try {
+    window.localStorage.setItem(TREND_BASIS_KEY, String(basis));
+  } catch {
+    /* storage unavailable — in-memory choice still works */
+  }
+}
+
+/** The period the score is actually measured on for a given selection. */
+export function resolveTrendBasis(
+  basis: TrendBasis,
+  periods: readonly SmaPeriod[],
+): SmaPeriod | null {
+  if (basis !== "auto") return basis;
+  const ordered = SMA_PERIODS.filter((p) => periods.includes(p));
+  return ordered[ordered.length - 1] ?? null;
+}
+
 /** Home card can chart up to this many markets side by side. */
 export const MAX_SMA_SYMBOLS = 4;
 

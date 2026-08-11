@@ -44,11 +44,16 @@ import {
   PERIOD_STYLE,
   parseSmaPeriods,
   readStoredSmaPeriods,
+  readStoredTrendBasis,
+  resolveTrendBasis,
+  storeTrendBasis,
+  type TrendBasis,
   serialiseSmaPeriods,
   storeSmaPeriods,
   toggleSmaPeriod,
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
+import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import {
   buildComparison,
   parseCompareParam,
@@ -300,11 +305,17 @@ function MarketSymbolPage() {
 
   // Averages default to whatever the home dashboard card is showing, so the
   // two views stay in sync; an explicit ?sma= wins (shareable links).
+  const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
+  const pickTrendBasis = (b: TrendBasis) => {
+    setTrendBasis(b);
+    storeTrendBasis(b);
+  };
   const [periods, setPeriods] = useState<SmaPeriod[]>(
     smaParam ? parseSmaPeriods(smaParam) : DEFAULT_SMA_PERIODS,
   );
   useEffect(() => {
     setPeriods(smaParam ? parseSmaPeriods(smaParam) : readStoredSmaPeriods());
+    setTrendBasis(readStoredTrendBasis());
   }, [smaParam]);
 
   const togglePeriod = (p: SmaPeriod) => {
@@ -336,14 +347,15 @@ function MarketSymbolPage() {
     refetchOnWindowFocus: false,
   });
 
+  const basis = resolveTrendBasis(trendBasis, periods);
   const strength = useMemo(
-    () => (query.data ? computeTrendStrength(query.data.points, periods) : null),
-    [query.data, periods],
+    () => (query.data ? computeTrendStrength(query.data.points, periods, basis) : null),
+    [query.data, periods, basis],
   );
 
   const strengthSeries = useMemo(
-    () => (query.data ? computeTrendStrengthSeries(query.data.points, periods) : []),
-    [query.data, periods],
+    () => (query.data ? computeTrendStrengthSeries(query.data.points, periods, 30, basis) : []),
+    [query.data, periods, basis],
   );
 
   const annotationQuery = useQuery({
@@ -566,7 +578,17 @@ function MarketSymbolPage() {
                   <TrendStrengthStat strength={strength} />
                 </dl>
                 <div className="col-span-2 rounded-xl border border-border/60 bg-surface-2 px-3 py-2 sm:col-span-4">
-                  <p className="text-xs text-muted-foreground">Trend strength over time</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Trend strength over time
+                      {strength ? ` · ${strength.period}-day basis` : ""}
+                    </p>
+                    <TrendBasisSelect
+                      basis={trendBasis}
+                      periods={periods}
+                      onChange={pickTrendBasis}
+                    />
+                  </div>
                   <TrendStrengthSparkline series={strengthSeries} className="h-14 w-full" />
                 </div>
                 {periods.map((p) => (

@@ -38,11 +38,15 @@ import {
   SMA_SYMBOLS_KEY,
   parseSmaSymbols,
   readStoredSmaPeriods,
+  readStoredTrendBasis,
+  storeTrendBasis,
+  type TrendBasis,
   storeSmaPeriods,
   toggleSmaPeriod,
   toggleSmaSymbol,
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
+import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import { SmaTrendPanel } from "@/components/home/sma-trend-panel";
 
 const LEGACY_SYMBOL_KEY = "home-sma-symbol";
@@ -63,6 +67,7 @@ export function SmaTrendCard() {
   const [symbols, setSymbols] = useState<string[]>([DEFAULT_SYMBOL]);
   const [range, setRange] = useState<HistoryRange>(DEFAULT_RANGE);
   const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_SMA_PERIODS);
+  const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
   const fetchHistory = useServerFn(getSymbolHistory);
 
   // Restore the last view after hydration so SSR markup stays stable.
@@ -80,6 +85,7 @@ export function SmaTrendCard() {
       const r = window.localStorage.getItem(RANGE_KEY);
       if (r) setRange(coerceRange(Number(r)));
       setPeriods(readStoredSmaPeriods());
+      setTrendBasis(readStoredTrendBasis());
     } catch {
       /* storage unavailable — defaults are fine */
     }
@@ -110,6 +116,11 @@ export function SmaTrendCard() {
       storeSmaPeriods(final);
       return final;
     });
+  };
+
+  const pickTrendBasis = (b: TrendBasis) => {
+    setTrendBasis(b);
+    storeTrendBasis(b);
   };
 
   const queries = useQueries({
@@ -197,6 +208,8 @@ export function SmaTrendCard() {
 
           <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
 
+          <TrendBasisSelect basis={trendBasis} periods={periods} onChange={pickTrendBasis} />
+
           <div className="flex flex-wrap gap-1" role="group" aria-label="Chart time range">
             {HISTORY_RANGES.map((r) => (
               <Button
@@ -224,6 +237,7 @@ export function SmaTrendCard() {
                 symbol={s}
                 range={range}
                 periods={periods}
+                trendBasis={trendBasis}
                 history={q?.data as SymbolHistory | undefined}
                 loading={Boolean(q?.isLoading)}
                 error={Boolean(q?.isError)}
