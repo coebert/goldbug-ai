@@ -32,6 +32,18 @@ import {
   executionCostFor,
   type SymbolExecutionCalibration,
 } from "../src/lib/execution-calibration-from-bars";
+import {
+  parseFrictionLadder,
+  makeFrictionCostFn,
+  applyFrictionToShocks,
+  summariseFrictionSensitivity,
+  formatFrictionSensitivity,
+  frictionCostDrag,
+  type FrictionScenario,
+  type ArmMetricRow,
+  type FrictionSensitivityRow,
+} from "../src/lib/execution-friction-scenarios";
+
 import type { AssetClass } from "../src/lib/universe.server";
 import {
   SMA_VARIANTS,
