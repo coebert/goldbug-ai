@@ -21,6 +21,12 @@
 import { fetchUniverseHistory } from "../src/lib/real-market-tape.server";
 import { buildRealTape, type PriceMode } from "../src/lib/real-market-tape";
 import type { BacktestBar } from "../src/lib/backtest-runner";
+import {
+  calibrateSymbolExecution,
+  executionCostFor,
+  type SymbolExecutionCalibration,
+} from "../src/lib/execution-calibration-from-bars";
+import type { AssetClass } from "../src/lib/universe.server";
 
 const argv = process.argv.slice(2);
 const arg = (name: string, fallback: string) => {
