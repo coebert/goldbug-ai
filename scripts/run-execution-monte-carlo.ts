@@ -580,6 +580,8 @@ async function main() {
           const cfg = { ...simCfg, rho, volStressZ: z };
           const pathRet: number[] = [];
           const pathDeepestDd: number[] = [];
+          /** Did the path's deepest drawdown happen inside the stress regime? */
+          const pathDeepestInStress: boolean[] = [];
           const pathStressShare: number[] = [];
           const pathCosts: number[] = [];
           let stressBars = 0;
@@ -593,13 +595,17 @@ async function main() {
               : null;
             const rets: number[] = [];
             let deepestDd = 0;
+            let deepestInStress = false;
             let costSum = 0;
             let stressCostSum = 0;
             for (let k = 0; k < folds.length; k++) {
               const f = folds[k]!;
               const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
               rets.push(r.returnPct);
-              deepestDd = Math.min(deepestDd, r.maxDrawdownPct);
+              if (r.maxDrawdownPct < deepestDd) {
+                deepestDd = r.maxDrawdownPct;
+                deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+              }
               costSum += r.costs;
               stressCostSum += r.stressCosts;
               stressBars += r.stressBars;
@@ -607,6 +613,7 @@ async function main() {
             }
             pathRet.push(meanOf(rets));
             pathDeepestDd.push(deepestDd);
+            pathDeepestInStress.push(deepestInStress);
             pathCosts.push(costSum / folds.length);
             pathStressShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
           }
@@ -615,7 +622,11 @@ async function main() {
           const deep = percentileStats(pathDeepestDd);
           const cost = percentileStats(pathCosts);
           const stress = percentileStats(pathStressShare);
-          const breach = drawdownBreachProbabilities(pathDeepestDd, [sweepThreshold])[0]!;
+          const breach = jointDrawdownBreachProbabilities(
+            pathDeepestDd, pathDeepestInStress, [sweepThreshold])[0]!;
+          // Conditional CVaR: the average bad year *given* the tape was one of
+          // the worst-stress 20% of paths.
+          const condRet = conditionalTailStats(pathRet, pathStressShare, stressQuantile, stressTailFrac);
           console.log([
             fmt(rho, 2).padStart(5),
             fmt(z, 2).padStart(6),
@@ -625,6 +636,8 @@ async function main() {
             fmt(deep.p5).padStart(9),
             fmt(deep.worst).padStart(9),
             `${(breach.prob * 100).toFixed(1)}%`.padStart(11),
+            `${(breach.jointProb * 100).toFixed(1)}%`.padStart(9),
+            fmt(condRet.cvar).padStart(9),
             fmt(stress.median, 1).padStart(8),
             fmt(cost.median, 0).padStart(9),
           ].join(" "));
@@ -632,6 +645,7 @@ async function main() {
       }
       console.log();
     }
+
 
     console.log("Reading: each row is one joint-risk assumption. ρ controls how much every");
     console.log("symbol's slippage moves together; the vol-z trigger is how readily a volatile");
