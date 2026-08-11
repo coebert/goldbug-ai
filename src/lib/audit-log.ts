@@ -44,6 +44,10 @@ export type AuditEntry = {
   newsFactors: AuditNewsFactor[];
   guardrails: Record<string, unknown> | null;
   portfolioValue: number | null;
+  /** SMA trend snapshot the crossover rules saw when this order was decided. */
+  smaCross: import("./alpha/sma-cross-rules").SmaCrossState | null;
+  /** Risk setting in force for the run — drives the SMA thresholds. */
+  riskLevel: string | null;
 };
 
 type LooseDecision = {
@@ -63,6 +67,7 @@ type LooseOrder = {
   rejected?: string;
   conviction?: number | null;
   signal_weights?: Record<string, unknown>;
+  sma_cross?: unknown;
 };
 
 type LooseNews = {
@@ -93,6 +98,14 @@ function classifyNews(headline: string, symbol: string, side: "buy" | "sell", se
   const positive = sentiment > 0;
   if (side === "buy") return positive ? "aligned" : "opposing";
   return positive ? "opposing" : "aligned";
+}
+
+/** Accept only a structurally valid SMA snapshot; anything else is dropped. */
+function readSmaCross(v: unknown): AuditEntry["smaCross"] {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.price !== "number" || !Number.isFinite(o.price)) return null;
+  return v as AuditEntry["smaCross"];
 }
 
 export function buildAuditEntries(decisions: LooseDecision[]): AuditEntry[] {
@@ -164,6 +177,9 @@ export function buildAuditEntries(decisions: LooseDecision[]): AuditEntry[] {
         newsFactors,
         guardrails,
         portfolioValue: d.portfolio_value != null ? Number(d.portfolio_value) : null,
+        smaCross: readSmaCross(o.sma_cross ?? meta?.sma_cross),
+        riskLevel:
+          typeof guardrails?.risk_level === "string" ? (guardrails.risk_level as string) : null,
       });
     });
   }

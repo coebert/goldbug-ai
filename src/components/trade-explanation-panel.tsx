@@ -7,6 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import type { AuditEntry } from "@/lib/audit-log";
 import { buildTradeExplanation, type ExplainedSignal } from "@/lib/trade-explanation";
 import { readCalibration, type CalibrationBand } from "@/lib/confidence-calibration";
+import { buildSmaExplanation } from "@/lib/sma-explanation";
+import { SmaCrossExplainer } from "@/components/sma-cross-explainer";
 import {
   getConfidenceCalibration,
   type ConfidenceCalibrationResult,
@@ -82,6 +84,18 @@ export function TradeExplanationPanel({
     [data, x.confidence.score],
   );
 
+  const sma = useMemo(
+    () =>
+      buildSmaExplanation({
+        state: entry.smaCross,
+        side: entry.side,
+        riskLevel:
+          entry.riskLevel ??
+          (typeof entry.guardrails?.risk_level === "string" ? entry.guardrails.risk_level : null),
+      }),
+    [entry.smaCross, entry.side, entry.riskLevel, entry.guardrails],
+  );
+
   const trendPct = Math.round(x.trendShare * 100);
   const eventPct = Math.round(x.eventShare * 100);
 
@@ -126,6 +140,8 @@ export function TradeExplanationPanel({
           empty="No news/event weights recorded."
         />
       </div>
+
+      <SmaCrossExplainer explanation={sma} />
 
       <div>
         <div className="text-xs uppercase text-muted-foreground mb-1">Confidence</div>
