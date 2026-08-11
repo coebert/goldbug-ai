@@ -468,6 +468,11 @@ function simulate(
    * the same draws (common random numbers) and differences are causal.
    */
   mask: { slippage: boolean; fillRate: boolean } = { slippage: true, fillRate: true },
+  /**
+   * Rebalancing discipline. Defaults to the live engine's rules; the tail
+   * decomposition swaps in a permissive policy to price what the rules cost.
+   */
+  policy: RebalancePolicyOverrides = { minTicket, abandonPartialFraction: 0.2 },
 ): SegmentResult {
   const { seriesBySymbol, costFor, volZ, volBpsBySymbol } = ctx;
   let cash = startingCash;
@@ -576,7 +581,7 @@ function simulate(
       for (const sym of wanted.slice(0, openSlots)) {
         const price = priceAt(sym, i);
         const requested = Math.min(target, cash * 0.98);
-        if (requested < minTicket) continue;
+        if (requested < policy.minTicket) continue;
         const d = order(sym, i);
         if (stressedBar) stressOrders++;
         if (d.fillRatio <= 0) {
@@ -587,7 +592,7 @@ function simulate(
         const notional = requested * d.fillRatio;
         // The commission floor is charged on whatever actually fills, so a
         // partial fill is strictly worse in bps than the full ticket.
-        if (notional < minTicket * 0.2) {
+        if (notional < policy.minTicket * policy.abandonPartialFraction) {
           missedOrders++;
           if (stressedBar) stressMissed++;
           continue;
