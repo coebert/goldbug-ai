@@ -283,15 +283,23 @@ describe("FX rounding and venue quoting — cash-delta reconciliation", () => {
     for (const [from, to] of pairs) {
       const direct = roundRate(RATE[from] / RATE[to]);
       const viaBase = roundRate(roundRate(RATE[from]) / roundRate(RATE[to]));
-      expect(Math.abs(direct - viaBase), `${from}->${to}`).toBeLessThanOrEqual(10 ** -RATE_DP * 2);
 
-      // Converting 10,000 units both ways agrees inside a minor unit.
+      // Rate precision is absolute, so its *relative* cost scales with 1/rate:
+      // a 1e-6 wobble on a 0.0051 JPY rate is 200x worse than on a 0.78 USD one.
+      const relErr = (c: Ccy) => 10 ** -RATE_DP / 2 / RATE[c];
+      const rel = relErr(from) + relErr(to);
+      expect(Math.abs(direct - viaBase), `${from}->${to}`).toBeLessThanOrEqual(
+        direct * rel + 10 ** -RATE_DP * 2,
+      );
+
+      // Converting 10,000 units both ways agrees inside the same budget.
       const amount = 10_000;
       const a = roundMinor(amount * direct, to);
       const b = roundMinor(roundMinor(amount * roundRate(RATE[from]), BASE) / roundRate(RATE[to]), to);
-      const tolerance = minorUnit(to) * 2 + amount * 10 ** -RATE_DP + 1e-9;
+      const tolerance = minorUnit(to) * 2 + amount * direct * rel + 1e-6;
       expect(Math.abs(a - b), `${from}->${to}`).toBeLessThanOrEqual(tolerance);
     }
+
   });
 
   it("reconstructs the closing cash from the signed base legs", () => {
