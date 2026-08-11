@@ -711,7 +711,29 @@ async function main() {
       return best;
     });
 
+  // ------------------------------------------------ calibration diagnostics
+  // --calib-diagnostics: does the fitted coupling deserve to be trusted?
+  // Stability of the rolling estimate (overlap-discounted), moving-block
+  // bootstrap intervals on each leg and on the calm→stress separation, and the
+  // residual error of the two-parameter structures against the measured
+  // cluster × cluster matrix.
+  if (calibDiagnosticsMode) {
+    const diag = diagnoseCalibrationFit(seriesBySymbol, {
+      ...calibOpts,
+      volZ,
+      resamples: calibBootResamples,
+      seed,
+    });
+    console.log("Calibration diagnostics — rolling fit, confidence, residuals");
+    console.log(describeCalibration(diag.calibration));
+    console.log();
+    console.log(formatCalibrationDiagnostics(diag));
+    if (!spilloverMode && !attributionMode) return;
+    console.log();
+  }
+
   // ---------------------------------------------------- sector spillover mode
+
   // --spillover: two views of contagion. First the measured cluster × cluster
   // coupling (calm, stress, and the stress uplift), then a leave-one-cluster-
   // out simulation on common random numbers that says which of those clusters
