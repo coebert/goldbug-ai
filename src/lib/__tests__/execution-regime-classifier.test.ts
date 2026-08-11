@@ -160,6 +160,23 @@ describe("regimeBacktestReport", () => {
     expect(formatRegimeBacktest(report)).toContain("matters when the tape is loud");
   });
 
+  it("calls a sub-threshold edge immaterial instead of claiming concentration", () => {
+    const report = regimeBacktestReport(
+      clf,
+      sep,
+      [
+        row("fixed-global", "calm", -2),
+        row("fixed-global", "stress", -8),
+        row("calib-contagion", "calm", -2.001),
+        row("calib-contagion", "stress", -8.02),
+      ],
+      "fixed-global",
+    );
+    const text = formatRegimeBacktest(report);
+    expect(text).toContain("immaterial in both regimes");
+    expect(text).not.toContain("matters when the tape is loud");
+  });
+
   it("skips arms missing a regime instead of emitting NaN edges", () => {
     const report = regimeBacktestReport(
       clf,

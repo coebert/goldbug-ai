@@ -329,6 +329,9 @@ export function regimeBacktestReport(
   return { classifier, separation, rows: [...rows], baseline, edges, stressOnlyEdge };
 }
 
+/** Smallest |ΔCVaR5 per 100 bars| worth calling a real difference. */
+export const MATERIAL_CVAR_EDGE = 0.25;
+
 const num = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "n/a");
 const signed = (v: number, d = 2) => (v > 0 ? `+${num(v, d)}` : num(v, d));
 
@@ -399,9 +402,18 @@ export function formatRegimeBacktest(report: RegimeBacktestReport): string {
 
   out.push("");
   for (const { arm, value } of report.stressOnlyEdge) {
+    const stressEdge = report.edges.find((e) => e.arm === arm && e.regime === "stress");
+    // A concentration statement is only worth making when the stress-side edge
+    // is big enough to survive Monte-Carlo noise; otherwise both regimes are
+    // simply flat and the "larger in stress" ratio is dividing noise by noise.
+    const material = Math.abs(stressEdge?.cvar5Edge ?? 0) >= MATERIAL_CVAR_EDGE;
     out.push(
       `  ${arm}: |ΔCVaR5| is ${num(Math.abs(value))} ${value >= 0 ? "larger" : "smaller"} in stress than in calm` +
-        (value > 0 ? " — the coupling assumption matters when the tape is loud" : ""),
+        (material
+          ? value > 0
+            ? " — the coupling assumption matters when the tape is loud"
+            : " — the edge does not concentrate in stress"
+          : " — immaterial in both regimes; coupling choice is not priced here"),
     );
   }
 
