@@ -291,6 +291,14 @@ export function SmaTrendCard() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <FavoritesPanel
+            favorites={favorites}
+            onUnpin={toggleFavorite}
+            onMove={moveFavorite}
+          />
+
+
+
           <div className="flex flex-wrap gap-1">
             {symbols.map((s) => {
               const pinned = favorites.includes(s);
