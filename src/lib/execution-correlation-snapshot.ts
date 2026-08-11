@@ -48,15 +48,27 @@ export const CALIBRATION_SNAPSHOT_VERSION = 1 as const;
 
 // ------------------------------------------------------------------ fingerprint
 
-/** Prices are hashed at 6 significant figures: enough to catch a real change,
- *  loose enough to survive float formatting round-trips through JSON. */
-const quantise = (v: number) => (Number.isFinite(v) ? Number(v.toPrecision(6)) : 0);
+/**
+ * Prices are hashed at 4 significant figures, deliberately loose.
+ *
+ * Adjusted closes are recomputed by the data provider on every pull, so the
+ * same historical bar comes back differing in the 6th figure from one fetch to
+ * the next. Hashing at full precision would mark every run as a different tape
+ * and make the check useless. Four figures ignores that rounding noise while
+ * still catching anything that could move a correlation: a changed bar, a
+ * split adjustment, a different price mode, a shifted date range.
+ */
+const FINGERPRINT_PRECISION = 4;
+const quantise = (v: number, precision: number) =>
+  (Number.isFinite(v) ? Number(v.toPrecision(precision)) : 0);
 
 /** FNV-1a over the quantised closes. Deterministic and order-independent of
  *  Map insertion because the symbols are sorted first. */
 export function tapeFingerprint(
   seriesBySymbol: ReadonlyMap<string, readonly number[]>,
+  precision: number = FINGERPRINT_PRECISION,
 ): string {
+
   let h = 0x811c9dc5;
   const push = (s: string) => {
     for (let i = 0; i < s.length; i++) {
