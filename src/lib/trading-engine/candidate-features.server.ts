@@ -89,6 +89,7 @@ export async function buildCandidateFeatures(
         price: closes[closes.length - 1],
         sma20: sma(closes, 20),
         sma50: sma(closes, 50),
+        sma200: sma(closes, 200),
         rsi14: rsi(closes, 14),
         change5d: pctChange(closes, 5),
         change30d: pctChange(closes, 30),
