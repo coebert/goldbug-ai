@@ -913,9 +913,10 @@ async function main() {
       volZ,
       kinds: residualKinds,
       dates: bars.map((b) => b.date),
-      structures: loadedSnapshot
-        ? new Map([[loadedSnapshot.structure.kind as TimelineStructureKind,
-          loadedSnapshot.structure]])
+      // A pinned snapshot scores its own saved structure; the other kind is
+      // still fitted from the tape so the head-to-head stays available.
+      structures: loadedSnapshot && simCfg.structure
+        ? new Map([[loadedSnapshot.structure.kind as TimelineStructureKind, simCfg.structure]])
         : undefined,
     });
     console.log(formatResidualTimeline(timeline, {
