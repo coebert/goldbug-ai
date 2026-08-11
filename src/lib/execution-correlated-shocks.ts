@@ -239,19 +239,23 @@ export function makeCorrelatedExecutionSampler(
   };
 
   const decoupled = c.decoupledSymbols;
+  // Decoupled symbols draw their (calm, idiosyncratic) outcome off a side
+  // stream while still consuming exactly the numbers the coupled run would
+  // have consumed from the main stream. That keeps every *other* symbol on
+  // the path bit-identical, which is what makes leave-one-cluster-out
+  // attribution a like-for-like comparison instead of a reshuffle.
+  const offRng = mulberry32((seed ^ 0x2545f491) >>> 0);
   const draw = (symbol?: string): ExecutionDraw => {
     const off = decoupled ? decoupled.has(symbol ?? "") : false;
-    const stressed = bar.stressed && !off;
+    const stressed = bar.stressed;
     const sigma = c.slippageSigma * (stressed ? c.stressSigmaMult : 1);
     // Market + cluster + idiosyncratic decomposition. With a global structure
     // the cluster loading is zero and this reduces to the original two terms.
     const w = weightsFor(symbol ?? "", bar.stressT);
     const gz = bar.clusterZ.get(w.group) ?? 0;
-    // A decoupled symbol still burns the same idio draw, keeping the streams
-    // aligned; it just stops loading on the shared factors.
     const idioZ = standardNormal(rng);
-    const z = off ? idioZ : w.market * bar.commonZ + w.cluster * gz + w.idio * idioZ;
-    let mult = Math.exp(z * sigma) * (off ? 1 : bar.regimeMult);
+    const z = w.market * bar.commonZ + w.cluster * gz + w.idio * idioZ;
+    let mult = Math.exp(z * sigma) * bar.regimeMult;
     if (rng() < c.tailProb) mult *= c.tailMult;
     mult = Math.min(c.maxSlippageMult, Math.max(0, mult));
 
@@ -263,7 +267,20 @@ export function makeCorrelatedExecutionSampler(
     const u = rng();
     if (u < noFill) fillRatio = 0;
     else if (u < noFill + partial) fillRatio = c.minFillRatio + rng() * (1 - c.minFillRatio);
-    return { slippageMult: mult, fillRatio };
+    if (!off) return { slippageMult: mult, fillRatio };
+
+    // Same order, no shared factors, no stress amplification.
+    let offMult = Math.exp(standardNormal(offRng) * c.slippageSigma);
+    if (offRng() < c.tailProb) offMult *= c.tailMult;
+    offMult = Math.min(c.maxSlippageMult, Math.max(0, offMult));
+    const offNoFill = Math.min(1, c.noFillProb);
+    const offFull = Math.max(0, Math.min(1 - offNoFill, c.fullFillProb));
+    const offPartial = Math.max(0, 1 - offNoFill - offFull);
+    let offRatio = 1;
+    const ou = offRng();
+    if (ou < offNoFill) offRatio = 0;
+    else if (ou < offNoFill + offPartial) offRatio = c.minFillRatio + offRng() * (1 - c.minFillRatio);
+    return { slippageMult: offMult, fillRatio: offRatio };
   };
 
 
