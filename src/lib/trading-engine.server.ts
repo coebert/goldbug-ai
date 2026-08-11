@@ -177,6 +177,7 @@ import {
   resolveVenueTodConfig,
 } from "./alpha/execution-alpha";
 import { stochasticEntryTiming } from "./alpha/stochastic-timing";
+import { smaCrossBuyRule, smaCrossSellRule } from "./alpha/sma-cross-rules";
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -1007,6 +1008,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         };
       }
       if (timing.multiplier < 1) adjNotional = adjNotional * timing.multiplier;
+
+      // SMA crossover rules — death-cross regime vetoes new longs, a fresh
+      // golden / SMA20↑SMA50 cross upsizes them.
+      const crossRule = smaCrossBuyRule(featureBySymbol.get(symbol)?.sma_cross ?? null);
+      if (!crossRule.allow) {
+        return {
+          allow: false,
+          adjNotional: 0,
+          tod: tod ?? { multiplier: 0, allow: false, reason: crossRule.reason },
+        };
+      }
+      if (crossRule.sizeMultiplier !== 1) adjNotional = adjNotional * crossRule.sizeMultiplier;
     }
 
     const slicePlan = cfg.execution_slicing_enabled && adjNotional > 0
@@ -1237,7 +1250,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       }
     }
 
-    // 6. Legacy max_hold_days
+    // 6. SMA crossover exit — fresh death cross closes, SMA20↓SMA50 trims.
+    if (!trigger) {
+      const cross = smaCrossSellRule(featureBySymbol.get(sym)?.sma_cross ?? null);
+      if (cross.sell) {
+        trigger = cross.reason;
+        triggerKind = "trail";
+        sellFraction = cross.sellFraction;
+      }
+    }
+
+    // 7. Legacy max_hold_days
     if (!trigger && cfg.max_hold_days > 0) {
       const openedAt = (h as unknown as { opened_at?: string | null }).opened_at;
       if (openedAt) {

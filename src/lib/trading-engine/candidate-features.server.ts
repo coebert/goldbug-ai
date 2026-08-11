@@ -24,6 +24,7 @@ import type { RankInfo } from "../cross-sectional-ranking.server";
 import type { UniverseSymbol } from "../universe.server";
 import type { Fundamentals, FundamentalsScore } from "../fundamentals/types";
 import { detectBreakout, type BreakoutEvidence } from "../alpha/breakout";
+import { computeSmaCrossState, type SmaCrossState } from "../alpha/sma-cross-rules";
 
 export function classesFromUniverse(u: unknown): Database["public"]["Enums"]["asset_class"][] {
   if (!Array.isArray(u)) return ["stock", "etf", "crypto", "commodity", "fx"];
@@ -60,6 +61,8 @@ export async function buildCandidateFeatures(
     weekly_rsi14: number | null;
     // Stochastic oscillator (14/3/3) — entry timing.
     stochastic: StochasticSnapshot | null;
+    // SMA20/50 and SMA50/200 crossover state — buy/sell rule inputs.
+    sma_cross: SmaCrossState | null;
     // Evidence-based range-breakout state (Donchian base + ATR penetration
     // + volume confirmation + failure history).
     breakout: BreakoutEvidence | null;
@@ -108,6 +111,7 @@ export async function buildCandidateFeatures(
         weekly_trend_up: wk?.weekly_trend_up ?? false,
         weekly_rsi14: wk?.weekly_rsi14 ?? null,
         stochastic: stochastic(candles),
+        sma_cross: computeSmaCrossState(closes),
         breakout: detectBreakout(candles),
         news_score: null,
         news_contributors: 0,
