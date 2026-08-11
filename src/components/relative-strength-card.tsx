@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Gauge, TrendingDown, TrendingUp } from "lucide-react";
 import { getRelativeStrength } from "@/lib/relative-strength.functions";
 import { RS_WINDOWS, type HoldingComparison } from "@/lib/relative-strength";
-import { formatMoney } from "@/lib/format-money";
+import { formatMoneySigned } from "@/lib/format-money";
 
 function pp(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
