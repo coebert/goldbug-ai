@@ -24,12 +24,18 @@
 // the same shocks, so joint worst-case numbers are reproducible.
 
 import {
+  factorWeights,
+  makeCorrelationStructure,
+  type CorrelationStructure,
+} from "./execution-correlation-structures";
+import {
   DEFAULT_EXECUTION_SIM,
   mulberry32,
   standardNormal,
   type ExecutionDraw,
   type ExecutionSimConfig,
 } from "./execution-monte-carlo";
+
 
 export type CorrelatedExecutionConfig = ExecutionSimConfig & {
   /** Pairwise correlation of log-slippage across symbols on the same bar, 0…1. */
