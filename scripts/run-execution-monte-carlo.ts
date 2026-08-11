@@ -73,10 +73,13 @@ import {
   describeSnapshot,
   describeTapeCheck,
   foldStructuresFromSnapshot,
+  optionsFromSnapshot,
   structureFromSnapshot,
   tapeIdentity,
   verifySnapshotAgainstTape,
   type CalibrationSnapshot,
+  type SnapshotFoldWindow,
+
 } from "../src/lib/execution-correlation-snapshot";
 import {
   loadCalibrationSnapshotFile,
