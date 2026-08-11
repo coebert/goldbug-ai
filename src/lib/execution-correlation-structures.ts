@@ -108,17 +108,49 @@ export function makeCorrelationStructure(spec: CorrelationStructureSpec): Correl
 export const groupOf = (structure: CorrelationStructure, symbol: string): string =>
   structure.groups.get(symbol) ?? UNGROUPED;
 
+/**
+ * How "stressed" a bar is, as a number in [0, 1]. `true`/`false` are the
+ * degenerate endpoints, so every caller that passed a boolean keeps its exact
+ * previous behaviour while a sampler can hand in a continuous blend instead.
+ */
+export type RegimeState = boolean | number;
+
+export const regimeT = (state: RegimeState): number => {
+  const t = typeof state === "number" ? state : state ? 1 : 0;
+  return Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : 0;
+};
+
+/** Coupling parameters after blending calm → stress by `t`. */
+export function regimeRhos(structure: CorrelationStructure, state: RegimeState = false) {
+  const t = regimeT(state);
+  const mix = (calm: number, stress: number) => calm + (stress - calm) * t;
+  const within = clamp01(mix(structure.withinRho, structure.stressWithinRho));
+  const across = Math.min(within, clamp01(mix(structure.acrossRho, structure.stressAcrossRho)));
+  return { t, withinRho: within, acrossRho: across };
+}
+
+/**
+ * Smooth 0→1 ramp for the regime blend, driven by the realised-volatility
+ * z-score. Below `loZ` the structure is its calm self; at or above `hiZ` it is
+ * fully stressed; in between the coupling shifts continuously, so correlation
+ * moves with the tape instead of snapping on a single threshold.
+ */
+export function regimeRamp(volZ: number, loZ: number, hiZ: number): number {
+  if (!Number.isFinite(volZ)) return 0;
+  if (!(hiZ > loZ)) return volZ >= hiZ ? 1 : 0;
+  return Math.min(1, Math.max(0, (volZ - loZ) / (hiZ - loZ)));
+}
+
 /** Correlation the structure implies for a pair of symbols in a given regime. */
 export function impliedCorrelation(
   structure: CorrelationStructure,
   a: string,
   b: string,
-  stressed = false,
+  stressed: RegimeState = false,
 ): number {
   if (a === b) return 1;
-  const within = stressed ? structure.stressWithinRho : structure.withinRho;
-  const across = stressed ? structure.stressAcrossRho : structure.acrossRho;
-  return groupOf(structure, a) === groupOf(structure, b) ? within : across;
+  const { withinRho, acrossRho } = regimeRhos(structure, stressed);
+  return groupOf(structure, a) === groupOf(structure, b) ? withinRho : acrossRho;
 }
 
 export type FactorWeights = {
@@ -139,10 +171,9 @@ export type FactorWeights = {
 export function factorWeights(
   structure: CorrelationStructure,
   symbol: string,
-  stressed = false,
+  stressed: RegimeState = false,
 ): FactorWeights {
-  const within = stressed ? structure.stressWithinRho : structure.withinRho;
-  const across = Math.min(stressed ? structure.stressAcrossRho : structure.acrossRho, within);
+  const { withinRho: within, acrossRho: across } = regimeRhos(structure, stressed);
   return {
     group: groupOf(structure, symbol),
     market: Math.sqrt(across),
@@ -155,7 +186,7 @@ export function factorWeights(
 export function correlationMatrix(
   structure: CorrelationStructure,
   symbols: readonly string[],
-  stressed = false,
+  stressed: RegimeState = false,
 ): number[][] {
   return symbols.map((a) => symbols.map((b) => impliedCorrelation(structure, a, b, stressed)));
 }

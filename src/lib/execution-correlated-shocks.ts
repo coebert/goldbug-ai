@@ -26,6 +26,8 @@
 import {
   factorWeights,
   makeCorrelationStructure,
+  regimeRamp,
+  regimeRhos,
   type CorrelationStructure,
 } from "./execution-correlation-structures";
 import {
@@ -66,6 +68,21 @@ export type CorrelatedExecutionConfig = ExecutionSimConfig & {
   volStressZ: number;
   /** Extra slippage per unit of volatility z-score above `volStressZ`. */
   volSlippageBeta: number;
+
+  /**
+   * How the coupling parameters move between the calm and stress structures.
+   *   "binary" — a bar is either calm or stressed (the original behaviour).
+   *   "ramp"   — the structure blends continuously with realised volatility
+   *              between `regimeRampLoZ` and `regimeRampHiZ`, so correlation
+   *              drifts up as the tape heats and back down as it cools.
+   */
+  regimeBlend: "binary" | "ramp";
+  /** Volatility z-score at which the ramp starts leaving the calm structure. */
+  regimeRampLoZ: number;
+  /** Volatility z-score at which the ramp reaches the full stress structure. */
+  regimeRampHiZ: number;
+  /** Minimum blend applied once the Markov chain says the bar is stressed. */
+  stressBlendFloor: number;
 };
 
 export const DEFAULT_CORRELATED_EXECUTION: CorrelatedExecutionConfig = {
@@ -79,6 +96,10 @@ export const DEFAULT_CORRELATED_EXECUTION: CorrelatedExecutionConfig = {
   stressFullFillMult: 0.6,
   volStressZ: 1.5,
   volSlippageBeta: 0.35,
+  regimeBlend: "binary",
+  regimeRampLoZ: 0.5,
+  regimeRampHiZ: 2,
+  stressBlendFloor: 1,
 };
 
 export type BarRegime = {
@@ -91,6 +112,12 @@ export type BarRegime = {
   clusterZ: ReadonlyMap<string, number>;
   /** Deterministic slippage multiplier applied to every symbol on this bar. */
   regimeMult: number;
+  /** Blend between the calm (0) and stress (1) coupling structures. */
+  stressT: number;
+  /** Same-cluster correlation actually in force on this bar. */
+  withinRho: number;
+  /** Cross-cluster correlation actually in force on this bar. */
+  acrossRho: number;
 };
 
 export type CorrelatedExecutionSampler = {
@@ -110,6 +137,11 @@ export type CorrelatedExecutionSampler = {
   regime: () => BarRegime;
   /** Fraction of bars so far that were stressed. */
   stressShare: () => number;
+  /**
+   * Per-bar history of the regime blend and the coupling it implied, so tail
+   * sensitivity can be tracked over time rather than assumed constant.
+   */
+  regimePath: () => readonly BarRegime[];
 };
 
 const CALM: BarRegime = {
@@ -118,6 +150,9 @@ const CALM: BarRegime = {
   commonZ: 0,
   clusterZ: new Map(),
   regimeMult: 1,
+  stressT: 0,
+  withinRho: 0,
+  acrossRho: 0,
 };
 
 export function makeCorrelatedExecutionSampler(
@@ -134,19 +169,23 @@ export function makeCorrelatedExecutionSampler(
   // does not shift the main stream: paths stay comparable across assumptions.
   const clusterRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
   const weightCache = new Map<string, ReturnType<typeof factorWeights>>();
-  const weightsFor = (symbol: string, stressed: boolean) => {
-    const key = `${stressed ? "s" : "c"}|${symbol}`;
+  // Quantise the blend so the cache stays small; 1% of correlation is far
+  // below the resolution of anything this simulation claims to measure.
+  const weightsFor = (symbol: string, stressT: number) => {
+    const q = Math.round(stressT * 100) / 100;
+    const key = `${q}|${symbol}`;
     let w = weightCache.get(key);
     if (!w) {
-      w = factorWeights(structure, symbol, stressed);
+      w = factorWeights(structure, symbol, q);
       weightCache.set(key, w);
     }
     return w;
   };
 
-  let bar: BarRegime = CALM;
+  let bar: BarRegime = { ...CALM, ...regimeRhos(structure, 0) };
   let bars = 0;
   let stressedBars = 0;
+  const path: BarRegime[] = [];
 
   const beginBar = (volZ = 0): BarRegime => {
     const z = Number.isFinite(volZ) ? volZ : 0;
@@ -162,9 +201,30 @@ export function makeCorrelatedExecutionSampler(
     const clusterZ = new Map<string, number>();
     for (const g of clusters) clusterZ.set(g, standardNormal(clusterRng));
 
-    bar = { stressed, volZ: z, commonZ: standardNormal(rng), clusterZ, regimeMult };
+    // Regime-dependent coupling: binary keeps the hard calm/stress switch,
+    // ramp lets the structure migrate with realised volatility and floors the
+    // blend once the Markov chain has declared the bar stressed.
+    const stressT = c.regimeBlend === "ramp"
+      ? Math.max(
+          regimeRamp(z, c.regimeRampLoZ, c.regimeRampHiZ),
+          stressed ? Math.min(1, Math.max(0, c.stressBlendFloor)) : 0,
+        )
+      : (stressed ? 1 : 0);
+    const { withinRho, acrossRho } = regimeRhos(structure, stressT);
+
+    bar = {
+      stressed,
+      volZ: z,
+      commonZ: standardNormal(rng),
+      clusterZ,
+      regimeMult,
+      stressT,
+      withinRho,
+      acrossRho,
+    };
     bars++;
     if (stressed) stressedBars++;
+    path.push(bar);
     return bar;
   };
 
@@ -172,7 +232,7 @@ export function makeCorrelatedExecutionSampler(
     const sigma = c.slippageSigma * (bar.stressed ? c.stressSigmaMult : 1);
     // Market + cluster + idiosyncratic decomposition. With a global structure
     // the cluster loading is zero and this reduces to the original two terms.
-    const w = weightsFor(symbol ?? "", bar.stressed);
+    const w = weightsFor(symbol ?? "", bar.stressT);
     const gz = bar.clusterZ.get(w.group) ?? 0;
     const z = w.market * bar.commonZ + w.cluster * gz + w.idio * standardNormal(rng);
     let mult = Math.exp(z * sigma) * bar.regimeMult;
@@ -196,6 +256,7 @@ export function makeCorrelatedExecutionSampler(
     draw,
     regime: () => bar,
     stressShare: () => (bars ? stressedBars / bars : 0),
+    regimePath: () => path,
   };
 }
 
