@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSymbolHistory,
   coerceRange,
+  detectSmaCrossovers,
   isKnownSymbol,
   rangeLabel,
   symbolMeta,
