@@ -306,9 +306,35 @@ function MarketSymbolPage() {
                       connectNulls
                       isAnimationActive={false}
                     />
+                    {annotations.map((a, i) => (
+                      <ReferenceDot
+                        key={a.id}
+                        x={a.date}
+                        y={a.close}
+                        r={9}
+                        fill={ANNOTATION_TONE[a.kind] ?? CHART_ROLE.highlight}
+                        stroke="hsl(var(--background))"
+                        strokeWidth={1.5}
+                        isFront
+                        label={{
+                          value: String(i + 1),
+                          fill: "hsl(var(--background))",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          position: "center",
+                        }}
+                      />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
               </ChartFrame>
+
+              <AnnotationList
+                annotations={annotations}
+                loading={annotationQuery.isLoading || annotationQuery.isFetching}
+              />
+
+
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Stat label={`Change (${rangeLabel(range)})`} value={pct(history.changePct)} tone={up ? "up" : "down"} />
