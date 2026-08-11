@@ -22,16 +22,19 @@ export const EXECUTION_CHANNELS = ["slippage", "fillRate", "stress"] as const;
 export type ExecutionChannel = (typeof EXECUTION_CHANNELS)[number];
 
 /** Canonical key for a subset of enabled channels; "" is the no-shock baseline. */
-export function subsetKey(channels: Iterable<ExecutionChannel>): string {
+export function subsetKey<C extends string = ExecutionChannel>(
+  channels: Iterable<C>,
+  universe: readonly C[] = EXECUTION_CHANNELS as unknown as readonly C[],
+): string {
   const set = new Set(channels);
-  return EXECUTION_CHANNELS.filter((c) => set.has(c)).join("+");
+  return universe.filter((c) => set.has(c)).join("+");
 }
 
 /** Every subset of `channels`, baseline (empty) first, full set last. */
-export function channelSubsets(
-  channels: readonly ExecutionChannel[] = EXECUTION_CHANNELS,
-): ExecutionChannel[][] {
-  const out: ExecutionChannel[][] = [];
+export function channelSubsets<C extends string = ExecutionChannel>(
+  channels: readonly C[] = EXECUTION_CHANNELS as unknown as readonly C[],
+): C[][] {
+  const out: C[][] = [];
   for (let mask = 0; mask < 1 << channels.length; mask++) {
     const subset = channels.filter((_, i) => (mask >> i) & 1);
     out.push(subset);
@@ -39,8 +42,8 @@ export function channelSubsets(
   return out.sort((a, b) => a.length - b.length);
 }
 
-export type ChannelAttribution = {
-  channel: ExecutionChannel;
+export type ChannelAttribution<C extends string = ExecutionChannel> = {
+  channel: C;
   /** Shapley share of the total effect, in the metric's own units. */
   shapley: number;
   /** Share of the total, as a signed fraction (may exceed 1 if channels offset). */
@@ -51,14 +54,14 @@ export type ChannelAttribution = {
   marginal: number;
 };
 
-export type AttributionResult = {
+export type AttributionResult<C extends string = ExecutionChannel> = {
   /** Metric with no shocks at all. */
   baseline: number;
   /** Metric with every channel enabled. */
   full: number;
   /** full − baseline: the whole effect being split. */
   total: number;
-  contributions: ChannelAttribution[];
+  contributions: ChannelAttribution<C>[];
   /**
    * total − Σ solo effects. Positive-magnitude values mean the channels
    * amplify each other (the joint tail is worse than the sum of its parts).
@@ -79,16 +82,16 @@ const factorial = (n: number): number => {
  * for a simulation where only those channels are live — evaluated on the same
  * seeds, so differences are causal rather than sampling noise.
  */
-export function shapleyAttribution(
-  valueOf: (subset: readonly ExecutionChannel[], key: string) => number,
-  channels: readonly ExecutionChannel[] = EXECUTION_CHANNELS,
-): AttributionResult {
+export function shapleyAttribution<C extends string = ExecutionChannel>(
+  valueOf: (subset: readonly C[], key: string) => number,
+  channels: readonly C[] = EXECUTION_CHANNELS as unknown as readonly C[],
+): AttributionResult<C> {
   const values = new Map<string, number>();
-  for (const subset of channelSubsets(channels)) {
-    const key = subsetKey(subset);
+  for (const subset of channelSubsets<C>(channels)) {
+    const key = subsetKey<C>(subset, channels);
     values.set(key, valueOf(subset, key));
   }
-  const v = (subset: readonly ExecutionChannel[]) => values.get(subsetKey(subset)) ?? NaN;
+  const v = (subset: readonly C[]) => values.get(subsetKey<C>(subset, channels)) ?? NaN;
 
   const n = channels.length;
   const baseline = v([]);
@@ -98,7 +101,7 @@ export function shapleyAttribution(
   const contributions = channels.map((channel) => {
     const others = channels.filter((c) => c !== channel);
     let shapley = 0;
-    for (const subset of channelSubsets(others)) {
+    for (const subset of channelSubsets<C>(others)) {
       const weight = (factorial(subset.length) * factorial(n - subset.length - 1)) / factorial(n);
       shapley += weight * (v([...subset, channel]) - v(subset));
     }
