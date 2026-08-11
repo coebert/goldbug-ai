@@ -13,11 +13,13 @@ import {
   computeFrictionKpi,
   beforeAfterAttribution,
   realisedCostOverlay,
+  frictionTimeSeries,
   FRICTION_WINDOW_DAYS,
   type BeforeAfterAttribution,
   type FrictionFill,
   type FrictionKpi,
   type RealisedCostOverlay,
+  type FrictionSeriesPoint,
 } from "./friction-kpi";
 
 /**
@@ -32,6 +34,14 @@ const ATTRIBUTION_DAYS = 90;
 
 export type FrictionReport = {
   kpi: FrictionKpi;
+  /**
+   * Trailing-30d friction for each of the last 90 calendar days. The card
+   * slices this to 30 or 90 days client-side, so switching range is instant
+   * and cannot disagree with the headline number.
+   */
+  series: FrictionSeriesPoint[];
+  /** Days of history the series covers. */
+  seriesDays: number;
   attribution: BeforeAfterAttribution;
   overlay: RealisedCostOverlay;
   currency: string;
@@ -88,6 +98,12 @@ export async function loadFrictionReport(args: {
   }
 
   const sinceAttribution = new Date(now.getTime() - ATTRIBUTION_DAYS * 86_400_000).toISOString();
+  // The chart's left-hand points are trailing-window reads, so they need one
+  // extra window of tape behind them. Without it the first 30 days of a 90-day
+  // chart would slope up from zero purely because the history was truncated.
+  const sinceSeries = new Date(
+    now.getTime() - (ATTRIBUTION_DAYS + windowDays) * 86_400_000,
+  ).toISOString();
   let rows: Array<Record<string, unknown>> = [];
   try {
     const res = await args.db
@@ -96,7 +112,7 @@ export async function loadFrictionReport(args: {
         "symbol, side, quantity, fill_price, fee, fee_commission, fee_exchange, fee_tax, fee_other, fee_source, currency, filled_at",
       )
       .eq("portfolio_id", args.portfolioId)
-      .gte("filled_at", sinceAttribution)
+      .gte("filled_at", sinceSeries)
       .order("filled_at", { ascending: true })
       .limit(5000);
     rows = (res?.data ?? []) as Array<Record<string, unknown>>;
@@ -160,6 +176,10 @@ export async function loadFrictionReport(args: {
   }
 
 
+  // Attribution and the overlay keep their original 90-day tape; only the
+  // chart looks further back.
+  const attributionFills = all.filter((f) => Date.parse(f.filledAt) >= Date.parse(sinceAttribution));
+
   const windowStart = now.getTime() - windowDays * 86_400_000;
   const windowFills = all.filter((f) => Date.parse(f.filledAt) >= windowStart);
 
@@ -169,7 +189,7 @@ export async function loadFrictionReport(args: {
       .from("equity_snapshots")
       .select("snapshot_date, total_value")
       .eq("portfolio_id", args.portfolioId)
-      .gte("snapshot_date", sinceAttribution.slice(0, 10))
+      .gte("snapshot_date", sinceSeries.slice(0, 10))
       .order("snapshot_date", { ascending: true })
       .limit(400);
     equity = ((res?.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
@@ -180,16 +200,31 @@ export async function loadFrictionReport(args: {
     equity = [];
   }
 
+  const navByDay = new Map<string, number>();
+  for (const e of equity) {
+    const d = e.date.slice(0, 10);
+    if (d && Number.isFinite(e.totalValue) && e.totalValue > 0) navByDay.set(d, e.totalValue);
+  }
+
   return {
     kpi: computeFrictionKpi({ fills: windowFills, navBase, windowDays }),
-    attribution: beforeAfterAttribution({
+    series: frictionTimeSeries({
       fills: all,
+      navBase,
+      navByDay,
+      days: ATTRIBUTION_DAYS,
+      windowDays,
+      now,
+    }),
+    seriesDays: ATTRIBUTION_DAYS,
+    attribution: beforeAfterAttribution({
+      fills: attributionFills,
       cutoverIso: args.cutoverIso ?? COST_GOVERNOR_CUTOVER_ISO,
       navBase,
       equity,
       toIso: now.toISOString(),
     }),
-    overlay: realisedCostOverlay({ fills: all }),
+    overlay: realisedCostOverlay({ fills: attributionFills }),
     currency: base,
     asOf: now.toISOString(),
   };

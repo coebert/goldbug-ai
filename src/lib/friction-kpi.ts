@@ -571,3 +571,117 @@ export function beforeAfterAttribution(args: {
     verdict,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Trailing friction over time
+// ---------------------------------------------------------------------------
+
+/**
+ * One calendar day's read of the KPI: what the *trailing 30 days* of trading
+ * cost, as bps of that day's NAV.
+ *
+ * Rolling, not cumulative-since-window-start. The budget is "40bps per 30
+ * days", so only a trailing-30d number is comparable to the reference line on
+ * every day of the chart; a running total starts near zero and can only cross
+ * the line at the right-hand edge, which reads as "we were fine until today"
+ * even during a month of sustained overspend.
+ */
+export type FrictionSeriesPoint = {
+  /** UTC day key, YYYY-MM-DD. */
+  date: string;
+  /** Friction charged inside the trailing window ending this day, base currency. */
+  frictionBase: number;
+  /** That friction as bps of the day's NAV. `null` when NAV is unknown. */
+  frictionBps: number | null;
+  /** Tickets inside the trailing window. */
+  tickets: number;
+  /** Friction charged on this day alone, base currency. */
+  dayFrictionBase: number;
+  /** Over the budget line on this day. */
+  breach: boolean;
+};
+
+function addDays(dayIso: string, n: number): string {
+  return new Date(Date.parse(`${dayIso}T00:00:00.000Z`) + n * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/**
+ * Daily trailing-window friction across the last `days` calendar days.
+ *
+ * Emits every day in range, including days with no trades: a quiet week is
+ * information (the trailing number decays), and dropping those rows would
+ * squash the x-axis so a burst of trading looks evenly paced.
+ */
+export function frictionTimeSeries(args: {
+  fills: readonly FrictionFill[];
+  /** Fallback NAV for days with no snapshot. */
+  navBase: number;
+  /** Per-day NAV, base currency, when equity snapshots are available. */
+  navByDay?: ReadonlyMap<string, number> | Record<string, number>;
+  /** Length of the chart, in calendar days. */
+  days: number;
+  /** Length of the trailing window each point measures. */
+  windowDays?: number;
+  budgetBps?: number;
+  /** End of the chart. Defaults to now. */
+  now?: Date;
+}): FrictionSeriesPoint[] {
+  const windowDays = args.windowDays ?? FRICTION_WINDOW_DAYS;
+  const budgetBps = args.budgetBps ?? FRICTION_BUDGET_BPS;
+  const days = Math.max(1, Math.floor(args.days));
+  const fallbackNav = Number.isFinite(args.navBase) && args.navBase > 0 ? args.navBase : 0;
+  const navMap =
+    args.navByDay instanceof Map
+      ? args.navByDay
+      : new Map(Object.entries(args.navByDay ?? {}).map(([k, v]) => [k, Number(v)]));
+
+  const end = (args.now ?? new Date()).toISOString().slice(0, 10);
+  const start = addDays(end, -(days - 1));
+
+  const byDay = new Map<string, { frictionBase: number; tickets: number }>();
+  for (const f of args.fills) {
+    if (!(Number.isFinite(f.notionalBase) && f.notionalBase > 0)) continue;
+    const key = dayKey(f.filledAt);
+    if (!key || key > end) continue;
+    const b = byDay.get(key) ?? { frictionBase: 0, tickets: 0 };
+    b.frictionBase += chargedFriction(f);
+    b.tickets += 1;
+    byDay.set(key, b);
+  }
+
+  // Carry the last known NAV forward: snapshots are only written on days the
+  // valuation ran, and a missing weekend must not blank the line.
+  let carriedNav = 0;
+  for (const [d, v] of [...navMap.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    if (d <= start && Number.isFinite(v) && v > 0) carriedNav = v;
+  }
+
+  const out: FrictionSeriesPoint[] = [];
+  for (let i = 0; i < days; i += 1) {
+    const date = addDays(start, i);
+    const snapNav = navMap.get(date);
+    if (Number.isFinite(snapNav) && (snapNav as number) > 0) carriedNav = snapNav as number;
+    const nav = carriedNav > 0 ? carriedNav : fallbackNav;
+
+    let frictionBase = 0;
+    let tickets = 0;
+    for (let k = 0; k < windowDays; k += 1) {
+      const b = byDay.get(addDays(date, -k));
+      if (!b) continue;
+      frictionBase += b.frictionBase;
+      tickets += b.tickets;
+    }
+    const frictionBps = nav > 0 ? (frictionBase / nav) * 10_000 : null;
+    out.push({
+      date,
+      frictionBase,
+      frictionBps,
+      tickets,
+      dayFrictionBase: byDay.get(date)?.frictionBase ?? 0,
+      breach: frictionBps != null && frictionBps > budgetBps,
+    });
+  }
+  return out;
+}
