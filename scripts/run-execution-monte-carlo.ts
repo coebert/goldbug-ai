@@ -69,6 +69,11 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  diagnoseCalibrationFit,
+  formatCalibrationDiagnostics,
+} from "../src/lib/execution-correlation-diagnostics";
+
+import {
   clusterMap,
   describeStructure,
   makeCorrelationStructure,
@@ -239,10 +244,17 @@ const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.
 
 
 
+// --calib-diagnostics: how much to believe the calibrated coupling — rolling-fit
+// stability, bootstrap confidence intervals (including the contagion test) and
+// per-cluster-pair residual errors for the blocks and contagion structures.
+const calibDiagnosticsMode = argv.includes("--calib-diagnostics");
+const calibBootResamples = Number(arg("calib-resamples", "800"));
+
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
 const spilloverMode = process.argv.includes("--spillover");
 const spilloverPaths = Number(arg("spillover-paths", String(Math.max(30, Math.round(paths / 4)))));
+
 
 // --attribution: Shapley breakdown of the tail into slippage / fill-rate / stress.
 const attributionMode = process.argv.includes("--attribution");
@@ -699,7 +711,29 @@ async function main() {
       return best;
     });
 
+  // ------------------------------------------------ calibration diagnostics
+  // --calib-diagnostics: does the fitted coupling deserve to be trusted?
+  // Stability of the rolling estimate (overlap-discounted), moving-block
+  // bootstrap intervals on each leg and on the calm→stress separation, and the
+  // residual error of the two-parameter structures against the measured
+  // cluster × cluster matrix.
+  if (calibDiagnosticsMode) {
+    const diag = diagnoseCalibrationFit(seriesBySymbol, {
+      ...calibOpts,
+      volZ,
+      resamples: calibBootResamples,
+      seed: baseSeed,
+    });
+    console.log("Calibration diagnostics — rolling fit, confidence, residuals");
+    console.log(describeCalibration(diag.calibration));
+    console.log();
+    console.log(formatCalibrationDiagnostics(diag));
+    if (!spilloverMode && !attributionMode) return;
+    console.log();
+  }
+
   // ---------------------------------------------------- sector spillover mode
+
   // --spillover: two views of contagion. First the measured cluster × cluster
   // coupling (calm, stress, and the stress uplift), then a leave-one-cluster-
   // out simulation on common random numbers that says which of those clusters
