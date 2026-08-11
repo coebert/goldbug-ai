@@ -3,9 +3,12 @@
 // comparison table, so the two panels always describe the same period.
 
 import { Grid3x3 } from "lucide-react";
+import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import {
   MIN_CORRELATION_POINTS,
+  clusterCorrelation,
   type CorrelationCell,
   type CorrelationMatrix,
 } from "@/lib/market-compare";
@@ -38,16 +41,45 @@ export interface CorrelationHeatmapProps {
 }
 
 export function CorrelationHeatmap({ correlation, from, to }: CorrelationHeatmapProps) {
-  const { symbols, labels, cells } = correlation;
-  if (symbols.length < 2) return null;
+  const [clustered, setClustered] = useState(false);
+  const clustering = useMemo(() => clusterCorrelation(correlation), [correlation]);
+  const view = clustered ? clustering.matrix : correlation;
+  const groups = clustered ? clustering.groups : null;
+  const clusterCount = groups ? groups[groups.length - 1] + 1 : 0;
+
+  const { symbols, labels, cells } = view;
+  if (correlation.symbols.length < 2) return null;
 
   const hasAny = cells.some((row, i) => row.some((c, j) => i !== j && c.value != null));
+  const canCluster = correlation.symbols.length >= 3;
 
   return (
     <div className="space-y-2">
       <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         <Grid3x3 className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> Return correlation
       </h3>
+
+      {canCluster && hasAny ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={clustered ? "default" : "outline"}
+            className="h-7 px-2 text-[11px]"
+            aria-pressed={clustered}
+            onClick={() => setClustered((v) => !v)}
+          >
+            {clustered ? "Clustered order" : "Cluster by similarity"}
+          </Button>
+          {clustered ? (
+            <span className="text-[11px] text-muted-foreground">
+              {clusterCount === 1
+                ? "All selected markets move as one block."
+                : `${clusterCount} groups — dividers separate markets that move apart.`}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hasAny ? (
         <p className="text-xs text-muted-foreground">
@@ -71,7 +103,9 @@ export function CorrelationHeatmap({ correlation, from, to }: CorrelationHeatmap
                     <th
                       key={symbols[i]}
                       scope="col"
-                      className="px-1 text-center text-[10px] font-medium text-muted-foreground"
+                      className={`px-1 text-center text-[10px] font-medium text-muted-foreground${
+                        groups && i > 0 && groups[i] !== groups[i - 1] ? " border-l border-border" : ""
+                      }`}
                       title={l}
                     >
                       {shortLabel(l)}
@@ -81,7 +115,12 @@ export function CorrelationHeatmap({ correlation, from, to }: CorrelationHeatmap
               </thead>
               <tbody>
                 {cells.map((row, i) => (
-                  <tr key={symbols[i]}>
+                  <tr
+                    key={symbols[i]}
+                    className={
+                      groups && i > 0 && groups[i] !== groups[i - 1] ? "border-t border-border" : ""
+                    }
+                  >
                     <th
                       scope="row"
                       className="max-w-[7rem] truncate pr-1 text-left text-[11px] font-medium"
@@ -92,7 +131,9 @@ export function CorrelationHeatmap({ correlation, from, to }: CorrelationHeatmap
                     {row.map((cell, j) => (
                       <td
                         key={`${symbols[i]}-${symbols[j]}`}
-                        className="rounded-md px-2 py-1.5 text-center tabular-nums"
+                        className={`rounded-md px-2 py-1.5 text-center tabular-nums${
+                          groups && j > 0 && groups[j] !== groups[j - 1] ? " border-l border-border" : ""
+                        }`}
                         style={cellStyle(cell.value)}
                         title={
                           cell.value == null

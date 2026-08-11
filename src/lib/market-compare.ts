@@ -182,6 +182,88 @@ export function buildCorrelationMatrix(
   return { symbols, labels, cells, observations };
 }
 
+/** Result of reordering a correlation matrix by similarity. */
+export interface ClusteredCorrelation {
+  /** The same matrix with rows/columns reordered so similar markets sit together. */
+  matrix: CorrelationMatrix;
+  /** Original index of each symbol, in the new display order. */
+  order: number[];
+  /** Cluster id per display position; equal ids move together. */
+  groups: number[];
+}
+
+/** Pairs closer than this correlation distance (1 - r) count as one cluster. */
+const CLUSTER_CUT_DISTANCE = 0.5;
+
+function distanceOf(cells: CorrelationCell[][], a: number, b: number): number {
+  const v = cells[a]?.[b]?.value;
+  // Unmeasurable pairs are treated as unrelated rather than opposed.
+  return v == null ? 1 : 1 - v;
+}
+
+/**
+ * Average-linkage hierarchical clustering on correlation distance (1 - r).
+ * Returns a leaf ordering that puts co-moving markets next to each other, so
+ * blocks of green/red in the heatmap read as groups instead of scatter.
+ */
+export function clusterCorrelation(correlation: CorrelationMatrix): ClusteredCorrelation {
+  const { symbols, labels, cells, observations } = correlation;
+  const n = symbols.length;
+  if (n < 3) {
+    return {
+      matrix: correlation,
+      order: symbols.map((_, i) => i),
+      groups: symbols.map(() => 0),
+    };
+  }
+
+  // Each cluster keeps its members in leaf order; merges concatenate them.
+  let clusters = symbols.map((_, i) => ({ members: [i], height: 0 }));
+
+  const avgDistance = (a: number[], b: number[]) => {
+    let total = 0;
+    for (const i of a) for (const j of b) total += distanceOf(cells, i, j);
+    return total / (a.length * b.length);
+  };
+
+  while (clusters.length > 1) {
+    let best = { a: 0, b: 1, d: Infinity };
+    for (let a = 0; a < clusters.length; a++) {
+      for (let b = a + 1; b < clusters.length; b++) {
+        const d = avgDistance(clusters[a].members, clusters[b].members);
+        if (d < best.d) best = { a, b, d };
+      }
+    }
+    const merged = {
+      members: [...clusters[best.a].members, ...clusters[best.b].members],
+      height: best.d,
+    };
+    clusters = clusters.filter((_, i) => i !== best.a && i !== best.b);
+    clusters.push(merged);
+  }
+
+  const order = clusters[0].members;
+
+  // Cut the ordering into groups wherever adjacent markets are far apart.
+  const groups: number[] = [];
+  let group = 0;
+  order.forEach((idx, pos) => {
+    if (pos > 0 && distanceOf(cells, order[pos - 1], idx) > CLUSTER_CUT_DISTANCE) group++;
+    groups.push(group);
+  });
+
+  return {
+    matrix: {
+      symbols: order.map((i) => symbols[i]),
+      labels: order.map((i) => labels[i]),
+      cells: order.map((i) => order.map((j) => cells[i][j])),
+      observations,
+    },
+    order,
+    groups,
+  };
+}
+
 function intersectDates(histories: SymbolHistory[]): string[] {
   if (!histories.length) return [];
   let common: string[] = histories[0].points.map((p) => p.date);
