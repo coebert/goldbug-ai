@@ -202,7 +202,7 @@ describe("reproducibility", () => {
       );
       const out: number[] = [];
       for (let bar = 0; bar < 40; bar++) {
-        sampler.beginBar(bar, bar > 25 ? 2.5 : 0);
+        sampler.beginBar(bar > 25 ? 2.5 : 0);
         for (const sym of SYMBOLS) {
           const d = sampler.draw(sym);
           out.push(d.slippageMult, d.fillRatio);
