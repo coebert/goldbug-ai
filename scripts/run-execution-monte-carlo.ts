@@ -239,10 +239,17 @@ const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.
 
 
 
+// --calib-diagnostics: how much to believe the calibrated coupling — rolling-fit
+// stability, bootstrap confidence intervals (including the contagion test) and
+// per-cluster-pair residual errors for the blocks and contagion structures.
+const calibDiagnosticsMode = argv.includes("--calib-diagnostics");
+const calibBootResamples = Number(arg("calib-resamples", "800"));
+
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
 const spilloverMode = process.argv.includes("--spillover");
 const spilloverPaths = Number(arg("spillover-paths", String(Math.max(30, Math.round(paths / 4)))));
+
 
 // --attribution: Shapley breakdown of the tail into slippage / fill-rate / stress.
 const attributionMode = process.argv.includes("--attribution");
