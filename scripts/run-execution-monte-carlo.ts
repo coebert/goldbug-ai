@@ -199,6 +199,11 @@ simCfg.structure = buildStructure(
   (arg("corr-structure", "global") as CorrelationStructureKind),
 );
 
+// Any of the three axes puts the run into the sweep report.
+const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.length > 0;
+
+
+
 // --attribution: Shapley breakdown of the tail into slippage / fill-rate / stress.
 const attributionMode = process.argv.includes("--attribution");
 const attribPaths = Number(arg("attrib-paths", String(Math.max(30, Math.round(paths / 4)))));
