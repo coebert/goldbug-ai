@@ -159,7 +159,7 @@ const parseList = (raw: string) =>
 
 const rhoSweep = parseList(arg("rho-sweep", ""));
 const volZSweep = parseList(arg("vol-z-sweep", ""));
-const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0;
+// `sweepMode` is set below, once --structure-sweep has been parsed too.
 const sweepPaths = Number(arg("sweep-paths", String(Math.max(40, Math.round(paths / 3)))));
 // Threshold headlined in the sweep matrix; the full breach table still prints.
 const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? ddThresholds[0] ?? 15)));
