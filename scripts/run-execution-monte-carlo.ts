@@ -69,6 +69,11 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  diagnoseCalibrationFit,
+  formatCalibrationDiagnostics,
+} from "../src/lib/execution-correlation-diagnostics";
+
+import {
   clusterMap,
   describeStructure,
   makeCorrelationStructure,
