@@ -1,55 +1,24 @@
-// Home-dashboard SMA card: one market's price with a chosen set of moving
-// averages (20/50/100/200-day), over a selectable window. Same data path as the drill-down page
+// Home-dashboard SMA card: up to four markets shown side by side, each with
+// price plus a chosen set of moving averages (20/50/100/200-day) over a
+// selectable window. Same data path as the drill-down page
 // (`getSymbolHistory`), so the two never disagree.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQueries, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ReferenceDot,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  ArrowUpRight,
-  LineChart as LineChartIcon,
-  RefreshCw,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
-
+import { Check, LineChart as LineChartIcon, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ChartFrame } from "@/components/chart-frame";
-import {
-  AXIS_LINE,
-  AXIS_TICK,
-  CHART_ROLE,
-  GRID_PROPS,
-  LEGEND_STYLE,
-  TICK_LINE,
-  TOOLTIP_CONTENT_STYLE,
-  TOOLTIP_LABEL_STYLE,
-} from "@/lib/chart-palette";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getSymbolHistory } from "@/lib/market-symbol-history.functions";
 import {
   DEFAULT_RANGE,
@@ -59,58 +28,26 @@ import {
   isKnownSymbol,
   rangeLabel,
   symbolMeta,
-  smaKey,
-  crossoverLabel,
-  detectSmaCrossovers,
   type HistoryRange,
-  type SmaCrossover,
   type SmaPeriod,
+  type SymbolHistory,
 } from "@/lib/market-symbol-history";
 import {
   DEFAULT_SMA_PERIODS,
-  PERIOD_STYLE,
+  MAX_SMA_SYMBOLS,
+  SMA_SYMBOLS_KEY,
+  parseSmaSymbols,
   readStoredSmaPeriods,
   storeSmaPeriods,
   toggleSmaPeriod,
+  toggleSmaSymbol,
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
+import { SmaTrendPanel } from "@/components/home/sma-trend-panel";
 
-const SYMBOL_KEY = "home-sma-symbol";
+const LEGACY_SYMBOL_KEY = "home-sma-symbol";
 const RANGE_KEY = "home-sma-range";
 const DEFAULT_SYMBOL = HISTORY_SYMBOLS.includes("SPY") ? "SPY" : (HISTORY_SYMBOLS[0] ?? "");
-
-function num(v: number | null | undefined, digits = 2) {
-  if (v == null || !Number.isFinite(v)) return "—";
-  return v.toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits });
-}
-
-function pct(v: number | null | undefined, digits = 1) {
-  if (v == null || !Number.isFinite(v)) return "—";
-  return `${v > 0 ? "+" : ""}${v.toFixed(digits)}%`;
-}
-
-/** Plain-English read of where price sits against the chosen averages. */
-function trendVerdict(above: Array<boolean | null>) {
-  const known = above.filter((v): v is boolean => v != null);
-  if (!known.length) return { text: "Not enough history", tone: "muted" as const };
-  if (known.every(Boolean))
-    return {
-      text: known.length === 1 ? "Above its average" : "Uptrend — above every average",
-      tone: "up" as const,
-    };
-  if (known.every((v) => !v))
-    return {
-      text: known.length === 1 ? "Below its average" : "Downtrend — below every average",
-      tone: "down" as const,
-    };
-  return { text: "Mixed — between its averages", tone: "muted" as const };
-}
-
-const TONE_CLASS = {
-  up: "border-emerald-500/40 text-emerald-500",
-  down: "border-destructive/40 text-destructive",
-  muted: "border-border text-muted-foreground",
-} as const;
 
 /** Group the picker so sectors don't drown the headline markets. */
 function groupedSymbols() {
@@ -123,7 +60,7 @@ function groupedSymbols() {
 }
 
 export function SmaTrendCard() {
-  const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
+  const [symbols, setSymbols] = useState<string[]>([DEFAULT_SYMBOL]);
   const [range, setRange] = useState<HistoryRange>(DEFAULT_RANGE);
   const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_SMA_PERIODS);
   const fetchHistory = useServerFn(getSymbolHistory);
@@ -131,8 +68,15 @@ export function SmaTrendCard() {
   // Restore the last view after hydration so SSR markup stays stable.
   useEffect(() => {
     try {
-      const s = window.localStorage.getItem(SYMBOL_KEY);
-      if (s && isKnownSymbol(s)) setSymbol(s);
+      const stored = parseSmaSymbols(
+        window.localStorage.getItem(SMA_SYMBOLS_KEY),
+        isKnownSymbol,
+      );
+      if (stored.length) setSymbols(stored);
+      else {
+        const legacy = window.localStorage.getItem(LEGACY_SYMBOL_KEY);
+        if (legacy && isKnownSymbol(legacy)) setSymbols([legacy]);
+      }
       const r = window.localStorage.getItem(RANGE_KEY);
       if (r) setRange(coerceRange(Number(r)));
       setPeriods(readStoredSmaPeriods());
@@ -141,10 +85,10 @@ export function SmaTrendCard() {
     }
   }, []);
 
-  const pickSymbol = (s: string) => {
-    setSymbol(s);
+  const applySymbols = (next: string[]) => {
+    setSymbols(next);
     try {
-      window.localStorage.setItem(SYMBOL_KEY, s);
+      window.localStorage.setItem(SMA_SYMBOLS_KEY, next.join(","));
     } catch {
       /* ignore */
     }
@@ -168,71 +112,88 @@ export function SmaTrendCard() {
     });
   };
 
-  const query = useQuery({
-    queryKey: ["symbol-history", symbol, range],
-    queryFn: () => fetchHistory({ data: { symbol, days: range } }),
-    enabled: Boolean(symbol),
-    staleTime: 5 * 60_000,
-    placeholderData: keepPreviousData,
-    refetchOnWindowFocus: false,
+  const queries = useQueries({
+    queries: symbols.map((s) => ({
+      queryKey: ["symbol-history", s, range],
+      queryFn: () => fetchHistory({ data: { symbol: s, days: range } }),
+      enabled: Boolean(s),
+      staleTime: 5 * 60_000,
+      placeholderData: keepPreviousData,
+      refetchOnWindowFocus: false,
+    })),
   });
 
-  const history = query.data;
   const { markets, sectors } = useMemo(groupedSymbols, []);
-  const crossovers = useMemo(
-    () => (history ? detectSmaCrossovers(history.points, periods) : []),
-    [history, periods],
-  );
-  const verdict = trendVerdict(periods.map((p) => history?.aboveSma?.[p] ?? null));
-  const periodsLabel = periods.map((p) => `${p}`).join("/");
+  const periodsLabel = periods.join("/");
+  const compact = symbols.length > 1;
+  const atCap = symbols.length >= MAX_SMA_SYMBOLS;
+  const asOf = queries
+    .map((q) => (q.data as SymbolHistory | undefined)?.asOf ?? null)
+    .filter((d): d is string => Boolean(d))
+    .sort()
+    .pop();
+
+  const renderOption = (s: string) => {
+    const on = symbols.includes(s);
+    return (
+      <DropdownMenuItem
+        key={s}
+        className="text-xs"
+        disabled={!on && atCap}
+        onSelect={(e) => {
+          e.preventDefault();
+          applySymbols(toggleSmaSymbol(symbols, s));
+        }}
+      >
+        <Check className={`mr-2 h-3.5 w-3.5 ${on ? "opacity-100" : "opacity-0"}`} aria-hidden="true" />
+        {symbolMeta(s)?.label ?? s}
+      </DropdownMenuItem>
+    );
+  };
 
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-1.5 text-base">
-              <LineChartIcon className="h-4 w-4 text-primary" aria-hidden="true" /> Moving-average
-              trend
-            </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Price against its {periodsLabel}-day average{periods.length > 1 ? "s" : ""}
-              {history?.asOf ? ` · prices to ${history.asOf}` : ""}
-            </p>
-          </div>
-          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-            <Link to="/market/$symbol" params={{ symbol }} search={{ range, compare: undefined, sma: periods.join(",") }}>
-              Full chart <ArrowUpRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </Button>
+        <div className="min-w-0">
+          <CardTitle className="flex items-center gap-1.5 text-base">
+            <LineChartIcon className="h-4 w-4 text-primary" aria-hidden="true" /> Moving-average
+            trend
+          </CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {symbols.length === 1 ? "One market" : `${symbols.length} markets`} against their{" "}
+            {periodsLabel}-day average{periods.length > 1 ? "s" : ""}
+            {asOf ? ` · prices to ${asOf}` : ""}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={symbol} onValueChange={pickSymbol}>
-            <SelectTrigger className="h-8 w-[190px] text-xs" aria-label="Market to chart">
-              <SelectValue placeholder="Pick a market" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72">
-              <SelectGroup>
-                <SelectLabel>Markets</SelectLabel>
-                {markets.map((s) => (
-                  <SelectItem key={s} value={s} className="text-xs">
-                    {symbolMeta(s)?.label ?? s}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs">
+                <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                Markets ({symbols.length}/{MAX_SMA_SYMBOLS})
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-y-auto">
+              <DropdownMenuLabel className="text-xs">Markets</DropdownMenuLabel>
+              {markets.map(renderOption)}
               {sectors.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel>US sectors</SelectLabel>
-                  {sectors.map((s) => (
-                    <SelectItem key={s} value={s} className="text-xs">
-                      {symbolMeta(s)?.label ?? s}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs">US sectors</DropdownMenuLabel>
+                  {sectors.map(renderOption)}
+                </>
               )}
-            </SelectContent>
-          </Select>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="flex flex-wrap gap-1">
+            {symbols.map((s) => (
+              <Badge key={s} variant="outline" className="text-xs font-normal">
+                {symbolMeta(s)?.label ?? s}
+              </Badge>
+            ))}
+          </div>
 
           <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
 
@@ -253,168 +214,30 @@ export function SmaTrendCard() {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
-        {query.isLoading ? (
-          <Skeleton className="h-64 w-full rounded-xl" />
-        ) : query.isError || !history ? (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">Couldn't load this market's history.</p>
-            <Button size="sm" variant="outline" onClick={() => query.refetch()}>
-              <RefreshCw className="mr-1 h-4 w-4" aria-hidden="true" /> Retry
-            </Button>
-          </div>
-        ) : history.points.length < 2 ? (
-          <p className="text-sm text-muted-foreground">
-            Not enough stored price history for {rangeLabel(range)} yet.
-          </p>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <span className="font-display text-2xl font-bold tabular-nums">
-                {num(history.last)}
-              </span>
-              <Badge
-                variant="outline"
-                className={
-                  (history.changePct ?? 0) >= 0
-                    ? TONE_CLASS.up
-                    : TONE_CLASS.down
+      <CardContent>
+        <div className={compact ? "grid gap-3 lg:grid-cols-2" : "space-y-3"}>
+          {symbols.map((s, i) => {
+            const q = queries[i];
+            return (
+              <SmaTrendPanel
+                key={s}
+                symbol={s}
+                range={range}
+                periods={periods}
+                history={q?.data as SymbolHistory | undefined}
+                loading={Boolean(q?.isLoading)}
+                error={Boolean(q?.isError)}
+                compact={compact}
+                onRetry={() => void q?.refetch()}
+                onRemove={
+                  symbols.length > 1
+                    ? () => applySymbols(toggleSmaSymbol(symbols, s))
+                    : undefined
                 }
-              >
-                {pct(history.changePct)} over {rangeLabel(range)}
-              </Badge>
-              <Badge variant="outline" className={TONE_CLASS[verdict.tone]}>
-                {verdict.text}
-              </Badge>
-            </div>
-
-            <ChartFrame className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={history.points} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
-                  <CartesianGrid {...GRID_PROPS} />
-                  <XAxis
-                    dataKey="date"
-                    tick={AXIS_TICK}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
-                    minTickGap={40}
-                    tickFormatter={(d: string) => d.slice(2, 7)}
-                  />
-                  <YAxis
-                    tick={AXIS_TICK}
-                    axisLine={AXIS_LINE}
-                    tickLine={TICK_LINE}
-                    width={60}
-                    domain={["auto", "auto"]}
-                    tickFormatter={(v: number) => num(v, 0)}
-                  />
-                  <Tooltip
-                    contentStyle={TOOLTIP_CONTENT_STYLE}
-                    labelStyle={TOOLTIP_LABEL_STYLE}
-                    formatter={(v: number, name: string) => [num(v), name]}
-                  />
-                  <Legend wrapperStyle={LEGEND_STYLE} />
-                  <Line
-                    type="monotone"
-                    dataKey="close"
-                    name="Price"
-                    stroke={CHART_ROLE.neutral}
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  {periods.map((p) => (
-                    <Line
-                      key={p}
-                      type="monotone"
-                      dataKey={smaKey(p)}
-                      name={`${p}-day average`}
-                      stroke={PERIOD_STYLE[p].stroke}
-                      strokeWidth={1.5}
-                      strokeDasharray={PERIOD_STYLE[p].dash}
-                      dot={false}
-                      connectNulls
-                      isAnimationActive={false}
-                    />
-                  ))}
-                  {crossovers.map((c) => (
-                    <ReferenceDot
-                      key={c.id}
-                      x={c.date}
-                      y={c.close}
-                      r={5}
-                      fill={c.direction === "golden" ? CHART_ROLE.positive : CHART_ROLE.negative}
-                      stroke={CHART_ROLE.neutral}
-                      strokeWidth={1}
-                      isFront
-                      ifOverflow="extendDomain"
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartFrame>
-
-            <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              {periods.map((p) => (
-                <div
-                  key={p}
-                  className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2"
-                >
-                  <dt className="text-muted-foreground">{p}-day avg</dt>
-                  <dd className="tabular-nums">{num(history.smaLatest?.[p] ?? null)}</dd>
-                </div>
-              ))}
-              <div className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2">
-                <dt className="text-muted-foreground">Volatility</dt>
-                <dd className="tabular-nums">{pct(history.volatilityPct, 0)}</dd>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2">
-                <dt className="text-muted-foreground">Max fall</dt>
-                <dd className="tabular-nums">{pct(history.maxDrawdownPct)}</dd>
-              </div>
-            </dl>
-
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">
-                Crossovers in this window
-                {crossovers.length ? ` (${crossovers.length})` : ""}
-              </p>
-              {crossovers.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {periods.length < 2
-                    ? "Pick two or more averages to track crossovers."
-                    : `No ${periodsLabel}-day crossovers over ${rangeLabel(range)}.`}
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {crossovers.slice(0, 6).map((c: SmaCrossover) => {
-                    const up = c.direction === "golden";
-                    const Icon = up ? TrendingUp : TrendingDown;
-                    return (
-                      <li
-                        key={c.id}
-                        className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-surface-2 px-2.5 py-1.5 text-xs"
-                      >
-                        <Icon
-                          className={`h-3.5 w-3.5 shrink-0 ${up ? "text-emerald-500" : "text-destructive"}`}
-                          aria-hidden="true"
-                        />
-                        <span className="tabular-nums text-muted-foreground">{c.date}</span>
-                        <span className="font-medium">{crossoverLabel(c)}</span>
-                        <Badge variant="outline" className={up ? TONE_CLASS.up : TONE_CLASS.down}>
-                          {up ? "Golden cross" : "Death cross"}
-                        </Badge>
-                        <span className="ml-auto tabular-nums text-muted-foreground">
-                          {c.barsAgo === 0 ? "latest bar" : `${c.barsAgo} bars ago`} · {pct(c.sinceChangePct)} since
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </>
-        )}
+              />
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
