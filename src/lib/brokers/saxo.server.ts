@@ -688,8 +688,15 @@ export class SaxoAdapter implements BrokerAdapter {
       BuySell: req.side === "buy" ? "Buy" : "Sell",
       Amount: req.quantity,
       AmountType: "Quantity",
-      OrderType: req.orderType === "limit" ? "Limit" : "Market",
-      OrderDuration: { DurationType: "DayOrder" },
+      OrderType:
+        req.orderType === "limit"
+          ? "Limit"
+          : req.orderType === "stop"
+            ? "StopIfTraded"
+            : "Market",
+      OrderDuration: {
+        DurationType: req.duration === "gtc" ? "GoodTillCancel" : "DayOrder",
+      },
       ExternalReference: externalReference(req.clientOrderId),
       // Saxo requires this on every order since 2024: "true" marks the order
       // as manually initiated by a human. We surface manual + cron runs the
@@ -701,6 +708,7 @@ export class SaxoAdapter implements BrokerAdapter {
 
     if (accountKey) body.AccountKey = accountKey;
     if (req.orderType === "limit" && req.limitPrice != null) body.OrderPrice = req.limitPrice;
+    if (req.orderType === "stop" && req.stopPrice != null) body.OrderPrice = req.stopPrice;
 
     // Pre-flight against Saxo's precheck endpoint. This validates the order
     // against the *broker's* cash balance and position rules without actually
