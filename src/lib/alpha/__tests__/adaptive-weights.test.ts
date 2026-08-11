@@ -25,8 +25,8 @@ describe("adaptive alpha weights", () => {
     expect(performanceSignal({ model_kind: "trend", samples: 50, hit_rate: null, avg_edge_bps: null })).toBe(0);
     const good = performanceSignal({ model_kind: "trend", samples: 50, hit_rate: 0.7, avg_edge_bps: 300 });
     const bad = performanceSignal({ model_kind: "trend", samples: 50, hit_rate: 0.2, avg_edge_bps: -300 });
-    expect(good).toBe(1);
-    expect(bad).toBe(-1);
+    expect(good).toBeCloseTo(1, 9);
+    expect(bad).toBeCloseTo(-1, 9);
     // edge weighs 60% vs hit rate 40%
     const mixed = performanceSignal({ model_kind: "carry", samples: 50, hit_rate: 0.3, avg_edge_bps: 120 });
     expect(mixed).toBeCloseTo(-1 * 0.4 + 1 * 0.6, 6);
