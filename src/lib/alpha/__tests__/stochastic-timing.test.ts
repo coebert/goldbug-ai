@@ -63,8 +63,7 @@ describe("stochastic()", () => {
     const closes = [
       ...Array.from({ length: 30 }, (_, i) => 120 - i * 2), // long slide → oversold
       62,
-      66,
-      70,
+      68,
     ];
     const s = stochastic(candles(closes))!;
     expect(s.rising).toBe(true);
