@@ -33,6 +33,7 @@ import {
 } from "@/lib/chart-palette";
 import {
   computeTrendStrength,
+  computeTrendStrengthSeries,
   crossoverLabel,
   detectSmaCrossovers,
   rangeLabel,
@@ -43,7 +44,11 @@ import {
   type SmaPeriod,
   type SymbolHistory,
 } from "@/lib/market-symbol-history";
-import { TrendStrengthBadge, TrendStrengthStat } from "@/components/market/trend-strength-badge";
+import {
+  TrendStrengthBadge,
+  TrendStrengthSparkline,
+  TrendStrengthStat,
+} from "@/components/market/trend-strength-badge";
 import { PERIOD_STYLE, serialiseSmaPeriods } from "@/lib/sma-display";
 
 export const TONE_CLASS = {
@@ -107,6 +112,10 @@ export function SmaTrendPanel({
   );
   const strength = useMemo(
     () => (history ? computeTrendStrength(history.points, periods) : null),
+    [history, periods],
+  );
+  const strengthSeries = useMemo(
+    () => (history ? computeTrendStrengthSeries(history.points, periods) : []),
     [history, periods],
   );
   const verdict = trendVerdict(periods.map((p) => history?.aboveSma?.[p] ?? null));
@@ -250,6 +259,12 @@ export function SmaTrendPanel({
               <dd className="tabular-nums">{pct(history.volatilityPct, 0)}</dd>
             </div>
             <TrendStrengthStat strength={strength} />
+            <div className="col-span-2 rounded-lg border border-border/60 bg-surface-2 px-2.5 py-1.5">
+              <dt className="text-muted-foreground">Trend strength over time</dt>
+              <dd>
+                <TrendStrengthSparkline series={strengthSeries} className="h-10 w-full" />
+              </dd>
+            </div>
             <div className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2">
               <dt className="text-muted-foreground">Max fall</dt>
               <dd className="tabular-nums">{pct(history.maxDrawdownPct)}</dd>
