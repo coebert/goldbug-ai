@@ -335,12 +335,31 @@ function simulate(
   const sd = Math.sqrt(varr);
   const sharpe = sd > 0 ? (mean / sd) * Math.sqrt(252) : 0;
 
+  // Drawdown, plus where it happened: a trough reached while the tape is in
+  // the correlated stress regime is an execution tail, not just a signal tail.
   let peak = -Infinity;
+  let peakIdx = 0;
   let maxDd = 0;
-  for (const e of equityCurve) {
-    peak = Math.max(peak, e);
-    maxDd = Math.min(maxDd, e / peak - 1);
+  let ddPeakIdx = 0;
+  let ddTroughIdx = 0;
+  for (let i = 0; i < equityCurve.length; i++) {
+    const e = equityCurve[i]!;
+    if (e > peak) {
+      peak = e;
+      peakIdx = i;
+    }
+    const dd = e / peak - 1;
+    if (dd < maxDd) {
+      maxDd = dd;
+      ddPeakIdx = peakIdx;
+      ddTroughIdx = i;
+    }
   }
+  let windowStressBars = 0;
+  for (let i = ddPeakIdx; i <= ddTroughIdx && i < stressedCurve.length; i++) {
+    if (stressedCurve[i]) windowStressBars++;
+  }
+  const windowLen = Math.max(1, ddTroughIdx - ddPeakIdx + 1);
 
   return {
     returnPct: (finalEquity / startingCash - 1) * 100,
@@ -357,6 +376,9 @@ function simulate(
     makerFills,
     takerFills,
     driftCosts,
+    maxDdTroughStressed: stressedCurve[ddTroughIdx] === true,
+    maxDdWindowStressShare: (windowStressBars / windowLen) * 100,
+
   };
 }
 
