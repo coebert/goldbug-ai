@@ -61,6 +61,34 @@ export interface Comparison {
   to: string | null;
   /** Return correlations between every selected symbol over the shared window. */
   correlation: CorrelationMatrix;
+  /** Daily returns aligned to `dates` per symbol, for rolling-window analysis. */
+  returns: Record<string, (number | null)[]>;
+}
+
+/** Selectable rolling-correlation windows, in trading-day observations. */
+export const ROLLING_WINDOWS = [30, 60, 90] as const;
+export type RollingWindow = (typeof ROLLING_WINDOWS)[number];
+
+export interface RollingPair {
+  /** Stable key, e.g. "SPY|QQQ". */
+  key: string;
+  symbolA: string;
+  symbolB: string;
+  label: string;
+  color: string;
+  /** Correlation at each date in `dates`; null before the window fills. */
+  values: (number | null)[];
+  latest: number | null;
+  min: number | null;
+  max: number | null;
+  average: number | null;
+}
+
+export interface RollingCorrelation {
+  window: RollingWindow;
+  /** Dates carrying at least one computed pair value, ascending. */
+  dates: string[];
+  pairs: RollingPair[];
 }
 
 /** Parse the `compare` search param (comma separated) into a clean list. */
@@ -258,5 +286,65 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
       series.map((s) => s.label),
       returnsBySymbol,
     ),
+    returns: Object.fromEntries(returnsBySymbol),
+  };
+}
+
+/**
+ * Rolling Pearson correlation for every symbol pair: at each date, correlate
+ * the last `window` overlapping daily returns. This exposes *changes* in the
+ * relationship (e.g. a hedge that stops hedging in a selloff) that a single
+ * full-window number averages away.
+ *
+ * A date only gets a value once the trailing slice holds at least
+ * `MIN_CORRELATION_POINTS` overlapping observations, so early points are left
+ * blank rather than computed from a handful of days.
+ */
+export function buildRollingCorrelation(
+  comparison: Comparison,
+  window: RollingWindow,
+): RollingCorrelation {
+  const { dates, series, returns } = comparison;
+  const pairs: RollingPair[] = [];
+
+  let colorIndex = 0;
+  for (let a = 0; a < series.length; a++) {
+    for (let b = a + 1; b < series.length; b++) {
+      const sa = series[a];
+      const sb = series[b];
+      const ra = returns[sa.symbol] ?? [];
+      const rb = returns[sb.symbol] ?? [];
+
+      const values: (number | null)[] = dates.map((_, i) => {
+        const start = Math.max(0, i - window + 1);
+        const { value, n } = pearson(ra.slice(start, i + 1), rb.slice(start, i + 1));
+        return n >= MIN_CORRELATION_POINTS ? value : null;
+      });
+
+      const present = values.filter((v): v is number => v != null);
+      pairs.push({
+        key: `${sa.symbol}|${sb.symbol}`,
+        symbolA: sa.symbol,
+        symbolB: sb.symbol,
+        label: `${sa.label} · ${sb.label}`,
+        color: CHART_SEQUENCE[colorIndex++ % CHART_SEQUENCE.length],
+        values,
+        latest: present.length ? present[present.length - 1] : null,
+        min: present.length ? Math.min(...present) : null,
+        max: present.length ? Math.max(...present) : null,
+        average: present.length
+          ? Number((present.reduce((x, y) => x + y, 0) / present.length).toFixed(4))
+          : null,
+      });
+    }
+  }
+
+  const firstIndex = dates.findIndex((_, i) => pairs.some((p) => p.values[i] != null));
+  const trimFrom = firstIndex < 0 ? dates.length : firstIndex;
+
+  return {
+    window,
+    dates: dates.slice(trimFrom),
+    pairs: pairs.map((p) => ({ ...p, values: p.values.slice(trimFrom) })),
   };
 }
