@@ -24,6 +24,11 @@
 // the same shocks, so joint worst-case numbers are reproducible.
 
 import {
+  factorWeights,
+  makeCorrelationStructure,
+  type CorrelationStructure,
+} from "./execution-correlation-structures";
+import {
   DEFAULT_EXECUTION_SIM,
   mulberry32,
   standardNormal,
@@ -31,9 +36,17 @@ import {
   type ExecutionSimConfig,
 } from "./execution-monte-carlo";
 
+
 export type CorrelatedExecutionConfig = ExecutionSimConfig & {
   /** Pairwise correlation of log-slippage across symbols on the same bar, 0…1. */
   rho: number;
+  /**
+   * Optional alternative coupling assumption (sector blocks, contagion, …).
+   * When set it fully replaces the single global `rho`; see
+   * `execution-correlation-structures.ts`.
+   */
+  structure?: CorrelationStructure;
+
   /** Probability a calm bar turns stressed (before the volatility override). */
   stressEnterProb: number;
   /** Probability a stressed bar returns to calm — 1/this is the mean stress length. */
@@ -74,6 +87,8 @@ export type BarRegime = {
   volZ: number;
   /** Common slippage factor draw for the bar, in log space. */
   commonZ: number;
+  /** Per-cluster factor draws for the bar, in log space (empty for a global rho). */
+  clusterZ: ReadonlyMap<string, number>;
   /** Deterministic slippage multiplier applied to every symbol on this bar. */
   regimeMult: number;
 };
@@ -85,25 +100,49 @@ export type CorrelatedExecutionSampler = {
    * `volZ` is the cross-sectional realised-volatility z-score of the tape.
    */
   beginBar: (volZ?: number) => BarRegime;
-  /** Draws one order's execution on the current bar. */
-  draw: () => ExecutionDraw;
+  /**
+   * Draws one order's execution on the current bar. Pass the symbol when a
+   * clustered structure is configured so the right cluster factor is used;
+   * omitting it treats the order as unclustered.
+   */
+  draw: (symbol?: string) => ExecutionDraw;
   /** The current bar's regime (before `beginBar`, a calm placeholder). */
   regime: () => BarRegime;
   /** Fraction of bars so far that were stressed. */
   stressShare: () => number;
 };
 
-const CALM: BarRegime = { stressed: false, volZ: 0, commonZ: 0, regimeMult: 1 };
+const CALM: BarRegime = {
+  stressed: false,
+  volZ: 0,
+  commonZ: 0,
+  clusterZ: new Map(),
+  regimeMult: 1,
+};
 
 export function makeCorrelatedExecutionSampler(
   cfg: Partial<CorrelatedExecutionConfig>,
   seed: number,
 ): CorrelatedExecutionSampler {
   const c = { ...DEFAULT_CORRELATED_EXECUTION, ...cfg };
-  const rho = Math.min(1, Math.max(0, c.rho));
-  const wCommon = Math.sqrt(rho);
-  const wIdio = Math.sqrt(1 - rho);
+  // A bare `rho` is just the single-factor special case of a structure.
+  const structure = c.structure
+    ?? makeCorrelationStructure({ kind: "global", rho: c.rho });
+  const clusters = [...new Set([...structure.groups.values(), "other"])].sort();
   const rng = mulberry32(seed);
+  // Cluster factors come off their own stream so that swapping the structure
+  // does not shift the main stream: paths stay comparable across assumptions.
+  const clusterRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  const weightCache = new Map<string, ReturnType<typeof factorWeights>>();
+  const weightsFor = (symbol: string, stressed: boolean) => {
+    const key = `${stressed ? "s" : "c"}|${symbol}`;
+    let w = weightCache.get(key);
+    if (!w) {
+      w = factorWeights(structure, symbol, stressed);
+      weightCache.set(key, w);
+    }
+    return w;
+  };
 
   let bar: BarRegime = CALM;
   let bars = 0;
@@ -120,16 +159,22 @@ export function makeCorrelatedExecutionSampler(
     const volExcess = Math.max(0, z - c.volStressZ);
     const regimeMult = (stressed ? c.stressSlippageMult : 1) * (1 + c.volSlippageBeta * volExcess);
 
-    bar = { stressed, volZ: z, commonZ: standardNormal(rng), regimeMult };
+    const clusterZ = new Map<string, number>();
+    for (const g of clusters) clusterZ.set(g, standardNormal(clusterRng));
+
+    bar = { stressed, volZ: z, commonZ: standardNormal(rng), clusterZ, regimeMult };
     bars++;
     if (stressed) stressedBars++;
     return bar;
   };
 
-  const draw = (): ExecutionDraw => {
+  const draw = (symbol?: string): ExecutionDraw => {
     const sigma = c.slippageSigma * (bar.stressed ? c.stressSigmaMult : 1);
-    // Common + idiosyncratic decomposition: rho is the cross-symbol correlation.
-    const z = wCommon * bar.commonZ + wIdio * standardNormal(rng);
+    // Market + cluster + idiosyncratic decomposition. With a global structure
+    // the cluster loading is zero and this reduces to the original two terms.
+    const w = weightsFor(symbol ?? "", bar.stressed);
+    const gz = bar.clusterZ.get(w.group) ?? 0;
+    const z = w.market * bar.commonZ + w.cluster * gz + w.idio * standardNormal(rng);
     let mult = Math.exp(z * sigma) * bar.regimeMult;
     if (rng() < c.tailProb) mult *= c.tailMult;
     mult = Math.min(c.maxSlippageMult, Math.max(0, mult));
@@ -144,6 +189,7 @@ export function makeCorrelatedExecutionSampler(
     else if (u < noFill + partial) fillRatio = c.minFillRatio + rng() * (1 - c.minFillRatio);
     return { slippageMult: mult, fillRatio };
   };
+
 
   return {
     beginBar,

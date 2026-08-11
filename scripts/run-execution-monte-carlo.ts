@@ -57,6 +57,14 @@ import {
   type CorrelatedExecutionSampler,
 } from "../src/lib/execution-correlated-shocks";
 import {
+  clusterMap,
+  describeStructure,
+  makeCorrelationStructure,
+  type CorrelationStructure,
+  type CorrelationStructureKind,
+} from "../src/lib/execution-correlation-structures";
+
+import {
   EXECUTION_CHANNELS,
   channelSubsets,
   subsetKey,
@@ -118,7 +126,10 @@ const simCfg = {
   stressFullFillMult: DEFAULT_CORRELATED_EXECUTION.stressFullFillMult,
   volStressZ: Number(arg("vol-stress-z", String(DEFAULT_CORRELATED_EXECUTION.volStressZ))),
   volSlippageBeta: DEFAULT_CORRELATED_EXECUTION.volSlippageBeta,
+  // Set below, once the coupling assumption is resolved from the CLI.
+  structure: undefined as CorrelationStructure | undefined,
 };
+
 
 // --exec-model market  → every order crosses (the legacy behaviour).
 // --exec-model limit   → orders rest first: maker/taker odds, queue fill
@@ -148,7 +159,7 @@ const parseList = (raw: string) =>
 
 const rhoSweep = parseList(arg("rho-sweep", ""));
 const volZSweep = parseList(arg("vol-z-sweep", ""));
-const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0;
+// `sweepMode` is set below, once --structure-sweep has been parsed too.
 const sweepPaths = Number(arg("sweep-paths", String(Math.max(40, Math.round(paths / 3)))));
 // Threshold headlined in the sweep matrix; the full breach table still prints.
 const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? ddThresholds[0] ?? 15)));
@@ -159,9 +170,45 @@ const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? d
 const stressQuantile = Number(arg("stress-quantile", "0.8"));
 const stressTailFrac = Number(arg("stress-tail", "0.2"));
 
+// ------------------------------------------------ correlation-structure choice
+// --corr-structure blocks --within-rho 0.7 --across-rho 0.2
+// --structure-sweep independent,global,blocks,contagion
+// A single global ρ says every name widens with every other name equally. That
+// is one assumption among several; these flags let you re-estimate the joint
+// drawdown tail under sector-clustered coupling, or under contagion where the
+// clusters merge exactly when the tape is stressed.
+const clusters = clusterMap(symbols);
+const structureArgs = {
+  rho: simCfg.rho,
+  withinRho: argOrUndef("within-rho"),
+  acrossRho: argOrUndef("across-rho"),
+  stressWithinRho: argOrUndef("stress-within-rho"),
+  stressAcrossRho: argOrUndef("stress-across-rho"),
+  groups: clusters,
+};
+function argOrUndef(name: string): number | undefined {
+  const v = arg(name, "");
+  return v === "" ? undefined : Number(v);
+}
+const buildStructure = (kind: CorrelationStructureKind) =>
+  makeCorrelationStructure({ ...structureArgs, kind });
+
+const structureSweep = arg("structure-sweep", "")
+  .split(",").map((s) => s.trim()).filter(Boolean) as CorrelationStructureKind[];
+simCfg.structure = buildStructure(
+  (arg("corr-structure", "global") as CorrelationStructureKind),
+);
+
+// Any of the three axes puts the run into the sweep report.
+const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.length > 0;
+
+
+
 // --attribution: Shapley breakdown of the tail into slippage / fill-rate / stress.
 const attributionMode = process.argv.includes("--attribution");
 const attribPaths = Number(arg("attrib-paths", String(Math.max(30, Math.round(paths / 4)))));
+
+
 
 
 
@@ -250,8 +297,10 @@ function simulate(
   let takerFills = 0;
   let driftCosts = 0;
 
-  const marketDraw = () => {
-    const d = sampler ? sampler.draw() : DETERMINISTIC_DRAW;
+  const marketDraw = (sym: string) => {
+    // Symbol matters once the coupling assumption is clustered: the sampler
+    // routes it to its sector factor.
+    const d = sampler ? sampler.draw(sym) : DETERMINISTIC_DRAW;
     if (mask.slippage && mask.fillRate) return d;
     return {
       ...d,
@@ -264,7 +313,8 @@ function simulate(
   // limit book first. `extraBps` is fee + adverse selection + waiting drift,
   // which the calibrated spread model does not know about.
   const order = (sym: string, i: number, forceTaker = false) => {
-    const base = marketDraw();
+    const base = marketDraw(sym);
+
     if (!limit) return { ...base, extraBps: 0, liquidity: "taker" as const };
     const d = limit.draw({
       barVolBps: volBpsBySymbol.get(sym)?.[i] ?? 0,
@@ -728,16 +778,24 @@ async function main() {
   if (sweepMode) {
     const rhos = rhoSweep.length ? rhoSweep : [simCfg.rho];
     const zs = volZSweep.length ? volZSweep : [simCfg.volStressZ];
+    // Each structure is a different answer to "what couples with what?".
+    // Sweeping them shows how much of the joint tail is the coupling assumption.
+    const structs: CorrelationStructure[] = structureSweep.length
+      ? structureSweep.map(buildStructure)
+      : [simCfg.structure!];
     console.log(
       `Sensitivity sweep: ρ ∈ {${rhos.join(", ")}} × vol-z trigger ∈ {${zs.join(", ")}} `
+      + `× structure ∈ {${structs.map((s) => s.kind).join(", ")}} `
       + `· ${sweepPaths} paths/cell · headline breach threshold ${sweepThreshold}%`,
     );
+    for (const s of structs) console.log(`  · ${describeStructure(s)}`);
     console.log();
 
     for (const variant of SMA_VARIANTS) {
       const tuned = tuneVariant(variant);
       console.log(`=== ${variant} ===`);
       const header = [
+        "structure".padEnd(12),
         "rho".padStart(5),
         "volZ".padStart(6),
         "med ret%".padStart(9),
@@ -755,9 +813,20 @@ async function main() {
       console.log(header);
       console.log("-".repeat(header.length));
 
+      for (const structure of structs) {
       for (const rho of rhos) {
         for (const z of zs) {
-          const cfg = { ...simCfg, rho, volStressZ: z };
+          // A bare --rho-sweep still means the global structure: rebuild the
+          // structure at this ρ so the sweep axis actually bites.
+          const cfg = {
+            ...simCfg,
+            rho,
+            volStressZ: z,
+            structure: rhoSweep.length && structure.kind === "global"
+              ? makeCorrelationStructure({ kind: "global", rho })
+              : structure,
+          };
+
           const pathRet: number[] = [];
           const pathDeepestDd: number[] = [];
           /** Did the path's deepest drawdown happen inside the stress regime? */
@@ -808,6 +877,7 @@ async function main() {
           // the worst-stress 20% of paths.
           const condRet = conditionalTailStats(pathRet, pathStressShare, stressQuantile, stressTailFrac);
           console.log([
+            structure.kind.padEnd(12),
             fmt(rho, 2).padStart(5),
             fmt(z, 2).padStart(6),
             fmt(ret.median).padStart(9),
@@ -823,8 +893,14 @@ async function main() {
           ].join(" "));
         }
       }
+      }
       console.log();
     }
+
+    console.log("'structure' is the coupling assumption: independent = no cross-symbol link,");
+    console.log("global = one ρ for every pair, blocks = ρ within a sector cluster and a lower ρ");
+    console.log("across clusters, contagion = blocks in calm that converge toward 1 under stress.");
+
 
 
     console.log("Reading: each row is one joint-risk assumption. ρ controls how much every");
