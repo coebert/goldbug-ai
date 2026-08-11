@@ -124,6 +124,21 @@ const limitCfg = {
   waitDriftBeta: Number(arg("wait-drift-beta", String(DEFAULT_LIMIT_ORDER.waitDriftBeta))),
 };
 
+// ------------------------------------------------- joint-risk sensitivity sweep
+// --rho-sweep 0,0.3,0.6,0.9 --vol-z-sweep 1,1.5,2,99
+// Runs the same walk-forward Monte-Carlo across a grid of cross-symbol
+// correlation (ρ) × realised-vol stress trigger (z), so you can see how the
+// *joint* worst case moves with each assumption instead of trusting one cell.
+const parseList = (raw: string) =>
+  raw.split(",").map((s) => Number(s.trim())).filter((v) => Number.isFinite(v));
+const rhoSweep = parseList(arg("rho-sweep", ""));
+const volZSweep = parseList(arg("vol-z-sweep", ""));
+const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0;
+const sweepPaths = Number(arg("sweep-paths", String(Math.max(40, Math.round(paths / 3)))));
+// Threshold headlined in the sweep matrix; the full breach table still prints.
+const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? ddThresholds[0] ?? 15)));
+
+
 const GRID: SmaVariantParams[] = [];
 for (const separationPct of [0, 0.002, 0.005, 0.01]) {
   for (const confirmBars of [1, 2, 3]) GRID.push({ separationPct, confirmBars });
