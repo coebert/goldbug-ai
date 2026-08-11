@@ -162,6 +162,7 @@ import { updateSignalPerformance } from "./signal-decay.server";
 import { checkOvernightGap } from "./overnight-gap.server";
 import {
   atrScaledStopPct,
+  atrTakeProfitPct,
   evaluateChandelier,
   evaluateScaleOut,
   evaluateTimeStop,
