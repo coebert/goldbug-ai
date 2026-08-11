@@ -249,3 +249,24 @@ describe("computeTrendStrengthSeries", () => {
     expect(computeTrendStrengthSeries(mk(5, () => 100), [50], 30)).toEqual([]);
   });
 });
+
+describe("trend-strength basis override", () => {
+  const pts = Array.from({ length: 60 }, (_, i) => ({
+    date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10),
+    close: 100 * 1.002 ** i,
+    indexed: 100,
+    sma20: 100 * 1.002 ** i,
+    sma50: 100 * 0.998 ** i,
+    sma100: null,
+    sma200: null,
+  }));
+
+  it("measures the score on the requested average", () => {
+    expect(computeTrendStrength(pts, [20, 50], 20)!.period).toBe(20);
+    expect(computeTrendStrength(pts, [20, 50], 20)!.score).toBeGreaterThan(0);
+    expect(computeTrendStrength(pts, [20, 50], 50)!.score).toBeLessThan(0);
+    // auto falls back to the slowest selected average
+    expect(computeTrendStrength(pts, [20, 50])!.period).toBe(50);
+    expect(computeTrendStrengthSeries(pts, [20, 50], 20, 20)[0].score).toBeGreaterThan(0);
+  });
+});
