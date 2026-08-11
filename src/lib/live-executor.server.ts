@@ -11,6 +11,8 @@ import { asJson } from "@/lib/_server/db-json";
 import { createHash } from "node:crypto";
 import { assessTradeViability, modelledFillFee } from "@/lib/trade-viability-gate";
 import { resolveFillRecord } from "@/lib/fill-record";
+import { planMarketableLimit } from "@/lib/marketable-limit";
+import { planProtectiveStop } from "@/lib/protective-stops";
 
 
 export interface ExecutedOrderLike {
@@ -1761,6 +1763,15 @@ export async function routeOrdersToBroker(params: {
 
 
 
+    // Phase 2 — marketable limit instead of a naked market order. Still
+    // crosses the book (fills like a market order in normal conditions) but
+    // caps the worst price we will accept if the book gaps away.
+    const limitPlan = planMarketableLimit({
+      side: order.side,
+      referencePrice: order.price,
+      currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
+    });
+
     // Insert-first: DB unique index on client_order_id is the source of truth
     // for idempotency. On unique violation (23505) we look up the winner and
     // report it — no broker call is made for the duplicate.
@@ -1775,8 +1786,8 @@ export async function routeOrdersToBroker(params: {
         symbol: order.symbol,
         side: order.side,
         quantity: qty,
-        order_type: "market",
-        limit_price: order.price,
+        order_type: limitPlan ? "limit" : "market",
+        limit_price: limitPlan ? limitPlan.limitPrice : order.price,
         status: "pending",
         submitted_at: new Date().toISOString(),
         instrument_ccy: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
@@ -1821,7 +1832,9 @@ export async function routeOrdersToBroker(params: {
         symbol: order.symbol,
         side: order.side,
         quantity: qty,
-        orderType: "market",
+        ...(limitPlan
+          ? { orderType: "limit" as const, limitPrice: limitPlan.limitPrice }
+          : { orderType: "market" as const }),
         clientOrderId,
       });
     } catch (err) {
@@ -1907,6 +1920,51 @@ export async function routeOrdersToBroker(params: {
           broker_fill_id: brokerRes.brokerOrderId || null,
           filled_at: new Date().toISOString(),
         });
+        // Phase 2 — rest a protective stop at the broker so the exit
+        // survives outages, weekends and overnight gaps. Best-effort: a
+        // failed stop must never invalidate the fill we just booked.
+        if (order.side === "buy") {
+          try {
+            const stop = planProtectiveStop({
+              side: "buy",
+              fillPrice: resolved.fillPrice,
+            });
+            if (stop && brokerRes.filledQuantity >= 1) {
+              const stopQty = Math.floor(brokerRes.filledQuantity);
+              const stopClientId = `${clientOrderId}-stp`.slice(0, 50);
+              const stopRes = await adapter.placeOrder({
+                symbol: order.symbol,
+                side: stop.side,
+                quantity: stopQty,
+                orderType: "stop",
+                stopPrice: stop.stopPrice,
+                duration: "gtc",
+                clientOrderId: stopClientId,
+              });
+              await supabaseAdmin.from("live_broker_log").insert({
+                portfolio_id: portfolio.id,
+                user_id: userId,
+                broker: "saxo",
+                env: adapter.env,
+                method: "PROTECTIVE_STOP",
+                path: "live_orders",
+                status: null,
+                request: asJson({
+                  symbol: order.symbol,
+                  quantity: stopQty,
+                  stopPrice: stop.stopPrice,
+                  stopPct: stop.stopPct,
+                  reason: stop.reason,
+                }),
+                response: asJson({ status: stopRes.status, brokerOrderId: stopRes.brokerOrderId }),
+                error: stopRes.status === "rejected" ? (stopRes.reason ?? "rejected") : null,
+              });
+            }
+          } catch (e) {
+            console.warn("[live-executor] protective stop failed:", e);
+          }
+        }
+
         const { notifyTradeFilled } = await import("./trade-fill-notify.server");
         notifyTradeFilled({
           userId,
