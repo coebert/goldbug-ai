@@ -96,8 +96,8 @@ export async function deliverAlertWebhook(params: {
       http_status: summary.httpStatus,
       error: summary.error,
       duration_ms: summary.durationMs,
-      attempt_log: attempts,
-      payload,
+      attempt_log: attempts as unknown as never,
+      payload: payload as unknown as never,
     });
   } catch (e) {
     console.warn("alert webhook log failed", e instanceof Error ? e.message : String(e));
