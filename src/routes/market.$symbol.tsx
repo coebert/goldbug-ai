@@ -25,6 +25,7 @@ import {
   HISTORY_RANGES,
   HISTORY_SYMBOLS,
   coerceRange,
+  computeTrendStrength,
   rangeLabel,
   smaKey,
   symbolMeta,
@@ -32,6 +33,7 @@ import {
   type SmaPeriod,
   type SymbolHistory,
 } from "@/lib/market-symbol-history";
+import { TrendStrengthBadge, TrendStrengthStat } from "@/components/market/trend-strength-badge";
 import {
   DEFAULT_SMA_PERIODS,
   PERIOD_STYLE,
@@ -329,6 +331,11 @@ function MarketSymbolPage() {
     refetchOnWindowFocus: false,
   });
 
+  const strength = useMemo(
+    () => (query.data ? computeTrendStrength(query.data.points, periods) : null),
+    [query.data, periods],
+  );
+
   const annotationQuery = useQuery({
     queryKey: ["symbol-annotations", symbol, range],
     queryFn: () => fetchAnnotations({ data: { symbol, days: range } }),
@@ -447,7 +454,9 @@ function MarketSymbolPage() {
                 >
                   {pct(history.changePct)} over {rangeLabel(range)}
                 </Badge>
+                <TrendStrengthBadge strength={strength} />
               </div>
+
 
               <ChartFrame className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -543,6 +552,9 @@ function MarketSymbolPage() {
                 <Stat label="Range low" value={num(history.low)} />
                 <Stat label="Volatility (annualised)" value={pct(history.volatilityPct, 0)} />
                 <Stat label="Worst fall in range" value={pct(history.maxDrawdownPct)} />
+                <dl className="contents">
+                  <TrendStrengthStat strength={strength} />
+                </dl>
                 {periods.map((p) => (
                   <Stat key={p} label={`${p}-day average`} value={num(history.smaLatest?.[p] ?? null)} />
                 ))}

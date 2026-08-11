@@ -32,6 +32,7 @@ import {
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
 import {
+  computeTrendStrength,
   crossoverLabel,
   detectSmaCrossovers,
   rangeLabel,
@@ -42,6 +43,7 @@ import {
   type SmaPeriod,
   type SymbolHistory,
 } from "@/lib/market-symbol-history";
+import { TrendStrengthBadge, TrendStrengthStat } from "@/components/market/trend-strength-badge";
 import { PERIOD_STYLE, serialiseSmaPeriods } from "@/lib/sma-display";
 
 export const TONE_CLASS = {
@@ -101,6 +103,10 @@ export function SmaTrendPanel({
 }) {
   const crossovers = useMemo(
     () => (history ? detectSmaCrossovers(history.points, periods) : []),
+    [history, periods],
+  );
+  const strength = useMemo(
+    () => (history ? computeTrendStrength(history.points, periods) : null),
     [history, periods],
   );
   const verdict = trendVerdict(periods.map((p) => history?.aboveSma?.[p] ?? null));
@@ -163,6 +169,7 @@ export function SmaTrendPanel({
             <Badge variant="outline" className={TONE_CLASS[verdict.tone]}>
               {verdict.text}
             </Badge>
+            <TrendStrengthBadge strength={strength} />
           </div>
 
           <ChartFrame className={compact ? "h-44 w-full" : "h-64 w-full"}>
@@ -242,6 +249,7 @@ export function SmaTrendPanel({
               <dt className="text-muted-foreground">Volatility</dt>
               <dd className="tabular-nums">{pct(history.volatilityPct, 0)}</dd>
             </div>
+            <TrendStrengthStat strength={strength} />
             <div className="rounded-lg border border-border/60 bg-surface-2 px-2.5 py-2">
               <dt className="text-muted-foreground">Max fall</dt>
               <dd className="tabular-nums">{pct(history.maxDrawdownPct)}</dd>
