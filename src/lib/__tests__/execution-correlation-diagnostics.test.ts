@@ -30,8 +30,10 @@ function makeTape(opts: { bars: number; seed: number; stressFrom?: number }) {
   for (const s of symbols) groups.set(s, s.startsWith("A") ? "alpha" : "beta");
   const prices = new Map<string, number[]>(symbols.map((s) => [s, [100]]));
   const stressFrom = opts.stressFrom ?? Number.POSITIVE_INFINITY;
+  const volZ: number[] = [0];
   for (let t = 1; t < opts.bars; t++) {
     const stressed = t >= stressFrom;
+    volZ.push(stressed ? 2.5 : 0);
     const market = gauss(r) * (stressed ? 3 : 1);
     const alpha = gauss(r);
     const beta = gauss(r);
@@ -43,7 +45,7 @@ function makeTape(opts: { bars: number; seed: number; stressFrom?: number }) {
       series.push(Math.max(1, series[series.length - 1]! * (1 + shock)));
     }
   }
-  return { series: prices as ReadonlyMap<string, readonly number[]>, groups };
+  return { series: prices as ReadonlyMap<string, readonly number[]>, groups, volZ };
 }
 
 describe("rollingStability", () => {
@@ -93,7 +95,7 @@ describe("bootstrapRhoCI", () => {
   it("widens as the block size grows, because overlap is real information loss", () => {
     const tight = bootstrapRhoCI(sample, { seed: 3, resamples: 400, blockSize: 1 });
     const wide = bootstrapRhoCI(sample, { seed: 3, resamples: 400, blockSize: 20 });
-    expect(wide.hi - wide.lo).toBeGreaterThan(tight.hi - tight.lo);
+    expect(wide.seZ).toBeGreaterThan(tight.seZ);
     expect(wide.effN).toBeLessThan(tight.effN);
   });
 
@@ -125,8 +127,8 @@ describe("bootstrapSeparationCI", () => {
 });
 
 describe("residualCorrelationErrors", () => {
-  const { series, groups } = makeTape({ bars: 700, seed: 21, stressFrom: 420 });
-  const opts = { groups, window: 40, step: 5 } as const;
+  const { series, groups, volZ } = makeTape({ bars: 700, seed: 21, stressFrom: 420 });
+  const opts = { groups, window: 40, step: 5, volZ } as const;
   const cal = calibrateCorrelations(series, opts);
   const spill = clusterSpilloverMatrix(series, opts);
 
@@ -191,7 +193,9 @@ describe("diagnoseCalibrationFit", () => {
   const base = { window: 40, step: 5, resamples: 300, seed: 1 } as const;
 
   it("flags contagion when stress windows couple harder", () => {
-    const d = diagnoseCalibrationFit(stressed.series, { ...base, groups: stressed.groups });
+    const d = diagnoseCalibrationFit(stressed.series, {
+      ...base, groups: stressed.groups, volZ: stressed.volZ,
+    });
     expect(d.confidence.acrossSeparation.estimate).toBeGreaterThan(0);
     expect(d.contagionSupported).toBe(true);
     expect(d.bestFit).toBe("contagion");
@@ -203,14 +207,16 @@ describe("diagnoseCalibrationFit", () => {
   });
 
   it("derives the block size from the window overlap", () => {
-    const d = diagnoseCalibrationFit(stressed.series, { ...base, groups: stressed.groups });
+    const d = diagnoseCalibrationFit(stressed.series, {
+      ...base, groups: stressed.groups, volZ: stressed.volZ,
+    });
     expect(d.overlapRatio).toBeCloseTo(8, 9);
     expect(d.confidence.calmWithin.effN).toBeLessThan(d.stability.calmWithin.n);
     expect(d.stability.within.effN).toBeCloseTo(d.stability.within.n / 8, 6);
   });
 
   it("is deterministic and renders a report covering all three diagnostics", () => {
-    const opts = { ...base, groups: stressed.groups };
+    const opts = { ...base, groups: stressed.groups, volZ: stressed.volZ };
     const a = diagnoseCalibrationFit(stressed.series, opts);
     const b = diagnoseCalibrationFit(stressed.series, opts);
     expect(formatCalibrationDiagnostics(a)).toBe(formatCalibrationDiagnostics(b));
@@ -223,7 +229,7 @@ describe("diagnoseCalibrationFit", () => {
 
   it("honours a restricted structure list", () => {
     const d = diagnoseCalibrationFit(stressed.series, {
-      ...base, groups: stressed.groups, kinds: ["blocks"],
+      ...base, groups: stressed.groups, volZ: stressed.volZ, kinds: ["blocks"],
     });
     expect(d.structures).toHaveLength(1);
     expect(d.bestFit).toBe("blocks");
