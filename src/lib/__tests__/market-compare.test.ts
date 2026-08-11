@@ -4,6 +4,7 @@ import {
   MAX_COMPARE_SYMBOLS,
   buildComparison,
   buildRollingCorrelation,
+  clusterCorrelation,
   parseCompareParam,
   serialiseCompareParam,
   toggleCompareSymbol,
@@ -230,5 +231,73 @@ describe("rolling correlation", () => {
   it("returns no pairs for a single symbol", () => {
     const single = buildComparison([history("AAA", a)]);
     expect(buildRollingCorrelation(single, 30).pairs).toEqual([]);
+  });
+});
+
+describe("correlation clustering", () => {
+  const symbols = ["A", "B", "C", "D"];
+  const labels = symbols;
+  // A & C move together, B & D move together, blocks are uncorrelated.
+  const r: Record<string, number> = {
+    "A|C": 0.95,
+    "B|D": 0.9,
+    "A|B": 0.05,
+    "A|D": 0.0,
+    "C|B": -0.02,
+    "C|D": 0.03,
+  };
+  const cells = symbols.map((a) =>
+    symbols.map((b) => {
+      if (a === b) return { value: 1, n: 100 };
+      const v = r[`${a}|${b}`] ?? r[`${b}|${a}`]!;
+      return { value: v, n: 100 };
+    }),
+  );
+  const matrix = { symbols, labels, cells, observations: 100 };
+
+  it("puts co-moving markets next to each other", () => {
+    const { matrix: out, groups } = clusterCorrelation(matrix);
+    const pos = (s: string) => out.symbols.indexOf(s);
+    expect(Math.abs(pos("A") - pos("C"))).toBe(1);
+    expect(Math.abs(pos("B") - pos("D"))).toBe(1);
+    expect(groups[pos("A")]).toBe(groups[pos("C")]);
+    expect(groups[pos("B")]).toBe(groups[pos("D")]);
+    expect(groups[pos("A")]).not.toBe(groups[pos("B")]);
+  });
+
+  it("keeps the matrix consistent after reordering", () => {
+    const { matrix: out, order } = clusterCorrelation(matrix);
+    expect([...out.symbols].sort()).toEqual([...symbols].sort());
+    out.symbols.forEach((_, i) => {
+      expect(out.cells[i][i].value).toBe(1);
+      out.symbols.forEach((__, j) => {
+        expect(out.cells[i][j].value).toBe(cells[order[i]][order[j]].value);
+      });
+    });
+  });
+
+  it("leaves two-symbol matrices untouched", () => {
+    const small = {
+      symbols: ["A", "B"],
+      labels: ["A", "B"],
+      cells: [
+        [{ value: 1, n: 20 }, { value: -0.9, n: 20 }],
+        [{ value: -0.9, n: 20 }, { value: 1, n: 20 }],
+      ],
+      observations: 20,
+    };
+    const out = clusterCorrelation(small);
+    expect(out.matrix.symbols).toEqual(["A", "B"]);
+    expect(out.order).toEqual([0, 1]);
+  });
+
+  it("treats unmeasurable pairs as unrelated without crashing", () => {
+    const gappy = {
+      ...matrix,
+      cells: cells.map((row, i) => row.map((c, j) => (i === 0 && j === 3 ? { value: null, n: 2 } : c))),
+    };
+    const out = clusterCorrelation(gappy);
+    expect(out.matrix.symbols).toHaveLength(4);
+    expect(out.groups).toHaveLength(4);
   });
 });
