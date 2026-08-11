@@ -205,6 +205,15 @@ export function computeFrictionKpi(args: {
   let turnoverBase = 0;
   let reportedBase = 0;
   let modelledBase = 0;
+  let realisedFrictionBase = 0;
+  let estimatedFrictionBase = 0;
+  let brokerBookedTickets = 0;
+  // Ratio and coverage are read off invoiced tickets only. Averaging booked
+  // fees over the whole tape would divide real charges by modelled costs the
+  // broker never billed against, and report the model as twice as expensive
+  // as reality purely because half the rows have not been synced yet.
+  let invoicedReported = 0;
+  let invoicedModelled = 0;
   const components: FrictionComponents = { commissionBase: 0, spreadBase: 0, taxBase: 0 };
   const byDay = new Map<string, { frictionBase: number; tickets: number }>();
 
@@ -214,6 +223,16 @@ export function computeFrictionKpi(args: {
     turnoverBase += Math.max(0, f.notionalBase);
     reportedBase += Math.max(0, f.feeReportedBase) || 0;
     modelledBase += Math.max(0, f.feeModelledBase) || 0;
+
+    if (isInvoiced(f)) {
+      brokerBookedTickets += 1;
+      realisedFrictionBase += charged;
+      invoicedReported += Math.max(0, f.feeReportedBase) || 0;
+      invoicedModelled += Math.max(0, f.feeModelledBase) || 0;
+    } else {
+      estimatedFrictionBase += charged;
+    }
+
     const c = scaleComponents(f, charged);
     components.commissionBase += c.commissionBase;
     components.spreadBase += c.spreadBase;
@@ -244,7 +263,7 @@ export function computeFrictionKpi(args: {
 
   const frictionBps = bpsOfNav(frictionBase);
   const tickets = ordered.length;
-  const brokerBookedTickets = ordered.filter((f) => f.feeSource === "broker").length;
+
 
   return {
     windowDays,
