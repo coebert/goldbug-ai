@@ -26,7 +26,12 @@ export interface ExecutedOrderLike {
    * fx_enabled portfolios, and falls back to the portfolio base currency.
    */
   instrument_ccy?: string;
+  /** Conviction in [0,1] from the unified systematic score, when known. */
+  conviction?: number;
+  /** Resolved sector for concentration budgeting, when known. */
+  sector?: string;
 }
+
 
 
 export interface RouteResult {
@@ -159,6 +164,40 @@ export async function routeOrdersToBroker(params: {
     (e) => !e.rejected && e.quantity > 0 && Number.isFinite(e.quantity) && Number.isFinite(e.price),
   );
   if (routable.length === 0) return results;
+
+  // ---------- Intent-level ticket aggregation.
+  // One idea must cost one commission. Collapse same-symbol/same-side tickets
+  // into a single order and net opposing intents in the same name before any
+  // gate or the broker sees them (evidence: MKS.L bought 9 times, VMID.L 5
+  // times, for one position each).
+  {
+    const { aggregateOrders } = await import("./order-aggregation");
+    const agg = aggregateOrders(routable);
+    if (agg.ticketsSaved > 0) {
+      routable = agg.orders;
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: portfolio.mode === "live_prod" ? "live" : "sim",
+          method: "PRE_PLACE_TICKET_AGGREGATION",
+          path: "/reconcile/pre-place/aggregate",
+          status: 200,
+          request: asJson({ asOf, decisionId, before: executed.length }),
+          response: asJson({ after: routable.length, ticketsSaved: agg.ticketsSaved, notes: agg.notes }),
+          error: null,
+        });
+      } catch {
+        /* best-effort log only */
+      }
+    } else {
+      routable = agg.orders;
+    }
+    if (routable.length === 0) return results;
+  }
+
 
   const logGuard = async (method: string, detail: Record<string, unknown>, error: string) => {
     try {

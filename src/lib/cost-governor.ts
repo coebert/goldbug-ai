@@ -38,7 +38,19 @@ export type GovernorCandidate = {
   estCostBase: number;
   /** True when the portfolio already holds this symbol (i.e. this is an add). */
   isAdd?: boolean;
+  /**
+   * Conviction in [0,1] (typically |unifiedScore|). Drives admission ranking:
+   * a tight cost budget should be spent on the best ideas, not the biggest
+   * tickets. Absent = treated as neutral (0.5).
+   */
+  edgeScore?: number;
+  /**
+   * Expected favourable move for this idea, as a fraction of notional
+   * (0.04 = 4%). Absent = a conservative 2% is assumed.
+   */
+  expectedMovePct?: number;
 };
+
 
 export type GovernorConfig = {
   /** Portfolio NAV in base currency. */
@@ -96,9 +108,28 @@ export function minTicketBase(cfg: Pick<GovernorConfig, "navBase" | "minTicketPc
 }
 
 /**
+ * Expected edge per pound of friction: (conviction x expected move x notional)
+ * divided by the ticket's estimated cost. This is the only ranking that makes
+ * sense when the budget is scarce — a £250 ticket on a 0.9-conviction idea
+ * beats a £2,000 ticket on a 0.1-conviction one, even though the big ticket
+ * has lower *proportional* friction.
+ */
+export function edgePerCost(c: GovernorCandidate): number {
+  const conviction = Number.isFinite(c.edgeScore)
+    ? Math.min(1, Math.max(0, Number(c.edgeScore)))
+    : 0.5;
+  const move = Number.isFinite(c.expectedMovePct)
+    ? Math.max(0, Number(c.expectedMovePct))
+    : 0.02;
+  const grossEdge = conviction * move * Math.max(0, c.notionalBase);
+  const cost = Math.max(0.01, c.estCostBase);
+  return grossEdge / cost;
+}
+
+/**
  * Plan admissions. SELLs are always admitted — risk reduction must never be
- * gated by a cost budget. BUYs are ranked largest-first (biggest tickets have
- * the lowest proportional friction) and admitted while every budget holds.
+ * gated by a cost budget. BUYs are ranked by expected edge per pound of
+ * friction (notional as tie-break) and admitted while every budget holds.
  */
 export function planAdmissions(
   candidates: GovernorCandidate[],
@@ -115,7 +146,12 @@ export function planAdmissions(
   const buys = candidates
     .filter((c) => c.side === "buy")
     .slice()
-    .sort((a, b) => b.notionalBase - a.notionalBase);
+    .sort((a, b) => {
+      const diff = edgePerCost(b) - edgePerCost(a);
+      if (Math.abs(diff) > 1e-9) return diff;
+      return b.notionalBase - a.notionalBase;
+    });
+
 
   for (const c of sells) decisions.push({ kind: "admit", candidate: c });
 
@@ -177,20 +213,75 @@ export function planAdmissions(
   };
 }
 
+/** Anchor points for the NAV-scaled governor profile. */
+const NAV_ANCHORS: Array<{
+  nav: number;
+  minTicketPctOfNav: number;
+  absoluteMinTicketBase: number;
+  maxBuysPerDay: number;
+  addCooldownDays: number;
+}> = [
+  { nav: 10_000, minTicketPctOfNav: 0.03, absoluteMinTicketBase: 250, maxBuysPerDay: 3, addCooldownDays: 5 },
+  { nav: 50_000, minTicketPctOfNav: 0.02, absoluteMinTicketBase: 1_000, maxBuysPerDay: 5, addCooldownDays: 4 },
+  { nav: 250_000, minTicketPctOfNav: 0.01, absoluteMinTicketBase: 2_000, maxBuysPerDay: 8, addCooldownDays: 3 },
+];
+
 /**
  * Scale the governor to account size. Larger accounts can carry more names and
  * more tickets before fixed costs matter, so the caps loosen with NAV while the
  * percentage-of-NAV budgets stay constant.
+ *
+ * Interpolated rather than banded: a step function meant £49,999 and £50,001
+ * were governed very differently for no economic reason, and an account
+ * drifting across a boundary would flip between profiles tick to tick.
+ * Log-NAV interpolation matches how fixed costs actually decay with size.
  */
 export function governorForNav(navBase: number): Omit<
   GovernorConfig,
   "navBase" | "buysAlreadyToday" | "trailingCostBase" | "lastBuyDaysAgo"
 > {
-  if (navBase >= 250_000) {
-    return { ...DEFAULT_GOVERNOR, minTicketPctOfNav: 0.01, absoluteMinTicketBase: 2_000, maxBuysPerDay: 8, addCooldownDays: 3 };
+  const nav = Math.max(1, Number(navBase) || 0);
+  const lo = NAV_ANCHORS[0]!;
+  const hi = NAV_ANCHORS[NAV_ANCHORS.length - 1]!;
+  if (nav <= lo.nav) {
+    return {
+      ...DEFAULT_GOVERNOR,
+      minTicketPctOfNav: lo.minTicketPctOfNav,
+      absoluteMinTicketBase: lo.absoluteMinTicketBase,
+      maxBuysPerDay: lo.maxBuysPerDay,
+      addCooldownDays: lo.addCooldownDays,
+    };
   }
-  if (navBase >= 50_000) {
-    return { ...DEFAULT_GOVERNOR, minTicketPctOfNav: 0.02, absoluteMinTicketBase: 1_000, maxBuysPerDay: 5, addCooldownDays: 4 };
+  if (nav >= hi.nav) {
+    return {
+      ...DEFAULT_GOVERNOR,
+      minTicketPctOfNav: hi.minTicketPctOfNav,
+      absoluteMinTicketBase: hi.absoluteMinTicketBase,
+      maxBuysPerDay: hi.maxBuysPerDay,
+      addCooldownDays: hi.addCooldownDays,
+    };
   }
-  return DEFAULT_GOVERNOR;
+
+  let a = lo;
+  let b = hi;
+  for (let i = 0; i < NAV_ANCHORS.length - 1; i += 1) {
+    const left = NAV_ANCHORS[i]!;
+    const right = NAV_ANCHORS[i + 1]!;
+    if (nav >= left.nav && nav <= right.nav) {
+      a = left;
+      b = right;
+      break;
+    }
+  }
+  const t = (Math.log(nav) - Math.log(a.nav)) / (Math.log(b.nav) - Math.log(a.nav));
+  const mix = (x: number, y: number) => x + (y - x) * t;
+
+  return {
+    ...DEFAULT_GOVERNOR,
+    minTicketPctOfNav: mix(a.minTicketPctOfNav, b.minTicketPctOfNav),
+    absoluteMinTicketBase: Math.round(mix(a.absoluteMinTicketBase, b.absoluteMinTicketBase)),
+    maxBuysPerDay: Math.max(1, Math.round(mix(a.maxBuysPerDay, b.maxBuysPerDay))),
+    addCooldownDays: Math.max(1, Math.round(mix(a.addCooldownDays, b.addCooldownDays))),
+  };
 }
+

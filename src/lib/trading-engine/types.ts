@@ -54,4 +54,12 @@ export type ExecutedTrade = {
   // SMA trend telemetry — the snapshot the crossover rules saw for this
   // symbol at decision time, so the UI can explain the trend influence.
   sma_cross?: import("../alpha/sma-cross-rules").SmaCrossState | null;
+  /**
+   * Conviction in [0,1] from the unified systematic score, and the resolved
+   * sector. Carried on the order so downstream cost/concentration gates rank
+   * and cap without re-deriving signals.
+   */
+  conviction?: number;
+  sector?: string;
 };
+
