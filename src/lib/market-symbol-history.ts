@@ -326,9 +326,11 @@ function strengthLabel(score: number): { label: string; direction: "up" | "down"
 export function computeTrendStrength(
   points: HistoryPoint[],
   periods: readonly SmaPeriod[],
+  /** Explicit basis average; defaults to the slowest selected period. */
+  basis?: SmaPeriod | null,
 ): TrendStrength | null {
   const ordered = SMA_PERIODS.filter((p) => periods.includes(p));
-  const period = ordered[ordered.length - 1];
+  const period = basis && isSmaPeriod(basis) ? basis : ordered[ordered.length - 1];
   if (!period || points.length < 10) return null;
 
   // Slope of the trend average, in log space so it reads as % per unit time.
@@ -387,13 +389,14 @@ export function computeTrendStrengthSeries(
   points: HistoryPoint[],
   periods: readonly SmaPeriod[],
   window = 30,
+  basis?: SmaPeriod | null,
 ): TrendStrengthPoint[] {
   const w = Math.max(10, Math.min(window, points.length));
   if (points.length < w) return [];
   const out: TrendStrengthPoint[] = [];
   for (let end = w; end <= points.length; end++) {
     const slice = points.slice(end - w, end);
-    const s = computeTrendStrength(slice, periods);
+    const s = computeTrendStrength(slice, periods, basis);
     if (s) out.push({ date: slice[slice.length - 1].date, score: s.score });
   }
   return out;
