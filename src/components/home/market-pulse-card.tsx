@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -26,6 +26,7 @@ import {
 import { getMarketPulse } from "@/lib/market-pulse.functions";
 import type { PulseAlert } from "@/lib/market-pulse-alerts";
 import { DEFAULT_RANGE, isKnownSymbol } from "@/lib/market-symbol-history";
+import { formatUkTime } from "@/lib/uk-time";
 import {
   groupLabel,
   toneBlurb,
@@ -225,6 +226,17 @@ function ToneGauge({ score, tone }: { score: number; tone: MarketPulse["tone"] }
     </div>
   );
 }
+/** Auto-refresh cadence for the market pulse dashboard. */
+const REFRESH_MS = 5 * 60_000;
+
+/** mm:ss countdown label. */
+function formatCountdown(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+
+
 
 /**
  * Home-screen market dashboard: one risk-appetite read, cross-asset moves,
@@ -234,13 +246,26 @@ function ToneGauge({ score, tone }: { score: number; tone: MarketPulse["tone"] }
 export function MarketPulseCard() {
   const fetchPulse = useServerFn(getMarketPulse);
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(90);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
   const query = useQuery({
     queryKey: ["market-pulse", days],
     queryFn: () => fetchPulse({ data: { comparisonDays: days } }),
     staleTime: 5 * 60_000,
     gcTime: 15 * 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: autoRefresh ? REFRESH_MS : false,
   });
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const secondsLeft = query.dataUpdatedAt
+    ? Math.max(0, Math.ceil((query.dataUpdatedAt + REFRESH_MS - now) / 1000))
+    : REFRESH_MS / 1000;
+
 
   const pulse = query.data;
   const grouped = useMemo(() => {
@@ -294,18 +319,48 @@ export function MarketPulseCard() {
             where the money is going.
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className={
-            pulse.tone === "risk_on"
-              ? "border-emerald-500/40 text-emerald-500"
-              : pulse.tone === "risk_off"
-                ? "border-destructive/40 text-destructive"
-                : "border-amber-500/40 text-amber-500"
-          }
-        >
-          {toneLabel(pulse.tone)} · {pulse.toneScore}/100
-        </Badge>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Badge
+            variant="outline"
+            className={
+              pulse.tone === "risk_on"
+                ? "border-emerald-500/40 text-emerald-500"
+                : pulse.tone === "risk_off"
+                  ? "border-destructive/40 text-destructive"
+                  : "border-amber-500/40 text-amber-500"
+            }
+          >
+            {toneLabel(pulse.tone)} · {pulse.toneScore}/100
+          </Badge>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {query.dataUpdatedAt ? `Updated ${formatUkTime(query.dataUpdatedAt)}` : "—"}
+              {autoRefresh ? ` · next in ${formatCountdown(secondsLeft)}` : " · auto off"}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAutoRefresh((v) => !v)}
+              aria-pressed={autoRefresh}
+            >
+              {autoRefresh ? "Pause" : "Auto"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              aria-label="Refresh market pulse"
+            >
+              <RefreshCw
+                className={`mr-1 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              Refresh market pulse
+            </Button>
+          </div>
+        </div>
+
       </CardHeader>
 
       <CardContent className="space-y-6">
