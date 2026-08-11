@@ -151,6 +151,11 @@ const sweepThreshold = Number(arg("sweep-threshold", String(ddThresholds[1] ?? d
 const stressQuantile = Number(arg("stress-quantile", "0.8"));
 const stressTailFrac = Number(arg("stress-tail", "0.2"));
 
+// --attribution: Shapley breakdown of the tail into slippage / fill-rate / stress.
+const attributionMode = process.argv.includes("--attribution");
+const attribPaths = Number(arg("attrib-paths", String(Math.max(30, Math.round(paths / 4)))));
+
+
 
 
 const GRID: SmaVariantParams[] = [];
