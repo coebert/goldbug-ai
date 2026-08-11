@@ -5,7 +5,9 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_EXECUTION_SIM,
+  DEFAULT_DRAWDOWN_THRESHOLDS,
   DETERMINISTIC_DRAW,
+  drawdownBreachProbabilities,
   makeExecutionSampler,
   mulberry32,
   percentile,
@@ -146,5 +148,37 @@ describe("percentile statistics", () => {
     const s = percentileStats([]);
     expect(s.n).toBe(0);
     expect(s.median).toBeNaN();
+  });
+});
+
+describe("drawdown breach probabilities", () => {
+  const dds = [-2, -6, -11, -11, -18, -26, -30, 0, -4, -9];
+
+  it("counts a path as breaching when its drawdown reaches the depth", () => {
+    const [five, ten, twenty] = drawdownBreachProbabilities(dds, [10, 5, 20]);
+    // Sorted ascending regardless of input order.
+    expect(five!.thresholdPct).toBe(5);
+    expect(ten!.thresholdPct).toBe(10);
+    expect(twenty!.thresholdPct).toBe(20);
+    expect(five!.count).toBe(6);
+    expect(ten!.count).toBe(5);
+    expect(twenty!.count).toBe(2);
+    expect(ten!.prob).toBeCloseTo(0.5, 9);
+  });
+
+  it("is monotone non-increasing in threshold depth", () => {
+    const bs = drawdownBreachProbabilities(dds, [...DEFAULT_DRAWDOWN_THRESHOLDS]);
+    for (let i = 1; i < bs.length; i++) expect(bs[i]!.prob).toBeLessThanOrEqual(bs[i - 1]!.prob);
+  });
+
+  it("treats the threshold as inclusive and accepts positive or negative inputs", () => {
+    expect(drawdownBreachProbabilities([-10], [10])[0]!.count).toBe(1);
+    expect(drawdownBreachProbabilities([-10], [-10])[0]!.count).toBe(1);
+    expect(drawdownBreachProbabilities([-9.999], [10])[0]!.count).toBe(0);
+  });
+
+  it("ignores non-finite paths and returns NaN with no usable sample", () => {
+    expect(drawdownBreachProbabilities([NaN, -20], [10])[0]!.prob).toBe(1);
+    expect(drawdownBreachProbabilities([], [10])[0]!.prob).toBeNaN();
   });
 });
