@@ -154,8 +154,6 @@ type SegmentResult = {
   makerFills: number;
   /** Orders that had to cross. */
   takerFills: number;
-  /** Orders touched but never cleared the queue. */
-  queueMisses: number;
   /** Fee + adverse-selection + waiting-drift cost, in currency. */
   driftCosts: number;
 };
@@ -194,7 +192,6 @@ function simulate(
   let stressBars = 0;
   let makerFills = 0;
   let takerFills = 0;
-  let queueMisses = 0;
   let driftCosts = 0;
 
   const marketDraw = () => (sampler ? sampler.draw() : DETERMINISTIC_DRAW);
@@ -342,7 +339,6 @@ function simulate(
     stressBars,
     makerFills,
     takerFills,
-    queueMisses,
     driftCosts,
   };
 }
@@ -421,8 +417,11 @@ async function main() {
   }
   const fallback = calibrateSymbolExecution({ symbol: "UNKNOWN", bars: [] });
   const volZ = marketVolZScores(seriesBySymbol, 20);
+  const volBpsBySymbol = new Map<string, number[]>();
+  for (const [sym, closes] of seriesBySymbol) volBpsBySymbol.set(sym, barVolBpsSeries(closes, 20));
   const ctx: Ctx = {
     seriesBySymbol,
+    volBpsBySymbol,
     volZ,
     costFor: (sym, notional, slipMult) =>
       executionCostFor(calibs.get(sym) ?? fallback, notional, "normal", slipMult).total,
@@ -456,8 +455,28 @@ async function main() {
     + `stress regime enter ${(simCfg.stressEnterProb * 100).toFixed(1)}%/bar `
     + `(mean length ${(1 / Math.max(1e-9, simCfg.stressExitProb)).toFixed(1)} bars, `
     + `forced when vol z ≥ ${simCfg.volStressZ}), `
-    + `slippage ×${simCfg.stressSlippageMult} and no-fill ×${simCfg.stressNoFillMult} while stressed\n`,
+    + `slippage ×${simCfg.stressSlippageMult} and no-fill ×${simCfg.stressNoFillMult} while stressed`,
   );
+  if (execModel === "limit") {
+    const medVolBps = (() => {
+      const all = [...volBpsBySymbol.values()].flat().filter((v) => v > 0).sort((a, b) => a - b);
+      return all.length ? all[Math.floor(all.length / 2)]! : 0;
+    })();
+    const odds = limitFillOdds(limitCfg, medVolBps);
+    console.log(
+      `Order model: LIMIT resting ${limitCfg.limitOffsetBps}bps behind the touch, `
+      + `queue ${limitCfg.queueAheadRatio}× ahead vs ${limitCfg.queueTurnoverRatio}× turnover, `
+      + `cross after ${limitCfg.crossAfterBars} bar(s). `
+      + `At the median bar vol (${medVolBps.toFixed(0)}bps): `
+      + `P(touch) ${(odds.pTouch * 100).toFixed(0)}% × P(queue) ${(odds.pQueue * 100).toFixed(0)}% `
+      + `= ${(odds.pFill * 100).toFixed(0)}% passive fill odds/bar. `
+      + `Maker ${limitCfg.makerFeeBps}bps / taker ${limitCfg.takerFeeBps}bps fees, `
+      + `adverse selection ${limitCfg.adverseSelectionBeta}× bar vol.`,
+    );
+  } else {
+    console.log("Order model: MARKET — every order crosses the spread immediately.");
+  }
+  console.log();
 
   for (const variant of SMA_VARIANTS) {
     // 1. Tune on TRAIN with deterministic execution (the strategy cannot know
@@ -466,7 +485,7 @@ async function main() {
       let best: SmaVariantParams = GRID[0]!;
       let bestScore = -Infinity;
       for (const p of GRID) {
-        const r = simulate(ctx, variant, f.trainStart, f.trainEnd, p, null);
+        const r = simulate(ctx, variant, f.trainStart, f.trainEnd, p, null, null);
         const score = r.returnPct + r.sharpe * 5 + r.maxDrawdownPct * 0.5;
         if (score > bestScore) {
           bestScore = score;
@@ -478,7 +497,7 @@ async function main() {
 
     // 2. Deterministic OOS baseline.
     const detFolds = folds.map((f, k) =>
-      simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, null));
+      simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, null, null));
     const detMean = meanOf(detFolds.map((r) => r.returnPct));
 
     // 3. Monte-Carlo paths. A path uses one sampler across all folds, so a
@@ -501,12 +520,23 @@ async function main() {
     // Share of a path's total execution cost incurred on stressed bars — the
     // clean read on joint (rather than average) execution risk.
     const pathStressCostShare: number[] = [];
+    // Passive-execution accounting across all paths.
+    let makerFills = 0;
+    let takerFills = 0;
+    let queueMisses = 0;
+    let neverTouched = 0;
+    let limitOrders = 0;
+    let waitBars = 0;
+    const pathDriftShare: number[] = [];
 
     for (let pth = 0; pth < paths; pth++) {
-      const sampler = makeCorrelatedExecutionSampler(
-        simCfg,
-        baseSeed + pth * 7919 + variant.length * 104729,
-      );
+      const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+      const sampler = makeCorrelatedExecutionSampler(simCfg, pathSeed);
+      // Independent stream for the book so limit-order luck is not aliased to
+      // slippage luck within a path.
+      const limit = execModel === "limit"
+        ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+        : null;
       const rets: number[] = [];
       let worstFold = Infinity;
       let ddSum = 0;
@@ -514,9 +544,10 @@ async function main() {
       let shSum = 0;
       let costSum = 0;
       let stressCostSum = 0;
+      let driftSum = 0;
       for (let k = 0; k < folds.length; k++) {
         const f = folds[k]!;
-        const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler);
+        const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
         rets.push(r.returnPct);
         worstFold = Math.min(worstFold, r.returnPct);
         ddSum += r.maxDrawdownPct;
@@ -524,6 +555,7 @@ async function main() {
         shSum += r.sharpe;
         costSum += r.costs;
         stressCostSum += r.stressCosts;
+        driftSum += r.driftCosts;
         missed += r.missedOrders;
         partial += r.partialFills;
         totalOrders += r.fills + r.missedOrders;
@@ -532,6 +564,16 @@ async function main() {
         stressBars += r.stressBars;
         allBars += f.testEnd - f.testStart + 1;
       }
+      if (limit) {
+        const ls = limit.stats();
+        makerFills += ls.makerFills;
+        takerFills += ls.takerFills;
+        queueMisses += ls.queueMisses;
+        neverTouched += ls.neverTouched;
+        limitOrders += ls.orders;
+        waitBars += ls.totalWaitBars;
+      }
+      pathDriftShare.push(costSum > 0 ? (driftSum / costSum) * 100 : 0);
       pathStressCostShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
       pathMeanRet.push(meanOf(rets));
       pathWorstFold.push(worstFold);
@@ -549,6 +591,7 @@ async function main() {
     const sh = percentileStats(pathSharpe);
     const cost = percentileStats(pathCosts);
     const stressShare = percentileStats(pathStressCostShare);
+    const driftShare = percentileStats(pathDriftShare);
 
     console.log(`=== ${variant} ===`);
     console.log(
@@ -570,6 +613,16 @@ async function main() {
     console.log(statLine("Sharpe", sh));
     console.log(statLine("costs £/fold", cost));
     console.log(statLine("stress cost %", stressShare));
+    if (execModel === "limit") {
+      console.log(statLine("fee+drift %", driftShare));
+      console.log(
+        `book: ${((makerFills / Math.max(1, limitOrders)) * 100).toFixed(1)}% passive fills · `
+        + `${((takerFills / Math.max(1, limitOrders)) * 100).toFixed(1)}% crossed · `
+        + `queue misses ${((queueMisses / Math.max(1, limitOrders)) * 100).toFixed(1)}% · `
+        + `never touched ${((neverTouched / Math.max(1, limitOrders)) * 100).toFixed(1)}% · `
+        + `avg wait ${(waitBars / Math.max(1, limitOrders)).toFixed(2)} bars`,
+      );
+    }
     console.log(
       `stressed bars ${((stressBars / Math.max(1, allBars)) * 100).toFixed(1)}% of tape · `
       + `${((stressOrders / Math.max(1, totalOrders)) * 100).toFixed(1)}% of orders sent into stress · `
@@ -589,6 +642,10 @@ async function main() {
   console.log("p5 is the 1-in-20 bad-execution-luck year; CVaR5 is the average of those.");
   console.log("'deepest DD %' is the worst single fold on each path; the breach line reads");
   console.log("as the chance a lifetime touches that drawdown depth at least once.");
+  if (execModel === "limit") {
+    console.log("'fee+drift %' is the share of cost that is NOT spread: maker/taker fees plus");
+    console.log("adverse selection and waiting drift — the price of resting instead of crossing.");
+  }
   console.log("Shocks are correlated: on a stressed bar every symbol widens and every order");
   console.log("struggles together, so these tails are joint outcomes, not averaged-away ones.");
 }
