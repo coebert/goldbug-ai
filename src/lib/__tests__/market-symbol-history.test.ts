@@ -5,6 +5,8 @@ import {
   isKnownSymbol,
   rangeLabel,
   symbolMeta,
+  SMA_PERIODS,
+  smaKey,
 } from "../market-symbol-history";
 
 function tape(days: number, start = 100, step = 1) {
