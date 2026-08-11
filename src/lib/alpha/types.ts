@@ -39,6 +39,8 @@ export type FeatureLike = {
     bull_cross_from_oversold: boolean;
     rising: boolean;
   } | null;
+  /** SMA20/50 + SMA50/200 crossover state (see alpha/sma-cross-rules). */
+  sma_cross?: import("./sma-cross-rules").SmaCrossState | null;
   news_score: number | null;
   news_contributors: number;
   news_momentum: unknown | null;
