@@ -16,12 +16,34 @@ import {
 } from "@/components/ui/sheet";
 import { symbolMeta } from "@/lib/market-symbol-history";
 
+/** Latest trend metrics + within-set percentile ranks for a pinned market. */
+export type FavoriteMetric = {
+  slope: number | null;
+  volatility: number | null;
+  slopePct: number | null;
+  volatilityPct: number | null;
+};
+
+function ordinal(p: number) {
+  const rem100 = p % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${p}th`;
+  const rem10 = p % 10;
+  return `${p}${rem10 === 1 ? "st" : rem10 === 2 ? "nd" : rem10 === 3 ? "rd" : "th"}`;
+}
+
+function signed(v: number) {
+  return `${v > 0 ? "+" : ""}${v.toFixed(0)}`;
+}
+
 export function FavoritesPanel({
   favorites,
   onUnpin,
   onMove,
+  metrics,
 }: {
   favorites: readonly string[];
+  /** Per-symbol slope/volatility with percentile ranks across compared markets. */
+  metrics?: Record<string, FavoriteMetric | undefined>;
   onUnpin: (symbol: string) => void;
   onMove: (symbol: string, direction: "up" | "down") => void;
 }) {
@@ -49,6 +71,7 @@ export function FavoritesPanel({
           )}
           {favorites.map((s, i) => {
             const label = symbolMeta(s)?.label ?? s;
+            const m = metrics?.[s];
             return (
               <div
                 key={s}
@@ -60,10 +83,24 @@ export function FavoritesPanel({
                 <Link
                   to="/market/$symbol"
                   params={{ symbol: s }}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 text-sm hover:text-primary"
+                  className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm hover:text-primary"
                 >
-                  <LineChart className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{label}</span>
+                  <span className="flex items-center gap-1.5">
+                    <LineChart className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{label}</span>
+                  </span>
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {m && m.slope != null && m.volatility != null ? (
+                      <>
+                        slope {signed(m.slope)}%/yr
+                        {m.slopePct != null ? ` (${ordinal(m.slopePct)} pct)` : ""} · vol{" "}
+                        {m.volatility.toFixed(0)}%/yr
+                        {m.volatilityPct != null ? ` (${ordinal(m.volatilityPct)} pct)` : ""}
+                      </>
+                    ) : (
+                      "no trend data in current view"
+                    )}
+                  </span>
                 </Link>
                 <button
                   type="button"

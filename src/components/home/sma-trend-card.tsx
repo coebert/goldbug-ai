@@ -9,7 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Check, ChevronLeft, ChevronRight, LineChart as LineChartIcon, Plus, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { FavoritesPanel } from "@/components/home/favorites-panel";
+import { FavoritesPanel, type FavoriteMetric } from "@/components/home/favorites-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -237,6 +237,16 @@ export function SmaTrendCard() {
   const ranks = trendPercentiles(entries);
   const visible = rankByTrendStrength(entries, sort, filter, sort2, favorites);
   const hidden = entries.length - visible.length;
+  const favoriteMetrics: Record<string, FavoriteMetric> = {};
+  for (const e of entries) {
+    favoriteMetrics[e.symbol] = {
+      slope: e.slope,
+      volatility: e.volatility,
+      slopePct: ranks[e.symbol]?.count && ranks[e.symbol]!.count > 1 ? (ranks[e.symbol]!.slope ?? null) : null,
+      volatilityPct:
+        ranks[e.symbol]?.count && ranks[e.symbol]!.count > 1 ? (ranks[e.symbol]!.volatility ?? null) : null,
+    };
+  }
 
   const renderOption = (s: string) => {
     const on = symbols.includes(s);
@@ -296,6 +306,7 @@ export function SmaTrendCard() {
             favorites={favorites}
             onUnpin={toggleFavorite}
             onMove={moveFavorite}
+            metrics={favoriteMetrics}
           />
 
 
