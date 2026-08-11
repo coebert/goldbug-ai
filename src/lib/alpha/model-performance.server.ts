@@ -123,7 +123,7 @@ export async function updateAlphaModelPerformance(
   });
 
   await supabaseAdmin
-    .from("alpha_model_performance")
+    .from("alpha_model_performance" as never)
     .upsert(rows as never, { onConflict: "portfolio_id,model_kind,window_days" } as never);
 
   return rows;
