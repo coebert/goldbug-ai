@@ -258,7 +258,12 @@ function MarketSymbolPage() {
                 variant={r === range ? "secondary" : "ghost"}
                 className="h-7 px-2 text-xs"
               >
-                <Link to="/market/$symbol" params={{ symbol }} search={{ range: r }}>
+                <Link
+                  to="/market/$symbol"
+                  params={{ symbol }}
+                  search={{ range: r, compare: compareParam }}
+                >
+
                   {rangeLabel(r)}
                 </Link>
               </Button>
