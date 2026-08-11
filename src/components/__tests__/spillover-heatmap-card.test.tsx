@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+// @vitest-environment jsdom
+//
+// The heatmap's whole value is the interaction — hover a cell, read calm vs
+// stress vs Δ, switch layer — so this suite drives a real DOM rather than
+// asserting on SSR markup like the chart contract tests do.
+
+import { describe, it, expect, afterEach } from "vitest";
+import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
+
 import { SpilloverHeatmapViewer } from "../spillover-heatmap-card";
 import type { SpilloverHeatmapResponse } from "@/lib/spillover-heatmap.functions";
 
