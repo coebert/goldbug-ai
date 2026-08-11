@@ -193,7 +193,7 @@ export function formatRiskGrid(report: RiskGridReport): string {
   );
   if (report.knee) {
     lines.push(
-      `Knee: risk ${report.knee.knee_label ?? report.knee.risk.toFixed(2)} — `
+      `Knee: risk ${report.knee.risk.toFixed(2)} — `
       + `${pct(report.knee.returnPct)} for ${pct(report.knee.drawdownPct, 1)} drawdown `
       + `(${returnPerDrawdown(report.knee)!.toFixed(2)} return per unit of drawdown).`,
     );
@@ -205,6 +205,3 @@ export function formatRiskGrid(report: RiskGridReport): string {
   }
   return lines.join("\n");
 }
-
-// Keeps `formatRiskGrid` honest about optional labelling without widening the row type.
-declare module "./execution-risk-grid" {}
