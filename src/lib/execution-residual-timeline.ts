@@ -212,6 +212,7 @@ export function residualTimeline(
   const empty: ResidualTimeline = {
     clusters, windows: [], window, step, basis, structures: [],
     contagionEdgeByWindow: [], contagionWinRate: Number.NaN,
+    contagionTieRate: Number.NaN,
     contagionEdgeCalm: Number.NaN, contagionEdgeStress: Number.NaN,
   };
   if (symbols.length < 2 || !clusters.length || !rows.length) return empty;
