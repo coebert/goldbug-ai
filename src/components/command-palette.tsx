@@ -24,6 +24,7 @@ import {
   RefreshCw,
   LogOut,
   Briefcase,
+  Grid3x3,
 } from "lucide-react";
 import { listPortfolios } from "@/lib/trading.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -134,6 +135,9 @@ export function CommandPalette({
             <CommandItem onSelect={() => go(() => navigate({ to: "/learn" }))}>
               <BookOpen className="mr-2 h-4 w-4" /> Learn
               <CommandShortcut>g l</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => go(() => navigate({ to: "/spillover" }))}>
+              <Grid3x3 className="mr-2 h-4 w-4" /> Cluster spillover heatmap
             </CommandItem>
             <CommandItem onSelect={() => go(() => navigate({ to: "/saxo-status" }))}>
               <Plug className="mr-2 h-4 w-4" /> Broker status
