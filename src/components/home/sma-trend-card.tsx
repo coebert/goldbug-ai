@@ -43,6 +43,7 @@ import {
   TREND_SORT2_KEY,
 
   moveSmaFavorite,
+  reorderSmaFavorites,
   parseSmaFavorites,
   parseSmaSymbols,
   parseTrendFilter,
@@ -169,6 +170,14 @@ export function SmaTrendCard() {
     });
   };
 
+
+  const reorderFavorites = (symbol: string, toIndex: number) => {
+    setFavorites((prev) => {
+      const next = reorderSmaFavorites(prev, symbol, toIndex);
+      storeSmaFavorites(next);
+      return next;
+    });
+  };
 
   const pickSort = (s: TrendSort) => {
     setSort(s);
@@ -306,6 +315,7 @@ export function SmaTrendCard() {
             favorites={favorites}
             onUnpin={toggleFavorite}
             onMove={moveFavorite}
+            onReorder={reorderFavorites}
             metrics={favoriteMetrics}
           />
 
