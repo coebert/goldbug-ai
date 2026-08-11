@@ -264,6 +264,25 @@ const calibOpts = {
   groups: clusters,
 };
 
+// ------------------------------------------------ calibration state on disk
+// --save-calib runs/coupling-2026-08.json   write the fitted parameters out
+// --load-calib runs/coupling-2026-08.json   reuse them instead of re-fitting
+//
+// A snapshot carries the pooled calm/stress ρ, the derived structure, the
+// estimator settings and a fingerprint of the tape it was fitted on, so a later
+// run can be pinned to the exact calibration state. Loading also replaces the
+// --calib-* estimator settings with the saved ones, because a ρ estimated with
+// a 60-bar window is not the same measurement as one estimated with 120.
+// A tape whose fingerprint no longer matches is reported and, unless
+// --allow-tape-drift is passed, refused: silently replaying an old coupling on
+// new bars is exactly the kind of drift these files exist to prevent.
+const saveCalibPath = arg("save-calib", "");
+const loadCalibPath = arg("load-calib", "");
+const calibLabel = arg("calib-label", "");
+/** Drop the per-window series from the saved file (smaller, less inspectable). */
+const calibSlim = argv.includes("--calib-slim");
+const allowTapeDrift = argv.includes("--allow-tape-drift");
+
 // Any of the three axes puts the run into the sweep report.
 const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.length > 0;
 
