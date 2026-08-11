@@ -211,6 +211,12 @@ function simulate(
   sampler: CorrelatedExecutionSampler | null,
   /** null = every order crosses; otherwise orders rest first. */
   limit: LimitOrderSampler | null = null,
+  /**
+   * Channel mask for attribution runs. Disabling a channel neutralises its
+   * *effect* without touching the RNG stream, so every ablation sees exactly
+   * the same draws (common random numbers) and differences are causal.
+   */
+  mask: { slippage: boolean; fillRate: boolean } = { slippage: true, fillRate: true },
 ): SegmentResult {
   const { seriesBySymbol, costFor, volZ, volBpsBySymbol } = ctx;
   let cash = startingCash;
@@ -231,7 +237,16 @@ function simulate(
   let takerFills = 0;
   let driftCosts = 0;
 
-  const marketDraw = () => (sampler ? sampler.draw() : DETERMINISTIC_DRAW);
+  const marketDraw = () => {
+    const d = sampler ? sampler.draw() : DETERMINISTIC_DRAW;
+    if (mask.slippage && mask.fillRate) return d;
+    return {
+      ...d,
+      slippageMult: mask.slippage ? d.slippageMult : 1,
+      fillRatio: mask.fillRate ? d.fillRatio : 1,
+    };
+  };
+
   // One order = one market-order draw, optionally routed through the passive
   // limit book first. `extraBps` is fee + adverse selection + waiting drift,
   // which the calibrated spread model does not know about.
