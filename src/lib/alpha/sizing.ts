@@ -5,6 +5,7 @@
 // engine; downstream caps (per-symbol, asset-class, gross exposure,
 // commodity groups) still bind after these run.
 import { clamp1 } from "./types";
+import { unifiedVolSize } from "../sizing/unified-vol-size";
 
 export type AlphaBonusInput = {
   side: "buy" | "sell";
@@ -78,13 +79,13 @@ export type RiskParityInput = {
 export function riskParityTargetSpend(input: RiskParityInput): number {
   const vol = Number(input.vol ?? 0);
   if (!vol || vol <= 0) return 0;
-  const navCap = Math.max(0.01, Math.min(1, input.navCap ?? 0.2));
-  const alphaMag = Math.max(0, Math.min(1, Number(input.alphaMag ?? 0)));
-  // Scale the vol budget by alpha magnitude: weakest signal keeps 50%
-  // of the budget, strongest gets 150%. Bounded so no single symbol
-  // can consume more than navCap of NAV.
-  const scale = 0.5 + alphaMag;
-  const baseTarget = (input.targetVolPct * input.totalValue) / vol;
-  const target = baseTarget * scale;
-  return Math.max(0, Math.min(target, input.totalValue * navCap));
+  // Phase 3 item 14 — single vol-sizing implementation.
+  return unifiedVolSize({
+    totalValue: input.totalValue,
+    vol,
+    targetVolPct: input.targetVolPct,
+    navCap: input.navCap ?? 0.2,
+    riskParity: true,
+    alphaMag: input.alphaMag,
+  }).targetValue;
 }

@@ -7,6 +7,7 @@
 //   size_fraction = clip(targetVol / max(realizedVol, floor), 0, maxFraction) * base
 //
 // Pure, deterministic, and monotone-decreasing in `realizedVol`.
+import { unifiedVolSize } from "./unified-vol-size";
 
 export type VolTargetInputs = {
   /** Baseline fraction of NAV the sizer would allocate ignoring vol. */
@@ -27,12 +28,20 @@ export type VolTargetResult = {
   reason: string;
 };
 
+// Phase 3 item 14 — the arithmetic now lives in unifiedVolSize(); this stays
+// as the fraction-shaped wrapper the backtester expects.
 export function volTargetSize(i: VolTargetInputs): VolTargetResult {
   const floor = i.realizedVolFloor ?? 0.05;
   const rv = Math.max(floor, Number.isFinite(i.realizedVol) ? i.realizedVol : floor);
-  const rawScale = i.targetVol / rv;
-  const scale = Math.max(0, Math.min(rawScale, i.maxFraction / Math.max(1e-9, i.baseFraction)));
-  const fraction = Math.max(0, Math.min(i.baseFraction * scale, i.maxFraction));
+  const res = unifiedVolSize({
+    totalValue: 1,
+    vol: rv,
+    targetVolPct: i.targetVol * i.baseFraction,
+    navCap: i.maxFraction,
+    volFloor: floor,
+  });
+  const fraction = res.targetValue;
+  const scale = i.baseFraction > 0 ? fraction / i.baseFraction : 0;
   return {
     fraction,
     scale,

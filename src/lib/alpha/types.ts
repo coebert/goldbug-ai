@@ -46,6 +46,8 @@ export type FeatureLike = {
   news_momentum: unknown | null;
   cooling: boolean;
   rank_info: { percentile?: number | null } | null;
+  /** Raw published financials row for this symbol, when the provider covers it. */
+  fundamentals?: import("../fundamentals/types").Fundamentals | null;
   /**
    * Score derived from the company's published financials (see
    * src/lib/fundamentals). Null for instruments with no accounts — ETFs,

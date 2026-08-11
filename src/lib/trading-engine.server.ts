@@ -171,8 +171,9 @@ import {
   evaluateEventBlackout,
   reentryLockoutDays,
 } from "./exits";
-import { scoreUniverse, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutRegimeAction } from "./alpha";
-import { alphaConvictionBonus, riskParityTargetSpend } from "./alpha/sizing";
+import { scoreUniverseWithDiagnostics, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutRegimeAction } from "./alpha";
+import { unifiedVolSize } from "./sizing/unified-vol-size";
+import { alphaConvictionBonus } from "./alpha/sizing";
 import {
   planOrderSlices,
   todExecutionAdjustment,
@@ -785,11 +786,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   })();
   if (adaptiveWeights?.adapted) srvLog.info(adaptiveWeights.note);
 
-  const alphaScores = scoreUniverse(
-    features as unknown as Parameters<typeof scoreUniverse>[0],
+  // Phase 3 item 13 — residualise breakout/mean-reversion against trend (and
+  // carry against quality) across the universe so the composite stops paying
+  // twice for the same price move.
+  const alphaRun = scoreUniverseWithDiagnostics(
+    features as unknown as Parameters<typeof scoreUniverseWithDiagnostics>[0],
     effectiveRegime.regime,
     adaptiveWeights?.weights ?? null,
   );
+  const alphaScores = alphaRun.scores;
+  if (alphaRun.orthogonalisation.some((d) => d.applied)) srvLog.info(alphaRun.note);
   const alphaCompositeBySymbol = new Map(alphaScores.map((s) => [s.symbol, s.composite] as const));
   const alphaPriors = [
     formatAlphaPriorsForPrompt(alphaScores, effectiveRegime.regime, 10, adaptiveWeights?.weights ?? null),
@@ -2118,17 +2124,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       if (cfg.volatility_sizing) {
         const vol = featureBySymbol.get(meta.symbol)?.vol20d ?? null;
         if (vol && vol > 0) {
-          let targetPositionVal = (cfg.vol_target_pct * totalValue) / vol;
-          if (cfg.risk_parity_enabled) {
-            const alphaMag = Math.abs(alphaCompositeBySymbol.get(meta.symbol) ?? 0);
-            const rp = riskParityTargetSpend({
-              alphaMag, vol, totalValue,
-              targetVolPct: cfg.vol_target_pct,
-              navCap: cfg.risk_parity_nav_cap,
-            });
-            if (rp > 0) targetPositionVal = rp;
-          }
-          const volRoom = Math.max(0, targetPositionVal - existingVal);
+          // Phase 3 item 14 — one vol-sizing implementation for both the plain
+          // vol cap and the risk-parity (alpha-tilted) variant.
+          const volSize = unifiedVolSize({
+            totalValue,
+            vol,
+            targetVolPct: cfg.vol_target_pct,
+            existingValue: existingVal,
+            riskParity: Boolean(cfg.risk_parity_enabled),
+            alphaMag: Math.abs(alphaCompositeBySymbol.get(meta.symbol) ?? 0),
+            ...(cfg.risk_parity_enabled ? { navCap: cfg.risk_parity_nav_cap } : { navCap: 1 }),
+          });
+          const volRoom = volSize.room;
           if (spend > volRoom) {
             spend = volRoom;
             volCapped = true;

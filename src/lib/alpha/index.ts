@@ -17,7 +17,22 @@ export type {
   BreakoutRegimeBucket,
   BreakoutCohortKey,
 } from "./breakout-regime-policy";
-export { scoreCandidate, scoreUniverse, formatAlphaPriorsForPrompt } from "./composite";
+export { scoreCandidate, scoreUniverse, scoreUniverseWithDiagnostics, formatAlphaPriorsForPrompt } from "./composite";
+export { orthogonaliseScores, describeOrthogonalisation, DEFAULT_ORTHOGONALISATION } from "./orthogonalise";
+export type { OrthogonalisationDiagnostic, OrthogonalisationPair } from "./orthogonalise";
+export {
+  walkForwardRegime,
+  walkForwardAllRegimes,
+  fitWeights,
+  edgeOf,
+  DEFAULT_WALK_FORWARD,
+} from "./regime-walkforward";
+export type {
+  RegimeObservation,
+  RegimeWalkForwardResult,
+  WalkForwardConfig,
+  RegimeVerdict,
+} from "./regime-walkforward";
 export { resolveRegime, weightsForRegime, effectiveWeightsForRegime, enabledStrategiesForRegime } from "./regime-matrix";
 export type { AlphaScore, AlphaModelKind, CompositeScore, FeatureLike } from "./types";
 export type { RegimeName, StrategyWeights } from "./regime-matrix";
