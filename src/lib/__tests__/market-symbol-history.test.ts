@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSymbolHistory,
   coerceRange,
+  detectSmaCrossovers,
   isKnownSymbol,
   rangeLabel,
   symbolMeta,
@@ -105,5 +106,44 @@ describe("selectable SMA periods", () => {
     expect(short.smaLatest[20]).not.toBeNull();
     expect(short.smaLatest[100]).toBeNull();
     expect(short.aboveSma[200]).toBeNull();
+  });
+});
+
+describe("detectSmaCrossovers", () => {
+  const pt = (date: string, close: number, sma50: number, sma200: number) => ({
+    date,
+    close,
+    indexed: 100,
+    sma20: null,
+    sma50,
+    sma100: null,
+    sma200,
+  });
+
+  it("flags golden and death crosses between adjacent selected periods", () => {
+    const points = [
+      pt("2026-01-01", 100, 90, 100),
+      pt("2026-01-02", 101, 101, 100), // golden
+      pt("2026-01-03", 102, 103, 100),
+      pt("2026-01-04", 99, 98, 100), // death
+    ];
+    const out = detectSmaCrossovers(points, [50, 200]);
+    expect(out.map((c) => [c.date, c.direction])).toEqual([
+      ["2026-01-04", "death"],
+      ["2026-01-02", "golden"],
+    ]);
+    expect(out[0].barsAgo).toBe(0);
+    expect(out[1].fast).toBe(50);
+    expect(out[1].slow).toBe(200);
+  });
+
+  it("needs two averages and ignores gaps", () => {
+    const points = [pt("2026-01-01", 100, 90, 100), pt("2026-01-02", 101, 101, 100)];
+    expect(detectSmaCrossovers(points, [50])).toEqual([]);
+    const missing = [
+      { ...pt("2026-01-01", 100, 90, 100), sma200: null },
+      pt("2026-01-02", 101, 101, 100),
+    ];
+    expect(detectSmaCrossovers(missing, [50, 200])).toEqual([]);
   });
 });
