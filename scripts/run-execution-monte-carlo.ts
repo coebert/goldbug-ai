@@ -250,8 +250,10 @@ function simulate(
   let takerFills = 0;
   let driftCosts = 0;
 
-  const marketDraw = () => {
-    const d = sampler ? sampler.draw() : DETERMINISTIC_DRAW;
+  const marketDraw = (sym: string) => {
+    // Symbol matters once the coupling assumption is clustered: the sampler
+    // routes it to its sector factor.
+    const d = sampler ? sampler.draw(sym) : DETERMINISTIC_DRAW;
     if (mask.slippage && mask.fillRate) return d;
     return {
       ...d,
@@ -264,7 +266,8 @@ function simulate(
   // limit book first. `extraBps` is fee + adverse selection + waiting drift,
   // which the calibrated spread model does not know about.
   const order = (sym: string, i: number, forceTaker = false) => {
-    const base = marketDraw();
+    const base = marketDraw(sym);
+
     if (!limit) return { ...base, extraBps: 0, liquidity: "taker" as const };
     const d = limit.draw({
       barVolBps: volBpsBySymbol.get(sym)?.[i] ?? 0,
