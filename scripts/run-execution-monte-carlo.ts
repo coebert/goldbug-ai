@@ -652,6 +652,11 @@ async function main() {
     console.log("tape is treated as a stress regime (lower z = more stressed bars, z=99 = off).");
     console.log("'p5 DD%' and 'worstDD%' are the joint worst cases: read across a row to see");
     console.log("how much of your drawdown budget is an assumption rather than a measurement.");
+    console.log("'∧stress' is P(breach AND the drawdown ran through stressed bars) — the part");
+    console.log(`of the tail you cannot trade out of. 'cCVaR%' is the mean return of the worst`);
+    console.log(`${(stressTailFrac * 100).toFixed(0)}% of paths within the worst-stress `
+      + `${((1 - stressQuantile) * 100).toFixed(0)}% of paths.`);
+
     return;
   }
   for (const variant of SMA_VARIANTS) {
