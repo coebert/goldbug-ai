@@ -126,6 +126,13 @@ const simCfg = {
   stressFullFillMult: DEFAULT_CORRELATED_EXECUTION.stressFullFillMult,
   volStressZ: Number(arg("vol-stress-z", String(DEFAULT_CORRELATED_EXECUTION.volStressZ))),
   volSlippageBeta: DEFAULT_CORRELATED_EXECUTION.volSlippageBeta,
+  // Regime-dependent coupling: with --regime-blend ramp the within/across
+  // correlations migrate continuously between the calm and stress structures
+  // as realised volatility moves, instead of snapping at one threshold.
+  regimeBlend: arg("regime-blend", DEFAULT_CORRELATED_EXECUTION.regimeBlend) as "binary" | "ramp",
+  regimeRampLoZ: Number(arg("regime-ramp-lo", String(DEFAULT_CORRELATED_EXECUTION.regimeRampLoZ))),
+  regimeRampHiZ: Number(arg("regime-ramp-hi", String(DEFAULT_CORRELATED_EXECUTION.regimeRampHiZ))),
+  stressBlendFloor: Number(arg("stress-blend-floor", String(DEFAULT_CORRELATED_EXECUTION.stressBlendFloor))),
   // Set below, once the coupling assumption is resolved from the CLI.
   structure: undefined as CorrelationStructure | undefined,
 };
