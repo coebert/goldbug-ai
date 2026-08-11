@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCoverageTrendAlert } from "@/lib/coverage-trend-alert";
+import { evaluateCoverageTrendAlert, formatCoverageWindow } from "@/lib/coverage-trend-alert";
 import type { CoverageSeries } from "@/lib/fee-coverage-trend";
 
 function series(pcts: (number | null)[]): CoverageSeries {
@@ -82,5 +82,33 @@ describe("evaluateCoverageTrendAlert", () => {
     const a = evaluateCoverageTrendAlert(series(flat(75, 21)), { floorPct: 90 });
     expect(a.shouldAlert).toBe(true);
     expect(a.reason).toBe("below_floor");
+  });
+});
+
+describe("coverage window summaries", () => {
+  it("reports the dates and graded-day counts of the last two windows", () => {
+    const a = evaluateCoverageTrendAlert(
+      series([...flat(99, 7), ...flat(90, 7), ...flat(80, 7)]),
+    );
+    const [recent, prior] = a.windows;
+    expect(recent.index).toBe(0);
+    expect(recent.startDate).toBe("2026-07-15");
+    expect(recent.endDate).toBe("2026-07-21");
+    expect(recent.coveragePct).toBe(80);
+    expect(recent.gradedDays).toBe(7);
+    expect(prior.startDate).toBe("2026-07-08");
+    expect(prior.endDate).toBe("2026-07-14");
+    expect(prior.coveragePct).toBe(90);
+  });
+
+  it("formats a window as a readable date range", () => {
+    const [recent] = evaluateCoverageTrendAlert(series(flat(40, 14))).windows;
+    expect(formatCoverageWindow(recent)).toBe("08 Jul – 14 Jul");
+  });
+
+  it("still returns two windows when history is short", () => {
+    const a = evaluateCoverageTrendAlert(series(flat(40, 7)));
+    expect(a.windows).toHaveLength(2);
+    expect(a.windows[1].coveragePct).toBeNull();
   });
 });
