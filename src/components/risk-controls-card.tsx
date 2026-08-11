@@ -1016,6 +1016,78 @@ export function RiskControlsCard({
                 </div>
               )}
             </div>
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Volatility-adjusted exits</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Stops and profit targets are measured in ATR (average daily range) rather than
+                a flat percentage, so a calm mega-cap and a jumpy miner get exits that mean the
+                same thing in risk terms. The hard stop can only ever be tightened by this,
+                never widened.
+              </p>
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={cfg.atr_scaled_stop_enabled}
+                  onCheckedChange={(v) => setCfg((c) => ({ ...c, atr_scaled_stop_enabled: v }))}
+                />
+                <span className="text-xs">
+                  ATR-scaled stop-loss ({cfg.initial_stop_atr_mult}× ATR, floor{" "}
+                  {(cfg.atr_scaled_stop_floor_pct * 100).toFixed(1)}%, capped at the{" "}
+                  {(cfg.stop_loss_pct * 100).toFixed(0)}% hard stop)
+                </span>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <Switch
+                  checked={cfg.take_profit_enabled}
+                  onCheckedChange={(v) => setCfg((c) => ({ ...c, take_profit_enabled: v }))}
+                />
+                <span className="text-xs">
+                  Take-profit {cfg.take_profit_enabled ? "armed" : "off — winners run until a stop, trail or time exit"}
+                </span>
+              </div>
+              {cfg.take_profit_enabled && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={cfg.atr_take_profit_enabled}
+                      onCheckedChange={(v) => setCfg((c) => ({ ...c, atr_take_profit_enabled: v }))}
+                    />
+                    <span className="text-xs">
+                      Size the target in ATR ({cfg.take_profit_atr_mult}× ATR) instead of a flat{" "}
+                      {(cfg.take_profit_pct * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  {cfg.atr_take_profit_enabled && (
+                    <>
+                      {numInput(
+                        "Profit target, in ATRs",
+                        "e.g. 4 = exit when the gain reaches four average daily ranges",
+                        cfg.take_profit_atr_mult,
+                        (v) => setCfg((c) => ({ ...c, take_profit_atr_mult: v })),
+                        0,
+                        20,
+                      )}
+                      {pctInput(
+                        "Smallest allowed target",
+                        "Keeps quiet names from taking profit inside daily noise",
+                        cfg.atr_take_profit_floor_pct,
+                        (v) => setCfg((c) => ({ ...c, atr_take_profit_floor_pct: v })),
+                        0,
+                        100,
+                      )}
+                      {pctInput(
+                        "Largest allowed target",
+                        "Keeps volatile names from aiming at a gain that never arrives",
+                        cfg.atr_take_profit_cap_pct,
+                        (v) => setCfg((c) => ({ ...c, atr_take_profit_cap_pct: v })),
+                        0,
+                        200,
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             </>
             )}
 
