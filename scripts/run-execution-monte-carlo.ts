@@ -128,6 +128,16 @@ import {
 } from "../src/lib/execution-correlation-structures";
 
 import {
+  SHOCK_INGREDIENTS,
+  formatShockAblation,
+  shockAblationArms,
+  shockAblationReport,
+  type ShockArmResult,
+  type ShockIngredientKey,
+  type ShockMetricKey,
+} from "../src/lib/execution-shock-generators";
+
+import {
   EXECUTION_CHANNELS,
   channelSubsets,
   subsetKey,
@@ -366,6 +376,18 @@ const residualKinds = arg("residual-timeline", "blocks,contagion")
   .split(",").map((s) => s.trim()).filter(Boolean) as TimelineStructureKind[];
 const residualColumns = Number(arg("residual-columns", "64"));
 const residualEpisodes = Number(arg("residual-episodes", "8"));
+
+// --shock-ablation: hold the calibrated coupling fixed and swap only the
+// shock/tail generator. The ladder switches ingredients on one at a time
+// (dispersion → fill risk → jumps → stress regime → vol forcing); the
+// leave-one-out arms pull each one back out of the full generator. Everything
+// runs on common random numbers, so the differences are the generator's doing
+// and not the draws'.
+const shockAblationMode = argv.includes("--shock-ablation");
+const shockPaths = Number(arg("shock-paths", String(Math.max(30, Math.round(paths / 4)))));
+const shockFocus = arg("shock-focus", "worstDrawdownPct") as ShockMetricKey;
+const shockOrder = arg("shock-order", "")
+  .split(",").map((s) => s.trim()).filter(Boolean) as ShockIngredientKey[];
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
@@ -1419,6 +1441,93 @@ async function main() {
     console.log("means the channels compound — the joint tail is worse than the parts summed.");
     console.log("Stress cannot act alone, so its solo effect is ~0 while its Shapley share is not:");
     console.log("that gap is exactly the amplification it lends to the other two.");
+    return;
+  }
+
+  // ------------------------------------------------ shock-generator ablation
+  // Correlation is pinned (whatever --calibrate-corr / --load-calib / --corr-structure
+  // resolved to); only the shock process changes row to row.
+  if (shockAblationMode) {
+    const arms = shockAblationArms(shockOrder.length ? shockOrder : undefined);
+    console.log("Shock-generator ablation — calibrated coupling held fixed");
+    console.log(`  coupling: ${describeStructure(simCfg.structure!)}`);
+    console.log(`  ${shockPaths} paths/arm · common random numbers · focus metric ${shockFocus}`);
+    for (const i of SHOCK_INGREDIENTS) console.log(`  · ${i.label} — ${i.note}`);
+    console.log();
+
+    for (const variant of SMA_VARIANTS) {
+      const tuned = tuneVariant(variant);
+      console.log(`=== ${variant} ===`);
+      const results: ShockArmResult[] = [];
+
+      for (const armSpec of arms) {
+        // Only shock-side fields are overridden; `structure` and `rho` survive.
+        const cfg = { ...simCfg, ...armSpec.overrides };
+        const pathRet: number[] = [];
+        const pathDeepestDd: number[] = [];
+        const pathDeepestInStress: boolean[] = [];
+        const pathStressShare: number[] = [];
+        const pathCosts: number[] = [];
+
+        for (let pth = 0; pth < shockPaths; pth++) {
+          // Seed depends only on the path and variant, never on the arm.
+          const pathSeed = baseSeed + pth * 7919 + variant.length * 104729;
+          const sampler = makeCorrelatedExecutionSampler(cfg, pathSeed);
+          const limit = execModel === "limit"
+            ? makeLimitOrderSampler(limitCfg, pathSeed ^ 0x5f3759df)
+            : null;
+          const rets: number[] = [];
+          let deepestDd = 0;
+          let deepestInStress = false;
+          let costSum = 0;
+          let stressCostSum = 0;
+          for (let k = 0; k < folds.length; k++) {
+            const f = folds[k]!;
+            const r = simulate(ctx, variant, f.testStart, f.testEnd, tuned[k]!, sampler, limit);
+            rets.push(r.returnPct);
+            if (r.maxDrawdownPct < deepestDd) {
+              deepestDd = r.maxDrawdownPct;
+              deepestInStress = r.maxDdTroughStressed || r.maxDdWindowStressShare > 0;
+            }
+            costSum += r.costs;
+            stressCostSum += r.stressCosts;
+          }
+          pathRet.push(meanOf(rets));
+          pathDeepestDd.push(deepestDd);
+          pathDeepestInStress.push(deepestInStress);
+          pathCosts.push(costSum / folds.length);
+          pathStressShare.push(costSum > 0 ? (stressCostSum / costSum) * 100 : 0);
+        }
+
+        const ret = percentileStats(pathRet);
+        const deep = percentileStats(pathDeepestDd);
+        const cost = percentileStats(pathCosts);
+        const breach = jointDrawdownBreachProbabilities(
+          pathDeepestDd, pathDeepestInStress, [sweepThreshold])[0]!;
+        results.push({
+          arm: armSpec,
+          metrics: {
+            medianReturnPct: ret.median,
+            p5ReturnPct: ret.p5,
+            cvar5ReturnPct: ret.cvar5,
+            medianDrawdownPct: deep.median,
+            worstDrawdownPct: deep.worst,
+            breachProb: breach.prob,
+            jointBreachProb: breach.jointProb,
+            meanCost: cost.median,
+          },
+        });
+      }
+
+      console.log(formatShockAblation(shockAblationReport(results, shockFocus)));
+      console.log();
+    }
+
+    console.log("Reading: every row trades the same signals through the same coupling on the");
+    console.log("same random draws — only the shock process differs, so a row's gap to its");
+    console.log("neighbour is that ingredient's contribution to the tail. The ladder measures");
+    console.log("it on the way up, leave-one-out on the way down; when the two disagree the");
+    console.log(`ingredient interacts with the others ('interact' column). P(breach) is at ${sweepThreshold}%.`);
     return;
   }
 
