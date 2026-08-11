@@ -205,7 +205,9 @@ export function CoverageTrendCard() {
             </ul>
           </>
         )}
+        <WebhookDeliveryStatusStrip category={COVERAGE_TREND_ALERT_CATEGORY} />
       </CardContent>
+
     </Card>
   );
 }
