@@ -303,6 +303,7 @@ export function rollingCorrelationWindows(
   const step = Math.max(1, Math.floor(opts.step ?? DEFAULTS.step));
   const stressZ = opts.stressZ ?? DEFAULTS.stressZ;
   const minStressShare = opts.minStressShare ?? DEFAULTS.minStressShare;
+  const blend = Math.max(0, opts.blend ?? DEFAULTS.blend);
   const rets = returnSeries(seriesBySymbol, opts.basis ?? DEFAULTS.basis);
   const symbols = [...rets.keys()];
   if (symbols.length < 2) return [];
@@ -333,9 +334,10 @@ export function rollingCorrelationWindows(
       const z = volZ[i + 1];
       if (z === undefined) continue;
       counted++;
-      if (z >= stressZ) stressBars++;
+      stressBars += barStressWeight(z, stressZ, blend);
     }
     const stressShare = counted ? stressBars / counted : 0;
+    const stressWeight = windowStressWeight(stressShare, minStressShare, blend);
     rows.push({
       endIndex: end,
       bars: window,
@@ -344,7 +346,8 @@ export function rollingCorrelationWindows(
       withinPairs: within.length,
       acrossPairs: across.length,
       stressShare,
-      stressed: stressShare >= minStressShare,
+      stressWeight,
+      stressed: stressWeight >= 0.5,
     });
   }
   return rows;
@@ -364,12 +367,17 @@ export function calibrateCorrelations(
   const window = Math.max(5, Math.floor(opts.window ?? DEFAULTS.window));
   const step = Math.max(1, Math.floor(opts.step ?? DEFAULTS.step));
   const shrink = Math.min(1, Math.max(0, opts.shrink ?? DEFAULTS.shrink));
-  const rows = rollingCorrelationWindows(seriesBySymbol, { ...opts, basis, window, step });
+  const blend = Math.max(0, opts.blend ?? DEFAULTS.blend);
+  const rows = rollingCorrelationWindows(seriesBySymbol, { ...opts, basis, window, step, blend });
   const symbols = [...seriesBySymbol.keys()];
   const groups = opts.groups ?? new Map(symbols.map((s) => [s, defaultCluster(s)]));
 
-  const calmRows = rows.filter((r) => !r.stressed);
-  const stressRows = rows.filter((r) => r.stressed);
+  // Under a soft blend every window contributes to both regimes, weighted by
+  // its membership; at blend 0 the weights are 0/1 and this is the old split.
+  const stressW = rows.map((r) => r.stressWeight);
+  const calmW = rows.map((r) => 1 - r.stressWeight);
+  const withinRhos = rows.map((r) => r.withinRho);
+  const acrossRhos = rows.map((r) => r.acrossRho);
   const scale = (p: PooledRho): PooledRho => ({
     ...p,
     rho: Number.isFinite(p.rho) ? p.rho * shrink : p.rho,
@@ -381,18 +389,20 @@ export function calibrateCorrelations(
     window,
     step,
     shrink,
+    blend,
     symbols,
     clusters: [...new Set(symbols.map((s) => groups.get(s) ?? "other"))].sort(),
     windows: rows,
     calm: {
-      within: scale(pool(calmRows.map((r) => r.withinRho))),
-      across: scale(pool(calmRows.map((r) => r.acrossRho))),
+      within: scale(pool(withinRhos, calmW)),
+      across: scale(pool(acrossRhos, calmW)),
     },
     stress: {
-      within: scale(pool(stressRows.map((r) => r.withinRho))),
-      across: scale(pool(stressRows.map((r) => r.acrossRho))),
+      within: scale(pool(withinRhos, stressW)),
+      across: scale(pool(acrossRhos, stressW)),
     },
-    stressShare: rows.length ? stressRows.length / rows.length : 0,
+    stressShare: rows.length ? rows.filter((r) => r.stressed).length / rows.length : 0,
+    stressMass: stressW.reduce((a, b) => a + b, 0),
   };
 }
 
