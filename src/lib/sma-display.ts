@@ -297,6 +297,22 @@ export function toggleSmaFavorite(current: readonly string[], symbol: string): s
     : [...current, symbol];
 }
 
+/** Move a pinned market one slot up or down in the pinned sequence. */
+export function moveSmaFavorite(
+  current: readonly string[],
+  symbol: string,
+  direction: "up" | "down",
+): string[] {
+  const i = current.indexOf(symbol);
+  if (i === -1) return [...current];
+  const j = direction === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= current.length) return [...current];
+  const next = [...current];
+  [next[i], next[j]] = [next[j]!, next[i]!];
+  return next;
+}
+
+
 export function storeSmaFavorites(favorites: readonly string[]): void {
   try {
     window.localStorage.setItem(SMA_FAVORITES_KEY, favorites.join(","));
