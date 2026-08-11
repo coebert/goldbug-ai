@@ -39,6 +39,8 @@ import {
   TREND_FILTER_KEY,
   TREND_SIGNIFICANT_SCORE,
   TREND_SORT_KEY,
+  TREND_SORT2_KEY,
+
   parseSmaFavorites,
   parseSmaSymbols,
   parseTrendFilter,
