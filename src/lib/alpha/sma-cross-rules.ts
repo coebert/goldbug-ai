@@ -327,15 +327,21 @@ export type SmaCrossBuyRule = {
   /** Size multiplier applied to the intended notional when allowed. */
   sizeMultiplier: number;
   reason: string;
+  /** Conviction breakdown behind the multiplier (null when not sized). */
+  sizing: SmaSizeResult | null;
 };
 
-/** Buy-side rule: golden regime upsizes, death regime blocks (by default). */
+/**
+ * Buy-side rule: a death regime vetoes new longs (unless the risk profile
+ * allows reduced size), and everything else is sized by conviction —
+ * separation depth and cross freshness — inside the risk profile's bounds.
+ */
 export function smaCrossBuyRule(
   state: SmaCrossState | null | undefined,
   cfg: SmaCrossRuleConfig = DEFAULT_SMA_CROSS_RULES,
 ): SmaCrossBuyRule {
   if (!cfg.enabled || !state) {
-    return { allow: true, sizeMultiplier: 1, reason: "SMA cross rules off / no data" };
+    return { allow: true, sizeMultiplier: 1, reason: "SMA cross rules off / no data", sizing: null };
   }
 
   // 0. Missing / untrustworthy data never blocks a trade — the rest of the
@@ -345,75 +351,30 @@ export function smaCrossBuyRule(
       allow: true,
       sizeMultiplier: 1,
       reason: state.warnings[0] ?? "insufficient SMA history — neutral",
+      sizing: null,
     };
   }
-  // Newly listed: no SMA200, so no regime read. Size down rather than guess.
-  if (state.regimeUnknown) {
-    let m = Math.max(0, cfg.unknownRegimeSizeMult);
-    const why: string[] = [`no SMA200 (${state.bars} bars) — size ×${m.toFixed(2)}`];
-    if (state.fastCross === "bull") {
-      const priceOk =
-        !cfg.requirePriceConfirmation || (state.sma20 != null && state.price > state.sma20);
-      if (priceOk) {
-        m *= cfg.fastBullSizeMult;
-        why.push(`SMA20↑SMA50 (${state.fastCrossAgeBars}d ago)`);
-      }
-    } else if (state.fastCross === "bear") {
-      m *= 0.5;
-      why.push("SMA20↓SMA50 — half size");
-    }
-    return { allow: true, sizeMultiplier: m, reason: why.join("; ") };
-  }
 
-  // 1. Regime gate first — a death cross vetoes discretionary longs.
-  if (state.regime === "death") {
-    const mult = Math.max(0, cfg.deathSizeMult);
+  // 1. Regime veto — a death cross blocks discretionary longs outright when
+  // the profile sets `deathSizeMult` to 0. Profiles that allow reduced size
+  // fall through to the conviction sizer, which scales the cut by how deep
+  // the death cross actually is.
+  if (state.regime === "death" && !(cfg.deathSizeMult > 0)) {
     const sep = ((state.regimeSeparationPct ?? 0) * 100).toFixed(2);
-    if (mult <= 0) {
-      return {
-        allow: false,
-        sizeMultiplier: 0,
-        reason: `death cross regime (SMA50 ${sep}% vs SMA200) — new buys blocked`,
-      };
-    }
     return {
-      allow: true,
-      sizeMultiplier: mult,
-      reason: `death cross regime (SMA50 ${sep}% vs SMA200) — size ×${mult.toFixed(2)}`,
+      allow: false,
+      sizeMultiplier: 0,
+      reason: `death cross regime (SMA50 ${sep}% vs SMA200) — new buys blocked`,
+      sizing: null,
     };
   }
 
-  let mult = 1;
-  const notes: string[] = [];
-
-  if (state.regimeCross === "golden" || state.regime === "golden") {
-    mult *= cfg.goldenSizeMult;
-    notes.push(
-      state.regimeCross === "golden"
-        ? `fresh golden cross (${state.regimeCrossAgeBars}d ago)`
-        : "golden regime",
-    );
-  }
-
-  if (state.fastCross === "bull") {
-    const priceOk =
-      !cfg.requirePriceConfirmation || (state.sma20 != null && state.price > state.sma20);
-    if (priceOk) {
-      mult *= cfg.fastBullSizeMult;
-      notes.push(`SMA20↑SMA50 (${state.fastCrossAgeBars}d ago)`);
-    } else {
-      notes.push("SMA20↑SMA50 unconfirmed (px<SMA20)");
-    }
-  } else if (state.fastCross === "bear") {
-    // Fast trend just rolled over inside a golden regime — half size.
-    mult *= 0.5;
-    notes.push("SMA20↓SMA50 — half size");
-  }
-
+  const sizing = smaDynamicSizeMultiplier(state, cfg);
   return {
     allow: true,
-    sizeMultiplier: Math.max(0, mult),
-    reason: notes.length ? notes.join("; ") : "no fresh SMA cross",
+    sizeMultiplier: sizing.mult,
+    reason: sizing.notes.length ? sizing.notes.join("; ") : "no actionable SMA cross — full size",
+    sizing,
   };
 }
 
