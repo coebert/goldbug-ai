@@ -47,6 +47,70 @@ export function separationConviction(
 }
 
 /**
+ * Same ramp, but with a *soft knee* below the threshold instead of a dead
+ * zone: a spread of zero still scores 0, and the threshold scores `knee`
+ * rather than jumping from 0 to a boost. Used for the SMA200 regime leg so
+ * exposure moves continuously through the crossover point — there is no
+ * separation at which size steps.
+ */
+export function kneedConviction(
+  separationPct: number | null | undefined,
+  threshold: number,
+  saturation: number,
+  knee: number,
+): number {
+  const sep = Math.abs(Number(separationPct) || 0);
+  const lo = Math.max(0, threshold);
+  const hi = Math.max(lo, saturation);
+  const k = clamp01(knee);
+  if (sep <= 0) return 0;
+  if (sep < lo && lo > 0) return clamp01((sep / lo) * k);
+  if (hi <= lo) return 1;
+  return clamp01(k + (1 - k) * ((sep - lo) / (hi - lo)));
+}
+
+/**
+ * Signed SMA200 regime strength in [-1, 1]: positive in a golden regime,
+ * negative in a death regime, magnitude scaling with how decisively SMA50
+ * sits away from SMA200 (and how fresh the flip is). This is the quantity
+ * exposure scales with — the regime is no longer a yes/no gate.
+ */
+export function regimeStrength(
+  state: SmaCrossState,
+  cfg: SmaCrossRuleConfig,
+): number {
+  if (state.regimeUnknown || !state.regime) return 0;
+  const magnitude = kneedConviction(
+    state.regimeSeparationPct,
+    cfg.regimeSeparationPct,
+    cfg.regimeSaturationPct,
+    cfg.regimeKneeFraction,
+  );
+  const fresh =
+    state.regimeCross != null
+      ? crossFreshness(state.regimeCrossAgeBars, cfg.maxCrossAgeBars, cfg.freshnessWeight)
+      : 1;
+  // The regime is a state, not a trigger: freshness only modulates the top
+  // half of the ramp so an old-but-deep regime still carries conviction.
+  const scaled = clamp01(magnitude * (0.5 + 0.5 * fresh));
+  return state.regime === "golden" ? scaled : -scaled;
+}
+
+/**
+ * Exposure available while the SMA200 regime is still unknown (a newly
+ * listed name). Ramps continuously from `unknownRegimeSizeMult` at zero
+ * history to 1 as the series approaches `minBarsRegime`, rather than
+ * applying one flat haircut until the 200th bar lands.
+ */
+export function regimeDataMultiplier(state: SmaCrossState, cfg: SmaCrossRuleConfig): number {
+  if (!state.regimeUnknown) return 1;
+  const floor = Math.max(0, Math.min(1, cfg.unknownRegimeSizeMult));
+  const need = Math.max(1, cfg.minBarsRegime);
+  const progress = clamp01((Number(state.bars) || 0) / need);
+  return floor + (1 - floor) * progress;
+}
+
+/**
  * Freshness in [0,1]: 1 on the bar the cross confirmed, decaying linearly to
  * `1 - freshnessWeight` at `maxCrossAgeBars` and 0 beyond it. Unknown age is
  * treated as stale-but-valid regime state rather than a fresh trigger.
