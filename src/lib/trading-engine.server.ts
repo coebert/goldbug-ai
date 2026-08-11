@@ -176,6 +176,7 @@ import {
   inferVenueFromSymbol,
   resolveVenueTodConfig,
 } from "./alpha/execution-alpha";
+import { stochasticEntryTiming } from "./alpha/stochastic-timing";
 
 import type { Database } from "@/integrations/supabase/types";
 
