@@ -128,10 +128,15 @@ import {
 } from "../src/lib/execution-limit-orders";
 
 const argv = process.argv.slice(2);
+// A flag's value is the next token, unless that token is itself a flag — so
+// `--calibrate-corr --save-calib out.json` reads as "calibrate with the default
+// kind", not "calibrate with kind '--save-calib'".
 const arg = (name: string, fallback: string) => {
   const i = argv.indexOf(`--${name}`);
-  return i >= 0 && argv[i + 1] ? argv[i + 1]! : fallback;
+  const next = i >= 0 ? argv[i + 1] : undefined;
+  return next && !next.startsWith("--") ? next : fallback;
 };
+
 
 const DEFAULT_SYMBOLS = ["AAPL", "MSFT", "NVDA", "JPM", "XOM", "JNJ", "KO", "PG", "SPY", "GLD"];
 
