@@ -201,6 +201,7 @@ import { CryptoBacktestCard } from "@/components/crypto-backtest-card";
 import { CommodityLiquiditySimulatorCard } from "@/components/commodity-liquidity-simulator-card";
 import { PerformanceDashboardCard } from "@/components/performance-dashboard-card";
 import { VanguardBenchmarkCard } from "@/components/vanguard-benchmark-card";
+import { RelativeStrengthCard } from "@/components/relative-strength-card";
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { capitalAt, EquityPctChart } from "@/components/equity-pct-chart";
@@ -1153,6 +1154,15 @@ function PortfolioPage() {
                       equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
                       deposits={depositEvents}
                       riskLevel={p.risk_level}
+                    />
+                  </div>
+                )}
+                {p && (
+                  <div className="mb-4">
+                    <RelativeStrengthCard
+                      portfolioId={id}
+                      currency={String(p.currency ?? "GBP")}
+                      enabled={ready}
                     />
                   </div>
                 )}
