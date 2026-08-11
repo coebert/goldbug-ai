@@ -167,10 +167,16 @@ function AnnotationList({
 
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
-  const { range } = Route.useSearch();
+  const { range, compare: compareParam } = Route.useSearch();
+  const navigate = useNavigate();
   const meta = symbolMeta(symbol);
   const fetchHistory = useServerFn(getSymbolHistory);
   const fetchAnnotations = useServerFn(getChartAnnotations);
+
+  const compare = useMemo(
+    () => parseCompareParam(compareParam, symbol),
+    [compareParam, symbol],
+  );
 
   const query = useQuery({
     queryKey: ["symbol-history", symbol, range],
@@ -190,9 +196,39 @@ function MarketSymbolPage() {
     retry: false,
   });
 
+  const compareQueries = useQueries({
+    queries: compare.map((s) => ({
+      queryKey: ["symbol-history", s, range],
+      queryFn: () => fetchHistory({ data: { symbol: s, days: range } }),
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    })),
+  });
+
   const history = query.data;
   const annotations = annotationQuery.data?.annotations ?? [];
   const up = (history?.changePct ?? 0) >= 0;
+
+  const compareLoading = compareQueries.some((q) => q.isLoading);
+  const compareData = compareQueries
+    .map((q) => q.data)
+    .filter((d): d is SymbolHistory => Boolean(d));
+  const comparison = useMemo(
+    () => buildComparison(history ? [history, ...compareData] : compareData),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [history, compareData.map((d) => d.symbol).join(","), compareData.length, range],
+  );
+
+  const setCompare = (next: string[]) => {
+    void navigate({
+      to: "/market/$symbol",
+      params: { symbol },
+      search: { range, compare: serialiseCompareParam(next) },
+      replace: true,
+    });
+  };
+
+
 
 
   return (
