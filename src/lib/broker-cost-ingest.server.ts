@@ -14,7 +14,7 @@
 
 import { createLogger } from "@/lib/_server/log";
 import { convertAmount } from "./fx.server";
-import { matchChargesToFills, type ChargeUpdate, type IngestFill } from "./broker-cost-ingest";
+import { convertChargeLegs, matchChargesToFills, type IngestFill } from "./broker-cost-ingest";
 import type { BrokerAdapter, BrokerTradeCharge } from "./brokers/adapter";
 
 const log = createLogger("broker-cost-ingest");
@@ -158,8 +158,8 @@ export async function ingestBrokerCostsForPortfolio(args: {
     const fill = fillById.get(u.fillId);
     if (!fill) continue;
     const target = fill.currency || "GBP";
-    const legs = await convertChargeLegs(u, target);
-    const total = legs.commission + legs.exchangeFee + legs.tax + legs.other;
+    const legs = await convertChargeLegs(u, target, convertLeg);
+    const total = legs.total;
 
     const { error } = await supabaseAdmin
       .from("live_fills")
@@ -194,16 +194,4 @@ export async function ingestBrokerCostsForPortfolio(args: {
     chargedTotal,
     currency: baseCcy,
   };
-}
-
-async function convertChargeLegs(u: ChargeUpdate, target: string) {
-  const from = (u.currency || target).toUpperCase();
-  const to = target.toUpperCase();
-  const [commission, exchangeFee, tax, other] = await Promise.all([
-    convertLeg(u.commission, from, to),
-    convertLeg(u.exchangeFee, from, to),
-    convertLeg(u.tax, from, to),
-    convertLeg(u.other, from, to),
-  ]);
-  return { commission, exchangeFee, tax, other };
 }
