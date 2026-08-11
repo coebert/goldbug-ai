@@ -250,8 +250,13 @@ export function SmaTrendCard() {
       </CardHeader>
 
       <CardContent>
+        {hidden > 0 && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            {hidden} market{hidden > 1 ? "s" : ""} hidden by the trend filter.
+          </p>
+        )}
         <div className={compact ? "grid gap-3 lg:grid-cols-2" : "space-y-3"}>
-          {symbols.map((s, i) => {
+          {visible.map(({ symbol: s, index: i }) => {
             const q = queries[i];
             return (
               <SmaTrendPanel
