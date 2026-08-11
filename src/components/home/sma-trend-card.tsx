@@ -77,6 +77,8 @@ export function SmaTrendCard() {
   const [range, setRange] = useState<HistoryRange>(DEFAULT_RANGE);
   const [periods, setPeriods] = useState<SmaPeriod[]>(DEFAULT_SMA_PERIODS);
   const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
+  const [sort, setSort] = useState<TrendSort>("selection");
+  const [filter, setFilter] = useState<TrendFilter>("all");
   const fetchHistory = useServerFn(getSymbolHistory);
 
   // Restore the last view after hydration so SSR markup stays stable.
