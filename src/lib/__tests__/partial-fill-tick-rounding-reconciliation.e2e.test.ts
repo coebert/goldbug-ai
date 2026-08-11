@@ -102,6 +102,12 @@ type Scenario = {
   startingCashGbp: number;
 };
 
+/** Strictly increasing fill timestamps — the ledger replays in arrival order. */
+function stamp(seq: number): string {
+  const base = Date.UTC(2026, 7, 11, 8, 0, 0) + seq * 60_000;
+  return new Date(base).toISOString();
+}
+
 function buildScenario(seed: number, index: number): Scenario {
   const rnd = rng(seed);
   const inst = INSTRUMENTS[Math.floor(rnd() * INSTRUMENTS.length)]!;
@@ -128,7 +134,7 @@ function buildScenario(seed: number, index: number): Scenario {
       venuePrice,
       quantity: qty,
       fee: Number((1 + rnd() * 6).toFixed(2)),
-      filledAt: `2026-08-11T${String(9 + (seq % 8)).padStart(2, "0")}:${String((seq * 7) % 60).padStart(2, "0")}:00Z`,
+      filledAt: stamp(seq),
     });
     remaining = Number((remaining - qty).toFixed(10));
     seq += 1;
@@ -150,14 +156,21 @@ function buildScenario(seed: number, index: number): Scenario {
         venuePrice: roundToTick(inst.ref * (0.9 + rnd() * 0.2), inst.tick),
         quantity: q,
         fee: Number((1 + rnd() * 6).toFixed(2)),
-        filledAt: `2026-08-11T1${String(seq % 10)}:30:00Z`,
+        filledAt: stamp(seq),
       });
       toSell = Number((toSell - q).toFixed(10));
       seq += 1;
     }
   }
 
-  return { instrument: inst, intended, slices, startingCashGbp: 250_000 };
+  // Fund the account for the whole parent order plus commission headroom, so
+  // a fuzzed size can never manufacture a negative-cash scenario the live
+  // affordability gate would have refused before routing.
+  const worstNotional =
+    normalizeMarketPriceForTrading(inst.symbol, inst.ref * 1.1) * intended;
+  const startingCashGbp = Math.ceil(worstNotional * 1.5) + 10_000;
+
+  return { instrument: inst, intended, slices, startingCashGbp };
 }
 
 // ---------------------------------------------------------------------------
