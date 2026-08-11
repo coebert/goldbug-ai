@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSmaSymbolReport, type SmaBarInput } from "@/lib/sma-timeline";
+import { DEFAULT_SMA_CROSS_RULES } from "@/lib/alpha/sma-cross-rules";
 
 /** Deterministic series: a long downtrend, then a long uptrend. */
 function vShape(days: number): SmaBarInput[] {
@@ -142,7 +143,7 @@ describe("buildSmaSymbolReport", () => {
       });
     }
     const r = buildSmaSymbolReport("AAPL", bars, [], {
-      ...(await import("@/lib/alpha/sma-cross-rules")).DEFAULT_SMA_CROSS_RULES,
+      ...DEFAULT_SMA_CROSS_RULES,
       fastSeparationPct: 0.05,
     });
     expect(r.summary.fastCrosses).toBeGreaterThan(0);
