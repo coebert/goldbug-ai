@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Check, ChevronLeft, ChevronRight, LineChart as LineChartIcon, Plus, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FavoritesPanel } from "@/components/home/favorites-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
