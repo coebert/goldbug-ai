@@ -47,6 +47,7 @@ function Row({ row, currency }: { row: RiskLevelMetrics; currency: string }) {
     maximumFractionDigits: 0,
   });
   const thin = row.observations < 3;
+  const mixedCurrency = row.currencies.length > 1;
 
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
@@ -59,6 +60,16 @@ function Row({ row, currency }: { row: RiskLevelMetrics; currency: string }) {
         {thin && (
           <Badge variant="outline" className="text-[11px]">
             Not enough history
+          </Badge>
+        )}
+        {mixedCurrency && (
+          <Badge variant="outline" className="text-[11px]">
+            {row.currencies.join(" + ")} → {currency || "GBP"}
+          </Badge>
+        )}
+        {!row.fxComplete && (
+          <Badge variant="destructive" className="text-[11px]">
+            FX rate unavailable
           </Badge>
         )}
       </div>
@@ -84,6 +95,11 @@ function Row({ row, currency }: { row: RiskLevelMetrics; currency: string }) {
         Effective names {row.effectiveNames.toFixed(1)} · concentration{" "}
         {row.concentrationHhi.toFixed(2)}
         {row.drawdownTroughDate ? ` · worst on ${row.drawdownTroughDate}` : ""}
+        {row.flowEvents > 0
+          ? ` · ${row.flowEvents} deposit/withdrawal ${
+              row.flowEvents === 1 ? "step" : "steps"
+            } netted out (${money.format(row.netExternalFlow)})`
+          : ""}
       </div>
     </div>
   );
@@ -105,7 +121,8 @@ export function RiskLevelMetricsCard() {
           Risk levels at a glance
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Risk, drawdown and diversification per risk level
+          Return, drawdown and volatility exclude deposits, withdrawals and cash re-syncs; all
+          figures converted to {q.data?.currency ?? "GBP"}. Per risk level
           {q.data ? ` · last ${q.data.lookbackDays} days · ${formatUk(q.data.computedAt)}` : ""}
         </p>
       </CardHeader>
