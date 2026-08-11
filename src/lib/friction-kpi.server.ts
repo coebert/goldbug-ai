@@ -45,6 +45,11 @@ export type FrictionReport = {
   /** Days of history the series covers. */
   seriesDays: number;
   attribution: BeforeAfterAttribution;
+  /**
+   * Same window as `kpi`, split by traded asset and by venue. Both cuts are
+   * computed server-side so the drilldown cannot disagree with the headline.
+   */
+  breakdown: { byAsset: FrictionBreakdown; byVenue: FrictionBreakdown };
   overlay: RealisedCostOverlay;
   currency: string;
   asOf: string;
@@ -226,6 +231,10 @@ export async function loadFrictionReport(args: {
       equity,
       toIso: now.toISOString(),
     }),
+    breakdown: {
+      byAsset: frictionBreakdown({ fills: windowFills, by: "asset" }),
+      byVenue: frictionBreakdown({ fills: windowFills, by: "venue" }),
+    },
     overlay: realisedCostOverlay({ fills: attributionFills }),
     currency: base,
     asOf: now.toISOString(),
