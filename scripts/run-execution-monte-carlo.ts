@@ -69,6 +69,12 @@ import {
   structureFromCalibration,
 } from "../src/lib/execution-correlation-calibration";
 import {
+  stressTestCalibration,
+  formatCalibrationRobustness,
+  ALL_ESTIMATORS,
+  type CorrelationEstimator,
+} from "../src/lib/execution-correlation-robustness";
+import {
   buildCalibrationSnapshot,
   describeSnapshot,
   describeTapeCheck,
@@ -315,6 +321,18 @@ const oosPaths = Number(arg("oos-paths", String(Math.max(30, Math.round(paths / 
 const oosArms = arg("oos-arms", "independent,global,blocks,contagion,calib-blocks,calib-contagion")
   .split(",").map((s) => s.trim()).filter(Boolean);
 
+
+// --calib-stress: how much of the fitted coupling is the estimator? Refits the
+// calm/stress ρs across a window × estimator grid and moving-block bootstraps
+// the tape, so the report says how far the four numbers move under choices that
+// are arbitrary.
+const calibStressMode = argv.includes("--calib-stress");
+const calibStressWindows = arg("calib-stress-windows", "30,60,120")
+  .split(",").map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n > 0);
+const calibStressEstimators = arg("calib-stress-estimators", ALL_ESTIMATORS.join(","))
+  .split(",").map((s) => s.trim()).filter(Boolean) as CorrelationEstimator[];
+const calibStressResamples = Number(arg("calib-stress-resamples", "200"));
+const calibStressAllCells = argv.includes("--calib-stress-all");
 
 // --spillover: cluster × cluster coupling heatmap + leave-one-cluster-out tail
 // attribution, i.e. which sectors drive the joint worst case under contagion.
@@ -850,6 +868,25 @@ async function main() {
     console.log(describeCalibration(diag.calibration));
     console.log();
     console.log(formatCalibrationDiagnostics(diag));
+    if (!spilloverMode && !attributionMode) return;
+    console.log();
+  }
+
+  // ------------------------------------------------ calibration stress test
+  // --calib-stress: vary the window length and the estimator, and bootstrap the
+  // bars, then report how far calm/stress ρ actually move.
+  if (calibStressMode) {
+    const robustness = stressTestCalibration(seriesBySymbol, {
+      ...calibOpts,
+      volZ,
+      windows: calibStressWindows,
+      estimators: calibStressEstimators,
+      resamples: calibStressResamples,
+      bootstrapBaselineOnly: !calibStressAllCells,
+      baselineWindow: calibOpts.window,
+      seed: baseSeed,
+    });
+    console.log(formatCalibrationRobustness(robustness));
     if (!spilloverMode && !attributionMode) return;
     console.log();
   }
