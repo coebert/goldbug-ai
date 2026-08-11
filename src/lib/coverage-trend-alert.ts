@@ -19,6 +19,13 @@ import type { CoverageSeries } from "./fee-coverage-trend";
 
 /** Coverage floor, in percentage points, for the trailing 7-day window. */
 export const COVERAGE_TREND_FLOOR_PCT = 70;
+/**
+ * Points below the floor at which a shortfall stops being a nuisance and
+ * becomes critical: at floor-25 (45% by default) most of the recent tape is
+ * modelled rather than invoiced, so the friction KPI can no longer be read as
+ * a measurement at all.
+ */
+export const COVERAGE_TREND_CRITICAL_GAP_PCT = 25;
 /** Points of decline that count as a real deterioration rather than noise. */
 export const COVERAGE_TREND_STEP_PCT = 5;
 /** Days per comparison window. */
@@ -27,6 +34,8 @@ export const COVERAGE_TREND_WINDOW_DAYS = 7;
 const MIN_DAYS_PER_WINDOW = 3;
 
 export type CoverageTrendAlertReason = "below_floor" | "deteriorating" | "both";
+export type CoverageTrendSeverity = "info" | "warning" | "critical";
+
 
 /** One comparison window, carrying the dates and counts behind its number. */
 export type CoverageWindowSummary = {
