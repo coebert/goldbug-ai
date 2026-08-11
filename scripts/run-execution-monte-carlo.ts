@@ -57,6 +57,11 @@ import {
   type CorrelatedExecutionSampler,
 } from "../src/lib/execution-correlated-shocks";
 import {
+  calibrateCorrelations,
+  describeCalibration,
+  structureFromCalibration,
+} from "../src/lib/execution-correlation-calibration";
+import {
   clusterMap,
   describeStructure,
   makeCorrelationStructure,
@@ -205,6 +210,22 @@ const structureSweep = arg("structure-sweep", "")
 simCfg.structure = buildStructure(
   (arg("corr-structure", "global") as CorrelationStructureKind),
 );
+
+// ------------------------------------------------ calibrated coupling
+// --calibrate-corr [blocks|contagion]
+// Estimates ρ_within / ρ_across from the tape itself with a rolling window,
+// split into calm and stressed windows, instead of taking them on faith.
+const calibrateCorr = argv.includes("--calibrate-corr");
+const calibKind = (arg("calibrate-corr", "contagion") as "blocks" | "contagion");
+const calibOpts = {
+  window: Number(arg("calib-window", "60")),
+  step: Number(arg("calib-step", "5")),
+  basis: arg("calib-basis", "absReturns") as "returns" | "absReturns",
+  shrink: Number(arg("calib-shrink", "1")),
+  stressZ: Number(arg("calib-stress-z", String(simCfg.volStressZ))),
+  minStressShare: Number(arg("calib-min-stress", "0.25")),
+  groups: clusters,
+};
 
 // Any of the three axes puts the run into the sweep report.
 const sweepMode = rhoSweep.length > 0 || volZSweep.length > 0 || structureSweep.length > 0;
@@ -563,6 +584,30 @@ async function main() {
   }
   const fallback = calibrateSymbolExecution({ symbol: "UNKNOWN", bars: [] });
   const volZ = marketVolZScores(seriesBySymbol, 20);
+
+  if (calibrateCorr) {
+    const cal = calibrateCorrelations(seriesBySymbol, { ...calibOpts, volZ });
+    console.log("\nCalibrated coupling (rolling-window historical correlation)");
+    console.log(describeCalibration(cal));
+    // A short time series of the estimate: coupling is not a constant, and the
+    // spread between these rows is the honest error bar on any single number.
+    const tail = cal.windows.slice(-12);
+    if (tail.length) {
+      console.log(
+        ["  bar".padStart(7), "within".padStart(8), "across".padStart(8), "stress%".padStart(9)].join(" "),
+      );
+      for (const w of tail) {
+        console.log([
+          String(w.endIndex).padStart(7),
+          (Number.isFinite(w.withinRho) ? w.withinRho.toFixed(3) : "n/a").padStart(8),
+          (Number.isFinite(w.acrossRho) ? w.acrossRho.toFixed(3) : "n/a").padStart(8),
+          `${(w.stressShare * 100).toFixed(0)}%${w.stressed ? "*" : ""}`.padStart(9),
+        ].join(" "));
+      }
+    }
+    simCfg.structure = structureFromCalibration(cal, calibKind, clusters);
+    console.log(`Using calibrated structure: ${describeStructure(simCfg.structure)}\n`);
+  }
   const volBpsBySymbol = new Map<string, number[]>();
   for (const [sym, closes] of seriesBySymbol) volBpsBySymbol.set(sym, barVolBpsSeries(closes, 20));
   const ctx: Ctx = {
