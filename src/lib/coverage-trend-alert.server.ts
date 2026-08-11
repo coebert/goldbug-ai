@@ -41,12 +41,12 @@ export function maybeNotifyCoverageTrend(params: {
       if (recent && recent.length > 0) return;
 
       const label = portfolioName ? ` (${portfolioName})` : "";
-      const [recent, prior] = alert.windows;
+      const [recentWin, priorWin] = alert.windows;
       // Spell out the two windows in the body so the bell entry is
       // self-explanatory without opening the chart.
       const windowLine =
-        ` Windows compared: ${formatCoverageWindow(recent)} ${recent.coveragePct ?? "—"}% vs ` +
-        `${formatCoverageWindow(prior)} ${prior.coveragePct ?? "—"}%.`;
+        ` Windows compared: ${formatCoverageWindow(recentWin)} ${recentWin.coveragePct ?? "—"}% vs ` +
+        `${formatCoverageWindow(priorWin)} ${priorWin.coveragePct ?? "—"}%.`;
       await supabaseAdmin.from("notifications").insert({
         user_id: userId,
         category: COVERAGE_TREND_ALERT_CATEGORY,
