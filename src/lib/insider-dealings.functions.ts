@@ -1,19 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  insiderSignalBySymbol,
-  type InsiderDealingEvent,
-} from "@/lib/insider-dealings";
+import { type InsiderDealingEvent } from "@/lib/insider-dealings";
+import { insiderSignalsWithAi, type InsiderSignalRow } from "@/lib/insider-ai-scan";
 
 export type InsiderDealingsFeed = {
   as_of: string;
-  events: InsiderDealingEvent[];
-  signals: Array<{ symbol: string; nudge: number; events: number }>;
+  events: InsiderSignalRow[];
+  signals: Array<{ symbol: string; nudge: number; events: number; cluster: number; reviewed: number }>;
   refreshed: boolean;
   targets: number;
+  /** Summary of the most recent scheduled AI scan, when there has been one. */
+  last_scan: {
+    at: string;
+    trigger: string;
+    detected: number;
+    ai_scored: number;
+    signals: number;
+    mechanical: number;
+    noise: number;
+  } | null;
 };
 
-function rowToEvent(r: Record<string, unknown>): InsiderDealingEvent {
+function rowToEvent(r: Record<string, unknown>): InsiderSignalRow {
   return {
     symbol: String(r["symbol"] ?? ""),
     company: String(r["company"] ?? ""),
@@ -30,6 +38,10 @@ function rowToEvent(r: Record<string, unknown>): InsiderDealingEvent {
     value: r["value"] == null ? null : Number(r["value"]),
     severity: Number(r["severity"] ?? 0),
     sentiment_nudge: Number(r["sentiment_nudge"] ?? 0),
+    ai_verdict: (r["ai_verdict"] as InsiderSignalRow["ai_verdict"]) ?? null,
+    ai_confidence: r["ai_confidence"] == null ? null : Number(r["ai_confidence"]),
+    ai_nudge: r["ai_nudge"] == null ? null : Number(r["ai_nudge"]),
+    ai_rationale: (r["ai_rationale"] as string | null) ?? null,
   };
 }
 
@@ -48,8 +60,9 @@ export const getInsiderDealings = createServerFn({ method: "POST" })
     if (data.refresh) {
       try {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { ingestInsiderDealings } = await import("@/lib/insider-dealings.server");
-        const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 7 });
+        void supabaseAdmin;
+        const { runInsiderAiScan } = await import("@/lib/insider-ai-scan.server");
+        const res = await runInsiderAiScan({ trigger: "manual", windowDays: 7 });
         targets = res.targets;
         refreshed = true;
       } catch (err) {
@@ -65,15 +78,36 @@ export const getInsiderDealings = createServerFn({ method: "POST" })
       .limit(200);
 
     const events = (rows ?? []).map((r) => rowToEvent(r as Record<string, unknown>));
+
+    const { data: lastRun } = await context.supabase
+      .from("insider_scan_runs")
+      .select("created_at, trigger, detected, ai_scored, signals, mechanical, noise")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     return {
       as_of: new Date().toISOString(),
       events,
-      signals: insiderSignalBySymbol(events).map((s) => ({
+      signals: insiderSignalsWithAi(events).map((s) => ({
         symbol: s.symbol,
         nudge: s.nudge,
         events: s.events,
+        cluster: s.cluster,
+        reviewed: s.reviewed,
       })),
       refreshed,
       targets,
+      last_scan: lastRun
+        ? {
+            at: String((lastRun as Record<string, unknown>)["created_at"] ?? ""),
+            trigger: String((lastRun as Record<string, unknown>)["trigger"] ?? "cron"),
+            detected: Number((lastRun as Record<string, unknown>)["detected"] ?? 0),
+            ai_scored: Number((lastRun as Record<string, unknown>)["ai_scored"] ?? 0),
+            signals: Number((lastRun as Record<string, unknown>)["signals"] ?? 0),
+            mechanical: Number((lastRun as Record<string, unknown>)["mechanical"] ?? 0),
+            noise: Number((lastRun as Record<string, unknown>)["noise"] ?? 0),
+          }
+        : null,
     };
   });
