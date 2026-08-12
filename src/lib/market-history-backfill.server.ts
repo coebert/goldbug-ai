@@ -8,7 +8,7 @@
 // actually needs.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getDailyCandles } from "./market-data.server";
+import { getDailyCandles, getDailyCandlesRange } from "./market-data.server";
 
 export interface HistoryPriceRow {
   symbol: string;
@@ -70,15 +70,29 @@ export async function loadHistoryRows(
   const short = byDate.size < needed * 0.85;
   const stale = isStale(dates[dates.length - 1], todayIso);
 
-  if (short || stale) {
+  const absorb = (candles: { date: string; close: number }[]) => {
+    for (const c of candles) {
+      const close = Number(c.close);
+      if (c.date >= sinceIso && Number.isFinite(close) && close > 0) byDate.set(c.date, close);
+    }
+  };
+
+  // Depth: an explicit date range pulls the whole window from the feed (and
+  // caches it), instead of the newest-N slice a day-count fetch returns.
+  if (short) {
     try {
-      const candles = await getDailyCandles(symbol, Math.min(needed + 40, 2000), todayIso);
-      for (const c of candles) {
-        const close = Number(c.close);
-        if (c.date >= sinceIso && Number.isFinite(close) && close > 0) byDate.set(c.date, close);
-      }
+      absorb(await getDailyCandlesRange(symbol, sinceIso, todayIso));
     } catch (err) {
-      console.error("symbol-history: backfill failed", symbol, err);
+      console.error("symbol-history: range backfill failed", symbol, err);
+    }
+  }
+
+  // Freshness: a dense but out-of-date cache still needs the latest sessions.
+  if (stale || isStale(Array.from(byDate.keys()).sort().pop(), todayIso)) {
+    try {
+      absorb(await getDailyCandles(symbol, Math.min(needed + 40, 2000), todayIso));
+    } catch (err) {
+      console.error("symbol-history: recent backfill failed", symbol, err);
     }
   }
 
