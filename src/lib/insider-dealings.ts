@@ -76,6 +76,11 @@ const SELL_TERMS = [
   "disposes",
   "offloads",
   "cashes in",
+  "cash in",
+  "cashing in",
+  "cashes out",
+  "cash out",
+  "cashing out",
   "trims stake",
   "reduces stake",
 ];
