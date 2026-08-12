@@ -59,7 +59,7 @@ export function SectionIndex({
   useEffect(() => {
     if (!active || !rowRef.current) return;
     const chip = rowRef.current.querySelector<HTMLElement>(`[data-section="${active}"]`);
-    chip?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    chip?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [active]);
 
   if (present.length < 2) return null;
