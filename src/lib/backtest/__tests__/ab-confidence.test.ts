@@ -48,9 +48,11 @@ describe("computeAbConfidence", () => {
   });
 
   it("marks a cheaper-but-riskier arm when drawdown deteriorates", () => {
+    // Same drift, far choppier path: every resample inherits the extra swing.
     const batched = arm(120, 0.001, 1);
-    // Punch a deep hole into the batched path only.
-    for (let i = 30; i < 90; i++) batched.equityCurve[i]!.totalValue *= 0.55;
+    for (let i = 0; i < batched.equityCurve.length; i++) {
+      batched.equityCurve[i]!.totalValue *= i % 2 === 0 ? 1 : 0.94;
+    }
     const r = computeAbConfidence({
       batched,
       unbatched: arm(120, 0.001, 8),
