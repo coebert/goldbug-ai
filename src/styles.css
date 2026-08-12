@@ -271,6 +271,37 @@
     min-height: 100dvh;
   }
 
+  /* Viewport-safe sticky nav geometry.
+   *
+   * Every sticky offset in the app is expressed against these two tokens
+   * instead of hard-coded rems, and both resolve to a fixed height that does
+   * NOT depend on the content inside the bar. A sticky bar that changes
+   * height mid-scroll (a badge loading in, a clock widening, the notch inset
+   * resolving late) reflows everything below it and the browser corrects the
+   * scroll position — which reads as the page jumping. Header height is
+   * therefore locked; only the safe-area inset is variable, and that settles
+   * on the first frame. */
+  :root {
+    --app-header-row-h: 3.5rem;
+    --app-header-h: calc(var(--app-header-row-h) + env(safe-area-inset-top));
+    --subnav-h: 3.25rem;
+  }
+
+  /* In-page anchor jumps and focus scrolls must clear the sticky chrome
+   * rather than land underneath it. */
+  html {
+    scroll-padding-top: calc(var(--app-header-h) + var(--subnav-h) + 0.5rem);
+  }
+
+  /* Sticky nav chrome must never be chosen as the browser's scroll anchor.
+   * When it is, any re-render inside the bar (scroll-spy active chip, live
+   * clock tick) makes the browser "restore" the scroll position around it and
+   * yanks the page. Content below keeps normal scroll anchoring. */
+  [data-sticky-nav] {
+    overflow-anchor: none;
+  }
+
+
   /* Prevent any stray wide element (long broker tokens, JSON error blobs,
    * font-mono reconciliation lines) from forcing mobile Safari to zoom the
    * whole page out to fit. Opt-in horizontal scroll containers (tables with
