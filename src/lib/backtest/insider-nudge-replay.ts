@@ -20,6 +20,14 @@ import {
   type InsiderDirection,
   type InsiderFlavour,
 } from "@/lib/insider-dealings";
+import {
+  riskSizingFor,
+  realisedVol,
+  targetWeights,
+  stepWeights,
+  tailRisk,
+  type RiskSizing,
+} from "./replay-risk-sizing";
 
 export type Candlelike = { date: string; close: number };
 
@@ -200,6 +208,9 @@ export type NudgeReplayResult = {
     sharpe: number;
     costPct: number;
     trades: number;
+    /** Change in 1-day 95% VaR (negative = the nudge arm risks less). */
+    var95Pct: number;
+    cvar95Pct: number;
   };
   confidence: {
     iterations: number;
@@ -210,6 +221,8 @@ export type NudgeReplayResult = {
     probPositive: number;
   };
   attribution: NudgeAttribution;
+  /** The live risk-dial preset both arms sized through. */
+  sizing: RiskSizing;
   verdict: ReplayVerdict;
   summary: string;
 };
@@ -274,6 +287,7 @@ function quantile(sorted: readonly number[], q: number): number {
  */
 export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
   const params: ReplayParams = { ...DEFAULT_REPLAY_PARAMS, ...(input.params ?? {}) };
+  const sizing = riskSizingFor(params.riskLevel);
   const startEquity = input.startingEquity && input.startingEquity > 0 ? input.startingEquity : 10_000;
 
   const prepared: Prepared[] = [];
@@ -303,6 +317,10 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     totalCost: 0,
     trades: 0,
     avgPositions: 0,
+    avgGross: 0,
+    var95Pct: 0,
+    cvar95Pct: 0,
+    volAnnPct: 0,
   });
 
   const attribution: NudgeAttribution = {
@@ -325,9 +343,10 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
       params,
       baseline: emptyArm("Baseline (no nudge)"),
       nudged: emptyArm("With insider nudge"),
-      delta: { returnPct: 0, maxDrawdownPct: 0, sharpe: 0, costPct: 0, trades: 0 },
+      delta: { returnPct: 0, maxDrawdownPct: 0, sharpe: 0, costPct: 0, trades: 0, var95Pct: 0, cvar95Pct: 0 },
       confidence: { iterations: 0, blockDays: 0, returnDeltaLo: 0, returnDeltaHi: 0, probPositive: 0 },
       attribution,
+      sizing,
       verdict: "neutral",
       summary: "Not enough tape to replay — load a longer history for this universe.",
     };
@@ -463,8 +482,8 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
 
     const beforeBase = base.equity;
     const beforeNud = nud.equity;
-    const rb = applyDay(base, select(baseScores), dayReturn);
-    const rn = applyDay(nud, select(nudScores), dayReturn);
+    const rb = applyDay(base, select(base, baseScores), dayReturn);
+    const rn = applyDay(nud, select(nud, nudScores), dayReturn);
 
     baseCurve.push({ date: next, equity: Number(base.equity.toFixed(2)), cost: Number(rb.cost.toFixed(4)), positions: base.weights.size });
     nudCurve.push({ date: next, equity: Number(nud.equity.toFixed(2)), cost: Number(rn.cost.toFixed(4)), positions: nud.weights.size });
@@ -535,6 +554,8 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     sharpe: Number((nudged.sharpe - baseline.sharpe).toFixed(2)),
     costPct: Number((((nudged.totalCost - baseline.totalCost) / startEquity) * 100).toFixed(3)),
     trades: nudged.trades - baseline.trades,
+    var95Pct: Number((nudged.var95Pct - baseline.var95Pct).toFixed(3)),
+    cvar95Pct: Number((nudged.cvar95Pct - baseline.cvar95Pct).toFixed(3)),
   };
 
   const mean = (xs: number[]) => (xs.length ? Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(3)) : null);
@@ -570,6 +591,7 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     delta,
     confidence: { iterations: samples.length ? iterations : 0, blockDays, returnDeltaLo: lo, returnDeltaHi: hi, probPositive },
     attribution,
+    sizing,
     verdict,
     summary,
   };
