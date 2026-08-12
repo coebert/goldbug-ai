@@ -31,12 +31,13 @@ export const backtestReclaimSetups = createServerFn({ method: "POST" })
       config: {
         ...(data.frictionBps == null ? {} : { frictionBps: data.frictionBps }),
         ...(data.pullbackWindow == null ? {} : { pullbackWindow: data.pullbackWindow }),
-      } as never,
+      },
     });
     const { trades, ...rest } = run;
     return {
       ...rest,
-      trades: [],
-      sampleTrades: [...trades].sort((a, b) => b.signalDate.localeCompare(a.signalDate)).slice(0, 25),
-    } as SetupBacktestResult;
+      sampleTrades: [...trades]
+        .sort((a, b) => b.signalDate.localeCompare(a.signalDate))
+        .slice(0, 25),
+    };
   });
