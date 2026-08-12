@@ -1047,6 +1047,14 @@ function PortfolioPage() {
                   mode={p.mode}
                 />
                 <RiskHaltBanner portfolioId={id} className="mb-4 mt-4" />
+                <ConcentrationAlertCard
+                  holdings={holdings}
+                  series={holdingsSeries}
+                  totalValue={totalValue}
+                  currency={p.currency}
+                  mode={p.mode}
+                  className="mb-4"
+                />
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
                 <CostSyncAlertBanner portfolioId={id} className="mb-4" />
                 <CoverageTrendAlertBanner portfolioId={id} className="mb-4" />
