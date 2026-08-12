@@ -2371,6 +2371,44 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const qty = outcome.qty;
       const fillPrice = outcome.fillPrice;
 
+      // Net-of-cost edge gate. The fee guard above only sees commission; this
+      // prices the FULL round trip — commission both ways, half-spread both
+      // ways, UK stamp duty and the PTM levy — and refuses the buy unless the
+      // move the signal actually supports clears that friction with a margin
+      // of safety. This is what stops the book bleeding out through tickets
+      // that were never big enough, or never convinced enough, to pay for
+      // themselves. Sells are never gated here.
+      {
+        const { assessNetEdge } = await import("./net-edge-gate");
+        const horizonDays = cfg.max_hold_days > 0 ? Math.min(cfg.max_hold_days, 20) : 10;
+        const netEdge = assessNetEdge({
+          symbol: meta.symbol,
+          side: "buy",
+          quantity: qty,
+          price: fillPrice,
+          assetClass: meta.asset_class,
+          conviction: typeof order.conviction === "number" ? order.conviction : null,
+          atrPct: featExec?.atr_pct ?? null,
+          horizonDays,
+        });
+        if (!netEdge.pass) {
+          executed.push({
+            symbol: meta.symbol,
+            side: "buy",
+            quantity: 0,
+            price: fillPrice,
+            value: 0,
+            reason: order.reason,
+            rejected: `net-edge gate: ${netEdge.reason}`,
+            liquidity: commodityLiq,
+          });
+          continue;
+        }
+        sizingNotes.push(netEdge.note);
+      }
+
+
+
       // Crypto post-sizing pre-trade gate: fee %, whole-unit lot size,
       // venue minimum notional, and venue trading hours. Runs only for
       // crypto BUYs; SELLs are always allowed through so a position can exit.
