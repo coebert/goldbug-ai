@@ -455,6 +455,17 @@ function MarketSymbolPage() {
             >
               RSI
             </Button>
+            <Button
+              size="sm"
+              variant={showDiv ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs"
+              aria-pressed={showDiv}
+              onClick={toggleDiv}
+              title="Highlight RSI/price divergences"
+            >
+              Divergence
+            </Button>
+
             {HISTORY_RANGES.map((r) => (
               <Button
                 key={r}
@@ -559,6 +570,22 @@ function MarketSymbolPage() {
                         isAnimationActive={false}
                       />
                     ))}
+                    {showDiv
+                      ? divergences.map((d) => (
+                          <ReferenceLine
+                            key={`price-div-${d.kind}-${d.from.date}-${d.to.date}`}
+                            segment={[
+                              { x: d.from.date, y: d.from.price },
+                              { x: d.to.date, y: d.to.price },
+                            ]}
+                            stroke={DIVERGENCE_TONE[d.kind]}
+                            strokeWidth={1.8}
+                            strokeDasharray="5 3"
+                            ifOverflow="extendDomain"
+                          />
+                        ))
+                      : null}
+
                     {annotations.map((a, i) => (
                       <ReferenceDot
                         key={a.id}
@@ -582,7 +609,12 @@ function MarketSymbolPage() {
                 </ResponsiveContainer>
               </ChartFrame>
 
-              {showRsi ? <RsiPane points={history.points} /> : null}
+              {showRsi ? (
+                <RsiPane points={history.points} divergences={showDiv ? divergences : []} />
+              ) : null}
+
+              {showDiv ? <DivergenceList divergences={divergences} /> : null}
+
 
               <AnnotationList
                 annotations={annotations}
