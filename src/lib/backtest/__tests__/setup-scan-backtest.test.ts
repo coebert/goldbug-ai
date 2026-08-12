@@ -8,20 +8,25 @@ import {
 import type { ScanCandle } from "@/lib/setup-scan";
 
 /**
- * Builds a history that drifts down for a long stretch (pushing price below the
- * long averages), then surges on thin volume — the archetype the scanner fires
- * on — and finally follows the supplied path.
+ * Long uptrend, a sharp dip below the 50d average, then a thin-tape surge that
+ * reclaims both averages — the archetype the live scanner fires on. `after`
+ * supplies the follow-through path used to score the trade.
  */
 function makeHistory(after: number[]): ScanCandle[] {
   const closes: number[] = [];
   let p = 100;
-  for (let i = 0; i < 220; i += 1) {
-    p *= i < 170 ? 0.998 : 1.0005;
+  for (let i = 0; i < 200; i += 1) {
+    p *= 1.003;
     closes.push(p);
   }
-  const base = closes[closes.length - 1];
-  // 5 surge sessions of ~+5% each on thin tape.
-  for (let i = 0; i < 5; i += 1) closes.push(base * 1.05 ** (i + 1));
+  for (let i = 0; i < 12; i += 1) {
+    p *= 0.975;
+    closes.push(p);
+  }
+  for (let i = 0; i < 5; i += 1) {
+    p *= 1.07;
+    closes.push(p);
+  }
   closes.push(...after);
 
   return closes.map((close, i) => ({
@@ -29,31 +34,34 @@ function makeHistory(after: number[]): ScanCandle[] {
     close,
     high: close * 1.02,
     low: close * 0.97,
-    // Thin relative volume on the surge; normal before it.
-    volume: i >= 220 ? 700_000 : 1_000_000,
+    // Thin relative volume across the surge; normal beforehand.
+    volume: i >= 212 ? 700_000 : 1_000_000,
   }));
 }
 
+/** Signal fires at index 216 with price ~188 and a 140-172 pullback zone. */
+const SIGNAL_PRICE = 188.4;
+
 describe("setup-scan backtest", () => {
   it("locates historical signals matching the live scanner rules", () => {
-    const candles = makeHistory(Array.from({ length: 30 }, (_, i) => 200 * (1 + i * 0.001)));
-    const signals = findSignals("TEST", candles);
+    const signals = findSignals("TEST", makeHistory(Array.from({ length: 30 }, () => SIGNAL_PRICE)));
     expect(signals.length).toBeGreaterThan(0);
     expect(signals[0].match.relVolume).toBeLessThan(2);
+    expect(signals[0].match.annualVolPct).toBeGreaterThan(60);
   });
 
   it("measures a profitable follow-through as a win net of friction", () => {
-    // Strong continuation after the surge.
-    const up = Array.from({ length: 40 }, (_, i) => 120 * 1.01 ** (i + 1));
+    const up = Array.from({ length: 40 }, (_, i) => SIGNAL_PRICE * 1.01 ** (i + 1));
     const report = runSetupBacktest([{ symbol: "UP", candles: makeHistory(up) }]);
     expect(report.signals).toBeGreaterThan(0);
     const h10 = report.chase.horizons.find((h) => h.horizon === 10)!;
     expect(h10.samples).toBeGreaterThan(0);
     expect(h10.avgNetPct).toBeGreaterThan(0);
+    expect(h10.winRatePct).toBe(100);
   });
 
-  it("marks froth: a surge that fully retraces loses net of friction", () => {
-    const down = Array.from({ length: 40 }, (_, i) => 120 * 0.985 ** (i + 1));
+  it("marks froth: a surge that retraces loses net of friction", () => {
+    const down = Array.from({ length: 40 }, (_, i) => SIGNAL_PRICE * 0.97 ** (i + 1));
     const report = runSetupBacktest([{ symbol: "DOWN", candles: makeHistory(down) }]);
     const h10 = report.chase.horizons.find((h) => h.horizon === 10)!;
     expect(h10.avgNetPct).toBeLessThan(0);
@@ -62,14 +70,27 @@ describe("setup-scan backtest", () => {
   });
 
   it("skips signals whose pullback zone is never tagged", () => {
-    const up = Array.from({ length: 40 }, (_, i) => 120 * 1.01 ** (i + 1));
+    const up = Array.from({ length: 40 }, (_, i) => SIGNAL_PRICE * 1.01 ** (i + 1));
     const report = runSetupBacktest([{ symbol: "UP", candles: makeHistory(up) }]);
     expect(report.discipline.entries + report.discipline.skipped).toBe(report.signals);
+    expect(report.discipline.entries).toBe(0);
     expect(report.discipline.skipped).toBeGreaterThan(0);
   });
 
+  it("enters on a pullback into the reclaimed averages and holds the level", () => {
+    // Drift back into the 140-172 zone, then recover.
+    const path = [180, 172, 165, 168, 175, 182, 190, 196, 200, 205, 210, 215];
+    const report = runSetupBacktest([{ symbol: "PB", candles: makeHistory(path) }], {
+      ...DEFAULT_BACKTEST_CONFIG,
+      horizons: [5],
+    });
+    expect(report.discipline.entries).toBe(1);
+    const h5 = report.discipline.horizons.find((h) => h.horizon === 5)!;
+    expect(h5.avgNetPct).toBeGreaterThan(0);
+  });
+
   it("subtracts round-trip friction from every measured return", () => {
-    const flat = Array.from({ length: 40 }, () => 120);
+    const flat = Array.from({ length: 40 }, () => SIGNAL_PRICE);
     const candles = makeHistory(flat);
     const cheap = runSetupBacktest([{ symbol: "F", candles }], {
       ...DEFAULT_BACKTEST_CONFIG,
