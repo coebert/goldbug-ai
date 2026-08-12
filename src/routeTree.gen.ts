@@ -32,6 +32,7 @@ import { Route as PortfolioIdReportRouteImport } from './routes/portfolio.$id.re
 import { Route as PortfolioIdOptimizerRouteImport } from './routes/portfolio.$id.optimizer'
 import { Route as PortfolioIdAttributionRouteImport } from './routes/portfolio.$id.attribution'
 import { Route as PortfolioIdAnalyticsRouteImport } from './routes/portfolio.$id.analytics'
+import { Route as ApiPublicSetupScanCronRouteImport } from './routes/api/public/setup-scan-cron'
 import { Route as ApiPublicNewsPreviewRouteImport } from './routes/api/public/news-preview'
 import { Route as ApiPublicAlgoRegimeAutotuneCronRouteImport } from './routes/api/public/algo-regime-autotune-cron'
 import { Route as ApiBrokerBlocksClearRouteImport } from './routes/api/broker-blocks/clear'
@@ -169,6 +170,11 @@ const PortfolioIdAnalyticsRoute = PortfolioIdAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
   getParentRoute: () => PortfolioIdRoute,
+} as any)
+const ApiPublicSetupScanCronRoute = ApiPublicSetupScanCronRouteImport.update({
+  id: '/api/public/setup-scan-cron',
+  path: '/api/public/setup-scan-cron',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicNewsPreviewRoute = ApiPublicNewsPreviewRouteImport.update({
   id: '/api/public/news-preview',
@@ -320,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
+  '/api/public/setup-scan-cron': typeof ApiPublicSetupScanCronRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
@@ -367,6 +374,7 @@ export interface FileRoutesByTo {
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
+  '/api/public/setup-scan-cron': typeof ApiPublicSetupScanCronRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
@@ -415,6 +423,7 @@ export interface FileRoutesById {
   '/api/broker-blocks/clear': typeof ApiBrokerBlocksClearRoute
   '/api/public/algo-regime-autotune-cron': typeof ApiPublicAlgoRegimeAutotuneCronRoute
   '/api/public/news-preview': typeof ApiPublicNewsPreviewRoute
+  '/api/public/setup-scan-cron': typeof ApiPublicSetupScanCronRoute
   '/portfolio/$id/analytics': typeof PortfolioIdAnalyticsRoute
   '/portfolio/$id/attribution': typeof PortfolioIdAttributionRoute
   '/portfolio/$id/optimizer': typeof PortfolioIdOptimizerRoute
@@ -464,6 +473,7 @@ export interface FileRouteTypes {
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
+    | '/api/public/setup-scan-cron'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
@@ -511,6 +521,7 @@ export interface FileRouteTypes {
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
+    | '/api/public/setup-scan-cron'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
@@ -558,6 +569,7 @@ export interface FileRouteTypes {
     | '/api/broker-blocks/clear'
     | '/api/public/algo-regime-autotune-cron'
     | '/api/public/news-preview'
+    | '/api/public/setup-scan-cron'
     | '/portfolio/$id/analytics'
     | '/portfolio/$id/attribution'
     | '/portfolio/$id/optimizer'
@@ -606,6 +618,7 @@ export interface RootRouteChildren {
   ApiBrokerBlocksClearRoute: typeof ApiBrokerBlocksClearRoute
   ApiPublicAlgoRegimeAutotuneCronRoute: typeof ApiPublicAlgoRegimeAutotuneCronRoute
   ApiPublicNewsPreviewRoute: typeof ApiPublicNewsPreviewRoute
+  ApiPublicSetupScanCronRoute: typeof ApiPublicSetupScanCronRoute
   ApiPublicHooksAiGatewayHealthRoute: typeof ApiPublicHooksAiGatewayHealthRoute
   ApiPublicHooksBackfillDailyEquityChangesRoute: typeof ApiPublicHooksBackfillDailyEquityChangesRoute
   ApiPublicHooksBackfillIntradayEquityRoute: typeof ApiPublicHooksBackfillIntradayEquityRoute
@@ -789,6 +802,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/portfolio/$id/analytics'
       preLoaderRoute: typeof PortfolioIdAnalyticsRouteImport
       parentRoute: typeof PortfolioIdRoute
+    }
+    '/api/public/setup-scan-cron': {
+      id: '/api/public/setup-scan-cron'
+      path: '/api/public/setup-scan-cron'
+      fullPath: '/api/public/setup-scan-cron'
+      preLoaderRoute: typeof ApiPublicSetupScanCronRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/news-preview': {
       id: '/api/public/news-preview'
@@ -989,6 +1009,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBrokerBlocksClearRoute: ApiBrokerBlocksClearRoute,
   ApiPublicAlgoRegimeAutotuneCronRoute: ApiPublicAlgoRegimeAutotuneCronRoute,
   ApiPublicNewsPreviewRoute: ApiPublicNewsPreviewRoute,
+  ApiPublicSetupScanCronRoute: ApiPublicSetupScanCronRoute,
   ApiPublicHooksAiGatewayHealthRoute: ApiPublicHooksAiGatewayHealthRoute,
   ApiPublicHooksBackfillDailyEquityChangesRoute:
     ApiPublicHooksBackfillDailyEquityChangesRoute,
