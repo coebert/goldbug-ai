@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getInsiderDealings, type InsiderDealingsFeed } from "@/lib/insider-dealings.functions";
 import type { InsiderDealingEvent } from "@/lib/insider-dealings";
+import { InsiderDealingDetailPanel } from "@/components/insider-dealing-detail-panel";
 import { cn } from "@/lib/utils";
 
 function flavourLabel(e: InsiderDealingEvent): string {
