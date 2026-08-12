@@ -124,28 +124,70 @@ export function AppHeader({ email }: { email?: string | null }) {
   // Publish the measured header height as --app-header-h so every sticky
   // sub-nav (portfolio tabs, leaf back rows) lines up exactly beneath it,
   // including on notched devices where the safe-area padding varies.
+  //
+  // The row itself is a fixed height, so this should only ever fire once (the
+  // safe-area inset settling). Guard it anyway: writing the variable while the
+  // user is scrolling would move every sticky offset under it and shift the
+  // page. Sub-pixel noise is ignored, and any real change during a touch
+  // gesture is deferred until the finger lifts.
   useEffect(() => {
     const el = headerRef.current;
     if (!el || typeof window === "undefined") return;
-    const apply = () => {
-      document.documentElement.style.setProperty(
-        "--app-header-h",
-        `${Math.round(el.getBoundingClientRect().height)}px`,
-      );
+    const root = document.documentElement;
+    let applied = 0;
+    let pending: number | null = null;
+    let touching = false;
+
+    const write = (h: number) => {
+      applied = h;
+      root.style.setProperty("--app-header-h", `${h}px`);
     };
+    const apply = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (!h || Math.abs(h - applied) < 1) return;
+      if (touching) {
+        pending = h;
+        return;
+      }
+      write(h);
+    };
+    const onTouchStart = () => {
+      touching = true;
+    };
+    const onTouchEnd = () => {
+      touching = false;
+      if (pending != null) {
+        write(pending);
+        pending = null;
+      }
+    };
+
     apply();
     const ro = new ResizeObserver(apply);
     ro.observe(el);
-    return () => ro.disconnect();
+    const opts = { passive: true } as const;
+    window.addEventListener("touchstart", onTouchStart, opts);
+    window.addEventListener("touchend", onTouchEnd, opts);
+    window.addEventListener("touchcancel", onTouchEnd, opts);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
+    };
   }, []);
 
   return (
     <header
       ref={headerRef}
+      data-sticky-nav
       className="sticky top-0 z-30 border-b border-border bg-surface-2/85 pt-[env(safe-area-inset-top)] backdrop-blur"
     >
-      {/* Row 1 — Brand / global controls */}
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 2xl:max-w-7xl">
+      {/* Row 1 — Brand / global controls. Height is pinned to
+          --app-header-row-h so late-arriving widgets (env badge, clock,
+          notifications bell) can never grow the bar and shift the page. */}
+      <div className="mx-auto grid h-[var(--app-header-row-h)] max-w-6xl grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-center gap-3 px-4 2xl:max-w-7xl">
+
         <Link
           to="/"
           className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
