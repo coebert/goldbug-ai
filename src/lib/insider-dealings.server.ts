@@ -13,6 +13,7 @@ import {
   type InsiderNewsRow,
   type InsiderTarget,
 } from "./insider-dealings";
+import { collectRnsDealings } from "./rns/investegate.server";
 
 type Sb = { from: (table: string) => any };
 
