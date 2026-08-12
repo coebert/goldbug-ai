@@ -188,4 +188,46 @@ describe("runOrderBatchingAb", () => {
     expect(r.verdict).toBe("inconclusive");
     expect(r.batched.tickets).toBe(0);
   });
+
+  it("caps buy tickets per bar, keeping the largest ones", async () => {
+    const series: BacktestBar[] = [];
+    for (let i = 0; i < 6; i++) {
+      series.push({
+        date: new Date(Date.UTC(2026, 0, 5 + i)).toISOString().slice(0, 10),
+        closes: { "ISF.L": 10, "VUKE.L": 20, "IUSA.L": 30 },
+      });
+    }
+    const signals: BatchingSignal[] = [];
+    for (const b of series.slice(0, 3)) {
+      for (const [sym, notional] of [
+        ["ISF.L", 400],
+        ["VUKE.L", 800],
+        ["IUSA.L", 1200],
+      ] as const) {
+        signals.push({
+          date: b.date,
+          symbol: sym,
+          side: "buy",
+          notionalBase: notional,
+          conviction: 0.6,
+          assetClass: "etf",
+        });
+      }
+    }
+    const base = {
+      bars: series,
+      signals,
+      startingCash: 100_000,
+      minTicketBase: 250,
+      windowHours: 96,
+    };
+    const uncapped = await runOrderBatchingAb(base);
+    const capped = await runOrderBatchingAb({ ...base, maxTicketsPerDay: 1 });
+
+    expect(uncapped.batched.ticketsCapped).toBe(0);
+    expect(capped.batched.ticketsCapped).toBeGreaterThan(0);
+    expect(capped.batched.tickets).toBeLessThan(uncapped.batched.tickets);
+    // The biggest ticket wins the single slot on each bar.
+    expect(capped.batched.trades.every((t) => t.symbol === "IUSA.L")).toBe(true);
+  });
 });
