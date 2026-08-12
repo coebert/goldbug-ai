@@ -160,6 +160,8 @@ export interface SymbolHistory {
   volatilityPct: number | null;
   /** Worst peak-to-trough fall inside the window, in %. */
   maxDrawdownPct: number | null;
+  /** Latest 14-day Wilder RSI, null until the look-back is warm. */
+  rsi14: number | null;
   sma50: number | null;
   sma200: number | null;
   aboveSma50: boolean | null;
@@ -268,6 +270,7 @@ export function buildSymbolHistory(
     low,
     volatilityPct,
     maxDrawdownPct: maxDd,
+    rsi14: lastPoint?.rsi14 ?? null,
     sma50: lastPoint?.sma50 ?? null,
     sma200: lastPoint?.sma200 ?? null,
     aboveSma50: lastPoint?.sma50 != null && last != null ? last > lastPoint.sma50 : null,
