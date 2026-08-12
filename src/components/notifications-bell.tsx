@@ -6,13 +6,13 @@ import { listNotifications } from "@/lib/notifications.functions";
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { POLL } from "@/lib/query-keys";
 
-const CATEGORY = "pending_slices";
+const CATEGORIES = ["pending_slices", "insider_dealing"];
 
 export function NotificationsBell({ className = "" }: { className?: string }) {
   const list = useServerFn(listNotifications);
   const q = useQuery({
-    queryKey: ["notifications", CATEGORY, "unread-count"],
-    queryFn: () => list({ data: { category: CATEGORY, unreadOnly: true, limit: 1 } }),
+    queryKey: ["notifications", CATEGORIES.join(","), "unread-count"],
+    queryFn: () => list({ data: { categories: CATEGORIES, unreadOnly: true, limit: 1 } }),
     refetchInterval: POLL.SEMI_LIVE,
     staleTime: 30_000,
   });

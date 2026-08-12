@@ -19,7 +19,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { POLL } from "@/lib/query-keys";
 
-const CATEGORY = "pending_slices";
+const CATEGORIES = ["pending_slices", "insider_dealing"];
 
 function severityTone(s: string): string {
   switch (s) {
@@ -45,8 +45,8 @@ export function NotificationsPanel() {
   const qc = useQueryClient();
 
   const q = useQuery({
-    queryKey: ["notifications", CATEGORY, tab],
-    queryFn: () => list({ data: { category: CATEGORY, unreadOnly: tab === "unread", limit: 100 } }),
+    queryKey: ["notifications", CATEGORIES.join(","), tab],
+    queryFn: () => list({ data: { categories: CATEGORIES, unreadOnly: tab === "unread", limit: 100 } }),
     refetchInterval: POLL.SEMI_LIVE,
   });
 
@@ -54,7 +54,7 @@ export function NotificationsPanel() {
 
   const mRead = useMutation({ mutationFn: (ids: string[]) => markRead({ data: { ids } }), onSuccess: invalidate });
   const mUnread = useMutation({ mutationFn: (ids: string[]) => markUnread({ data: { ids } }), onSuccess: invalidate });
-  const mAll = useMutation({ mutationFn: () => markAll({ data: { category: CATEGORY } }), onSuccess: invalidate });
+  const mAll = useMutation({ mutationFn: () => markAll({ data: { categories: CATEGORIES } }), onSuccess: invalidate });
   const mDel = useMutation({ mutationFn: (ids: string[]) => del({ data: { ids } }), onSuccess: invalidate });
 
   const rows: NotificationRow[] = q.data?.rows ?? [];

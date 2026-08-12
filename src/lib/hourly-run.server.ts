@@ -302,8 +302,10 @@ async function runHourlyCycleInner(
       let insiderNote = "";
       try {
         const { ingestInsiderDealings } = await import("@/lib/insider-dealings.server");
-        const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 3 });
-        insiderNote = `, insider ${res.stored}/${res.detected} across ${res.targets} names`;
+        const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 7 });
+        insiderNote = `, insider ${res.stored}/${res.detected} across ${res.targets} names${
+          res.alerted ? `, ${res.alerted} disposal alert(s)` : ""
+        }`;
       } catch (e) {
         srvLog.error("hourly-run: insider dealings ingest failed", e);
       }
