@@ -34,6 +34,8 @@ import {
   type HistoryPoint,
   type RsiZone,
 } from "@/lib/market-symbol-history";
+import { DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
+
 
 const ZONE_LABEL: Record<RsiZone, string> = {
   oversold: "Oversold",
