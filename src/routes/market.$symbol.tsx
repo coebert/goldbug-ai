@@ -59,6 +59,7 @@ import {
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { BackRow } from "@/components/nav/back-row";
+import { ChartFilterRow } from "@/components/ui/chart-filter-row";
 import { useYAxisWidth, compactTick, Y_AXIS_WIDTH_MOBILE } from "@/lib/chart-axis";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
 import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
@@ -731,8 +732,11 @@ function MarketSymbolPage() {
               {history?.asOf ? ` · prices to ${history.asOf}` : ""}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <SymbolSearch range={range} className="w-full sm:w-64" />
+            {/* Overlay/range controls scroll as one line on a phone instead of
+                wrapping into a five-row wall above the chart. */}
+            <ChartFilterRow>
             <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
             <Button
               size="sm"
@@ -810,6 +814,7 @@ function MarketSymbolPage() {
                 </Link>
               </Button>
             ))}
+            </ChartFilterRow>
           </div>
         </CardHeader>
 
