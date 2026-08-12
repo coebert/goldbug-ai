@@ -32,7 +32,7 @@ describe("buildConcentrationAlert", () => {
     const a = buildConcentrationAlert({
       nav: 10_000,
       // 30% of NAV against a 15% cap.
-      positions: [pos("MKS", 3_000, 775), pos("VUSA", 2_000, 21)],
+      positions: [pos("MKS", 3_000, 775), pos("VUSA", 1_400, 21)],
     });
     expect(a).not.toBeNull();
     expect(a!.breaches).toHaveLength(1);
