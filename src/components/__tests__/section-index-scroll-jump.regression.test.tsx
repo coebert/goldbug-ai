@@ -39,8 +39,28 @@ function positionAt(y: number) {
   }
 }
 
+/** Narrow row: only ~100px of chips fit, chips laid out 120px apart. */
+function narrowRow(row: HTMLElement) {
+  Object.defineProperty(row, "clientWidth", { value: 100, configurable: true });
+  for (const [idx, chip] of Array.from(
+    row.querySelectorAll<HTMLElement>("[data-section]"),
+  ).entries()) {
+    Object.defineProperty(chip, "offsetLeft", { value: idx * 120, configurable: true });
+    Object.defineProperty(chip, "offsetWidth", { value: 110, configurable: true });
+  }
+}
+
+/** Dispatch a scroll and let the rAF-throttled spy run. */
+async function scrollTick() {
+  await act(async () => {
+    window.dispatchEvent(new Event("scroll"));
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+  });
+}
+
 let scrollIntoView: ReturnType<typeof vi.fn>;
 let windowScrollTo: ReturnType<typeof vi.fn>;
+
 
 beforeEach(() => {
   scrollIntoView = vi.fn();
