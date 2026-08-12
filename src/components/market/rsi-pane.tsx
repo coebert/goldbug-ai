@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -35,6 +36,8 @@ import {
   type RsiZone,
 } from "@/lib/market-symbol-history";
 import { DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
+import { RSI_SIGNAL_TONE } from "@/lib/rsi-signal-style";
+import type { RsiSignal } from "@/lib/rsi-signals";
 
 
 const ZONE_LABEL: Record<RsiZone, string> = {
@@ -62,11 +65,14 @@ export function RsiBadge({ value }: { value: number | null | undefined }) {
 export function RsiPane({
   points,
   divergences = [],
+  signals = [],
   className,
 }: {
   points: HistoryPoint[];
   /** Divergence legs to draw across the RSI line. */
   divergences?: RsiDivergence[];
+  /** Oversold/overbought buy/sell markers to pin on the RSI line. */
+  signals?: RsiSignal[];
   className?: string;
 }) {
   const hasData = points.some((p) => p.rsi14 != null);
@@ -125,6 +131,18 @@ export function RsiPane({
               connectNulls
               isAnimationActive={false}
             />
+            {signals.map((sig) => (
+              <ReferenceDot
+                key={`rsi-sig-${sig.kind}-${sig.date}`}
+                x={sig.date}
+                y={sig.rsi}
+                r={4}
+                fill={RSI_SIGNAL_TONE[sig.kind]}
+                stroke="hsl(var(--background))"
+                strokeWidth={1.5}
+                isFront
+              />
+            ))}
             {divergences.map((d) => (
               <ReferenceLine
                 key={`rsi-div-${d.kind}-${d.from.date}-${d.to.date}`}
