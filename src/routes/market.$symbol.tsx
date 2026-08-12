@@ -334,6 +334,36 @@ function MarketSymbolPage() {
       return next;
     });
   };
+  // Divergence overlay is its own toggle; enabling it opens the RSI pane too
+  // so the two legs of the signal are visible together.
+  const [showDiv, setShowDiv] = useState(false);
+  useEffect(() => {
+    try {
+      setShowDiv(window.localStorage.getItem("chart.rsiDivergence") === "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleDiv = () => {
+    setShowDiv((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("chart.rsiDivergence", next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      if (next) {
+        setShowRsi(true);
+        try {
+          window.localStorage.setItem("chart.rsi", "1");
+        } catch {
+          /* storage unavailable */
+        }
+      }
+      return next;
+    });
+  };
+
   const pickTrendBasis = (b: TrendBasis) => {
     setTrendBasis(b);
     storeTrendBasis(b);
