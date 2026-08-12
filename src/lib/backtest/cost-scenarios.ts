@@ -178,6 +178,11 @@ export type CostScenarioSweepInput = {
   rollingWindowDays?: number;
   /** Which scenarios to run. Defaults to best/base/worst. */
   scenarioIds?: CostScenarioId[];
+  /**
+   * Market-impact / slippage model applied on top of the scenario's fee and
+   * spread assumptions, so bigger tickets pay for the liquidity they take.
+   */
+  execution?: OrderBatchingAbInput["execution"];
 };
 
 export const DEFAULT_ROLLING_WINDOW_DAYS = 21;
@@ -267,6 +272,7 @@ export async function runCostScenarioSweep(
         windowHours: input.windowHours,
         maxPriceDriftPct: input.maxPriceDriftPct,
         costModel: (o) => scenarioTradeCost(o, scenario),
+        execution: input.execution,
       };
       const result = await runBatchingArm(arm, armInput);
       const curve = result.equityCurve;

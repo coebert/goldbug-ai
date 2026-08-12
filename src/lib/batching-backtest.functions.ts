@@ -148,7 +148,7 @@ export const runCostScenarioBacktest = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }): Promise<CostScenarioResponse> => {
-    const { bars, symbols, navBase } = await loadReplayInputs(context.supabase, {
+    const { bars, symbols, navBase, advBySymbol } = await loadReplayInputs(context.supabase, {
       portfolioId: data.portfolioId,
       days: data.days,
     });
@@ -178,6 +178,7 @@ export const runCostScenarioBacktest = createServerFn({ method: "POST" })
       windowHours: data.windowHours,
       rollingWindowDays: data.rollingWindowDays,
       scenarioIds: data.scenarioIds as CostScenarioId[] | undefined,
+      execution: { enabled: true, advBySymbol },
     });
 
     return {
