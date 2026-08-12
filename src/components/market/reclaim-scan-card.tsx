@@ -14,6 +14,7 @@ import {
   type ScheduledScanResult,
 } from "@/lib/setup-scan.functions";
 import { SetupMatchChart } from "@/components/market/setup-match-chart";
+import { POLL } from "@/lib/query-keys";
 
 /**
  * Applies the CRWV-derived rules across the market: high-volatility names that

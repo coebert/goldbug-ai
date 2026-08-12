@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   CHART_ROLE,
+  REFERENCE_LINE,
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";

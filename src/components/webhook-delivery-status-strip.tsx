@@ -10,6 +10,7 @@ import { AlertTriangle, CheckCircle2, MinusCircle } from "lucide-react";
 import { getWebhookDeliveries } from "@/lib/alert-webhook.functions";
 import { describeDeliveryStatus } from "@/lib/alert-webhook-retry";
 import { cn } from "@/lib/utils";
+import { POLL } from "@/lib/query-keys";
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "delivered") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />;
