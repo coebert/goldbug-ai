@@ -10,6 +10,12 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import {
+  AXIS_PROPS,
+  GRID_PROPS,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_LABEL_STYLE,
+} from "@/lib/chart-palette";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -309,11 +315,12 @@ export function InsiderNudgeReplayCard({
               <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chart} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
-                    <YAxis tick={{ fontSize: 10 }} width={52} domain={["auto", "auto"]} />
+                    <CartesianGrid {...GRID_PROPS} />
+                    <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
+                    <YAxis {...AXIS_PROPS} width={52} domain={["auto", "auto"]} />
                     <Tooltip
-                      contentStyle={{ fontSize: 12 }}
+                      contentStyle={TOOLTIP_CONTENT_STYLE}
+                      labelStyle={TOOLTIP_LABEL_STYLE}
                       formatter={(v: number | string) => Number(v).toFixed(0)}
                     />
                     <Line
@@ -321,14 +328,14 @@ export function InsiderNudgeReplayCard({
                       dataKey="baseline"
                       dot={false}
                       strokeWidth={1.5}
-                      stroke="hsl(var(--muted-foreground))"
+                      stroke="var(--muted-foreground)"
                     />
                     <Line
                       type="monotone"
                       dataKey="nudged"
                       dot={false}
                       strokeWidth={1.8}
-                      stroke="hsl(var(--primary))"
+                      stroke="var(--primary)"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -426,11 +433,12 @@ function WalkForwardBlock({ r }: { r: WalkForwardResult }) {
         <div className="h-44 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chart} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
-              <YAxis tick={{ fontSize: 10 }} width={52} domain={["auto", "auto"]} />
+              <CartesianGrid {...GRID_PROPS} />
+              <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
+              <YAxis {...AXIS_PROPS} width={52} domain={["auto", "auto"]} />
               <Tooltip
-                contentStyle={{ fontSize: 12 }}
+                contentStyle={TOOLTIP_CONTENT_STYLE}
+                      labelStyle={TOOLTIP_LABEL_STYLE}
                 formatter={(v: number | string) => Number(v).toFixed(0)}
               />
               <Line
@@ -438,14 +446,14 @@ function WalkForwardBlock({ r }: { r: WalkForwardResult }) {
                 dataKey="baseline"
                 dot={false}
                 strokeWidth={1.5}
-                stroke="hsl(var(--muted-foreground))"
+                stroke="var(--muted-foreground)"
               />
               <Line
                 type="monotone"
                 dataKey="nudged"
                 dot={false}
                 strokeWidth={1.8}
-                stroke="hsl(var(--primary))"
+                stroke="var(--primary)"
               />
             </LineChart>
           </ResponsiveContainer>

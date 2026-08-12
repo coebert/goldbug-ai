@@ -59,7 +59,7 @@ import {
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { BackRow } from "@/components/nav/back-row";
-import { useYAxisWidth, compactTick } from "@/lib/chart-axis";
+import { useYAxisWidth, compactTick, Y_AXIS_WIDTH_MOBILE } from "@/lib/chart-axis";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
 import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
 import { DIVERGENCE_LABEL, DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
@@ -896,7 +896,7 @@ function MarketSymbolPage() {
                       width={yWidth}
                       domain={["auto", "auto"]}
                       tickFormatter={(v: number) =>
-                        yWidth <= 40 ? compactTick(v) : num(v, 0)
+                        yWidth <= Y_AXIS_WIDTH_MOBILE ? compactTick(v) : num(v, 0)
                       }
                     />
                     <Tooltip
@@ -950,13 +950,13 @@ function MarketSymbolPage() {
                         y={sig.price}
                         r={5}
                         fill={RSI_SIGNAL_TONE[sig.kind]}
-                        stroke="hsl(var(--background))"
+                        stroke="var(--background)"
                         strokeWidth={1.5}
                         isFront
                         label={{
                           value: sig.kind === "buy" ? "B" : "S",
                           fill: RSI_SIGNAL_TONE[sig.kind],
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           position: sig.kind === "buy" ? "bottom" : "top",
                         }}
@@ -984,7 +984,7 @@ function MarketSymbolPage() {
                         x={m.date}
                         y={m.price}
                         r={isFocused(focus, m.tradeId) ? 9 : 6}
-                        fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
+                        fill={m.side === "entry" ? "var(--background)" : tradeMarkerColor(m)}
                         stroke={tradeMarkerColor(m)}
                         strokeWidth={isFocused(focus, m.tradeId) ? 3 : 2}
                         opacity={focusOpacity(focus, m.tradeId)}
@@ -993,7 +993,7 @@ function MarketSymbolPage() {
                         label={{
                           value: m.glyph,
                           fill: tradeMarkerColor(m),
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           position: m.side === "entry" ? "bottom" : "top",
                         }}
@@ -1007,13 +1007,13 @@ function MarketSymbolPage() {
                         y={a.close}
                         r={9}
                         fill={ANNOTATION_TONE[a.kind] ?? CHART_ROLE.highlight}
-                        stroke="hsl(var(--background))"
+                        stroke="var(--background)"
                         strokeWidth={1.5}
                         isFront
                         label={{
                           value: String(i + 1),
-                          fill: "hsl(var(--background))",
-                          fontSize: 10,
+                          fill: "var(--background)",
+                          fontSize: 11,
                           fontWeight: 700,
                           position: "center",
                         }}

@@ -16,6 +16,7 @@ import {
   SAXO_TOOLTIP_CURSOR,
   SAXO_TOOLTIP_LABEL,
 } from "@/lib/saxo-chart";
+import { SAXO_REFERENCE_LINE } from "@/lib/saxo-chart";
 
 const VERDICT: Record<
   AbConfidenceResult["verdict"],
@@ -152,7 +153,7 @@ export function AbConfidencePanel({ confidence }: { confidence: AbConfidenceResu
                 formatter={(value: number) => [`${value} resamples`, "Count"]}
                 labelFormatter={(x: number) => `${signed(Number(x))} bps`}
               />
-              <ReferenceLine x={0} stroke={SAXO_COLOR.crosshair} strokeDasharray="3 3" />
+              <ReferenceLine x={0} {...SAXO_REFERENCE_LINE} />
               <Bar dataKey="count" radius={[2, 2, 0, 0]}>
                 {bars.map((b, i) => (
                   <Cell

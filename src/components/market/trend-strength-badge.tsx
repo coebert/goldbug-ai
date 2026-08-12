@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   CHART_ROLE,
+  REFERENCE_LINE,
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
@@ -130,7 +131,7 @@ export function TrendStrengthSparkline({
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={series} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
           <YAxis hide domain={[-100, 100]} />
-          <ReferenceLine y={0} stroke={CHART_ROLE.neutral} strokeOpacity={0.35} />
+          <ReferenceLine y={0} {...REFERENCE_LINE} />
           <RTooltip
             contentStyle={TOOLTIP_CONTENT_STYLE}
             labelStyle={TOOLTIP_LABEL_STYLE}

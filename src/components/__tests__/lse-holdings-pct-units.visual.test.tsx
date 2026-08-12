@@ -12,7 +12,7 @@
 // snapshots the extracted per-row labels plus the sparkline geometry. Any
 // drift in unit handling, formatter config, or row markup fails the snapshot.
 
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { renderWithQuery } from "@/components/__tests__/render-with-query";
 import { LiveHoldingsCard } from "@/components/live-holdings-card";
@@ -164,6 +164,16 @@ function extractRowLabels(html: string) {
 }
 
 describe("holdings card + equity charts — LSE unit/percentage visual parity", () => {
+  // The card renders "today" into axis labels/captions, so the markup snapshot
+  // would otherwise drift every calendar day. Pin the clock.
+  beforeAll(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-12T12:00:00Z"));
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("per-row cost basis and percentage labels snapshot", () => {
     expect(extractRowLabels(renderCard())).toMatchSnapshot();
   });

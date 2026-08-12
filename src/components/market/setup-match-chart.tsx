@@ -13,6 +13,12 @@ import {
   YAxis,
 } from "recharts";
 import type { SetupMatch } from "@/lib/setup-scan";
+import {
+  AXIS_PROPS,
+  GRID_PROPS,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_LABEL_STYLE,
+} from "@/lib/chart-palette";
 
 function shortDate(iso: string): string {
   const d = new Date(iso);
@@ -102,32 +108,24 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
       <div className="h-40 w-full sm:h-44">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" vertical={false} />
+            <CartesianGrid {...GRID_PROPS} vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10 }}
+              {...AXIS_PROPS}
               interval="preserveStartEnd"
               minTickGap={28}
-              stroke="currentColor"
-              className="text-muted-foreground"
             />
             <YAxis
               yAxisId="price"
               domain={domain}
-              width={44}
-              tick={{ fontSize: 10 }}
-              stroke="currentColor"
-              className="text-muted-foreground"
+              width={48}
+              {...AXIS_PROPS}
               tickFormatter={(v: number) => v.toFixed(0)}
             />
             <YAxis yAxisId="vol" hide domain={[0, (max: number) => max * 4]} />
             <Tooltip
-              contentStyle={{
-                background: "hsl(var(--popover))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: 8,
-                fontSize: 11,
-              }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
+              labelStyle={TOOLTIP_LABEL_STYLE}
               formatter={(value: unknown, name: string) => {
                 const n = typeof value === "number" ? value : Number(value);
                 if (!Number.isFinite(n)) return ["—", name];
@@ -142,15 +140,15 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
               yAxisId="price"
               y1={match.zoneLow}
               y2={match.zoneHigh}
-              fill="hsl(var(--primary))"
+              fill="var(--primary)"
               fillOpacity={0.12}
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeOpacity={0.3}
             />
             <ReferenceLine
               yAxisId="price"
               y={match.invalidationBelow}
-              stroke="hsl(var(--destructive))"
+              stroke="var(--destructive)"
               strokeDasharray="4 3"
               strokeOpacity={0.8}
             />
@@ -166,7 +164,7 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
             <ReferenceLine
               yAxisId="price"
               x={reclaimLabel}
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeDasharray="2 3"
             />
 
@@ -182,9 +180,9 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
               yAxisId="price"
               dataKey="close"
               type="monotone"
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeWidth={1.8}
-              fill="hsl(var(--primary))"
+              fill="var(--primary)"
               fillOpacity={0.08}
               isAnimationActive={false}
             />

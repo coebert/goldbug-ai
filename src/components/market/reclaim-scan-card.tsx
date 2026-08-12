@@ -14,6 +14,7 @@ import {
   type ScheduledScanResult,
 } from "@/lib/setup-scan.functions";
 import { SetupMatchChart } from "@/components/market/setup-match-chart";
+import { POLL } from "@/lib/query-keys";
 
 /**
  * Applies the CRWV-derived rules across the market: high-volatility names that
@@ -42,7 +43,7 @@ export function ReclaimScanCard() {
   const cached = useQuery({
     queryKey: ["reclaim-scan"],
     queryFn: () => loadScan({ data: {} }),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
     refetchOnWindowFocus: true,
     staleTime: 60_000,
   });

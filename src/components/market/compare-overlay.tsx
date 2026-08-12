@@ -26,6 +26,7 @@ import {
   AXIS_TICK,
   GRID_PROPS,
   LEGEND_STYLE,
+  REFERENCE_LINE,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
@@ -311,7 +312,7 @@ export function CompareOverlay({
                     tickFormatter={(v: number) => `${(returnScale ? v : v - 100).toFixed(0)}%`}
                   />
                 )}
-                {returnScale && <ReferenceLine y={0} {...AXIS_LINE} strokeDasharray="3 3" />}
+                {returnScale && <ReferenceLine y={0} {...REFERENCE_LINE} />}
                 <Tooltip
                   contentStyle={TOOLTIP_CONTENT_STYLE}
                   labelStyle={TOOLTIP_LABEL_STYLE}
@@ -394,7 +395,7 @@ export function CompareOverlay({
                       tick={AXIS_TICK}
                       axisLine={AXIS_LINE}
                       tickLine={TICK_LINE}
-                      width={44}
+                      width={48}
                       domain={[0, 100]}
                       ticks={[0, RSI_OVERSOLD, 50, RSI_OVERBOUGHT, 100]}
                     />

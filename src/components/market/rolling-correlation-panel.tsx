@@ -17,7 +17,14 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { ChartFrame } from "@/components/chart-frame";
-import { CHART_ROLE } from "@/lib/chart-palette";
+import {
+  AXIS_PROPS,
+  CHART_ROLE,
+  GRID_PROPS,
+  REFERENCE_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_LABEL_STYLE,
+} from "@/lib/chart-palette";
 import {
   MIN_CORRELATION_POINTS,
   ROLLING_WINDOWS,
@@ -94,27 +101,18 @@ export function RollingCorrelationPanel({
           <ChartFrame className="h-52 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -18 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10 }}
-                  minTickGap={28}
-                  stroke="hsl(var(--muted-foreground))"
-                />
+                <CartesianGrid {...GRID_PROPS} vertical={false} />
+                <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={28} />
                 <YAxis
                   domain={[-1, 1]}
                   ticks={[-1, -0.5, 0, 0.5, 1]}
-                  tick={{ fontSize: 10 }}
-                  stroke="hsl(var(--muted-foreground))"
+                  width={46}
+                  {...AXIS_PROPS}
                 />
-                <ReferenceLine y={0} stroke="hsl(var(--border))" />
+                <ReferenceLine y={0} {...REFERENCE_LINE} />
                 <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 10,
-                    fontSize: 12,
-                  }}
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
                   formatter={(value: number | string, name: string) => {
                     const pair = rolling.pairs.find((p) => p.key === name);
                     return [typeof value === "number" ? value.toFixed(2) : "—", pair?.label ?? name];

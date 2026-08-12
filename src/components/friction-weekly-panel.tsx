@@ -113,7 +113,12 @@ export function FrictionWeeklyPanel({
               <ReferenceLine
                 y={weekly.weeklyBudgetBps}
                 {...SAXO_REFERENCE_LINE}
-                label={{ value: "budget", position: "insideTopRight", fontSize: 10 }}
+                label={{
+                  value: "budget",
+                  position: "insideTopRight",
+                  fontSize: 12,
+                  fill: "var(--muted-foreground)",
+                }}
               />
             )}
             <Tooltip
