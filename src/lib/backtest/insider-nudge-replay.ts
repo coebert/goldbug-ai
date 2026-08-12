@@ -446,19 +446,29 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     nudRets.push(beforeNud > 0 ? nud.equity / beforeNud - 1 : 0);
   }
 
-  const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => ({
-    label,
-    curve,
-    finalEquity: Number(state.equity.toFixed(2)),
-    totalReturnPct: Number(((state.equity / startEquity - 1) * 100).toFixed(3)),
-    maxDrawdownPct: drawdownPct(curve.map((c) => c.equity)),
-    sharpe: sharpeOf(rets),
-    totalCost: Number(state.cost.toFixed(2)),
-    trades: state.trades,
-    avgPositions: Number(
-      (state.positions.reduce((a, b) => a + b, 0) / Math.max(1, state.positions.length)).toFixed(2),
-    ),
-  });
+  const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => {
+    const t = tailRisk(rets);
+    return {
+      label,
+      curve,
+      finalEquity: Number(state.equity.toFixed(2)),
+      totalReturnPct: Number(((state.equity / startEquity - 1) * 100).toFixed(3)),
+      maxDrawdownPct: drawdownPct(curve.map((c) => c.equity)),
+      sharpe: sharpeOf(rets),
+      totalCost: Number(state.cost.toFixed(2)),
+      trades: state.trades,
+      avgPositions: Number(
+        (state.positions.reduce((a, b) => a + b, 0) / Math.max(1, state.positions.length)).toFixed(2),
+      ),
+      avgGross: Number(
+        (state.gross.reduce((a, b) => a + b, 0) / Math.max(1, state.gross.length)).toFixed(4),
+      ),
+      var95Pct: t.var95Pct,
+      cvar95Pct: t.cvar95Pct,
+      volAnnPct: t.volAnnPct,
+    };
+  };
+
 
   const baseline = arm("Baseline (no nudge)", base, baseCurve, baseRets);
   const nudged = arm("With insider nudge", nud, nudCurve, nudRets);
