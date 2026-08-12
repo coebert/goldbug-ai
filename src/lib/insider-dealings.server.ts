@@ -57,35 +57,86 @@ export async function insiderTargetsFromHoldings(supabase: Sb): Promise<InsiderT
   return targets.slice(0, MAX_TARGETS);
 }
 
+function decode(s: string): string {
+  return s
+    .replace(/<!\[CDATA\[|\]\]>/g, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Minimal RSS item extraction. The world-events parser in `news-rss.server`
+ * hard-drops anything older than 48h, which is wrong here: a filing published
+ * last week is still the freshest insider signal for a name.
+ */
+export function parseInsiderFeed(xml: string, windowDays: number): InsiderNewsRow[] {
+  const cutoff = Date.now() - windowDays * 86_400_000;
+  const out: InsiderNewsRow[] = [];
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const chunk = m[1];
+    const title = chunk.match(/<title>([\s\S]*?)<\/title>/)?.[1];
+    if (!title) continue;
+    const pub = chunk.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1];
+    const ts = pub ? new Date(decode(pub)).getTime() : NaN;
+    if (Number.isFinite(ts) && ts < cutoff) continue;
+    out.push({
+      headline: decode(title),
+      summary: chunk.match(/<description>([\s\S]*?)<\/description>/)?.[1]
+        ? decode(chunk.match(/<description>([\s\S]*?)<\/description>/)![1]).slice(0, 300)
+        : null,
+      source: chunk.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1]
+        ? decode(chunk.match(/<source[^>]*>([\s\S]*?)<\/source>/)![1])
+        : "news.google.com",
+      url: chunk.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ?? null,
+      date: Number.isFinite(ts)
+        ? new Date(ts).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+    });
+  }
+  return out;
+}
+
 /** Fetches + classifies dealings for the given targets (no DB writes). */
 export async function collectInsiderDealings(
   targets: InsiderTarget[],
-  windowDays = 3,
+  windowDays = 7,
 ): Promise<InsiderDealingEvent[]> {
-  const today = new Date().toISOString().slice(0, 10);
   const out: InsiderDealingEvent[] = [];
-  const queue = [...targets];
-
-  async function worker() {
-    for (;;) {
-      const target = queue.shift();
-      if (!target) return;
-      const xml = await fetchFeed(insiderFeedUrl(target.company, windowDays));
-      if (!xml) continue;
-      const items = parseRssFeed(xml, "news.google.com", today, 15);
-      const rows: InsiderNewsRow[] = items.map((i) => ({
-        headline: i.headline,
-        summary: i.summary ?? null,
-        source: i.source ?? null,
-        url: i.url ?? null,
-        date: i.date ?? today,
-      }));
-      out.push(...detectInsiderDealings(rows, [target]));
+  const jobs: Array<{ target: InsiderTarget; query: string }> = [];
+  for (const target of targets) {
+    for (const query of insiderFeedQueries(target.company, windowDays)) {
+      jobs.push({ target, query });
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
-  return out;
+  async function worker() {
+    for (;;) {
+      const job = jobs.shift();
+      if (!job) return;
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(job.query)}&hl=en-GB&gl=GB&ceid=GB:en`;
+      const xml = await fetchFeed(url);
+      if (!xml) continue;
+      out.push(...detectInsiderDealings(parseInsiderFeed(xml, windowDays), [job.target]));
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, worker));
+
+  // One filing is reported by several outlets — collapse identical headlines.
+  const seen = new Set<string>();
+  return out.filter((e) => {
+    const key = `${e.symbol}|${e.event_date ?? ""}|${e.headline.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export type InsiderIngestResult = {
