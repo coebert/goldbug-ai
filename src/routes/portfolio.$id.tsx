@@ -979,6 +979,13 @@ function PortfolioPage() {
               trades={trades as unknown as import("@/lib/chart-trade-markers").MarkerTrade[]}
             />
 
+            <Suspense fallback={<div className="mb-4 h-64 animate-pulse rounded-md bg-muted/40" />}>
+              <div className="mb-4">
+                <EquityCompositionCard portfolioId={id} />
+              </div>
+            </Suspense>
+
+
             <div className="mt-2 flex justify-end">
               <ExperienceLevelToggle />
             </div>
