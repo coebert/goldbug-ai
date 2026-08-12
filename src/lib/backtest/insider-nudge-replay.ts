@@ -420,21 +420,23 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     const date = allDates[d] as string;
     const next = allDates[d + 1] as string;
 
-    const baseScores: Array<{ symbol: string; score: number }> = [];
-    const nudScores: Array<{ symbol: string; score: number }> = [];
+    const baseScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
+    const nudScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
 
     for (const p of prepared) {
       const i = p.index.get(date);
       if (i == null) continue;
       const s = trendScore(p.closes, i);
       if (s == null) continue;
-      baseScores.push({ symbol: p.symbol, score: s });
+      const vol = realisedVol(p.closes, i, 20);
+      baseScores.push({ symbol: p.symbol, score: s, vol });
 
       const n = params.nudgeScale === 0
         ? 0
         : activeNudge(p.events, (ed) => dayDiff(date, ed), params) * params.nudgeScale;
       const adj = Math.max(0, Math.min(1, s + n));
-      nudScores.push({ symbol: p.symbol, score: adj });
+      nudScores.push({ symbol: p.symbol, score: adj, vol });
+
 
       if (n < 0 && s >= params.entryThreshold && adj < params.entryThreshold) {
         attribution.suppressedDays += 1;
