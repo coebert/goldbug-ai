@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -108,6 +109,7 @@ function SmaReportPage() {
     <div className="min-h-screen bg-background">
       <AppHeader />
       <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+        <PortfolioTabs id={id} />
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm">
             <Link to="/portfolio/$id" params={{ id }}>

@@ -1,4 +1,5 @@
 import { ChartFrame } from "@/components/chart-frame";
+import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -857,6 +858,7 @@ function PortfolioPage() {
     <div className="min-h-dvh">
       <AppHeader email={email} />
       <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4">
+        <PortfolioTabs id={id} />
         <Link
           to="/"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

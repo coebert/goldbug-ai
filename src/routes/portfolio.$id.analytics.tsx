@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ function AnalyticsPage() {
     <div className="min-h-dvh bg-background">
       <AppHeader />
       <main className="mx-auto max-w-7xl p-4 md:p-6 space-y-4">
+        <PortfolioTabs id={id} />
         <Link
           to="/portfolio/$id"
           params={{ id }}
