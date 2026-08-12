@@ -22,7 +22,7 @@ function archetype(opts: { surgePct: number; relVol: number; volNoise: number })
   }
   // Dip: 10 sessions down, pushing price firmly under the 50d average.
   for (let i = 1; i <= 10; i += 1) {
-    closes.push(100 - i * 1.5 + Math.sin(i) * (opts.volNoise / 4));
+    closes.push(100 - i * 2.5 + Math.sin(i) * opts.volNoise);
     volumes.push(1_000_000);
   }
   // Surge: 5 sessions up, reclaiming the averages.
@@ -36,7 +36,7 @@ function archetype(opts: { surgePct: number; relVol: number; volNoise: number })
 
 describe("evaluateSetup", () => {
   it("matches a high-vol, low-relative-volume reclaim", () => {
-    const v = evaluateSetup("TEST", archetype({ surgePct: 20, relVol: 1.5, volNoise: 4 }));
+    const v = evaluateSetup("TEST", archetype({ surgePct: 25, relVol: 1.5, volNoise: 4 }));
     expect(v.rejected).toBeNull();
     expect(v.match).not.toBeNull();
     expect(v.match!.relVolume).toBeCloseTo(1.5, 1);
@@ -46,7 +46,7 @@ describe("evaluateSetup", () => {
   });
 
   it("rejects a confirmed move on heavy volume", () => {
-    const v = evaluateSetup("TEST", archetype({ surgePct: 20, relVol: 3.5, volNoise: 4 }));
+    const v = evaluateSetup("TEST", archetype({ surgePct: 25, relVol: 3.5, volNoise: 4 }));
     expect(v.match).toBeNull();
     expect(v.rejected).toMatch(/relative volume/);
   });
