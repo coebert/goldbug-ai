@@ -151,7 +151,7 @@ export function planFolds(
   for (let guard = 0; guard < 64; guard++) {
     const trainTo = addMonths(trainFrom, o.trainMonths);
     const testFrom = shiftDays(trainTo, 1);
-    const testTo = addMonths(testFrom, o.testMonths);
+    const testTo = shiftDays(addMonths(testFrom, o.testMonths), -1);
     if (testFrom > last) break;
     folds.push({ trainFrom, trainTo, testFrom, testTo: testTo > last ? last : testTo });
     if (testTo >= last) break;
