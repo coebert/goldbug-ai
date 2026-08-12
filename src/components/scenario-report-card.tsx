@@ -30,7 +30,7 @@ import {
   AXIS_TICK,
   CHART_ROLE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   OKABE_ITO,
   TICK_LINE,
 } from "@/lib/chart-palette";
@@ -124,7 +124,7 @@ export function ScenarioReportCard(props: { title?: string; input: BuildScenario
                   formatter={(v: number) => fmtMoney(v)}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
-                <Legend wrapperStyle={LEGEND_STYLE} />
+                <Legend {...LEGEND_PROPS} />
                 {reports.map(
                   (r, i) =>
                     visible[r.id] && (
@@ -170,7 +170,7 @@ export function ScenarioReportCard(props: { title?: string; input: BuildScenario
                   formatter={(v: number) => `${v.toFixed(2)}%`}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
-                <Legend wrapperStyle={LEGEND_STYLE} />
+                <Legend {...LEGEND_PROPS} />
                 {reports.map(
                   (r, i) =>
                     visible[r.id] && (
@@ -299,7 +299,7 @@ function ExecutionQualitySection(props: {
                 formatter={(v: number) => `${(v * 100).toFixed(1)}%`}
                 labelFormatter={(l) => `Decision: ${l}`}
               />
-              <Legend wrapperStyle={LEGEND_STYLE} />
+              <Legend {...LEGEND_PROPS} />
               {reports.map(
                 (r, i) =>
                   visible[r.id] && (
@@ -352,7 +352,7 @@ function ExecutionQualitySection(props: {
                 formatter={(v: number) => `${v.toFixed(2)} bps`}
                 labelFormatter={(l) => `Decision: ${l}`}
               />
-              <Legend wrapperStyle={LEGEND_STYLE} />
+              <Legend {...LEGEND_PROPS} />
               {reports.map(
                 (r, i) =>
                   visible[r.id] && (

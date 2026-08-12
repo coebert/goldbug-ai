@@ -32,7 +32,7 @@ import {
   AXIS_TICK,
   CHART_ROLE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   TICK_LINE,
 } from "@/lib/chart-palette";
 import { POLL } from "@/lib/query-keys";
@@ -181,7 +181,7 @@ export function RunMetricsCard() {
                     />
                     <YAxis width={64} tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={TICK_LINE} />
                     <Tooltip />
-                    <Legend wrapperStyle={LEGEND_STYLE} />
+                    <Legend {...LEGEND_PROPS} />
                     <Line
                       type="monotone"
                       dataKey="duration_s"
@@ -217,7 +217,7 @@ export function RunMetricsCard() {
                       tickLine={TICK_LINE}
                     />
                     <Tooltip />
-                    <Legend wrapperStyle={LEGEND_STYLE} />
+                    <Legend {...LEGEND_PROPS} />
                     <Bar dataKey="ok" name="success" stackId="p" fill={CHART_ROLE.positive} />
                     <Bar dataKey="err" name="error" stackId="p" fill={CHART_ROLE.negative} />
                     <Bar
@@ -253,7 +253,7 @@ export function RunMetricsCard() {
                       tickLine={TICK_LINE}
                     />
                     <Tooltip />
-                    <Legend wrapperStyle={LEGEND_STYLE} />
+                    <Legend {...LEGEND_PROPS} />
                     <Bar dataKey="saxo_total" name="total" fill="var(--primary)" />
                     <Bar dataKey="saxo_err" name="errors" fill={CHART_ROLE.negative} />
                     <Bar dataKey="saxo_429" name="429 retries" fill={CHART_ROLE.benchmark} />

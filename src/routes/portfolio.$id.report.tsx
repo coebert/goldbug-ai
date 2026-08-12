@@ -35,6 +35,7 @@ import {
   GRID_PROPS,
   REFERENCE_LINE,
   TICK_LINE,
+  LEGEND_PROPS,
 } from "@/lib/chart-palette";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 
@@ -301,7 +302,7 @@ function ReportPage() {
                           name,
                         ]}
                       />
-                      <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
+                      <Legend {...LEGEND_PROPS} />
                       <ReferenceLine
                         {...REFERENCE_LINE}
                         y={data.portfolio.starting_cash}

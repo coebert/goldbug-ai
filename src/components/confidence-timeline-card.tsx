@@ -25,7 +25,7 @@ import {
   AXIS_TICK,
   CHART_ROLE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   OKABE_ITO,
   TICK_LINE,
 } from "@/lib/chart-palette";
@@ -173,7 +173,7 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
                     tickLine={TICK_LINE}
                   />
                   <Tooltip content={<TimelineTooltip />} />
-                  <Legend wrapperStyle={LEGEND_STYLE} />
+                  <Legend {...LEGEND_PROPS} />
                   <Line
                     type="monotone"
                     dataKey="score"

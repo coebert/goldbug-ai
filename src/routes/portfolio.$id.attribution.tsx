@@ -32,7 +32,7 @@ import {
   CHART_NEUTRAL_SERIES,
   CHART_ROLE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   OKABE_ITO,
   REFERENCE_LINE,
   TICK_LINE,
@@ -218,7 +218,7 @@ function AttributionPage() {
                           color: "var(--popover-foreground)",
                         }}
                       />
-                      <Legend wrapperStyle={{ color: "var(--foreground)" }} />
+                      <Legend {...LEGEND_PROPS} />
                       <ReferenceLine {...REFERENCE_LINE} yAxisId="left" y={0} />
                       <Bar yAxisId="left" dataKey="contribution" name="Signed contribution (%)">
                         {data.overall.rows.map((r) => (
@@ -346,7 +346,7 @@ function AttributionPage() {
                             color: "var(--popover-foreground)",
                           }}
                         />
-                        <Legend wrapperStyle={LEGEND_STYLE} />
+                        <Legend {...LEGEND_PROPS} />
                         <ReferenceLine {...REFERENCE_LINE} y={0} />
                         <Line
                           type="monotone"
@@ -437,7 +437,7 @@ function AttributionPage() {
                             color: "var(--popover-foreground)",
                           }}
                         />
-                        <Legend wrapperStyle={LEGEND_STYLE} />
+                        <Legend {...LEGEND_PROPS} />
                         <ReferenceLine {...REFERENCE_LINE} y={0} />
                         {SIGNALS.map((k) => (
                           <Line

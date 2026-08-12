@@ -27,7 +27,7 @@ import {
   CHART_NEUTRAL_SERIES,
   CHART_ROLE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   OKABE_ITO,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
@@ -225,7 +225,7 @@ function SmaReportPage() {
                         labelStyle={TOOLTIP_LABEL_STYLE}
                         itemStyle={TOOLTIP_ITEM_STYLE}
                       />
-                      <Legend wrapperStyle={LEGEND_STYLE} />
+                      <Legend {...LEGEND_PROPS} />
                       <Line
                         type="monotone"
                         dataKey="close"

@@ -253,6 +253,7 @@ import {
   AXIS_TICK,
   CHART_NEUTRAL_SERIES,
   GRID_PROPS,
+  LEGEND_PROPS,
   OKABE_ITO,
   REFERENCE_LINE,
   TICK_LINE,
@@ -1806,11 +1807,11 @@ function PortfolioPage() {
                               verticalAlign="bottom"
                               height={28}
                               iconType="plainline"
+                              {...LEGEND_PROPS}
                               wrapperStyle={{
-                                fontSize: 12,
+                                ...LEGEND_PROPS.wrapperStyle,
                                 color: chartTheme.axisText,
                                 paddingTop: 8,
-                                lineHeight: "18px",
                               }}
                             />
                           </ComposedChart>

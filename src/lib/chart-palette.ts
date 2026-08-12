@@ -49,7 +49,28 @@ export const AXIS_LABEL = { fontSize: 12, fill: "var(--foreground)" } as const;
 // Legend text. Recharts renders legend labels with the browser's inherited
 // colour, which resolves to black inside an SVG-adjacent wrapper — always
 // pin it to the theme foreground.
-export const LEGEND_STYLE = { fontSize: 12, color: "var(--foreground)" } as const;
+//
+// Sizing is viewport-responsive without a JS breakpoint: `clamp()` shrinks the
+// label to 11px on a 360px phone and settles at 12px from ~460px up, and the
+// wrapper is allowed to wrap onto a second row (with its own scroll ceiling)
+// so a five-series legend can never push the plot area off the card or clip
+// its last entry.
+export const LEGEND_STYLE = {
+  fontSize: "clamp(11px, 2.9vw, 12px)",
+  lineHeight: 1.35,
+  color: "var(--foreground)",
+  width: "100%",
+  maxHeight: "3.75rem",
+  overflowY: "auto",
+  paddingTop: 4,
+} as const;
+
+/**
+ * Spread onto `<Legend {...LEGEND_PROPS} />`. Adds a smaller swatch to the
+ * responsive text style: Recharts' 14px default icon plus its fixed gap is
+ * what makes multi-series legends overflow first on a phone.
+ */
+export const LEGEND_PROPS = { wrapperStyle: LEGEND_STYLE, iconSize: 9 } as const;
 
 // Tooltip surface. Recharts' built-in default is an opaque white panel with
 // black text, which is unreadable against this app's dark theme.
@@ -59,6 +80,22 @@ export const TOOLTIP_CONTENT_STYLE = {
   border: "1px solid var(--border)",
   borderRadius: 6,
   color: "var(--popover-foreground)",
+  // A tooltip with several long series names renders as one very wide,
+  // single-line panel that runs off a phone screen. Cap it against the
+  // viewport and let long labels wrap instead of extending the panel.
+  maxWidth: "min(88vw, 20rem)",
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
+} as const;
+
+/**
+ * `wrapperStyle` for `<Tooltip>`: keeps the floating panel above sticky page
+ * chrome and stops it from swallowing touches meant for the chart beneath.
+ */
+export const TOOLTIP_WRAPPER_STYLE = {
+  zIndex: 30,
+  maxWidth: "min(88vw, 20rem)",
+  pointerEvents: "none",
 } as const;
 export const TOOLTIP_LABEL_STYLE = { color: "var(--muted-foreground)" } as const;
 export const TOOLTIP_ITEM_STYLE = { color: "var(--popover-foreground)" } as const;

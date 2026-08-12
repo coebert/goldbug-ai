@@ -35,7 +35,7 @@ import {
   Legend,
 } from "recharts";
 import { Languages, RefreshCw } from "lucide-react";
-import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_STYLE, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
 const COLORS = [
   "var(--primary)",
@@ -187,7 +187,7 @@ export function TranslationQualityCard() {
                       typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "—"
                     }
                   />
-                  <Legend wrapperStyle={LEGEND_STYLE} />
+                  <Legend {...LEGEND_PROPS} />
                   {topLangs.map((l, i) => (
                     <Line
                       key={l.language}

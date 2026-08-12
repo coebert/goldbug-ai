@@ -34,7 +34,7 @@ import { Explain } from "@/components/explain";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { lttb } from "@/lib/downsample";
-import { AXIS_LINE, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, GRID_PROPS, LEGEND_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 import { qk } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/long-horizon/$id")({
@@ -534,11 +534,8 @@ function LongHorizonPage() {
                           }}
                         />
                         <Legend
-                          wrapperStyle={{
-                            fontSize: 12,
-                            cursor: "pointer",
-                            color: "var(--foreground)",
-                          }}
+                          {...LEGEND_PROPS}
+                          wrapperStyle={{ ...LEGEND_PROPS.wrapperStyle, cursor: "pointer" }}
                           onClick={(o) => {
                             const dk = (o as { dataKey?: unknown }).dataKey;
                             const key = typeof dk === "string" ? dk : String(dk ?? "");

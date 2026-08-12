@@ -72,6 +72,9 @@ describe("chart legends, tooltips and axis labels use theme tokens", () => {
     it(`${name}: every <Legend> pins its text colour`, () => {
       const legends = src.match(/<Legend\b[^>]*?\/?>/gs) ?? [];
       for (const legend of legends) {
+        // Spreading a shared legend preset (LEGEND_PROPS / SAXO_LEGEND_PROPS)
+        // carries both the colour token and the responsive sizing.
+        if (/\{\.\.\.[A-Z][A-Z0-9_]*_LEGEND_PROPS\}|\{\.\.\.LEGEND_PROPS\}/.test(legend)) continue;
         expect(legend, `bare <Legend> inherits black text in ${name}`).toMatch(
           /wrapperStyle=\{/,
         );

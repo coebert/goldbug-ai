@@ -27,6 +27,7 @@ import {
   OKABE_ITO,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
+  LEGEND_PROPS,
 } from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
@@ -339,7 +340,7 @@ export function BacktestResultsCard({
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
                     contentStyle={TOOLTIP_CONTENT_STYLE}
                   />
-                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
+                  <Legend {...LEGEND_PROPS} />
                   <Area
                     type="monotone"
                     dataKey="cash"

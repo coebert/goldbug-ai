@@ -26,7 +26,7 @@ import {
   AXIS_TICK,
   CHART_ROLE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
@@ -219,7 +219,7 @@ export function SmaTrendPanel({
                   labelStyle={TOOLTIP_LABEL_STYLE}
                   formatter={(v: number, name: string) => [num(v), name]}
                 />
-                {!compact && <Legend wrapperStyle={LEGEND_STYLE} />}
+                {!compact && <Legend {...LEGEND_PROPS} />}
                 <Line
                   type="monotone"
                   dataKey="close"

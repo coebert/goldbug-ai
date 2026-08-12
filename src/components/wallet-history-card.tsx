@@ -24,7 +24,7 @@ import {
   AXIS_LINE,
   AXIS_TICK,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
 } from "@/lib/chart-palette";
@@ -180,7 +180,7 @@ export function WalletHistoryCard({ portfolioId, active = true }: Props) {
                     labelFormatter={(l) => String(l)}
                   />
                   <Legend
-                    wrapperStyle={LEGEND_STYLE}
+                    {...LEGEND_PROPS}
                     formatter={(v) => (v === "__baseTotal" ? `Total (${baseCcy})` : v)}
                   />
                   {currencies.map((c, i) => (
