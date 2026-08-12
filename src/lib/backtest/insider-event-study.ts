@@ -74,6 +74,30 @@ export function classifyEvents(txs: readonly InsiderTx[]): ClassifiedEvent[] {
   });
 }
 
+/**
+ * Several directors routinely file the same trade on the same day. Counting
+ * each filing as an independent observation fakes sample size and shrinks the
+ * confidence interval, so same symbol+day+direction filings collapse into one
+ * event carrying the summed consideration.
+ */
+export function collapseSameDay(events: readonly ClassifiedEvent[]): ClassifiedEvent[] {
+  const byKey = new Map<string, ClassifiedEvent>();
+  for (const e of events) {
+    const key = `${e.symbol}|${e.date}|${e.action}|${e.flavour}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, { ...e });
+      continue;
+    }
+    prev.value = (prev.value ?? 0) + (e.value ?? 0);
+    prev.shares = (prev.shares ?? 0) + (e.shares ?? 0);
+    prev.senior = prev.senior || e.senior;
+    // Keep the most senior / largest filer as the face of the cluster.
+    if (e.senior && !prev.senior) prev.person = e.person;
+  }
+  return [...byKey.values()];
+}
+
 /** Index of trading-day position by date, for O(1) window slicing. */
 function indexOf(series: readonly Candlelike[]): Map<string, number> {
   const m = new Map<string, number>();
@@ -120,6 +144,8 @@ export type BuildOptions = {
   minValue?: number;
   /** Drop events whose full longest window is not yet on the tape. */
   requireComplete?: boolean;
+  /** Collapse same symbol+day filings into one event (default true). */
+  collapse?: boolean;
 };
 
 /**
@@ -137,10 +163,11 @@ export function buildEventOutcomes(
   const horizons = opts.horizons ?? DEFAULT_HORIZONS;
   const minValue = opts.minValue ?? 0;
   const maxH = Math.max(...horizons);
+  const rows = opts.collapse === false ? events : collapseSameDay(events);
   const benchIdx = new Map<string, Map<string, number>>();
 
   const out: EventOutcome[] = [];
-  for (const e of events) {
+  for (const e of rows) {
     if (minValue > 0 && (e.value == null || Math.abs(e.value) < minValue)) continue;
     const series = prices.get(e.symbol);
     if (!series || series.length === 0) continue;
