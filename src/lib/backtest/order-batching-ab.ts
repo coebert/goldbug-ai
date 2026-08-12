@@ -36,6 +36,11 @@ import {
   type ParkedIntent,
 } from "../order-batching";
 import { engineSymbolKey } from "../price-symbol";
+import {
+  quoteExecutionImpact,
+  DEFAULT_EXECUTION_IMPACT,
+  type ExecutionImpactConfig,
+} from "./execution-impact";
 
 /** One sized intent produced by the strategy for a given bar. */
 export type BatchingSignal = {
@@ -58,7 +63,14 @@ export type BatchingArmTrade = {
   quantity: number;
   price: number;
   notional: number;
+  /** Commission + stamp + PTM + half-spread + modelled slippage. */
   cost: number;
+  /** Size-dependent market impact + latency, base currency. */
+  slippageBase: number;
+  /** Same, in bps of this ticket's notional. */
+  slippageBps: number;
+  /** notional / ADV for this ticket. */
+  participation: number;
   /** Quantity that came from previously parked slices (batched arm only). */
   parkedQuantity: number;
   waitedHours: number;
@@ -69,8 +81,14 @@ export type BatchingArmResult = {
   /** Tickets actually routed (this is what pays the commission floor). */
   tickets: number;
   trades: BatchingArmTrade[];
-  /** Total modelled execution cost (commission + stamp + PTM + half-spread). */
+  /** Total modelled execution cost (commission + stamp + PTM + half-spread + impact). */
   totalCostBase: number;
+  /** Market-impact + latency portion of `totalCostBase`, base currency. */
+  totalSlippageBase: number;
+  /** Impact portion in bps of starting equity. */
+  slippageBpsOfEquity: number;
+  /** Notional-weighted average participation rate across filled tickets. */
+  avgParticipation: number;
   /** Cost as bps of the notional actually traded. */
   costBpsOfTurnover: number;
   /** Cost as bps of starting equity — the number that shows up in the P&L. */
@@ -135,6 +153,12 @@ export type OrderBatchingAbInput = {
     price: number;
     assetClass?: string | null;
   }) => number;
+  /**
+   * Market-impact / slippage model. Enabled by default so the batching
+   * verdict is scored under size-aware execution: a released batch is a
+   * bigger ticket and pays more impact than the slices it replaced.
+   */
+  execution?: Partial<ExecutionImpactConfig>;
 };
 
 export const DEFAULT_DRAWDOWN_TOLERANCE_PCT = 0.5;
@@ -201,10 +225,16 @@ export async function runBatchingArm(
   let parkSeq = 0;
   let decisionSeq = 0;
 
+  const execConfig: ExecutionImpactConfig = {
+    ...DEFAULT_EXECUTION_IMPACT,
+    ...(input.execution ?? {}),
+  };
+
   const strategy = async (ctx: {
     date: string;
     state: SimState;
     closes: Record<string, number>;
+    history: Record<string, number[]>;
   }): Promise<SimDecision[]> => {
     const todays = byDate.get(ctx.date) ?? [];
     // A bar with no signals still ages the window: parked slices expire.
@@ -295,13 +325,22 @@ export async function runBatchingArm(
     for (const r of routed) {
       const o = r.order;
       const side = o.side === "sell" ? "sell" : "buy";
-      const cost = costFor({
+      const baseCost = costFor({
         symbol: o.symbol,
         side,
         quantity: o.quantity,
         price: o.price,
         assetClass: o.assetClass,
       });
+      const impact = quoteExecutionImpact({
+        symbol: o.symbol,
+        quantity: o.quantity,
+        price: o.price,
+        assetClass: o.assetClass,
+        history: ctx.history?.[o.symbol],
+        config: execConfig,
+      });
+      const cost = baseCost + impact.slippageBase;
       const id = `${arm}-${ctx.date}-${decisionSeq++}`;
       trades.push({
         id,
@@ -312,6 +351,9 @@ export async function runBatchingArm(
         price: o.price,
         notional: o.quantity * o.price,
         cost,
+        slippageBase: impact.slippageBase,
+        slippageBps: impact.slippageBps,
+        participation: impact.participation,
         parkedQuantity: r.parkedQuantity,
         waitedHours: r.waitedHours,
       });
@@ -339,7 +381,12 @@ export async function runBatchingArm(
 
 
   const totalCostBase = filled.reduce((a, t) => a + t.cost, 0);
+  const totalSlippageBase = filled.reduce((a, t) => a + t.slippageBase, 0);
   const turnoverBase = filled.reduce((a, t) => a + t.notional, 0);
+  const avgParticipation =
+    turnoverBase > 0
+      ? filled.reduce((a, t) => a + t.participation * t.notional, 0) / turnoverBase
+      : 0;
   const startingValue = initial.cash;
   const finalValue = result.equityCurve.at(-1)?.totalValue ?? startingValue;
   const points = result.equityCurve.map((p) => ({
@@ -355,6 +402,9 @@ export async function runBatchingArm(
     tickets: filled.length,
     trades: filled,
     totalCostBase,
+    totalSlippageBase,
+    slippageBpsOfEquity: startingValue > 0 ? (totalSlippageBase / startingValue) * 10_000 : 0,
+    avgParticipation,
     costBpsOfTurnover: turnoverBase > 0 ? (totalCostBase / turnoverBase) * 10_000 : 0,
     costBpsOfEquity: startingValue > 0 ? (totalCostBase / startingValue) * 10_000 : 0,
     turnoverBase,
