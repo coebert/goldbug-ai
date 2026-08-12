@@ -540,11 +540,6 @@ export async function routeOrdersToBroker(params: {
       isAdd?: boolean;
       edgeScore?: number;
     }> = [];
-
-      estCostBase: number;
-      isAdd?: boolean;
-      edgeScore?: number;
-    }> = [];
     const notionalBySymbol = new Map<string, number>();
     for (const o of routable) {
       if (preSkips.has(`${o.symbol}:${o.side}`)) continue;
