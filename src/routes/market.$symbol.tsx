@@ -60,6 +60,17 @@ import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
 import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
 import { DIVERGENCE_LABEL, DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
+import {
+  RSI_SIGNAL_MODES,
+  RSI_SIGNAL_MODE_HINT,
+  RSI_SIGNAL_MODE_LABEL,
+  detectRsiSignals,
+  isRsiSignalMode,
+  rsiSignalSummary,
+  type RsiSignal,
+  type RsiSignalMode,
+} from "@/lib/rsi-signals";
+import { RSI_SIGNAL_TONE } from "@/lib/rsi-signal-style";
 
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import {
@@ -307,6 +318,49 @@ function AnnotationList({
   );
 }
 
+/** Plain-language read-out of the RSI zone buy/sell markers. */
+function RsiSignalList({ signals, mode }: { signals: RsiSignal[]; mode: RsiSignalMode }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="text-xs font-medium text-muted-foreground">
+        RSI zone markers · {RSI_SIGNAL_MODE_LABEL[mode]} logic ({signals.length} in window)
+      </h2>
+      <p className="text-[11px] text-muted-foreground">{RSI_SIGNAL_MODE_HINT[mode]}</p>
+      {signals.length ? (
+        <ul className="space-y-1.5">
+          {signals
+            .slice(-5)
+            .reverse()
+            .map((s) => (
+              <li key={`${s.kind}-${s.date}`} className="flex flex-wrap items-center gap-2 text-xs">
+                <Badge
+                  variant="outline"
+                  className={
+                    s.kind === "buy"
+                      ? "border-emerald-500/40 text-emerald-500"
+                      : "border-destructive/40 text-destructive"
+                  }
+                >
+                  {s.kind === "buy" ? "Buy" : "Sell"}
+                </Badge>
+                <span className="text-muted-foreground">
+                  {formatUkDate(s.date)} · {rsiSignalSummary(s)}
+                </span>
+              </li>
+            ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          No oversold/overbought {mode === "cross" ? "crosses" : "touches"} in this window.
+        </p>
+      )}
+      <p className="text-[11px] text-muted-foreground">
+        Markers are momentum reference points, not instructions to trade. Not financial advice.
+      </p>
+    </section>
+  );
+}
+
 /** Plain-language read-out of the divergences drawn on the charts. */
 function DivergenceList({ divergences }: { divergences: RsiDivergence[] }) {
   if (!divergences.length) {
@@ -408,6 +462,46 @@ function MarketSymbolPage() {
     });
   };
 
+  // RSI zone buy/sell markers: opt-in, with the cross/touch school remembered.
+  const [showSignals, setShowSignals] = useState(false);
+  const [signalMode, setSignalMode] = useState<RsiSignalMode>("cross");
+  useEffect(() => {
+    try {
+      setShowSignals(window.localStorage.getItem("chart.rsiSignals") === "1");
+      const m = window.localStorage.getItem("chart.rsiSignalMode");
+      if (isRsiSignalMode(m)) setSignalMode(m);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleSignals = () => {
+    setShowSignals((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("chart.rsiSignals", next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      if (next) {
+        setShowRsi(true);
+        try {
+          window.localStorage.setItem("chart.rsi", "1");
+        } catch {
+          /* storage unavailable */
+        }
+      }
+      return next;
+    });
+  };
+  const pickSignalMode = (m: RsiSignalMode) => {
+    setSignalMode(m);
+    try {
+      window.localStorage.setItem("chart.rsiSignalMode", m);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+
   const pickTrendBasis = (b: TrendBasis) => {
     setTrendBasis(b);
     storeTrendBasis(b);
@@ -489,6 +583,11 @@ function MarketSymbolPage() {
   );
 
 
+  const rsiSignals = useMemo(
+    () => (history && showSignals ? detectRsiSignals(history.points, signalMode) : []),
+    [history, showSignals, signalMode],
+  );
+
   const compareLoading = compareQueries.some((q) => q.isLoading);
   const compareData = compareQueries
     .map((q) => q.data)
@@ -551,6 +650,31 @@ function MarketSymbolPage() {
             >
               Divergence
             </Button>
+            <Button
+              size="sm"
+              variant={showSignals ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs"
+              aria-pressed={showSignals}
+              onClick={toggleSignals}
+              title="Mark buy/sell points where RSI enters or leaves the oversold/overbought zones"
+            >
+              Signals
+            </Button>
+            {showSignals
+              ? RSI_SIGNAL_MODES.map((m) => (
+                  <Button
+                    key={m}
+                    size="sm"
+                    variant={signalMode === m ? "secondary" : "ghost"}
+                    className="h-7 px-2 text-[11px]"
+                    aria-pressed={signalMode === m}
+                    onClick={() => pickSignalMode(m)}
+                    title={RSI_SIGNAL_MODE_HINT[m]}
+                  >
+                    {RSI_SIGNAL_MODE_LABEL[m]}
+                  </Button>
+                ))
+              : null}
 
             {HISTORY_RANGES.map((r) => (
               <Button
@@ -672,6 +796,26 @@ function MarketSymbolPage() {
                         ))
                       : null}
 
+                    {rsiSignals.map((sig) => (
+                      <ReferenceDot
+                        key={`price-sig-${sig.kind}-${sig.date}`}
+                        x={sig.date}
+                        y={sig.price}
+                        r={5}
+                        fill={RSI_SIGNAL_TONE[sig.kind]}
+                        stroke="hsl(var(--background))"
+                        strokeWidth={1.5}
+                        isFront
+                        label={{
+                          value: sig.kind === "buy" ? "B" : "S",
+                          fill: RSI_SIGNAL_TONE[sig.kind],
+                          fontSize: 10,
+                          fontWeight: 700,
+                          position: sig.kind === "buy" ? "bottom" : "top",
+                        }}
+                      />
+                    ))}
+
                     {annotations.map((a, i) => (
                       <ReferenceDot
                         key={a.id}
@@ -696,8 +840,14 @@ function MarketSymbolPage() {
               </ChartFrame>
 
               {showRsi ? (
-                <RsiPane points={history.points} divergences={showDiv ? divergences : []} />
+                <RsiPane
+                  points={history.points}
+                  divergences={showDiv ? divergences : []}
+                  signals={rsiSignals}
+                />
               ) : null}
+
+              {showSignals ? <RsiSignalList signals={rsiSignals} mode={signalMode} /> : null}
 
               {showDiv ? <DivergenceList divergences={divergences} /> : null}
 
