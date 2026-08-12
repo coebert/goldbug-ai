@@ -476,10 +476,71 @@ export async function routeOrdersToBroker(params: {
       return r;
     };
 
+    // ---------- Cross-run batching window.
+    // A buy under the minimum economic ticket is parked rather than thrown
+    // away; later signals in the same name top it up until one full-size
+    // ticket can be sent. Sells bypass the window entirely.
+    {
+      const [{ applyBatchWindow }, { minTicketBase }] = await Promise.all([
+        import("./order-batching.server"),
+        import("./cost-governor"),
+      ]);
+      const minTicket = minTicketBase({
+        navBase: inputs.navBase,
+        minTicketPctOfNav: navProfile.minTicketPctOfNav,
+        absoluteMinTicketBase: navProfile.absoluteMinTicketBase,
+      });
+      const notionalOf = async (o: (typeof routable)[number]) => {
+        const ccy = o.instrument_ccy?.toUpperCase() ?? inferSaxoCurrency(o.symbol);
+        return Math.floor(o.quantity) * o.price * (await rateTo(ccy));
+      };
+      const notionals = new Map<string, number>();
+      for (const o of routable) notionals.set(`${o.symbol}:${o.side}`, await notionalOf(o));
+
+      const batch = await applyBatchWindow({
+        db: supabaseAdmin as unknown as { from: (t: string) => unknown },
+        portfolioId: portfolio.id,
+        userId,
+        orders: routable,
+        notionalBase: (o) => notionals.get(`${o.symbol}:${o.side}`) ?? 0,
+        minTicketBase: minTicket,
+      });
+      if (batch.parked.length > 0 || batch.dropped.length > 0 || batch.releasedWithParked > 0) {
+        try {
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolio.id,
+            user_id: userId,
+            broker: "saxo",
+            env: portfolio.mode === "live_prod" ? "live" : "sim",
+            method: "PRE_PLACE_BATCH_WINDOW",
+            path: "/reconcile/pre-place/batch-window",
+            status: 200,
+            request: asJson({ asOf, decisionId, minTicket, before: routable.length }),
+            response: asJson({
+              after: batch.orders.length,
+              parked: batch.parked,
+              dropped: batch.dropped,
+              releasedWithParked: batch.releasedWithParked,
+            }),
+            error: null,
+          });
+        } catch {
+          /* best-effort log only */
+        }
+      }
+      routable = batch.orders;
+      if (routable.length === 0) return results;
+    }
+
     const candidates: Array<{
       symbol: string;
       side: "buy" | "sell";
       notionalBase: number;
+      estCostBase: number;
+      isAdd?: boolean;
+      edgeScore?: number;
+    }> = [];
+
       estCostBase: number;
       isAdd?: boolean;
       edgeScore?: number;
