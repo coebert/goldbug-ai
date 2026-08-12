@@ -159,40 +159,51 @@ export function SetupBacktestCard() {
             </div>
 
             {result.sampleTrades.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="text-muted-foreground">
-                    <tr>
-                      <th className="py-1 text-left font-normal">Signal</th>
-                      <th className="py-1 text-left font-normal">Symbol</th>
-                      <th className="py-1 text-right font-normal">Entry</th>
-                      <th className="py-1 text-right font-normal">10d net</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.sampleTrades.slice(0, 10).map((t) => {
-                      const r = t.netReturnPct[10];
-                      return (
-                        <tr key={`${t.symbol}-${t.signalDate}`} className="border-t">
-                          <td className="py-1">{t.signalDate}</td>
-                          <td className="py-1">{t.symbol}</td>
-                          <td className="py-1 text-right tabular-nums">
-                            {t.entryPrice == null ? "no entry" : t.entryPrice.toFixed(2)}
-                          </td>
-                          <td
-                            className={`py-1 text-right tabular-nums ${
-                              r == null ? "" : r >= 0 ? "text-primary" : "text-destructive"
-                            }`}
-                          >
-                            {r == null ? "—" : pct(r)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Simulated trade per match</p>
+                  <div className="flex items-center gap-1">
+                    {(["discipline", "chase"] as const).map((p) => (
+                      <Button
+                        key={p}
+                        size="sm"
+                        variant={policy === p ? "secondary" : "ghost"}
+                        className="h-7 px-2 text-[11px]"
+                        aria-pressed={policy === p}
+                        onClick={() => setPolicy(p)}
+                      >
+                        {p === "discipline" ? "Pullback" : "Chase"}
+                      </Button>
+                    ))}
+                    <span className="mx-1 text-muted-foreground">|</span>
+                    {result.config.horizons.map((h) => (
+                      <Button
+                        key={h}
+                        size="sm"
+                        variant={h === horizon ? "secondary" : "ghost"}
+                        className="h-7 px-2 text-[11px]"
+                        aria-pressed={h === horizon}
+                        onClick={() => setHorizon(h)}
+                      >
+                        {h}d
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Each row is one historical match and the exact trade it produced under the
+                  selected entry rule and {horizon}-session horizon, net of{" "}
+                  {result.config.frictionBps}bps round-trip friction.
+                </p>
+                {result.sampleTrades
+                  .filter((t) => t.policy === policy)
+                  .slice(0, 12)
+                  .map((t) => (
+                    <TradeRow key={`${t.policy}-${t.symbol}-${t.signalDate}`} trade={t} horizon={horizon} />
+                  ))}
               </div>
             ) : null}
+
 
             {result.errors.length > 0 ? (
               <p className="text-xs text-muted-foreground">
