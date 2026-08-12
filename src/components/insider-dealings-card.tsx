@@ -118,6 +118,16 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
                   <Badge variant="outline" className={cn("text-[11px]", severityTone(e))}>
                     {e.direction === "buy" ? "Buy" : "Sell"} · {flavourLabel(e)}
                   </Badge>
+                  {e.ai_verdict === "signal" ? (
+                    <Badge variant="outline" className="border-primary/50 text-[11px] text-primary">
+                      AI: real signal
+                      {e.ai_confidence != null ? ` ${Math.round(e.ai_confidence * 100)}%` : ""}
+                    </Badge>
+                  ) : e.ai_verdict === "mechanical" ? (
+                    <Badge variant="outline" className="text-[11px] text-muted-foreground">
+                      AI: mechanical
+                    </Badge>
+                  ) : null}
                   {e.role ? (
                     <span className="text-[11px] text-muted-foreground">
                       {e.person ? `${e.person} · ` : ""}
@@ -129,9 +139,16 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
                   ) : null}
                 </div>
                 <p className="mt-1.5 text-sm leading-snug">{e.headline}</p>
+                {e.ai_rationale ? (
+                  <p className="mt-1 text-[11px] italic text-muted-foreground">{e.ai_rationale}</p>
+                ) : null}
                 <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                   {e.shares != null ? <span>{e.shares.toLocaleString()} shares</span> : null}
-                  <span>signal nudge {e.sentiment_nudge.toFixed(3)}</span>
+                  <span>
+                    signal nudge {(e.ai_nudge ?? e.sentiment_nudge).toFixed(3)}
+                    {e.ai_nudge != null ? " (AI reviewed)" : ""}
+                  </span>
+
                   {e.url ? (
                     <span className="inline-flex items-center gap-1">
                       source <ExternalLink className="h-3 w-3" />
