@@ -1459,6 +1459,69 @@ export type Database = {
         }
         Relationships: []
       }
+      insider_dealing_events: {
+        Row: {
+          company: string
+          created_at: string
+          direction: string
+          event_date: string | null
+          fetched_at: string
+          flavour: string
+          headline: string
+          id: string
+          person: string | null
+          role: string | null
+          sentiment_nudge: number
+          severity: number
+          shares: number | null
+          source: string | null
+          summary: string | null
+          symbol: string
+          url: string | null
+          value: number | null
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          direction?: string
+          event_date?: string | null
+          fetched_at?: string
+          flavour?: string
+          headline: string
+          id?: string
+          person?: string | null
+          role?: string | null
+          sentiment_nudge?: number
+          severity?: number
+          shares?: number | null
+          source?: string | null
+          summary?: string | null
+          symbol: string
+          url?: string | null
+          value?: number | null
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          direction?: string
+          event_date?: string | null
+          fetched_at?: string
+          flavour?: string
+          headline?: string
+          id?: string
+          person?: string | null
+          role?: string | null
+          sentiment_nudge?: number
+          severity?: number
+          shares?: number | null
+          source?: string | null
+          summary?: string | null
+          symbol?: string
+          url?: string | null
+          value?: number | null
+        }
+        Relationships: []
+      }
       lesson_overrides: {
         Row: {
           action: string
