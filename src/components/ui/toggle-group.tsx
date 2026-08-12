@@ -43,6 +43,9 @@ const ToggleGroupItem = React.forwardRef<
           variant: context.variant || variant,
           size: context.size || size,
         }),
+        // Never let a sibling option squash this one's label on a phone; the
+        // surrounding filter row scrolls instead.
+        "shrink-0 snap-start",
         className,
       )}
       {...props}
