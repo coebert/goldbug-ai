@@ -48,7 +48,7 @@ export function MobileTabBar() {
                 }`}
               >
                 <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <span className="max-w-full truncate leading-none">{d.label}</span>
+                <span className="max-w-full truncate leading-none">{d.tabLabel ?? d.label}</span>
               </Link>
             );
           })}

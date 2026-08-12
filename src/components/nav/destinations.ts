@@ -41,6 +41,8 @@ export type Destination = {
   exact?: boolean;
   /** Show as a top-level tab / rail entry. */
   primary?: boolean;
+  /** Short label for the cramped mobile tab bar (defaults to label). */
+  tabLabel?: string;
   /** Extra words that should match in the More sheet search box. */
   keywords?: string;
 };
@@ -143,6 +145,7 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
   {
     to: "/saxo-status",
     label: "Broker status",
+    tabLabel: "Broker",
     hint: "Connection health, cash sync and reconciliation.",
     icon: Plug,
     area: "system",
