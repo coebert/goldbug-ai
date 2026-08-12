@@ -301,20 +301,21 @@ function Home() {
 
         <NewHereBanner />
 
-        {/* Market pulse — the state of the wider market, above your own money
-            so the numbers below can be read in context. */}
-        <section className="mb-6">
-          <Suspense fallback={<div className="h-72 rounded-2xl border bg-card/50" aria-hidden="true" />}>
-            <MarketPulseCard />
-          </Suspense>
-        </section>
+        {/* Markets live on their own page now — Home keeps one compact
+            link so the wider picture is always one tap away. */}
+        <Link
+          to="/markets"
+          className="mb-6 grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted"
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium">Markets today</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              Market pulse, moving-average trends and trading hours
+            </span>
+          </span>
+          <LineChart className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+        </Link>
 
-        {/* Moving-average trend — pick a market and window without leaving home. */}
-        <section className="mb-6">
-          <Suspense fallback={<div className="h-96 rounded-2xl border bg-card/50" aria-hidden="true" />}>
-            <SmaTrendCard />
-          </Suspense>
-        </section>
 
         {/* Portfolios — real money first, practice money folded away */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
