@@ -91,6 +91,25 @@ export const SAXO_TOOLTIP_CONTENT = {
   border: `1px solid ${SAXO_COLOR.tooltipBorder}`,
   borderRadius: SAXO_METRIC.tooltipRadius,
   color: SAXO_COLOR.tooltipForeground,
+  // Same phone-width cap as the generic tooltip surface: wrap long series
+  // names instead of growing a panel that runs off the screen edge.
+  maxWidth: "min(88vw, 20rem)",
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
+} as const;
+
+/** Legend styling for Saxo-themed charts; mirrors LEGEND_PROPS sizing. */
+export const SAXO_LEGEND_PROPS = {
+  wrapperStyle: {
+    fontSize: "clamp(11px, 2.9vw, 12px)",
+    lineHeight: 1.35,
+    color: SAXO_COLOR.axis,
+    width: "100%",
+    maxHeight: "3.75rem",
+    overflowY: "auto",
+    paddingTop: 4,
+  },
+  iconSize: 9,
 } as const;
 export const SAXO_TOOLTIP_LABEL = { color: SAXO_COLOR.axis } as const;
 export const SAXO_TOOLTIP_CURSOR = {
