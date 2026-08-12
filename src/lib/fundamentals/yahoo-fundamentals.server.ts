@@ -58,6 +58,10 @@ async function mintSession(): Promise<Session | null> {
   }
 }
 
+export async function getYahooSession(force = false): Promise<Session | null> {
+  return getSession(force);
+}
+
 async function getSession(force = false): Promise<Session | null> {
   if (!force && session && Date.now() - session.mintedAt < SESSION_TTL_MS) return session;
   session = await mintSession();

@@ -141,6 +141,8 @@ import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { ConcentrationAlertCard } from "@/components/concentration-alert-card";
 import { InsiderDealingsCard } from "@/components/insider-dealings-card";
+import { InsiderEventStudyCard } from "@/components/insider-event-study-card";
+
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { CostSyncAlertBanner } from "@/components/cost-sync-alert-banner";
 import { CoverageTrendAlertBanner } from "@/components/coverage-trend-alert-banner";
@@ -1057,6 +1059,8 @@ function PortfolioPage() {
                   className="mb-4"
                 />
                 <InsiderDealingsCard className="mb-4" />
+                <InsiderEventStudyCard className="mb-4" />
+
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
                 <CostSyncAlertBanner portfolioId={id} className="mb-4" />
                 <CoverageTrendAlertBanner portfolioId={id} className="mb-4" />
