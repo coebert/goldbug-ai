@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { runInsiderStudy } from "@/lib/backtest/insider-event-study.functions";
-import type { StudyResult } from "@/lib/backtest/insider-event-study.server";
 import type { Bucket, HorizonStats } from "@/lib/backtest/insider-event-study";
+
+type StudyResult = Awaited<ReturnType<typeof runInsiderStudy>>;
 
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
 

@@ -136,7 +136,7 @@ export type StudyResult = {
   outcomes: EventOutcome[];
   study: StudyBuckets;
   verdict: ReturnType<typeof studyVerdict>;
-  /** Same study restricted to MKS.L, so the held name can be read alone. */
+  /** Same study restricted to the focus ticker, so a held name reads alone. */
   focus: { symbol: string; n: number; study: StudyBuckets } | null;
 };
 
@@ -187,7 +187,8 @@ export async function runInsiderEventStudy(req: StudyRequest = {}): Promise<Stud
     minValue,
   });
   const study = summariseStudy(outcomes, horizons);
-  const focusOutcomes = outcomes.filter((o) => o.symbol === "MKS.L");
+  const focusSymbol = symbols.includes("MKS.L") ? "MKS.L" : (symbols[0] as string);
+  const focusOutcomes = outcomes.filter((o) => o.symbol === focusSymbol);
 
   return {
     symbols,
@@ -201,7 +202,7 @@ export async function runInsiderEventStudy(req: StudyRequest = {}): Promise<Stud
     verdict: studyVerdict(study, horizons.includes(21) ? 21 : (horizons[horizons.length - 1] as number)),
     focus:
       focusOutcomes.length > 0
-        ? { symbol: "MKS.L", n: focusOutcomes.length, study: summariseStudy(focusOutcomes, horizons) }
+        ? { symbol: focusSymbol, n: focusOutcomes.length, study: summariseStudy(focusOutcomes, horizons) }
         : null,
   };
 }
