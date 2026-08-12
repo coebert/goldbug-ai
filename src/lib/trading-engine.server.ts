@@ -2069,6 +2069,44 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       const roomInPosition = Math.max(0, maxPosVal - existingVal);
       spend = Math.min(spend, roomInPosition);
 
+      // Target-weight sizing. Rather than letting "cash × pct" nibble the same
+      // name until it bumps the concentration cap, decide the weight we
+      // actually want and buy only the gap to it. Sub-scale gaps are skipped
+      // outright, so a position can never be walked into the cap inch by inch.
+      let targetWeightRejected: string | null = null;
+      if (totalValue > 0 && maxPosVal > 0) {
+        const maxWeight = maxPosVal / totalValue;
+        const tw = desiredWeight({
+          baseWeight: maxWeight * 0.5,
+          maxWeight,
+          alphaMag: Math.abs(alphaCompositeBySymbol.get(meta.symbol) ?? 0),
+          conviction: order.conviction ?? null,
+        });
+        const twSpend = targetWeightSpend({
+          nav: totalValue,
+          currentValue: existingVal,
+          targetWeight: tw,
+          minTicketBase: minTicketBase({
+            navBase: totalValue,
+            ...governorForNav(totalValue),
+          }),
+        });
+        if (twSpend.note) sizingNotes.push(twSpend.note);
+        if (twSpend.reason !== "ok") {
+          targetWeightRejected = twSpend.note ?? "target weight reached";
+          spend = 0;
+        } else if (twSpend.spend < spend) {
+          spend = twSpend.spend;
+        }
+      }
+      if (targetWeightRejected) {
+        planned.push({
+          symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
+          reason: order.reason, rejected: targetWeightRejected,
+        });
+        continue;
+      }
+
       // Enforce asset class exposure cap
       const classCap = cfg.asset_class_limits[meta.asset_class];
       let classRejected = false;
