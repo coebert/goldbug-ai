@@ -149,79 +149,119 @@ export function findSignals(
 }
 
 function measure(
+  policy: "chase" | "discipline",
   symbol: string,
   candles: ScanCandle[],
   signalIndex: number,
   match: NonNullable<ReturnType<typeof evaluateSetup>["match"]>,
   entryIndex: number | null,
   cfg: BacktestConfig,
+  noEntryReason: string | null = null,
 ): TradeOutcome {
   const netReturnPct: Record<number, number | null> = {};
-  for (const h of cfg.horizons) netReturnPct[h] = null;
-
-  if (entryIndex == null) {
-    return {
-      symbol,
-      signalDate: candles[signalIndex].date,
-      signalPrice: match.price,
-      score: match.score,
-      relVolume: match.relVolume,
-      annualVolPct: match.annualVolPct,
-      entryPrice: null,
-      entryDate: null,
-      netReturnPct,
-      maxAdversePct: null,
-      stoppedOut: false,
-    };
-  }
-
-  const entry = candles[entryIndex].close;
-  const maxH = Math.max(...cfg.horizons);
+  const exits: Record<number, HorizonOutcome | null> = {};
   for (const h of cfg.horizons) {
-    const exitIdx = entryIndex + h;
-    if (exitIdx >= candles.length) continue;
-    const gross = (candles[exitIdx].close / entry - 1) * 100;
-    netReturnPct[h] = gross - cfg.frictionBps / 100;
+    netReturnPct[h] = null;
+    exits[h] = null;
   }
 
-  let worst = 0;
-  let stoppedOut = false;
-  for (let i = entryIndex + 1; i <= Math.min(entryIndex + maxH, candles.length - 1); i += 1) {
-    const dd = (candles[i].close / entry - 1) * 100;
-    if (dd < worst) worst = dd;
-    if (candles[i].close < match.invalidationBelow) stoppedOut = true;
-  }
-
-  return {
+  const base = {
+    policy,
     symbol,
     signalDate: candles[signalIndex].date,
     signalPrice: match.price,
     score: match.score,
     relVolume: match.relVolume,
     annualVolPct: match.annualVolPct,
+    invalidationBelow: match.invalidationBelow,
+    zoneLow: match.zoneLow,
+    zoneHigh: match.zoneHigh,
+    netReturnPct,
+    exits,
+  };
+
+  if (entryIndex == null) {
+    return {
+      ...base,
+      entryPrice: null,
+      entryDate: null,
+      noEntryReason: noEntryReason ?? "zone never tagged inside the pullback window",
+      maxAdversePct: null,
+      stoppedOut: false,
+      invalidationDate: null,
+    };
+  }
+
+  const entry = candles[entryIndex].close;
+  const maxH = Math.max(...cfg.horizons);
+  const lastIdx = candles.length - 1;
+
+  // Walk forward once, snapshotting every horizon as it is reached so each
+  // reported outcome is the exact bar the simulated trade exited on.
+  let worst = 0;
+  let best = 0;
+  let invalidationDate: string | null = null;
+  const sorted = [...cfg.horizons].sort((a, b) => a - b);
+  let cursor = 0;
+  for (let i = entryIndex + 1; i <= Math.min(entryIndex + maxH, lastIdx); i += 1) {
+    const c = candles[i];
+    const move = (c.close / entry - 1) * 100;
+    if (move < worst) worst = move;
+    if (move > best) best = move;
+    if (invalidationDate == null && c.close < match.invalidationBelow) invalidationDate = c.date;
+
+    while (cursor < sorted.length && i - entryIndex === sorted[cursor]) {
+      const h = sorted[cursor];
+      const gross = move;
+      exits[h] = {
+        horizon: h,
+        exitDate: c.date,
+        exitPrice: c.close,
+        grossPct: gross,
+        netPct: gross - cfg.frictionBps / 100,
+        maxAdversePct: worst,
+        maxFavourablePct: best,
+        invalidated: invalidationDate != null,
+        invalidationDate,
+        barsHeld: i - entryIndex,
+      };
+      netReturnPct[h] = gross - cfg.frictionBps / 100;
+      cursor += 1;
+    }
+  }
+
+  return {
+    ...base,
     entryPrice: entry,
     entryDate: candles[entryIndex].date,
-    netReturnPct,
+    noEntryReason: null,
     maxAdversePct: worst,
-    stoppedOut,
+    stoppedOut: invalidationDate != null,
+    invalidationDate,
   };
 }
 
 /** Pullback entry: first bar whose low tags the zone while the close holds above invalidation. */
-function pullbackEntryIndex(
+function pullbackEntry(
   candles: ScanCandle[],
   signalIndex: number,
   match: NonNullable<ReturnType<typeof evaluateSetup>["match"]>,
   cfg: BacktestConfig,
-): number | null {
+): { index: number | null; reason: string | null } {
   const end = Math.min(signalIndex + cfg.pullbackWindow, candles.length - 1);
   for (let i = signalIndex + 1; i <= end; i += 1) {
     const c = candles[i];
-    if (c.close < match.invalidationBelow) return null; // thesis broke before entry
-    if (c.low <= match.zoneHigh && c.close >= match.zoneLow) return i;
+    if (c.close < match.invalidationBelow) {
+      return { index: null, reason: `invalidated on ${c.date} before the zone was tagged` };
+    }
+    if (c.low <= match.zoneHigh && c.close >= match.zoneLow) return { index: i, reason: null };
   }
-  return null;
+  return {
+    index: null,
+    reason: `never pulled back into ${match.zoneLow.toFixed(2)}–${match.zoneHigh.toFixed(2)} within ${cfg.pullbackWindow} sessions`,
+  };
 }
+
 
 function summarise(policy: "chase" | "discipline", trades: TradeOutcome[], cfg: BacktestConfig): PolicyStats {
   const entered = trades.filter((t) => t.entryPrice != null);
