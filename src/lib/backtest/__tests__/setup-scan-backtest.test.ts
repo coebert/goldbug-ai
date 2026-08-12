@@ -154,3 +154,50 @@ describe("setup-scan backtest", () => {
     expect(verdict).toContain("do not buy the surge bar");
   });
 });
+
+describe("per-match trade outcomes", () => {
+  const up = Array.from({ length: 40 }, (_, i) => SIGNAL_PRICE * 1.01 ** (i + 1));
+
+  it("reports the exact exit bar, dates and net return for each horizon", () => {
+    const report = runSetupBacktest([{ symbol: "UP", candles: makeHistory(up) }]);
+    const chase = report.trades.find((t) => t.policy === "chase")!;
+    expect(chase.entryDate).toBe(chase.signalDate);
+    for (const h of DEFAULT_BACKTEST_CONFIG.horizons) {
+      const exit = chase.exits[h];
+      if (!exit) continue;
+      expect(exit.barsHeld).toBe(h);
+      expect(exit.exitDate > chase.entryDate!).toBe(true);
+      expect(exit.netPct).toBeCloseTo(
+        exit.grossPct - DEFAULT_BACKTEST_CONFIG.frictionBps / 100,
+        6,
+      );
+      expect(exit.netPct).toBeCloseTo(chase.netReturnPct[h]!, 6);
+      expect(exit.maxFavourablePct).toBeGreaterThanOrEqual(exit.maxAdversePct);
+    }
+    const five = chase.exits[5]!;
+    const twenty = chase.exits[20]!;
+    expect(twenty.exitDate > five.exitDate).toBe(true);
+    expect(twenty.grossPct).toBeGreaterThan(five.grossPct);
+  });
+
+  it("flags invalidation with the date the level broke", () => {
+    const down = Array.from({ length: 40 }, (_, i) => SIGNAL_PRICE * 0.94 ** (i + 1));
+    const report = runSetupBacktest([{ symbol: "DOWN", candles: makeHistory(down) }]);
+    const chase = report.trades.find((t) => t.policy === "chase")!;
+    const exit = chase.exits[20] ?? chase.exits[10] ?? chase.exits[5]!;
+    expect(exit.invalidated).toBe(true);
+    expect(exit.invalidationDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(exit.invalidationDate! <= exit.exitDate).toBe(true);
+    expect(exit.netPct).toBeLessThan(0);
+    expect(chase.stoppedOut).toBe(true);
+  });
+
+  it("explains why a disciplined entry never happened", () => {
+    const report = runSetupBacktest([{ symbol: "UP", candles: makeHistory(up) }]);
+    const skipped = report.trades.find((t) => t.policy === "discipline" && t.entryPrice == null);
+    if (skipped) {
+      expect(skipped.noEntryReason).toBeTruthy();
+      expect(skipped.exits[10]).toBeNull();
+    }
+  });
+});
