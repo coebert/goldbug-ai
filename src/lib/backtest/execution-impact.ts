@@ -125,9 +125,7 @@ export function quoteExecutionImpact(args: {
   const atrPct = realizedAtrPct(args.history ?? []);
   const adv = Math.max(
     0,
-    Number(args.advBySymbolLookup?.(args.symbol) ?? config.advBySymbol?.[args.symbol]) ||
-      config.defaultAdvBase ||
-      0,
+    Number(config.advBySymbol?.[args.symbol]) || config.defaultAdvBase || 0,
   );
 
   const b = estimateSpreadSlippage({
