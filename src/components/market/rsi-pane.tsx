@@ -25,7 +25,7 @@ import {
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
-} from "@/lib/chart-theme";
+} from "@/lib/chart-palette";
 import {
   RSI_OVERBOUGHT,
   RSI_OVERSOLD,
