@@ -187,6 +187,7 @@ export async function runBuyAndHoldArm(
     turnoverBase,
     signalsSkipped: 0,
     parkedLost: 0,
+    ticketsCapped: 0,
     startingValue: startingCash,
     finalValue,
     returnPct: startingCash > 0 ? ((finalValue - startingCash) / startingCash) * 100 : 0,
