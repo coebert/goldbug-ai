@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildEquityComposition, validateComposition } from "@/lib/equity-composition";
+import {
+  ROW_GAP,
+  ROW_INTERPOLATED,
+  buildEquityComposition,
+  fillCompositionGaps,
+  validateComposition,
+} from "@/lib/equity-composition";
 describe("composition", () => {
   it("stacks to total", () => {
     const r = buildEquityComposition({
@@ -37,5 +43,54 @@ describe("validateComposition", () => {
     expect(bad).toHaveLength(1);
     expect(bad[0].date).toBe("2026-01-02");
     expect(bad[0].diff).toBeCloseTo(-10);
+  });
+});
+
+describe("fillCompositionGaps", () => {
+  const keys = ["cash", "total"];
+
+  it("interpolates short gaps and flags them", () => {
+    const { rows, gaps } = fillCompositionGaps(
+      [
+        { date: "2026-01-05", cash: 100, total: 200 },
+        { date: "2026-01-07", cash: 200, total: 400 },
+      ],
+      keys,
+    );
+    expect(rows.map((r) => r.date)).toEqual(["2026-01-05", "2026-01-06", "2026-01-07"]);
+    expect(rows[1].total).toBeCloseTo(300);
+    expect(rows[1][ROW_INTERPOLATED]).toBe(1);
+    expect(gaps).toEqual([
+      { from: "2026-01-05", to: "2026-01-07", missingDays: 1, interpolated: true },
+    ]);
+  });
+
+  it("ignores weekends", () => {
+    // 2026-01-09 is a Friday, 2026-01-12 the following Monday.
+    const { rows, gaps } = fillCompositionGaps(
+      [
+        { date: "2026-01-09", cash: 1, total: 1 },
+        { date: "2026-01-12", cash: 2, total: 2 },
+      ],
+      keys,
+    );
+    expect(rows).toHaveLength(2);
+    expect(gaps).toEqual([]);
+  });
+
+  it("leaves long gaps blank rather than inventing data", () => {
+    const { rows, gaps } = fillCompositionGaps(
+      [
+        { date: "2026-01-05", cash: 100, total: 200 },
+        { date: "2026-01-16", cash: 200, total: 400 },
+      ],
+      keys,
+      3,
+    );
+    const blanks = rows.filter((r) => r[ROW_GAP]);
+    expect(blanks.length).toBe(8);
+    expect(blanks[0].total).toBeNull();
+    expect(gaps[0].interpolated).toBe(false);
+    expect(validateComposition(rows, ["cash"])).toHaveLength(rows.length - blanks.length);
   });
 });

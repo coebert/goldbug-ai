@@ -20,7 +20,7 @@ import {
 } from "recharts";
 
 import { getEquityComposition } from "@/lib/equity-composition.functions";
-import { ROW_GAP, validateComposition } from "@/lib/equity-composition";
+import { ROW_INTERPOLATED, validateComposition } from "@/lib/equity-composition";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChartFrame } from "@/components/chart-frame";
@@ -227,7 +227,10 @@ export function EquityCompositionCard({
                     money.format(Number(value)),
                     labelFor(name),
                   ]}
-                  labelFormatter={(d: string) => d}
+                  labelFormatter={(d: string) => {
+                    const row = rows.find((r) => r.date === d);
+                    return row?.[ROW_INTERPOLATED] ? `${d} (interpolated)` : d;
+                  }}
                 />
                 {keys.map((key) => (
                   <Area
