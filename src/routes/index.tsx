@@ -14,6 +14,7 @@ import { getMarketStatusOverview } from "@/lib/market-hours";
 import { ukHour, ukZoneAbbr } from "@/lib/uk-time";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SectionIndex } from "@/components/nav/section-index";
 import { AppHeader } from "@/components/app-header";
 import { PageLoading } from "@/components/page-loading";
 import { HomeCoachMarks } from "@/components/home-coach-marks";
@@ -71,6 +72,13 @@ export const Route = createFileRoute("/")({
   }),
   component: Home,
 });
+
+const HOME_SECTIONS = [
+  { id: "today", label: "Today" },
+  { id: "portfolios", label: "Portfolios" },
+  { id: "create-portfolio", label: "New portfolio" },
+  { id: "look-deeper", label: "Look deeper" },
+] as const;
 
 function Home() {
   const navigate = useNavigate();
@@ -218,7 +226,7 @@ function Home() {
     <div className="min-h-dvh overflow-x-hidden bg-surface-1">
       <AppHeader email={session?.user.email} />
       <HomeCoachMarks />
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
+      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8 2xl:max-w-7xl">
         {/* Page heading + density control */}
         <div className="mb-5 space-y-3 sm:mb-7 sm:flex sm:flex-wrap sm:items-start sm:justify-between sm:gap-3 sm:space-y-0">
           <div className="min-w-0">
@@ -261,8 +269,10 @@ function Home() {
           <PortfolioMirrorAlert findings={mirrorQ.data?.findings ?? []} />
         )}
 
+        <SectionIndex items={HOME_SECTIONS} />
+
         {/* Bento: the answer to "how am I doing?" beside "what should I do?" */}
-        <div className="mb-6 grid gap-4 lg:grid-cols-3">
+        <div id="today" className="mb-6 grid scroll-mt-28 gap-4 lg:grid-cols-3">
           <div className="min-w-0 lg:col-span-2">
             {equityQ.isLoading && !equityQ.data ? (
               <TodayHeroSkeleton />
@@ -296,7 +306,7 @@ function Home() {
 
 
         {/* Portfolios — real money first, practice money folded away */}
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div id="portfolios" className="grid scroll-mt-28 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0 space-y-3">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-display text-lg font-semibold tracking-tight">Real money</h2>
@@ -359,7 +369,7 @@ function Home() {
         )}
 
         {!focusMode && level !== "simple" && (
-          <div className="mt-8 space-y-3">
+          <div id="look-deeper" className="mt-8 scroll-mt-28 space-y-3">
             <h2 className="font-display text-lg font-semibold tracking-tight">Look deeper</h2>
             <p className="-mt-2 text-xs text-muted-foreground">
               Optional detail. Nothing here needs your attention day to day.

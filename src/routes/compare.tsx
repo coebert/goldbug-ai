@@ -294,7 +294,7 @@ function ComparePage() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
+      <main className="mx-auto max-w-6xl 2xl:max-w-7xl px-4 py-5 sm:py-8">
         <div className="mb-6 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-lg font-semibold leading-tight tracking-tight sm:text-2xl">

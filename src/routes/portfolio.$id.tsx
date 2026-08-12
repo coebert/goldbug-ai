@@ -1,4 +1,6 @@
 import { ChartFrame } from "@/components/chart-frame";
+import { SectionIndex } from "@/components/nav/section-index";
+import { OverviewLookDeeperSection } from "@/components/portfolio-detail/sections/overview-look-deeper";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -173,6 +175,7 @@ import { StressPanelCard } from "@/components/stress-panel-card";
 import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useChartPreset } from "@/lib/chart-axis";
 
 import {
   shortChartDate,
@@ -295,6 +298,14 @@ export const Route = createFileRoute("/portfolio/$id")({
 
 const SIMPLE_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk"];
 
+const PORTFOLIO_SECTIONS = [
+  { id: "equity", label: "Equity" },
+  { id: "composition", label: "Composition" },
+  { id: "holdings", label: "Holdings" },
+  { id: "actions", label: "Actions" },
+  { id: "portfolio-look-deeper", label: "Look deeper" },
+] as const;
+
 function PortfolioPage() {
   const { id } = Route.useParams();
   const { tab: searchTab } = Route.useSearch();
@@ -319,6 +330,7 @@ function PortfolioPage() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const isMobile = useIsMobile();
+  const chartPreset = useChartPreset();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -857,8 +869,13 @@ function PortfolioPage() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={email} />
-      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4">
+      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4 2xl:max-w-7xl">
         <PortfolioTabs id={id} />
+        <SectionIndex
+          items={PORTFOLIO_SECTIONS}
+          offset={44}
+          top="calc(var(--app-header-h, 3.25rem) + 3.25rem)"
+        />
         <Link
           to="/"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -981,6 +998,7 @@ function PortfolioPage() {
                 </div>
               </div>
             )}
+            <div id="equity" className="scroll-mt-32" />
             <EquityPctChart
               className="mb-4"
               portfolioId={id}
@@ -993,7 +1011,7 @@ function PortfolioPage() {
             />
 
             <Suspense fallback={<div className="mb-4 h-64 animate-pulse rounded-md bg-muted/40" />}>
-              <div className="mb-4">
+              <div id="composition" className="mb-4 scroll-mt-32">
                 <EquityCompositionCard portfolioId={id} />
               </div>
             </Suspense>
@@ -1073,7 +1091,7 @@ function PortfolioPage() {
                 <InstrumentCcyAlert portfolioId={id} className="mb-4" />
                 <ReconcileFillsCard portfolioId={id} className="mb-4" />
                 <PriceUnitAuditCard portfolioId={id} className="mb-4" />
-                <div className="mb-6">
+                <div id="holdings" className="mb-6 scroll-mt-32">
                   <LiveHoldingsCard
                     holdings={holdings}
                     currency={p.currency}
@@ -1098,7 +1116,7 @@ function PortfolioPage() {
                   </div>
                 )}
 
-                <Card className="mb-6">
+                <Card id="actions" className="mb-6 scroll-mt-32">
                   <CardContent className="flex flex-wrap items-center gap-3 py-4">
                     <UITooltipProvider delayDuration={100}>
                       <UITooltip>
@@ -1167,241 +1185,20 @@ function PortfolioPage() {
                   </CardContent>
                 </Card>
 
-                <div className="mb-6 space-y-3">
-                  <div>
-                    <h3 className="font-display text-base font-semibold tracking-tight">Look deeper</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Optional detail. Nothing here needs your attention day to day.
-                    </p>
-                  </div>
-                  <AdvancedSection
-                    title="How this portfolio is performing"
-                    summary="Return, risk and how it compares with a simple index fund."
-                    defaultOpen={advancedLevel}
-                  >
-                {p && (
-                  <div className="mb-4">
-                    <PerformanceDashboardCard
-                      startingCash={baselineStartingCash}
-                      currency={String(p.currency ?? "GBP")}
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
-                      deposits={depositEvents}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <VanguardBenchmarkCard
-                      startingCash={baselineStartingCash}
-                      currency={String(p.currency ?? "GBP")}
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      deposits={depositEvents}
-                      riskLevel={p.risk_level}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <RelativeStrengthCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                      enabled={ready}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <FrictionKpiCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                      enabled={ready}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <div id="coverage-trend" className="scroll-mt-24">
-                      <CoverageTrendCard />
-                    </div>
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <BatchingBacktestCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <CostScenarioBacktestCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="What changed your value"
-                    summary="Day by day, separating trading gains from money you paid in."
-                    defaultOpen={advancedLevel}
-                  >
-                {p && (
-                  <div className="mb-4">
-                    <EquityChangeBreakdownCard
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      deposits={depositEvents}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <DailyEquityChangesCard
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      deposits={depositEvents}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="Cash, currencies and spending power"
-                    summary="What is left to spend, in which currency, and how that has moved."
-                    defaultOpen={advancedLevel}
-                  >
-                {p && (
-                  <div className="mb-4">
-                    <Suspense
-                      fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
-                    >
-                      <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
-                    </Suspense>
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <Suspense
-                      fallback={<div className="h-48 rounded-xl border bg-card" aria-hidden />}
-                    >
-                      <MultiCurrencyExposureCard portfolioId={id} active={tab === "overview"} />
-                    </Suspense>
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <Suspense
-                      fallback={<div className="h-64 rounded-xl border bg-card" aria-hidden />}
-                    >
-                      <WalletHistoryCard portfolioId={id} active={tab === "overview"} />
-                    </Suspense>
-                  </div>
-                )}
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="Crash protection"
-                    summary="The hedge that cushions the portfolio when markets fall sharply."
-                    defaultOpen={advancedLevel}
-                  >
-                <div className="mb-6">
-                  <TailHedgeCard portfolioId={id} currency={p.currency} />
-                </div>
-                <div className="mb-6">
-                  <TailHedgeReportCard portfolioId={id} currency={p.currency} />
-                </div>
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="Practice runs on past data"
-                    summary="Backtests — how this strategy would have done in the past."
-                    defaultOpen={advancedLevel}
-                  >
-                {lastBtMetrics && (
-                  <Card className="mb-4">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Backtest metrics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <Metric
-                          label="Total return"
-                          value={`${lastBtMetrics.totalReturnPct.toFixed(2)}%`}
-                          tone={lastBtMetrics.totalReturnPct >= 0 ? "up" : "down"}
-                        />
-                        <Metric
-                          label="Max drawdown"
-                          value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`}
-                          tone="down"
-                          hint={
-                            lastBtMetrics.maxDrawdownCI
-                              ? `95% CI ${lastBtMetrics.maxDrawdownCI.low.toFixed(2)}% … ${lastBtMetrics.maxDrawdownCI.high.toFixed(2)}%`
-                              : lastBtMetrics.maxDrawdownPeakDate &&
-                                  lastBtMetrics.maxDrawdownTroughDate
-                                ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}`
-                                : undefined
-                          }
-                        />
-                        <Metric
-                          label="Sharpe (ann.)"
-                          value={lastBtMetrics.sharpe.toFixed(2)}
-                          tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"}
-                          hint={
-                            lastBtMetrics.sharpeCI
-                              ? `95% CI ${lastBtMetrics.sharpeCI.low.toFixed(2)} … ${lastBtMetrics.sharpeCI.high.toFixed(2)}`
-                              : undefined
-                          }
-                        />
-                        <Metric
-                          label="Win rate"
-                          value={
-                            lastBtMetrics.winRatePct != null
-                              ? `${lastBtMetrics.winRatePct.toFixed(0)}%`
-                              : "—"
-                          }
-                          hint={`${lastBtMetrics.wins}W / ${lastBtMetrics.losses}L / ${lastBtMetrics.trades} trades`}
-                        />
-                        <Metric
-                          label="Volatility (ann.)"
-                          value={`${lastBtMetrics.volatilityPct.toFixed(2)}%`}
-                        />
-                        <Metric
-                          label="Best day"
-                          value={`${lastBtMetrics.bestDayPct.toFixed(2)}%`}
-                          tone="up"
-                        />
-                        <Metric
-                          label="Worst day"
-                          value={`${lastBtMetrics.worstDayPct.toFixed(2)}%`}
-                          tone="down"
-                        />
-                        <Metric
-                          label="Realized PnL"
-                          value={lastBtMetrics.grossRealizedPnl.toFixed(2)}
-                          tone={lastBtMetrics.grossRealizedPnl >= 0 ? "up" : "down"}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {backtestRunToken > 0 && lastBtDays != null && (
-                  <Suspense
-                    fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
-                  >
-                    <BacktestResultsCard
-                      portfolioId={id}
-                      days={lastBtDays}
-                      runToken={backtestRunToken}
-                      currency={p?.currency ?? "USD"}
-                    />
-                  </Suspense>
-                )}
-                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                  <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
-                </Suspense>
-                  </AdvancedSection>
-                </div>
+                <OverviewLookDeeperSection
+                  id={id}
+                  p={p}
+                  equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
+                  trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
+                  depositEvents={depositEvents}
+                  baselineStartingCash={baselineStartingCash}
+                  advancedLevel={advancedLevel}
+                  tab={tab}
+                  lastBtMetrics={lastBtMetrics}
+                  lastBtDays={lastBtDays}
+                  backtestRunToken={backtestRunToken}
+                  ready={ready}
+                />
 
                 {(() => {
                   const cb = p.circuit_breaker as {
@@ -1737,12 +1534,7 @@ function PortfolioPage() {
                         <ResponsiveContainer width="100%" height="100%">
                           <ComposedChart
                             data={displayChartData}
-                            margin={{
-                              top: 8,
-                              right: isMobile ? 6 : 12,
-                              left: isMobile ? -12 : 0,
-                              bottom: 28,
-                            }}
+                            margin={{ ...chartPreset.margin, bottom: 28 }}
                           >
                             <defs>
                               <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
@@ -1775,7 +1567,7 @@ function PortfolioPage() {
                               dataKey="date"
                               tick={AXIS_TICK}
                               stroke={chartTheme.axis}
-                              minTickGap={isMobile ? 56 : 30}
+                              minTickGap={chartPreset.minTickGap}
                               tickFormatter={(v) => formatDateTick(v, isMobile)}
                               label={
                                 isMobile
