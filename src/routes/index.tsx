@@ -350,7 +350,7 @@ function Home() {
 
         {/* Everything expert-level lives here: present, labelled in plain
             English, but folded away unless asked for. */}
-        {!focusMode && (
+        {!focusMode && level !== "simple" && (
           <div className="mt-8 space-y-3">
             <h2 className="font-display text-lg font-semibold tracking-tight">Look deeper</h2>
             <p className="-mt-2 text-xs text-muted-foreground">

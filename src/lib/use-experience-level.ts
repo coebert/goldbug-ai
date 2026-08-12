@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
  * Experience level — the single lever that controls how much of the
  * app is visible.
  *
+ * - "standard" : the middle setting — your money plus the panels that
+ *                explain today's decisions.
  * - "simple"   : the default. Only the handful of panels a newcomer
  *                needs (equity, what happened today, holdings, one
  *                clear next action). Everything expert-level is
@@ -16,14 +18,17 @@ import { useCallback, useEffect, useState } from "react";
  * broadcast on a window event so every mounted consumer (header,
  * home, portfolio page) stays in sync without a global store.
  */
-export type ExperienceLevel = "simple" | "advanced";
+export type ExperienceLevel = "simple" | "standard" | "advanced";
 
 const KEY = "aegis.experienceLevel";
 const EVENT = "aegis:experience-level";
 
+const LEVELS: ReadonlyArray<ExperienceLevel> = ["simple", "standard", "advanced"];
+
 function read(): ExperienceLevel {
   if (typeof window === "undefined") return "simple";
-  return window.localStorage.getItem(KEY) === "advanced" ? "advanced" : "simple";
+  const raw = window.localStorage.getItem(KEY) as ExperienceLevel | null;
+  return raw && LEVELS.includes(raw) ? raw : "simple";
 }
 
 export function useExperienceLevel(): [ExperienceLevel, (v: ExperienceLevel) => void] {

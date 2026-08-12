@@ -1,4 +1,4 @@
-import { Gauge, Layers } from "lucide-react";
+import { Gauge, LayoutGrid, Layers } from "lucide-react";
 import { useExperienceLevel } from "@/lib/use-experience-level";
 
 /**
@@ -19,7 +19,8 @@ export function ExperienceLevelToggle({ className = "" }: { className?: string }
       {(
         [
           { value: "simple", label: "Simple", Icon: Gauge, hint: "Just the essentials" },
-          { value: "advanced", label: "Advanced", Icon: Layers, hint: "Every analytics panel" },
+          { value: "standard", label: "Standard", Icon: LayoutGrid, hint: "Essentials plus today's detail" },
+          { value: "advanced", label: "Everything", Icon: Layers, hint: "Every analytics panel" },
         ] as const
       ).map(({ value, label, Icon, hint }) => {
         const active = level === value;
