@@ -8,6 +8,8 @@ import {
   Line,
   LineChart,
   ReferenceDot,
+  ReferenceLine,
+
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -56,6 +58,9 @@ import {
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
+import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
+import { DIVERGENCE_LABEL, DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
+
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import {
   buildComparison,
