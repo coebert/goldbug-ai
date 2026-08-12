@@ -438,6 +438,13 @@ function MarketSymbolPage() {
   const annotations = annotationQuery.data?.annotations ?? [];
   const up = (history?.changePct ?? 0) >= 0;
 
+  // Divergences are derived purely from the window on screen.
+  const divergences = useMemo(
+    () => (history ? detectRsiDivergences(history.points) : []),
+    [history],
+  );
+
+
   const compareLoading = compareQueries.some((q) => q.isLoading);
   const compareData = compareQueries
     .map((q) => q.data)
