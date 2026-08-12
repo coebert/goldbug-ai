@@ -27,15 +27,22 @@ export function SectionIndex({
   const [active, setActive] = useState<string | null>(null);
   const rowRef = useRef<HTMLDivElement | null>(null);
 
-  // Which targets actually exist right now.
+  // Which targets actually exist right now. Only update state when the set
+  // actually changes, so unrelated DOM churn can't re-render the row endlessly.
   useEffect(() => {
     const resolve = () =>
-      setPresent(items.filter((i) => document.getElementById(i.id) !== null));
+      setPresent((prev) => {
+        const next = items.filter((i) => document.getElementById(i.id) !== null);
+        const same =
+          prev.length === next.length && prev.every((p, idx) => p.id === next[idx]!.id);
+        return same ? prev : next;
+      });
     resolve();
     const mo = new MutationObserver(resolve);
     mo.observe(document.body, { childList: true, subtree: true });
     return () => mo.disconnect();
   }, [items]);
+
 
   // Scroll spy: the topmost section whose start is above the fold wins.
   useEffect(() => {
