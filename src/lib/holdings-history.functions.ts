@@ -19,6 +19,8 @@ export type HoldingSeries = {
   pctChangeSincePurchase: number | null;
   valueChangeSincePurchase: number | null;
   points: number;
+  /** Broker hourly quotes disagree with the latest close — ignore them. */
+  hourlyStale: boolean;
 };
 
 /**
