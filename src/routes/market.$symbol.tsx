@@ -861,6 +861,15 @@ function MarketSymbolPage() {
 
               {showDiv ? <DivergenceList divergences={divergences} /> : null}
 
+              <AiChartReadCard
+                symbol={symbol}
+                days={range}
+                periods={periods}
+                basis={basis}
+                signalMode={signalMode}
+              />
+
+
 
               <AnnotationList
                 annotations={annotations}
