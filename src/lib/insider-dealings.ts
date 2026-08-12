@@ -163,14 +163,27 @@ export function companyAliases(company: string, extra: string[] = []): string[] 
   return [...out].filter((s) => s.length >= 3);
 }
 
-/** Google News RSS query that surfaces reported director dealings for a company. */
-export function insiderFeedUrl(company: string, windowDays = 3): string {
+/**
+ * Google News RSS queries that surface reported director dealings.
+ *
+ * Deliberately short and OR-free: Google News returns an EMPTY feed for
+ * multi-clause boolean queries, so several simple queries beat one precise
+ * one. The classifier downstream does the filtering.
+ */
+export function insiderFeedQueries(company: string, windowDays = 7): string[] {
   const name = company.replace(/\((?:LON|LSE|NYSE|NASDAQ)\)/gi, "").trim();
-  const q =
-    `when:${Math.max(1, Math.min(30, Math.round(windowDays)))}d ` +
-    `"${name}" ` +
-    `("director dealing" OR "director/PDMR" OR PDMR OR "director deals" OR ` +
-    `"insider selling" OR "sells shares" OR "sold shares" OR "buys shares" OR "share sale")`;
+  const when = `when:${Math.max(1, Math.min(60, Math.round(windowDays)))}d`;
+  return [
+    `${when} "${name}" director shares`,
+    `${when} "${name}" directors deals`,
+    `${when} "${name}" chief executive sells shares`,
+  ];
+}
+
+/** Google News RSS endpoint for one of the queries above. */
+export function insiderFeedUrl(company: string, windowDays = 7, variant = 0): string {
+  const queries = insiderFeedQueries(company, windowDays);
+  const q = queries[Math.min(Math.max(0, variant), queries.length - 1)];
   return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-GB&gl=GB&ceid=GB:en`;
 }
 
