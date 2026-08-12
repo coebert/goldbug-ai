@@ -66,6 +66,7 @@ export function RsiPane({
   points,
   divergences = [],
   signals = [],
+  tradeMarkers = [],
   className,
 }: {
   points: HistoryPoint[];
@@ -73,8 +74,11 @@ export function RsiPane({
   divergences?: RsiDivergence[];
   /** Oversold/overbought buy/sell markers to pin on the RSI line. */
   signals?: RsiSignal[];
+  /** Executed backtest fills to pin on the RSI line. */
+  tradeMarkers?: TradeMarker[];
   className?: string;
 }) {
+
   const hasData = points.some((p) => p.rsi14 != null);
   if (!hasData) {
     return (
