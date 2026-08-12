@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
  */
 export const CHART_FILTER_ROW_CLASS =
   "-mx-1 flex max-w-full snap-x snap-mandatory items-center gap-2 overflow-x-auto px-1 pb-0.5 " +
+  // Children must keep their intrinsic width or the row squashes labels
+  // instead of scrolling; `sm:` hands sizing back to the wrapping layout.
+  "[&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:shrink " +
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden " +
   "sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0";
 
