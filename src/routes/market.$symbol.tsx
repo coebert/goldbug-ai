@@ -387,9 +387,9 @@ function MarketSymbolPage() {
     .map((q) => q.data)
     .filter((d): d is SymbolHistory => Boolean(d));
   const comparison = useMemo(
-    () => buildComparison(history ? [history, ...compareData] : compareData),
+    () => buildComparison(history ? [history, ...compareData] : compareData, periods),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [history, compareData.map((d) => d.symbol).join(","), compareData.length, range],
+    [history, compareData.map((d) => d.symbol).join(","), compareData.length, range, periods],
   );
 
   const setCompare = (next: string[]) => {
@@ -562,6 +562,7 @@ function MarketSymbolPage() {
                 compare={compare}
                 options={HISTORY_SYMBOLS}
                 comparison={comparison}
+                periods={periods}
                 loading={compareLoading}
                 onToggle={(s) => setCompare(toggleCompareSymbol(compare, s))}
                 onClear={() => setCompare([])}

@@ -13,10 +13,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Layers, X } from "lucide-react";
+import { Layers, Plus, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartFrame } from "@/components/chart-frame";
 import {
@@ -35,7 +36,14 @@ import {
   type Comparison,
   type RollingWindow,
 } from "@/lib/market-compare";
-import { rangeLabel, symbolMeta, type HistoryRange } from "@/lib/market-symbol-history";
+import {
+  isChartableSymbol,
+  normaliseSymbolInput,
+  rangeLabel,
+  symbolMeta,
+  type HistoryRange,
+  type SmaPeriod,
+} from "@/lib/market-symbol-history";
 
 function pct(v: number | null | undefined, digits = 1) {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -55,6 +63,8 @@ export interface CompareOverlayProps {
   /** Every symbol that can be added. */
   options: string[];
   comparison: Comparison;
+  /** Moving-average periods available to overlay on every compared symbol. */
+  periods: SmaPeriod[];
   loading: boolean;
   onToggle: (symbol: string) => void;
   onClear: () => void;
@@ -66,10 +76,14 @@ export function CompareOverlay({
   compare,
   options,
   comparison,
+  periods,
   loading,
   onToggle,
   onClear,
 }: CompareOverlayProps) {
+  const [showSma, setShowSma] = useState(false);
+  const [ticker, setTicker] = useState("");
+  const [tickerError, setTickerError] = useState<string | null>(null);
   const [rollingWindow, setRollingWindow] = useState<RollingWindow>(() => {
     if (typeof window === "undefined") return 30;
     const saved = Number(window.localStorage.getItem("market.rollingCorrWindow"));
@@ -85,6 +99,22 @@ export function CompareOverlay({
 
   const addable = options.filter((s) => s !== symbol && !compare.includes(s));
   const full = compare.length >= MAX_COMPARE_SYMBOLS;
+
+  const addTicker = (e: React.FormEvent) => {
+    e.preventDefault();
+    const next = normaliseSymbolInput(ticker);
+    if (!isChartableSymbol(next)) {
+      setTickerError("Enter a ticker like AAPL, MKS.L, ^FTSE or BTC-USD.");
+      return;
+    }
+    if (next === symbol || compare.includes(next)) {
+      setTickerError("That symbol is already on the chart.");
+      return;
+    }
+    setTickerError(null);
+    setTicker("");
+    onToggle(next);
+  };
 
   return (
     <section className="space-y-3 rounded-xl border border-border/60 bg-surface-2 p-3">
@@ -130,6 +160,36 @@ export function CompareOverlay({
           </Button>
         ))}
       </div>
+
+      <form onSubmit={addTicker} className="flex flex-wrap items-center gap-2">
+        <Input
+          value={ticker}
+          onChange={(e) => {
+            setTicker(e.target.value);
+            if (tickerError) setTickerError(null);
+          }}
+          disabled={full}
+          aria-label="Add any ticker to the comparison"
+          placeholder="Add any ticker — AAPL, MKS.L, BTC-USD"
+          className="h-8 w-full max-w-[16rem] text-xs uppercase placeholder:normal-case"
+        />
+        <Button type="submit" size="sm" variant="outline" className="h-8 px-2 text-xs" disabled={full}>
+          <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Add
+        </Button>
+        {periods.length > 0 && compare.length > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            variant={showSma ? "default" : "outline"}
+            className="h-8 px-2 text-xs"
+            aria-pressed={showSma}
+            onClick={() => setShowSma((v) => !v)}
+          >
+            {showSma ? "Hide" : "Show"} SMA {periods.join("/")}
+          </Button>
+        )}
+      </form>
+      {tickerError && <p className="text-[11px] text-destructive">{tickerError}</p>}
 
       {full && (
         <p className="text-[11px] text-muted-foreground">
@@ -189,6 +249,23 @@ export function CompareOverlay({
                     isAnimationActive={false}
                   />
                 ))}
+                {showSma &&
+                  comparison.smaSeries.map((s) => (
+                    <Line
+                      key={s.key}
+                      type="monotone"
+                      dataKey={s.key}
+                      name={s.label}
+                      stroke={s.color}
+                      strokeWidth={1}
+                      strokeDasharray={s.period >= 100 ? "2 4" : "5 3"}
+                      strokeOpacity={0.75}
+                      dot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                      legendType="plainline"
+                    />
+                  ))}
               </LineChart>
             </ResponsiveContainer>
           </ChartFrame>
