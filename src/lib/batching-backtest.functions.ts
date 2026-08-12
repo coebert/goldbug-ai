@@ -13,6 +13,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { OrderBatchingAbResult } from "./backtest/order-batching-ab";
+import {
+  MAX_REPLAY_SYMBOLS,
+  DEFAULT_REPLAY_ADD_PCT,
+  buildReplayBars,
+  rankTradedSymbols,
+} from "./backtest/batching-backtest.helpers";
 
 export type OrderBatchingAbResponse = OrderBatchingAbResult & {
   symbols: string[];
@@ -21,8 +27,6 @@ export type OrderBatchingAbResponse = OrderBatchingAbResult & {
   navBase: number;
   windowHours: number;
 };
-
-const MAX_SYMBOLS = 8;
 
 export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -64,16 +68,11 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
         .limit(400),
     ]);
 
-    const counts = new Map<string, number>();
-    for (const r of holdRows ?? []) counts.set(String(r.symbol), 1_000);
-    for (const r of tradeRows ?? []) {
-      const s = String(r.symbol);
-      counts.set(s, (counts.get(s) ?? 0) + 1);
-    }
-    const symbols = [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, MAX_SYMBOLS)
-      .map(([s]) => s);
+    const symbols = rankTradedSymbols(
+      (holdRows ?? []).map((r) => String(r.symbol)),
+      (tradeRows ?? []).map((r) => String(r.symbol)),
+      MAX_REPLAY_SYMBOLS,
+    );
     if (symbols.length === 0) {
       throw new Error("No traded symbols yet — the replay needs some history to work with.");
     }
@@ -87,18 +86,13 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       .order("price_date", { ascending: true });
     if (priceErr) throw new Error(priceErr.message);
 
-    const byDate = new Map<string, Record<string, number>>();
-    for (const r of priceRows ?? []) {
-      const close = Number(r.close);
-      if (!Number.isFinite(close) || close <= 0) continue;
-      const date = String(r.price_date).slice(0, 10);
-      const row = byDate.get(date) ?? {};
-      row[String(r.symbol)] = close;
-      byDate.set(date, row);
-    }
-    const bars = [...byDate.entries()]
-      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-      .map(([date, closes]) => ({ date, closes }));
+    const bars = buildReplayBars(
+      (priceRows ?? []).map((r) => ({
+        symbol: String(r.symbol),
+        price_date: String(r.price_date),
+        close: Number(r.close),
+      })),
+    );
     if (bars.length < 60) {
       throw new Error(
         `Not enough price history to replay (${bars.length} bars, need 60+). Let the price cache fill in first.`,
@@ -144,9 +138,3 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       windowHours: data.windowHours,
     };
   });
-
-/**
- * Per-bar add size as a fraction of NAV. Deliberately small: sub-minimum
- * drips are precisely the case batching claims to fix.
- */
-const DEFAULT_REPLAY_ADD_PCT = 0.009;
