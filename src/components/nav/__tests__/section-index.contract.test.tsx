@@ -54,7 +54,19 @@ describe("SectionIndex", () => {
     mountTargets(["alpha", "beta"]);
     render(<SectionIndex items={items} />);
     for (const chip of screen.getAllByRole("link")) {
-      expect(chip.className).toContain("min-h-11");
+      // Fixed h-11 rather than min-h-11: the bar's height must not depend on
+      // its contents, or sticky offsets below it move mid-scroll.
+      expect(chip.className).toMatch(/\bh-11\b/);
     }
   });
+
+  it("pins the bar to the shared sub-nav height and opts out of scroll anchoring", () => {
+    mountTargets(["alpha", "beta"]);
+    const { container } = render(<SectionIndex items={items} />);
+    const nav = container.querySelector("nav")!;
+    expect(nav.className).toContain("h-[var(--subnav-h,3.25rem)]");
+    expect(nav.getAttribute("data-sticky-nav")).not.toBeNull();
+    expect(nav.style.top).toBe("var(--app-header-h)");
+  });
+
 });

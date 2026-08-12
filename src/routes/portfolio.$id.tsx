@@ -875,7 +875,7 @@ function PortfolioPage() {
         <SectionIndex
           items={PORTFOLIO_SECTIONS}
           offset={44}
-          top="calc(var(--app-header-h, 3.25rem) + 3.25rem)"
+          top="calc(var(--app-header-h) + var(--subnav-h))"
         />
         <Link
           to="/"

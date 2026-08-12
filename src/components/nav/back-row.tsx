@@ -25,7 +25,10 @@ export function BackRow({
     </>
   );
   return (
-    <div className="sticky top-[var(--app-header-h,3.25rem)] z-20 -mx-4 mb-3 flex items-center gap-2 border-b border-border bg-surface-1/90 px-4 py-1 backdrop-blur md:hidden">
+    <div
+      data-sticky-nav
+      className="sticky top-[var(--app-header-h)] z-20 -mx-4 mb-3 flex h-[var(--subnav-h,3.25rem)] items-center gap-2 border-b border-border bg-surface-1/90 px-4 backdrop-blur md:hidden"
+    >
       {to ? (
         <Link
           to={to as never}

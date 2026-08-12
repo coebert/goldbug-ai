@@ -16,7 +16,7 @@ export function SectionIndex({
   /** Extra offset below the sticky app header, in px. */
   offset = 0,
   /** CSS `top` for the sticky row; defaults to sitting under the app header. */
-  top = "var(--app-header-h, 3.25rem)",
+  top = "var(--app-header-h)",
 }: {
   items: readonly SectionIndexItem[];
   className?: string;
@@ -132,12 +132,15 @@ export function SectionIndex({
   return (
     <nav
       aria-label="Sections on this page"
+      data-sticky-nav
       style={{ top }}
-      className={`sticky z-20 -mx-4 mb-4 border-b border-border bg-surface-1/90 px-4 backdrop-blur ${className}`}
+      className={`sticky z-20 -mx-4 mb-4 h-[var(--subnav-h,3.25rem)] border-b border-border bg-surface-1/90 px-4 backdrop-blur ${className}`}
     >
+      {/* Fixed row height: chips wrapping or a longer label appearing must not
+          resize the bar, or every sticky offset below it shifts mid-scroll. */}
       <div
         ref={rowRef}
-        className="flex min-w-0 gap-1 overflow-x-auto py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex h-full min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {present.map((i) => (
           <a
@@ -145,10 +148,11 @@ export function SectionIndex({
             href={`#${i.id}`}
             data-section={i.id}
             aria-current={active === i.id ? "true" : undefined}
-            className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 text-sm transition-colors hover:bg-muted hover:text-foreground ${
+            className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 text-sm transition-colors hover:bg-muted hover:text-foreground ${
               active === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground"
             }`}
           >
+
             {i.label}
           </a>
         ))}
