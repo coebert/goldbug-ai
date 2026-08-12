@@ -32,8 +32,10 @@ import {
   symbolMeta,
   type HistoryRange,
   type SmaPeriod,
+  isKnownSymbol,
   type SymbolHistory,
 } from "@/lib/market-symbol-history";
+import { SymbolSearch } from "@/components/market/symbol-search";
 import {
   TrendStrengthBadge,
   TrendStrengthSparkline,
@@ -342,7 +344,6 @@ function MarketSymbolPage() {
   const query = useQuery({
     queryKey: ["symbol-history", symbol, range],
     queryFn: () => fetchHistory({ data: { symbol, days: range } }),
-    enabled: Boolean(meta),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
@@ -361,7 +362,7 @@ function MarketSymbolPage() {
   const annotationQuery = useQuery({
     queryKey: ["symbol-annotations", symbol, range],
     queryFn: () => fetchAnnotations({ data: { symbol, days: range } }),
-    enabled: Boolean(meta) && (query.data?.points.length ?? 0) > 4,
+    enabled: isKnownSymbol(symbol) && (query.data?.points.length ?? 0) > 4,
     staleTime: 30 * 60_000,
     gcTime: 60 * 60_000,
     refetchOnWindowFocus: false,
@@ -422,6 +423,7 @@ function MarketSymbolPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <SymbolSearch range={range} className="w-full sm:w-64" />
             <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
             {HISTORY_RANGES.map((r) => (
               <Button
@@ -445,15 +447,13 @@ function MarketSymbolPage() {
         </CardHeader>
 
         <CardContent className="space-y-5">
-          {!meta ? (
-            <p className="text-sm text-muted-foreground">
-              No chart is available for “{symbol}”.
-            </p>
-          ) : query.isLoading ? (
+          {query.isLoading ? (
             <Skeleton className="h-80 w-full rounded-xl" />
           ) : query.isError || !history ? (
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">Couldn't load this market's history.</p>
+              <p className="text-sm text-muted-foreground">
+                No price history found for “{symbol}”. Check the ticker (LSE names end in .L).
+              </p>
               <Button size="sm" variant="outline" onClick={() => query.refetch()}>
                 <RefreshCw className="mr-1 h-4 w-4" /> Retry
               </Button>

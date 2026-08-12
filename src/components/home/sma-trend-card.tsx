@@ -11,6 +11,7 @@ import { Check, ChevronLeft, ChevronRight, LineChart as LineChartIcon, Plus, Sta
 import { Button } from "@/components/ui/button";
 import { FavoritesPanel, type FavoriteMetric } from "@/components/home/favorites-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SymbolSearch } from "@/components/market/symbol-search";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -289,6 +290,8 @@ export function SmaTrendCard() {
             {asOf ? ` · prices to ${asOf}` : ""}
           </p>
         </div>
+
+        <SymbolSearch className="w-full" placeholder="Chart any stock — AAPL, MKS.L, ^FTSE" />
 
         <div className="flex flex-wrap items-center gap-2">
           <DropdownMenu>

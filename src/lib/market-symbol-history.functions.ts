@@ -16,9 +16,9 @@ export const getSymbolHistory = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { buildSymbolHistory, isKnownSymbol } = await import("./market-symbol-history");
+    const { buildSymbolHistory, isChartableSymbol } = await import("./market-symbol-history");
 
-    if (!isKnownSymbol(data.symbol)) throw new Error(`Unknown market symbol: ${data.symbol}`);
+    if (!isChartableSymbol(data.symbol)) throw new Error(`Unsupported symbol: ${data.symbol}`);
 
     // Pull an extra 300 calendar days so the 200-day average is populated
     // from the very first point in the visible window.
@@ -36,13 +36,33 @@ export const getSymbolHistory = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
+    let priceRows = (rows ?? []).map((r) => ({
+      symbol: r.symbol as string,
+      price_date: r.price_date as string,
+      close: Number(r.close),
+    }));
+
+    // Free-form tickers usually aren't in the shared cache yet. Pull them from
+    // the daily price feed on demand (which also backfills the cache).
+    if (priceRows.length < Math.min(30, data.days)) {
+      try {
+        const { getDailyCandles } = await import("./market-data.server");
+        const candles = await getDailyCandles(data.symbol, Math.min(data.days + 320, 2000));
+        if (candles.length > priceRows.length) {
+          priceRows = candles.map((c) => ({
+            symbol: data.symbol,
+            price_date: c.date,
+            close: Number(c.close),
+          }));
+        }
+      } catch (err) {
+        console.error("symbol-history: on-demand fetch failed", data.symbol, err);
+      }
+    }
+
     return buildSymbolHistory(
       data.symbol,
-      (rows ?? []).map((r) => ({
-        symbol: r.symbol as string,
-        price_date: r.price_date as string,
-        close: Number(r.close),
-      })),
+      priceRows,
       data.days,
     );
   });
