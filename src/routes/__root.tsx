@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { AppShell } from "@/components/nav/app-shell";
 import { GlobalShortcutsHost } from "@/lib/keyboard-shortcuts";
 import { DensityHost } from "@/lib/use-density";
 import { installChunkReloadHandler } from "@/lib/chunk-reload";
