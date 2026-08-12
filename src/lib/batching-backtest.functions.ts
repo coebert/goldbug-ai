@@ -14,6 +14,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { OrderBatchingAbResult } from "./backtest/order-batching-ab";
 import type { BenchmarkResult } from "./backtest/benchmark-arms";
+import type { AbConfidenceResult } from "./backtest/ab-confidence";
 import type {
   CostScenarioId,
   CostScenarioSweepResult,
