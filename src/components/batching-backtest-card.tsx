@@ -235,7 +235,7 @@ export function BatchingBacktestCard({
                     {...SAXO_AXIS}
                     width={62}
                     domain={["auto", "auto"]}
-                    tickFormatter={(v: number) => formatMoney(v, currency, { compact: true })}
+                    tickFormatter={(v: number) => formatMoney(v, currency, 0)}
                   />
                   <Tooltip
                     contentStyle={SAXO_TOOLTIP_CONTENT}
