@@ -113,15 +113,9 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
                   {e.shares != null ? <span>{e.shares.toLocaleString()} shares</span> : null}
                   <span>signal nudge {e.sentiment_nudge.toFixed(3)}</span>
                   {e.url ? (
-                    <a
-                      href={e.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(ev) => ev.stopPropagation()}
-                      className="inline-flex items-center gap-1 underline underline-offset-2"
-                    >
+                    <span className="inline-flex items-center gap-1">
                       source <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </span>
                   ) : null}
                   <span className="ml-auto text-primary">details →</span>
                 </div>
