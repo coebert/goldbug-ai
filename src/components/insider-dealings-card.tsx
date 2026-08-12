@@ -32,6 +32,7 @@ function severityTone(e: InsiderDealingEvent): string {
 
 export function InsiderDealingsCard({ className }: { className?: string }) {
   const [feed, setFeed] = useState<InsiderDealingsFeed | null>(null);
+  const [selected, setSelected] = useState<InsiderDealingEvent | null>(null);
 
   const load = useMutation({
     mutationFn: (refresh: boolean) =>
@@ -83,10 +84,13 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
         ) : (
           <ul className="space-y-2">
             {ranked.map((e, i) => (
-              <li
-                key={`${e.symbol}-${i}-${e.headline.slice(0, 24)}`}
-                className="rounded-md border border-border/60 bg-muted/20 p-3"
-              >
+              <li key={`${e.symbol}-${i}-${e.headline.slice(0, 24)}`}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(e)}
+                  aria-label={`Show filing detail for ${e.symbol}`}
+                  className="w-full rounded-md border border-border/60 bg-muted/20 p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="font-mono text-[11px]">
                     {e.symbol}
@@ -113,17 +117,29 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
                       href={e.url}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={(ev) => ev.stopPropagation()}
                       className="inline-flex items-center gap-1 underline underline-offset-2"
                     >
                       source <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : null}
+                  <span className="ml-auto text-primary">details →</span>
                 </div>
+                </button>
               </li>
             ))}
           </ul>
         )}
       </CardContent>
+
+      <InsiderDealingDetailPanel
+        event={selected}
+        symbolEvents={selected ? events.filter((e) => e.symbol === selected.symbol) : []}
+        open={selected != null}
+        onOpenChange={(o) => {
+          if (!o) setSelected(null);
+        }}
+      />
     </Card>
   );
 }
