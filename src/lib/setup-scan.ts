@@ -11,6 +11,9 @@
  * testable without touching the network or the database.
  */
 
+import { detectRsiDivergences, type RsiDivergence } from "./rsi-divergence";
+import { computeRsiSeries, type HistoryPoint } from "./market-symbol-history";
+
 export type ScanCandle = {
   date: string;
   close: number;
@@ -66,7 +69,27 @@ export type SetupMatch = {
   thesis: string;
   /** Compact chart + timeline context for the match. */
   timeline: SetupTimeline;
+  /** Most recent confirmed RSI divergence, if any, and its effect on the score. */
+  divergence: SetupDivergence | null;
 };
+
+/** RSI divergence confluence attached to a setup match. */
+export type SetupDivergence = {
+  kind: "bullish" | "bearish";
+  /** Date of the first pivot in the divergence pair. */
+  fromDate: string;
+  /** Date of the confirming pivot. */
+  toDate: string;
+  /** Sessions since the confirming pivot. */
+  barsAgo: number;
+  pricePct: number;
+  rsiDelta: number;
+  /** Score points added (bullish) or removed (bearish) by the confluence. */
+  scoreAdjust: number;
+  /** Plain-language one-liner for the card and the watchlist thesis. */
+  summary: string;
+};
+
 
 /** One session in the compact match chart. */
 export type SetupSeriesPoint = {
@@ -196,6 +219,69 @@ function buildTimeline(clean: ScanCandle[], closes: number[], age: number): Setu
   };
 }
 
+/** Confirming pivots older than this are no longer treated as confluence. */
+export const DIVERGENCE_MAX_AGE_DAYS = 30;
+
+/**
+ * Most recent confirmed RSI divergence near the scan date.
+ *
+ * Bullish divergence into the reclaim says momentum was already turning up
+ * before price did — genuine confluence. Bearish divergence says the surge is
+ * running on fading momentum, which is exactly the froth the rules guard
+ * against, so it removes score instead of adding it.
+ */
+export function detectSetupDivergence(clean: ScanCandle[], closes: number[]): SetupDivergence | null {
+  const window = 180;
+  const start = Math.max(0, clean.length - window);
+  const slice = clean.slice(start);
+  if (slice.length < 40) return null;
+
+  const sliceCloses = slice.map((c) => c.close);
+  const rsi = computeRsiSeries(sliceCloses);
+  const points: HistoryPoint[] = slice.map((c, i) => ({
+    date: c.date,
+    close: c.close,
+    indexed: 100,
+    sma20: null,
+    sma50: null,
+    sma100: null,
+    sma200: null,
+    rsi14: rsi[i] ?? null,
+  }));
+
+  const found = detectRsiDivergences(points);
+  if (found.length === 0) return null;
+
+  const last = slice.length - 1;
+  const recent = found.filter((d) => last - d.to.index <= DIVERGENCE_MAX_AGE_DAYS);
+  if (recent.length === 0) return null;
+  const d: RsiDivergence = recent[recent.length - 1];
+
+  const barsAgo = last - d.to.index;
+  const recency = 1 - barsAgo / (DIVERGENCE_MAX_AGE_DAYS + 1);
+  const strength = Math.min(1, Math.abs(d.rsiDelta) / 12);
+  const magnitude = (0.5 + 0.5 * strength) * recency;
+  const scoreAdjust =
+    d.kind === "bullish" ? Math.round(10 * magnitude) : -Math.round(12 * magnitude);
+
+  const ago = barsAgo === 0 ? "today" : `${barsAgo} session${barsAgo === 1 ? "" : "s"} ago`;
+  const summary =
+    d.kind === "bullish"
+      ? `Bullish RSI divergence confirmed ${ago} (price ${d.pricePct.toFixed(1)}% into the low, RSI +${d.rsiDelta.toFixed(1)}) — momentum turned up before price did`
+      : `Bearish RSI divergence confirmed ${ago} (price +${d.pricePct.toFixed(1)}%, RSI ${d.rsiDelta.toFixed(1)}) — the surge is running on fading momentum`;
+
+  return {
+    kind: d.kind,
+    fromDate: d.from.date,
+    toDate: d.to.date,
+    barsAgo,
+    pricePct: d.pricePct,
+    rsiDelta: d.rsiDelta,
+    scoreAdjust,
+    summary,
+  };
+}
+
 
 /** Sessions since close crossed from below to above the 50d average, or null. */
 function reclaimAge(closes: number[], lookback: number): number | null {
@@ -286,16 +372,34 @@ export function evaluateSetup(
   ];
 
   // Score: thinner tape, fresher reclaim and less extension all look more like
-  // the archetype, so they score higher.
+  // the archetype, so they score higher. RSI divergence then nudges the fit up
+  // (bullish confluence) or down (momentum fading under the surge).
   const thinness = Math.min(1, Math.max(0, (rules.maxRelVolume - relVolume) / rules.maxRelVolume));
   const freshness = 1 - age / (rules.reclaimLookbackDays + 1);
   const tightness = Math.min(1, Math.max(0, 1 - extensionPct / rules.maxExtensionPct));
   const surge = Math.min(1, changePct5d / (rules.minSurgePct * 2));
-  const score = Math.round((thinness * 35 + freshness * 25 + tightness * 20 + surge * 20));
+  const baseScore = Math.round(thinness * 35 + freshness * 25 + tightness * 20 + surge * 20);
+
+  const divergence = detectSetupDivergence(clean, closes);
+  const score = Math.max(0, Math.min(100, baseScore + (divergence?.scoreAdjust ?? 0)));
+
+  if (divergence) {
+    const sign = divergence.scoreAdjust >= 0 ? "+" : "";
+    reasons.push(`${divergence.summary} (${sign}${divergence.scoreAdjust} fit)`);
+  } else {
+    reasons.push("No recent RSI divergence — momentum neither confirms nor contradicts");
+  }
+
+  const divergenceLine = divergence
+    ? divergence.kind === "bullish"
+      ? `Confluence: ${divergence.summary}. That strengthens the pullback-buy case if ${zoneLow.toFixed(2)}–${zoneHigh.toFixed(2)} holds.`
+      : `Warning: ${divergence.summary}. Treat any bounce as suspect and require a reclaim of the surge high before sizing up.`
+    : `No confirmed RSI divergence in the last ${DIVERGENCE_MAX_AGE_DAYS} sessions — momentum offers no extra confirmation either way.`;
 
   const thesis = [
     `Post-reclaim, unconfirmed-volume setup (CRWV archetype).`,
     `${symbol} is +${changePct5d.toFixed(1)}% over 5 sessions and back above its 50d (${sma50.toFixed(2)}) and 200d (${sma200.toFixed(2)}) averages, but on only ${relVolume.toFixed(2)}x average volume — price discovery on thin tape, not institutional accumulation.`,
+    divergenceLine,
     `Rule: do not chase. Wait for a pullback into ${zoneLow.toFixed(2)}–${zoneHigh.toFixed(2)} that holds the reclaimed averages, or a 2-day consolidation.`,
     `Volatility ${annualVolPct.toFixed(0)}% annualised caps any position at ${maxWeightPct}% of NAV, limit orders only.`,
     `Invalidated on a daily close below ${invalidationBelow.toFixed(2)} (surge gap filled).`,
@@ -324,6 +428,7 @@ export function evaluateSetup(
       maxWeightPct,
       thesis,
       timeline,
+      divergence,
     },
     rejected: null,
   };
