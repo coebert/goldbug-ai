@@ -66,7 +66,13 @@ export function buildReplayBars(
 export async function loadReplayInputs(
   supabase: SupabaseClient<Database>,
   args: { portfolioId: string; days: number },
-): Promise<{ bars: BacktestBar[]; symbols: string[]; navBase: number }> {
+): Promise<{
+  bars: BacktestBar[];
+  symbols: string[];
+  navBase: number;
+  /** 20-day average traded value per symbol, for the market-impact model. */
+  advBySymbol: Record<string, number>;
+}> {
   const { data: pf } = await supabase
     .from("portfolios")
     .select("id, starting_cash, current_cash")
@@ -96,7 +102,7 @@ export async function loadReplayInputs(
   const from = new Date(Date.now() - args.days * 86_400_000).toISOString().slice(0, 10);
   const { data: priceRows, error } = await supabase
     .from("price_cache")
-    .select("symbol, price_date, close")
+    .select("symbol, price_date, close, volume")
     .in("symbol", symbols)
     .gte("price_date", from)
     .order("price_date", { ascending: true });
@@ -120,5 +126,14 @@ export async function loadReplayInputs(
     Number(pf.starting_cash ?? 0) || Number(pf.current_cash ?? 0) || 10_000,
   );
 
-  return { bars, symbols, navBase };
+  const { advFromBars } = await import("./execution-impact");
+  const advBySymbol = advFromBars(
+    (priceRows ?? []).map((r) => ({
+      symbol: String(r.symbol),
+      close: Number(r.close),
+      volume: r.volume == null ? null : Number(r.volume),
+    })),
+  );
+
+  return { bars, symbols, navBase, advBySymbol };
 }
