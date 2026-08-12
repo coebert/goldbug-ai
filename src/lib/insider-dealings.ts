@@ -262,20 +262,30 @@ export function classifyInsiderHeadline(row: InsiderNewsRow): {
   return { direction, flavour, isInsider };
 }
 
-/**
- * Severity 0..1 and the bounded sentiment nudge.
- *
- * A discretionary open-market sale by a named CEO scores highest; a
- * tax-withholding disposal is deliberately near-zero because it is a
- * mechanical consequence of vesting, not a view on the shares.
- */
-export function scoreInsiderEvent(input: {
+export type InsiderScoreInput = {
   direction: InsiderDirection;
   flavour: InsiderFlavour;
   role: string | null;
   value: number | null;
-}): { severity: number; sentiment_nudge: number } {
-  if (input.direction === "unknown") return { severity: 0.1, sentiment_nudge: 0 };
+};
+
+/** The individual terms behind a severity score, for the detail panel. */
+export type InsiderScoreBreakdown = {
+  flavourWeight: number;
+  roleWeight: number;
+  /** 0..1 size factor: £250k barely registers, £5m+ saturates. */
+  sizeWeight: number;
+  severity: number;
+  sentiment_nudge: number;
+  /** True when the raw nudge hit the hard floor/ceiling. */
+  clamped: boolean;
+};
+
+/** Severity terms, exposed so the UI can show exactly how a score was built. */
+export function insiderScoreBreakdown(input: InsiderScoreInput): InsiderScoreBreakdown {
+  if (input.direction === "unknown") {
+    return { flavourWeight: 0, roleWeight: 0, sizeWeight: 0, severity: 0.1, sentiment_nudge: 0, clamped: false };
+  }
 
   const flavourWeight =
     input.flavour === "discretionary" ? 1 : input.flavour === "award" ? 0.35 : input.flavour === "tax" ? 0.15 : 0.5;
@@ -288,12 +298,34 @@ export function scoreInsiderEvent(input: {
           ? 0.75
           : 0.6;
   // Size: £250k barely registers, £5m+ saturates.
-  const size = input.value == null ? 0.5 : Math.min(1, Math.max(0.15, Math.log10(Math.max(1, input.value / 250_000)) / Math.log10(20)));
+  const sizeWeight =
+    input.value == null
+      ? 0.5
+      : Math.min(1, Math.max(0.15, Math.log10(Math.max(1, input.value / 250_000)) / Math.log10(20)));
 
-  const severity = Math.min(1, Number((flavourWeight * roleWeight * (0.5 + 0.5 * size)).toFixed(3)));
+  const severity = Math.min(1, Number((flavourWeight * roleWeight * (0.5 + 0.5 * sizeWeight)).toFixed(3)));
   const raw = input.direction === "sell" ? -0.15 * severity : 0.1 * severity;
   const nudge = Math.max(INSIDER_NUDGE_FLOOR, Math.min(INSIDER_NUDGE_CEILING, raw));
-  return { severity, sentiment_nudge: Number(nudge.toFixed(4)) };
+  return {
+    flavourWeight,
+    roleWeight,
+    sizeWeight: Number(sizeWeight.toFixed(3)),
+    severity,
+    sentiment_nudge: Number(nudge.toFixed(4)),
+    clamped: raw !== nudge,
+  };
+}
+
+/**
+ * Severity 0..1 and the bounded sentiment nudge.
+ *
+ * A discretionary open-market sale by a named CEO scores highest; a
+ * tax-withholding disposal is deliberately near-zero because it is a
+ * mechanical consequence of vesting, not a view on the shares.
+ */
+export function scoreInsiderEvent(input: InsiderScoreInput): { severity: number; sentiment_nudge: number } {
+  const b = insiderScoreBreakdown(input);
+  return { severity: b.severity, sentiment_nudge: b.sentiment_nudge };
 }
 
 /** Matches headlines to tracked companies and turns them into scored events. */
