@@ -74,6 +74,15 @@ import { RSI_SIGNAL_TONE } from "@/lib/rsi-signal-style";
 import { RsiBacktestPanel } from "@/components/market/rsi-backtest-panel";
 import { AiChartReadCard } from "@/components/market/ai-chart-read-card";
 import { DivergenceBacktestPanel } from "@/components/market/divergence-backtest-panel";
+import type { RsiTrade } from "@/lib/rsi-backtest";
+import type { DivergenceTrade } from "@/lib/rsi-divergence-backtest";
+import {
+  EMPTY_TRADE_OVERLAY,
+  divergenceTradeOverlay,
+  mergeTradeOverlays,
+  rsiTradeOverlay,
+} from "@/lib/backtest-trade-markers";
+import { tradeLegColor, tradeMarkerColor } from "@/lib/trade-marker-style";
 
 
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
