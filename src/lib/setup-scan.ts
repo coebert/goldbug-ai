@@ -372,16 +372,34 @@ export function evaluateSetup(
   ];
 
   // Score: thinner tape, fresher reclaim and less extension all look more like
-  // the archetype, so they score higher.
+  // the archetype, so they score higher. RSI divergence then nudges the fit up
+  // (bullish confluence) or down (momentum fading under the surge).
   const thinness = Math.min(1, Math.max(0, (rules.maxRelVolume - relVolume) / rules.maxRelVolume));
   const freshness = 1 - age / (rules.reclaimLookbackDays + 1);
   const tightness = Math.min(1, Math.max(0, 1 - extensionPct / rules.maxExtensionPct));
   const surge = Math.min(1, changePct5d / (rules.minSurgePct * 2));
-  const score = Math.round((thinness * 35 + freshness * 25 + tightness * 20 + surge * 20));
+  const baseScore = Math.round(thinness * 35 + freshness * 25 + tightness * 20 + surge * 20);
+
+  const divergence = detectSetupDivergence(clean, closes);
+  const score = Math.max(0, Math.min(100, baseScore + (divergence?.scoreAdjust ?? 0)));
+
+  if (divergence) {
+    const sign = divergence.scoreAdjust >= 0 ? "+" : "";
+    reasons.push(`${divergence.summary} (${sign}${divergence.scoreAdjust} fit)`);
+  } else {
+    reasons.push("No recent RSI divergence — momentum neither confirms nor contradicts");
+  }
+
+  const divergenceLine = divergence
+    ? divergence.kind === "bullish"
+      ? `Confluence: ${divergence.summary}. That strengthens the pullback-buy case if ${zoneLow.toFixed(2)}–${zoneHigh.toFixed(2)} holds.`
+      : `Warning: ${divergence.summary}. Treat any bounce as suspect and require a reclaim of the surge high before sizing up.`
+    : `No confirmed RSI divergence in the last ${DIVERGENCE_MAX_AGE_DAYS} sessions — momentum offers no extra confirmation either way.`;
 
   const thesis = [
     `Post-reclaim, unconfirmed-volume setup (CRWV archetype).`,
     `${symbol} is +${changePct5d.toFixed(1)}% over 5 sessions and back above its 50d (${sma50.toFixed(2)}) and 200d (${sma200.toFixed(2)}) averages, but on only ${relVolume.toFixed(2)}x average volume — price discovery on thin tape, not institutional accumulation.`,
+    divergenceLine,
     `Rule: do not chase. Wait for a pullback into ${zoneLow.toFixed(2)}–${zoneHigh.toFixed(2)} that holds the reclaimed averages, or a 2-day consolidation.`,
     `Volatility ${annualVolPct.toFixed(0)}% annualised caps any position at ${maxWeightPct}% of NAV, limit orders only.`,
     `Invalidated on a daily close below ${invalidationBelow.toFixed(2)} (surge gap filled).`,
@@ -410,6 +428,7 @@ export function evaluateSetup(
       maxWeightPct,
       thesis,
       timeline,
+      divergence,
     },
     rejected: null,
   };
