@@ -7,7 +7,7 @@
 // move over exactly the same window for every row.
 
 import { CHART_SEQUENCE } from "./chart-palette";
-import type { SymbolHistory } from "./market-symbol-history";
+import { smaKey, type SmaPeriod, type SymbolHistory } from "./market-symbol-history";
 
 /** Hard cap on overlays: beyond this the chart stops being readable. */
 export const MAX_COMPARE_SYMBOLS = 4;
@@ -31,6 +31,21 @@ export interface CompareSeries {
   volatilityPct: number | null;
   maxDrawdownPct: number | null;
   last: number | null;
+}
+
+/** One rebased moving-average line drawn alongside a symbol's price line. */
+export interface CompareSmaSeries {
+  /** Data key on each ComparePoint, e.g. "AAPL~sma50". */
+  key: string;
+  symbol: string;
+  period: SmaPeriod;
+  label: string;
+  color: string;
+}
+
+/** Data key for a symbol's rebased moving average. */
+export function compareSmaKey(symbol: string, period: SmaPeriod): string {
+  return `${symbol}~sma${period}`;
 }
 
 export interface CorrelationCell {
@@ -57,6 +72,8 @@ export interface Comparison {
   dates: string[];
   points: ComparePoint[];
   series: CompareSeries[];
+  /** Rebased moving-average lines, empty unless periods were requested. */
+  smaSeries: CompareSmaSeries[];
   from: string | null;
   to: string | null;
   /** Return correlations between every selected symbol over the shared window. */
@@ -278,7 +295,10 @@ function intersectDates(histories: SymbolHistory[]): string[] {
  * Build the overlay chart rows and the side-by-side stats.
  * `histories[0]` is treated as the page's primary symbol and drawn first.
  */
-export function buildComparison(histories: SymbolHistory[]): Comparison {
+export function buildComparison(
+  histories: SymbolHistory[],
+  smaPeriods: readonly SmaPeriod[] = [],
+): Comparison {
   const usable = histories.filter((h) => h && h.points.length >= 2);
   const dates = intersectDates(usable);
 
@@ -287,6 +307,7 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
       dates: [],
       points: [],
       series: [],
+      smaSeries: [],
       from: null,
       to: null,
       correlation: { symbols: [], labels: [], cells: [], observations: 0 },
@@ -298,6 +319,7 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
   const points: ComparePoint[] = dates.map((date) => ({ date }) as ComparePoint);
   const index = new Map(dates.map((d, i) => [d, i]));
   const series: CompareSeries[] = [];
+  const smaSeries: CompareSmaSeries[] = [];
   // symbol -> daily returns aligned to `dates` (index 0 has no prior close).
   const returnsBySymbol = new Map<string, (number | null)[]>();
 
@@ -333,6 +355,29 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
       }
     }
 
+    // Moving averages share the symbol's rebasing factor, so they stay in the
+    // same 100-based space as its price line and remain directly comparable.
+    for (const period of smaPeriods) {
+      let any = false;
+      for (const p of h.points) {
+        const at = index.get(p.date);
+        if (at == null) continue;
+        const v = p[smaKey(period)];
+        if (v == null || !Number.isFinite(v)) continue;
+        points[at][compareSmaKey(h.symbol, period)] = Number(((v / base) * 100).toFixed(3));
+        any = true;
+      }
+      if (any) {
+        smaSeries.push({
+          key: compareSmaKey(h.symbol, period),
+          symbol: h.symbol,
+          period,
+          label: `${h.label} SMA${period}`,
+          color: CHART_SEQUENCE[i % CHART_SEQUENCE.length],
+        });
+      }
+    }
+
     returnsBySymbol.set(h.symbol, aligned);
 
     let volatilityPct: number | null = null;
@@ -362,6 +407,7 @@ export function buildComparison(histories: SymbolHistory[]): Comparison {
     dates,
     points,
     series,
+    smaSeries,
     from: dates[0] ?? null,
     to: dates[dates.length - 1] ?? null,
     correlation: buildCorrelationMatrix(
