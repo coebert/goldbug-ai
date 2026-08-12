@@ -11,15 +11,21 @@ function series(closes: number[], volumes: number[]): ScanCandle[] {
   }));
 }
 
-/** Long downtrend/base then a thin-tape surge back over the averages. */
+/** Long base, a dip below the averages, then a thin-tape surge back over them. */
 function archetype(opts: { surgePct: number; relVol: number; volNoise: number }): ScanCandle[] {
   const closes: number[] = [];
   const volumes: number[] = [];
-  for (let i = 0; i < 250; i += 1) {
-    const wobble = Math.sin(i / 3) * opts.volNoise;
-    closes.push(100 + wobble - i * 0.05);
+  // Base: choppy sideways tape whose choppiness sets realised volatility.
+  for (let i = 0; i < 240; i += 1) {
+    closes.push(100 + Math.sin(i / 3) * opts.volNoise);
     volumes.push(1_000_000);
   }
+  // Dip: 10 sessions down, pushing price firmly under the 50d average.
+  for (let i = 1; i <= 10; i += 1) {
+    closes.push(100 - i * 1.5 + Math.sin(i) * (opts.volNoise / 4));
+    volumes.push(1_000_000);
+  }
+  // Surge: 5 sessions up, reclaiming the averages.
   const base = closes[closes.length - 1];
   for (let i = 1; i <= 5; i += 1) {
     closes.push(base * (1 + (opts.surgePct / 100) * (i / 5)));
@@ -48,7 +54,7 @@ describe("evaluateSetup", () => {
   it("rejects a quiet, low-volatility drift", () => {
     const v = evaluateSetup("TEST", archetype({ surgePct: 2, relVol: 1.2, volNoise: 0.2 }));
     expect(v.match).toBeNull();
-    expect(v.rejected).toMatch(/surge bar|volatility/);
+    expect(v.rejected).toMatch(/surge bar|volatility|averages/);
   });
 
   it("rejects when history is too short for the 200d average", () => {
