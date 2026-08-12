@@ -78,7 +78,77 @@ function PolicyTable({
   );
 }
 
-/**
+/** One historical match paired with the trade it produced at the chosen horizon. */
+function TradeRow({
+  trade,
+  horizon,
+}: {
+  trade: SetupBacktestResult["sampleTrades"][number];
+  horizon: number;
+}) {
+  const exit = trade.exits[horizon] ?? null;
+  const tone =
+    exit == null ? "" : exit.netPct >= 0 ? "text-primary" : "text-destructive";
+
+  return (
+    <div className="rounded-md border p-3 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold">{trade.symbol}</span>
+          <span className="text-muted-foreground">signal {trade.signalDate}</span>
+          <Badge variant="outline" className="text-[10px]">
+            Fit {trade.score}/100
+          </Badge>
+          {trade.entryPrice != null && exit?.invalidated ? (
+            <Badge variant="outline" className="border-destructive/40 text-[10px] text-destructive">
+              Invalidated {exit.invalidationDate}
+            </Badge>
+          ) : null}
+        </div>
+        <span className={`text-sm font-semibold tabular-nums ${tone}`}>
+          {exit == null ? "—" : pct(exit.netPct)}
+        </span>
+      </div>
+
+      {trade.entryPrice == null ? (
+        <p className="mt-1 text-muted-foreground">
+          No trade — {trade.noEntryReason ?? "entry never triggered"}.
+        </p>
+      ) : exit == null ? (
+        <p className="mt-1 text-muted-foreground">
+          Entered {trade.entryDate} at {trade.entryPrice.toFixed(2)} — history ran out before the{" "}
+          {horizon}-session exit.
+        </p>
+      ) : (
+        <>
+          <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-muted-foreground sm:grid-cols-4">
+            <span>
+              In {trade.entryDate} @ {trade.entryPrice.toFixed(2)}
+            </span>
+            <span>
+              Out {exit.exitDate} @ {exit.exitPrice.toFixed(2)}
+            </span>
+            <span>
+              Gross {pct(exit.grossPct)} · held {exit.barsHeld}d
+            </span>
+            <span>
+              Peak {pct(exit.maxFavourablePct)} · trough {pct(exit.maxAdversePct)}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Invalidation level {trade.invalidationBelow.toFixed(2)} ·{" "}
+            {exit.invalidated
+              ? `broken on ${exit.invalidationDate} while the trade was open`
+              : "held for the whole horizon"}
+            .
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+
  * Replays the CRWV-derived post-reclaim rules over years of history to show how
  * often the pattern produced a profitable entry versus froth — and whether
  * waiting for the pullback beats chasing the surge bar.
