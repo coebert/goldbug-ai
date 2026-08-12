@@ -379,27 +379,6 @@ function Home() {
             </p>
 
             <AdvancedSection
-              title="When markets are open"
-              summary="Trading hours for each exchange the AI uses, in UK time."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-40 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <MarketHoursCard />
-              </Suspense>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="Risk levels at a glance"
-              summary="Risk, drawdown and diversification for each risk level, side by side."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <RiskLevelMetricsCard />
-              </Suspense>
-            </AdvancedSection>
-
-
-            <AdvancedSection
               title="All portfolios on one chart"
               summary="Your combined value over time, every portfolio added together."
               defaultOpen={advanced}
@@ -417,16 +396,14 @@ function Home() {
               <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <TickerWatchCard />
               </Suspense>
-              <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <ReclaimScanCard />
-              </Suspense>
-              <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <SetupBacktestCard />
-              </Suspense>
-
-
+              <p className="mt-2 text-xs text-muted-foreground">
+                Scanners and backtests moved to{" "}
+                <Link to="/research" className="text-primary underline-offset-2 hover:underline">
+                  Research
+                </Link>
+                .
+              </p>
             </AdvancedSection>
-
 
             <AdvancedSection
               title="CEO posts the AI is tracking"
@@ -438,25 +415,6 @@ function Home() {
               </Suspense>
             </AdvancedSection>
 
-            <AdvancedSection
-              title="What the AI learned from CEO posts"
-              summary="The study of past posts against the price path that followed, and the rules it now applies."
-              defaultOpen={false}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <ExecPostLessonsCard />
-              </Suspense>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="What the AI learned from 20 years of news"
-              summary="Two decades of drawdowns and the headlines behind them, turned into rules for reacting to today's news."
-              defaultOpen={false}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <MacroLessonsCard />
-              </Suspense>
-            </AdvancedSection>
 
             <AdvancedSection
               title="News the AI is reading"
