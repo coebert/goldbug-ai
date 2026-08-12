@@ -59,6 +59,10 @@ const MacroLessonsCard = lazy(() =>
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
 );
+const ReclaimScanCard = lazy(() =>
+  import("@/components/market/reclaim-scan-card").then((m) => ({ default: m.ReclaimScanCard })),
+);
+
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
 );
@@ -409,6 +413,10 @@ function Home() {
               <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <TickerWatchCard />
               </Suspense>
+              <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <ReclaimScanCard />
+              </Suspense>
+
             </AdvancedSection>
 
 
