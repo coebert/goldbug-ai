@@ -5,10 +5,9 @@
 // the pure module, and upsert the resulting events into
 // `insider_dealing_events`. The dedupe index makes repeated runs idempotent.
 
-import { parseRssFeed } from "./news-rss.server";
 import {
   detectInsiderDealings,
-  insiderFeedUrl,
+  insiderFeedQueries,
   type InsiderDealingEvent,
   type InsiderNewsRow,
   type InsiderTarget,
