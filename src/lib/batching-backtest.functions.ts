@@ -13,6 +13,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { OrderBatchingAbResult } from "./backtest/order-batching-ab";
+import type { BenchmarkResult } from "./backtest/benchmark-arms";
 import type {
   CostScenarioId,
   CostScenarioSweepResult,
@@ -66,6 +67,7 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
 
     const { generateReplaySignals } = await import("./backtest/batching-replay-signals");
     const { runOrderBatchingAb } = await import("./backtest/order-batching-ab");
+    const { runBenchmarkArms } = await import("./backtest/benchmark-arms");
     const { minTicketBase, DEFAULT_GOVERNOR } = await import("./cost-governor");
 
     const signals = generateReplaySignals(bars, {
@@ -76,7 +78,7 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       maxAddsPerName: 8,
     });
 
-    const result = await runOrderBatchingAb({
+    const abInput = {
       bars,
       signals,
       startingCash: navBase,
@@ -87,10 +89,19 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       }),
       windowHours: data.windowHours,
       maxPriceDriftPct: data.maxPriceDriftPct,
+    };
+
+    const result = await runOrderBatchingAb(abInput);
+    const benchmarks = await runBenchmarkArms(abInput, {
+      returnPct: result.batched.returnPct,
+      maxDrawdownPct: result.batched.maxDrawdownPct,
+      sharpe: result.batched.sharpe,
+      costBpsOfEquity: result.batched.costBpsOfEquity,
     });
 
     return {
       ...result,
+      benchmarks,
       symbols,
       from: bars[0].date,
       to: bars[bars.length - 1].date,
