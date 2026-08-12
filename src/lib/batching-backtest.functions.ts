@@ -39,6 +39,8 @@ export type OrderBatchingAbResponse = OrderBatchingAbResult & {
   windowHours: number;
   /** Whether size-dependent market impact was charged. */
   marketImpact: boolean;
+  /** Per-day buy-ticket cap actually applied (0 = uncapped). */
+  maxTicketsPerDay: number;
   /** Buy-and-hold and momentum-only baselines over the same assets/period. */
   benchmarks: BenchmarkResult;
 };
@@ -61,6 +63,10 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
         /** Charge size-dependent market impact + latency on every ticket. */
         marketImpact: z.boolean().default(true),
         urgency: z.enum(["passive", "normal", "aggressive"]).default("normal"),
+        /** Cap on buy tickets routed per bar. 0 = uncapped. */
+        maxTicketsPerDay: z.number().int().min(0).max(20).default(0),
+        /** Override the NAV-scaled minimum ticket, base currency. 0 = default. */
+        minTicketOverride: z.number().min(0).max(100000).default(0),
       })
       .parse(input),
   )
@@ -87,13 +93,17 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       bars,
       signals,
       startingCash: navBase,
-      minTicketBase: minTicketBase({
-        navBase,
-        minTicketPctOfNav: DEFAULT_GOVERNOR.minTicketPctOfNav,
-        absoluteMinTicketBase: DEFAULT_GOVERNOR.absoluteMinTicketBase,
-      }),
+      minTicketBase:
+        data.minTicketOverride > 0
+          ? data.minTicketOverride
+          : minTicketBase({
+              navBase,
+              minTicketPctOfNav: DEFAULT_GOVERNOR.minTicketPctOfNav,
+              absoluteMinTicketBase: DEFAULT_GOVERNOR.absoluteMinTicketBase,
+            }),
       windowHours: data.windowHours,
       maxPriceDriftPct: data.maxPriceDriftPct,
+      maxTicketsPerDay: data.maxTicketsPerDay > 0 ? data.maxTicketsPerDay : undefined,
       execution: {
         enabled: data.marketImpact,
         urgency: data.urgency,
@@ -118,6 +128,7 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       navBase,
       windowHours: data.windowHours,
       marketImpact: data.marketImpact,
+      maxTicketsPerDay: data.maxTicketsPerDay,
     };
   });
 
