@@ -139,6 +139,7 @@ import { TradingModeBadge } from "@/components/trading-mode-badge";
 import { RiskCurveComparisonCard } from "@/components/risk-curve-comparison-card";
 import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
+import { ConcentrationAlertCard } from "@/components/concentration-alert-card";
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { CostSyncAlertBanner } from "@/components/cost-sync-alert-banner";
 import { CoverageTrendAlertBanner } from "@/components/coverage-trend-alert-banner";
