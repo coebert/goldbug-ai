@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, RefreshCw, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceDot,
   ReferenceLine,
 
@@ -78,10 +79,19 @@ import type { RsiTrade } from "@/lib/rsi-backtest";
 import type { DivergenceTrade } from "@/lib/rsi-divergence-backtest";
 import {
   EMPTY_TRADE_OVERLAY,
+  divergenceTradeId,
   divergenceTradeOverlay,
   mergeTradeOverlays,
+  rsiTradeId,
   rsiTradeOverlay,
 } from "@/lib/backtest-trade-markers";
+import {
+  clipOverlayToWindow,
+  focusOpacity,
+  focusPoints,
+  isFocused,
+  type TradeFocus,
+} from "@/lib/trade-focus";
 import { tradeLegColor, tradeMarkerColor } from "@/lib/trade-marker-style";
 
 
@@ -606,13 +616,63 @@ function MarketSymbolPage() {
   const [rsiTrades, setRsiTrades] = useState<RsiTrade[]>([]);
   const [divTrades, setDivTrades] = useState<DivergenceTrade[]>([]);
   const [showFills, setShowFills] = useState(true);
-  const tradeOverlay = useMemo(() => {
+  const fullOverlay = useMemo(() => {
     if (!history || !showFills) return EMPTY_TRADE_OVERLAY;
     return mergeTradeOverlays(
       showSignals ? rsiTradeOverlay(rsiTrades, history.points) : EMPTY_TRADE_OVERLAY,
       showDiv ? divergenceTradeOverlay(divTrades, history.points) : EMPTY_TRADE_OVERLAY,
     );
   }, [history, showFills, showSignals, showDiv, rsiTrades, divTrades]);
+
+  // Click-to-highlight: selecting a trade zooms both panes to its entry/exit.
+  const [focus, setFocus] = useState<TradeFocus | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
+
+  const chartPoints = useMemo(
+    () => (history ? focusPoints(history.points, focus) : []),
+    [history, focus],
+  );
+  const tradeOverlay = useMemo(
+    () => (focus ? clipOverlayToWindow(fullOverlay, chartPoints) : fullOverlay),
+    [fullOverlay, chartPoints, focus],
+  );
+
+  // Scroll the fills into view whenever a new trade is selected.
+  useEffect(() => {
+    if (!focus) return;
+    chartRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focus]);
+
+  // A trade selected under one toggle stops existing when that toggle is off.
+  useEffect(() => {
+    if (!showFills) setFocus(null);
+  }, [showFills]);
+
+  const selectRsiTrade = useCallback((t: RsiTrade | null) => {
+    setFocus(
+      t
+        ? {
+            tradeId: rsiTradeId(t),
+            fromDate: t.entryDate,
+            toDate: t.exitDate,
+            label: `RSI trade ${t.entryDate} → ${t.exitDate}`,
+          }
+        : null,
+    );
+  }, []);
+
+  const selectDivTrade = useCallback((t: DivergenceTrade | null) => {
+    setFocus(
+      t
+        ? {
+            tradeId: divergenceTradeId(t),
+            fromDate: t.entryDate,
+            toDate: t.exitDate,
+            label: `${t.kind} divergence ${t.entryDate} → ${t.exitDate}`,
+          }
+        : null,
+    );
+  }, []);
 
 
   const compareLoading = compareQueries.some((q) => q.isLoading);
@@ -772,10 +832,36 @@ function MarketSymbolPage() {
               </div>
 
 
+              <div ref={chartRef} className="scroll-mt-4 space-y-2">
+              {focus ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5">
+                  <p className="text-xs">
+                    Zoomed to <span className="font-medium">{focus.label}</span> — entry and exit
+                    highlighted, other fills dimmed.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setFocus(null)}
+                  >
+                    Show full range
+                  </Button>
+                </div>
+              ) : null}
               <ChartFrame className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={history.points} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+                  <LineChart data={chartPoints} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
                     <CartesianGrid {...GRID_PROPS} />
+                    {focus ? (
+                      <ReferenceArea
+                        x1={focus.fromDate}
+                        x2={focus.toDate}
+                        fill={CHART_ROLE.highlight}
+                        fillOpacity={0.1}
+                        ifOverflow="extendDomain"
+                      />
+                    ) : null}
                     <XAxis
                       dataKey="date"
                       tick={AXIS_TICK}
@@ -864,9 +950,9 @@ function MarketSymbolPage() {
                           { x: leg.toDate, y: leg.toPrice },
                         ]}
                         stroke={tradeLegColor(leg)}
-                        strokeWidth={1.4}
+                        strokeWidth={isFocused(focus, leg.tradeId) ? 2.6 : 1.4}
                         strokeDasharray={leg.open ? "2 4" : undefined}
-                        strokeOpacity={0.7}
+                        strokeOpacity={0.7 * focusOpacity(focus, leg.tradeId)}
                         ifOverflow="extendDomain"
                       />
                     ))}
@@ -876,10 +962,11 @@ function MarketSymbolPage() {
                         key={`price-trade-${m.key}`}
                         x={m.date}
                         y={m.price}
-                        r={6}
+                        r={isFocused(focus, m.tradeId) ? 9 : 6}
                         fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
                         stroke={tradeMarkerColor(m)}
-                        strokeWidth={2}
+                        strokeWidth={isFocused(focus, m.tradeId) ? 3 : 2}
+                        opacity={focusOpacity(focus, m.tradeId)}
                         isFront
                         ifOverflow="extendDomain"
                         label={{
@@ -914,6 +1001,7 @@ function MarketSymbolPage() {
                   </LineChart>
                 </ResponsiveContainer>
               </ChartFrame>
+              </div>
 
               {tradeOverlay.markers.length ? (
                 <p className="text-[11px] text-muted-foreground">
@@ -924,10 +1012,11 @@ function MarketSymbolPage() {
 
               {showRsi ? (
                 <RsiPane
-                  points={history.points}
+                  points={chartPoints}
                   divergences={showDiv ? divergences : []}
                   signals={rsiSignals}
                   tradeMarkers={tradeOverlay.markers}
+                  focusTradeId={focus?.tradeId ?? null}
                 />
               ) : null}
 
@@ -939,6 +1028,8 @@ function MarketSymbolPage() {
                     mode={signalMode}
                     rangeLabel={rangeLabel(range)}
                     onTrades={setRsiTrades}
+                    selectedTradeId={focus?.tradeId ?? null}
+                    onSelectTrade={selectRsiTrade}
                   />
                 </>
               ) : null}
@@ -950,6 +1041,8 @@ function MarketSymbolPage() {
                     points={history.points}
                     rangeLabel={rangeLabel(range)}
                     onTrades={setDivTrades}
+                    selectedTradeId={focus?.tradeId ?? null}
+                    onSelectTrade={selectDivTrade}
                   />
                 </>
               ) : null}
