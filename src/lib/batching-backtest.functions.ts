@@ -14,6 +14,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { OrderBatchingAbResult } from "./backtest/order-batching-ab";
 import type { BenchmarkResult } from "./backtest/benchmark-arms";
+import type { AbConfidenceResult } from "./backtest/ab-confidence";
 import type {
   CostScenarioId,
   CostScenarioSweepResult,
@@ -43,6 +44,8 @@ export type OrderBatchingAbResponse = OrderBatchingAbResult & {
   maxTicketsPerDay: number;
   /** Buy-and-hold and momentum-only baselines over the same assets/period. */
   benchmarks: BenchmarkResult;
+  /** Block-bootstrap distributions and 95% CIs for the A/B deltas. */
+  confidence: AbConfidenceResult;
 };
 
 
@@ -112,6 +115,12 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
     };
 
     const result = await runOrderBatchingAb(abInput);
+    const { computeAbConfidence } = await import("./backtest/ab-confidence");
+    const confidence = computeAbConfidence({
+      batched: result.batched,
+      unbatched: result.unbatched,
+      startingValue: result.batched.startingValue,
+    });
     const benchmarks = await runBenchmarkArms(abInput, {
       returnPct: result.batched.returnPct,
       maxDrawdownPct: result.batched.maxDrawdownPct,
@@ -129,6 +138,7 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       windowHours: data.windowHours,
       marketImpact: data.marketImpact,
       maxTicketsPerDay: data.maxTicketsPerDay,
+      confidence,
     };
   });
 
