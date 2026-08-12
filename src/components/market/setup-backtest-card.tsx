@@ -87,6 +87,8 @@ export function SetupBacktestCard() {
   const run = useServerFn(backtestReclaimSetups);
   const [result, setResult] = useState<SetupBacktestResult | null>(null);
   const [lookbackDays, setLookbackDays] = useState<number>(1095);
+  const [horizon, setHorizon] = useState<number>(10);
+  const [policy, setPolicy] = useState<"discipline" | "chase">("discipline");
 
   const backtest = useMutation({
     mutationFn: () => run({ data: { limit: 24, lookbackDays } }),
