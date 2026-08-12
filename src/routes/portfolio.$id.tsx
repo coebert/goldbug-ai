@@ -208,6 +208,7 @@ import { RelativeStrengthCard } from "@/components/relative-strength-card";
 import { FrictionKpiCard } from "@/components/friction-kpi-card";
 import { CoverageTrendCard } from "@/components/coverage-trend-card";
 import { BatchingBacktestCard } from "@/components/batching-backtest-card";
+import { CostScenarioBacktestCard } from "@/components/cost-scenario-backtest-card";
 
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
@@ -1195,6 +1196,14 @@ function PortfolioPage() {
                 {p && (
                   <div className="mb-4">
                     <BatchingBacktestCard
+                      portfolioId={id}
+                      currency={String(p.currency ?? "GBP")}
+                    />
+                  </div>
+                )}
+                {p && (
+                  <div className="mb-4">
+                    <CostScenarioBacktestCard
                       portfolioId={id}
                       currency={String(p.currency ?? "GBP")}
                     />
