@@ -25,6 +25,7 @@ import {
   type ScenarioReport,
 } from "@/lib/scenario-report";
 import { ExecutionCostHeatmaps } from "@/components/execution-cost-heatmaps";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   AXIS_LINE,
   AXIS_TICK,
@@ -124,7 +125,7 @@ export function ScenarioReportCard(props: { title?: string; input: BuildScenario
                   formatter={(v: number) => fmtMoney(v)}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
-                <Legend {...LEGEND_PROPS} />
+                <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                 {reports.map(
                   (r, i) =>
                     visible[r.id] && (
@@ -170,7 +171,7 @@ export function ScenarioReportCard(props: { title?: string; input: BuildScenario
                   formatter={(v: number) => `${v.toFixed(2)}%`}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
-                <Legend {...LEGEND_PROPS} />
+                <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                 {reports.map(
                   (r, i) =>
                     visible[r.id] && (
@@ -299,7 +300,7 @@ function ExecutionQualitySection(props: {
                 formatter={(v: number) => `${(v * 100).toFixed(1)}%`}
                 labelFormatter={(l) => `Decision: ${l}`}
               />
-              <Legend {...LEGEND_PROPS} />
+              <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
               {reports.map(
                 (r, i) =>
                   visible[r.id] && (
@@ -352,7 +353,7 @@ function ExecutionQualitySection(props: {
                 formatter={(v: number) => `${v.toFixed(2)} bps`}
                 labelFormatter={(l) => `Decision: ${l}`}
               />
-              <Legend {...LEGEND_PROPS} />
+              <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
               {reports.map(
                 (r, i) =>
                   visible[r.id] && (

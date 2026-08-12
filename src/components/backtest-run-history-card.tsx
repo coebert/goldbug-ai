@@ -23,6 +23,7 @@ import {
   YAxis,
 } from "recharts";
 import type { BacktestMetrics } from "@/lib/backtest-metrics";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   AXIS_LINE,
   AXIS_TICK,
@@ -577,7 +578,7 @@ export function BacktestRunHistoryCard({
                         labelFormatter={(t: number) => `Day ${t}`}
                         contentStyle={TOOLTIP_CONTENT_STYLE}
                       />
-                      <Legend {...LEGEND_PROPS} />
+                      <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}
@@ -628,7 +629,7 @@ export function BacktestRunHistoryCard({
                         labelFormatter={(t: number) => `Day ${t}`}
                         contentStyle={TOOLTIP_CONTENT_STYLE}
                       />
-                      <Legend {...LEGEND_PROPS} />
+                      <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}

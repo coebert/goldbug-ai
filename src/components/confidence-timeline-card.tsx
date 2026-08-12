@@ -31,6 +31,7 @@ import {
 } from "@/lib/chart-palette";
 import { buildConfidenceTimeline, type ConfidencePoint } from "@/lib/confidence-timeline";
 
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 type Decision = { id: string; run_date: string; raw: unknown };
 
 type Props = {
@@ -173,7 +174,7 @@ export function ConfidenceTimelineCard({ decisions }: Props) {
                     tickLine={TICK_LINE}
                   />
                   <Tooltip content={<TimelineTooltip />} />
-                  <Legend {...LEGEND_PROPS} />
+                  <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                   <Line
                     type="monotone"
                     dataKey="score"

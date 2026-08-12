@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   ComposedChart,
   Line,
@@ -225,7 +226,7 @@ function SmaReportPage() {
                         labelStyle={TOOLTIP_LABEL_STYLE}
                         itemStyle={TOOLTIP_ITEM_STYLE}
                       />
-                      <Legend {...LEGEND_PROPS} />
+                      <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                       <Line
                         type="monotone"
                         dataKey="close"

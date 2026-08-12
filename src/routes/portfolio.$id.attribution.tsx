@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   BarChart,
   Bar,
@@ -218,7 +219,7 @@ function AttributionPage() {
                           color: "var(--popover-foreground)",
                         }}
                       />
-                      <Legend {...LEGEND_PROPS} />
+                      <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                       <ReferenceLine {...REFERENCE_LINE} yAxisId="left" y={0} />
                       <Bar yAxisId="left" dataKey="contribution" name="Signed contribution (%)">
                         {data.overall.rows.map((r) => (
@@ -346,7 +347,7 @@ function AttributionPage() {
                             color: "var(--popover-foreground)",
                           }}
                         />
-                        <Legend {...LEGEND_PROPS} />
+                        <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                         <ReferenceLine {...REFERENCE_LINE} y={0} />
                         <Line
                           type="monotone"
@@ -437,7 +438,7 @@ function AttributionPage() {
                             color: "var(--popover-foreground)",
                           }}
                         />
-                        <Legend {...LEGEND_PROPS} />
+                        <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                         <ReferenceLine {...REFERENCE_LINE} y={0} />
                         {SIGNALS.map((k) => (
                           <Line

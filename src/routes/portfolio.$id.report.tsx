@@ -39,6 +39,7 @@ import {
 } from "@/lib/chart-palette";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 export const Route = createFileRoute("/portfolio/$id/report")({
   head: () => ({
     meta: [
@@ -302,7 +303,7 @@ function ReportPage() {
                           name,
                         ]}
                       />
-                      <Legend {...LEGEND_PROPS} />
+                      <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                       <ReferenceLine
                         {...REFERENCE_LINE}
                         y={data.portfolio.starting_cash}

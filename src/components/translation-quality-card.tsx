@@ -37,6 +37,7 @@ import {
 import { Languages, RefreshCw } from "lucide-react";
 import { AXIS_LINE, AXIS_TICK, GRID_PROPS, LEGEND_PROPS, TICK_LINE } from "@/lib/chart-palette";
 
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 const COLORS = [
   "var(--primary)",
   "var(--destructive)",
@@ -187,7 +188,7 @@ export function TranslationQualityCard() {
                       typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2) : "—"
                     }
                   />
-                  <Legend {...LEGEND_PROPS} />
+                  <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                   {topLangs.map((l, i) => (
                     <Line
                       key={l.language}

@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartFrame } from "@/components/chart-frame";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   AXIS_LINE,
   AXIS_TICK,
@@ -219,7 +220,7 @@ export function SmaTrendPanel({
                   labelStyle={TOOLTIP_LABEL_STYLE}
                   formatter={(v: number, name: string) => [num(v), name]}
                 />
-                {!compact && <Legend {...LEGEND_PROPS} />}
+                {!compact && <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />}
                 <Line
                   type="monotone"
                   dataKey="close"

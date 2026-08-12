@@ -20,6 +20,7 @@ import { runCostScenarioBacktest } from "@/lib/batching-backtest.functions";
 import type { CostScenarioResponse } from "@/lib/batching-backtest.functions";
 import type { CostScenarioId } from "@/lib/backtest/cost-scenarios";
 import { formatMoney } from "@/lib/format-money";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   SAXO_LEGEND_PROPS,
   SAXO_AXIS,
@@ -246,7 +247,7 @@ export function CostScenarioBacktestCard({
                     cursor={SAXO_TOOLTIP_CURSOR}
                     formatter={(v: number, name: string) => [formatMoney(v, currency), name]}
                   />
-                  <Legend {...SAXO_LEGEND_PROPS} />
+                  <Legend {...SAXO_LEGEND_PROPS} content={<CollapsibleLegend />} />
                   {result.scenarios.map((s) => (
                     <Line
                       key={s.scenario.id}
