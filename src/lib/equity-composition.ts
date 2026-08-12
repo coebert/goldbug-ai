@@ -134,3 +134,37 @@ export function buildEquityComposition({
 
   return { symbols, rows, currency };
 }
+
+// ---------------------------------------------------------------------------
+// Validation: every stacked band on a row must add up to that row's stored
+// total equity. A mismatch means the composition is misleading (bands would
+// not reach, or would overshoot, the recorded equity line), so the UI shows an
+// error banner rather than silently drawing a wrong chart.
+
+export type CompositionMismatch = {
+  date: string;
+  stacked: number;
+  total: number;
+  diff: number;
+};
+
+/** Absolute tolerance (currency units) for float accumulation noise. */
+const SUM_TOLERANCE = 0.01;
+
+export function validateComposition(
+  rows: CompositionRow[],
+  keys: string[],
+  tolerance = SUM_TOLERANCE,
+): CompositionMismatch[] {
+  const out: CompositionMismatch[] = [];
+  for (const row of rows) {
+    const total = num(row.total);
+    const stacked = keys.reduce((s, k) => s + num(row[k]), 0);
+    const diff = stacked - total;
+    // Scale tolerance a touch with size so large portfolios aren't flagged for
+    // sub-basis-point rounding.
+    const tol = Math.max(tolerance, Math.abs(total) * 1e-6);
+    if (Math.abs(diff) > tol) out.push({ date: row.date, stacked, total, diff });
+  }
+  return out;
+}
