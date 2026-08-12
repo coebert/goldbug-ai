@@ -114,22 +114,54 @@ export function BatchingBacktestCard({
   const [windowHours, setWindowHours] = useState<WindowHours>(96);
   const [days, setDays] = useState<number>(365);
   const [marketImpact, setMarketImpact] = useState(true);
+  const [maxTicketsPerDay, setMaxTicketsPerDay] = useState<number>(0);
+  const [minTicketOverride, setMinTicketOverride] = useState<string>("");
   const [result, setResult] = useState<OrderBatchingAbResponse | null>(null);
   const run = useServerFn(runOrderBatchingBacktest);
 
   const mutation = useMutation({
-    mutationFn: (vars: { windowHours: number; days: number; marketImpact: boolean }) =>
+    mutationFn: (vars: {
+      windowHours: number;
+      days: number;
+      marketImpact: boolean;
+      maxTicketsPerDay: number;
+      minTicketOverride: number;
+    }) =>
       run({
         data: {
           portfolioId,
           windowHours: vars.windowHours,
           days: vars.days,
           marketImpact: vars.marketImpact,
+          maxTicketsPerDay: vars.maxTicketsPerDay,
+          minTicketOverride: vars.minTicketOverride,
         },
       }),
     onSuccess: (r) => setResult(r),
     onError: (e: Error) => toast.error(e.message || "Backtest failed"),
   });
+
+  const minTicketNum = Math.max(0, Math.min(100000, Number(minTicketOverride) || 0));
+  const runNow = useCallback(() => {
+    mutation.mutate({
+      windowHours,
+      days,
+      marketImpact,
+      maxTicketsPerDay,
+      minTicketOverride: minTicketNum,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowHours, days, marketImpact, maxTicketsPerDay, minTicketNum]);
+
+  // Instant re-run: once a first replay exists, any parameter change re-scores
+  // the A/B automatically (debounced so typing a min-notional does not spam).
+  const hasRun = result != null;
+  useEffect(() => {
+    if (!hasRun) return;
+    const t = setTimeout(() => runNow(), 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRun, windowHours, days, marketImpact, maxTicketsPerDay, minTicketNum]);
 
   const chartData = useMemo(() => {
     if (!result) return [];
@@ -208,9 +240,43 @@ export function BatchingBacktestCard({
           >
             Market impact {marketImpact ? "on" : "off"}
           </button>
+          <div
+            className="flex items-center gap-1 rounded-md border border-border/60 p-0.5"
+            title="Maximum buy tickets routed per bar. Sells are never gated."
+          >
+            <span className="px-1 text-[11px] text-muted-foreground">Tickets/day</span>
+            {[0, 1, 3, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setMaxTicketsPerDay(n)}
+                className={`rounded px-2 py-1 text-xs ${
+                  maxTicketsPerDay === n ? "bg-muted font-medium" : "text-muted-foreground"
+                }`}
+              >
+                {n === 0 ? "Any" : n}
+              </button>
+            ))}
+          </div>
+          <div
+            className="flex items-center gap-1 rounded-md border border-border/60 px-2 py-0.5"
+            title="Minimum economic notional per order. Blank = the live NAV-scaled floor."
+          >
+            <span className="text-[11px] text-muted-foreground">Min notional</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={25}
+              value={minTicketOverride}
+              onChange={(e) => setMinTicketOverride(e.target.value)}
+              placeholder="auto"
+              className="w-20 bg-transparent text-xs outline-none"
+            />
+          </div>
           <Button
             size="sm"
-            onClick={() => mutation.mutate({ windowHours, days, marketImpact })}
+            onClick={runNow}
             disabled={mutation.isPending}
           >
             {mutation.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
