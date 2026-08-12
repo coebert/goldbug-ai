@@ -30,7 +30,7 @@ describe("InsiderDealingDetailPanel", () => {
     expect(screen.getByText(/Disposal — open market/)).toBeTruthy();
     expect(screen.getAllByText("MKS.L").length).toBeGreaterThan(0);
     expect(screen.getByText("Applied to news score")).toBeTruthy();
-    expect(screen.getByText("-0.075")).toBeTruthy();
+    expect(screen.getAllByText("-0.075").length).toBeGreaterThan(0);
   });
 
   it("renders nothing when no event is selected", () => {
