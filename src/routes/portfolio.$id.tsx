@@ -174,6 +174,7 @@ import { StressPanelCard } from "@/components/stress-panel-card";
 import { LearningDiagnosticsCard } from "@/components/learning-diagnostics-card";
 import { ShadowVariantCard } from "@/components/shadow-variant-card";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useChartPreset } from "@/lib/chart-axis";
 
 import {
   shortChartDate,
@@ -328,6 +329,7 @@ function PortfolioPage() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const isMobile = useIsMobile();
+  const chartPreset = useChartPreset();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -1752,12 +1754,7 @@ function PortfolioPage() {
                         <ResponsiveContainer width="100%" height="100%">
                           <ComposedChart
                             data={displayChartData}
-                            margin={{
-                              top: 8,
-                              right: isMobile ? 6 : 12,
-                              left: isMobile ? -12 : 0,
-                              bottom: 28,
-                            }}
+                            margin={{ ...chartPreset.margin, bottom: 28 }}
                           >
                             <defs>
                               <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
@@ -1790,7 +1787,7 @@ function PortfolioPage() {
                               dataKey="date"
                               tick={AXIS_TICK}
                               stroke={chartTheme.axis}
-                              minTickGap={isMobile ? 56 : 30}
+                              minTickGap={chartPreset.minTickGap}
                               tickFormatter={(v) => formatDateTick(v, isMobile)}
                               label={
                                 isMobile

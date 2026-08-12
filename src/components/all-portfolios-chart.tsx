@@ -10,7 +10,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { ChartSkeleton } from "@/components/ui/card-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useChartPreset } from "@/lib/chart-axis";
 import { LineChart, RefreshCw } from "lucide-react";
 import { CHART_ROLE, CHART_SEQUENCE, OKABE_ITO } from "@/lib/chart-palette";
 import {
@@ -180,7 +180,7 @@ function ModeChart({
   deposits: Array<{ portfolio_id: string; date: string; amount: number }>;
 }) {
   const [range, setRange] = useState<Range>("all");
-  const isMobile = useIsMobile();
+  const { isMobile, margin: chartMargin } = useChartPreset();
 
   const { series, totalNow, startingTotal, adjustedNow, netDeposits, yDomain } = useMemo(() => {
     const opt = RANGE_OPTS.find((r) => r.value === range)!;
@@ -289,7 +289,7 @@ function ModeChart({
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={series}
-                  margin={{ top: 8, right: isMobile ? 6 : 12, bottom: 20, left: isMobile ? -8 : 8 }}
+                  margin={chartMargin}
                 >
                   <defs>
                     <linearGradient id={`area-${totalKey}`} x1="0" y1="0" x2="0" y2="1">
