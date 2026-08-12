@@ -2,6 +2,7 @@ import * as React from "react";
 import { HelpCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CHART_FILTER_ROW_CLASS } from "@/components/ui/chart-filter-row";
 import {
   Card,
   CardContent,
@@ -82,7 +83,10 @@ export function SectionCardHeader({
   return (
     <CardHeader
       className={cn(
-        "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 space-y-0",
+        // Phones get the action (range toggles, filters, refresh) on its own
+        // full-width row so a long title can never squeeze it into a clipped
+        // sliver; from `sm:` up it returns to the trailing column.
+        "grid grid-cols-1 gap-3 space-y-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start",
         className,
       )}
     >
@@ -123,7 +127,9 @@ export function SectionCardHeader({
           </CardDescription>
         ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? (
+        <div className={cn(CHART_FILTER_ROW_CLASS, "sm:shrink-0")}>{action}</div>
+      ) : null}
     </CardHeader>
   );
 }
