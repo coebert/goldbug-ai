@@ -85,6 +85,12 @@ import {
   rsiTradeId,
   rsiTradeOverlay,
 } from "@/lib/backtest-trade-markers";
+import { TradeDetailDrawer } from "@/components/market/trade-detail-drawer";
+import {
+  divergenceTradeDetail,
+  rsiTradeDetail,
+  type TradeDetail,
+} from "@/lib/trade-detail";
 import {
   clipOverlayToWindow,
   focusOpacity,
@@ -626,6 +632,8 @@ function MarketSymbolPage() {
 
   // Click-to-highlight: selecting a trade zooms both panes to its entry/exit.
   const [focus, setFocus] = useState<TradeFocus | null>(null);
+  const [detail, setDetail] = useState<TradeDetail | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const chartRef = useRef<HTMLDivElement | null>(null);
 
   const chartPoints = useMemo(
@@ -649,6 +657,8 @@ function MarketSymbolPage() {
   }, [showFills]);
 
   const selectRsiTrade = useCallback((t: RsiTrade | null) => {
+    setDetail(t ? rsiTradeDetail(t) : null);
+    setDetailOpen(t != null);
     setFocus(
       t
         ? {
@@ -662,6 +672,8 @@ function MarketSymbolPage() {
   }, []);
 
   const selectDivTrade = useCallback((t: DivergenceTrade | null) => {
+    setDetail(t ? divergenceTradeDetail(t) : null);
+    setDetailOpen(t != null);
     setFocus(
       t
         ? {
@@ -843,7 +855,10 @@ function MarketSymbolPage() {
                     size="sm"
                     variant="ghost"
                     className="h-6 px-2 text-xs"
-                    onClick={() => setFocus(null)}
+                    onClick={() => {
+                      setFocus(null);
+                      setDetailOpen(false);
+                    }}
                   >
                     Show full range
                   </Button>
@@ -1002,6 +1017,24 @@ function MarketSymbolPage() {
                 </ResponsiveContainer>
               </ChartFrame>
               </div>
+
+              {detail && !detailOpen ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setDetailOpen(true)}
+                >
+                  Trade details
+                </Button>
+              ) : null}
+
+              <TradeDetailDrawer
+                detail={detail}
+                symbol={symbol}
+                open={detailOpen}
+                onOpenChange={setDetailOpen}
+              />
 
               {tradeOverlay.markers.length ? (
                 <p className="text-[11px] text-muted-foreground">
