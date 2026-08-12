@@ -13,6 +13,7 @@ import {
   type InsiderNewsRow,
   type InsiderTarget,
 } from "./insider-dealings";
+import { collectRnsDealings } from "./rns/investegate.server";
 
 type Sb = { from: (table: string) => any };
 
@@ -164,7 +165,29 @@ export async function ingestInsiderDealings(
   const targets = opts.targets ?? (await insiderTargetsFromHoldings(supabase));
   if (targets.length === 0) return { targets: 0, ...empty };
 
-  const events = await collectInsiderDealings(targets, opts.windowDays ?? 7);
+  const windowDays = opts.windowDays ?? 7;
+  // Two sources: the official RNS filing (UK listings — authoritative, gives
+  // name/role/price/volume) and the news wire (everything else, plus faster
+  // secondary reporting).
+  const [newsEvents, rnsEvents] = await Promise.all([
+    collectInsiderDealings(targets, windowDays),
+    collectRnsDealings(targets, { windowDays }).catch((err) => {
+      console.error("rns: collect failed", err);
+      return [] as InsiderDealingEvent[];
+    }),
+  ]);
+
+  // RNS wins: drop reported-news duplicates of a filing we already hold in
+  // primary form for the same symbol, day and direction.
+  const covered = new Set(rnsEvents.map((e) => `${e.symbol}|${e.event_date ?? ""}|${e.direction}`));
+  const seen = new Set<string>();
+  const events = [...rnsEvents, ...newsEvents].filter((e) => {
+    if (e.source !== "RNS (Investegate)" && covered.has(`${e.symbol}|${e.event_date ?? ""}|${e.direction}`)) return false;
+    const key = insiderEventKey(e);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   if (events.length === 0) return { targets: targets.length, ...empty };
 
   // Which of these are genuinely new? The upsert cannot tell us per-row, and
