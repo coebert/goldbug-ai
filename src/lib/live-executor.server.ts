@@ -510,9 +510,11 @@ export async function routeOrdersToBroker(params: {
       buysAlreadyToday: inputs.buysAlreadyToday,
       trailingCostBase: inputs.trailingCostBase,
       lastBuyDaysAgo: inputs.lastBuyDaysAgo,
+      positionExposureBase: inputs.positionExposureBase,
       ...navProfile,
       addCooldownDays: churn.cooldownDays,
     });
+
 
     const blocked: Array<{ symbol: string; reason: string }> = [];
     for (const d of plan.decisions) {

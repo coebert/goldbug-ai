@@ -15,6 +15,7 @@
 import { estimateTradeCosts } from "./trade-viability-gate";
 import { convertAmount } from "./fx.server";
 import { ukDayKey } from "./uk-time";
+import { engineSymbolKey } from "./price-symbol";
 
 export type GovernorInputs = {
   navBase: number;
@@ -24,9 +25,16 @@ export type GovernorInputs = {
   windowDays: number;
   /** Current gross exposure per sector key (base currency), for concentration budgeting. */
   sectorExposureBase: Record<string, number>;
+  /**
+   * Current gross exposure per symbol (base currency), keyed by
+   * `engineSymbolKey` so broker-native holdings ("MKS:xlon") match order
+   * symbols ("MKS.L"). Feeds the single-name concentration cap.
+   */
+  positionExposureBase: Record<string, number>;
   /** Symbols currently held (upper-cased), so adds can be told apart from new entries. */
   heldSymbols: Set<string>;
 };
+
 
 
 const WINDOW_DAYS = 30;
@@ -118,10 +126,12 @@ export async function loadGovernorInputs(args: {
         const t = Date.parse(filledAt);
         if (Number.isFinite(t)) {
           const days = Math.floor((now - t) / 86_400_000);
-          const prev = lastBuyDaysAgo[symbol];
-          if (prev === undefined || days < prev) lastBuyDaysAgo[symbol] = days;
+          const key = engineSymbolKey(symbol);
+          const prev = lastBuyDaysAgo[key];
+          if (prev === undefined || days < prev) lastBuyDaysAgo[key] = days;
         }
       }
+
     }
   } catch {
     /* degrade to no memory */
@@ -131,6 +141,7 @@ export async function loadGovernorInputs(args: {
   // is to hand. Cost basis understates winners slightly, which is the safe
   // direction for a concentration cap (it never over-admits by much).
   const sectorExposureBase: Record<string, number> = {};
+  const positionExposureBase: Record<string, number> = {};
   const heldSymbols = new Set<string>();
   try {
     const { symbolSector } = await import("./sector-rotation.server");
@@ -149,6 +160,8 @@ export async function loadGovernorInputs(args: {
       const value = await toBase(qty * cost, ccy);
       const key = symbolSector(symbol) ?? "__unknown__";
       sectorExposureBase[key] = (sectorExposureBase[key] ?? 0) + Math.max(0, value);
+      const symKey = engineSymbolKey(symbol);
+      positionExposureBase[symKey] = (positionExposureBase[symKey] ?? 0) + Math.max(0, value);
     }
   } catch {
     /* concentration budget degrades to "no existing exposure" */
@@ -161,7 +174,9 @@ export async function loadGovernorInputs(args: {
     lastBuyDaysAgo,
     windowDays,
     sectorExposureBase,
+    positionExposureBase,
     heldSymbols,
   };
+
 
 }

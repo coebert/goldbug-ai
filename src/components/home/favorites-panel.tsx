@@ -127,7 +127,9 @@ export function FavoritesPanel({
                 <Link
                   to="/market/$symbol"
                   params={{ symbol: s }}
+                  search={{ range: 180 as const }}
                   className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm hover:text-primary"
+
                 >
                   <span className="flex items-center gap-1.5">
                     <LineChart className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
