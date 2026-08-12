@@ -50,7 +50,7 @@ describe("computeAbConfidence", () => {
   it("marks a cheaper-but-riskier arm when drawdown deteriorates", () => {
     const batched = arm(120, 0.001, 1);
     // Punch a deep hole into the batched path only.
-    for (let i = 40; i < 60; i++) batched.equityCurve[i]!.totalValue *= 0.75;
+    for (let i = 30; i < 90; i++) batched.equityCurve[i]!.totalValue *= 0.55;
     const r = computeAbConfidence({
       batched,
       unbatched: arm(120, 0.001, 8),
