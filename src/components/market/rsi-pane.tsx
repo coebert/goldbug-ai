@@ -38,6 +38,8 @@ import {
 import { DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
 import { RSI_SIGNAL_TONE } from "@/lib/rsi-signal-style";
 import type { RsiSignal } from "@/lib/rsi-signals";
+import type { TradeMarker } from "@/lib/backtest-trade-markers";
+import { tradeMarkerColor } from "@/lib/trade-marker-style";
 
 
 const ZONE_LABEL: Record<RsiZone, string> = {
@@ -66,6 +68,7 @@ export function RsiPane({
   points,
   divergences = [],
   signals = [],
+  tradeMarkers = [],
   className,
 }: {
   points: HistoryPoint[];
@@ -73,8 +76,11 @@ export function RsiPane({
   divergences?: RsiDivergence[];
   /** Oversold/overbought buy/sell markers to pin on the RSI line. */
   signals?: RsiSignal[];
+  /** Executed backtest fills to pin on the RSI line. */
+  tradeMarkers?: TradeMarker[];
   className?: string;
 }) {
+
   const hasData = points.some((p) => p.rsi14 != null);
   if (!hasData) {
     return (
@@ -156,6 +162,23 @@ export function RsiPane({
                 ifOverflow="extendDomain"
               />
             ))}
+            {tradeMarkers
+              .filter((m) => m.rsi != null)
+              .map((m) => (
+                <ReferenceDot
+                  key={`rsi-trade-${m.key}`}
+                  x={m.date}
+                  y={m.rsi as number}
+                  r={5}
+                  fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
+                  stroke={tradeMarkerColor(m)}
+                  strokeWidth={2}
+                  isFront
+                  ifOverflow="extendDomain"
+                />
+              ))}
+
+
 
           </LineChart>
         </ResponsiveContainer>

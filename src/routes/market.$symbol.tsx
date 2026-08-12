@@ -74,6 +74,15 @@ import { RSI_SIGNAL_TONE } from "@/lib/rsi-signal-style";
 import { RsiBacktestPanel } from "@/components/market/rsi-backtest-panel";
 import { AiChartReadCard } from "@/components/market/ai-chart-read-card";
 import { DivergenceBacktestPanel } from "@/components/market/divergence-backtest-panel";
+import type { RsiTrade } from "@/lib/rsi-backtest";
+import type { DivergenceTrade } from "@/lib/rsi-divergence-backtest";
+import {
+  EMPTY_TRADE_OVERLAY,
+  divergenceTradeOverlay,
+  mergeTradeOverlays,
+  rsiTradeOverlay,
+} from "@/lib/backtest-trade-markers";
+import { tradeLegColor, tradeMarkerColor } from "@/lib/trade-marker-style";
 
 
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
@@ -592,6 +601,20 @@ function MarketSymbolPage() {
     [history, showSignals, signalMode],
   );
 
+  // Executed backtest fills, reported up from the panels so the charts can
+  // mark the exact bars each engine traded.
+  const [rsiTrades, setRsiTrades] = useState<RsiTrade[]>([]);
+  const [divTrades, setDivTrades] = useState<DivergenceTrade[]>([]);
+  const [showFills, setShowFills] = useState(true);
+  const tradeOverlay = useMemo(() => {
+    if (!history || !showFills) return EMPTY_TRADE_OVERLAY;
+    return mergeTradeOverlays(
+      showSignals ? rsiTradeOverlay(rsiTrades, history.points) : EMPTY_TRADE_OVERLAY,
+      showDiv ? divergenceTradeOverlay(divTrades, history.points) : EMPTY_TRADE_OVERLAY,
+    );
+  }, [history, showFills, showSignals, showDiv, rsiTrades, divTrades]);
+
+
   const compareLoading = compareQueries.some((q) => q.isLoading);
   const compareData = compareQueries
     .map((q) => q.data)
@@ -679,6 +702,19 @@ function MarketSymbolPage() {
                   </Button>
                 ))
               : null}
+            {showSignals || showDiv ? (
+              <Button
+                size="sm"
+                variant={showFills ? "secondary" : "ghost"}
+                className="h-7 px-2 text-xs"
+                aria-pressed={showFills}
+                onClick={() => setShowFills((v) => !v)}
+                title="Mark the backtest's executed entries and exits on the price and RSI charts"
+              >
+                Fills
+              </Button>
+            ) : null}
+
 
             {HISTORY_RANGES.map((r) => (
               <Button
@@ -820,6 +856,42 @@ function MarketSymbolPage() {
                       />
                     ))}
 
+                    {tradeOverlay.legs.map((leg) => (
+                      <ReferenceLine
+                        key={`price-leg-${leg.key}`}
+                        segment={[
+                          { x: leg.fromDate, y: leg.fromPrice },
+                          { x: leg.toDate, y: leg.toPrice },
+                        ]}
+                        stroke={tradeLegColor(leg)}
+                        strokeWidth={1.4}
+                        strokeDasharray={leg.open ? "2 4" : undefined}
+                        strokeOpacity={0.7}
+                        ifOverflow="extendDomain"
+                      />
+                    ))}
+
+                    {tradeOverlay.markers.map((m) => (
+                      <ReferenceDot
+                        key={`price-trade-${m.key}`}
+                        x={m.date}
+                        y={m.price}
+                        r={6}
+                        fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
+                        stroke={tradeMarkerColor(m)}
+                        strokeWidth={2}
+                        isFront
+                        ifOverflow="extendDomain"
+                        label={{
+                          value: m.glyph,
+                          fill: tradeMarkerColor(m),
+                          fontSize: 10,
+                          fontWeight: 700,
+                          position: m.side === "entry" ? "bottom" : "top",
+                        }}
+                      />
+                    ))}
+
                     {annotations.map((a, i) => (
                       <ReferenceDot
                         key={a.id}
@@ -843,11 +915,19 @@ function MarketSymbolPage() {
                 </ResponsiveContainer>
               </ChartFrame>
 
+              {tradeOverlay.markers.length ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Backtest fills: hollow markers are entries, filled markers are exits (green =
+                  profitable net of costs, red = loss); the connecting line is the holding period.
+                </p>
+              ) : null}
+
               {showRsi ? (
                 <RsiPane
                   points={history.points}
                   divergences={showDiv ? divergences : []}
                   signals={rsiSignals}
+                  tradeMarkers={tradeOverlay.markers}
                 />
               ) : null}
 
@@ -858,6 +938,7 @@ function MarketSymbolPage() {
                     points={history.points}
                     mode={signalMode}
                     rangeLabel={rangeLabel(range)}
+                    onTrades={setRsiTrades}
                   />
                 </>
               ) : null}
@@ -868,6 +949,7 @@ function MarketSymbolPage() {
                   <DivergenceBacktestPanel
                     points={history.points}
                     rangeLabel={rangeLabel(range)}
+                    onTrades={setDivTrades}
                   />
                 </>
               ) : null}

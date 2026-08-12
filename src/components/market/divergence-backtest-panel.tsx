@@ -1,7 +1,7 @@
 // Divergence backtest panel: how often the divergences drawn on this chart
 // led to a real reversal versus a failed setup.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   backtestRsiDivergences,
   divergenceBacktestVerdict,
   type DivergenceStats,
+  type DivergenceTrade,
 } from "@/lib/rsi-divergence-backtest";
 import type { HistoryPoint } from "@/lib/market-symbol-history";
 import { formatUkDate } from "@/lib/uk-time";
@@ -93,9 +94,12 @@ function Toggles<T extends number>({
 export function DivergenceBacktestPanel({
   points,
   rangeLabel,
+  onTrades,
 }: {
   points: HistoryPoint[];
   rangeLabel?: string;
+  /** Reports the executed setups so the charts above can mark them. */
+  onTrades?: (trades: DivergenceTrade[]) => void;
 }) {
   const [horizon, setHorizon] = useState(DEFAULT_DIVERGENCE_HORIZON);
   const [targetPct, setTargetPct] = useState(DEFAULT_DIVERGENCE_TARGET_PCT);
@@ -105,6 +109,13 @@ export function DivergenceBacktestPanel({
     () => backtestRsiDivergences(points, { horizon, targetPct, frictionBps }),
     [points, horizon, targetPct, frictionBps],
   );
+
+  useEffect(() => {
+    onTrades?.(result.trades);
+  }, [result.trades, onTrades]);
+
+  useEffect(() => () => onTrades?.([]), [onTrades]);
+
 
   const o = result.overall;
 

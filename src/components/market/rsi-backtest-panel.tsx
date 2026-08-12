@@ -3,13 +3,14 @@
 // It replays the same buy/sell markers drawn on the chart over the visible
 // window so what you see and what you measure cannot drift apart.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DEFAULT_RSI_BACKTEST_FRICTION_BPS,
   backtestRsiStrategy,
+  type RsiTrade,
 } from "@/lib/rsi-backtest";
 import { RSI_SIGNAL_MODE_LABEL, type RsiSignalMode } from "@/lib/rsi-signals";
 import type { HistoryPoint } from "@/lib/market-symbol-history";
@@ -55,16 +56,26 @@ export function RsiBacktestPanel({
   points,
   mode,
   rangeLabel,
+  onTrades,
 }: {
   points: HistoryPoint[];
   mode: RsiSignalMode;
   rangeLabel?: string;
+  /** Reports the executed trades so the charts above can mark them. */
+  onTrades?: (trades: RsiTrade[]) => void;
 }) {
   const [frictionBps, setFrictionBps] = useState(DEFAULT_RSI_BACKTEST_FRICTION_BPS);
   const result = useMemo(
     () => backtestRsiStrategy(points, mode, { frictionBps }),
     [points, mode, frictionBps],
   );
+
+  useEffect(() => {
+    onTrades?.(result.trades);
+  }, [result.trades, onTrades]);
+
+  useEffect(() => () => onTrades?.([]), [onTrades]);
+
 
   const beatsHold = result.totalReturn > result.buyHoldReturn;
 
