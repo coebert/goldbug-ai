@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAxisLockedScroll } from "@/hooks/use-axis-locked-scroll";
 
 /**
  * Sticky in-page section index for long pages (Home, Portfolio detail).
