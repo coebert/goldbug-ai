@@ -255,7 +255,7 @@ export function runSetupBacktest(
 
   for (const { symbol, candles } of histories) {
     const clean = candles.filter((c) => Number.isFinite(c.close) && c.close > 0);
-    if (clean.length < 230) continue;
+    if (clean.length < 215) continue;
     const signals = findSignals(symbol, clean, cfg);
     let entries = 0;
     for (const s of signals) {
