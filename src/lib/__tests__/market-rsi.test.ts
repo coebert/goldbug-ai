@@ -51,6 +51,7 @@ describe("rsiZone", () => {
 describe("buildSymbolHistory RSI", () => {
   it("attaches rsi14 to points and surfaces the latest reading", () => {
     const rows = ramp(80, 1).map((close, i) => ({
+      symbol: "TEST",
       price_date: `2026-0${1 + Math.floor(i / 31)}-${String((i % 31) + 1).padStart(2, "0")}`,
       close,
     }));
