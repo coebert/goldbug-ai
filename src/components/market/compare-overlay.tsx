@@ -311,7 +311,7 @@ export function CompareOverlay({
                     tickFormatter={(v: number) => `${(returnScale ? v : v - 100).toFixed(0)}%`}
                   />
                 )}
-                {returnScale && <ReferenceLine y={0} {...AXIS_LINE} strokeDasharray="3 3" />}
+                {returnScale && <ReferenceLine y={0} {...REFERENCE_LINE} />}
                 <Tooltip
                   contentStyle={TOOLTIP_CONTENT_STYLE}
                   labelStyle={TOOLTIP_LABEL_STYLE}

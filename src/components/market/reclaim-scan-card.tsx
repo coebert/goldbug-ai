@@ -42,7 +42,7 @@ export function ReclaimScanCard() {
   const cached = useQuery({
     queryKey: ["reclaim-scan"],
     queryFn: () => loadScan({ data: {} }),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: POLL.SLOW,
     refetchOnWindowFocus: true,
     staleTime: 60_000,
   });
