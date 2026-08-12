@@ -37,7 +37,7 @@ async function fetchFeed(url: string): Promise<string | null> {
 /** Resolves the symbols worth watching: current holdings first. */
 export async function insiderTargetsFromHoldings(supabase: Sb): Promise<InsiderTarget[]> {
   const { UNIVERSE } = await import("./universe.server");
-  const { engineSymbolKey } = await import("./engine-symbol");
+  const { engineSymbolKey } = await import("./price-symbol");
 
   const { data } = await supabase.from("holdings").select("symbol, quantity").limit(500);
   const symbols = new Set<string>();
