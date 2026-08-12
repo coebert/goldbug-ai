@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Receipt } from "lucide-react";
 import { getFrictionReport } from "@/lib/friction-kpi.functions";
 import { FrictionCostDrilldown } from "@/components/friction-cost-drilldown";
+import { FrictionWeeklyPanel } from "@/components/friction-weekly-panel";
 import { FeeSyncStatusStrip } from "@/components/fee-sync-status-strip";
 import { backfillBrokerChargesFn } from "@/lib/broker-cost-backfill.functions";
 import { formatMoney } from "@/lib/format-money";
@@ -311,6 +312,10 @@ export function FrictionKpiCard({
 
             {report?.feeSync && <FeeSyncStatusStrip summary={report.feeSync} />}
           </>
+        )}
+
+        {report?.weekly && (
+          <FrictionWeeklyPanel weekly={report.weekly} currency={report.currency} />
         )}
 
         {report?.breakdown && (
