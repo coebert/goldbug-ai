@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -119,9 +119,31 @@ export function AppHeader({ email }: { email?: string | null }) {
   const [open, setOpen] = useState(false);
   const crumb = useCrumb();
   const contextActions = useContextActions();
+  const headerRef = useRef<HTMLElement | null>(null);
+
+  // Publish the measured header height as --app-header-h so every sticky
+  // sub-nav (portfolio tabs, leaf back rows) lines up exactly beneath it,
+  // including on notched devices where the safe-area padding varies.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof window === "undefined") return;
+    const apply = () => {
+      document.documentElement.style.setProperty(
+        "--app-header-h",
+        `${Math.round(el.getBoundingClientRect().height)}px`,
+      );
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-surface-2/85 pt-[env(safe-area-inset-top)] backdrop-blur">
+    <header
+      ref={headerRef}
+      className="sticky top-0 z-30 border-b border-border bg-surface-2/85 pt-[env(safe-area-inset-top)] backdrop-blur"
+    >
       {/* Row 1 — Brand / global controls */}
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5">
         <Link

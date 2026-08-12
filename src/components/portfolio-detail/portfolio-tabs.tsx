@@ -18,7 +18,7 @@ export function PortfolioTabs({ id }: { id: string }) {
   return (
     <nav
       aria-label="Portfolio sections"
-      className="sticky top-[3.25rem] z-20 -mx-4 mb-4 border-b border-border bg-surface-1/90 px-4 backdrop-blur"
+      className="sticky top-[var(--app-header-h,3.25rem)] z-20 -mx-4 mb-4 border-b border-border bg-surface-1/90 px-4 backdrop-blur"
     >
       <ul className="flex min-w-0 gap-1 overflow-x-auto py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => (

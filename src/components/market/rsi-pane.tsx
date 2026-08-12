@@ -18,6 +18,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { ChartFrame } from "@/components/chart-frame";
+import { useYAxisWidth } from "@/lib/chart-axis";
 import {
   AXIS_LINE,
   AXIS_TICK,
@@ -84,6 +85,8 @@ export function RsiPane({
   className?: string;
 }) {
 
+  const yWidth = useYAxisWidth();
+
   const hasData = points.some((p) => p.rsi14 != null);
   if (!hasData) {
     return (
@@ -103,7 +106,7 @@ export function RsiPane({
       </div>
       <ChartFrame className="h-36 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
+          <LineChart data={points} syncId="symbol-price" margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
 
             <CartesianGrid {...GRID_PROPS} />
             <XAxis
@@ -118,7 +121,7 @@ export function RsiPane({
               tick={AXIS_TICK}
               axisLine={AXIS_LINE}
               tickLine={TICK_LINE}
-              width={64}
+              width={yWidth}
               domain={[0, 100]}
               ticks={[0, RSI_OVERSOLD, 50, RSI_OVERBOUGHT, 100]}
             />

@@ -58,6 +58,8 @@ import {
   toggleSmaPeriod,
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
+import { BackRow } from "@/components/nav/back-row";
+import { useYAxisWidth, compactTick } from "@/lib/chart-axis";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
 import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
 import { DIVERGENCE_LABEL, DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
@@ -437,6 +439,7 @@ function DivergenceList({ divergences }: { divergences: RsiDivergence[] }) {
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
   const { range, compare: compareParam, sma: smaParam } = Route.useSearch();
+  const yWidth = useYAxisWidth();
 
   // Averages default to whatever the home dashboard card is showing, so the
   // two views stay in sync; an explicit ?sma= wins (shareable links).
@@ -711,9 +714,10 @@ function MarketSymbolPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6">
+      <BackRow to="/markets" label="Markets" title={symbol} />
       <Link
         to="/"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="hidden items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:inline-flex"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to dashboard
       </Link>
@@ -733,7 +737,7 @@ function MarketSymbolPage() {
             <Button
               size="sm"
               variant={showRsi ? "secondary" : "ghost"}
-              className="h-7 px-2 text-xs"
+              className="h-11 px-3 text-xs sm:h-7 sm:px-2"
               aria-pressed={showRsi}
               onClick={toggleRsi}
             >
@@ -742,7 +746,7 @@ function MarketSymbolPage() {
             <Button
               size="sm"
               variant={showDiv ? "secondary" : "ghost"}
-              className="h-7 px-2 text-xs"
+              className="h-11 px-3 text-xs sm:h-7 sm:px-2"
               aria-pressed={showDiv}
               onClick={toggleDiv}
               title="Highlight RSI/price divergences"
@@ -752,7 +756,7 @@ function MarketSymbolPage() {
             <Button
               size="sm"
               variant={showSignals ? "secondary" : "ghost"}
-              className="h-7 px-2 text-xs"
+              className="h-11 px-3 text-xs sm:h-7 sm:px-2"
               aria-pressed={showSignals}
               onClick={toggleSignals}
               title="Mark buy/sell points where RSI enters or leaves the oversold/overbought zones"
@@ -765,7 +769,7 @@ function MarketSymbolPage() {
                     key={m}
                     size="sm"
                     variant={signalMode === m ? "secondary" : "ghost"}
-                    className="h-7 px-2 text-[11px]"
+                    className="h-11 px-3 text-[11px] sm:h-7 sm:px-2"
                     aria-pressed={signalMode === m}
                     onClick={() => pickSignalMode(m)}
                     title={RSI_SIGNAL_MODE_HINT[m]}
@@ -778,7 +782,7 @@ function MarketSymbolPage() {
               <Button
                 size="sm"
                 variant={showFills ? "secondary" : "ghost"}
-                className="h-7 px-2 text-xs"
+                className="h-11 px-3 text-xs sm:h-7 sm:px-2"
                 aria-pressed={showFills}
                 onClick={() => setShowFills((v) => !v)}
                 title="Mark the backtest's executed entries and exits on the price and RSI charts"
@@ -794,7 +798,7 @@ function MarketSymbolPage() {
                 asChild
                 size="sm"
                 variant={r === range ? "secondary" : "ghost"}
-                className="h-7 px-2 text-xs"
+                className="h-11 px-3 text-xs sm:h-7 sm:px-2"
               >
                 <Link
                   to="/market/$symbol"
@@ -866,7 +870,7 @@ function MarketSymbolPage() {
               ) : null}
               <ChartFrame className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartPoints} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+                  <LineChart data={chartPoints} syncId="symbol-price" margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
                     <CartesianGrid {...GRID_PROPS} />
                     {focus ? (
                       <ReferenceArea
@@ -889,9 +893,11 @@ function MarketSymbolPage() {
                       tick={AXIS_TICK}
                       axisLine={AXIS_LINE}
                       tickLine={TICK_LINE}
-                      width={64}
+                      width={yWidth}
                       domain={["auto", "auto"]}
-                      tickFormatter={(v: number) => num(v, 0)}
+                      tickFormatter={(v: number) =>
+                        yWidth <= 40 ? compactTick(v) : num(v, 0)
+                      }
                     />
                     <Tooltip
                       contentStyle={TOOLTIP_CONTENT_STYLE}
@@ -1022,7 +1028,7 @@ function MarketSymbolPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 px-2 text-xs"
+                  className="h-11 px-3 text-xs sm:h-7 sm:px-2"
                   onClick={() => setDetailOpen(true)}
                 >
                   Trade details
