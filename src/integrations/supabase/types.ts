@@ -2964,6 +2964,42 @@ export type Database = {
         }
         Relationships: []
       }
+      setup_scan_runs: {
+        Row: {
+          duration_ms: number
+          errors: Json
+          id: string
+          matches: Json
+          near_misses: Json
+          ran_at: string
+          rate_limited: boolean
+          scanned: number
+          source: string
+        }
+        Insert: {
+          duration_ms?: number
+          errors?: Json
+          id?: string
+          matches?: Json
+          near_misses?: Json
+          ran_at?: string
+          rate_limited?: boolean
+          scanned?: number
+          source?: string
+        }
+        Update: {
+          duration_ms?: number
+          errors?: Json
+          id?: string
+          matches?: Json
+          near_misses?: Json
+          ran_at?: string
+          rate_limited?: boolean
+          scanned?: number
+          source?: string
+        }
+        Relationships: []
+      }
       shadow_decisions: {
         Row: {
           agreement: number | null
