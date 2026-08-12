@@ -125,6 +125,20 @@ export function RsiPane({
               connectNulls
               isAnimationActive={false}
             />
+            {divergences.map((d) => (
+              <ReferenceLine
+                key={`rsi-div-${d.kind}-${d.from.date}-${d.to.date}`}
+                segment={[
+                  { x: d.from.date, y: d.from.rsi },
+                  { x: d.to.date, y: d.to.rsi },
+                ]}
+                stroke={DIVERGENCE_TONE[d.kind]}
+                strokeWidth={1.6}
+                strokeDasharray="5 3"
+                ifOverflow="extendDomain"
+              />
+            ))}
+
           </LineChart>
         </ResponsiveContainer>
       </ChartFrame>
