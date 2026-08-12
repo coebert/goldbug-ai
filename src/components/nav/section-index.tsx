@@ -55,12 +55,21 @@ export function SectionIndex({
     return () => window.removeEventListener("scroll", onScroll);
   }, [present, offset]);
 
-  // Keep the active chip in view on narrow screens.
+  // Keep the active chip in view on narrow screens. Scroll the row
+  // horizontally by hand — scrollIntoView() also scrolls ancestors, which
+  // yanked the whole page back to the sticky row while scrolling.
   useEffect(() => {
-    if (!active || !rowRef.current) return;
-    const chip = rowRef.current.querySelector<HTMLElement>(`[data-section="${active}"]`);
-    chip?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    const row = rowRef.current;
+    if (!active || !row) return;
+    const chip = row.querySelector<HTMLElement>(`[data-section="${active}"]`);
+    if (!chip) return;
+    const left = chip.offsetLeft;
+    const right = left + chip.offsetWidth;
+    if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 12);
+    else if (right > row.scrollLeft + row.clientWidth)
+      row.scrollLeft = right - row.clientWidth + 12;
   }, [active]);
+
 
   if (present.length < 2) return null;
 
