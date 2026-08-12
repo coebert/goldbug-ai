@@ -6,4 +6,4 @@ for(let i=0;i<5;i++){p*=1.07;closes.push(p);}
 closes.push(...after);
 return closes.map((close,i)=>({date:new Date(Date.UTC(2020,0,1+i)).toISOString().slice(0,10),close,high:close*1.02,low:close*0.97,volume:i>=212?700000:1000000}));}
 const c=hist([]);
-for(let i=218;i<c.length;i++){const v=evaluateSetup("T",c.slice(0,i+1));console.log(i,v.match?`MATCH score=${v.match.score} zone=${v.match.zoneLow.toFixed(1)}-${v.match.zoneHigh.toFixed(1)} inval=${v.match.invalidationBelow.toFixed(1)} px=${v.match.price.toFixed(1)}`:v.rejected);}
+for(let i=210;i<c.length;i++){const v=evaluateSetup("T",c.slice(0,i+1));console.log(i,v.match?`MATCH score=${v.match.score} zone=${v.match.zoneLow.toFixed(1)}-${v.match.zoneHigh.toFixed(1)} inval=${v.match.invalidationBelow.toFixed(1)} px=${v.match.price.toFixed(1)}`:v.rejected);}
