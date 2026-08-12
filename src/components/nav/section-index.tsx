@@ -144,7 +144,8 @@ export function SectionIndex({
           resize the bar, or every sticky offset below it shifts mid-scroll. */}
       <div
         ref={rowRef}
-        className="flex h-full min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        data-chip-scroller
+        className="flex h-full min-w-0 touch-pan-x items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {present.map((i) => (
           <a
