@@ -580,6 +580,8 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
           ? `The bounded nudge cost ${Math.abs(delta.returnPct).toFixed(2)}pp versus baseline (95% CI ${lo}..${hi}pp) — on this tape it filtered out names that went on to work.`
           : `No measurable edge: return delta ${delta.returnPct.toFixed(2)}pp with a 95% CI of ${lo}..${hi}pp straddling zero. The nudge is bounded tightly enough to be close to harmless either way.`;
 
+  const sized = ` Both arms sized through the ${sizing.name} dial (level ${sizing.level}, ${(sizing.perSymbolCap * 100).toFixed(0)}% per-symbol cap, ×${sizing.aggressiveness.sizeMult} size): 95% 1-day VaR ${baseline.var95Pct.toFixed(2)}% baseline vs ${nudged.var95Pct.toFixed(2)}% nudged.`;
+
   return {
     from: allDates[0] as string,
     to: allDates[allDates.length - 1] as string,
@@ -593,6 +595,6 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     attribution,
     sizing,
     verdict,
-    summary,
+    summary: summary + sized,
   };
 }

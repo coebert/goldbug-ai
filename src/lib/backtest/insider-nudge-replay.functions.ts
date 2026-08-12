@@ -20,6 +20,7 @@ export const runNudgeReplayFn = createServerFn({ method: "POST" })
             halfLifeDays: z.number().min(0.5).max(60).optional(),
             costBps: z.number().min(0).max(200).optional(),
             nudgeScale: z.number().min(0).max(4).optional(),
+            riskLevel: z.number().int().min(1).max(5).optional(),
           })
           .optional(),
       })
