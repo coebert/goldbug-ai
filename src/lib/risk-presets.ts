@@ -26,6 +26,12 @@ export type RiskDialConfig = {
   commodity_max_atr_pct: number;
   fx_currency_limits?: Partial<Record<string, number>>;
   diversification_tilt?: "off" | "balanced" | "strong";
+  /**
+   * Prefer stamp-exempt instruments (ETFs/ETCs, non-UK listings) over UK
+   * single stocks when signal strength is comparable, lowering the break-even
+   * bps a new position must earn back.
+   */
+  stamp_exempt_preference?: "off" | "balanced" | "strong";
   risk_level?: number;
   /** Position-sizing multiplier applied to every buy budget (0.25–2). */
   size_multiplier?: number;
@@ -71,6 +77,7 @@ export const RISK_DIAL_DEFAULTS: RiskDialConfig = {
   commodity_min_adv_usd: 250_000,
   commodity_max_atr_pct: 0.06,
   fx_currency_limits: {},
+  stamp_exempt_preference: "balanced",
   atr_scaled_stop_enabled: true,
   initial_stop_atr_mult: 2.5,
   atr_scaled_stop_floor_pct: 0.03,

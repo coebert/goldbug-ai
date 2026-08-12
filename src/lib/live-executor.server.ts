@@ -430,7 +430,7 @@ export async function routeOrdersToBroker(params: {
     const { planAdmissions, governorForNav } = await import("./cost-governor");
     const { planSectorAdmissions, DEFAULT_SECTOR_BUDGET } = await import("./sector-concentration");
     const { resolveChurnPolicy } = await import("./churn-policy");
-    const { estimateTradeCosts } = await import("./trade-viability-gate");
+    const { estimateTradeCosts, attractsStampDuty } = await import("./trade-viability-gate");
     const { convertAmount } = await import("./fx.server");
     const { inferSaxoCurrency } = await import("./saxo-fees");
     const { symbolSector } = await import("./sector-rotation.server");
@@ -532,6 +532,15 @@ export async function routeOrdersToBroker(params: {
       if (routable.length === 0) return results;
     }
 
+    // Stamp-exempt preference (user setting): prefer ETFs/ETCs and non-UK
+    // listings over UK single stocks when signal strength is comparable, since
+    // the exempt instrument needs ~50bps less to break even.
+    const stampExemptPreference = (() => {
+      const raw = (portfolio as { risk_config?: { stamp_exempt_preference?: unknown } }).risk_config;
+      const v = raw?.stamp_exempt_preference;
+      return v === "off" || v === "balanced" || v === "strong" ? v : "balanced";
+    })();
+
     const candidates: Array<{
       symbol: string;
       side: "buy" | "sell";
@@ -539,6 +548,7 @@ export async function routeOrdersToBroker(params: {
       estCostBase: number;
       isAdd?: boolean;
       edgeScore?: number;
+      stampLiable?: boolean;
     }> = [];
     const notionalBySymbol = new Map<string, number>();
     for (const o of routable) {
@@ -558,6 +568,12 @@ export async function routeOrdersToBroker(params: {
         estCostBase: costs.oneWayCost * fx,
         isAdd: inputs.heldSymbols.has(o.symbol.toUpperCase()),
         edgeScore: Number.isFinite(o.conviction) ? Number(o.conviction) : undefined,
+        stampLiable:
+          side === "buy" &&
+          attractsStampDuty(
+            o.symbol,
+            (o as { asset_class?: string | null }).asset_class ?? null,
+          ),
       });
     }
 
@@ -569,6 +585,7 @@ export async function routeOrdersToBroker(params: {
       positionExposureBase: inputs.positionExposureBase,
       ...navProfile,
       addCooldownDays: churn.cooldownDays,
+      stampExemptPreference,
     });
 
 

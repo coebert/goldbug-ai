@@ -152,6 +152,10 @@ function parseCfg(raw: unknown): RiskConfig {
       r.diversification_tilt === "balanced" || r.diversification_tilt === "strong"
         ? r.diversification_tilt
         : "off",
+    stamp_exempt_preference:
+      r.stamp_exempt_preference === "off" || r.stamp_exempt_preference === "strong"
+        ? r.stamp_exempt_preference
+        : "balanced",
     trading_style: r.trading_style === "swing" ? "swing" : "position",
     swing_min_hold_days: Number.isFinite(Number(r.swing_min_hold_days))
       ? Math.max(0, Math.min(30, Math.floor(Number(r.swing_min_hold_days))))
@@ -230,6 +234,11 @@ function diffConfigs(prev: RiskConfig, next: RiskConfig): FieldChange[] {
     );
   }
   push("Diversification tilt", prev.diversification_tilt ?? "off", next.diversification_tilt ?? "off");
+  push(
+    "Stamp-exempt preference",
+    prev.stamp_exempt_preference ?? "balanced",
+    next.stamp_exempt_preference ?? "balanced",
+  );
   push(
     "Trading style",
     prev.trading_style === "swing" ? "Swing (days–weeks)" : "Position (months)",
@@ -844,6 +853,43 @@ export function RiskControlsCard({
                 })}
               </div>
             </div>
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Stamp-exempt preference</h4>
+              <p className="mb-3 text-xs text-muted-foreground">
+                UK single shares pay 0.5% stamp duty on every buy — 50bps the
+                position must earn back before it makes anything. ETFs, ETCs and
+                non-UK listings are exempt. When two ideas look about as strong,
+                this prefers the exempt one to lower the required break-even.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { key: "off", label: "Off", blurb: "Rank on modelled costs only." },
+                    { key: "balanced", label: "Balanced", blurb: "Break near-ties in favour of stamp-exempt instruments." },
+                    { key: "strong", label: "Strong", blurb: "Weigh stamp duty double when ranking UK single stocks." },
+                  ] as const
+                ).map((opt) => {
+                  const active = (cfg.stamp_exempt_preference ?? "balanced") === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setCfg((c) => ({ ...c, stamp_exempt_preference: opt.key }))}
+                      className={`rounded-md border px-3 py-2 text-left text-xs transition ${
+                        active
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-background hover:bg-muted"
+                      }`}
+                    >
+                      <div className="font-medium">{opt.label}</div>
+                      <div className="text-muted-foreground">{opt.blurb}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
 
             <div>
               <h4 className="mb-2 text-sm font-medium">Per-asset-class limits</h4>
