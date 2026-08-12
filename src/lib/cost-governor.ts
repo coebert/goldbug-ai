@@ -29,6 +29,8 @@
 // Pure and I/O-free: the caller resolves NAV, the trailing cost total and the
 // per-symbol last-buy ages, and passes base-currency notionals.
 
+import { engineSymbolKey } from "./price-symbol";
+
 export type GovernorCandidate = {
   symbol: string;
   side: "buy" | "sell";
@@ -71,7 +73,21 @@ export type GovernorConfig = {
   addCooldownDays: number;
   /** Days since the last BUY per symbol; absent = never bought. */
   lastBuyDaysAgo: Record<string, number | undefined>;
+  /**
+   * Current gross exposure per symbol (base currency), keyed the same way as
+   * candidate symbols. Used for the single-name concentration cap.
+   */
+  positionExposureBase?: Record<string, number | undefined>;
+  /**
+   * Hard cap on any single name as a fraction of NAV. A £10k book that
+   * nibbles one ticker across nine tickets ends up 31% in that name with no
+   * decision ever having approved it. Default 0.15.
+   */
+  maxPositionPctOfNav?: number;
 };
+
+
+
 
 export type GovernorDecision =
   | { kind: "admit"; candidate: GovernorCandidate }
@@ -85,7 +101,15 @@ export type GovernorPlan = {
   minTicketBase: number;
 };
 
+/**
+ * Hard ceiling on any single name, as a fraction of NAV. Evidence: MKS.L was
+ * nibbled to 31% of a £10k book across nine tickets, so the account's fate
+ * hung on one mid-cap retailer that no sizing decision ever sanctioned.
+ */
+export const DEFAULT_MAX_POSITION_PCT_OF_NAV = 0.15;
+
 /** Sensible defaults for a small (< £50k) single-account portfolio. */
+
 export const DEFAULT_GOVERNOR: Omit<
   GovernorConfig,
   "navBase" | "buysAlreadyToday" | "trailingCostBase" | "lastBuyDaysAgo"
@@ -155,8 +179,20 @@ export function planAdmissions(
 
   for (const c of sells) decisions.push({ kind: "admit", candidate: c });
 
+  // Single-name concentration. Tracked as we admit so two tickets in the same
+  // name inside one tick cannot jointly breach the cap.
+  const maxPositionPct = Math.max(0, cfg.maxPositionPctOfNav ?? DEFAULT_MAX_POSITION_PCT_OF_NAV);
+  const positionCap = Math.max(0, cfg.navBase) * maxPositionPct;
+  const exposure = new Map<string, number>();
+  for (const [k, v] of Object.entries(cfg.positionExposureBase ?? {})) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) exposure.set(k.toUpperCase(), n);
+  }
+
   for (const c of buys) {
-    const cooldown = cfg.lastBuyDaysAgo[c.symbol];
+    const symKey = engineSymbolKey(c.symbol);
+    const cooldown = cfg.lastBuyDaysAgo[symKey] ?? cfg.lastBuyDaysAgo[c.symbol];
+
     if (cooldown !== undefined && cooldown < cfg.addCooldownDays) {
       decisions.push({
         kind: "skip",
@@ -167,6 +203,20 @@ export function planAdmissions(
       });
       continue;
     }
+
+    const held = exposure.get(symKey) ?? 0;
+    if (positionCap > 0 && held + c.notionalBase > positionCap) {
+      decisions.push({
+        kind: "skip",
+        candidate: c,
+        reason:
+          `single-name cap: ${c.symbol} would reach ` +
+          `${(((held + c.notionalBase) / Math.max(1, cfg.navBase)) * 100).toFixed(1)}% of NAV, ` +
+          `above the ${(maxPositionPct * 100).toFixed(0)}% limit`,
+      });
+      continue;
+    }
+
 
     if (c.notionalBase < minTicket) {
       decisions.push({
@@ -203,7 +253,9 @@ export function planAdmissions(
 
     budgetLeft -= c.estCostBase;
     buysAdmitted += 1;
+    exposure.set(symKey, held + c.notionalBase);
     decisions.push({ kind: "admit", candidate: c });
+
   }
 
   return {
