@@ -76,17 +76,16 @@ afterEach(() => {
 });
 
 describe("SectionIndex mobile scroll regression", () => {
-  it("never scrolls the page or an ancestor while spying on scroll", () => {
+  it("never scrolls the page or an ancestor while spying on scroll", async () => {
     mountSections();
     positionAt(0);
     render(<SectionIndex items={items} />);
 
     for (const y of [100, 500, 900, 1400, 1900, 2400]) {
       positionAt(y);
-      act(() => {
-        window.dispatchEvent(new Event("scroll"));
-      });
+      await scrollTick();
     }
+
 
     expect(scrollIntoView).not.toHaveBeenCalled();
     expect(windowScrollTo).not.toHaveBeenCalled();
