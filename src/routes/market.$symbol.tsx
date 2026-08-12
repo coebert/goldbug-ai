@@ -843,6 +843,42 @@ function MarketSymbolPage() {
                       />
                     ))}
 
+                    {tradeOverlay.legs.map((leg) => (
+                      <ReferenceLine
+                        key={`price-leg-${leg.key}`}
+                        segment={[
+                          { x: leg.fromDate, y: leg.fromPrice },
+                          { x: leg.toDate, y: leg.toPrice },
+                        ]}
+                        stroke={tradeLegColor(leg)}
+                        strokeWidth={1.4}
+                        strokeDasharray={leg.open ? "2 4" : undefined}
+                        strokeOpacity={0.7}
+                        ifOverflow="extendDomain"
+                      />
+                    ))}
+
+                    {tradeOverlay.markers.map((m) => (
+                      <ReferenceDot
+                        key={`price-trade-${m.key}`}
+                        x={m.date}
+                        y={m.price}
+                        r={6}
+                        fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
+                        stroke={tradeMarkerColor(m)}
+                        strokeWidth={2}
+                        isFront
+                        ifOverflow="extendDomain"
+                        label={{
+                          value: m.glyph,
+                          fill: tradeMarkerColor(m),
+                          fontSize: 10,
+                          fontWeight: 700,
+                          position: m.side === "entry" ? "bottom" : "top",
+                        }}
+                      />
+                    ))}
+
                     {annotations.map((a, i) => (
                       <ReferenceDot
                         key={a.id}
@@ -866,11 +902,19 @@ function MarketSymbolPage() {
                 </ResponsiveContainer>
               </ChartFrame>
 
+              {tradeOverlay.markers.length ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Backtest fills: hollow markers are entries, filled markers are exits (green =
+                  profitable net of costs, red = loss); the connecting line is the holding period.
+                </p>
+              ) : null}
+
               {showRsi ? (
                 <RsiPane
                   points={history.points}
                   divergences={showDiv ? divergences : []}
                   signals={rsiSignals}
+                  tradeMarkers={tradeOverlay.markers}
                 />
               ) : null}
 
@@ -881,6 +925,7 @@ function MarketSymbolPage() {
                     points={history.points}
                     mode={signalMode}
                     rangeLabel={rangeLabel(range)}
+                    onTrades={setRsiTrades}
                   />
                 </>
               ) : null}
@@ -891,6 +936,7 @@ function MarketSymbolPage() {
                   <DivergenceBacktestPanel
                     points={history.points}
                     rangeLabel={rangeLabel(range)}
+                    onTrades={setDivTrades}
                   />
                 </>
               ) : null}
