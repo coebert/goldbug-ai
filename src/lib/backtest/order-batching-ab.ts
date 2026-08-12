@@ -282,7 +282,9 @@ async function runArm(
         price: o.price,
         assetClass: o.assetClass,
       });
+      const id = `${arm}-${ctx.date}-${decisionSeq++}`;
       trades.push({
+        id,
         date: ctx.date,
         symbol: o.symbol,
         side,
@@ -294,6 +296,7 @@ async function runArm(
         waitedHours: r.waitedHours,
       });
       decisions.push({
+        id,
         symbol: o.symbol,
         side: side === "sell" ? "SELL" : "BUY",
         quantity: o.quantity,
@@ -309,12 +312,11 @@ async function runArm(
 
   // Trades the simulator refused (no cash, no position) never happened: drop
   // them from the ledger so cost is not credited to a fill that didn't occur.
-  const rejectedKeys = new Set(
-    result.rejections.map((r) => `${r.date}|${engineSymbolKey(r.symbol)}|${r.side.toLowerCase()}`),
-  );
-  const filled = trades.filter(
-    (t) => !rejectedKeys.has(`${t.date}|${engineSymbolKey(t.symbol)}|${t.side}`),
-  );
+  const rejectedIds = new Set(result.rejections.map((r) => r.decisionId));
+  const filled = trades
+    .filter((t) => !rejectedIds.has(t.id))
+    .map(({ id: _id, ...rest }) => rest);
+
 
   const totalCostBase = filled.reduce((a, t) => a + t.cost, 0);
   const turnoverBase = filled.reduce((a, t) => a + t.notional, 0);
