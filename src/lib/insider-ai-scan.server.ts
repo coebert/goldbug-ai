@@ -18,6 +18,7 @@ import {
   applyAiVerdict,
   buildInsiderScanPrompt,
   parseInsiderScanReply,
+  type InsiderAiVerdict,
   type InsiderScanCandidate,
 } from "./insider-ai-scan";
 import type { InsiderTarget } from "./insider-dealings";
@@ -129,7 +130,7 @@ export async function reviewUnscannedDealings(
       value: (r as Record<string, unknown>)["value"] == null ? null : Number((r as Record<string, unknown>)["value"]),
     }));
 
-    let verdicts = new Map<number, ReturnType<typeof parseInsiderScanReply> extends Map<number, infer V> ? V : never>();
+    let verdicts = new Map<number, InsiderAiVerdict>();
     try {
       const { text } = await generateText({ model, prompt: buildInsiderScanPrompt(candidates) });
       verdicts = parseInsiderScanReply(text);
