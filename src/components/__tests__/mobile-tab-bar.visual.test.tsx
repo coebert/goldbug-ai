@@ -148,13 +148,20 @@ describe("mobile tab bar — visual regression", () => {
         );
       });
 
-      it("renders all four tabs plus the raised primary action", () => {
-        // Home / Trades / Learn / More + New portfolio.
-        expect(html).toMatch(/>Home<\/span>/);
-        expect(html).toMatch(/>Trades<\/span>/);
-        expect(html).toMatch(/>Learn<\/span>/);
+      it("renders the five primary tabs plus a More button", () => {
+        // Home / Markets / Research / Trades / Broker status + More.
+        for (const label of ["Home", "Markets", "Research", "Trades", "Broker status"]) {
+          expect(html).toContain(`>${label}</span>`);
+        }
         expect(html).toMatch(/>More<\/span>/);
-        expect(html).toMatch(/aria-label="New portfolio"/);
+        // The raised "+" is gone: creating a portfolio is a rare action
+        // and no longer earns a prime tap target.
+        expect(html).not.toMatch(/aria-label="New portfolio"/);
+      });
+
+      it("opens the destination sheet from More instead of navigating", () => {
+        expect(html).toMatch(/aria-label="More destinations"[^>]*aria-haspopup="dialog"/);
+        expect(html).not.toMatch(/href="\/compare"[^>]*aria-label="More destinations"/);
       });
     },
   );
