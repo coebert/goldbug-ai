@@ -215,10 +215,10 @@ export function OverviewLookDeeperSection({
           defaultOpen={advancedLevel}
         >
       <div className="mb-6">
-        <TailHedgeCard portfolioId={id} currency={p.currency} />
+        <TailHedgeCard portfolioId={id} currency={String(p?.currency ?? "GBP")} />
       </div>
       <div className="mb-6">
-        <TailHedgeReportCard portfolioId={id} currency={p.currency} />
+        <TailHedgeReportCard portfolioId={id} currency={String(p?.currency ?? "GBP")} />
       </div>
         </AdvancedSection>
         <AdvancedSection
@@ -306,7 +306,7 @@ export function OverviewLookDeeperSection({
         </Suspense>
       )}
       <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-        <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
+        <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level ?? undefined} />
       </Suspense>
         </AdvancedSection>
       </div>
