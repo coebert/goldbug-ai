@@ -69,6 +69,7 @@ export function RsiPane({
   divergences = [],
   signals = [],
   tradeMarkers = [],
+  focusTradeId = null,
   className,
 }: {
   points: HistoryPoint[];
@@ -78,6 +79,8 @@ export function RsiPane({
   signals?: RsiSignal[];
   /** Executed backtest fills to pin on the RSI line. */
   tradeMarkers?: TradeMarker[];
+  /** Trade selected in a backtest list — its fills are emphasised here too. */
+  focusTradeId?: string | null;
   className?: string;
 }) {
 
@@ -169,10 +172,11 @@ export function RsiPane({
                   key={`rsi-trade-${m.key}`}
                   x={m.date}
                   y={m.rsi as number}
-                  r={5}
+                  r={focusTradeId === m.tradeId ? 8 : 5}
                   fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
                   stroke={tradeMarkerColor(m)}
-                  strokeWidth={2}
+                  strokeWidth={focusTradeId === m.tradeId ? 3 : 2}
+                  opacity={focusTradeId == null || focusTradeId === m.tradeId ? 1 : 0.18}
                   isFront
                   ifOverflow="extendDomain"
                 />

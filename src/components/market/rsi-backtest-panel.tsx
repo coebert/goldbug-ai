@@ -12,6 +12,7 @@ import {
   backtestRsiStrategy,
   type RsiTrade,
 } from "@/lib/rsi-backtest";
+import { rsiTradeId } from "@/lib/backtest-trade-markers";
 import { RSI_SIGNAL_MODE_LABEL, type RsiSignalMode } from "@/lib/rsi-signals";
 import type { HistoryPoint } from "@/lib/market-symbol-history";
 import { formatUkDate } from "@/lib/uk-time";
@@ -57,12 +58,18 @@ export function RsiBacktestPanel({
   mode,
   rangeLabel,
   onTrades,
+  selectedTradeId = null,
+  onSelectTrade,
 }: {
   points: HistoryPoint[];
   mode: RsiSignalMode;
   rangeLabel?: string;
   /** Reports the executed trades so the charts above can mark them. */
   onTrades?: (trades: RsiTrade[]) => void;
+  /** Currently highlighted trade, if any. */
+  selectedTradeId?: string | null;
+  /** Click-to-highlight: jump the charts to this trade's entry and exit. */
+  onSelectTrade?: (trade: RsiTrade | null) => void;
 }) {
   const [frictionBps, setFrictionBps] = useState(DEFAULT_RSI_BACKTEST_FRICTION_BPS);
   const result = useMemo(
@@ -131,13 +138,29 @@ export function RsiBacktestPanel({
 
       {result.trades.length ? (
         <div className="space-y-1.5">
-          <p className="text-[11px] font-medium text-muted-foreground">Recent trades</p>
+          <p className="text-[11px] font-medium text-muted-foreground">
+            Recent trades · click one to jump the charts to it
+          </p>
           <ul className="space-y-1">
             {result.trades
               .slice(-5)
               .reverse()
-              .map((t) => (
-                <li key={`${t.entryDate}-${t.exitDate}`} className="flex flex-wrap items-center gap-2 text-xs">
+              .map((t) => {
+                const id = rsiTradeId(t);
+                const selected = id === selectedTradeId;
+                return (
+                <li key={`${t.entryDate}-${t.exitDate}`}>
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onSelectTrade?.(selected ? null : t)}
+                  title="Jump the charts to this trade's entry and exit"
+                  className={`flex w-full flex-wrap items-center gap-2 rounded-md border px-2 py-1 text-left text-xs transition-colors ${
+                    selected
+                      ? "border-primary/60 bg-primary/10"
+                      : "border-transparent hover:border-border hover:bg-muted/50"
+                  }`}
+                >
                   <Badge
                     variant="outline"
                     className={
@@ -152,8 +175,10 @@ export function RsiBacktestPanel({
                     {formatUkDate(t.entryDate)} → {formatUkDate(t.exitDate)} · {t.bars} bars
                     {t.open ? " · still open at window end" : ""}
                   </span>
+                </button>
                 </li>
-              ))}
+                );
+              })}
           </ul>
         </div>
       ) : (
