@@ -64,6 +64,35 @@ export type SetupMatch = {
   /** Position cap implied by the realised volatility. */
   maxWeightPct: number;
   thesis: string;
+  /** Compact chart + timeline context for the match. */
+  timeline: SetupTimeline;
+};
+
+/** One session in the compact match chart. */
+export type SetupSeriesPoint = {
+  date: string;
+  close: number;
+  sma50: number | null;
+  sma200: number | null;
+  volume: number;
+  /** Volume relative to the trailing 20-session average, when computable. */
+  relVolume: number | null;
+};
+
+export type SetupTimeline = {
+  /** Session on which the close crossed back above the 50d average. */
+  reclaimDate: string;
+  /** First session of the 5-session surge window. */
+  surgeStartDate: string;
+  /** Latest session in the window (the scan date). */
+  surgeEndDate: string;
+  latestDate: string;
+  todayVolume: number;
+  avgVolume20d: number;
+  /** Highest single-session relative volume inside the surge window. */
+  peakRelVolume: number;
+  /** Trailing sessions for the sparkline, oldest first. */
+  series: SetupSeriesPoint[];
 };
 
 export type SetupVerdict =
