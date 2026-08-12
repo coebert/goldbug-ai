@@ -34,10 +34,16 @@ export const backtestReclaimSetups = createServerFn({ method: "POST" })
       },
     });
     const { trades, ...rest } = run;
+    // Keep the most recent signals, both policies, so the UI can pair each
+    // match with its exact simulated outcome under either entry rule.
+    const signalKeys = [...new Set(trades.map((t) => `${t.symbol}|${t.signalDate}`))]
+      .sort((a, b) => b.split("|")[1].localeCompare(a.split("|")[1]))
+      .slice(0, 25);
+    const keep = new Set(signalKeys);
     return {
       ...rest,
-      sampleTrades: [...trades]
-        .sort((a, b) => b.signalDate.localeCompare(a.signalDate))
-        .slice(0, 25),
+      sampleTrades: trades
+        .filter((t) => keep.has(`${t.symbol}|${t.signalDate}`))
+        .sort((a, b) => b.signalDate.localeCompare(a.signalDate)),
     };
   });
