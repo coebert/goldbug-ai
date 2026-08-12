@@ -953,11 +953,6 @@ export function ukWeekStart(iso: string): string {
   return local.toISOString().slice(0, 10);
 }
 
-function addDays(dayKey: string, n: number): string {
-  const d = new Date(`${dayKey}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
 
 function emptyWeek(weekStart: string): FrictionWeekRow {
   return {
