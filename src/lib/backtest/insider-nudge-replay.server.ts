@@ -10,6 +10,11 @@ import {
   type ReplayEvent,
   type ReplayParams,
 } from "./insider-nudge-replay";
+import {
+  runNudgeWalkForward,
+  type WalkForwardOptions,
+  type WalkForwardResult,
+} from "./insider-nudge-oos";
 import type { InsiderFlavour } from "@/lib/insider-dealings";
 
 export type NudgeReplayRequest = {
@@ -23,9 +28,11 @@ export type NudgeReplayRequest = {
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-export async function runInsiderNudgeReplay(
-  req: NudgeReplayRequest = {},
-): Promise<NudgeReplayResult> {
+/** Pull the tape + filings once so single-pass and walk-forward share a loader. */
+export async function loadReplayData(req: NudgeReplayRequest = {}): Promise<{
+  prices: Map<string, Candle[]>;
+  events: ReplayEvent[];
+}> {
   const symbols = (req.symbols?.length ? req.symbols : [...MKS_PEERS]).map((s) =>
     s.trim().toUpperCase(),
   );
@@ -73,5 +80,28 @@ export async function runInsiderNudgeReplay(
     await Promise.all(symbols.slice(i, i + 4).map(loadTape));
   }
 
-  return runNudgeReplay({ prices, events: txs, params: req.params ?? {} });
+  return { prices, events: txs };
+}
+
+export async function runInsiderNudgeReplay(
+  req: NudgeReplayRequest = {},
+): Promise<NudgeReplayResult> {
+  const { prices, events } = await loadReplayData(req);
+  return runNudgeReplay({ prices, events, params: req.params ?? {} });
+}
+
+/**
+ * Rolling walk-forward: tune the nudge strength on the first N months of each
+ * fold, then score the next M months untouched.
+ */
+export async function runInsiderNudgeWalkForward(
+  req: NudgeReplayRequest & { options?: Partial<WalkForwardOptions> } = {},
+): Promise<WalkForwardResult> {
+  const { prices, events } = await loadReplayData(req);
+  return runNudgeWalkForward({
+    prices,
+    events,
+    params: req.params ?? {},
+    options: req.options ?? {},
+  });
 }

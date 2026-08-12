@@ -17,7 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import type { NudgeReplayResult } from "@/lib/backtest/insider-nudge-replay";
-import { runNudgeReplayFn } from "@/lib/backtest/insider-nudge-replay.functions";
+import type { WalkForwardResult } from "@/lib/backtest/insider-nudge-oos";
+import {
+  runNudgeReplayFn,
+  runNudgeWalkForwardFn,
+} from "@/lib/backtest/insider-nudge-replay.functions";
 
 const pp = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}pp`;
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
@@ -54,6 +58,25 @@ export function InsiderNudgeReplayCard({
   const [nudgeScale, setNudgeScale] = useState(1);
   const [riskLevel, setRiskLevel] = useState(3);
   const [result, setResult] = useState<NudgeReplayResult | null>(null);
+  const [mode, setMode] = useState<"single" | "walkforward">("single");
+  const [trainMonths, setTrainMonths] = useState(9);
+  const [testMonths, setTestMonths] = useState(3);
+  const [objective, setObjective] = useState<"return" | "sharpe" | "calmar">("return");
+  const [wf, setWf] = useState<WalkForwardResult | null>(null);
+  const runWf = useServerFn(runNudgeWalkForwardFn);
+  const wfm = useMutation({
+    mutationFn: () =>
+      runWf({
+        data: {
+          symbols,
+          lookbackDays,
+          minValue,
+          params: { riskLevel },
+          options: { trainMonths, testMonths, objective, scaleGrid: [0, 0.5, 1, 2] },
+        },
+      }),
+    onSuccess: (r) => setWf(r as WalkForwardResult),
+  });
 
   const m = useMutation({
     mutationFn: () =>
@@ -83,6 +106,21 @@ export function InsiderNudgeReplayCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="inline-flex rounded-lg border border-border/60 p-0.5 text-xs">
+          {(["single", "walkforward"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setMode(k)}
+              className={`rounded-md px-2.5 py-1 ${
+                mode === k ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {k === "single" ? "Single pass" : "Rolling out-of-sample"}
+            </button>
+          ))}
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-4">
           <div className="space-y-1">
             <Label htmlFor="nr-lookback" className="text-xs">
@@ -111,7 +149,7 @@ export function InsiderNudgeReplayCard({
               onChange={(e) => setMinValue(Number(e.target.value) || 0)}
             />
           </div>
-          <div className="space-y-1">
+          <div className={`space-y-1 ${mode === "walkforward" ? "hidden" : ""}`}>
             <Label className="text-xs">Nudge strength ×{nudgeScale.toFixed(1)}</Label>
             <Slider
               value={[nudgeScale]}
@@ -141,17 +179,77 @@ export function InsiderNudgeReplayCard({
           </div>
         </div>
 
-        <Button onClick={() => m.mutate()} disabled={m.isPending} size="sm">
-          {m.isPending ? "Replaying…" : "Run replay"}
-        </Button>
+        {mode === "walkforward" ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label htmlFor="wf-train" className="text-xs">
+                Train window (months)
+              </Label>
+              <Input
+                id="wf-train"
+                type="number"
+                min={3}
+                max={18}
+                value={trainMonths}
+                onChange={(e) => setTrainMonths(Number(e.target.value) || 9)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wf-test" className="text-xs">
+                Evaluate window (months)
+              </Label>
+              <Input
+                id="wf-test"
+                type="number"
+                min={1}
+                max={12}
+                value={testMonths}
+                onChange={(e) => setTestMonths(Number(e.target.value) || 3)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wf-obj" className="text-xs">
+                Training objective
+              </Label>
+              <select
+                id="wf-obj"
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={objective}
+                onChange={(e) => setObjective(e.target.value as typeof objective)}
+              >
+                <option value="return">Return</option>
+                <option value="sharpe">Sharpe</option>
+                <option value="calmar">Return / drawdown</option>
+              </select>
+            </div>
+          </div>
+        ) : null}
 
-        {m.isError ? (
+        {mode === "single" ? (
+          <Button onClick={() => m.mutate()} disabled={m.isPending} size="sm">
+            {m.isPending ? "Replaying…" : "Run replay"}
+          </Button>
+        ) : (
+          <Button onClick={() => wfm.mutate()} disabled={wfm.isPending} size="sm">
+            {wfm.isPending ? "Walking forward…" : "Run rolling test"}
+          </Button>
+        )}
+
+        {mode === "walkforward" && wfm.isError ? (
+          <p className="text-xs text-destructive">
+            {(wfm.error as Error)?.message ?? "Walk-forward failed."}
+          </p>
+        ) : null}
+
+        {mode === "walkforward" && wf ? <WalkForwardBlock r={wf} /> : null}
+
+        {mode === "single" && m.isError ? (
           <p className="text-xs text-destructive">
             {(m.error as Error)?.message ?? "Replay failed."}
           </p>
         ) : null}
 
-        {result ? (
+        {mode === "single" && result ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{result.summary}</p>
 
@@ -276,5 +374,132 @@ export function InsiderNudgeReplayCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+/** Out-of-sample block: stitched curves plus what each fold trained and picked. */
+function WalkForwardBlock({ r }: { r: WalkForwardResult }) {
+  const chart = r.baseline.curve.map((c, i) => ({
+    date: c.date,
+    baseline: c.equity,
+    nudged: r.nudged.curve[i]?.equity ?? null,
+  }));
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {r.verdict === "helps" ? (
+          <Badge className="bg-primary text-primary-foreground">Holds up out of sample</Badge>
+        ) : r.verdict === "hurts" ? (
+          <Badge variant="destructive">Hurts out of sample</Badge>
+        ) : (
+          <Badge variant="outline">
+            {r.verdict === "insufficient" ? "Not enough history" : "No out-of-sample edge"}
+          </Badge>
+        )}
+        <span className="text-xs text-muted-foreground">
+          Fold win rate {(r.foldWinRate * 100).toFixed(0)}%
+        </span>
+      </div>
+
+      <p className="text-sm text-muted-foreground">{r.summary}</p>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat
+          label="OOS return delta"
+          value={pp(r.delta.returnPct)}
+          tone={r.delta.returnPct < 0 ? "text-destructive" : "text-primary"}
+        />
+        <Stat
+          label="Drawdown delta"
+          value={pp(r.delta.maxDrawdownPct)}
+          tone={r.delta.maxDrawdownPct < 0 ? "text-primary" : "text-destructive"}
+        />
+        <Stat label="Sharpe delta" value={r.delta.sharpe.toFixed(2)} />
+        <Stat
+          label="95% VaR delta"
+          value={pp(r.delta.var95Pct)}
+          tone={r.delta.var95Pct <= 0 ? "text-primary" : "text-destructive"}
+        />
+      </div>
+
+      {chart.length > 0 ? (
+        <div className="h-44 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chart} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={40} />
+              <YAxis tick={{ fontSize: 10 }} width={52} domain={["auto", "auto"]} />
+              <Tooltip
+                contentStyle={{ fontSize: 12 }}
+                formatter={(v: number | string) => Number(v).toFixed(0)}
+              />
+              <Line
+                type="monotone"
+                dataKey="baseline"
+                dot={false}
+                strokeWidth={1.5}
+                stroke="hsl(var(--muted-foreground))"
+              />
+              <Line
+                type="monotone"
+                dataKey="nudged"
+                dot={false}
+                strokeWidth={1.8}
+                stroke="hsl(var(--primary))"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : null}
+
+      {r.folds.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs tabular-nums">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="py-1 pr-3 text-left font-normal">Fold</th>
+                <th className="py-1 pr-3 text-left font-normal">Train</th>
+                <th className="py-1 pr-3 text-left font-normal">Evaluate</th>
+                <th className="py-1 pr-3 text-right font-normal">Picked ×</th>
+                <th className="py-1 pr-3 text-right font-normal">Train edge</th>
+                <th className="py-1 pr-3 text-right font-normal">OOS base</th>
+                <th className="py-1 pr-3 text-right font-normal">OOS nudge</th>
+                <th className="py-1 text-right font-normal">OOS delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.folds.map((f) => (
+                <tr key={f.index} className="border-t border-border/40">
+                  <td className="py-1 pr-3">{f.index}</td>
+                  <td className="py-1 pr-3">
+                    {f.trainFrom} → {f.trainTo}
+                  </td>
+                  <td className="py-1 pr-3">
+                    {f.testFrom} → {f.testTo}
+                  </td>
+                  <td className="py-1 pr-3 text-right">{f.chosenScale.toFixed(1)}</td>
+                  <td className="py-1 pr-3 text-right">{pp(f.trainDeltaPct)}</td>
+                  <td className="py-1 pr-3 text-right">{pct(f.testBaselinePct)}</td>
+                  <td className="py-1 pr-3 text-right">{pct(f.testNudgedPct)}</td>
+                  <td
+                    className={`py-1 text-right ${
+                      f.testDeltaPct < 0 ? "text-destructive" : "text-primary"
+                    }`}
+                  >
+                    {pp(f.testDeltaPct)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      <p className="text-[11px] text-muted-foreground">
+        Each fold tunes the nudge strength on {r.options.trainMonths} months of history and is then
+        scored blind on the following {r.options.testMonths} months; only evaluation windows are
+        compounded into the curves above.
+      </p>
+    </div>
   );
 }
