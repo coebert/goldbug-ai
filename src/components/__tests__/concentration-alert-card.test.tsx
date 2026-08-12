@@ -1,5 +1,7 @@
+// Renders the concentration prompt to static markup (no jsdom needed) and
+// asserts the breach, suggested trim and risk-impact block are present.
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { ConcentrationAlertCard } from "../concentration-alert-card";
 
 // Real-money book as of 12 Aug 2026: MKS is ~30% of a ~£9.96k portfolio.
@@ -15,34 +17,31 @@ const SERIES = {
   "VUSA:xlon": { currentPrice: 108.6512 },
 };
 
+function html(totalValue: number) {
+  return renderToStaticMarkup(
+    <ConcentrationAlertCard
+      holdings={HOLDINGS}
+      series={SERIES}
+      totalValue={totalValue}
+      currency="GBP"
+      mode="live_prod"
+    />,
+  );
+}
+
 describe("ConcentrationAlertCard", () => {
   it("prompts a trim when a holding breaches the cap", () => {
-    render(
-      <ConcentrationAlertCard
-        holdings={HOLDINGS}
-        series={SERIES}
-        totalValue={9962.32}
-        currency="GBP"
-        mode="live_prod"
-      />,
-    );
-    const alert = screen.getByTestId("concentration-alert");
-    expect(alert.textContent).toContain("MKS:xlon");
-    expect(alert.textContent).toContain("over your 15% single-holding cap");
-    expect(screen.getByRole("button", { name: /Trim \d+%/ })).toBeTruthy();
-    expect(alert.textContent).toContain("Expected impact on risk");
+    const out = html(9962.32);
+    expect(out).toContain("MKS:xlon");
+    expect(out).toContain("over your 15% single-holding cap");
+    expect(out).toMatch(/Trim \d+%/);
+    expect(out).toContain("Expected impact on risk");
+    // HSBA (~3.7%) and VUSA (~22.9%)… VUSA also breaches, MKS is listed first.
+    expect(out.indexOf("MKS:xlon")).toBeLessThan(out.indexOf("VUSA:xlon"));
+    expect(out).not.toContain("HSBA:xlon");
   });
 
   it("renders nothing when every holding is inside the cap", () => {
-    const { container } = render(
-      <ConcentrationAlertCard
-        holdings={HOLDINGS}
-        series={SERIES}
-        totalValue={100_000}
-        currency="GBP"
-        mode="live_prod"
-      />,
-    );
-    expect(container.firstChild).toBeNull();
+    expect(html(100_000)).toBe("");
   });
 });
