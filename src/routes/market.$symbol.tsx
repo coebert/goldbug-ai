@@ -714,9 +714,10 @@ function MarketSymbolPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6">
+      <BackRow to="/markets" label="Markets" title={symbol} />
       <Link
         to="/"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="hidden items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:inline-flex"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to dashboard
       </Link>
