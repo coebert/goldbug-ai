@@ -36,7 +36,8 @@ async function closeBody(res: Response): Promise<void> {
 
 async function fetchYahooDaily(symbol: string, days: number): Promise<Candle[]> {
   // range picks: buffer to ensure we get `days` trading days back
-  const range = days <= 30 ? "3mo" : days <= 180 ? "1y" : days <= 365 ? "2y" : "5y";
+  const range =
+    days <= 30 ? "3mo" : days <= 180 ? "1y" : days <= 365 ? "2y" : days <= 1200 ? "5y" : "10y";
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     symbol,
   )}?interval=1d&range=${range}`;
