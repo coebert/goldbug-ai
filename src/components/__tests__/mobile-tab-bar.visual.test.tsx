@@ -150,7 +150,7 @@ describe("mobile tab bar — visual regression", () => {
 
       it("renders the five primary tabs plus a More button", () => {
         // Home / Markets / Research / Trades / Broker status + More.
-        for (const label of ["Home", "Markets", "Research", "Trades", "Broker status"]) {
+        for (const label of ["Home", "Markets", "Research", "Trades", "Broker"]) {
           expect(html).toContain(`>${label}</span>`);
         }
         expect(html).toMatch(/>More<\/span>/);
