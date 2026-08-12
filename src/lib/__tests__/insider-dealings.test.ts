@@ -5,6 +5,8 @@ import {
   detectInsiderDealings,
   extractPerson,
   insiderFeedUrl,
+  insiderFeedQueries,
+  companyAliases,
   insiderSignalBySymbol,
   parseDealValue,
   parseShareCount,
@@ -134,5 +136,43 @@ describe("detectInsiderDealings", () => {
     expect(signal.events).toBe(3);
     expect(signal.nudge).toBeGreaterThanOrEqual(INSIDER_NUDGE_FLOOR);
     expect(signal.nudge).toBeLessThan(0);
+  });
+});
+
+describe("short-form company matching", () => {
+  it("recognises the ampersand initialism used in headlines", () => {
+    const aliases = companyAliases("Marks & Spencer (LON)");
+    expect(aliases).toContain("m&s");
+  });
+
+  it("detects a discretionary sale reported only under the short form", () => {
+    const events = detectInsiderDealings(
+      [
+        {
+          headline: "Directors' Deals: M&S directors cash out as shares climb",
+          summary: null,
+          source: "Financial Times",
+          url: null,
+          date: "2026-07-31",
+        },
+      ],
+      [{ symbol: "MKS.L", company: "Marks & Spencer (LON)" }],
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].direction).toBe("sell");
+    expect(events[0].role).toBe("Director");
+    expect(events[0].sentiment_nudge).toBeLessThan(0);
+  });
+});
+
+describe("insiderFeedQueries", () => {
+  it("emits several short OR-free queries (Google News returns nothing for boolean clauses)", () => {
+    const queries = insiderFeedQueries("Marks & Spencer (LON)", 7);
+    expect(queries.length).toBeGreaterThan(1);
+    for (const q of queries) {
+      expect(q).toContain('"Marks & Spencer"');
+      expect(q).toContain("when:7d");
+      expect(q).not.toContain(" OR ");
+    }
   });
 });

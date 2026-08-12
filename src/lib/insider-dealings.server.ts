@@ -70,6 +70,7 @@ function decode(s: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&");
   return unescaped
+    .replace(/&nbsp;/g, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
