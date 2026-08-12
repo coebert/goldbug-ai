@@ -9,6 +9,7 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
+  ReferenceLine,
   Tooltip,
   XAxis,
   YAxis,
@@ -86,8 +87,15 @@ export function CompareOverlay({
   const [showSma, setShowSma] = useState(false);
   // "rebased" = every series indexed to 100 at the window start (shared axis).
   // "price" = each symbol drawn on its own true price scale (per-symbol axis).
-  const [scaleMode, setScaleMode] = useState<"rebased" | "price">("rebased");
+  // "return" = each ticker's % return from the window start (0-based).
+  const [scaleMode, setScaleMode] = useState<"return" | "rebased" | "price">("rebased");
   const priceScale = scaleMode === "price";
+  const returnScale = scaleMode === "return";
+  // Relative-performance readings: value - 100 for the rebased series.
+  const relKey = (key: string) => (row: Record<string, unknown>) => {
+    const v = row[key];
+    return typeof v === "number" && Number.isFinite(v) ? Number((v - 100).toFixed(3)) : null;
+  };
   const [ticker, setTicker] = useState("");
   const [tickerError, setTickerError] = useState<string | null>(null);
   const [rollingWindow, setRollingWindow] = useState<RollingWindow>(() => {
@@ -196,7 +204,7 @@ export function CompareOverlay({
         )}
         {compare.length > 0 && (
           <div className="inline-flex overflow-hidden rounded-md border border-border/60" role="group" aria-label="Chart scale">
-            {(["rebased", "price"] as const).map((m) => (
+            {(["return", "rebased", "price"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -208,7 +216,7 @@ export function CompareOverlay({
                     : "bg-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {m === "rebased" ? "Rebased 100" : "Price scale"}
+                {m === "return" ? "Return %" : m === "rebased" ? "Rebased 100" : "Price scale"}
               </button>
             ))}
           </div>
@@ -218,7 +226,9 @@ export function CompareOverlay({
         <p className="text-[11px] text-muted-foreground">
           {priceScale
             ? "Each symbol is drawn on its own true price scale, so lines show actual levels rather than relative performance."
-            : "All symbols share a 100-based index at the window start, so lines compare performance directly."}
+            : returnScale
+              ? "Every ticker (and its SMA overlays) is plotted as % return from the start of the window, so 0% is the common baseline."
+              : "All symbols share a 100-based index at the window start, so lines compare performance directly."}
         </p>
       )}
       {tickerError && <p className="text-[11px] text-destructive">{tickerError}</p>}
@@ -278,9 +288,10 @@ export function CompareOverlay({
                     tickLine={TICK_LINE}
                     width={54}
                     domain={["auto", "auto"]}
-                    tickFormatter={(v: number) => `${(v - 100).toFixed(0)}%`}
+                    tickFormatter={(v: number) => `${(returnScale ? v : v - 100).toFixed(0)}%`}
                   />
                 )}
+                {returnScale && <ReferenceLine y={0} {...AXIS_LINE} strokeDasharray="3 3" />}
                 <Tooltip
                   contentStyle={TOOLTIP_CONTENT_STYLE}
                   labelStyle={TOOLTIP_LABEL_STYLE}
@@ -289,7 +300,7 @@ export function CompareOverlay({
                       ? Math.abs(v) >= 1000
                         ? v.toFixed(0)
                         : v.toFixed(2)
-                      : pct(v - 100),
+                      : pct(returnScale ? v : v - 100),
                     name,
                   ]}
                 />
@@ -298,7 +309,13 @@ export function CompareOverlay({
                   <Line
                     key={s.symbol}
                     type="monotone"
-                    dataKey={priceScale ? comparePriceKey(s.symbol) : s.symbol}
+                    dataKey={
+                      priceScale
+                        ? comparePriceKey(s.symbol)
+                        : returnScale
+                          ? relKey(s.symbol)
+                          : s.symbol
+                    }
                     {...(priceScale ? { yAxisId: s.symbol } : {})}
                     name={s.label}
                     stroke={s.color}
@@ -313,7 +330,13 @@ export function CompareOverlay({
                     <Line
                       key={s.key}
                       type="monotone"
-                      dataKey={priceScale ? compareSmaPriceKey(s.symbol, s.period) : s.key}
+                      dataKey={
+                        priceScale
+                          ? compareSmaPriceKey(s.symbol, s.period)
+                          : returnScale
+                            ? relKey(s.key)
+                            : s.key
+                      }
                       {...(priceScale ? { yAxisId: s.symbol } : {})}
                       name={s.label}
                       stroke={s.color}
