@@ -592,6 +592,20 @@ function MarketSymbolPage() {
     [history, showSignals, signalMode],
   );
 
+  // Executed backtest fills, reported up from the panels so the charts can
+  // mark the exact bars each engine traded.
+  const [rsiTrades, setRsiTrades] = useState<RsiTrade[]>([]);
+  const [divTrades, setDivTrades] = useState<DivergenceTrade[]>([]);
+  const [showFills, setShowFills] = useState(true);
+  const tradeOverlay = useMemo(() => {
+    if (!history || !showFills) return EMPTY_TRADE_OVERLAY;
+    return mergeTradeOverlays(
+      showSignals ? rsiTradeOverlay(rsiTrades, history.points) : EMPTY_TRADE_OVERLAY,
+      showDiv ? divergenceTradeOverlay(divTrades, history.points) : EMPTY_TRADE_OVERLAY,
+    );
+  }, [history, showFills, showSignals, showDiv, rsiTrades, divTrades]);
+
+
   const compareLoading = compareQueries.some((q) => q.isLoading);
   const compareData = compareQueries
     .map((q) => q.data)
