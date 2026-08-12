@@ -1,5 +1,6 @@
 import { ChartFrame } from "@/components/chart-frame";
 import { SectionIndex } from "@/components/nav/section-index";
+import { OverviewLookDeeperSection } from "@/components/portfolio-detail/sections/overview-look-deeper";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -1184,241 +1185,20 @@ function PortfolioPage() {
                   </CardContent>
                 </Card>
 
-                <div id="portfolio-look-deeper" className="mb-6 scroll-mt-32 space-y-3">
-                  <div>
-                    <h3 className="font-display text-base font-semibold tracking-tight">Look deeper</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Optional detail. Nothing here needs your attention day to day.
-                    </p>
-                  </div>
-                  <AdvancedSection
-                    title="How this portfolio is performing"
-                    summary="Return, risk and how it compares with a simple index fund."
-                    defaultOpen={advancedLevel}
-                  >
-                {p && (
-                  <div className="mb-4">
-                    <PerformanceDashboardCard
-                      startingCash={baselineStartingCash}
-                      currency={String(p.currency ?? "GBP")}
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
-                      deposits={depositEvents}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <VanguardBenchmarkCard
-                      startingCash={baselineStartingCash}
-                      currency={String(p.currency ?? "GBP")}
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      deposits={depositEvents}
-                      riskLevel={p.risk_level}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <RelativeStrengthCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                      enabled={ready}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <FrictionKpiCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                      enabled={ready}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <div id="coverage-trend" className="scroll-mt-24">
-                      <CoverageTrendCard />
-                    </div>
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <BatchingBacktestCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <CostScenarioBacktestCard
-                      portfolioId={id}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="What changed your value"
-                    summary="Day by day, separating trading gains from money you paid in."
-                    defaultOpen={advancedLevel}
-                  >
-                {p && (
-                  <div className="mb-4">
-                    <EquityChangeBreakdownCard
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      deposits={depositEvents}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <DailyEquityChangesCard
-                      equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
-                      deposits={depositEvents}
-                      currency={String(p.currency ?? "GBP")}
-                    />
-                  </div>
-                )}
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="Cash, currencies and spending power"
-                    summary="What is left to spend, in which currency, and how that has moved."
-                    defaultOpen={advancedLevel}
-                  >
-                {p && (
-                  <div className="mb-4">
-                    <Suspense
-                      fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
-                    >
-                      <WalletAffordabilityCard portfolioId={id} active={tab === "overview"} />
-                    </Suspense>
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <Suspense
-                      fallback={<div className="h-48 rounded-xl border bg-card" aria-hidden />}
-                    >
-                      <MultiCurrencyExposureCard portfolioId={id} active={tab === "overview"} />
-                    </Suspense>
-                  </div>
-                )}
-                {p && (
-                  <div className="mb-4">
-                    <Suspense
-                      fallback={<div className="h-64 rounded-xl border bg-card" aria-hidden />}
-                    >
-                      <WalletHistoryCard portfolioId={id} active={tab === "overview"} />
-                    </Suspense>
-                  </div>
-                )}
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="Crash protection"
-                    summary="The hedge that cushions the portfolio when markets fall sharply."
-                    defaultOpen={advancedLevel}
-                  >
-                <div className="mb-6">
-                  <TailHedgeCard portfolioId={id} currency={p.currency} />
-                </div>
-                <div className="mb-6">
-                  <TailHedgeReportCard portfolioId={id} currency={p.currency} />
-                </div>
-                  </AdvancedSection>
-                  <AdvancedSection
-                    title="Practice runs on past data"
-                    summary="Backtests — how this strategy would have done in the past."
-                    defaultOpen={advancedLevel}
-                  >
-                {lastBtMetrics && (
-                  <Card className="mb-4">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Backtest metrics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <Metric
-                          label="Total return"
-                          value={`${lastBtMetrics.totalReturnPct.toFixed(2)}%`}
-                          tone={lastBtMetrics.totalReturnPct >= 0 ? "up" : "down"}
-                        />
-                        <Metric
-                          label="Max drawdown"
-                          value={`${lastBtMetrics.maxDrawdownPct.toFixed(2)}%`}
-                          tone="down"
-                          hint={
-                            lastBtMetrics.maxDrawdownCI
-                              ? `95% CI ${lastBtMetrics.maxDrawdownCI.low.toFixed(2)}% … ${lastBtMetrics.maxDrawdownCI.high.toFixed(2)}%`
-                              : lastBtMetrics.maxDrawdownPeakDate &&
-                                  lastBtMetrics.maxDrawdownTroughDate
-                                ? `${lastBtMetrics.maxDrawdownPeakDate} → ${lastBtMetrics.maxDrawdownTroughDate}`
-                                : undefined
-                          }
-                        />
-                        <Metric
-                          label="Sharpe (ann.)"
-                          value={lastBtMetrics.sharpe.toFixed(2)}
-                          tone={lastBtMetrics.sharpe >= 0 ? "up" : "down"}
-                          hint={
-                            lastBtMetrics.sharpeCI
-                              ? `95% CI ${lastBtMetrics.sharpeCI.low.toFixed(2)} … ${lastBtMetrics.sharpeCI.high.toFixed(2)}`
-                              : undefined
-                          }
-                        />
-                        <Metric
-                          label="Win rate"
-                          value={
-                            lastBtMetrics.winRatePct != null
-                              ? `${lastBtMetrics.winRatePct.toFixed(0)}%`
-                              : "—"
-                          }
-                          hint={`${lastBtMetrics.wins}W / ${lastBtMetrics.losses}L / ${lastBtMetrics.trades} trades`}
-                        />
-                        <Metric
-                          label="Volatility (ann.)"
-                          value={`${lastBtMetrics.volatilityPct.toFixed(2)}%`}
-                        />
-                        <Metric
-                          label="Best day"
-                          value={`${lastBtMetrics.bestDayPct.toFixed(2)}%`}
-                          tone="up"
-                        />
-                        <Metric
-                          label="Worst day"
-                          value={`${lastBtMetrics.worstDayPct.toFixed(2)}%`}
-                          tone="down"
-                        />
-                        <Metric
-                          label="Realized PnL"
-                          value={lastBtMetrics.grossRealizedPnl.toFixed(2)}
-                          tone={lastBtMetrics.grossRealizedPnl >= 0 ? "up" : "down"}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {backtestRunToken > 0 && lastBtDays != null && (
-                  <Suspense
-                    fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}
-                  >
-                    <BacktestResultsCard
-                      portfolioId={id}
-                      days={lastBtDays}
-                      runToken={backtestRunToken}
-                      currency={p?.currency ?? "USD"}
-                    />
-                  </Suspense>
-                )}
-                <Suspense fallback={<div className="h-40 rounded-xl border bg-card" aria-hidden />}>
-                  <BacktestRunHistoryCard portfolioId={id} portfolioRiskLevel={p?.risk_level} />
-                </Suspense>
-                  </AdvancedSection>
-                </div>
+                <OverviewLookDeeperSection
+                  id={id}
+                  p={p}
+                  equity={equity as { snapshot_date: string; total_value: number; source?: string | null }[]}
+                  trades={trades as unknown as import("@/lib/backtest-metrics").TradeRow[]}
+                  depositEvents={depositEvents}
+                  baselineStartingCash={baselineStartingCash}
+                  advancedLevel={advancedLevel}
+                  tab={tab}
+                  lastBtMetrics={lastBtMetrics}
+                  lastBtDays={lastBtDays}
+                  backtestRunToken={backtestRunToken}
+                  ready={ready}
+                />
 
                 {(() => {
                   const cb = p.circuit_breaker as {
