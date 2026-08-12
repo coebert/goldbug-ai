@@ -20,10 +20,9 @@ import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
 import { PortfolioMirrorAlert } from "@/components/portfolio-mirror-alert";
 import { checkPortfolioMirrors } from "@/lib/portfolio-mirror-detect.functions";
-import { RiskLevelMetricsCard } from "@/components/risk-level-metrics-card";
 import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
-import { Sparkles, PlusCircle } from "lucide-react";
+import { Sparkles, PlusCircle, LineChart } from "lucide-react";
 
 import { TodayHero } from "@/components/home/today-hero";
 import { TodayHeroSkeleton } from "@/components/home/today-hero-skeleton";
@@ -50,34 +49,13 @@ const NewsReel = lazy(() =>
 const ExecPostsCard = lazy(() =>
   import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
 );
-const ExecPostLessonsCard = lazy(() =>
-  import("@/components/exec-post-lessons-card").then((m) => ({ default: m.ExecPostLessonsCard })),
-);
-const MacroLessonsCard = lazy(() =>
-  import("@/components/macro-lessons-card").then((m) => ({ default: m.MacroLessonsCard })),
-);
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
-);
-const ReclaimScanCard = lazy(() =>
-  import("@/components/market/reclaim-scan-card").then((m) => ({ default: m.ReclaimScanCard })),
-);
-const SetupBacktestCard = lazy(() =>
-  import("@/components/market/setup-backtest-card").then((m) => ({ default: m.SetupBacktestCard })),
 );
 
 
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
-);
-const MarketPulseCard = lazy(() =>
-  import("@/components/home/market-pulse-card").then((m) => ({ default: m.MarketPulseCard })),
-);
-const SmaTrendCard = lazy(() =>
-  import("@/components/home/sma-trend-card").then((m) => ({ default: m.SmaTrendCard })),
-);
-const MarketHoursCard = lazy(() =>
-  import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
 );
 
 export const Route = createFileRoute("/")({
