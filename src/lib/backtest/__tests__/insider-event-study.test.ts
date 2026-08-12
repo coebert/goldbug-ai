@@ -89,7 +89,7 @@ describe("collapseSameDay", () => {
 });
 
 describe("summariseStudy / studyVerdict", () => {
-  it("returns not_supported when the interval straddles zero", () => {
+  it("flags tiny samples as insufficient evidence rather than a signal", () => {
     const prices = new Map<string, Candlelike[]>([
       ["AAA", tape("2026-01-01", [100, 101, 99, 102, 98, 103, 97, 104])],
     ]);
@@ -113,7 +113,7 @@ describe("summariseStudy / studyVerdict", () => {
     });
     const study = summariseStudy(out, [1]);
     const verdict = studyVerdict(study, 1);
-    expect(verdict.verdict).toBe("not_supported");
+    expect(verdict.verdict).toBe("insufficient_evidence");
     expect(verdict.supported_nudge).toBe(0);
   });
 });
