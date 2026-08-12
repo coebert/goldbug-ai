@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Layers } from "lucide-react";
+import { AlertTriangle, Layers } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -20,6 +20,7 @@ import {
 } from "recharts";
 
 import { getEquityComposition } from "@/lib/equity-composition.functions";
+import { validateComposition } from "@/lib/equity-composition";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChartFrame } from "@/components/chart-frame";
@@ -116,6 +117,9 @@ export function EquityCompositionCard({
   const rows = q.data?.rows ?? [];
   const latest = (rows[rows.length - 1] ?? {}) as Record<string, unknown>;
 
+  // Each stacked snapshot must sum exactly to its stored total equity.
+  const mismatches = useMemo(() => validateComposition(rows, keys), [rows, keys]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
@@ -141,6 +145,25 @@ export function EquityCompositionCard({
         <p className="mb-3 text-xs text-muted-foreground">
           Total equity over time, shaded by how much each holding (and cash) contributes.
         </p>
+        {mismatches.length > 0 ? (
+          <div
+            role="alert"
+            className="mb-3 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Composition does not match stored equity</p>
+              <p className="mt-0.5 text-destructive/90">
+                {mismatches.length} of {rows.length} snapshots have bands that don't sum to the
+                recorded total (worst gap {money.format(
+                  mismatches.reduce((w, m) => (Math.abs(m.diff) > Math.abs(w) ? m.diff : w), 0),
+                )}{" "}
+                on {mismatches.reduce((w, m) => (Math.abs(m.diff) > Math.abs(w.diff) ? m : w)).date}
+                ). Treat the shaded split as indicative until this is resolved.
+              </p>
+            </div>
+          </div>
+        ) : null}
         {q.isLoading ? (
           <div className="h-64 animate-pulse rounded-md bg-muted/40" />
         ) : rows.length < 2 ? (
