@@ -174,6 +174,8 @@ import {
 import { scoreUniverseWithDiagnostics, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutRegimeAction } from "./alpha";
 import { unifiedVolSize } from "./sizing/unified-vol-size";
 import { alphaConvictionBonus } from "./alpha/sizing";
+import { desiredWeight, targetWeightSpend } from "./sizing/target-weight";
+import { minTicketBase, governorForNav } from "./cost-governor";
 import {
   planOrderSlices,
   todExecutionAdjustment,
@@ -2100,7 +2102,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         }
       }
       if (targetWeightRejected) {
-        planned.push({
+        executed.push({
           symbol: meta.symbol, side: "buy", quantity: 0, price, value: 0,
           reason: order.reason, rejected: targetWeightRejected,
         });
