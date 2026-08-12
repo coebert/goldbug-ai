@@ -123,6 +123,18 @@ export type OrderBatchingAbInput = {
   drawdownTolerancePct?: number;
   /** Cost saving (bps of equity) below which the result is noise. */
   costSavingFloorBps?: number;
+  /**
+   * Override the execution-cost model. Used by the fee/spread/stamp scenario
+   * sweep to re-price the identical order flow under best/base/worst
+   * assumptions. Defaults to the live Saxo estimator.
+   */
+  costModel?: (o: {
+    symbol: string;
+    side: "buy" | "sell";
+    quantity: number;
+    price: number;
+    assetClass?: string | null;
+  }) => number;
 };
 
 export const DEFAULT_DRAWDOWN_TOLERANCE_PCT = 0.5;
@@ -159,10 +171,16 @@ function heldQuantity(state: SimState, symbol: string): number {
   return q;
 }
 
-async function runArm(
+/**
+ * Replay one arm. Exported so the cost-scenario sweep can re-run the identical
+ * order flow under a different fee model without also paying for the arm it
+ * does not need.
+ */
+export async function runBatchingArm(
   arm: BatchingAbArm,
   input: OrderBatchingAbInput,
 ): Promise<BatchingArmResult> {
+  const costFor = input.costModel ?? costOf;
   const minTicket = Math.max(0, Number(input.minTicketBase) || 0);
   const windowHours = input.windowHours ?? DEFAULT_BATCH_WINDOW.windowHours;
   const maxPriceDriftPct = input.maxPriceDriftPct ?? DEFAULT_BATCH_WINDOW.maxPriceDriftPct;
@@ -277,7 +295,7 @@ async function runArm(
     for (const r of routed) {
       const o = r.order;
       const side = o.side === "sell" ? "sell" : "buy";
-      const cost = costOf({
+      const cost = costFor({
         symbol: o.symbol,
         side,
         quantity: o.quantity,
@@ -362,8 +380,8 @@ export async function runOrderBatchingAb(
   input: OrderBatchingAbInput,
 ): Promise<OrderBatchingAbResult> {
   const [batched, unbatched] = await Promise.all([
-    runArm("batched", input),
-    runArm("unbatched", input),
+    runBatchingArm("batched", input),
+    runBatchingArm("unbatched", input),
   ]);
 
   const costSavingBps = unbatched.costBpsOfEquity - batched.costBpsOfEquity;

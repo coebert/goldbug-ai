@@ -13,12 +13,22 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { OrderBatchingAbResult } from "./backtest/order-batching-ab";
+import type {
+  CostScenarioId,
+  CostScenarioSweepResult,
+} from "./backtest/cost-scenarios";
 import {
-  MAX_REPLAY_SYMBOLS,
   DEFAULT_REPLAY_ADD_PCT,
-  buildReplayBars,
-  rankTradedSymbols,
+  loadReplayInputs,
 } from "./backtest/batching-backtest.helpers";
+
+export type CostScenarioResponse = CostScenarioSweepResult & {
+  symbols: string[];
+  from: string;
+  to: string;
+  navBase: number;
+  windowHours: number;
+};
 
 export type OrderBatchingAbResponse = OrderBatchingAbResult & {
   symbols: string[];
@@ -46,63 +56,10 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }): Promise<OrderBatchingAbResponse> => {
-    const { data: pf } = await context.supabase
-      .from("portfolios")
-      .select("id, starting_cash, current_cash")
-      .eq("id", data.portfolioId)
-      .maybeSingle();
-    if (!pf) throw new Error("Portfolio not found");
-
-    // Symbols this portfolio actually trades: current holdings first, then
-    // anything it has traded historically.
-    const [{ data: holdRows }, { data: tradeRows }] = await Promise.all([
-      context.supabase
-        .from("holdings")
-        .select("symbol, quantity")
-        .eq("portfolio_id", data.portfolioId),
-      context.supabase
-        .from("trades")
-        .select("symbol")
-        .eq("portfolio_id", data.portfolioId)
-        .order("trade_date", { ascending: false })
-        .limit(400),
-    ]);
-
-    const symbols = rankTradedSymbols(
-      (holdRows ?? []).map((r) => String(r.symbol)),
-      (tradeRows ?? []).map((r) => String(r.symbol)),
-      MAX_REPLAY_SYMBOLS,
-    );
-    if (symbols.length === 0) {
-      throw new Error("No traded symbols yet — the replay needs some history to work with.");
-    }
-
-    const from = new Date(Date.now() - data.days * 86_400_000).toISOString().slice(0, 10);
-    const { data: priceRows, error: priceErr } = await context.supabase
-      .from("price_cache")
-      .select("symbol, price_date, close")
-      .in("symbol", symbols)
-      .gte("price_date", from)
-      .order("price_date", { ascending: true });
-    if (priceErr) throw new Error(priceErr.message);
-
-    const bars = buildReplayBars(
-      (priceRows ?? []).map((r) => ({
-        symbol: String(r.symbol),
-        price_date: String(r.price_date),
-        close: Number(r.close),
-      })),
-    );
-    if (bars.length < 60) {
-      throw new Error(
-        `Not enough price history to replay (${bars.length} bars, need 60+). Let the price cache fill in first.`,
-      );
-    }
-
-    const navBase = Math.max(
-      1_000,
-      Number(pf.starting_cash ?? 0) || Number(pf.current_cash ?? 0) || 10_000,
-    );
+    const { bars, symbols, navBase } = await loadReplayInputs(context.supabase, {
+      portfolioId: data.portfolioId,
+      days: data.days,
+    });
 
     const { generateReplaySignals } = await import("./backtest/batching-replay-signals");
     const { runOrderBatchingAb } = await import("./backtest/order-batching-ab");
@@ -134,6 +91,75 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       symbols,
       from: bars[0].date,
       to: bars[bars.length - 1].date,
+      navBase,
+      windowHours: data.windowHours,
+    };
+  });
+
+/**
+ * Replay the strategy under best / base / worst fee, spread and stamp-duty
+ * assumptions and report how often it avoided losses in each case.
+ *
+ * Read-only and RLS-scoped: the caller can only replay their own portfolio.
+ */
+export const runCostScenarioBacktest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        portfolioId: z.string().uuid(),
+        days: z.number().int().min(60).max(750).default(365),
+        windowHours: z.number().int().min(6).max(336).default(96),
+        /** Length of the rolling loss-avoidance window, in trading days. */
+        rollingWindowDays: z.number().int().min(5).max(120).default(21),
+        scenarioIds: z
+          .array(z.enum(["best", "base", "worst"]))
+          .min(1)
+          .max(3)
+          .optional(),
+        /** Price the live routing (batched) or the pre-batching behaviour. */
+        arm: z.enum(["batched", "unbatched"]).default("batched"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }): Promise<CostScenarioResponse> => {
+    const { bars, symbols, navBase } = await loadReplayInputs(context.supabase, {
+      portfolioId: data.portfolioId,
+      days: data.days,
+    });
+
+    const { generateReplaySignals } = await import("./backtest/batching-replay-signals");
+    const { runCostScenarioSweep } = await import("./backtest/cost-scenarios");
+    const { minTicketBase, DEFAULT_GOVERNOR } = await import("./cost-governor");
+
+    const signals = generateReplaySignals(bars, {
+      navBase,
+      addPctOfNav: DEFAULT_REPLAY_ADD_PCT,
+      fastPeriod: 20,
+      slowPeriod: 50,
+      maxAddsPerName: 8,
+    });
+
+    const result = await runCostScenarioSweep({
+      bars,
+      signals,
+      startingCash: navBase,
+      minTicketBase: minTicketBase({
+        navBase,
+        minTicketPctOfNav: DEFAULT_GOVERNOR.minTicketPctOfNav,
+        absoluteMinTicketBase: DEFAULT_GOVERNOR.absoluteMinTicketBase,
+      }),
+      arm: data.arm,
+      windowHours: data.windowHours,
+      rollingWindowDays: data.rollingWindowDays,
+      scenarioIds: data.scenarioIds as CostScenarioId[] | undefined,
+    });
+
+    return {
+      ...result,
+      symbols,
+      from: bars[0]!.date,
+      to: bars[bars.length - 1]!.date,
       navBase,
       windowHours: data.windowHours,
     };
