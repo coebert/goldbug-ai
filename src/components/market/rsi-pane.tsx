@@ -162,6 +162,23 @@ export function RsiPane({
                 ifOverflow="extendDomain"
               />
             ))}
+            {tradeMarkers
+              .filter((m) => m.rsi != null)
+              .map((m) => (
+                <ReferenceDot
+                  key={`rsi-trade-${m.key}`}
+                  x={m.date}
+                  y={m.rsi as number}
+                  r={5}
+                  fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
+                  stroke={tradeMarkerColor(m)}
+                  strokeWidth={2}
+                  isFront
+                  ifOverflow="extendDomain"
+                />
+              ))}
+
+
 
           </LineChart>
         </ResponsiveContainer>
