@@ -7,7 +7,7 @@
 import { PULSE_COMPARISON, PULSE_INSTRUMENTS, PULSE_SECTORS, type PriceRow } from "./market-pulse";
 
 /** Selectable time ranges on the drill-down page, in calendar days. */
-export const HISTORY_RANGES = [30, 90, 180, 365, 1095] as const;
+export const HISTORY_RANGES = [30, 90, 180, 365, 730, 1095, 1825] as const;
 export type HistoryRange = (typeof HISTORY_RANGES)[number];
 export const DEFAULT_RANGE: HistoryRange = 90;
 
@@ -52,6 +52,22 @@ export function symbolMeta(symbol: string): SymbolMeta | null {
 
 export function isKnownSymbol(symbol: string): boolean {
   return META.has(symbol);
+}
+
+/**
+ * Any ticker the chart page will attempt: curated pulse symbols plus free-form
+ * tickers (AAPL, MKS.L, BRK-B, ^VIX, BTC-USD). Prices for unknown names are
+ * fetched on demand and cached.
+ */
+export function isChartableSymbol(symbol: string): boolean {
+  const s = symbol.trim().toUpperCase();
+  if (!s || s.length > 24) return false;
+  return /^\^?[A-Z0-9]{1,12}([.\-=][A-Z0-9]{1,8})*$/.test(s);
+}
+
+/** Normalise user input into the ticker form the price feed expects. */
+export function normaliseSymbolInput(raw: string): string {
+  return raw.trim().toUpperCase().replace(/\s+/g, "");
 }
 
 /** Simple-moving-average periods available on charts, in trading days. */
