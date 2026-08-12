@@ -2147,6 +2147,62 @@ export type Database = {
         }
         Relationships: []
       }
+      order_batch_queue: {
+        Row: {
+          conviction: number | null
+          created_at: string
+          expires_at: string
+          first_seen_at: string
+          id: string
+          notional_base: number
+          portfolio_id: string
+          price: number
+          quantity: number
+          side: string
+          symbol: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conviction?: number | null
+          created_at?: string
+          expires_at: string
+          first_seen_at?: string
+          id?: string
+          notional_base: number
+          portfolio_id: string
+          price: number
+          quantity: number
+          side?: string
+          symbol: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conviction?: number | null
+          created_at?: string
+          expires_at?: string
+          first_seen_at?: string
+          id?: string
+          notional_base?: number
+          portfolio_id?: string
+          price?: number
+          quantity?: number
+          side?: string
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_batch_queue_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_explanations: {
         Row: {
           created_at: string
