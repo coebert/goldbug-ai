@@ -62,6 +62,10 @@ const TickerWatchCard = lazy(() =>
 const ReclaimScanCard = lazy(() =>
   import("@/components/market/reclaim-scan-card").then((m) => ({ default: m.ReclaimScanCard })),
 );
+const SetupBacktestCard = lazy(() =>
+  import("@/components/market/setup-backtest-card").then((m) => ({ default: m.SetupBacktestCard })),
+);
+
 
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
@@ -416,6 +420,10 @@ function Home() {
               <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <ReclaimScanCard />
               </Suspense>
+              <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <SetupBacktestCard />
+              </Suspense>
+
 
             </AdvancedSection>
 
