@@ -218,7 +218,7 @@ function Home() {
     <div className="min-h-dvh overflow-x-hidden bg-surface-1">
       <AppHeader email={session?.user.email} />
       <HomeCoachMarks />
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
+      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8 2xl:max-w-7xl">
         {/* Page heading + density control */}
         <div className="mb-5 space-y-3 sm:mb-7 sm:flex sm:flex-wrap sm:items-start sm:justify-between sm:gap-3 sm:space-y-0">
           <div className="min-w-0">

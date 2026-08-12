@@ -857,7 +857,7 @@ function PortfolioPage() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={email} />
-      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4">
+      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4 2xl:max-w-7xl">
         <PortfolioTabs id={id} />
         <Link
           to="/"

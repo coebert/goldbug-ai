@@ -25,3 +25,29 @@ export function compactTick(v: number): string {
   if (abs >= 10) return v.toFixed(0);
   return v.toFixed(2);
 }
+
+/**
+ * One shared mobile chart preset, so charts stop hand-rolling `isMobile`
+ * branches: tighter margins, a wider tick gap (fewer labels), and the
+ * narrowed y-axis from `useYAxisWidth`.
+ */
+export type ChartPreset = {
+  isMobile: boolean;
+  margin: { top: number; right: number; bottom: number; left: number };
+  yWidth: number;
+  minTickGap: number;
+  tickFontSize: number;
+};
+
+export function useChartPreset(desktopYWidth: number = Y_AXIS_WIDTH_DESKTOP): ChartPreset {
+  const isMobile = useIsMobile();
+  return {
+    isMobile,
+    margin: isMobile
+      ? { top: 8, right: 6, bottom: 20, left: -8 }
+      : { top: 8, right: 12, bottom: 20, left: 8 },
+    yWidth: isMobile ? Y_AXIS_WIDTH_MOBILE : desktopYWidth,
+    minTickGap: isMobile ? 56 : 30,
+    tickFontSize: isMobile ? 11 : 12,
+  };
+}

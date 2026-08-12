@@ -145,7 +145,7 @@ export function AppHeader({ email }: { email?: string | null }) {
       className="sticky top-0 z-30 border-b border-border bg-surface-2/85 pt-[env(safe-area-inset-top)] backdrop-blur"
     >
       {/* Row 1 — Brand / global controls */}
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 2xl:max-w-7xl">
         <Link
           to="/"
           className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
@@ -298,7 +298,7 @@ export function AppHeader({ email }: { email?: string | null }) {
           + route-scoped actions. Hidden on mobile — the floating tab
           bar covers primary destinations there. */}
       <div className="border-t border-border/60 bg-surface-1/60">
-        <div className="mx-auto hidden max-w-6xl items-center gap-1 px-4 py-1.5 md:flex lg:hidden">
+        <div className="mx-auto hidden max-w-6xl items-center gap-1 px-4 py-1.5 md:flex lg:hidden 2xl:max-w-7xl">
           <nav
             aria-label="Primary"
             className="flex flex-1 items-center gap-1 text-sm"
@@ -329,7 +329,7 @@ export function AppHeader({ email }: { email?: string | null }) {
 
         {/* Mobile row: breadcrumb + context actions only. Primary nav
             lives in the floating tab bar. */}
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-1.5 md:hidden">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-1.5 md:hidden 2xl:max-w-7xl">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{crumb.title}</div>
             {crumb.subtitle && (
