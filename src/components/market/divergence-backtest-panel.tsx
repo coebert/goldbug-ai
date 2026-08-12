@@ -93,9 +93,12 @@ function Toggles<T extends number>({
 export function DivergenceBacktestPanel({
   points,
   rangeLabel,
+  onTrades,
 }: {
   points: HistoryPoint[];
   rangeLabel?: string;
+  /** Reports the executed setups so the charts above can mark them. */
+  onTrades?: (trades: DivergenceTrade[]) => void;
 }) {
   const [horizon, setHorizon] = useState(DEFAULT_DIVERGENCE_HORIZON);
   const [targetPct, setTargetPct] = useState(DEFAULT_DIVERGENCE_TARGET_PCT);
@@ -105,6 +108,13 @@ export function DivergenceBacktestPanel({
     () => backtestRsiDivergences(points, { horizon, targetPct, frictionBps }),
     [points, horizon, targetPct, frictionBps],
   );
+
+  useEffect(() => {
+    onTrades?.(result.trades);
+  }, [result.trades, onTrades]);
+
+  useEffect(() => () => onTrades?.([]), [onTrades]);
+
 
   const o = result.overall;
 
