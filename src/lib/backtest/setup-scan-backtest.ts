@@ -34,23 +34,56 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   cooldownDays: 20,
 };
 
+/** What the simulated trade actually did over one forward horizon. */
+export type HorizonOutcome = {
+  horizon: number;
+  exitDate: string;
+  exitPrice: number;
+  grossPct: number;
+  /** Gross less the round-trip friction assumption. */
+  netPct: number;
+  /** Worst close-to-close excursion from entry within this horizon, %. */
+  maxAdversePct: number;
+  /** Best close-to-close excursion from entry within this horizon, %. */
+  maxFavourablePct: number;
+  /** True when a close broke the invalidation level before the horizon ended. */
+  invalidated: boolean;
+  /** First close below the invalidation level, when it happened. */
+  invalidationDate: string | null;
+  /** Sessions actually held (equals the horizon unless data ran out). */
+  barsHeld: number;
+};
+
 export type TradeOutcome = {
+  policy: "chase" | "discipline";
   symbol: string;
   signalDate: string;
   signalPrice: number;
   score: number;
   relVolume: number;
   annualVolPct: number;
+  /** Rule-derived level that voids the thesis. */
+  invalidationBelow: number;
+  /** Pullback zone the disciplined policy waits for. */
+  zoneLow: number;
+  zoneHigh: number;
   /** Entry price under this policy, or null when no entry triggered. */
   entryPrice: number | null;
   entryDate: string | null;
+  /** Why no entry happened (discipline only). */
+  noEntryReason: string | null;
   /** Net return per horizon, in percent. Missing when data runs out. */
   netReturnPct: Record<number, number | null>;
+  /** Full exit detail per horizon: dates, prices, excursions, invalidation. */
+  exits: Record<number, HorizonOutcome | null>;
   /** Worst close-to-close drawdown from entry over the longest horizon, %. */
   maxAdversePct: number | null;
   /** True when a close broke the rule-derived invalidation level. */
   stoppedOut: boolean;
+  /** Date of the first invalidating close over the longest horizon. */
+  invalidationDate: string | null;
 };
+
 
 export type PolicyStats = {
   policy: "chase" | "discipline";
