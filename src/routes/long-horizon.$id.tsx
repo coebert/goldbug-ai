@@ -34,7 +34,7 @@ import { Explain } from "@/components/explain";
 import { EventOverlay, EventOverlayControls } from "@/components/event-overlay";
 import { eventsInRange, eventColor } from "@/lib/global-events";
 import { lttb } from "@/lib/downsample";
-import { AXIS_LINE, GRID_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
+import { AXIS_LINE, GRID_PROPS, LEGEND_PROPS, REFERENCE_LINE, TICK_LINE } from "@/lib/chart-palette";
 import { qk } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/long-horizon/$id")({
