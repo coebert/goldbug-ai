@@ -6,7 +6,6 @@ import {
   extractPerson,
   insiderFeedUrl,
   insiderFeedQueries,
-  companyAliases,
   insiderSignalBySymbol,
   parseDealValue,
   parseShareCount,
