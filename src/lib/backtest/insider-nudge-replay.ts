@@ -333,8 +333,22 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     };
   }
 
-  type ArmState = { weights: Map<string, number>; equity: number; cost: number; trades: number; positions: number[] };
-  const mk = (): ArmState => ({ weights: new Map(), equity: startEquity, cost: 0, trades: 0, positions: [] });
+  type ArmState = {
+    weights: Map<string, number>;
+    equity: number;
+    cost: number;
+    trades: number;
+    positions: number[];
+    gross: number[];
+  };
+  const mk = (): ArmState => ({
+    weights: new Map(),
+    equity: startEquity,
+    cost: 0,
+    trades: 0,
+    positions: [],
+    gross: [],
+  });
   const base = mk();
   const nud = mk();
   const baseCurve: ArmDay[] = [];
@@ -352,16 +366,22 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     return a && b && a > 0 ? ((b - a) / a) * 100 : null;
   };
 
-  const select = (scores: Array<{ symbol: string; score: number }>): Map<string, number> => {
+  /**
+   * Selection picks the names; the risk dial decides how much of the book they
+   * get. Sizing runs through the same preset-driven primitives as the live AI
+   * (per-symbol cap, vol targeting, size multiplier, gross ceiling) and the
+   * move toward target is paced by the dial's buy/sell aggressiveness.
+   */
+  const select = (
+    state: ArmState,
+    scores: Array<{ symbol: string; score: number; vol: number | null }>,
+  ): Map<string, number> => {
     const eligible = scores
       .filter((s) => s.score >= params.entryThreshold)
       .sort((a, b) => b.score - a.score)
       .slice(0, params.maxPositions);
-    const w = new Map<string, number>();
-    if (eligible.length === 0) return w;
-    const each = 1 / eligible.length;
-    for (const e of eligible) w.set(e.symbol, each);
-    return w;
+    const desired = targetWeights(eligible, sizing);
+    return stepWeights(state.weights, desired, sizing);
   };
 
   const applyDay = (
@@ -382,15 +402,19 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     state.cost += cost;
 
     let port = 0;
+    let gross = 0;
     for (const [sym, w] of target) {
+      gross += w;
       const r = dayReturn(sym);
       if (r != null) port += w * r;
     }
     state.equity *= 1 + port;
     state.weights = target;
     state.positions.push(target.size);
+    state.gross.push(gross);
     return { cost, port };
   };
+
 
   for (let d = 0; d < allDates.length - 1; d++) {
     const date = allDates[d] as string;
