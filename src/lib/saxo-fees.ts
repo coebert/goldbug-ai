@@ -77,14 +77,34 @@ const DEFAULT_TIER: SaxoVenueTier = {
  *   BTC-USD / FX  → USD (spot pairs)
  *   bare / no dot → USD (US listings)
  */
+/** Broker-native MIC suffixes (`MKS:xlon`) → trade currency. */
+const MIC_CURRENCY: Record<string, string> = {
+  XLON: "GBP", LSE: "GBP", XLOD: "GBP",
+  XNAS: "USD", XNYS: "USD", ARCX: "USD", BATS: "USD", XASE: "USD",
+  XETR: "EUR", XFRA: "EUR", XPAR: "EUR", XAMS: "EUR", XMIL: "EUR",
+  XMAD: "EUR", XBRU: "EUR", XLIS: "EUR", XHEL: "EUR", XDUB: "EUR",
+  XSWX: "CHF", XVTX: "CHF",
+  XCSE: "DKK", XSTO: "SEK", XOSL: "NOK",
+  XTKS: "JPY", XHKG: "HKD", XASX: "AUD", XTSE: "CAD",
+};
+
 export function inferSaxoCurrency(symbol: string): string {
   const s = symbol.toUpperCase();
   // FX and crypto spot pairs quote in USD by convention here.
   if (s.endsWith("=X")) return "USD";
   if (s.endsWith("-USD")) return "USD";
+  // Broker-native form: TICKER:MIC. Saxo holdings and orders use this, so it
+  // must resolve as precisely as the Yahoo-style suffix — otherwise UK names
+  // look like US dollars and their 0.5% stamp duty is never charged.
+  const colon = s.lastIndexOf(":");
+  if (colon > 0) {
+    const mic = MIC_CURRENCY[s.slice(colon + 1)];
+    if (mic) return mic;
+  }
   const dot = s.lastIndexOf(".");
   if (dot < 0) return "USD";
   const suffix = s.slice(dot + 1);
+
   switch (suffix) {
     case "L":
     case "LON":
