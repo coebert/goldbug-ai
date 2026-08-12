@@ -394,7 +394,7 @@ export function CompareOverlay({
                       tick={AXIS_TICK}
                       axisLine={AXIS_LINE}
                       tickLine={TICK_LINE}
-                      width={44}
+                      width={48}
                       domain={[0, 100]}
                       ticks={[0, RSI_OVERSOLD, 50, RSI_OVERBOUGHT, 100]}
                     />

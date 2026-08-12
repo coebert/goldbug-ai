@@ -59,7 +59,7 @@ import {
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { BackRow } from "@/components/nav/back-row";
-import { useYAxisWidth, compactTick } from "@/lib/chart-axis";
+import { useYAxisWidth, compactTick Y_AXIS_WIDTH_MOBILE } from "@/lib/chart-axis";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
 import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
 import { DIVERGENCE_LABEL, DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
@@ -896,7 +896,7 @@ function MarketSymbolPage() {
                       width={yWidth}
                       domain={["auto", "auto"]}
                       tickFormatter={(v: number) =>
-                        yWidth <= 40 ? compactTick(v) : num(v, 0)
+                        yWidth <= Y_AXIS_WIDTH_MOBILE ? compactTick(v) : num(v, 0)
                       }
                     />
                     <Tooltip
@@ -956,7 +956,7 @@ function MarketSymbolPage() {
                         label={{
                           value: sig.kind === "buy" ? "B" : "S",
                           fill: RSI_SIGNAL_TONE[sig.kind],
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           position: sig.kind === "buy" ? "bottom" : "top",
                         }}
@@ -993,7 +993,7 @@ function MarketSymbolPage() {
                         label={{
                           value: m.glyph,
                           fill: tradeMarkerColor(m),
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           position: m.side === "entry" ? "bottom" : "top",
                         }}
@@ -1013,7 +1013,7 @@ function MarketSymbolPage() {
                         label={{
                           value: String(i + 1),
                           fill: "var(--background)",
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           position: "center",
                         }}

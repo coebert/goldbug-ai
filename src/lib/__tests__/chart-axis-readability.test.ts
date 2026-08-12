@@ -21,6 +21,7 @@ import {
   TICK_LINE_STROKE,
 } from "@/lib/chart-palette";
 import { SAXO_TICK } from "@/lib/saxo-chart";
+import { Y_AXIS_WIDTH_DESKTOP, Y_AXIS_WIDTH_MOBILE } from "@/lib/chart-axis";
 import { AA_NON_TEXT, AA_NORMAL_TEXT, contrastRatio, parseColor } from "@/lib/contrast";
 
 const SRC = join(process.cwd(), "src");
@@ -79,6 +80,9 @@ describe("chart axis readability", () => {
         if (/\bhide\b/.test(tag)) continue;
         // A percent axis renders at most "-100%" — it needs no currency gutter.
         if (/tickFormatter=\{\(v: number\) => `\$\{v\}%`\}/.test(tag)) continue;
+        // `width={yWidth}` comes from useYAxisWidth, whose own floor is
+        // asserted below — it can never go under the 46px gutter.
+        if (/width=\{yWidth\}/.test(tag)) continue;
         const widths = [...tag.matchAll(/width=\{(?:isMobile \? )?(\d+)/g)].map((m) => Number(m[1]));
         if (widths.length === 0 || widths.some((w) => w < 46)) {
           offenders.push(p.replace(SRC, "src"));
@@ -86,6 +90,11 @@ describe("chart axis readability", () => {
       }
     }
     expect([...new Set(offenders)]).toEqual([]);
+  });
+
+  it("keeps the shared y-axis width helper above the 46px gutter", () => {
+    expect(Y_AXIS_WIDTH_MOBILE).toBeGreaterThanOrEqual(46);
+    expect(Y_AXIS_WIDTH_DESKTOP).toBeGreaterThanOrEqual(Y_AXIS_WIDTH_MOBILE);
   });
 
   it("axis tick colour clears WCAG AA on every dark surface", () => {

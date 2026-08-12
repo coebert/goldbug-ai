@@ -440,7 +440,7 @@ export function MarketPulseCard() {
                   tick={AXIS_TICK}
                   axisLine={AXIS_LINE}
                   tickLine={TICK_LINE}
-                  width={44}
+                  width={48}
                   domain={["auto", "auto"]}
                   tickFormatter={(v: number) => `${v.toFixed(0)}`}
                 />
