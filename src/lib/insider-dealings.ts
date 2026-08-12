@@ -161,6 +161,17 @@ export function companyAliases(company: string, extra: string[] = []): string[] 
   const out = new Set<string>([base]);
   if (base.includes("&")) out.add(base.replace(/&/g, "and"));
   if (base.includes(" and ")) out.add(base.replace(/ and /g, " & "));
+
+  // Headlines almost always use the short form ("M&S directors cash out"),
+  // so derive the ampersand initialism for two/three-word names.
+  const words = base.split(/\s+/).filter((w) => /^[a-z&]/.test(w) && w !== "&" && w !== "and");
+  if (words.length >= 2 && words.length <= 3) {
+    const initials = words.map((w) => w[0]).join("");
+    if (initials.length >= 2) {
+      out.add(initials);
+      out.add(words.map((w) => w[0]).join("&"));
+    }
+  }
   for (const e of extra) {
     const v = e.trim().toLowerCase();
     if (v) out.add(v);
