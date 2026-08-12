@@ -35,6 +35,8 @@ type WindowHours = (typeof WINDOWS)[number];
 
 const BATCHED = SAXO_COLOR.up;
 const UNBATCHED = SAXO_COLOR.crosshair;
+const BUY_HOLD = SAXO_COLOR.down;
+const MOMENTUM = SAXO_COLOR.axis;
 
 function bps(v: number | null | undefined, digits = 1): string {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -124,10 +126,20 @@ export function BatchingBacktestCard({
   const chartData = useMemo(() => {
     if (!result) return [];
     const un = new Map(result.unbatched.equityCurve.map((p) => [p.date, p.totalValue]));
+    const byId = new Map(
+      (result.benchmarks?.arms ?? []).map((a) => [
+        a.id,
+        new Map(a.equityCurve.map((p) => [p.date, p.totalValue])),
+      ]),
+    );
+    const bh = byId.get("buy_and_hold");
+    const mo = byId.get("momentum_only");
     return result.batched.equityCurve.map((p) => ({
       date: p.date,
       batched: p.totalValue,
       unbatched: un.get(p.date) ?? null,
+      buyHold: bh?.get(p.date) ?? null,
+      momentum: mo?.get(p.date) ?? null,
     }));
   }, [result]);
 
@@ -260,6 +272,24 @@ export function BatchingBacktestCard({
                     strokeWidth={SAXO_METRIC.hairlineWidth}
                     dot={false}
                   />
+                  <Line
+                    type="monotone"
+                    dataKey="buyHold"
+                    name="Buy & hold"
+                    stroke={BUY_HOLD}
+                    strokeWidth={SAXO_METRIC.hairlineWidth}
+                    strokeDasharray="4 3"
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="momentum"
+                    name="Momentum only"
+                    stroke={MOMENTUM}
+                    strokeWidth={SAXO_METRIC.hairlineWidth}
+                    strokeDasharray="2 3"
+                    dot={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -278,9 +308,13 @@ export function BatchingBacktestCard({
                   </tr>
                 </thead>
                 <tbody className="tabular-nums">
-                  {[result.batched, result.unbatched].map((arm) => (
-                    <tr key={arm.arm} className="border-b border-border/40 last:border-0">
-                      <td className="py-1.5">{arm.arm === "batched" ? "Batching on" : "Batching off"}</td>
+                  {[
+                    { key: "batched", label: "Batching on", ...result.batched },
+                    { key: "unbatched", label: "Batching off", ...result.unbatched },
+                    ...(result.benchmarks?.arms ?? []).map((a) => ({ ...a, key: a.id, label: a.label })),
+                  ].map((arm) => (
+                    <tr key={arm.key} className="border-b border-border/40 last:border-0">
+                      <td className="py-1.5">{arm.label}</td>
                       <td className="py-1.5 text-right">{arm.tickets}</td>
                       <td className="py-1.5 text-right">{formatMoney(arm.totalCostBase, currency)}</td>
                       <td className="py-1.5 text-right">{bps(arm.costBpsOfTurnover)}</td>
@@ -292,6 +326,43 @@ export function BatchingBacktestCard({
                 </tbody>
               </table>
             </div>
+
+            {result.benchmarks ? (
+              <div className="rounded-lg border border-border/60 bg-card/40 p-3">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Versus baselines
+                </div>
+                <p className="mt-1 text-xs">{result.benchmarks.summary}</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {result.benchmarks.comparisons.map((c) => (
+                    <div key={c.id} className="rounded-md border border-border/40 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium">{c.label}</span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            c.outcome === "beats"
+                              ? "border-emerald-500/40 text-emerald-400"
+                              : c.outcome === "lags"
+                                ? "border-rose-500/40 text-rose-400"
+                                : ""
+                          }
+                        >
+                          {c.outcome === "beats" ? "Ahead" : c.outcome === "lags" ? "Behind" : "Level"}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-muted-foreground">
+                        <span>Return {signed(c.returnDeltaPct, 2, "pp")}</span>
+                        <span>Max DD {signed(c.drawdownDeltaPct, 2, "pp")}</span>
+                        <span>Sharpe {signed(c.sharpeDelta, 2, "")}</span>
+                        <span>Cost {signed(c.costDeltaBps)}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{c.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <p className="text-[11px] text-muted-foreground">
               {result.bars} bars {result.from} → {result.to} · {result.symbols.join(", ")} · minimum
