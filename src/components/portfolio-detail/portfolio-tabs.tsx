@@ -18,17 +18,19 @@ export function PortfolioTabs({ id }: { id: string }) {
   return (
     <nav
       aria-label="Portfolio sections"
-      className="sticky top-[var(--app-header-h,3.25rem)] z-20 -mx-4 mb-4 border-b border-border bg-surface-1/90 px-4 backdrop-blur"
+      data-sticky-nav
+      className="sticky top-[var(--app-header-h)] z-20 -mx-4 mb-4 h-[var(--subnav-h,3.25rem)] border-b border-border bg-surface-1/90 px-4 backdrop-blur"
     >
-      <ul className="flex min-w-0 gap-1 overflow-x-auto py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul className="flex h-full min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => (
           <li key={t.to} className="shrink-0">
             <Link
               to={t.to}
               params={{ id }}
               activeOptions={"exact" in t && t.exact ? { exact: true } : undefined}
-              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
+              className="inline-flex h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
             >
+
               {t.label}
             </Link>
           </li>
