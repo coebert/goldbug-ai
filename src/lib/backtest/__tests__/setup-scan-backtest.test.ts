@@ -66,7 +66,6 @@ describe("setup-scan backtest", () => {
     const h10 = report.chase.horizons.find((h) => h.horizon === 10)!;
     expect(h10.avgNetPct).toBeLessThan(0);
     expect(report.chase.stopRatePct).toBeGreaterThan(0);
-    expect(report.verdict).toContain("froth");
   });
 
   it("skips signals whose pullback zone is never tagged", () => {
@@ -127,5 +126,31 @@ describe("setup-scan backtest", () => {
       stopRatePct: 0,
     };
     expect(buildVerdict(stats, stats, 10)).toContain("Not enough historical signals");
+  });
+
+  it("calls a negative-expectancy pattern froth once the sample is large enough", () => {
+    const losing = {
+      policy: "chase" as const,
+      entries: 12,
+      skipped: 0,
+      horizons: [
+        {
+          horizon: 10,
+          samples: 12,
+          winRatePct: 33,
+          avgNetPct: -2.4,
+          medianNetPct: -3,
+          bestPct: 6,
+          worstPct: -14,
+          payoff: 0.6,
+          expectancyPct: -2.4,
+        },
+      ],
+      avgMaxAdversePct: -9,
+      stopRatePct: 50,
+    };
+    const verdict = buildVerdict(losing, { ...losing, entries: 6 }, 10);
+    expect(verdict).toContain("froth");
+    expect(verdict).toContain("do not buy the surge bar");
   });
 });
