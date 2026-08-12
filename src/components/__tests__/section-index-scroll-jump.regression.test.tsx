@@ -39,8 +39,28 @@ function positionAt(y: number) {
   }
 }
 
+/** Narrow row: only ~100px of chips fit, chips laid out 120px apart. */
+function narrowRow(row: HTMLElement) {
+  Object.defineProperty(row, "clientWidth", { value: 100, configurable: true });
+  for (const [idx, chip] of Array.from(
+    row.querySelectorAll<HTMLElement>("[data-section]"),
+  ).entries()) {
+    Object.defineProperty(chip, "offsetLeft", { value: idx * 120, configurable: true });
+    Object.defineProperty(chip, "offsetWidth", { value: 110, configurable: true });
+  }
+}
+
+/** Dispatch a scroll and let the rAF-throttled spy run. */
+async function scrollTick() {
+  await act(async () => {
+    window.dispatchEvent(new Event("scroll"));
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+  });
+}
+
 let scrollIntoView: ReturnType<typeof vi.fn>;
 let windowScrollTo: ReturnType<typeof vi.fn>;
+
 
 beforeEach(() => {
   scrollIntoView = vi.fn();
@@ -56,45 +76,73 @@ afterEach(() => {
 });
 
 describe("SectionIndex mobile scroll regression", () => {
-  it("never scrolls the page or an ancestor while spying on scroll", () => {
+  it("never scrolls the page or an ancestor while spying on scroll", async () => {
     mountSections();
     positionAt(0);
     render(<SectionIndex items={items} />);
 
     for (const y of [100, 500, 900, 1400, 1900, 2400]) {
       positionAt(y);
-      act(() => {
-        window.dispatchEvent(new Event("scroll"));
-      });
+      await scrollTick();
     }
+
 
     expect(scrollIntoView).not.toHaveBeenCalled();
     expect(windowScrollTo).not.toHaveBeenCalled();
   });
 
-  it("keeps the active chip visible via horizontal row scrolling only", () => {
+  it("keeps the active chip visible via horizontal row scrolling only", async () => {
     mountSections();
     positionAt(0);
     const { container } = render(<SectionIndex items={items} />);
     const row = container.querySelector<HTMLElement>("nav > div")!;
-
-    // Narrow row: only ~100px of chips fit, chips laid out 120px apart.
-    Object.defineProperty(row, "clientWidth", { value: 100, configurable: true });
-    const chips = Array.from(row.querySelectorAll<HTMLElement>("[data-section]"));
-    chips.forEach((chip, idx) => {
-      Object.defineProperty(chip, "offsetLeft", { value: idx * 120, configurable: true });
-      Object.defineProperty(chip, "offsetWidth", { value: 110, configurable: true });
-    });
+    narrowRow(row);
 
     positionAt(1700); // third section is active
-    act(() => {
-      window.dispatchEvent(new Event("scroll"));
-    });
+    await scrollTick();
 
     expect(row.scrollLeft).toBeGreaterThan(0);
     expect(scrollIntoView).not.toHaveBeenCalled();
     expect(windowScrollTo).not.toHaveBeenCalled();
   });
+
+  it("writes no scroll position while a finger is down, then flushes on lift", async () => {
+    mountSections();
+    positionAt(0);
+    const { container } = render(<SectionIndex items={items} />);
+    const row = container.querySelector<HTMLElement>("nav > div")!;
+    narrowRow(row);
+
+    act(() => {
+      window.dispatchEvent(new Event("touchstart"));
+    });
+    positionAt(1700);
+    await scrollTick();
+
+    // Mid-gesture: the row must not be scrolled, or iOS aborts the fling.
+    expect(row.scrollLeft).toBe(0);
+
+    act(() => {
+      window.dispatchEvent(new Event("touchend"));
+    });
+    expect(row.scrollLeft).toBeGreaterThan(0);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(windowScrollTo).not.toHaveBeenCalled();
+  });
+
+  it("registers its scroll and touch listeners as passive", () => {
+    mountSections();
+    positionAt(0);
+    const add = vi.spyOn(window, "addEventListener");
+    render(<SectionIndex items={items} />);
+
+    for (const type of ["scroll", "touchstart", "touchend", "touchcancel"]) {
+      const call = add.mock.calls.find((c) => c[0] === type);
+      expect(call, `${type} listener registered`).toBeTruthy();
+      expect(call![2], `${type} passive`).toMatchObject({ passive: true });
+    }
+  });
+
 
   it("ignores unrelated DOM mutations instead of re-running its scroll effect", async () => {
     const host = mountSections();

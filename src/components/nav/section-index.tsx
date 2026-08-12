@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Sticky in-page section index for long pages (Home, Portfolio detail).
@@ -43,11 +43,19 @@ export function SectionIndex({
     return () => mo.disconnect();
   }, [items]);
 
+  // True while a finger is down. Touch scrolling on iOS is interrupted if we
+  // write to scrollLeft mid-gesture, so all scroll writes are deferred until
+  // the gesture ends.
+  const touchingRef = useRef(false);
+  const pendingRef = useRef(false);
 
   // Scroll spy: the topmost section whose start is above the fold wins.
+  // Reads only — measured inside rAF so it never blocks the scroll thread.
   useEffect(() => {
     if (present.length === 0) return;
-    const onScroll = () => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
       const line = 120 + offset;
       let current: string | null = null;
       for (const i of present) {
@@ -57,15 +65,20 @@ export function SectionIndex({
       }
       setActive(current ?? present[0]!.id);
     };
-    onScroll();
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [present, offset]);
 
-  // Keep the active chip in view on narrow screens. Scroll the row
-  // horizontally by hand — scrollIntoView() also scrolls ancestors, which
-  // yanked the whole page back to the sticky row while scrolling.
-  useEffect(() => {
+  // Centre the active chip. Never called while the user is mid-gesture.
+  const centreActive = useCallback(() => {
     const row = rowRef.current;
     if (!active || !row) return;
     const chip = row.querySelector<HTMLElement>(`[data-section="${active}"]`);
@@ -76,6 +89,42 @@ export function SectionIndex({
     else if (right > row.scrollLeft + row.clientWidth)
       row.scrollLeft = right - row.clientWidth + 12;
   }, [active]);
+
+  // Track the gesture with passive listeners so touch scrolling stays on the
+  // compositor; flush any deferred chip centring once the finger lifts.
+  useEffect(() => {
+    const onStart = () => {
+      touchingRef.current = true;
+    };
+    const onEnd = () => {
+      touchingRef.current = false;
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        centreActive();
+      }
+    };
+    const opts = { passive: true } as const;
+    window.addEventListener("touchstart", onStart, opts);
+    window.addEventListener("touchend", onEnd, opts);
+    window.addEventListener("touchcancel", onEnd, opts);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [centreActive]);
+
+  // Keep the active chip in view on narrow screens. Scroll the row
+  // horizontally by hand — scrollIntoView() also scrolls ancestors, which
+  // yanked the whole page back to the sticky row while scrolling.
+  useEffect(() => {
+    if (touchingRef.current) {
+      pendingRef.current = true;
+      return;
+    }
+    centreActive();
+  }, [active, centreActive]);
+
 
 
   if (present.length < 2) return null;
