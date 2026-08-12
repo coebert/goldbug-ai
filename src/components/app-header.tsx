@@ -39,21 +39,15 @@ import { HelpDrawer } from "@/components/help-drawer";
 import { CommandPalette } from "@/components/command-palette";
 import { UkClock } from "@/components/uk-clock";
 import { EnvBadge } from "@/components/env-badge";
+import { PRIMARY } from "@/components/nav/destinations";
 
-/** Primary destinations that appear in the desktop context row. */
+/** Primary destinations, shared with the mobile tab bar and desktop rail. */
 const NAV: ReadonlyArray<{
-  to: "/" | "/trades" | "/compare" | "/learn" | "/saxo-status" | "/settings";
+  to: string;
   label: string;
   icon: typeof TrendingUp;
   exact?: boolean;
-}> = [
-  { to: "/", label: "Home", icon: TrendingUp, exact: true },
-  { to: "/trades", label: "Trades", icon: Receipt },
-  { to: "/compare", label: "Compare", icon: GitCompare },
-  { to: "/learn", label: "Learn", icon: BookOpen },
-  { to: "/saxo-status", label: "Broker", icon: Plug },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
-];
+}> = PRIMARY.map((d) => ({ to: d.to, label: d.label, icon: d.icon, exact: d.exact }));
 
 
 const MOBILE_EXTRAS = [
@@ -222,7 +216,7 @@ export function AppHeader({ email }: { email?: string | null }) {
                 {NAV.map(({ to, label, icon: Icon, exact }) => (
                   <Link
                     key={to}
-                    to={to}
+                    to={to as never}
                     activeOptions={exact ? { exact: true } : undefined}
                     onClick={() => setOpen(false)}
                     className="inline-flex items-center gap-3 rounded-md px-3 py-3 text-foreground hover:bg-muted [&.active]:bg-muted [&.active]:text-foreground"
@@ -282,7 +276,7 @@ export function AppHeader({ email }: { email?: string | null }) {
           + route-scoped actions. Hidden on mobile — the floating tab
           bar covers primary destinations there. */}
       <div className="border-t border-border/60 bg-surface-1/60">
-        <div className="mx-auto hidden max-w-6xl items-center gap-1 px-4 py-1.5 md:flex">
+        <div className="mx-auto hidden max-w-6xl items-center gap-1 px-4 py-1.5 md:flex lg:hidden">
           <nav
             aria-label="Primary"
             className="flex flex-1 items-center gap-1 text-sm"
@@ -290,7 +284,7 @@ export function AppHeader({ email }: { email?: string | null }) {
             {NAV.map(({ to, label, icon: Icon, exact }) => (
               <Link
                 key={to}
-                to={to}
+                to={to as never}
                 activeOptions={exact ? { exact: true } : undefined}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
               >

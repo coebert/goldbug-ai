@@ -20,10 +20,9 @@ import { HomeCoachMarks } from "@/components/home-coach-marks";
 import { SnapshotMismatchAlert } from "@/components/snapshot-mismatch-alert";
 import { PortfolioMirrorAlert } from "@/components/portfolio-mirror-alert";
 import { checkPortfolioMirrors } from "@/lib/portfolio-mirror-detect.functions";
-import { RiskLevelMetricsCard } from "@/components/risk-level-metrics-card";
 import { AdvancedSection } from "@/components/advanced-section";
 import { ExperienceLevelToggle } from "@/components/experience-level-toggle";
-import { Sparkles, PlusCircle } from "lucide-react";
+import { Sparkles, PlusCircle, LineChart } from "lucide-react";
 
 import { TodayHero } from "@/components/home/today-hero";
 import { TodayHeroSkeleton } from "@/components/home/today-hero-skeleton";
@@ -50,34 +49,13 @@ const NewsReel = lazy(() =>
 const ExecPostsCard = lazy(() =>
   import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
 );
-const ExecPostLessonsCard = lazy(() =>
-  import("@/components/exec-post-lessons-card").then((m) => ({ default: m.ExecPostLessonsCard })),
-);
-const MacroLessonsCard = lazy(() =>
-  import("@/components/macro-lessons-card").then((m) => ({ default: m.MacroLessonsCard })),
-);
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
-);
-const ReclaimScanCard = lazy(() =>
-  import("@/components/market/reclaim-scan-card").then((m) => ({ default: m.ReclaimScanCard })),
-);
-const SetupBacktestCard = lazy(() =>
-  import("@/components/market/setup-backtest-card").then((m) => ({ default: m.SetupBacktestCard })),
 );
 
 
 const DecisionNewsBreakdown = lazy(() =>
   import("@/components/decision-news-breakdown").then((m) => ({ default: m.DecisionNewsBreakdown })),
-);
-const MarketPulseCard = lazy(() =>
-  import("@/components/home/market-pulse-card").then((m) => ({ default: m.MarketPulseCard })),
-);
-const SmaTrendCard = lazy(() =>
-  import("@/components/home/sma-trend-card").then((m) => ({ default: m.SmaTrendCard })),
-);
-const MarketHoursCard = lazy(() =>
-  import("@/components/market-hours-card").then((m) => ({ default: m.MarketHoursCard })),
 );
 
 export const Route = createFileRoute("/")({
@@ -301,20 +279,21 @@ function Home() {
 
         <NewHereBanner />
 
-        {/* Market pulse — the state of the wider market, above your own money
-            so the numbers below can be read in context. */}
-        <section className="mb-6">
-          <Suspense fallback={<div className="h-72 rounded-2xl border bg-card/50" aria-hidden="true" />}>
-            <MarketPulseCard />
-          </Suspense>
-        </section>
+        {/* Markets live on their own page now — Home keeps one compact
+            link so the wider picture is always one tap away. */}
+        <Link
+          to="/markets"
+          className="mb-6 grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted"
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium">Markets today</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              Market pulse, moving-average trends and trading hours
+            </span>
+          </span>
+          <LineChart className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+        </Link>
 
-        {/* Moving-average trend — pick a market and window without leaving home. */}
-        <section className="mb-6">
-          <Suspense fallback={<div className="h-96 rounded-2xl border bg-card/50" aria-hidden="true" />}>
-            <SmaTrendCard />
-          </Suspense>
-        </section>
 
         {/* Portfolios — real money first, practice money folded away */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -371,33 +350,20 @@ function Home() {
 
         {/* Everything expert-level lives here: present, labelled in plain
             English, but folded away unless asked for. */}
-        {!focusMode && (
+        {level === "simple" && (
+          <p className="mt-8 text-xs text-muted-foreground">
+            Showing the essentials. Switch to <strong className="font-medium">Standard</strong> or{" "}
+            <strong className="font-medium">Everything</strong> at the top of the page for the
+            deeper panels.
+          </p>
+        )}
+
+        {!focusMode && level !== "simple" && (
           <div className="mt-8 space-y-3">
             <h2 className="font-display text-lg font-semibold tracking-tight">Look deeper</h2>
             <p className="-mt-2 text-xs text-muted-foreground">
               Optional detail. Nothing here needs your attention day to day.
             </p>
-
-            <AdvancedSection
-              title="When markets are open"
-              summary="Trading hours for each exchange the AI uses, in UK time."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-40 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <MarketHoursCard />
-              </Suspense>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="Risk levels at a glance"
-              summary="Risk, drawdown and diversification for each risk level, side by side."
-              defaultOpen={advanced}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <RiskLevelMetricsCard />
-              </Suspense>
-            </AdvancedSection>
-
 
             <AdvancedSection
               title="All portfolios on one chart"
@@ -417,16 +383,14 @@ function Home() {
               <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <TickerWatchCard />
               </Suspense>
-              <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <ReclaimScanCard />
-              </Suspense>
-              <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <SetupBacktestCard />
-              </Suspense>
-
-
+              <p className="mt-2 text-xs text-muted-foreground">
+                Scanners and backtests moved to{" "}
+                <Link to="/research" className="text-primary underline-offset-2 hover:underline">
+                  Research
+                </Link>
+                .
+              </p>
             </AdvancedSection>
-
 
             <AdvancedSection
               title="CEO posts the AI is tracking"
@@ -438,25 +402,6 @@ function Home() {
               </Suspense>
             </AdvancedSection>
 
-            <AdvancedSection
-              title="What the AI learned from CEO posts"
-              summary="The study of past posts against the price path that followed, and the rules it now applies."
-              defaultOpen={false}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <ExecPostLessonsCard />
-              </Suspense>
-            </AdvancedSection>
-
-            <AdvancedSection
-              title="What the AI learned from 20 years of news"
-              summary="Two decades of drawdowns and the headlines behind them, turned into rules for reacting to today's news."
-              defaultOpen={false}
-            >
-              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
-                <MacroLessonsCard />
-              </Suspense>
-            </AdvancedSection>
 
             <AdvancedSection
               title="News the AI is reading"
