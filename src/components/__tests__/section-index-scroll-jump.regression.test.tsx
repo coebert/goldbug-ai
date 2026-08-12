@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Regression: the sticky section index used to yank the page back to the top
  * while scrolling on mobile.
