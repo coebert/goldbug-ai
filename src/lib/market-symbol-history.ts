@@ -140,7 +140,7 @@ export interface HistoryPoint {
   sma100: number | null;
   sma200: number | null;
   /** 14-day Wilder RSI, null until the look-back is warm. */
-  rsi14: number | null;
+  rsi14?: number | null;
 }
 
 
@@ -208,6 +208,7 @@ export function buildSymbolHistory(
 
   const points: HistoryPoint[] = [];
   const base = all[from]?.close ?? null;
+  const rsiAll = computeRsiSeries(closes);
   for (let i = from; i < all.length; i++) {
     points.push({
       date: all[i].price_date,
@@ -217,6 +218,7 @@ export function buildSymbolHistory(
       sma50: trailingAverage(closes, i, 50),
       sma100: trailingAverage(closes, i, 100),
       sma200: trailingAverage(closes, i, 200),
+      rsi14: rsiAll[i] ?? null,
     });
   }
 
