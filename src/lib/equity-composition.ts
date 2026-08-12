@@ -27,14 +27,38 @@ export type CompositionSnapshot = {
 
 export type CompositionPrice = { date: string; close: number };
 
-export type CompositionRow = Record<string, number | string> & { date: string };
+export type CompositionRow = Record<string, number | string | null> & { date: string };
+
+/** A stretch of missing trading days between two real snapshots. */
+export type CompositionGap = {
+  /** Last real snapshot before the gap. */
+  from: string;
+  /** First real snapshot after the gap. */
+  to: string;
+  /** Number of missing weekdays between them. */
+  missingDays: number;
+  /** True when the gap was short enough to fill by linear interpolation. */
+  interpolated: boolean;
+};
 
 export type EquityComposition = {
   /** Stacked series keys, largest average weight first. `cash` is separate. */
   symbols: string[];
   rows: CompositionRow[];
   currency: string;
+  /** Missing-snapshot stretches, whether filled or left as visible breaks. */
+  gaps: CompositionGap[];
 };
+
+/** Marker fields present on rows the builder synthesised (not real snapshots). */
+export const ROW_INTERPOLATED = "_interpolated";
+export const ROW_GAP = "_gap";
+
+export const isRealRow = (row: CompositionRow) =>
+  !row[ROW_INTERPOLATED] && !row[ROW_GAP];
+
+/** Gaps up to this many missing weekdays are filled by interpolation. */
+export const DEFAULT_MAX_INTERPOLATE_DAYS = 3;
 
 const num = (v: unknown, fallback = 0) => {
   const n = Number(v);
@@ -57,6 +81,7 @@ export function buildEquityComposition({
   prices,
   currency = "GBP",
   maxSymbols = 8,
+  maxInterpolateDays = DEFAULT_MAX_INTERPOLATE_DAYS,
 }: {
   snapshots: CompositionSnapshot[];
   trades: CompositionTrade[];
@@ -64,11 +89,13 @@ export function buildEquityComposition({
   prices: Record<string, CompositionPrice[]>;
   currency?: string;
   maxSymbols?: number;
+  /** Longest run of missing weekdays that may be interpolated. */
+  maxInterpolateDays?: number;
 }): EquityComposition {
   const snaps = [...snapshots].sort((a, b) =>
     a.snapshot_date.localeCompare(b.snapshot_date),
   );
-  if (snaps.length === 0) return { symbols: [], rows: [], currency };
+  if (snaps.length === 0) return { symbols: [], rows: [], currency, gaps: [] };
 
   const sortedTrades = [...trades].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
 
@@ -132,7 +159,87 @@ export function buildEquityComposition({
   if (hasOther) symbols.push("other");
   if (rows.some((r) => num(r.unpriced) > 0)) symbols.push("unpriced");
 
-  return { symbols, rows, currency };
+  const seriesKeys = ["cash", ...symbols, "total"];
+  const { rows: filled, gaps } = fillCompositionGaps(rows, seriesKeys, maxInterpolateDays);
+
+  return { symbols, rows: filled, currency, gaps };
+}
+
+// ---------------------------------------------------------------------------
+// Missing-snapshot handling.
+//
+// Snapshots can be missing for a day (worker outage, broker downtime). Short
+// gaps are filled by linear interpolation between the surrounding snapshots so
+// the stack stays continuous; long gaps are NOT invented — they are marked with
+// null-valued rows so the chart visibly breaks and the UI can say why.
+
+const DAY_MS = 86_400_000;
+const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
+const toIso = (d: Date) => d.toISOString().slice(0, 10);
+const isWeekend = (d: Date) => d.getUTCDay() === 0 || d.getUTCDay() === 6;
+
+/** Weekday ISO dates strictly between two dates (markets are shut at weekends). */
+function weekdaysBetween(from: string, to: string): string[] {
+  const out: string[] = [];
+  const end = toDate(to).getTime();
+  for (let t = toDate(from).getTime() + DAY_MS; t < end; t += DAY_MS) {
+    const d = new Date(t);
+    if (!isWeekend(d)) out.push(toIso(d));
+  }
+  return out;
+}
+
+export function fillCompositionGaps(
+  rows: CompositionRow[],
+  keys: string[],
+  maxInterpolateDays = DEFAULT_MAX_INTERPOLATE_DAYS,
+): { rows: CompositionRow[]; gaps: CompositionGap[] } {
+  if (rows.length < 2) return { rows, gaps: [] };
+
+  const out: CompositionRow[] = [rows[0]];
+  const gaps: CompositionGap[] = [];
+
+  for (let i = 1; i < rows.length; i += 1) {
+    const prev = rows[i - 1];
+    const next = rows[i];
+    const missing = weekdaysBetween(prev.date, next.date);
+
+    if (missing.length > 0) {
+      const interpolated = missing.length <= maxInterpolateDays;
+      gaps.push({
+        from: prev.date,
+        to: next.date,
+        missingDays: missing.length,
+        interpolated,
+      });
+
+      if (interpolated) {
+        const span = missing.length + 1;
+        missing.forEach((date, idx) => {
+          const w = (idx + 1) / span;
+          const row: CompositionRow = { date, [ROW_INTERPOLATED]: 1 };
+          for (const k of keys) {
+            const a = num(prev[k]);
+            const b = num(next[k]);
+            row[k] = a + (b - a) * w;
+          }
+          out.push(row);
+        });
+      } else {
+        // Leave the series genuinely empty across the gap so it renders as a
+        // break rather than a straight line through data we never had.
+        for (const date of missing) {
+          const row: CompositionRow = { date, [ROW_GAP]: 1 };
+          for (const k of keys) row[k] = null;
+          out.push(row);
+        }
+      }
+    }
+
+    out.push(next);
+  }
+
+  return { rows: out, gaps };
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +265,9 @@ export function validateComposition(
 ): CompositionMismatch[] {
   const out: CompositionMismatch[] = [];
   for (const row of rows) {
+    // Gap rows are intentionally empty; interpolated rows are derived from the
+    // same arithmetic and are checked like any other row.
+    if (row[ROW_GAP]) continue;
     const total = num(row.total);
     const stacked = keys.reduce((s, k) => s + num(row[k]), 0);
     const diff = stacked - total;

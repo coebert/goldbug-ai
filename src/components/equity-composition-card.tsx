@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, Layers } from "lucide-react";
+import { AlertTriangle, Info, Layers } from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -20,7 +20,7 @@ import {
 } from "recharts";
 
 import { getEquityComposition } from "@/lib/equity-composition.functions";
-import { validateComposition } from "@/lib/equity-composition";
+import { ROW_INTERPOLATED, validateComposition } from "@/lib/equity-composition";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChartFrame } from "@/components/chart-frame";
@@ -120,6 +120,10 @@ export function EquityCompositionCard({
   // Each stacked snapshot must sum exactly to its stored total equity.
   const mismatches = useMemo(() => validateComposition(rows, keys), [rows, keys]);
 
+  const gaps = q.data?.gaps ?? [];
+  const filledGaps = gaps.filter((g) => g.interpolated);
+  const openGaps = gaps.filter((g) => !g.interpolated);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
@@ -164,6 +168,33 @@ export function EquityCompositionCard({
             </div>
           </div>
         ) : null}
+        {gaps.length > 0 ? (
+          <div className="mb-3 flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium text-foreground">Some snapshots are missing</p>
+              {filledGaps.length > 0 ? (
+                <p className="mt-0.5">
+                  {filledGaps.length} short gap{filledGaps.length === 1 ? "" : "s"} (
+                  {filledGaps.reduce((n, g) => n + g.missingDays, 0)} trading day
+                  {filledGaps.reduce((n, g) => n + g.missingDays, 0) === 1 ? "" : "s"}) were filled
+                  by interpolating between the surrounding snapshots.
+                </p>
+              ) : null}
+              {openGaps.length > 0 ? (
+                <p className="mt-0.5">
+                  {openGaps.length} longer gap{openGaps.length === 1 ? "" : "s"} left blank (
+                  {openGaps
+                    .map((g) => `${g.from} to ${g.to}, ${g.missingDays} days`)
+                    .slice(0, 3)
+                    .join("; ")}
+                  {openGaps.length > 3 ? "; …" : ""}) — no data was available, so the chart breaks
+                  there instead of inventing values.
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         {q.isLoading ? (
           <div className="h-64 animate-pulse rounded-md bg-muted/40" />
         ) : rows.length < 2 ? (
@@ -196,7 +227,10 @@ export function EquityCompositionCard({
                     money.format(Number(value)),
                     labelFor(name),
                   ]}
-                  labelFormatter={(d: string) => d}
+                  labelFormatter={(d: string) => {
+                    const row = rows.find((r) => r.date === d);
+                    return row?.[ROW_INTERPOLATED] ? `${d} (interpolated)` : d;
+                  }}
                 />
                 {keys.map((key) => (
                   <Area
@@ -207,6 +241,7 @@ export function EquityCompositionCard({
                     stroke={colorFor(key)}
                     fill={colorFor(key)}
                     fillOpacity={0.55}
+                    connectNulls={false}
                     strokeWidth={1}
                     isAnimationActive={false}
                   />
