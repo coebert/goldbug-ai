@@ -307,6 +307,50 @@ function AnnotationList({
   );
 }
 
+/** Plain-language read-out of the divergences drawn on the charts. */
+function DivergenceList({ divergences }: { divergences: RsiDivergence[] }) {
+  if (!divergences.length) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No RSI divergences in this window — price and momentum agree.
+      </p>
+    );
+  }
+  const recent = divergences.slice(-4).reverse();
+  return (
+    <section className="space-y-2">
+      <h2 className="text-xs font-medium text-muted-foreground">
+        RSI divergences ({divergences.length} in window)
+      </h2>
+      <ul className="space-y-1.5">
+        {recent.map((d) => (
+          <li key={`${d.kind}-${d.from.date}-${d.to.date}`} className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge
+              variant="outline"
+              className={
+                d.kind === "bullish"
+                  ? "border-emerald-500/40 text-emerald-500"
+                  : "border-destructive/40 text-destructive"
+              }
+            >
+              {DIVERGENCE_LABEL[d.kind]}
+            </Badge>
+            <span className="text-muted-foreground">
+              {formatUkDate(d.from.date)} → {formatUkDate(d.to.date)} · {divergenceSummary(d)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-muted-foreground">
+        Divergence flags waning momentum, not a trade signal: confirm with a reclaim of the
+        20-day average before acting. Not financial advice.
+      </p>
+    </section>
+  );
+}
+
+
+
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
   const { range, compare: compareParam, sma: smaParam } = Route.useSearch();
