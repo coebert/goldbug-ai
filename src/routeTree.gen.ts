@@ -15,6 +15,7 @@ import { Route as SimulationReportRouteImport } from './routes/simulation-report
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SaxoStatusRouteImport } from './routes/saxo-status'
 import { Route as SaxoReconnectRouteImport } from './routes/saxo-reconnect'
+import { Route as ResearchRouteImport } from './routes/research'
 import { Route as MarketsRouteImport } from './routes/markets'
 import { Route as LearnRouteImport } from './routes/learn'
 import { Route as HedgeFallbacksRouteImport } from './routes/hedge-fallbacks'
@@ -85,6 +86,11 @@ const SaxoStatusRoute = SaxoStatusRouteImport.update({
 const SaxoReconnectRoute = SaxoReconnectRouteImport.update({
   id: '/saxo-reconnect',
   path: '/saxo-reconnect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResearchRoute = ResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketsRoute = MarketsRouteImport.update({
@@ -320,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/markets': typeof MarketsRoute
+  '/research': typeof ResearchRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
@@ -369,6 +376,7 @@ export interface FileRoutesByTo {
   '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/markets': typeof MarketsRoute
+  '/research': typeof ResearchRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
@@ -419,6 +427,7 @@ export interface FileRoutesById {
   '/hedge-fallbacks': typeof HedgeFallbacksRoute
   '/learn': typeof LearnRoute
   '/markets': typeof MarketsRoute
+  '/research': typeof ResearchRoute
   '/saxo-reconnect': typeof SaxoReconnectRoute
   '/saxo-status': typeof SaxoStatusRoute
   '/settings': typeof SettingsRoute
@@ -470,6 +479,7 @@ export interface FileRouteTypes {
     | '/hedge-fallbacks'
     | '/learn'
     | '/markets'
+    | '/research'
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/settings'
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/hedge-fallbacks'
     | '/learn'
     | '/markets'
+    | '/research'
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/settings'
@@ -568,6 +579,7 @@ export interface FileRouteTypes {
     | '/hedge-fallbacks'
     | '/learn'
     | '/markets'
+    | '/research'
     | '/saxo-reconnect'
     | '/saxo-status'
     | '/settings'
@@ -618,6 +630,7 @@ export interface RootRouteChildren {
   HedgeFallbacksRoute: typeof HedgeFallbacksRoute
   LearnRoute: typeof LearnRoute
   MarketsRoute: typeof MarketsRoute
+  ResearchRoute: typeof ResearchRoute
   SaxoReconnectRoute: typeof SaxoReconnectRoute
   SaxoStatusRoute: typeof SaxoStatusRoute
   SettingsRoute: typeof SettingsRoute
@@ -695,6 +708,13 @@ declare module '@tanstack/react-router' {
       path: '/saxo-reconnect'
       fullPath: '/saxo-reconnect'
       preLoaderRoute: typeof SaxoReconnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/research': {
+      id: '/research'
+      path: '/research'
+      fullPath: '/research'
+      preLoaderRoute: typeof ResearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/markets': {
@@ -1017,6 +1037,7 @@ const rootRouteChildren: RootRouteChildren = {
   HedgeFallbacksRoute: HedgeFallbacksRoute,
   LearnRoute: LearnRoute,
   MarketsRoute: MarketsRoute,
+  ResearchRoute: ResearchRoute,
   SaxoReconnectRoute: SaxoReconnectRoute,
   SaxoStatusRoute: SaxoStatusRoute,
   SettingsRoute: SettingsRoute,
