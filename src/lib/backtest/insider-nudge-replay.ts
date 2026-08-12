@@ -48,6 +48,12 @@ export type ReplayParams = {
   costBps: number;
   /** Multiplier on the production nudge; 1 = live behaviour, 0 = baseline. */
   nudgeScale: number;
+  /**
+   * Risk dial (1..5). Both arms size positions through the same preset the live
+   * AI uses, so drawdown/VaR comparisons reflect real deployment, not equal
+   * weights.
+   */
+  riskLevel: number;
 };
 
 export const DEFAULT_REPLAY_PARAMS: ReplayParams = {
@@ -57,7 +63,9 @@ export const DEFAULT_REPLAY_PARAMS: ReplayParams = {
   halfLifeDays: 7,
   costBps: 25,
   nudgeScale: 1,
+  riskLevel: 3,
 };
+
 
 const SENIOR_ROLE = /(chief exec|ceo|founder)/i;
 const CFO_ROLE = /(chief financ|cfo|finance director)/i;
