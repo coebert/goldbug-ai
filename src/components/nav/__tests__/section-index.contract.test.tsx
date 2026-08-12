@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+// @vitest-environment jsdom
+import { describe, expect, it, afterEach } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { SectionIndex } from "@/components/nav/section-index";
 
 /**
@@ -13,6 +14,11 @@ describe("SectionIndex", () => {
     { id: "ghost", label: "Ghost" },
   ] as const;
 
+  afterEach(() => {
+    cleanup();
+    document.body.innerHTML = "";
+  });
+
   function mountTargets(ids: string[]) {
     for (const id of ids) {
       const el = document.createElement("div");
@@ -24,8 +30,8 @@ describe("SectionIndex", () => {
   it("renders one chip per present target and drops missing ones", () => {
     mountTargets(["alpha", "beta"]);
     render(<SectionIndex items={items} />);
-    expect(screen.getByRole("link", { name: "Alpha" })).toHaveAttribute("href", "#alpha");
-    expect(screen.getByRole("link", { name: "Beta" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Alpha" }).getAttribute("href")).toBe("#alpha");
+    expect(screen.getByRole("link", { name: "Beta" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Ghost" })).toBeNull();
   });
 
@@ -38,8 +44,8 @@ describe("SectionIndex", () => {
   it("marks the first section active on initial render", () => {
     mountTargets(["alpha", "beta"]);
     render(<SectionIndex items={items} />);
-    expect(screen.getByRole("link", { name: "Alpha" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("link", { name: "Beta" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Alpha" }).getAttribute("aria-current")).toBe("true");
+    expect(screen.getByRole("link", { name: "Beta" }).getAttribute("aria-current")).toBeNull();
   });
 
   it("keeps every chip a 44px touch target", () => {
