@@ -147,8 +147,7 @@ function TradeRow({
     </div>
   );
 }
-
-
+/**
  * Replays the CRWV-derived post-reclaim rules over years of history to show how
  * often the pattern produced a profitable entry versus froth — and whether
  * waiting for the pullback beats chasing the surge bar.
