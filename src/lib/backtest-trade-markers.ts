@@ -16,6 +16,8 @@ export type MarkerTone = "positive" | "negative" | "neutral";
 
 export interface TradeMarker {
   key: string;
+  /** Stable id of the trade this marker belongs to (shared with the lists). */
+  tradeId: string;
   date: string;
   price: number;
   /** RSI at that bar, when the window is warm — used by the RSI pane. */
@@ -31,6 +33,7 @@ export interface TradeMarker {
 
 export interface TradeLeg {
   key: string;
+  tradeId: string;
   fromDate: string;
   fromPrice: number;
   toDate: string;
@@ -46,6 +49,16 @@ export interface TradeOverlay {
 }
 
 export const EMPTY_TRADE_OVERLAY: TradeOverlay = { markers: [], legs: [] };
+
+/** Stable id for an RSI-zone strategy trade. */
+export function rsiTradeId(t: { entryDate: string; exitDate: string }): string {
+  return `rsi:${t.entryDate}:${t.exitDate}`;
+}
+
+/** Stable id for a divergence trade. */
+export function divergenceTradeId(t: { pivotDate: string; entryDate: string }): string {
+  return `div:${t.pivotDate}:${t.entryDate}`;
+}
 
 function rsiIndex(points: HistoryPoint[]): Map<string, number | null> {
   const m = new Map<string, number | null>();
@@ -77,8 +90,10 @@ export function rsiTradeOverlay(trades: RsiTrade[], points: HistoryPoint[]): Tra
 
   trades.forEach((t, i) => {
     const id = `rsi-${i}-${t.entryDate}`;
+    const tradeId = rsiTradeId(t);
     markers.push({
       key: `${id}-entry`,
+      tradeId,
       date: t.entryDate,
       price: t.entryPrice,
       rsi: rsi.get(t.entryDate) ?? null,
@@ -93,6 +108,7 @@ export function rsiTradeOverlay(trades: RsiTrade[], points: HistoryPoint[]): Tra
       date: t.exitDate,
       price: t.exitPrice,
       rsi: rsi.get(t.exitDate) ?? null,
+      tradeId,
       side: "exit",
       direction: "long",
       glyph: exitGlyph("long"),
@@ -101,6 +117,7 @@ export function rsiTradeOverlay(trades: RsiTrade[], points: HistoryPoint[]): Tra
     });
     legs.push({
       key: `${id}-leg`,
+      tradeId,
       fromDate: t.entryDate,
       fromPrice: t.entryPrice,
       toDate: t.exitDate,
@@ -126,8 +143,10 @@ export function divergenceTradeOverlay(
   trades.forEach((t, i) => {
     const direction: TradeDirection = t.kind === "bullish" ? "long" : "short";
     const id = `div-${i}-${t.entryDate}`;
+    const tradeId = divergenceTradeId(t);
     markers.push({
       key: `${id}-entry`,
+      tradeId,
       date: t.entryDate,
       price: t.entryPrice,
       rsi: rsi.get(t.entryDate) ?? null,
@@ -142,6 +161,7 @@ export function divergenceTradeOverlay(
       date: t.exitDate,
       price: t.exitPrice,
       rsi: rsi.get(t.exitDate) ?? null,
+      tradeId,
       side: "exit",
       direction,
       glyph: exitGlyph(direction),
@@ -150,6 +170,7 @@ export function divergenceTradeOverlay(
     });
     legs.push({
       key: `${id}-leg`,
+      tradeId,
       fromDate: t.entryDate,
       fromPrice: t.entryPrice,
       toDate: t.exitDate,
