@@ -121,12 +121,13 @@ export function SectionIndex({
   // horizontally by hand — scrollIntoView() also scrolls ancestors, which
   // yanked the whole page back to the sticky row while scrolling.
   useEffect(() => {
-    if (touchingRef.current) {
+    if (touchingRef.current || isGesturing()) {
       pendingRef.current = true;
       return;
     }
     centreActive();
-  }, [active, centreActive]);
+  }, [active, centreActive, isGesturing]);
+
 
 
 
