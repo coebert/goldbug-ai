@@ -144,7 +144,18 @@ export function ReclaimScanCard() {
                         <Badge variant="outline" className="text-[10px]">
                           Fit {m.score}/100
                         </Badge>
+                        {m.divergence ? (
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${m.divergence.kind === "bullish" ? "border-emerald-500/40 text-emerald-500" : "border-destructive/40 text-destructive"}`}
+                          >
+                            {m.divergence.kind === "bullish" ? "Bullish" : "Bearish"} divergence{" "}
+                            {m.divergence.scoreAdjust >= 0 ? "+" : ""}
+                            {m.divergence.scoreAdjust}
+                          </Badge>
+                        ) : null}
                       </div>
+
                       <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
                         {m.reasons.map((r) => (
                           <li key={r}>· {r}</li>
