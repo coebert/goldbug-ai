@@ -28,7 +28,7 @@ import {
   AXIS_TICK,
   CHART_ROLE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   OKABE_ITO,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
@@ -577,7 +577,7 @@ export function BacktestRunHistoryCard({
                         labelFormatter={(t: number) => `Day ${t}`}
                         contentStyle={TOOLTIP_CONTENT_STYLE}
                       />
-                      <Legend wrapperStyle={LEGEND_STYLE} />
+                      <Legend {...LEGEND_PROPS} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}
@@ -628,7 +628,7 @@ export function BacktestRunHistoryCard({
                         labelFormatter={(t: number) => `Day ${t}`}
                         contentStyle={TOOLTIP_CONTENT_STYLE}
                       />
-                      <Legend wrapperStyle={LEGEND_STYLE} />
+                      <Legend {...LEGEND_PROPS} />
                       {overlaySeries.map((s) => (
                         <Line
                           key={s.id}

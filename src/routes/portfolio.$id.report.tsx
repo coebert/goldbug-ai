@@ -301,7 +301,7 @@ function ReportPage() {
                           name,
                         ]}
                       />
-                      <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
+                      <Legend {...LEGEND_PROPS} />
                       <ReferenceLine
                         {...REFERENCE_LINE}
                         y={data.portfolio.starting_cash}

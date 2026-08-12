@@ -21,6 +21,7 @@ import type { OrderBatchingAbResponse } from "@/lib/batching-backtest.functions"
 import { formatMoney } from "@/lib/format-money";
 import { AbConfidencePanel } from "@/components/backtest-ab-confidence-panel";
 import {
+  SAXO_LEGEND_PROPS,
   SAXO_AXIS,
   SAXO_COLOR,
   SAXO_GRID,
@@ -350,7 +351,7 @@ export function BatchingBacktestCard({
                     cursor={SAXO_TOOLTIP_CURSOR}
                     formatter={(v: number, name: string) => [formatMoney(v, currency), name]}
                   />
-                  <Legend wrapperStyle={{ fontSize: SAXO_METRIC.tickFontSize, color: SAXO_COLOR.axis }} />
+                  <Legend {...SAXO_LEGEND_PROPS} />
                   <Line
                     type="monotone"
                     dataKey="batched"

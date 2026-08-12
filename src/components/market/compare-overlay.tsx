@@ -25,7 +25,7 @@ import {
   AXIS_LINE,
   AXIS_TICK,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   REFERENCE_LINE,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
@@ -325,7 +325,7 @@ export function CompareOverlay({
                     name,
                   ]}
                 />
-                <Legend wrapperStyle={LEGEND_STYLE} />
+                <Legend {...LEGEND_PROPS} />
                 {comparison.series.map((s) => (
                   <Line
                     key={s.symbol}

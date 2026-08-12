@@ -339,7 +339,7 @@ export function BacktestResultsCard({
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
                     contentStyle={TOOLTIP_CONTENT_STYLE}
                   />
-                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--foreground)" }} />
+                  <Legend {...LEGEND_PROPS} />
                   <Area
                     type="monotone"
                     dataKey="cash"

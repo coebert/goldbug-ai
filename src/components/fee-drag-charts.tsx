@@ -19,7 +19,7 @@ import {
   CHART_ROLE,
   CHART_SEQUENCE,
   GRID_PROPS,
-  LEGEND_STYLE,
+  LEGEND_PROPS,
   TICK_LINE,
 } from "@/lib/chart-palette";
 import type { PerTradeFeeRow } from "@/lib/fee-breakdown";
@@ -190,7 +190,7 @@ export function FeeDragCharts({
                   return [money(Number(v)), name];
                 }}
               />
-              <Legend wrapperStyle={LEGEND_STYLE} />
+              <Legend {...LEGEND_PROPS} />
               {scale === "cost" ? (
                 <>
                   <Area
@@ -282,7 +282,7 @@ export function FeeDragCharts({
                   return [`${money(Number(v))}${extra}`, name];
                 }}
               />
-              <Legend wrapperStyle={LEGEND_STYLE} />
+              <Legend {...LEGEND_PROPS} />
               <Bar dataKey="buyFee" stackId="fees" name="Buy fees" fill={CHART_ROLE.positive}>
                 {topSymbols.map((_, i) => (
                   <Cell key={`buy-${i}`} fill={CHART_ROLE.positive} />
