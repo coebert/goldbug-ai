@@ -117,6 +117,11 @@ export type OrderBatchingAbResult = {
   unbatched: BatchingArmResult;
   /** Positive = batching is cheaper, in bps of starting equity. */
   costSavingBps: number;
+  /**
+   * Positive = batching paid MORE market impact (bigger tickets), bps of
+   * starting equity. This is the term that can eat the commission saving.
+   */
+  slippageDeltaBps: number;
   /** Positive = batching drew down MORE (worse). Percentage points. */
   drawdownDeltaPct: number;
   /** Positive = batching returned more. Percentage points. */
@@ -435,6 +440,7 @@ export async function runOrderBatchingAb(
   ]);
 
   const costSavingBps = unbatched.costBpsOfEquity - batched.costBpsOfEquity;
+  const slippageDeltaBps = batched.slippageBpsOfEquity - unbatched.slippageBpsOfEquity;
   const drawdownDeltaPct = batched.maxDrawdownPct - unbatched.maxDrawdownPct;
   const returnDeltaPct = batched.returnPct - unbatched.returnPct;
   const ticketsSaved = unbatched.tickets - batched.tickets;
@@ -457,7 +463,7 @@ export async function runOrderBatchingAb(
 
   const summary =
     verdict === "supported"
-      ? `Batching saved ${fmt(costSavingBps)}bps of equity in costs (${ticketsSaved} fewer tickets) with drawdown ${drawdownDeltaPct <= 0 ? `${fmt(-drawdownDeltaPct)}pp lower` : `only ${fmt(drawdownDeltaPct)}pp higher`}. Keep the window on.`
+      ? `Batching saved ${fmt(costSavingBps)}bps of equity in costs (${ticketsSaved} fewer tickets, ${fmt(slippageDeltaBps)}bps of that handed back as market impact) with drawdown ${drawdownDeltaPct <= 0 ? `${fmt(-drawdownDeltaPct)}pp lower` : `only ${fmt(drawdownDeltaPct)}pp higher`}. Keep the window on.`
       : verdict === "costly_risk"
         ? `Batching saved ${fmt(costSavingBps)}bps of costs but deepened max drawdown by ${fmt(drawdownDeltaPct)}pp — the delayed entries cost more risk than the commissions saved.`
         : verdict === "not_supported"
@@ -468,6 +474,7 @@ export async function runOrderBatchingAb(
     batched,
     unbatched,
     costSavingBps,
+    slippageDeltaBps,
     drawdownDeltaPct,
     returnDeltaPct,
     ticketsSaved,

@@ -25,6 +25,11 @@ import {
   type OrderBatchingAbInput,
 } from "./order-batching-ab";
 import { estimateTradeCosts } from "../trade-viability-gate";
+import {
+  quoteExecutionImpact,
+  DEFAULT_EXECUTION_IMPACT,
+  type ExecutionImpactConfig,
+} from "./execution-impact";
 
 export type BenchmarkId = "buy_and_hold" | "momentum_only";
 
@@ -97,10 +102,16 @@ export async function runBuyAndHoldArm(
 
   const trades: Array<BatchingArmTrade & { id: string }> = [];
 
+  const execConfig: ExecutionImpactConfig = {
+    ...DEFAULT_EXECUTION_IMPACT,
+    ...(input.execution ?? {}),
+  };
+
   const strategy = async (ctx: {
     date: string;
     barIndex: number;
     closes: Record<string, number>;
+    history: Record<string, number[]>;
   }): Promise<SimDecision[]> => {
     if (ctx.barIndex !== 0) return [];
     const decisions: SimDecision[] = [];
@@ -112,7 +123,16 @@ export async function runBuyAndHoldArm(
       const quantity = Math.floor((perName * 0.99) / price);
       if (quantity <= 0) return;
       const assetClass = assetClassOf(input, symbol);
-      const cost = costFor({ symbol, side: "buy", quantity, price, assetClass });
+      const impact = quoteExecutionImpact({
+        symbol,
+        quantity,
+        price,
+        assetClass,
+        history: ctx.history?.[symbol],
+        config: execConfig,
+      });
+      const cost =
+        costFor({ symbol, side: "buy", quantity, price, assetClass }) + impact.slippageBase;
       const id = `bh-${ctx.date}-${i}`;
       trades.push({
         id,
@@ -123,6 +143,9 @@ export async function runBuyAndHoldArm(
         price,
         notional: quantity * price,
         cost,
+        slippageBase: impact.slippageBase,
+        slippageBps: impact.slippageBps,
+        participation: impact.participation,
         parkedQuantity: 0,
         waitedHours: 0,
       });
@@ -138,7 +161,12 @@ export async function runBuyAndHoldArm(
   const filled = trades.filter((t) => !rejected.has(t.id)).map(({ id: _id, ...rest }) => rest);
 
   const totalCostBase = filled.reduce((a, t) => a + t.cost, 0);
+  const totalSlippageBase = filled.reduce((a, t) => a + t.slippageBase, 0);
   const turnoverBase = filled.reduce((a, t) => a + t.notional, 0);
+  const avgParticipation =
+    turnoverBase > 0
+      ? filled.reduce((a, t) => a + t.participation * t.notional, 0) / turnoverBase
+      : 0;
   const finalValue = result.equityCurve.at(-1)?.totalValue ?? startingCash;
   const points = result.equityCurve.map((p) => ({
     snapshot_date: p.date,
@@ -151,6 +179,9 @@ export async function runBuyAndHoldArm(
     tickets: filled.length,
     trades: filled,
     totalCostBase,
+    totalSlippageBase,
+    slippageBpsOfEquity: startingCash > 0 ? (totalSlippageBase / startingCash) * 10_000 : 0,
+    avgParticipation,
     costBpsOfTurnover: turnoverBase > 0 ? (totalCostBase / turnoverBase) * 10_000 : 0,
     costBpsOfEquity: startingCash > 0 ? (totalCostBase / startingCash) * 10_000 : 0,
     turnoverBase,
