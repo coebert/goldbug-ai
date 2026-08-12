@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render } from "@testing-library/react";
 import { useAxisLockedScroll } from "../use-axis-locked-scroll";
 
 function Strip({ width = 400, client = 100 }: { width?: number; client?: number }) {
@@ -31,6 +31,8 @@ function touch(el: Element, type: string, x: number, y: number) {
 }
 
 describe("useAxisLockedScroll", () => {
+  afterEach(() => cleanup());
+
   it("claims the gesture (preventDefault) once locked horizontally", () => {
     const { getByTestId } = render(<Strip />);
     const el = getByTestId("strip");
