@@ -43,6 +43,16 @@ export interface CompareSmaSeries {
   color: string;
 }
 
+/** Data key for a symbol's raw (unrebased) close. */
+export function comparePriceKey(symbol: string): string {
+  return `${symbol}~price`;
+}
+
+/** Data key for a symbol's raw (unrebased) moving average. */
+export function compareSmaPriceKey(symbol: string, period: SmaPeriod): string {
+  return `${symbol}~sma${period}~price`;
+}
+
 /** Data key for a symbol's rebased moving average. */
 export function compareSmaKey(symbol: string, period: SmaPeriod): string {
   return `${symbol}~sma${period}`;
@@ -339,7 +349,10 @@ export function buildComparison(
       const close = rows[j].close;
       const rebased = Number(((close / base) * 100).toFixed(3));
       const at = index.get(rows[j].date);
-      if (at != null) points[at][h.symbol] = rebased;
+      if (at != null) {
+        points[at][h.symbol] = rebased;
+        points[at][comparePriceKey(h.symbol)] = close;
+      }
 
       peak = Math.max(peak, rebased);
       trough = Math.min(trough, rebased);
@@ -365,6 +378,7 @@ export function buildComparison(
         const v = p[smaKey(period)];
         if (v == null || !Number.isFinite(v)) continue;
         points[at][compareSmaKey(h.symbol, period)] = Number(((v / base) * 100).toFixed(3));
+        points[at][compareSmaPriceKey(h.symbol, period)] = v;
         any = true;
       }
       if (any) {
