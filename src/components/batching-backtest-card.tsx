@@ -311,7 +311,7 @@ export function BatchingBacktestCard({
                   {[
                     { key: "batched", label: "Batching on", ...result.batched },
                     { key: "unbatched", label: "Batching off", ...result.unbatched },
-                    ...(result.benchmarks?.arms ?? []).map((a) => ({ key: a.id, label: a.label, ...a })),
+                    ...(result.benchmarks?.arms ?? []).map((a) => ({ ...a, key: a.id, label: a.label })),
                   ].map((arm) => (
                     <tr key={arm.key} className="border-b border-border/40 last:border-0">
                       <td className="py-1.5">{arm.label}</td>
