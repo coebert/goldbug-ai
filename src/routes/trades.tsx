@@ -151,7 +151,7 @@ function TradesPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
       <AppHeader email={email} />
-      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 space-y-4">
+      <main className="mx-auto w-full min-w-0 max-w-6xl 2xl:max-w-7xl px-4 py-6 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">

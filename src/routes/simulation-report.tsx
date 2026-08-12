@@ -27,7 +27,7 @@ export const Route = createFileRoute("/simulation-report")({
 function SimulationReportPage() {
   const input = useMemo(() => buildDemoScenarioInput(), []);
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8">
+    <div className="container mx-auto max-w-6xl 2xl:max-w-7xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-semibold">
         Simulation Performance Report
       </h1>

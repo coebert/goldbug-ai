@@ -176,7 +176,7 @@ function LongHorizonPage() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={session.user.email} />
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
+      <main className="mx-auto max-w-6xl 2xl:max-w-7xl px-4 py-5 sm:py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">

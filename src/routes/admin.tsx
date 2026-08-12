@@ -380,7 +380,7 @@ function AdminPage() {
 
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6 overflow-x-hidden p-4 sm:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-6xl 2xl:max-w-7xl space-y-6 overflow-x-hidden p-4 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold sm:text-2xl">Admin — Broker & Routing Health</h1>

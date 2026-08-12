@@ -108,7 +108,7 @@ function SmaReportPage() {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
-      <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+      <main className="mx-auto max-w-6xl 2xl:max-w-7xl space-y-4 p-4 sm:p-6">
         <PortfolioTabs id={id} />
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm">
