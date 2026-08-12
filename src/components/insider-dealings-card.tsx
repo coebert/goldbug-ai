@@ -50,7 +50,17 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
   }, [mutate]);
 
   const events = feed?.events ?? [];
-  const ranked = [...events].sort((a, b) => b.severity - a.severity).slice(0, 8);
+  // The AI scan's own read comes first: anything it rejected as not-an-insider
+  // -dealing is hidden, and confirmed signals outrank keyword severity.
+  const ranked = events
+    .filter((e) => e.ai_verdict !== "noise")
+    .sort((a, b) => {
+      const rank = (v: (typeof a)["ai_verdict"]) => (v === "signal" ? 2 : v == null ? 1 : 0);
+      return rank(b.ai_verdict) - rank(a.ai_verdict) || b.severity - a.severity;
+    })
+    .slice(0, 8);
+  const scan = feed?.last_scan ?? null;
+
 
   return (
     <Card className={cn("border-border/60", className)}>
