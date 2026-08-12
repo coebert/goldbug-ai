@@ -1,0 +1,5 @@
+UPDATE public.ticker_watches
+SET thesis = 'Re-run 12 Aug 2026 (close 387.6p): signal WEAKER. The 3.5% one-day drop broke the July-August uptrend structure — price is now 10p below the 20-day (397.4p), 5.6% off the 410.6p high, and 5d momentum is -5.3%. RSI 14 fell 56.8 -> 46.0, so it is neutral, not oversold: no washout entry yet. Trend is not broken outright: price still holds above the 50-day (381.3p) and well above the 100-day (364.8p), and 20-day annualised vol is 32.4%, inside the 35% cap. Verdict: HOLD, do not add. Re-arm to accumulate only on a daily close back above 397.4p (20-day) or RSI below 30 with vol under 35%. Warning level 381p (50-day) — a close below it turns this into a trim candidate. Invalidation unchanged at 347.2p (60-day low).',
+    buy_above = 397.40,
+    updated_at = now()
+WHERE symbol = 'MKS.L';
