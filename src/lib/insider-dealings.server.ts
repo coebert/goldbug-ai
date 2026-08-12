@@ -257,6 +257,11 @@ export async function ingestInsiderDealings(
 /**
  * Recent stored dealings, reduced to the per-symbol nudge the trading engine
  * applies. Kept here (not in the pure module) because it touches the DB.
+ *
+ * Where the scheduled AI scan has already reviewed an event, its vetted
+ * `ai_nudge` wins over the keyword score, events it judged to be noise drop
+ * out entirely, and a cluster of insiders dealing the same way earns a small
+ * bounded premium.
  */
 export async function loadRecentInsiderSignals(
   supabase: Sb,
@@ -289,8 +294,18 @@ export async function loadRecentInsiderSignals(
     value: r["value"] == null ? null : Number(r["value"]),
     severity: Number(r["severity"] ?? 0),
     sentiment_nudge: Number(r["sentiment_nudge"] ?? 0),
-  })) as InsiderDealingEvent[];
+    ai_verdict: (r["ai_verdict"] as "signal" | "mechanical" | "noise" | null) ?? null,
+    ai_confidence: r["ai_confidence"] == null ? null : Number(r["ai_confidence"]),
+    ai_nudge: r["ai_nudge"] == null ? null : Number(r["ai_nudge"]),
+    ai_rationale: (r["ai_rationale"] as string | null) ?? null,
+  }));
 
-  const { insiderSignalBySymbol } = await import("./insider-dealings");
-  return insiderSignalBySymbol(events);
+  const { insiderSignalsWithAi } = await import("./insider-ai-scan");
+  return insiderSignalsWithAi(events).map((s) => ({
+    symbol: s.symbol,
+    nudge: s.nudge,
+    events: s.events,
+    worst: s.worst as InsiderDealingEvent,
+  }));
 }
+

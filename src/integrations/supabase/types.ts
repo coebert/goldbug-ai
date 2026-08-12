@@ -1461,6 +1461,11 @@ export type Database = {
       }
       insider_dealing_events: {
         Row: {
+          ai_confidence: number | null
+          ai_nudge: number | null
+          ai_rationale: string | null
+          ai_scanned_at: string | null
+          ai_verdict: string | null
           company: string
           created_at: string
           direction: string
@@ -1481,6 +1486,11 @@ export type Database = {
           value: number | null
         }
         Insert: {
+          ai_confidence?: number | null
+          ai_nudge?: number | null
+          ai_rationale?: string | null
+          ai_scanned_at?: string | null
+          ai_verdict?: string | null
           company: string
           created_at?: string
           direction?: string
@@ -1501,6 +1511,11 @@ export type Database = {
           value?: number | null
         }
         Update: {
+          ai_confidence?: number | null
+          ai_nudge?: number | null
+          ai_rationale?: string | null
+          ai_scanned_at?: string | null
+          ai_verdict?: string | null
           company?: string
           created_at?: string
           direction?: string
@@ -1519,6 +1534,57 @@ export type Database = {
           symbol?: string
           url?: string | null
           value?: number | null
+        }
+        Relationships: []
+      }
+      insider_scan_runs: {
+        Row: {
+          ai_scored: number
+          alerted: number
+          created_at: string
+          detected: number
+          duration_ms: number | null
+          error: string | null
+          id: string
+          mechanical: number
+          model: string | null
+          noise: number
+          signals: number
+          stored: number
+          targets: number
+          trigger: string
+        }
+        Insert: {
+          ai_scored?: number
+          alerted?: number
+          created_at?: string
+          detected?: number
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          mechanical?: number
+          model?: string | null
+          noise?: number
+          signals?: number
+          stored?: number
+          targets?: number
+          trigger?: string
+        }
+        Update: {
+          ai_scored?: number
+          alerted?: number
+          created_at?: string
+          detected?: number
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          mechanical?: number
+          model?: string | null
+          noise?: number
+          signals?: number
+          stored?: number
+          targets?: number
+          trigger?: string
         }
         Relationships: []
       }

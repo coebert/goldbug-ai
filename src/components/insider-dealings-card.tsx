@@ -50,7 +50,17 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
   }, [mutate]);
 
   const events = feed?.events ?? [];
-  const ranked = [...events].sort((a, b) => b.severity - a.severity).slice(0, 8);
+  // The AI scan's own read comes first: anything it rejected as not-an-insider
+  // -dealing is hidden, and confirmed signals outrank keyword severity.
+  const ranked = events
+    .filter((e) => e.ai_verdict !== "noise")
+    .sort((a, b) => {
+      const rank = (v: (typeof a)["ai_verdict"]) => (v === "signal" ? 2 : v == null ? 1 : 0);
+      return rank(b.ai_verdict) - rank(a.ai_verdict) || b.severity - a.severity;
+    })
+    .slice(0, 8);
+  const scan = feed?.last_scan ?? null;
+
 
   return (
     <Card className={cn("border-border/60", className)}>
@@ -71,9 +81,19 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Reported share sales and purchases by executives of the companies you hold. Tax and
-          vesting disposals are scored down; open-market sales by a CEO or CFO are scored up.
+          Every four hours the AI re-reads reported share dealings by executives of the companies
+          you hold, watch or could buy. It separates genuine open-market deals from mechanical
+          vesting or tax sales and from false matches, and feeds the verdict into buy and sell
+          decisions.
         </p>
+        {scan ? (
+          <p className="text-[11px] text-muted-foreground">
+            Last scan {new Date(scan.at).toLocaleString("en-GB", { timeZone: "Europe/London" })} ·{" "}
+            {scan.ai_scored} reviewed · {scan.signals} real signals · {scan.mechanical} mechanical ·{" "}
+            {scan.noise} discarded
+          </p>
+        ) : null}
+
 
         {ranked.length === 0 ? (
           <p className="rounded-md border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
@@ -98,6 +118,16 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
                   <Badge variant="outline" className={cn("text-[11px]", severityTone(e))}>
                     {e.direction === "buy" ? "Buy" : "Sell"} · {flavourLabel(e)}
                   </Badge>
+                  {e.ai_verdict === "signal" ? (
+                    <Badge variant="outline" className="border-primary/50 text-[11px] text-primary">
+                      AI: real signal
+                      {e.ai_confidence != null ? ` ${Math.round(e.ai_confidence * 100)}%` : ""}
+                    </Badge>
+                  ) : e.ai_verdict === "mechanical" ? (
+                    <Badge variant="outline" className="text-[11px] text-muted-foreground">
+                      AI: mechanical
+                    </Badge>
+                  ) : null}
                   {e.role ? (
                     <span className="text-[11px] text-muted-foreground">
                       {e.person ? `${e.person} · ` : ""}
@@ -109,9 +139,16 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
                   ) : null}
                 </div>
                 <p className="mt-1.5 text-sm leading-snug">{e.headline}</p>
+                {e.ai_rationale ? (
+                  <p className="mt-1 text-[11px] italic text-muted-foreground">{e.ai_rationale}</p>
+                ) : null}
                 <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                   {e.shares != null ? <span>{e.shares.toLocaleString()} shares</span> : null}
-                  <span>signal nudge {e.sentiment_nudge.toFixed(3)}</span>
+                  <span>
+                    signal nudge {(e.ai_nudge ?? e.sentiment_nudge).toFixed(3)}
+                    {e.ai_nudge != null ? " (AI reviewed)" : ""}
+                  </span>
+
                   {e.url ? (
                     <span className="inline-flex items-center gap-1">
                       source <ExternalLink className="h-3 w-3" />
