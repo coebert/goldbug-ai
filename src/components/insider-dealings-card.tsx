@@ -5,7 +5,7 @@
 // are ranked by severity: a discretionary open-market sale by a named CEO
 // matters, a tax-withholding disposal on vested shares mostly does not.
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { UserMinus, RefreshCw, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,10 +39,13 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
   });
 
   // Load stored events once on mount, without hitting the upstream feeds.
-  useMemo(() => {
-    if (!feed && load.isIdle) load.mutate(false);
-    return null;
-  }, [feed, load.isIdle]);
+  const loadedRef = useRef(false);
+  const mutate = load.mutate;
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    mutate(false);
+  }, [mutate]);
 
   const events = feed?.events ?? [];
   const ranked = [...events].sort((a, b) => b.severity - a.severity).slice(0, 8);
