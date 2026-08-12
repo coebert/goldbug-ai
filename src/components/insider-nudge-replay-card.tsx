@@ -52,11 +52,12 @@ export function InsiderNudgeReplayCard({
   const [lookbackDays, setLookbackDays] = useState(730);
   const [minValue, setMinValue] = useState(100_000);
   const [nudgeScale, setNudgeScale] = useState(1);
+  const [riskLevel, setRiskLevel] = useState(3);
   const [result, setResult] = useState<NudgeReplayResult | null>(null);
 
   const m = useMutation({
     mutationFn: () =>
-      run({ data: { symbols, lookbackDays, minValue, params: { nudgeScale } } }),
+      run({ data: { symbols, lookbackDays, minValue, params: { nudgeScale, riskLevel } } }),
     onSuccess: (r) => setResult(r as NudgeReplayResult),
   });
 
@@ -82,7 +83,7 @@ export function InsiderNudgeReplayCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <div className="space-y-1">
             <Label htmlFor="nr-lookback" className="text-xs">
               Lookback (days)
@@ -121,6 +122,23 @@ export function InsiderNudgeReplayCard({
               aria-label="Nudge strength"
             />
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs">
+              Risk level {riskLevel}
+              {result ? ` — ${result.sizing.name}` : ""}
+            </Label>
+            <Slider
+              value={[riskLevel]}
+              min={1}
+              max={5}
+              step={1}
+              onValueChange={(v) => setRiskLevel(v[0] ?? 3)}
+              aria-label="Risk level"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Sizes both arms with the same dial preset the live AI uses.
+            </p>
+          </div>
         </div>
 
         <Button onClick={() => m.mutate()} disabled={m.isPending} size="sm">
@@ -149,7 +167,11 @@ export function InsiderNudgeReplayCard({
                 tone={result.delta.maxDrawdownPct < 0 ? "text-primary" : "text-destructive"}
               />
               <Stat label="Sharpe delta" value={result.delta.sharpe.toFixed(2)} />
-              <Stat label="Trade delta" value={String(result.delta.trades)} />
+              <Stat
+                label="95% VaR delta"
+                value={pp(result.delta.var95Pct)}
+                tone={result.delta.var95Pct <= 0 ? "text-primary" : "text-destructive"}
+              />
             </div>
 
             <div className="overflow-x-auto">
@@ -160,6 +182,9 @@ export function InsiderNudgeReplayCard({
                     <th className="py-1 pr-3 text-right font-normal">Return</th>
                     <th className="py-1 pr-3 text-right font-normal">Max DD</th>
                     <th className="py-1 pr-3 text-right font-normal">Sharpe</th>
+                    <th className="py-1 pr-3 text-right font-normal">VaR 95%</th>
+                    <th className="py-1 pr-3 text-right font-normal">CVaR 95%</th>
+                    <th className="py-1 pr-3 text-right font-normal">Avg gross</th>
                     <th className="py-1 pr-3 text-right font-normal">Cost</th>
                     <th className="py-1 text-right font-normal">Tickets</th>
                   </tr>
@@ -171,6 +196,9 @@ export function InsiderNudgeReplayCard({
                       <td className="py-1 pr-3 text-right">{pct(a.totalReturnPct)}</td>
                       <td className="py-1 pr-3 text-right">{a.maxDrawdownPct.toFixed(2)}%</td>
                       <td className="py-1 pr-3 text-right">{a.sharpe.toFixed(2)}</td>
+                      <td className="py-1 pr-3 text-right">{a.var95Pct.toFixed(2)}%</td>
+                      <td className="py-1 pr-3 text-right">{a.cvar95Pct.toFixed(2)}%</td>
+                      <td className="py-1 pr-3 text-right">{(a.avgGross * 100).toFixed(0)}%</td>
                       <td className="py-1 pr-3 text-right">{a.totalCost.toFixed(0)}</td>
                       <td className="py-1 text-right">{a.trades}</td>
                     </tr>
@@ -229,6 +257,13 @@ export function InsiderNudgeReplayCard({
                   {result.attribution.promotedForward21Pct == null
                     ? "n/a"
                     : pct(result.attribution.promotedForward21Pct)}
+                </li>
+                <li>
+                  Sized at {result.sizing.name} (level {result.sizing.level}): per-symbol cap{" "}
+                  {(result.sizing.perSymbolCap * 100).toFixed(0)}%, size ×
+                  {result.sizing.aggressiveness.sizeMult}, buy fill{" "}
+                  {(result.sizing.aggressiveness.buy * 100).toFixed(0)}%, drift band{" "}
+                  {(result.sizing.aggressiveness.driftBand * 100).toFixed(2)}%
                 </li>
                 <li>
                   95% CI on return delta {result.confidence.returnDeltaLo}..

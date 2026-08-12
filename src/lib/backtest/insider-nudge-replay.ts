@@ -20,6 +20,14 @@ import {
   type InsiderDirection,
   type InsiderFlavour,
 } from "@/lib/insider-dealings";
+import {
+  riskSizingFor,
+  realisedVol,
+  targetWeights,
+  stepWeights,
+  tailRisk,
+  type RiskSizing,
+} from "./replay-risk-sizing";
 
 export type Candlelike = { date: string; close: number };
 
@@ -48,6 +56,12 @@ export type ReplayParams = {
   costBps: number;
   /** Multiplier on the production nudge; 1 = live behaviour, 0 = baseline. */
   nudgeScale: number;
+  /**
+   * Risk dial (1..5). Both arms size positions through the same preset the live
+   * AI uses, so drawdown/VaR comparisons reflect real deployment, not equal
+   * weights.
+   */
+  riskLevel: number;
 };
 
 export const DEFAULT_REPLAY_PARAMS: ReplayParams = {
@@ -57,7 +71,9 @@ export const DEFAULT_REPLAY_PARAMS: ReplayParams = {
   halfLifeDays: 7,
   costBps: 25,
   nudgeScale: 1,
+  riskLevel: 3,
 };
+
 
 const SENIOR_ROLE = /(chief exec|ceo|founder)/i;
 const CFO_ROLE = /(chief financ|cfo|finance director)/i;
@@ -149,7 +165,14 @@ export type ArmResult = {
   /** Count of weight changes big enough to be a ticket. */
   trades: number;
   avgPositions: number;
+  /** Average deployed gross exposure as a fraction of equity. */
+  avgGross: number;
+  /** Historical 1-day 95% VaR / expected shortfall, positive % losses. */
+  var95Pct: number;
+  cvar95Pct: number;
+  volAnnPct: number;
 };
+
 
 export type NudgeAttribution = {
   /** Symbol-days where the nudge kept an otherwise-eligible name out. */
@@ -185,6 +208,9 @@ export type NudgeReplayResult = {
     sharpe: number;
     costPct: number;
     trades: number;
+    /** Change in 1-day 95% VaR (negative = the nudge arm risks less). */
+    var95Pct: number;
+    cvar95Pct: number;
   };
   confidence: {
     iterations: number;
@@ -195,6 +221,8 @@ export type NudgeReplayResult = {
     probPositive: number;
   };
   attribution: NudgeAttribution;
+  /** The live risk-dial preset both arms sized through. */
+  sizing: RiskSizing;
   verdict: ReplayVerdict;
   summary: string;
 };
@@ -259,6 +287,7 @@ function quantile(sorted: readonly number[], q: number): number {
  */
 export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
   const params: ReplayParams = { ...DEFAULT_REPLAY_PARAMS, ...(input.params ?? {}) };
+  const sizing = riskSizingFor(params.riskLevel);
   const startEquity = input.startingEquity && input.startingEquity > 0 ? input.startingEquity : 10_000;
 
   const prepared: Prepared[] = [];
@@ -288,6 +317,10 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     totalCost: 0,
     trades: 0,
     avgPositions: 0,
+    avgGross: 0,
+    var95Pct: 0,
+    cvar95Pct: 0,
+    volAnnPct: 0,
   });
 
   const attribution: NudgeAttribution = {
@@ -310,16 +343,31 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
       params,
       baseline: emptyArm("Baseline (no nudge)"),
       nudged: emptyArm("With insider nudge"),
-      delta: { returnPct: 0, maxDrawdownPct: 0, sharpe: 0, costPct: 0, trades: 0 },
+      delta: { returnPct: 0, maxDrawdownPct: 0, sharpe: 0, costPct: 0, trades: 0, var95Pct: 0, cvar95Pct: 0 },
       confidence: { iterations: 0, blockDays: 0, returnDeltaLo: 0, returnDeltaHi: 0, probPositive: 0 },
       attribution,
+      sizing,
       verdict: "neutral",
       summary: "Not enough tape to replay — load a longer history for this universe.",
     };
   }
 
-  type ArmState = { weights: Map<string, number>; equity: number; cost: number; trades: number; positions: number[] };
-  const mk = (): ArmState => ({ weights: new Map(), equity: startEquity, cost: 0, trades: 0, positions: [] });
+  type ArmState = {
+    weights: Map<string, number>;
+    equity: number;
+    cost: number;
+    trades: number;
+    positions: number[];
+    gross: number[];
+  };
+  const mk = (): ArmState => ({
+    weights: new Map(),
+    equity: startEquity,
+    cost: 0,
+    trades: 0,
+    positions: [],
+    gross: [],
+  });
   const base = mk();
   const nud = mk();
   const baseCurve: ArmDay[] = [];
@@ -337,16 +385,22 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     return a && b && a > 0 ? ((b - a) / a) * 100 : null;
   };
 
-  const select = (scores: Array<{ symbol: string; score: number }>): Map<string, number> => {
+  /**
+   * Selection picks the names; the risk dial decides how much of the book they
+   * get. Sizing runs through the same preset-driven primitives as the live AI
+   * (per-symbol cap, vol targeting, size multiplier, gross ceiling) and the
+   * move toward target is paced by the dial's buy/sell aggressiveness.
+   */
+  const select = (
+    state: ArmState,
+    scores: Array<{ symbol: string; score: number; vol: number | null }>,
+  ): Map<string, number> => {
     const eligible = scores
       .filter((s) => s.score >= params.entryThreshold)
       .sort((a, b) => b.score - a.score)
       .slice(0, params.maxPositions);
-    const w = new Map<string, number>();
-    if (eligible.length === 0) return w;
-    const each = 1 / eligible.length;
-    for (const e of eligible) w.set(e.symbol, each);
-    return w;
+    const desired = targetWeights(eligible, sizing);
+    return stepWeights(state.weights, desired, sizing);
   };
 
   const applyDay = (
@@ -367,35 +421,41 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     state.cost += cost;
 
     let port = 0;
+    let gross = 0;
     for (const [sym, w] of target) {
+      gross += w;
       const r = dayReturn(sym);
       if (r != null) port += w * r;
     }
     state.equity *= 1 + port;
     state.weights = target;
     state.positions.push(target.size);
+    state.gross.push(gross);
     return { cost, port };
   };
+
 
   for (let d = 0; d < allDates.length - 1; d++) {
     const date = allDates[d] as string;
     const next = allDates[d + 1] as string;
 
-    const baseScores: Array<{ symbol: string; score: number }> = [];
-    const nudScores: Array<{ symbol: string; score: number }> = [];
+    const baseScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
+    const nudScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
 
     for (const p of prepared) {
       const i = p.index.get(date);
       if (i == null) continue;
       const s = trendScore(p.closes, i);
       if (s == null) continue;
-      baseScores.push({ symbol: p.symbol, score: s });
+      const vol = realisedVol(p.closes, i, 20);
+      baseScores.push({ symbol: p.symbol, score: s, vol });
 
       const n = params.nudgeScale === 0
         ? 0
         : activeNudge(p.events, (ed) => dayDiff(date, ed), params) * params.nudgeScale;
       const adj = Math.max(0, Math.min(1, s + n));
-      nudScores.push({ symbol: p.symbol, score: adj });
+      nudScores.push({ symbol: p.symbol, score: adj, vol });
+
 
       if (n < 0 && s >= params.entryThreshold && adj < params.entryThreshold) {
         attribution.suppressedDays += 1;
@@ -422,8 +482,8 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
 
     const beforeBase = base.equity;
     const beforeNud = nud.equity;
-    const rb = applyDay(base, select(baseScores), dayReturn);
-    const rn = applyDay(nud, select(nudScores), dayReturn);
+    const rb = applyDay(base, select(base, baseScores), dayReturn);
+    const rn = applyDay(nud, select(nud, nudScores), dayReturn);
 
     baseCurve.push({ date: next, equity: Number(base.equity.toFixed(2)), cost: Number(rb.cost.toFixed(4)), positions: base.weights.size });
     nudCurve.push({ date: next, equity: Number(nud.equity.toFixed(2)), cost: Number(rn.cost.toFixed(4)), positions: nud.weights.size });
@@ -431,19 +491,29 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     nudRets.push(beforeNud > 0 ? nud.equity / beforeNud - 1 : 0);
   }
 
-  const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => ({
-    label,
-    curve,
-    finalEquity: Number(state.equity.toFixed(2)),
-    totalReturnPct: Number(((state.equity / startEquity - 1) * 100).toFixed(3)),
-    maxDrawdownPct: drawdownPct(curve.map((c) => c.equity)),
-    sharpe: sharpeOf(rets),
-    totalCost: Number(state.cost.toFixed(2)),
-    trades: state.trades,
-    avgPositions: Number(
-      (state.positions.reduce((a, b) => a + b, 0) / Math.max(1, state.positions.length)).toFixed(2),
-    ),
-  });
+  const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => {
+    const t = tailRisk(rets);
+    return {
+      label,
+      curve,
+      finalEquity: Number(state.equity.toFixed(2)),
+      totalReturnPct: Number(((state.equity / startEquity - 1) * 100).toFixed(3)),
+      maxDrawdownPct: drawdownPct(curve.map((c) => c.equity)),
+      sharpe: sharpeOf(rets),
+      totalCost: Number(state.cost.toFixed(2)),
+      trades: state.trades,
+      avgPositions: Number(
+        (state.positions.reduce((a, b) => a + b, 0) / Math.max(1, state.positions.length)).toFixed(2),
+      ),
+      avgGross: Number(
+        (state.gross.reduce((a, b) => a + b, 0) / Math.max(1, state.gross.length)).toFixed(4),
+      ),
+      var95Pct: t.var95Pct,
+      cvar95Pct: t.cvar95Pct,
+      volAnnPct: t.volAnnPct,
+    };
+  };
+
 
   const baseline = arm("Baseline (no nudge)", base, baseCurve, baseRets);
   const nudged = arm("With insider nudge", nud, nudCurve, nudRets);
@@ -484,6 +554,8 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     sharpe: Number((nudged.sharpe - baseline.sharpe).toFixed(2)),
     costPct: Number((((nudged.totalCost - baseline.totalCost) / startEquity) * 100).toFixed(3)),
     trades: nudged.trades - baseline.trades,
+    var95Pct: Number((nudged.var95Pct - baseline.var95Pct).toFixed(3)),
+    cvar95Pct: Number((nudged.cvar95Pct - baseline.cvar95Pct).toFixed(3)),
   };
 
   const mean = (xs: number[]) => (xs.length ? Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(3)) : null);
@@ -508,6 +580,8 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
           ? `The bounded nudge cost ${Math.abs(delta.returnPct).toFixed(2)}pp versus baseline (95% CI ${lo}..${hi}pp) — on this tape it filtered out names that went on to work.`
           : `No measurable edge: return delta ${delta.returnPct.toFixed(2)}pp with a 95% CI of ${lo}..${hi}pp straddling zero. The nudge is bounded tightly enough to be close to harmless either way.`;
 
+  const sized = ` Both arms sized through the ${sizing.name} dial (level ${sizing.level}, ${(sizing.perSymbolCap * 100).toFixed(0)}% per-symbol cap, ×${sizing.aggressiveness.sizeMult} size): 95% 1-day VaR ${baseline.var95Pct.toFixed(2)}% baseline vs ${nudged.var95Pct.toFixed(2)}% nudged.`;
+
   return {
     from: allDates[0] as string,
     to: allDates[allDates.length - 1] as string,
@@ -519,7 +593,8 @@ export function runNudgeReplay(input: ReplayInput): NudgeReplayResult {
     delta,
     confidence: { iterations: samples.length ? iterations : 0, blockDays, returnDeltaLo: lo, returnDeltaHi: hi, probPositive },
     attribution,
+    sizing,
     verdict,
-    summary,
+    summary: summary + sized,
   };
 }
