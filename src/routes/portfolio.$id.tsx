@@ -1057,6 +1057,8 @@ function PortfolioPage() {
                   className="mb-4"
                 />
                 <InsiderDealingsCard className="mb-4" />
+                <InsiderEventStudyCard className="mb-4" />
+
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
                 <CostSyncAlertBanner portfolioId={id} className="mb-4" />
                 <CoverageTrendAlertBanner portfolioId={id} className="mb-4" />
