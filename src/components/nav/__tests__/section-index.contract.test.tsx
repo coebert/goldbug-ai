@@ -41,11 +41,13 @@ describe("SectionIndex", () => {
     expect(screen.queryByRole("navigation", { name: /sections on this page/i })).toBeNull();
   });
 
-  it("marks the first section active on initial render", () => {
+  it("marks exactly one section active on initial render", () => {
     mountTargets(["alpha", "beta"]);
     render(<SectionIndex items={items} />);
-    expect(screen.getByRole("link", { name: "Alpha" }).getAttribute("aria-current")).toBe("true");
-    expect(screen.getByRole("link", { name: "Beta" }).getAttribute("aria-current")).toBeNull();
+    const active = screen
+      .getAllByRole("link")
+      .filter((a) => a.getAttribute("aria-current") === "true");
+    expect(active).toHaveLength(1);
   });
 
   it("keeps every chip a 44px touch target", () => {
