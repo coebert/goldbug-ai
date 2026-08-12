@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { getBacktestSeries } from "@/lib/backtest-series.functions";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   AXIS_LINE,
   AXIS_TICK,
@@ -340,7 +341,7 @@ export function BacktestResultsCard({
                     formatter={(v: number, name: string) => [fmtCurrency(v), name]}
                     contentStyle={TOOLTIP_CONTENT_STYLE}
                   />
-                  <Legend {...LEGEND_PROPS} />
+                  <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                   <Area
                     type="monotone"
                     dataKey="cash"

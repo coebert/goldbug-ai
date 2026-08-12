@@ -20,6 +20,7 @@ import { runOrderBatchingBacktest } from "@/lib/batching-backtest.functions";
 import type { OrderBatchingAbResponse } from "@/lib/batching-backtest.functions";
 import { formatMoney } from "@/lib/format-money";
 import { AbConfidencePanel } from "@/components/backtest-ab-confidence-panel";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   SAXO_LEGEND_PROPS,
   SAXO_AXIS,
@@ -351,7 +352,7 @@ export function BatchingBacktestCard({
                     cursor={SAXO_TOOLTIP_CURSOR}
                     formatter={(v: number, name: string) => [formatMoney(v, currency), name]}
                   />
-                  <Legend {...SAXO_LEGEND_PROPS} />
+                  <Legend {...SAXO_LEGEND_PROPS} content={<CollapsibleLegend />} />
                   <Line
                     type="monotone"
                     dataKey="batched"

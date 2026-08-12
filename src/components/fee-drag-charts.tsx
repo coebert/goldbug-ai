@@ -24,6 +24,7 @@ import {
 } from "@/lib/chart-palette";
 import type { PerTradeFeeRow } from "@/lib/fee-breakdown";
 
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 /** Builds a cumulative-fee-drag-over-time series and a per-asset stacked
  *  breakdown from the per-trade rows already loaded by FeeBreakdownCard.
  *  Pure aggregation — no server round-trip. */
@@ -190,7 +191,7 @@ export function FeeDragCharts({
                   return [money(Number(v)), name];
                 }}
               />
-              <Legend {...LEGEND_PROPS} />
+              <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
               {scale === "cost" ? (
                 <>
                   <Area
@@ -282,7 +283,7 @@ export function FeeDragCharts({
                   return [`${money(Number(v))}${extra}`, name];
                 }}
               />
-              <Legend {...LEGEND_PROPS} />
+              <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
               <Bar dataKey="buyFee" stackId="fees" name="Buy fees" fill={CHART_ROLE.positive}>
                 {topSymbols.map((_, i) => (
                   <Cell key={`buy-${i}`} fill={CHART_ROLE.positive} />

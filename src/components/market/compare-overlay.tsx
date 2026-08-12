@@ -39,6 +39,7 @@ import {
 import { CHART_ROLE } from "@/lib/chart-palette";
 import { CorrelationHeatmap } from "@/components/market/correlation-heatmap";
 import { RollingCorrelationPanel } from "@/components/market/rolling-correlation-panel";
+import { CollapsibleLegend } from "@/components/ui/collapsible-legend";
 import {
   MAX_COMPARE_SYMBOLS,
   comparePriceKey,
@@ -325,7 +326,7 @@ export function CompareOverlay({
                     name,
                   ]}
                 />
-                <Legend {...LEGEND_PROPS} />
+                <Legend {...LEGEND_PROPS} content={<CollapsibleLegend />} />
                 {comparison.series.map((s) => (
                   <Line
                     key={s.symbol}
