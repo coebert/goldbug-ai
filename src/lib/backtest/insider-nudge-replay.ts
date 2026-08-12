@@ -157,7 +157,14 @@ export type ArmResult = {
   /** Count of weight changes big enough to be a ticket. */
   trades: number;
   avgPositions: number;
+  /** Average deployed gross exposure as a fraction of equity. */
+  avgGross: number;
+  /** Historical 1-day 95% VaR / expected shortfall, positive % losses. */
+  var95Pct: number;
+  cvar95Pct: number;
+  volAnnPct: number;
 };
+
 
 export type NudgeAttribution = {
   /** Symbol-days where the nudge kept an otherwise-eligible name out. */
