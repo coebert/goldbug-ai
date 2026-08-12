@@ -27,7 +27,7 @@ export function SmaPeriodToggles({
             key={p}
             size="sm"
             variant={on ? "secondary" : "ghost"}
-            className="h-7 px-2 text-xs"
+            className="h-11 px-3 text-xs sm:h-7 sm:px-2"
             aria-pressed={on}
             aria-label={`${p}-day moving average`}
             onClick={() => onToggle(p)}
