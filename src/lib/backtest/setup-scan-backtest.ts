@@ -332,10 +332,12 @@ export function runSetupBacktest(
     const signals = findSignals(symbol, clean, cfg);
     let entries = 0;
     for (const s of signals) {
-      chaseTrades.push(measure(symbol, clean, s.index, s.match, s.index, cfg));
-      const pb = pullbackEntryIndex(clean, s.index, s.match, cfg);
-      if (pb != null) entries += 1;
-      disciplineTrades.push(measure(symbol, clean, s.index, s.match, pb, cfg));
+      chaseTrades.push(measure("chase", symbol, clean, s.index, s.match, s.index, cfg));
+      const pb = pullbackEntry(clean, s.index, s.match, cfg);
+      if (pb.index != null) entries += 1;
+      disciplineTrades.push(
+        measure("discipline", symbol, clean, s.index, s.match, pb.index, cfg, pb.reason),
+      );
     }
     bySymbol.push({ symbol, signals: signals.length, entries });
   }
@@ -350,7 +352,8 @@ export function runSetupBacktest(
     bySymbol: bySymbol.sort((a, b) => b.signals - a.signals),
     chase,
     discipline,
-    trades: disciplineTrades,
+    trades: [...disciplineTrades, ...chaseTrades],
+
     config: cfg,
     verdict: buildVerdict(chase, discipline, primary),
   };
