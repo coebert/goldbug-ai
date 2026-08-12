@@ -113,12 +113,20 @@ export function BatchingBacktestCard({
 }) {
   const [windowHours, setWindowHours] = useState<WindowHours>(96);
   const [days, setDays] = useState<number>(365);
+  const [marketImpact, setMarketImpact] = useState(true);
   const [result, setResult] = useState<OrderBatchingAbResponse | null>(null);
   const run = useServerFn(runOrderBatchingBacktest);
 
   const mutation = useMutation({
-    mutationFn: (vars: { windowHours: number; days: number }) =>
-      run({ data: { portfolioId, windowHours: vars.windowHours, days: vars.days } }),
+    mutationFn: (vars: { windowHours: number; days: number; marketImpact: boolean }) =>
+      run({
+        data: {
+          portfolioId,
+          windowHours: vars.windowHours,
+          days: vars.days,
+          marketImpact: vars.marketImpact,
+        },
+      }),
     onSuccess: (r) => setResult(r),
     onError: (e: Error) => toast.error(e.message || "Backtest failed"),
   });
@@ -188,9 +196,21 @@ export function BatchingBacktestCard({
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setMarketImpact((v) => !v)}
+            className={`rounded-md border px-2 py-1 text-xs ${
+              marketImpact
+                ? "border-emerald-500/40 text-emerald-400"
+                : "border-border/60 text-muted-foreground"
+            }`}
+            title="Charge square-root market impact plus latency on every ticket, scaled by each name's traded volume"
+          >
+            Market impact {marketImpact ? "on" : "off"}
+          </button>
           <Button
             size="sm"
-            onClick={() => mutation.mutate({ windowHours, days })}
+            onClick={() => mutation.mutate({ windowHours, days, marketImpact })}
             disabled={mutation.isPending}
           >
             {mutation.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
@@ -207,7 +227,7 @@ export function BatchingBacktestCard({
           <>
             <p className="text-sm">{result.summary}</p>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               <Stat
                 label="Cost saved"
                 value={signed(result.costSavingBps)}
@@ -225,6 +245,12 @@ export function BatchingBacktestCard({
                 value={signed(result.returnDeltaPct, 2, "pp")}
                 hint="batched vs unbatched"
                 tone={result.returnDeltaPct > 0 ? "good" : result.returnDeltaPct < 0 ? "bad" : undefined}
+              />
+              <Stat
+                label="Impact delta"
+                value={signed(result.slippageDeltaBps)}
+                hint="bigger tickets, more impact"
+                tone={result.slippageDeltaBps > 0 ? "bad" : result.slippageDeltaBps < 0 ? "good" : undefined}
               />
               <Stat
                 label="Tickets saved"
@@ -302,6 +328,7 @@ export function BatchingBacktestCard({
                     <th className="py-1.5 text-right font-medium">Tickets</th>
                     <th className="py-1.5 text-right font-medium">Cost</th>
                     <th className="py-1.5 text-right font-medium">Cost / turnover</th>
+                    <th className="py-1.5 text-right font-medium">Impact</th>
                     <th className="py-1.5 text-right font-medium">Max DD</th>
                     <th className="py-1.5 text-right font-medium">Return</th>
                     <th className="py-1.5 text-right font-medium">Signals lost</th>
@@ -318,6 +345,12 @@ export function BatchingBacktestCard({
                       <td className="py-1.5 text-right">{arm.tickets}</td>
                       <td className="py-1.5 text-right">{formatMoney(arm.totalCostBase, currency)}</td>
                       <td className="py-1.5 text-right">{bps(arm.costBpsOfTurnover)}</td>
+                      <td className="py-1.5 text-right">
+                        {formatMoney(arm.totalSlippageBase, currency)}
+                        <span className="ml-1 text-muted-foreground">
+                          ({(arm.avgParticipation * 100).toFixed(2)}% ADV)
+                        </span>
+                      </td>
                       <td className="py-1.5 text-right">{arm.maxDrawdownPct.toFixed(2)}%</td>
                       <td className="py-1.5 text-right">{arm.returnPct.toFixed(2)}%</td>
                       <td className="py-1.5 text-right">{arm.signalsSkipped + arm.parkedLost}</td>
@@ -367,7 +400,10 @@ export function BatchingBacktestCard({
             <p className="text-[11px] text-muted-foreground">
               {result.bars} bars {result.from} → {result.to} · {result.symbols.join(", ")} · minimum
               ticket {formatMoney(result.minTicketBase, currency)} · {result.windowHours}h window ·{" "}
-              {result.signals} signals
+              {result.signals} signals ·{" "}
+              {result.marketImpact
+                ? "square-root market impact + latency charged per ticket"
+                : "market impact off"}
             </p>
           </>
         )}

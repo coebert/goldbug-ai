@@ -37,6 +37,8 @@ export type OrderBatchingAbResponse = OrderBatchingAbResult & {
   to: string;
   navBase: number;
   windowHours: number;
+  /** Whether size-dependent market impact was charged. */
+  marketImpact: boolean;
   /** Buy-and-hold and momentum-only baselines over the same assets/period. */
   benchmarks: BenchmarkResult;
 };
@@ -56,11 +58,14 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
          */
         windowHours: z.number().int().min(6).max(336).default(96),
         maxPriceDriftPct: z.number().min(0.005).max(0.25).default(0.05),
+        /** Charge size-dependent market impact + latency on every ticket. */
+        marketImpact: z.boolean().default(true),
+        urgency: z.enum(["passive", "normal", "aggressive"]).default("normal"),
       })
       .parse(input),
   )
   .handler(async ({ data, context }): Promise<OrderBatchingAbResponse> => {
-    const { bars, symbols, navBase } = await loadReplayInputs(context.supabase, {
+    const { bars, symbols, navBase, advBySymbol } = await loadReplayInputs(context.supabase, {
       portfolioId: data.portfolioId,
       days: data.days,
     });
@@ -89,6 +94,11 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       }),
       windowHours: data.windowHours,
       maxPriceDriftPct: data.maxPriceDriftPct,
+      execution: {
+        enabled: data.marketImpact,
+        urgency: data.urgency,
+        advBySymbol,
+      },
     };
 
     const result = await runOrderBatchingAb(abInput);
@@ -107,6 +117,7 @@ export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
       to: bars[bars.length - 1].date,
       navBase,
       windowHours: data.windowHours,
+      marketImpact: data.marketImpact,
     };
   });
 
@@ -137,7 +148,7 @@ export const runCostScenarioBacktest = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }): Promise<CostScenarioResponse> => {
-    const { bars, symbols, navBase } = await loadReplayInputs(context.supabase, {
+    const { bars, symbols, navBase, advBySymbol } = await loadReplayInputs(context.supabase, {
       portfolioId: data.portfolioId,
       days: data.days,
     });
@@ -167,6 +178,7 @@ export const runCostScenarioBacktest = createServerFn({ method: "POST" })
       windowHours: data.windowHours,
       rollingWindowDays: data.rollingWindowDays,
       scenarioIds: data.scenarioIds as CostScenarioId[] | undefined,
+      execution: { enabled: true, advBySymbol },
     });
 
     return {
