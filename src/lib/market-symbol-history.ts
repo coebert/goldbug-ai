@@ -83,6 +83,53 @@ export function isSmaPeriod(value: number): value is SmaPeriod {
   return (SMA_PERIODS as readonly number[]).includes(value);
 }
 
+/** Wilder RSI look-back used across the app, in trading days. */
+export const RSI_PERIOD = 14;
+/** Standard oversold / overbought thresholds. */
+export const RSI_OVERSOLD = 30;
+export const RSI_OVERBOUGHT = 70;
+
+export type RsiZone = "oversold" | "overbought" | "neutral";
+
+export function rsiZone(value: number | null | undefined): RsiZone | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  if (value <= RSI_OVERSOLD) return "oversold";
+  if (value >= RSI_OVERBOUGHT) return "overbought";
+  return "neutral";
+}
+
+/**
+ * Wilder's smoothed RSI over a close series. Returns one entry per input bar;
+ * the first `period` bars are null while the average gain/loss warms up.
+ */
+export function computeRsiSeries(closes: number[], period = RSI_PERIOD): (number | null)[] {
+  const out: (number | null)[] = closes.map(() => null);
+  if (closes.length <= period) return out;
+
+  let gain = 0;
+  let loss = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gain += diff;
+    else loss -= diff;
+  }
+  let avgGain = gain / period;
+  let avgLoss = loss / period;
+  const rsiAt = () =>
+    avgLoss === 0 ? 100 : Number((100 - 100 / (1 + avgGain / avgLoss)).toFixed(2));
+  out[period] = rsiAt();
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const up = diff > 0 ? diff : 0;
+    const down = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + up) / period;
+    avgLoss = (avgLoss * (period - 1) + down) / period;
+    out[i] = rsiAt();
+  }
+  return out;
+}
+
 export interface HistoryPoint {
   date: string;
   close: number;
@@ -92,7 +139,10 @@ export interface HistoryPoint {
   sma50: number | null;
   sma100: number | null;
   sma200: number | null;
+  /** 14-day Wilder RSI, null until the look-back is warm. */
+  rsi14?: number | null;
 }
+
 
 export interface SymbolHistory {
   symbol: string;
@@ -110,6 +160,8 @@ export interface SymbolHistory {
   volatilityPct: number | null;
   /** Worst peak-to-trough fall inside the window, in %. */
   maxDrawdownPct: number | null;
+  /** Latest 14-day Wilder RSI, null until the look-back is warm. */
+  rsi14: number | null;
   sma50: number | null;
   sma200: number | null;
   aboveSma50: boolean | null;
@@ -158,6 +210,7 @@ export function buildSymbolHistory(
 
   const points: HistoryPoint[] = [];
   const base = all[from]?.close ?? null;
+  const rsiAll = computeRsiSeries(closes);
   for (let i = from; i < all.length; i++) {
     points.push({
       date: all[i].price_date,
@@ -167,6 +220,7 @@ export function buildSymbolHistory(
       sma50: trailingAverage(closes, i, 50),
       sma100: trailingAverage(closes, i, 100),
       sma200: trailingAverage(closes, i, 200),
+      rsi14: rsiAll[i] ?? null,
     });
   }
 
@@ -216,6 +270,7 @@ export function buildSymbolHistory(
     low,
     volatilityPct,
     maxDrawdownPct: maxDd,
+    rsi14: lastPoint?.rsi14 ?? null,
     sma50: lastPoint?.sma50 ?? null,
     sma200: lastPoint?.sma200 ?? null,
     aboveSma50: lastPoint?.sma50 != null && last != null ? last > lastPoint.sma50 : null,

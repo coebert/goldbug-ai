@@ -30,11 +30,18 @@ import {
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
 } from "@/lib/chart-palette";
+import {
+  RSI_OVERBOUGHT,
+  RSI_OVERSOLD,
+  RSI_PERIOD,
+} from "@/lib/market-symbol-history";
+import { CHART_ROLE } from "@/lib/chart-palette";
 import { CorrelationHeatmap } from "@/components/market/correlation-heatmap";
 import { RollingCorrelationPanel } from "@/components/market/rolling-correlation-panel";
 import {
   MAX_COMPARE_SYMBOLS,
   comparePriceKey,
+  compareRsiKey,
   compareSmaPriceKey,
   type Comparison,
   type RollingWindow,
@@ -85,6 +92,7 @@ export function CompareOverlay({
   onClear,
 }: CompareOverlayProps) {
   const [showSma, setShowSma] = useState(false);
+  const [showRsi, setShowRsi] = useState(false);
   // "rebased" = every series indexed to 100 at the window start (shared axis).
   // "price" = each symbol drawn on its own true price scale (per-symbol axis).
   // "return" = each ticker's % return from the window start (0-based).
@@ -200,6 +208,18 @@ export function CompareOverlay({
             onClick={() => setShowSma((v) => !v)}
           >
             {showSma ? "Hide" : "Show"} SMA {periods.join("/")}
+          </Button>
+        )}
+        {compare.length > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            variant={showRsi ? "default" : "outline"}
+            className="h-8 px-2 text-xs"
+            aria-pressed={showRsi}
+            onClick={() => setShowRsi((v) => !v)}
+          >
+            {showRsi ? "Hide" : "Show"} RSI
           </Button>
         )}
         {compare.length > 0 && (
@@ -352,6 +372,57 @@ export function CompareOverlay({
               </LineChart>
             </ResponsiveContainer>
           </ChartFrame>
+
+          {showRsi && (
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">
+                RSI ({RSI_PERIOD}) · below {RSI_OVERSOLD} oversold, above {RSI_OVERBOUGHT} overbought
+              </p>
+              <ChartFrame className="h-36 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={comparison.points} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
+                    <CartesianGrid {...GRID_PROPS} />
+                    <XAxis
+                      dataKey="date"
+                      tick={AXIS_TICK}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                      minTickGap={40}
+                      tickFormatter={(d: string) => d.slice(2, 7)}
+                    />
+                    <YAxis
+                      tick={AXIS_TICK}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                      width={44}
+                      domain={[0, 100]}
+                      ticks={[0, RSI_OVERSOLD, 50, RSI_OVERBOUGHT, 100]}
+                    />
+                    <Tooltip
+                      contentStyle={TOOLTIP_CONTENT_STYLE}
+                      labelStyle={TOOLTIP_LABEL_STYLE}
+                      formatter={(v: number, name: string) => [v.toFixed(1), name]}
+                    />
+                    <ReferenceLine y={RSI_OVERBOUGHT} stroke={CHART_ROLE.negative} strokeDasharray="4 4" />
+                    <ReferenceLine y={RSI_OVERSOLD} stroke={CHART_ROLE.positive} strokeDasharray="4 4" />
+                    {comparison.series.map((s) => (
+                      <Line
+                        key={`rsi-${s.symbol}`}
+                        type="monotone"
+                        dataKey={compareRsiKey(s.symbol)}
+                        name={`${s.label} RSI`}
+                        stroke={s.color}
+                        strokeWidth={s.symbol === symbol ? 2 : 1.4}
+                        dot={false}
+                        connectNulls
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartFrame>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-sm">

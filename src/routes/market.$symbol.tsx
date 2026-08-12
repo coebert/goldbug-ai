@@ -55,6 +55,7 @@ import {
   toggleSmaPeriod,
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
+import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import {
   buildComparison,
@@ -308,6 +309,26 @@ function MarketSymbolPage() {
   // Averages default to whatever the home dashboard card is showing, so the
   // two views stay in sync; an explicit ?sma= wins (shareable links).
   const [trendBasis, setTrendBasis] = useState<TrendBasis>("auto");
+  // RSI is opt-in and remembered locally, like the SMA selection.
+  const [showRsi, setShowRsi] = useState(false);
+  useEffect(() => {
+    try {
+      setShowRsi(window.localStorage.getItem("chart.rsi") === "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleRsi = () => {
+    setShowRsi((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("chart.rsi", next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  };
   const pickTrendBasis = (b: TrendBasis) => {
     setTrendBasis(b);
     storeTrendBasis(b);
@@ -425,6 +446,15 @@ function MarketSymbolPage() {
           <div className="flex flex-wrap items-center gap-2">
             <SymbolSearch range={range} className="w-full sm:w-64" />
             <SmaPeriodToggles periods={periods} onToggle={togglePeriod} />
+            <Button
+              size="sm"
+              variant={showRsi ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs"
+              aria-pressed={showRsi}
+              onClick={toggleRsi}
+            >
+              RSI
+            </Button>
             {HISTORY_RANGES.map((r) => (
               <Button
                 key={r}
@@ -477,6 +507,7 @@ function MarketSymbolPage() {
                   {pct(history.changePct)} over {rangeLabel(range)}
                 </Badge>
                 <TrendStrengthBadge strength={strength} />
+                <RsiBadge value={history.rsi14} />
               </div>
 
 
@@ -550,6 +581,8 @@ function MarketSymbolPage() {
                   </LineChart>
                 </ResponsiveContainer>
               </ChartFrame>
+
+              {showRsi ? <RsiPane points={history.points} /> : null}
 
               <AnnotationList
                 annotations={annotations}

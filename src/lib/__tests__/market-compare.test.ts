@@ -35,6 +35,7 @@ function history(symbol: string, series: Array<[string, number]>): SymbolHistory
     low: null,
     volatilityPct: null,
     maxDrawdownPct: null,
+    rsi14: null,
     sma50: null,
     sma200: null,
     aboveSma50: null,
