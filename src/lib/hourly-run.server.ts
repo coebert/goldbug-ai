@@ -297,7 +297,17 @@ async function runHourlyCycleInner(
       } catch (e) {
         srvLog.error("hourly-run: news cache count failed", e);
       }
-      tel.recordPhase("news", Date.now() - newsT0, false, `${newsCount} headlines`);
+      // Director / PDMR dealings for held names never reach the general wires,
+      // so they get their own bounded pass alongside the news step.
+      let insiderNote = "";
+      try {
+        const { ingestInsiderDealings } = await import("@/lib/insider-dealings.server");
+        const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 3 });
+        insiderNote = `, insider ${res.stored}/${res.detected} across ${res.targets} names`;
+      } catch (e) {
+        srvLog.error("hourly-run: insider dealings ingest failed", e);
+      }
+      tel.recordPhase("news", Date.now() - newsT0, false, `${newsCount} headlines${insiderNote}`);
     } else {
       tel.recordPhase("news", 0, true, "preflight disabled for bounded run");
     }
