@@ -16,6 +16,7 @@ import {
   realisedCostOverlay,
   frictionTimeSeries,
   frictionBreakdown,
+  weeklyFrictionLedger,
   FRICTION_WINDOW_DAYS,
   type BeforeAfterAttribution,
   type FrictionBreakdown,
@@ -23,6 +24,7 @@ import {
   type FrictionKpi,
   type RealisedCostOverlay,
   type FrictionSeriesPoint,
+  type WeeklyFrictionLedger,
 } from "./friction-kpi";
 
 /**
@@ -51,6 +53,11 @@ export type FrictionReport = {
    * computed server-side so the drilldown cannot disagree with the headline.
    */
   breakdown: { byAsset: FrictionBreakdown; byVenue: FrictionBreakdown };
+  /**
+   * Week-by-week cost ledger over the 90-day tape: commission, stamp duty,
+   * spread, turnover and ticket counts per calendar week (UK clock).
+   */
+  weekly: WeeklyFrictionLedger;
   overlay: RealisedCostOverlay;
   /** Per-fill broker-pricing state for the KPI window, with reasons. */
   feeSync: FeeSyncSummary;
@@ -254,6 +261,12 @@ export async function loadFrictionReport(args: {
       byAsset: frictionBreakdown({ fills: windowFills, by: "asset" }),
       byVenue: frictionBreakdown({ fills: windowFills, by: "venue" }),
     },
+    weekly: weeklyFrictionLedger({
+      fills: attributionFills,
+      navBase,
+      navByDay,
+      limitWeeks: 13,
+    }),
     overlay: realisedCostOverlay({ fills: attributionFills }),
     currency: base,
     asOf: now.toISOString(),
