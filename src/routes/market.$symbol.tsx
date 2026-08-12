@@ -72,6 +72,8 @@ import {
 } from "@/lib/rsi-signals";
 import { RSI_SIGNAL_TONE } from "@/lib/rsi-signal-style";
 import { RsiBacktestPanel } from "@/components/market/rsi-backtest-panel";
+import { AiChartReadCard } from "@/components/market/ai-chart-read-card";
+
 
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import {
@@ -860,6 +862,15 @@ function MarketSymbolPage() {
               ) : null}
 
               {showDiv ? <DivergenceList divergences={divergences} /> : null}
+
+              <AiChartReadCard
+                symbol={symbol}
+                days={range}
+                periods={periods}
+                basis={basis}
+                signalMode={signalMode}
+              />
+
 
 
               <AnnotationList
