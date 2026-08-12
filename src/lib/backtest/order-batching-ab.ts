@@ -173,13 +173,15 @@ async function runArm(
     (byDate.get(s.date) ?? byDate.set(s.date, []).get(s.date)!).push(s);
   }
 
-  const trades: BatchingArmTrade[] = [];
+  type TradeRow = BatchingArmTrade & { id: string };
+  const trades: TradeRow[] = [];
   let signalsSkipped = 0;
   let parkedLost = 0;
   // Parked window state carried across bars. Ids are synthetic and stable so
   // the planner's consume/drop bookkeeping behaves exactly as it does live.
   let parked: ParkedIntent[] = [];
   let parkSeq = 0;
+  let decisionSeq = 0;
 
   const strategy = async (ctx: {
     date: string;
@@ -343,7 +345,7 @@ async function runArm(
     startingValue,
     finalValue,
     returnPct: startingValue > 0 ? ((finalValue - startingValue) / startingValue) * 100 : 0,
-    maxDrawdownPct: dd.maxDrawdownPct,
+    maxDrawdownPct: Math.abs(dd.pct),
     sharpe: computeSharpe(dailyReturns(points)),
     equityCurve: result.equityCurve.map((p) => ({ date: p.date, totalValue: p.totalValue })),
   };
