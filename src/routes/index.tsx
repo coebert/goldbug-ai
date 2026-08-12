@@ -416,6 +416,10 @@ function Home() {
               <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <ReclaimScanCard />
               </Suspense>
+              <Suspense fallback={<div className="h-48 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <SetupBacktestCard />
+              </Suspense>
+
 
             </AdvancedSection>
 
