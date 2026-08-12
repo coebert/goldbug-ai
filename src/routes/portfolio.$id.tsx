@@ -1,4 +1,5 @@
 import { ChartFrame } from "@/components/chart-frame";
+import { SectionIndex } from "@/components/nav/section-index";
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -294,6 +295,14 @@ export const Route = createFileRoute("/portfolio/$id")({
 });
 
 const SIMPLE_TABS: PortfolioTab[] = ["overview", "trades", "decisions", "risk"];
+
+const PORTFOLIO_SECTIONS = [
+  { id: "equity", label: "Equity" },
+  { id: "composition", label: "Composition" },
+  { id: "holdings", label: "Holdings" },
+  { id: "actions", label: "Actions" },
+  { id: "portfolio-look-deeper", label: "Look deeper" },
+] as const;
 
 function PortfolioPage() {
   const { id } = Route.useParams();
@@ -859,6 +868,11 @@ function PortfolioPage() {
       <AppHeader email={email} />
       <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4 2xl:max-w-7xl">
         <PortfolioTabs id={id} />
+        <SectionIndex
+          items={PORTFOLIO_SECTIONS}
+          offset={44}
+          top="calc(var(--app-header-h, 3.25rem) + 3.25rem)"
+        />
         <Link
           to="/"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -981,6 +995,7 @@ function PortfolioPage() {
                 </div>
               </div>
             )}
+            <div id="equity" className="scroll-mt-32" />
             <EquityPctChart
               className="mb-4"
               portfolioId={id}
@@ -993,7 +1008,7 @@ function PortfolioPage() {
             />
 
             <Suspense fallback={<div className="mb-4 h-64 animate-pulse rounded-md bg-muted/40" />}>
-              <div className="mb-4">
+              <div id="composition" className="mb-4 scroll-mt-32">
                 <EquityCompositionCard portfolioId={id} />
               </div>
             </Suspense>
@@ -1073,7 +1088,7 @@ function PortfolioPage() {
                 <InstrumentCcyAlert portfolioId={id} className="mb-4" />
                 <ReconcileFillsCard portfolioId={id} className="mb-4" />
                 <PriceUnitAuditCard portfolioId={id} className="mb-4" />
-                <div className="mb-6">
+                <div id="holdings" className="mb-6 scroll-mt-32">
                   <LiveHoldingsCard
                     holdings={holdings}
                     currency={p.currency}
@@ -1098,7 +1113,7 @@ function PortfolioPage() {
                   </div>
                 )}
 
-                <Card className="mb-6">
+                <Card id="actions" className="mb-6 scroll-mt-32">
                   <CardContent className="flex flex-wrap items-center gap-3 py-4">
                     <UITooltipProvider delayDuration={100}>
                       <UITooltip>
@@ -1167,7 +1182,7 @@ function PortfolioPage() {
                   </CardContent>
                 </Card>
 
-                <div className="mb-6 space-y-3">
+                <div id="portfolio-look-deeper" className="mb-6 scroll-mt-32 space-y-3">
                   <div>
                     <h3 className="font-display text-base font-semibold tracking-tight">Look deeper</h3>
                     <p className="text-xs text-muted-foreground">

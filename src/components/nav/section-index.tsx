@@ -15,10 +15,13 @@ export function SectionIndex({
   className = "",
   /** Extra offset below the sticky app header, in px. */
   offset = 0,
+  /** CSS `top` for the sticky row; defaults to sitting under the app header. */
+  top = "var(--app-header-h, 3.25rem)",
 }: {
   items: readonly SectionIndexItem[];
   className?: string;
   offset?: number;
+  top?: string;
 }) {
   const [present, setPresent] = useState<SectionIndexItem[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -64,7 +67,8 @@ export function SectionIndex({
   return (
     <nav
       aria-label="Sections on this page"
-      className={`sticky top-[var(--app-header-h,3.25rem)] z-20 -mx-4 mb-4 border-b border-border bg-surface-1/90 px-4 backdrop-blur ${className}`}
+      style={{ top }}
+      className={`sticky z-20 -mx-4 mb-4 border-b border-border bg-surface-1/90 px-4 backdrop-blur ${className}`}
     >
       <div
         ref={rowRef}
