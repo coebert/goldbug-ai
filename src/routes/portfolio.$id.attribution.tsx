@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -93,6 +94,7 @@ function AttributionPage() {
   return (
     <div className="min-h-dvh bg-background">
       <AppHeader />
+      <div className="mx-auto max-w-7xl px-4"><PortfolioTabs id={id} /></div>
       <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>

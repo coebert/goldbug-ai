@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -82,6 +83,7 @@ function OptimizerPage() {
   return (
     <div className="min-h-dvh bg-background">
       <AppHeader />
+      <div className="mx-auto max-w-7xl px-4"><PortfolioTabs id={id} /></div>
       <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
         <div className="mb-4 flex items-center gap-3 flex-wrap">
           <Button variant="ghost" size="sm" asChild>
