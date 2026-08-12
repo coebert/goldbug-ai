@@ -13,6 +13,13 @@ import {
 
 const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 
+/** Selectable history depths, in calendar days. */
+const LOOKBACKS = [
+  { label: "2y", days: 730 },
+  { label: "3y", days: 1095 },
+  { label: "5y", days: 1825 },
+] as const;
+
 function PolicyTable({
   title,
   subtitle,
@@ -79,9 +86,10 @@ function PolicyTable({
 export function SetupBacktestCard() {
   const run = useServerFn(backtestReclaimSetups);
   const [result, setResult] = useState<SetupBacktestResult | null>(null);
+  const [lookbackDays, setLookbackDays] = useState<number>(1095);
 
   const backtest = useMutation({
-    mutationFn: () => run({ data: { limit: 24, lookbackDays: 1500 } }),
+    mutationFn: () => run({ data: { limit: 24, lookbackDays } }),
     onSuccess: (r) => {
       setResult(r);
       if (r.signals === 0) toast.info("No historical signals found in the sampled tickers.");
@@ -96,10 +104,25 @@ export function SetupBacktestCard() {
           <History className="h-4 w-4 text-primary" />
           Pattern backtest: profitable or froth?
         </CardTitle>
-        <Button size="sm" onClick={() => backtest.mutate()} disabled={backtest.isPending}>
+        <div className="flex items-center gap-1">
+          {LOOKBACKS.map((l) => (
+            <Button
+              key={l.days}
+              size="sm"
+              variant={l.days === lookbackDays ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs"
+              aria-pressed={l.days === lookbackDays}
+              onClick={() => setLookbackDays(l.days)}
+              disabled={backtest.isPending}
+            >
+              {l.label}
+            </Button>
+          ))}
+          <Button size="sm" onClick={() => backtest.mutate()} disabled={backtest.isPending}>
           {backtest.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-          {backtest.isPending ? "Replaying…" : "Run backtest"}
-        </Button>
+            {backtest.isPending ? "Replaying…" : "Run backtest"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
@@ -116,7 +139,7 @@ export function SetupBacktestCard() {
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">{result.signals} signals</Badge>
               <Badge variant="secondary">{result.symbolsTested} tickers</Badge>
-              <Badge variant="secondary">{Math.round(result.lookbackDays / 252)}y history</Badge>
+              <Badge variant="secondary">{(result.lookbackDays / 365).toFixed(1)}y history</Badge>
               <Badge variant="outline">{result.config.frictionBps}bps friction</Badge>
             </div>
 
