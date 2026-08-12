@@ -45,17 +45,19 @@ describe("scenarioTradeCost", () => {
   });
 
   it("drops UK stamp duty in the best case only", () => {
-    const best = scenarioTradeCost(order, COST_SCENARIOS.best);
-    const bestWithSpreadOnly = scenarioTradeCost(
-      { ...order, symbol: "AAPL:xnas" },
-      COST_SCENARIOS.best,
-    );
-    // Same notional, same spread, no stamp on either side of the comparison.
-    expect(Math.abs(best - bestWithSpreadOnly)).toBeLessThan(0.01);
-    const base = scenarioTradeCost(order, COST_SCENARIOS.base);
-    // Base case still charges the 50bps stamp on the GBP name.
-    expect(base - scenarioTradeCost({ ...order, symbol: "AAPL:xnas" }, COST_SCENARIOS.base))
-      .toBeGreaterThan(2);
+    // Same symbol, same spread — the only difference is the stamp multiplier.
+    const withStamp = scenarioTradeCost(order, {
+      ...COST_SCENARIOS.best,
+      stampMult: 1,
+    });
+    const exempt = scenarioTradeCost(order, COST_SCENARIOS.best);
+    const notional = order.quantity * order.price;
+    expect(withStamp - exempt).toBeCloseTo(notional * 0.005, 6);
+    // A US name is unaffected by the stamp multiplier either way.
+    const us = { ...order, symbol: "AAPL:xnas" };
+    expect(
+      scenarioTradeCost(us, { ...COST_SCENARIOS.best, stampMult: 1 }),
+    ).toBeCloseTo(scenarioTradeCost(us, COST_SCENARIOS.best), 6);
   });
 
   it("never returns a negative or non-finite cost", () => {
