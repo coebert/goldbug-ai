@@ -81,9 +81,19 @@ export function InsiderDealingsCard({ className }: { className?: string }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Reported share sales and purchases by executives of the companies you hold. Tax and
-          vesting disposals are scored down; open-market sales by a CEO or CFO are scored up.
+          Every four hours the AI re-reads reported share dealings by executives of the companies
+          you hold, watch or could buy. It separates genuine open-market deals from mechanical
+          vesting or tax sales and from false matches, and feeds the verdict into buy and sell
+          decisions.
         </p>
+        {scan ? (
+          <p className="text-[11px] text-muted-foreground">
+            Last scan {new Date(scan.at).toLocaleString("en-GB", { timeZone: "Europe/London" })} ·{" "}
+            {scan.ai_scored} reviewed · {scan.signals} real signals · {scan.mechanical} mechanical ·{" "}
+            {scan.noise} discarded
+          </p>
+        ) : null}
+
 
         {ranked.length === 0 ? (
           <p className="rounded-md border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
