@@ -752,6 +752,7 @@ function PortfolioPage() {
         closes: h.closes,
         hourly: h.hourly,
         hourlyAt: h.hourlyAt,
+        hourlyStale: h.hourlyStale,
 
         currentPrice: h.currentPrice,
         pctChangeSincePurchase: h.pctChangeSincePurchase,

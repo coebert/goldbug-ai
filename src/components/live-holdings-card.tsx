@@ -49,6 +49,12 @@ export type HoldingSeriesInfo = {
   /** Hour-bucketed prices since purchase (may be empty on older payloads). */
   hourly?: number[];
   hourlyAt?: string[];
+  /**
+   * Set when the broker's hourly quote stream is stale (no fresher than the
+   * latest close yet materially different). Those points are not intraday
+   * detail, so the trend falls back to daily closes.
+   */
+  hourlyStale?: boolean;
   currentPrice: number | null;
   pctChangeSincePurchase: number | null;
   valueChangeSincePurchase: number | null;
@@ -102,7 +108,9 @@ export function LiveHoldingsCard({
   const [sellTarget, setSellTarget] = useState<Holding | null>(null);
   // Trend resolution shared by every row so the rows stay comparable.
   const [trendRes, setTrendRes] = useState<"hourly" | "daily">("hourly");
-  const hasHourly = Object.values(series ?? {}).some((s) => (s.hourly?.length ?? 0) >= 2);
+  const hasHourly = Object.values(series ?? {}).some(
+    (s) => !s.hourlyStale && (s.hourly?.length ?? 0) >= 2,
+  );
   const resolution = hasHourly ? trendRes : "daily";
 
   const isLive = mode === "live_prod";
@@ -479,7 +487,7 @@ export function LiveHoldingsCard({
               const changeVal = r.unitsUnknown ? null : (s?.valueChangeSincePurchase ?? null);
               const up = (changePct ?? 0) >= 0;
               const openedLabel = fmtOpened(r.opened_at ?? s?.opened_at ?? null);
-              const hourlyPts = s?.hourly ?? [];
+              const hourlyPts = s?.hourlyStale ? [] : (s?.hourly ?? []);
               const useHourly = resolution === "hourly" && hourlyPts.length >= 2;
               const trendValues = useHourly ? hourlyPts : (s?.closes ?? []);
               const hasSeries = trendValues.length >= 2;
@@ -609,7 +617,7 @@ export function LiveHoldingsCard({
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground tabular-nums break-words">
                         {r.qty.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {currency}{" "}
-                        {r.avg.toFixed(2)}
+                        {r.avg.toFixed(2)} cost
                         {openedLabel && (
                           <span className="ml-1 text-muted-foreground/70">
                             · since {openedLabel}
