@@ -338,12 +338,16 @@ export async function runBatchingArm(
     // Per-day ticket cap: largest tickets win the slots, the rest are lost.
     const cap = Number(input.maxTicketsPerDay);
     let admitted = routed;
-    if (Number.isFinite(cap) && cap > 0 && routed.length > cap) {
-      const ranked = [...routed].sort(
-        (a, b) => b.order.notionalBase - a.order.notionalBase,
-      );
-      admitted = ranked.slice(0, cap);
-      ticketsCapped += routed.length - admitted.length;
+    if (Number.isFinite(cap) && cap > 0) {
+      // Sells are never gated; only buy tickets compete for the daily slots.
+      const sells = routed.filter((r) => r.order.side === "sell");
+      const buys = routed
+        .filter((r) => r.order.side !== "sell")
+        .sort((a, b) => b.order.notionalBase - a.order.notionalBase);
+      if (buys.length > cap) {
+        ticketsCapped += buys.length - cap;
+        admitted = [...sells, ...buys.slice(0, cap)];
+      }
     }
 
     const decisions: SimDecision[] = [];
