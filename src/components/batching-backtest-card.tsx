@@ -19,6 +19,7 @@ import { Loader2, Layers } from "lucide-react";
 import { runOrderBatchingBacktest } from "@/lib/batching-backtest.functions";
 import type { OrderBatchingAbResponse } from "@/lib/batching-backtest.functions";
 import { formatMoney } from "@/lib/format-money";
+import { AbConfidencePanel } from "@/components/backtest-ab-confidence-panel";
 import {
   SAXO_AXIS,
   SAXO_COLOR,
@@ -292,6 +293,8 @@ export function BatchingBacktestCard({
         ) : (
           <>
             <p className="text-sm">{result.summary}</p>
+
+            {result.confidence ? <AbConfidencePanel confidence={result.confidence} /> : null}
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               <Stat
