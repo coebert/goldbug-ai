@@ -16,7 +16,7 @@ export function SectionIndex({
   /** Extra offset below the sticky app header, in px. */
   offset = 0,
   /** CSS `top` for the sticky row; defaults to sitting under the app header. */
-  top = "var(--app-header-h, 3.25rem)",
+  top = "var(--app-header-h)",
 }: {
   items: readonly SectionIndexItem[];
   className?: string;
