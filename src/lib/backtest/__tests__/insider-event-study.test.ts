@@ -114,6 +114,6 @@ describe("summariseStudy / studyVerdict", () => {
     const study = summariseStudy(out, [1]);
     const verdict = studyVerdict(study, 1);
     expect(verdict.verdict).toBe("insufficient_evidence");
-    expect(verdict.supported_nudge).toBe(0);
+    expect(verdict.supported_nudge).toBeNull();
   });
 });
