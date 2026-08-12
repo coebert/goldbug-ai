@@ -884,3 +884,204 @@ export function frictionBreakdown(args: {
     totals: finish(totals, { reported: totalInvoicedReported, modelled: totalInvoicedModelled }),
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Weekly cost ledger
+ *
+ * The headline KPI answers "are we over budget right now"; it cannot show
+ * *when* the money leaked. This cut lays the same charged-friction rule over
+ * calendar weeks (Monday-start, UK clock) and splits each week into the three
+ * things a real-cash account actually pays: broker commission, stamp duty and
+ * levies, and the spread we cross. Turnover and ticket counts sit beside them
+ * so a bad week reads as either "traded too much" or "paid too much per trade".
+ * ------------------------------------------------------------------ */
+
+export type FrictionWeekRow = {
+  /** Monday of the week, YYYY-MM-DD (UK clock). */
+  weekStart: string;
+  /** Sunday of the week, YYYY-MM-DD. */
+  weekEnd: string;
+  tickets: number;
+  buyTickets: number;
+  sellTickets: number;
+  /** Total traded notional, base currency. */
+  turnoverBase: number;
+  buyTurnoverBase: number;
+  sellTurnoverBase: number;
+  /** Turnover as a fraction of the week's NAV (1.0 = whole book churned). */
+  turnoverRatio: number | null;
+  /** Charged friction, base currency (broker's number or ours, larger wins). */
+  chargedBase: number;
+  /** Commission / stamp+levies / spread split of `chargedBase`. */
+  components: FrictionComponents;
+  /** Charged friction in bps of the week's own turnover. */
+  chargedBpsOfTurnover: number | null;
+  /** Charged friction in bps of the week's NAV — comparable to the budget. */
+  chargedBpsOfNav: number | null;
+  /** Average ticket size, base currency. */
+  avgTicketBase: number;
+  /** NAV used for the bps-of-NAV figure. */
+  navBase: number | null;
+  /** Share of the week's tickets carrying broker-booked charges (0..1). */
+  brokerCoverage: number;
+};
+
+export type WeeklyFrictionLedger = {
+  weeks: FrictionWeekRow[];
+  totals: FrictionWeekRow;
+  /** Weekly slice of the 40bps/30d budget, for the reference line. */
+  weeklyBudgetBps: number;
+  currencyHint?: string;
+};
+
+/** Monday-start week key for an instant, evaluated on the UK clock. */
+export function ukWeekStart(iso: string): string {
+  const d = new Date(Date.parse(iso));
+  if (Number.isNaN(d.getTime())) return "";
+  // London is UTC+0/+1; shifting by the zone offset keeps Sunday-night fills
+  // in the right week without pulling in a date library.
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const local = new Date(Date.UTC(get("year"), get("month") - 1, get("day")));
+  const dow = (local.getUTCDay() + 6) % 7; // Monday = 0
+  local.setUTCDate(local.getUTCDate() - dow);
+  return local.toISOString().slice(0, 10);
+}
+
+function addDays(dayKey: string, n: number): string {
+  const d = new Date(`${dayKey}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function emptyWeek(weekStart: string): FrictionWeekRow {
+  return {
+    weekStart,
+    weekEnd: weekStart ? addDays(weekStart, 6) : "",
+    tickets: 0,
+    buyTickets: 0,
+    sellTickets: 0,
+    turnoverBase: 0,
+    buyTurnoverBase: 0,
+    sellTurnoverBase: 0,
+    turnoverRatio: null,
+    chargedBase: 0,
+    components: { commissionBase: 0, spreadBase: 0, taxBase: 0 },
+    chargedBpsOfTurnover: null,
+    chargedBpsOfNav: null,
+    avgTicketBase: 0,
+    navBase: null,
+    brokerCoverage: 0,
+  };
+}
+
+/**
+ * Per-week cost ledger over the supplied tape.
+ *
+ * `navByDay` is optional: when a week has no snapshot the NAV-relative
+ * columns are left null rather than divided by a stale number, because a
+ * wrong denominator here would make a cheap week look expensive.
+ */
+export function weeklyFrictionLedger(args: {
+  fills: readonly FrictionFill[];
+  /** Fallback NAV when a week has no snapshot of its own. */
+  navBase?: number;
+  /** YYYY-MM-DD → NAV, used to pick each week's own denominator. */
+  navByDay?: Map<string, number>;
+  /** Most recent weeks to return (default 13 ≈ a quarter). */
+  limitWeeks?: number;
+}): WeeklyFrictionLedger {
+  const limit = Math.max(1, args.limitWeeks ?? 13);
+  const byWeek = new Map<string, FrictionWeekRow>();
+  const invoiced = new Map<string, number>();
+
+  for (const f of args.fills) {
+    if (!(Number.isFinite(f.notionalBase) && f.notionalBase > 0)) continue;
+    const week = ukWeekStart(f.filledAt);
+    if (!week) continue;
+    const row = byWeek.get(week) ?? emptyWeek(week);
+    const charged = chargedFriction(f);
+    const comp = scaleComponents(f, charged);
+
+    row.tickets += 1;
+    row.turnoverBase += f.notionalBase;
+    if (f.side === "sell") {
+      row.sellTickets += 1;
+      row.sellTurnoverBase += f.notionalBase;
+    } else {
+      row.buyTickets += 1;
+      row.buyTurnoverBase += f.notionalBase;
+    }
+    row.chargedBase += charged;
+    row.components.commissionBase += comp.commissionBase;
+    row.components.spreadBase += comp.spreadBase;
+    row.components.taxBase += comp.taxBase;
+    if (isInvoiced(f)) invoiced.set(week, (invoiced.get(week) ?? 0) + 1);
+    byWeek.set(week, row);
+  }
+
+  const navFor = (weekStart: string): number | null => {
+    if (args.navByDay) {
+      for (let i = 6; i >= 0; i--) {
+        const nav = args.navByDay.get(addDays(weekStart, i));
+        if (Number.isFinite(nav) && (nav as number) > 0) return nav as number;
+      }
+    }
+    const fallback = Number(args.navBase ?? 0);
+    return fallback > 0 ? fallback : null;
+  };
+
+  const finish = (row: FrictionWeekRow, invoicedTickets: number): FrictionWeekRow => {
+    const nav = row.navBase ?? navFor(row.weekStart);
+    row.navBase = nav;
+    row.avgTicketBase = row.tickets > 0 ? row.turnoverBase / row.tickets : 0;
+    row.chargedBpsOfTurnover =
+      row.turnoverBase > 0 ? (row.chargedBase / row.turnoverBase) * 10_000 : null;
+    row.chargedBpsOfNav = nav && nav > 0 ? (row.chargedBase / nav) * 10_000 : null;
+    row.turnoverRatio = nav && nav > 0 ? row.turnoverBase / nav : null;
+    row.brokerCoverage = row.tickets > 0 ? invoicedTickets / row.tickets : 0;
+    return row;
+  };
+
+  const weeks = [...byWeek.values()]
+    .map((r) => finish(r, invoiced.get(r.weekStart) ?? 0))
+    .sort((a, b) => (a.weekStart < b.weekStart ? -1 : a.weekStart > b.weekStart ? 1 : 0))
+    .slice(-limit);
+
+  const totals = emptyWeek(weeks[0]?.weekStart ?? "");
+  totals.weekEnd = weeks[weeks.length - 1]?.weekEnd ?? "";
+  let totalInvoiced = 0;
+  let navSum = 0;
+  let navCount = 0;
+  for (const w of weeks) {
+    totals.tickets += w.tickets;
+    totals.buyTickets += w.buyTickets;
+    totals.sellTickets += w.sellTickets;
+    totals.turnoverBase += w.turnoverBase;
+    totals.buyTurnoverBase += w.buyTurnoverBase;
+    totals.sellTurnoverBase += w.sellTurnoverBase;
+    totals.chargedBase += w.chargedBase;
+    totals.components.commissionBase += w.components.commissionBase;
+    totals.components.spreadBase += w.components.spreadBase;
+    totals.components.taxBase += w.components.taxBase;
+    totalInvoiced += Math.round(w.brokerCoverage * w.tickets);
+    if (w.navBase && w.navBase > 0) {
+      navSum += w.navBase;
+      navCount += 1;
+    }
+  }
+  totals.navBase = navCount > 0 ? navSum / navCount : null;
+  finish(totals, totalInvoiced);
+
+  return {
+    weeks,
+    totals,
+    // 40bps per 30 days ≈ 9.3bps per 7-day week.
+    weeklyBudgetBps: (FRICTION_BUDGET_BPS * 7) / FRICTION_WINDOW_DAYS,
+  };
+}
