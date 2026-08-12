@@ -47,6 +47,7 @@ import { Route as ApiPublicHooksNewsRefreshRouteImport } from './routes/api/publ
 import { Route as ApiPublicHooksNewsBackfillRouteImport } from './routes/api/public/hooks/news-backfill'
 import { Route as ApiPublicHooksMarketOpenAlertsRouteImport } from './routes/api/public/hooks/market-open-alerts'
 import { Route as ApiPublicHooksLiveReconcileRouteImport } from './routes/api/public/hooks/live-reconcile'
+import { Route as ApiPublicHooksInsiderScanRouteImport } from './routes/api/public/hooks/insider-scan'
 import { Route as ApiPublicHooksHourlyRunRouteImport } from './routes/api/public/hooks/hourly-run'
 import { Route as ApiPublicHooksDailySummaryRouteImport } from './routes/api/public/hooks/daily-summary'
 import { Route as ApiPublicHooksDailyRunRouteImport } from './routes/api/public/hooks/daily-run'
@@ -257,6 +258,12 @@ const ApiPublicHooksLiveReconcileRoute =
     path: '/api/public/hooks/live-reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksInsiderScanRoute =
+  ApiPublicHooksInsiderScanRouteImport.update({
+    id: '/api/public/hooks/insider-scan',
+    path: '/api/public/hooks/insider-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksHourlyRunRoute = ApiPublicHooksHourlyRunRouteImport.update({
   id: '/api/public/hooks/hourly-run',
   path: '/api/public/hooks/hourly-run',
@@ -356,6 +363,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
+  '/api/public/hooks/insider-scan': typeof ApiPublicHooksInsiderScanRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
@@ -406,6 +414,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
+  '/api/public/hooks/insider-scan': typeof ApiPublicHooksInsiderScanRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
@@ -457,6 +466,7 @@ export interface FileRoutesById {
   '/api/public/hooks/daily-run': typeof ApiPublicHooksDailyRunRoute
   '/api/public/hooks/daily-summary': typeof ApiPublicHooksDailySummaryRoute
   '/api/public/hooks/hourly-run': typeof ApiPublicHooksHourlyRunRoute
+  '/api/public/hooks/insider-scan': typeof ApiPublicHooksInsiderScanRoute
   '/api/public/hooks/live-reconcile': typeof ApiPublicHooksLiveReconcileRoute
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
@@ -509,6 +519,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
+    | '/api/public/hooks/insider-scan'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
@@ -559,6 +570,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
+    | '/api/public/hooks/insider-scan'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
@@ -609,6 +621,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/daily-run'
     | '/api/public/hooks/daily-summary'
     | '/api/public/hooks/hourly-run'
+    | '/api/public/hooks/insider-scan'
     | '/api/public/hooks/live-reconcile'
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
@@ -655,6 +668,7 @@ export interface RootRouteChildren {
   ApiPublicHooksDailyRunRoute: typeof ApiPublicHooksDailyRunRoute
   ApiPublicHooksDailySummaryRoute: typeof ApiPublicHooksDailySummaryRoute
   ApiPublicHooksHourlyRunRoute: typeof ApiPublicHooksHourlyRunRoute
+  ApiPublicHooksInsiderScanRoute: typeof ApiPublicHooksInsiderScanRoute
   ApiPublicHooksLiveReconcileRoute: typeof ApiPublicHooksLiveReconcileRoute
   ApiPublicHooksMarketOpenAlertsRoute: typeof ApiPublicHooksMarketOpenAlertsRoute
   ApiPublicHooksNewsBackfillRoute: typeof ApiPublicHooksNewsBackfillRoute
@@ -934,6 +948,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksLiveReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/insider-scan': {
+      id: '/api/public/hooks/insider-scan'
+      path: '/api/public/hooks/insider-scan'
+      fullPath: '/api/public/hooks/insider-scan'
+      preLoaderRoute: typeof ApiPublicHooksInsiderScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/hourly-run': {
       id: '/api/public/hooks/hourly-run'
       path: '/api/public/hooks/hourly-run'
@@ -1065,6 +1086,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksDailyRunRoute: ApiPublicHooksDailyRunRoute,
   ApiPublicHooksDailySummaryRoute: ApiPublicHooksDailySummaryRoute,
   ApiPublicHooksHourlyRunRoute: ApiPublicHooksHourlyRunRoute,
+  ApiPublicHooksInsiderScanRoute: ApiPublicHooksInsiderScanRoute,
   ApiPublicHooksLiveReconcileRoute: ApiPublicHooksLiveReconcileRoute,
   ApiPublicHooksMarketOpenAlertsRoute: ApiPublicHooksMarketOpenAlertsRoute,
   ApiPublicHooksNewsBackfillRoute: ApiPublicHooksNewsBackfillRoute,
