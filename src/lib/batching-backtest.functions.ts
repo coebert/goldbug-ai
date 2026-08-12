@@ -36,7 +36,10 @@ export type OrderBatchingAbResponse = OrderBatchingAbResult & {
   to: string;
   navBase: number;
   windowHours: number;
+  /** Buy-and-hold and momentum-only baselines over the same assets/period. */
+  benchmarks: BenchmarkResult;
 };
+
 
 export const runOrderBatchingBacktest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
