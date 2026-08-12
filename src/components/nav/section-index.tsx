@@ -145,7 +145,7 @@ export function SectionIndex({
       <div
         ref={rowRef}
         data-chip-scroller
-        className="flex h-full min-w-0 touch-pan-x items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex h-full min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {present.map((i) => (
           <a
