@@ -30,6 +30,11 @@
 // per-symbol last-buy ages, and passes base-currency notionals.
 
 import { engineSymbolKey } from "./price-symbol";
+import {
+  edgesComparable,
+  stampPreferenceSurcharge,
+  type StampExemptPreference,
+} from "./sizing/stamp-exempt-preference";
 
 export type GovernorCandidate = {
   symbol: string;
@@ -51,6 +56,12 @@ export type GovernorCandidate = {
    * (0.04 = 4%). Absent = a conservative 2% is assumed.
    */
   expectedMovePct?: number;
+  /**
+   * True when a BUY of this instrument attracts 0.5% UK stamp duty (UK single
+   * stocks). ETFs/ETCs and non-UK listings are exempt and therefore have a
+   * lower break-even, which the ranking can be told to prefer.
+   */
+  stampLiable?: boolean;
 };
 
 
@@ -84,6 +95,13 @@ export type GovernorConfig = {
    * decision ever having approved it. Default 0.15.
    */
   maxPositionPctOfNav?: number;
+  /**
+   * Prefer stamp-exempt instruments (ETFs/ETCs, non-UK listings) over UK
+   * single stocks when signal strength is comparable. "off" ranks on the cost
+   * model alone; "balanced"/"strong" re-count part of the 50bps stamp charge
+   * when ranking, and break near-ties in favour of the exempt instrument.
+   */
+  stampExemptPreference?: StampExemptPreference;
 };
 
 
@@ -138,7 +156,10 @@ export function minTicketBase(cfg: Pick<GovernorConfig, "navBase" | "minTicketPc
  * beats a £2,000 ticket on a 0.1-conviction one, even though the big ticket
  * has lower *proportional* friction.
  */
-export function edgePerCost(c: GovernorCandidate): number {
+export function edgePerCost(
+  c: GovernorCandidate,
+  stampExemptPreference?: StampExemptPreference,
+): number {
   const conviction = Number.isFinite(c.edgeScore)
     ? Math.min(1, Math.max(0, Number(c.edgeScore)))
     : 0.5;
@@ -146,7 +167,15 @@ export function edgePerCost(c: GovernorCandidate): number {
     ? Math.max(0, Number(c.expectedMovePct))
     : 0.02;
   const grossEdge = conviction * move * Math.max(0, c.notionalBase);
-  const cost = Math.max(0.01, c.estCostBase);
+  // Ranking-only surcharge: a stamp-liable buy carries a higher break-even, so
+  // when the preference is on it must clear a higher bar to outrank an
+  // exempt idea of similar strength.
+  const surcharge = stampPreferenceSurcharge({
+    notionalBase: c.notionalBase,
+    stampLiable: c.stampLiable,
+    level: stampExemptPreference,
+  });
+  const cost = Math.max(0.01, c.estCostBase + surcharge);
   return grossEdge / cost;
 }
 
@@ -165,13 +194,25 @@ export function planAdmissions(
   let buysAdmitted = 0;
   const roomToday = Math.max(0, cfg.maxBuysPerDay - Math.max(0, cfg.buysAlreadyToday));
 
+  const stampPref = cfg.stampExemptPreference ?? "off";
   const decisions: GovernorDecision[] = [];
   const sells = candidates.filter((c) => c.side === "sell");
   const buys = candidates
     .filter((c) => c.side === "buy")
     .slice()
     .sort((a, b) => {
-      const diff = edgePerCost(b) - edgePerCost(a);
+      const ea = edgePerCost(a, stampPref);
+      const eb = edgePerCost(b, stampPref);
+      // Comparable signal strength → prefer the stamp-exempt instrument, which
+      // needs ~50bps less to break even.
+      if (
+        stampPref !== "off" &&
+        Boolean(a.stampLiable) !== Boolean(b.stampLiable) &&
+        edgesComparable(ea, eb)
+      ) {
+        return a.stampLiable ? 1 : -1;
+      }
+      const diff = eb - ea;
       if (Math.abs(diff) > 1e-9) return diff;
       return b.notionalBase - a.notionalBase;
     });

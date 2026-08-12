@@ -272,6 +272,11 @@ export type RiskConfig = {
   // propose diversifiers whenever the guardrail room is available. Purely a
   // prompt-level bias — it never overrides hard `asset_class_limits`.
   diversification_tilt: "off" | "balanced" | "strong";
+  // Prefer stamp-exempt instruments (ETFs/ETCs, non-UK listings) over UK
+  // single stocks when signal strength is comparable. UK shares pay 0.5%
+  // stamp duty on every buy, so the exempt instrument breaks even ~50bps
+  // sooner. Ranking-only: it never overrides caps or forces a trade.
+  stamp_exempt_preference: "off" | "balanced" | "strong";
   // Per-non-base-currency exposure caps (0..1) as fraction of NAV in
   // base-currency terms. Applies to any holding whose instrument currency is
   // NOT the portfolio's base currency (e.g. JPY holdings for a GBP portfolio).
@@ -380,6 +385,7 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   tod_venue_overrides: null,
   cash_floor_pct: null,
   diversification_tilt: "off",
+  stamp_exempt_preference: "balanced",
   fx_currency_limits: {},
   trading_style: "position",
   swing_min_hold_days: 2,
@@ -557,6 +563,15 @@ export function parseRiskConfig(raw: unknown): RiskConfig {
   // the neutral default so upgrades don't silently change AI behaviour.
   if (r.diversification_tilt === "off" || r.diversification_tilt === "balanced" || r.diversification_tilt === "strong") {
     out.diversification_tilt = r.diversification_tilt;
+  }
+
+  // Stamp-exempt instrument preference. Same tri-state shape as the tilt.
+  if (
+    r.stamp_exempt_preference === "off" ||
+    r.stamp_exempt_preference === "balanced" ||
+    r.stamp_exempt_preference === "strong"
+  ) {
+    out.stamp_exempt_preference = r.stamp_exempt_preference;
   }
 
 

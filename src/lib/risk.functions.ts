@@ -37,6 +37,7 @@ export const updateRiskConfig = createServerFn({ method: "POST" })
       atr_take_profit_floor_pct: z.number().min(0).max(2).optional(),
       atr_take_profit_cap_pct: z.number().min(0).max(5).optional(),
       diversification_tilt: z.enum(["off", "balanced", "strong"]).optional(),
+      stamp_exempt_preference: z.enum(["off", "balanced", "strong"]).optional(),
       trading_style: z.enum(["position", "swing"]).optional(),
       swing_min_hold_days: z.number().int().min(0).max(30).optional(),
       risk_level: z.number().int().min(1).max(5).optional(),
