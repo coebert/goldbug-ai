@@ -355,7 +355,8 @@ function ModeChart({
                   <Legend
                     verticalAlign="top"
                     height={24}
-                    wrapperStyle={{ fontSize: isMobile ? 10 : 12, color: AXIS_COLOR }}
+                    {...LEGEND_PROPS}
+                    wrapperStyle={{ ...LEGEND_PROPS.wrapperStyle, color: AXIS_COLOR }}
                   />
 
                   <Area

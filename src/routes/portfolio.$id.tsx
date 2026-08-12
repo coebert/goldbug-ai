@@ -1806,11 +1806,11 @@ function PortfolioPage() {
                               verticalAlign="bottom"
                               height={28}
                               iconType="plainline"
+                              {...LEGEND_PROPS}
                               wrapperStyle={{
-                                fontSize: 12,
+                                ...LEGEND_PROPS.wrapperStyle,
                                 color: chartTheme.axisText,
                                 paddingTop: 8,
-                                lineHeight: "18px",
                               }}
                             />
                           </ComposedChart>
