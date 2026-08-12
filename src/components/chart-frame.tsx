@@ -71,7 +71,11 @@ export function ChartFrame({
   }, []);
 
   return (
-    <div className={`w-full min-w-0 max-w-full overflow-hidden ${className}`} {...rest}>
+    <div
+      ref={boxRef}
+      className={`w-full min-w-0 max-w-full overflow-hidden ${className}`}
+      {...rest}
+    >
       <div key={remeasureKey} className="h-full w-full min-w-0">
         {children}
       </div>
