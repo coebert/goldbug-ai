@@ -64,7 +64,7 @@ export type BatchableOrder = {
   quantity: number;
   price: number;
   /** Ticket notional in the portfolio's base currency. */
-  notionalBase: number;
+  notionalBase?: number;
   conviction?: number | null;
 };
 

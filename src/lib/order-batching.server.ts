@@ -54,7 +54,7 @@ export async function applyBatchWindow<T extends BatchableOrder>(
     return { orders: args.orders, parked: [], dropped: [], releasedWithParked: 0 };
   }
 
-  const incoming = args.orders.map((o) => ({
+  const incoming: Array<T & { notionalBase: number }> = args.orders.map((o) => ({
     ...o,
     notionalBase: args.notionalBase(o),
   }));
@@ -105,7 +105,7 @@ export async function applyBatchWindow<T extends BatchableOrder>(
   }
 
   return {
-    orders: plan.release.map((r) => r.order as unknown as T),
+    orders: plan.release.map((r) => r.order as T),
     parked: plan.park,
     dropped: plan.drop,
     releasedWithParked: plan.release.filter((r) => r.parkedQuantity > 0).length,
