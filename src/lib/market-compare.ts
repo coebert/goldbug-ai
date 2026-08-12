@@ -53,6 +53,11 @@ export function compareSmaPriceKey(symbol: string, period: SmaPeriod): string {
   return `${symbol}~sma${period}~price`;
 }
 
+/** Data key for a symbol's 14-day RSI (its own 0-100 scale). */
+export function compareRsiKey(symbol: string): string {
+  return `${symbol}~rsi`;
+}
+
 /** Data key for a symbol's rebased moving average. */
 export function compareSmaKey(symbol: string, period: SmaPeriod): string {
   return `${symbol}~sma${period}`;
@@ -390,6 +395,15 @@ export function buildComparison(
           color: CHART_SEQUENCE[i % CHART_SEQUENCE.length],
         });
       }
+    }
+
+    // RSI is scale-free (0-100), so it is carried through unrebased.
+    for (const p of h.points) {
+      const at = index.get(p.date);
+      if (at == null) continue;
+      const r = p.rsi14;
+      if (r == null || !Number.isFinite(r)) continue;
+      points[at][compareRsiKey(h.symbol)] = r;
     }
 
     returnsBySymbol.set(h.symbol, aligned);
