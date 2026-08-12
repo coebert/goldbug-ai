@@ -43,13 +43,18 @@ export type NewsBackfillJob = BackfillJobLike & {
   finished_at: string | null;
 };
 
-const GDELT_TIMEOUT_MS = 10_000;
-/** GDELT asks for ≤1 request / 5s per client. */
-const GDELT_PACE_MS = 5_600;
+const GDELT_TIMEOUT_MS = 15_000;
+/**
+ * GDELT documents "≤1 request / 5s", but in practice it answers a steady 5–8s
+ * cadence with its plain-text throttle notice. 12s between publisher sweeps
+ * is the first spacing that returns JSON reliably.
+ */
+const GDELT_PACE_MS = 12_000;
 /** GDELT answers throttled callers with a plain-text notice — retry those. */
-const GDELT_MAX_ATTEMPTS = 3;
-const GDELT_RETRY_MS = 6_000;
+const GDELT_MAX_ATTEMPTS = 4;
+const GDELT_RETRY_MS = 12_000;
 const DEFAULT_BUDGET_MS = 45_000;
+
 /** Publishers queried per invocation before the cursor moves on. */
 const DOMAINS_PER_SLICE = 6;
 const MAX_RECORDS = 120;
@@ -274,6 +279,7 @@ export async function advanceNewsBackfill(opts?: {
   const seen = await windowSeenKeys(job.start_date, job.end_date);
   let inserted = 0;
   let processed = 0;
+  let advanced = 0;
   let throttled = 0;
 
   try {
@@ -283,7 +289,23 @@ export async function advanceNewsBackfill(opts?: {
 
       const history = await fetchDomainHistory(domains[i], job.start_date, job.end_date);
       processed++;
-      if (history.status === "rate_limited") throttled++;
+
+      // A throttled/failed sweep returns zero articles for a publisher that
+      // almost certainly has history. Advancing the pointer here would retire
+      // the feed unread — which is exactly how a job reached "36 of 36 feeds,
+      // 0 headlines". Leave the pointer where it is and end the pass so the
+      // next one retries this same feed after a cooling-off period.
+      if (history.status !== "ok") {
+        throttled++;
+        await supabaseAdmin
+          .from("news_backfill_jobs")
+          .update({
+            last_error:
+              "GDELT is throttling history requests — the job will retry this feed on the next pass.",
+          })
+          .eq("id", job.id);
+        break;
+      }
 
       const weight = RSS_SOURCES.find((s) => s.id === job.new_sources[i]?.id)?.weight ?? 0.6;
       const candidates = history.articles.map((a) => ({
@@ -312,15 +334,13 @@ export async function advanceNewsBackfill(opts?: {
         else inserted += rows.length;
       }
 
+      advanced = i + 1 - startIdx;
       await supabaseAdmin
         .from("news_backfill_jobs")
         .update({
           days_done: i + 1,
           headlines_inserted: job.headlines_inserted + inserted,
-          last_error:
-            throttled > 0 && inserted === 0
-              ? "GDELT is throttling history requests — the job will pick up where it left off on the next pass."
-              : null,
+          last_error: null,
           cursor_date: addDaysISO(job.end_date, -Math.floor(((i + 1) / domains.length) * (job.days_total - 1))),
         })
         .eq("id", job.id);
@@ -333,7 +353,8 @@ export async function advanceNewsBackfill(opts?: {
     return { job: failed, inserted, domains_processed: processed, done: true, reason: message };
   }
 
-  const completed = startIdx + processed >= domains.length;
+  const completed = startIdx + advanced >= domains.length;
+
   const final = completed
     ? await finishJob(job.id, "completed", null)
     : await latestBackfillJob(opts?.userId ?? null);
