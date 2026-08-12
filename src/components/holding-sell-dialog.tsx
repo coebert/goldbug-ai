@@ -24,14 +24,20 @@ type Props = {
     instrument_ccy?: string | null;
   };
   mode: string;
+  /** Pre-selected sell size, e.g. a suggested concentration trim. */
+  initialPercent?: number;
   onClose: () => void;
   onSold?: () => void;
 };
 
 const QUICK = [25, 50, 75, 100];
 
-export function HoldingSellDialog({ holding, mode, onClose, onSold }: Props) {
-  const [percent, setPercent] = useState(25);
+export function HoldingSellDialog({ holding, mode, initialPercent, onClose, onSold }: Props) {
+  const [percent, setPercent] = useState(() =>
+    initialPercent != null && Number.isFinite(initialPercent)
+      ? Math.min(100, Math.max(1, Math.round(initialPercent)))
+      : 25,
+  );
   const qc = useQueryClient();
   const sellFn = useServerFn(manualSellHolding);
 
