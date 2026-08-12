@@ -58,15 +58,19 @@ export async function insiderTargetsFromHoldings(supabase: Sb): Promise<InsiderT
 }
 
 function decode(s: string): string {
-  return s
+  // Entities first, then tags: Google encodes an <a> element inside
+  // <description>, so stripping tags before unescaping leaves markup behind.
+  const unescaped = s
     .replace(/<!\[CDATA\[|\]\]>/g, "")
-    .replace(/<[^>]+>/g, "")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+  return unescaped
+    .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

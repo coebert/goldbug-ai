@@ -132,10 +132,10 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/\bchief executive( officer)?\b|\bceo\b/i, "CEO"],
   [/\bchief financial( officer)?\b|\bcfo\b|\bfinance chief\b/i, "CFO"],
   [/\bchief operating( officer)?\b|\bcoo\b/i, "COO"],
-  [/\bchair(man|woman|person)?\b/i, "Chair"],
-  [/\bfounder\b/i, "Founder"],
-  [/\bdirector\b/i, "Director"],
-  [/\bpdmr\b/i, "PDMR"],
+  [/\bchair(man|woman|person)?s?\b/i, "Chair"],
+  [/\bfounders?\b/i, "Founder"],
+  [/\bdirectors?\b/i, "Director"],
+  [/\bpdmrs?\b/i, "PDMR"],
 ];
 
 function norm(s: string | null | undefined): string {
