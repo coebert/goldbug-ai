@@ -54,7 +54,8 @@ export function InsiderDealingDetailPanel({
           <>
             <SheetHeader className="space-y-2 text-left">
               <SheetTitle className="text-base leading-snug">{ex.event.headline}</SheetTitle>
-              <SheetDescription className="flex flex-wrap items-center gap-2">
+              <SheetDescription asChild>
+                <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="font-mono text-[11px]">
                   {ex.match.symbol}
                 </Badge>
@@ -80,6 +81,7 @@ export function InsiderDealingDetailPanel({
                     Reported
                   </Badge>
                 )}
+                </div>
               </SheetDescription>
             </SheetHeader>
 
