@@ -11,6 +11,9 @@
  * testable without touching the network or the database.
  */
 
+import { detectRsiDivergences, type RsiDivergence } from "./rsi-divergence";
+import { computeRsiSeries, type HistoryPoint } from "./market-symbol-history";
+
 export type ScanCandle = {
   date: string;
   close: number;
