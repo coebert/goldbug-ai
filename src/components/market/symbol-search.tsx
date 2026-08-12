@@ -60,7 +60,7 @@ export function SymbolSearch({ range = 365, className, placeholder }: Props) {
     return () => {
       cancelled = true;
       clearTimeout(t);
-ங    };
+    };
   }, [query, lookup]);
 
   const options = useMemo(
