@@ -213,6 +213,12 @@ import { CostScenarioBacktestCard } from "@/components/cost-scenario-backtest-ca
 import { EquityChangeBreakdownCard } from "@/components/equity-change-breakdown-card";
 import { DailyEquityChangesCard } from "@/components/daily-equity-changes-card";
 import { capitalAt, EquityPctChart } from "@/components/equity-pct-chart";
+const EquityCompositionCard = lazy(() =>
+  import("@/components/equity-composition-card").then((m) => ({
+    default: m.EquityCompositionCard,
+  })),
+);
+
 import { getHoldingsHistory } from "@/lib/holdings-history.functions";
 import { derivePortfolioMetrics } from "@/lib/derive-portfolio-metrics";
 const BacktestResultsCard = lazy(() =>
