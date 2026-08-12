@@ -246,6 +246,8 @@ export function evaluateSetup(
     `Invalidated on a daily close below ${invalidationBelow.toFixed(2)} (surge gap filled).`,
   ].join(" ");
 
+  const timeline = buildTimeline(clean, closes, age);
+
   return {
     match: {
       symbol,
@@ -266,6 +268,7 @@ export function evaluateSetup(
       invalidationBelow,
       maxWeightPct,
       thesis,
+      timeline,
     },
     rejected: null,
   };
