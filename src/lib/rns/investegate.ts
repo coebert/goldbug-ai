@@ -76,13 +76,12 @@ export function textify(html: string): string {
     .trim();
 }
 
-const PDMR_TITLE = /director\s*\/?\s*pdmr\s+shareholding|holding\(s\)\s+in\s+company|transaction\s+in\s+own\s+shares/i;
+/** Titles the RNS wire uses for director / PDMR dealings. */
+const PDMR_TITLE = /director\s*\/?\s*pdmr|pdmr\s+shareholding|director\s+shareholding|director\s+dealing/i;
 
 /** Is this announcement title a director-dealing filing? */
 export function isPdmrTitle(title: string): boolean {
-  return PDMR_TITLE.test(title) && !/holding\(s\)\s+in\s+company/i.test(title)
-    ? true
-    : /director\s*\/?\s*pdmr/i.test(title);
+  return PDMR_TITLE.test(title);
 }
 
 /**
