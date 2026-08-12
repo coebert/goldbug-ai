@@ -16,7 +16,6 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   CartesianGrid,
 } from "recharts";
 
@@ -28,7 +27,6 @@ import {
   AXIS_LINE,
   AXIS_TICK,
   GRID_PROPS,
-  LEGEND_STYLE,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
 } from "@/lib/chart-palette";
@@ -47,14 +45,22 @@ const CASH_COLOR = "hsl(215, 16%, 55%)";
 const OTHER_COLOR = "hsl(250, 20%, 60%)";
 const UNPRICED_COLOR = "hsl(30, 12%, 45%)";
 
-const colorFor = (key: string, i: number) =>
+// Colour is derived from the symbol itself (not its position in the stack), so
+// a given holding keeps the same shade across portfolios and time windows.
+const hashKey = (key: string) => {
+  let h = 0;
+  for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h;
+};
+
+const colorFor = (key: string) =>
   key === "cash"
     ? CASH_COLOR
     : key === "other"
       ? OTHER_COLOR
       : key === "unpriced"
         ? UNPRICED_COLOR
-        : BAND_COLORS[i % BAND_COLORS.length];
+        : BAND_COLORS[hashKey(key) % BAND_COLORS.length];
 
 const labelFor = (key: string) =>
   key === "cash"
@@ -108,6 +114,7 @@ export function EquityCompositionCard({
   }, [q.data]);
 
   const rows = q.data?.rows ?? [];
+  const latest = (rows[rows.length - 1] ?? {}) as Record<string, unknown>;
 
   return (
     <Card>
@@ -168,15 +175,14 @@ export function EquityCompositionCard({
                   ]}
                   labelFormatter={(d: string) => d}
                 />
-                <Legend wrapperStyle={LEGEND_STYLE} formatter={(v: string) => labelFor(v)} />
-                {keys.map((key, i) => (
+                {keys.map((key) => (
                   <Area
                     key={key}
                     type="monotone"
                     dataKey={key}
                     stackId="equity"
-                    stroke={colorFor(key, i - 1)}
-                    fill={colorFor(key, i - 1)}
+                    stroke={colorFor(key)}
+                    fill={colorFor(key)}
                     fillOpacity={0.55}
                     strokeWidth={1}
                     isAnimationActive={false}
@@ -186,6 +192,23 @@ export function EquityCompositionCard({
             </ResponsiveContainer>
           </ChartFrame>
         )}
+        {rows.length >= 2 && !q.isLoading ? (
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Chart legend">
+            {keys.map((key) => (
+              <li key={key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  aria-hidden
+                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                  style={{ backgroundColor: colorFor(key) }}
+                />
+                <span className="text-foreground">{labelFor(key)}</span>
+                {latest[key] != null ? (
+                  <span className="tabular-nums">{money.format(Number(latest[key]))}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </CardContent>
     </Card>
   );
