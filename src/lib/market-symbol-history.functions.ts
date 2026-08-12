@@ -62,11 +62,7 @@ export const getSymbolHistory = createServerFn({ method: "POST" })
 
     return buildSymbolHistory(
       data.symbol,
-      (rows ?? []).map((r) => ({
-        symbol: r.symbol as string,
-        price_date: r.price_date as string,
-        close: Number(r.close),
-      })),
+      priceRows,
       data.days,
     );
   });
