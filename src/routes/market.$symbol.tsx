@@ -59,7 +59,7 @@ import {
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { BackRow } from "@/components/nav/back-row";
-import { useYAxisWidth, compactTick Y_AXIS_WIDTH_MOBILE } from "@/lib/chart-axis";
+import { useYAxisWidth, compactTick, Y_AXIS_WIDTH_MOBILE } from "@/lib/chart-axis";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
 import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
 import { DIVERGENCE_LABEL, DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
