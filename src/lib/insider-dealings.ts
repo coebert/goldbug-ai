@@ -372,3 +372,67 @@ export function insiderSignalBySymbol(
     })
     .sort((a, b) => a.nudge - b.nudge);
 }
+
+/** Stable identity for one reported dealing — used to de-duplicate alerts. */
+export function insiderEventKey(e: InsiderDealingEvent): string {
+  return `${e.symbol}|${e.event_date ?? ""}|${e.headline.toLowerCase().replace(/\s+/g, " ").trim()}`
+    .slice(0, 200);
+}
+
+/**
+ * How loudly a disposal should land. Mechanical tax/award disposals stay
+ * informational; a discretionary sale by a named executive is a warning, and a
+ * large one (severity is already size- and role-weighted) is critical.
+ */
+export function insiderAlertSeverity(e: InsiderDealingEvent): "info" | "warning" | "critical" {
+  if (e.direction !== "sell") return "info";
+  if (e.flavour === "tax" || e.flavour === "award") return "info";
+  return e.severity >= 0.7 ? "critical" : "warning";
+}
+
+/** Human-readable alert copy for a dealing. */
+export function insiderAlertText(e: InsiderDealingEvent): { title: string; body: string } {
+  const who = e.person ?? (e.role ? `${e.role}` : "An insider");
+  const role = e.person && e.role ? ` (${e.role})` : "";
+  const verb = e.direction === "sell" ? "sold" : e.direction === "buy" ? "bought" : "dealt in";
+  const size = e.shares
+    ? ` ${e.shares.toLocaleString("en-GB")} shares`
+    : e.value
+      ? ` ~${e.value >= 1e6 ? `${(e.value / 1e6).toFixed(2)}m` : e.value.toLocaleString("en-GB")}`
+      : "";
+  const flavour =
+    e.flavour === "tax"
+      ? " (tax/withholding — mechanical)"
+      : e.flavour === "award"
+        ? " (vesting/award — mechanical)"
+        : e.flavour === "discretionary"
+          ? " (discretionary open-market sale)"
+          : "";
+
+  const title = `${e.symbol}: ${who}${role} ${verb}${size} shares`;
+  const body = `${e.headline}${flavour}. Signal applied: ${(e.sentiment_nudge * 100).toFixed(1)}pts${
+    e.source ? ` · ${e.source}` : ""
+  }`;
+  return { title: title.slice(0, 160), body: body.slice(0, 400) };
+}
+
+/** Prompt block so the model reasons about insider selling explicitly. */
+export function formatInsiderBlock(
+  signals: Array<{ symbol: string; nudge: number; events: number; worst: InsiderDealingEvent }>,
+): string {
+  if (signals.length === 0) {
+    return "DIRECTOR / PDMR DEALINGS: none reported for held or candidate names in the last 14 days.";
+  }
+  const lines = signals.slice(0, 8).map((s) => {
+    const w = s.worst;
+    const who = w.person ?? w.role ?? "insider";
+    return `- ${s.symbol}: ${w.direction} by ${who}${w.flavour !== "unknown" ? ` (${w.flavour})` : ""} on ${
+      w.event_date ?? "n/a"
+    } — nudge ${s.nudge >= 0 ? "+" : ""}${s.nudge.toFixed(3)} over ${s.events} report(s). "${w.headline.slice(0, 120)}"`;
+  });
+  return [
+    "DIRECTOR / PDMR DEALINGS (bounded -0.15..+0.10, already folded into each symbol's news score):",
+    ...lines,
+    "Treat discretionary open-market selling by a CEO/CFO as a reason to avoid adding and to prefer trimming an oversized position; tax/award disposals are mechanical and near-meaningless.",
+  ].join("\n");
+}

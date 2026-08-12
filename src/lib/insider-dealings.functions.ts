@@ -49,7 +49,7 @@ export const getInsiderDealings = createServerFn({ method: "POST" })
       try {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { ingestInsiderDealings } = await import("@/lib/insider-dealings.server");
-        const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 3 });
+        const res = await ingestInsiderDealings(supabaseAdmin as never, { windowDays: 7 });
         targets = res.targets;
         refreshed = true;
       } catch (err) {

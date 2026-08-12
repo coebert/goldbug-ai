@@ -49,6 +49,8 @@ import {
 } from "./cross-sectional-ranking.server";
 import { getNewsForDate } from "./news.server";
 import { computeExecPostSignals } from "./exec-posts";
+import { formatInsiderBlock } from "./insider-dealings";
+import { loadRecentInsiderSignals } from "./insider-dealings.server";
 import { learnedExecPostNudge, learnedHalfLifeHours } from "./exec-post-learning";
 import { loadActiveExecPostLessons } from "./exec-post-analysis.server";
 import {
@@ -593,6 +595,16 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
   const macroEvents = macroEventFeatures(marketEvents);
 
+  // Director / PDMR dealings never reach the general wires, so they are loaded
+  // from their own store and folded into the same bounded news score.
+  const insiderSignals = await loadRecentInsiderSignals(supabaseAdmin as never, {
+    sinceDays: 14,
+  }).catch(() => []);
+  const insiderBySymbol = new Map(
+    insiderSignals.map((s: (typeof insiderSignals)[number]) => [s.symbol.toUpperCase(), s] as const),
+  );
+  const insiderBlock = formatInsiderBlock(insiderSignals);
+
   for (const f of features) {
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
     const execNudge = learnedExecPostNudge(f.symbol, execPostSignals, execCoefficients).nudge;
@@ -606,10 +618,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       [...evf.top_kinds, ...macroEvents.drivers.map((d) => d.kind)],
       macroPlaybook,
     );
+    const insiderNudge = insiderBySymbol.get(f.symbol.toUpperCase())?.nudge ?? 0;
     const base = agg.contributors > 0 ? agg.score : 0;
-    const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt));
+    const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt + insiderNudge));
     f.news_score =
-      agg.contributors > 0 || execNudge !== 0 || evTilt !== 0
+      agg.contributors > 0 || execNudge !== 0 || evTilt !== 0 || insiderNudge !== 0
         ? Number(blended.toFixed(3))
         : null;
     f.news_contributors = agg.contributors;
@@ -924,9 +937,9 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
         optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
         crossSectional: formatCrossSectionalBlock(rankMap),
-        marketEvents: macroPlaybookBlock
-          ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
-          : marketEventsBlock,
+        marketEvents: `${
+          macroPlaybookBlock ? `${marketEventsBlock}\n\n${macroPlaybookBlock}` : marketEventsBlock
+        }\n\n${insiderBlock}`,
         events,
         cooling: coolingSymbols,
         asOf,
@@ -3124,9 +3137,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             crossAsset: crossAsset ? formatCrossAssetBlock(crossAsset) : "CROSS-ASSET CONTEXT: unavailable.",
             optionsBlock: `${options ? formatOptionsBlock(options) : "OPTIONS-IMPLIED SIGNALS: unavailable."}\n\n${fearBlock}`,
             crossSectional: formatCrossSectionalBlock(rankMap),
-            marketEvents: macroPlaybookBlock
-              ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
-              : marketEventsBlock,
+            marketEvents: `${
+              macroPlaybookBlock
+                ? `${marketEventsBlock}\n\n${macroPlaybookBlock}`
+                : marketEventsBlock
+            }\n\n${insiderBlock}`,
             events,
             cooling: coolingSymbols,
             asOf,

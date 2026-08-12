@@ -7,6 +7,7 @@
 
 import {
   detectInsiderDealings,
+  insiderEventKey,
   insiderFeedQueries,
   type InsiderDealingEvent,
   type InsiderNewsRow,
@@ -148,19 +149,41 @@ export type InsiderIngestResult = {
   targets: number;
   detected: number;
   stored: number;
+  /** Events not previously in the table — the ones worth alerting on. */
+  fresh: InsiderDealingEvent[];
+  alerted: number;
   events: InsiderDealingEvent[];
 };
 
-/** Full pass: resolve held symbols, fetch feeds, persist new events. */
+/** Full pass: resolve held symbols, fetch feeds, persist new events, alert. */
 export async function ingestInsiderDealings(
   supabase: Sb,
-  opts: { targets?: InsiderTarget[]; windowDays?: number } = {},
+  opts: { targets?: InsiderTarget[]; windowDays?: number; alert?: boolean } = {},
 ): Promise<InsiderIngestResult> {
+  const empty = { detected: 0, stored: 0, fresh: [], alerted: 0, events: [] };
   const targets = opts.targets ?? (await insiderTargetsFromHoldings(supabase));
-  if (targets.length === 0) return { targets: 0, detected: 0, stored: 0, events: [] };
+  if (targets.length === 0) return { targets: 0, ...empty };
 
-  const events = await collectInsiderDealings(targets, opts.windowDays ?? 3);
-  if (events.length === 0) return { targets: targets.length, detected: 0, stored: 0, events: [] };
+  const events = await collectInsiderDealings(targets, opts.windowDays ?? 7);
+  if (events.length === 0) return { targets: targets.length, ...empty };
+
+  // Which of these are genuinely new? The upsert cannot tell us per-row, and
+  // the alert must only fire once per filing.
+  const { data: known } = await supabase
+    .from("insider_dealing_events")
+    .select("symbol, event_date, headline")
+    .in("symbol", [...new Set(events.map((e) => e.symbol))])
+    .limit(1000);
+  const knownKeys = new Set(
+    ((known ?? []) as Array<Record<string, unknown>>).map((r) =>
+      insiderEventKey({
+        symbol: String(r["symbol"] ?? ""),
+        event_date: (r["event_date"] as string | null) ?? null,
+        headline: String(r["headline"] ?? ""),
+      } as InsiderDealingEvent),
+    ),
+  );
+  const fresh = events.filter((e) => !knownKeys.has(insiderEventKey(e)));
 
   const rows = events.map((e) => ({
     symbol: e.symbol,
@@ -195,5 +218,56 @@ export async function ingestInsiderDealings(
     stored = count ?? rows.length;
   }
 
-  return { targets: targets.length, detected: events.length, stored, events };
+  let alerted = 0;
+  if (opts.alert !== false && fresh.length > 0) {
+    try {
+      const { alertInsiderDisposals } = await import("./insider-dealing-alert.server");
+      alerted = (await alertInsiderDisposals(fresh, { supabase })).sent;
+    } catch (err) {
+      console.error("insider-dealings: alert dispatch failed", err);
+    }
+  }
+
+  return { targets: targets.length, detected: events.length, stored, fresh, alerted, events };
+}
+
+/**
+ * Recent stored dealings, reduced to the per-symbol nudge the trading engine
+ * applies. Kept here (not in the pure module) because it touches the DB.
+ */
+export async function loadRecentInsiderSignals(
+  supabase: Sb,
+  opts: { sinceDays?: number } = {},
+): Promise<
+  Array<{ symbol: string; nudge: number; events: number; worst: InsiderDealingEvent }>
+> {
+  const sinceDays = Math.max(1, Math.min(90, Math.round(opts.sinceDays ?? 14)));
+  const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("insider_dealing_events")
+    .select("*")
+    .gte("event_date", since)
+    .limit(500);
+  if (error || !data) return [];
+
+  const events = (data as Array<Record<string, unknown>>).map((r) => ({
+    symbol: String(r["symbol"] ?? ""),
+    company: String(r["company"] ?? ""),
+    event_date: (r["event_date"] as string | null) ?? null,
+    headline: String(r["headline"] ?? ""),
+    summary: (r["summary"] as string | null) ?? null,
+    source: (r["source"] as string | null) ?? null,
+    url: (r["url"] as string | null) ?? null,
+    direction: (r["direction"] as InsiderDealingEvent["direction"]) ?? "unknown",
+    flavour: (r["flavour"] as InsiderDealingEvent["flavour"]) ?? "unknown",
+    person: (r["person"] as string | null) ?? null,
+    role: (r["role"] as string | null) ?? null,
+    shares: r["shares"] == null ? null : Number(r["shares"]),
+    value: r["value"] == null ? null : Number(r["value"]),
+    severity: Number(r["severity"] ?? 0),
+    sentiment_nudge: Number(r["sentiment_nudge"] ?? 0),
+  })) as InsiderDealingEvent[];
+
+  const { insiderSignalBySymbol } = await import("./insider-dealings");
+  return insiderSignalBySymbol(events);
 }

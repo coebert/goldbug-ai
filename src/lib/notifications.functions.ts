@@ -27,6 +27,7 @@ export const listNotifications = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({
       category: z.string().trim().min(1).max(64).optional(),
+      categories: z.array(z.string().trim().min(1).max(64)).min(1).max(10).optional(),
       unreadOnly: z.boolean().default(false),
       limit: z.number().int().min(1).max(200).default(50),
     }).parse(input ?? {}),
@@ -41,7 +42,8 @@ export const listNotifications = createServerFn({ method: "POST" })
       .select("id, category, severity, title, body, portfolio_id, slice_id, details, read_at, created_at")
       .order("created_at", { ascending: false })
       .limit(data.limit);
-    if (data.category) q = q.eq("category", data.category);
+    if (data.categories) q = q.in("category", data.categories);
+    else if (data.category) q = q.eq("category", data.category);
     if (data.unreadOnly) q = q.is("read_at", null);
     const { data: rows, error } = await q;
     if (error) throw new Error(`notifications query failed: ${error.message}`);
@@ -50,7 +52,8 @@ export const listNotifications = createServerFn({ method: "POST" })
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .is("read_at", null);
-    if (data.category) cq = cq.eq("category", data.category);
+    if (data.categories) cq = cq.in("category", data.categories);
+    else if (data.category) cq = cq.eq("category", data.category);
     const { count, error: countErr } = await cq;
     if (countErr) throw new Error(`notifications unread count failed: ${countErr.message}`);
 
@@ -89,7 +92,10 @@ export const markNotificationsUnread = createServerFn({ method: "POST" })
 export const markAllNotificationsRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ category: z.string().trim().min(1).max(64).optional() })
+    z.object({
+      category: z.string().trim().min(1).max(64).optional(),
+      categories: z.array(z.string().trim().min(1).max(64)).min(1).max(10).optional(),
+    })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
@@ -97,7 +103,8 @@ export const markAllNotificationsRead = createServerFn({ method: "POST" })
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
       .is("read_at", null);
-    if (data.category) q = q.eq("category", data.category);
+    if (data.categories) q = q.in("category", data.categories);
+    else if (data.category) q = q.eq("category", data.category);
     const { error } = await q;
     if (error) throw new Error(`mark all read failed: ${error.message}`);
     return { ok: true };
