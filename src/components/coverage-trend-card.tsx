@@ -37,16 +37,14 @@ import {
   SAXO_TOOLTIP_LABEL,
   saxoActiveDot,
 } from "@/lib/saxo-chart";
+import { CHART_SEQUENCE } from "@/lib/chart-palette";
 
 const RANGES = [30, 90] as const;
 type Range = (typeof RANGES)[number];
 
 const LINE_COLORS = [
   SAXO_COLOR.up,
-  "hsl(var(--chart-2, 199 89% 60%))",
-  "hsl(var(--chart-3, 43 96% 56%))",
-  "hsl(var(--chart-4, 322 81% 66%))",
-  "hsl(var(--chart-5, 262 83% 68%))",
+  ...CHART_SEQUENCE.slice(0, 4),
 ];
 
 function pct(v: number | null | undefined): string {

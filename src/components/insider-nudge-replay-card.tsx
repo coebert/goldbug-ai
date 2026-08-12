@@ -321,14 +321,14 @@ export function InsiderNudgeReplayCard({
                       dataKey="baseline"
                       dot={false}
                       strokeWidth={1.5}
-                      stroke="hsl(var(--muted-foreground))"
+                      stroke="var(--muted-foreground)"
                     />
                     <Line
                       type="monotone"
                       dataKey="nudged"
                       dot={false}
                       strokeWidth={1.8}
-                      stroke="hsl(var(--primary))"
+                      stroke="var(--primary)"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -438,14 +438,14 @@ function WalkForwardBlock({ r }: { r: WalkForwardResult }) {
                 dataKey="baseline"
                 dot={false}
                 strokeWidth={1.5}
-                stroke="hsl(var(--muted-foreground))"
+                stroke="var(--muted-foreground)"
               />
               <Line
                 type="monotone"
                 dataKey="nudged"
                 dot={false}
                 strokeWidth={1.8}
-                stroke="hsl(var(--primary))"
+                stroke="var(--primary)"
               />
             </LineChart>
           </ResponsiveContainer>

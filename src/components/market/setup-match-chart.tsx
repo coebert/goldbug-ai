@@ -123,8 +123,8 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
             <YAxis yAxisId="vol" hide domain={[0, (max: number) => max * 4]} />
             <Tooltip
               contentStyle={{
-                background: "hsl(var(--popover))",
-                border: "1px solid hsl(var(--border))",
+                background: "var(--popover)",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 fontSize: 11,
               }}
@@ -142,15 +142,15 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
               yAxisId="price"
               y1={match.zoneLow}
               y2={match.zoneHigh}
-              fill="hsl(var(--primary))"
+              fill="var(--primary)"
               fillOpacity={0.12}
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeOpacity={0.3}
             />
             <ReferenceLine
               yAxisId="price"
               y={match.invalidationBelow}
-              stroke="hsl(var(--destructive))"
+              stroke="var(--destructive)"
               strokeDasharray="4 3"
               strokeOpacity={0.8}
             />
@@ -166,7 +166,7 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
             <ReferenceLine
               yAxisId="price"
               x={reclaimLabel}
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeDasharray="2 3"
             />
 
@@ -182,9 +182,9 @@ export function SetupMatchChart({ match }: { match: SetupMatch }) {
               yAxisId="price"
               dataKey="close"
               type="monotone"
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeWidth={1.8}
-              fill="hsl(var(--primary))"
+              fill="var(--primary)"
               fillOpacity={0.08}
               isAnimationActive={false}
             />

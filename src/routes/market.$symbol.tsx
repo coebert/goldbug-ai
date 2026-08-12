@@ -950,7 +950,7 @@ function MarketSymbolPage() {
                         y={sig.price}
                         r={5}
                         fill={RSI_SIGNAL_TONE[sig.kind]}
-                        stroke="hsl(var(--background))"
+                        stroke="var(--background)"
                         strokeWidth={1.5}
                         isFront
                         label={{
@@ -984,7 +984,7 @@ function MarketSymbolPage() {
                         x={m.date}
                         y={m.price}
                         r={isFocused(focus, m.tradeId) ? 9 : 6}
-                        fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
+                        fill={m.side === "entry" ? "var(--background)" : tradeMarkerColor(m)}
                         stroke={tradeMarkerColor(m)}
                         strokeWidth={isFocused(focus, m.tradeId) ? 3 : 2}
                         opacity={focusOpacity(focus, m.tradeId)}
@@ -1007,12 +1007,12 @@ function MarketSymbolPage() {
                         y={a.close}
                         r={9}
                         fill={ANNOTATION_TONE[a.kind] ?? CHART_ROLE.highlight}
-                        stroke="hsl(var(--background))"
+                        stroke="var(--background)"
                         strokeWidth={1.5}
                         isFront
                         label={{
                           value: String(i + 1),
-                          fill: "hsl(var(--background))",
+                          fill: "var(--background)",
                           fontSize: 10,
                           fontWeight: 700,
                           position: "center",

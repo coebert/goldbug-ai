@@ -150,7 +150,7 @@ export function RsiPane({
                 y={sig.rsi}
                 r={4}
                 fill={RSI_SIGNAL_TONE[sig.kind]}
-                stroke="hsl(var(--background))"
+                stroke="var(--background)"
                 strokeWidth={1.5}
                 isFront
               />
@@ -176,7 +176,7 @@ export function RsiPane({
                   x={m.date}
                   y={m.rsi as number}
                   r={focusTradeId === m.tradeId ? 8 : 5}
-                  fill={m.side === "entry" ? "hsl(var(--background))" : tradeMarkerColor(m)}
+                  fill={m.side === "entry" ? "var(--background)" : tradeMarkerColor(m)}
                   stroke={tradeMarkerColor(m)}
                   strokeWidth={focusTradeId === m.tradeId ? 3 : 2}
                   opacity={focusTradeId == null || focusTradeId === m.tradeId ? 1 : 0.18}
