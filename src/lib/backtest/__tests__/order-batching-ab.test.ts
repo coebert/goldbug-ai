@@ -34,6 +34,9 @@ describe("runOrderBatchingAb", () => {
       signals: drips(series, 90),
       startingCash: 10_000,
       minTicketBase: 250,
+      // Daily bars are 24h apart, so the live 24h window expires a parked
+      // slice before the next bar can top it up. Multi-day window required.
+      windowHours: 96,
     });
     expect(r.batched.tickets).toBeGreaterThan(0);
     expect(r.batched.tickets).toBeLessThan(9);
@@ -71,7 +74,9 @@ describe("runOrderBatchingAb", () => {
       signals,
       startingCash: 20_000,
       minTicketBase: 250,
+      windowHours: 96,
     });
+    expect(batchedOnly.batched.tickets).toBeGreaterThan(0);
     // Same money deployed via 8 slices would have paid 8 floors; batching
     // pays one per release.
     expect(batchedOnly.batched.tickets).toBeLessThanOrEqual(4);
@@ -151,6 +156,7 @@ describe("runOrderBatchingAb", () => {
       signals: drips(series, 90),
       startingCash: 10_000,
       minTicketBase: 250,
+      windowHours: 96,
       drawdownTolerancePct: -100, // force the risk branch
     });
     expect(["costly_risk", "inconclusive", "supported", "not_supported"]).toContain(r.verdict);
@@ -164,6 +170,7 @@ describe("runOrderBatchingAb", () => {
       signals: drips(series, 90),
       startingCash: 10_000,
       minTicketBase: 250,
+      windowHours: 96,
     };
     const a = await runOrderBatchingAb(args);
     const b = await runOrderBatchingAb(args);
