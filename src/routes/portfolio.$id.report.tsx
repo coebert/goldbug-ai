@@ -35,6 +35,7 @@ import {
   GRID_PROPS,
   REFERENCE_LINE,
   TICK_LINE,
+  LEGEND_PROPS,
 } from "@/lib/chart-palette";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 

@@ -27,6 +27,7 @@ import {
   OKABE_ITO,
   TICK_LINE,
   TOOLTIP_CONTENT_STYLE,
+  LEGEND_PROPS,
 } from "@/lib/chart-palette";
 
 // Okabe–Ito colour-blind-safe sequence for per-symbol stacks.
