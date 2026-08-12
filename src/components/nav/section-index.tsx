@@ -27,15 +27,22 @@ export function SectionIndex({
   const [active, setActive] = useState<string | null>(null);
   const rowRef = useRef<HTMLDivElement | null>(null);
 
-  // Which targets actually exist right now.
+  // Which targets actually exist right now. Only update state when the set
+  // actually changes, so unrelated DOM churn can't re-render the row endlessly.
   useEffect(() => {
     const resolve = () =>
-      setPresent(items.filter((i) => document.getElementById(i.id) !== null));
+      setPresent((prev) => {
+        const next = items.filter((i) => document.getElementById(i.id) !== null);
+        const same =
+          prev.length === next.length && prev.every((p, idx) => p.id === next[idx]!.id);
+        return same ? prev : next;
+      });
     resolve();
     const mo = new MutationObserver(resolve);
     mo.observe(document.body, { childList: true, subtree: true });
     return () => mo.disconnect();
   }, [items]);
+
 
   // Scroll spy: the topmost section whose start is above the fold wins.
   useEffect(() => {
@@ -55,12 +62,21 @@ export function SectionIndex({
     return () => window.removeEventListener("scroll", onScroll);
   }, [present, offset]);
 
-  // Keep the active chip in view on narrow screens.
+  // Keep the active chip in view on narrow screens. Scroll the row
+  // horizontally by hand — scrollIntoView() also scrolls ancestors, which
+  // yanked the whole page back to the sticky row while scrolling.
   useEffect(() => {
-    if (!active || !rowRef.current) return;
-    const chip = rowRef.current.querySelector<HTMLElement>(`[data-section="${active}"]`);
-    chip?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    const row = rowRef.current;
+    if (!active || !row) return;
+    const chip = row.querySelector<HTMLElement>(`[data-section="${active}"]`);
+    if (!chip) return;
+    const left = chip.offsetLeft;
+    const right = left + chip.offsetWidth;
+    if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 12);
+    else if (right > row.scrollLeft + row.clientWidth)
+      row.scrollLeft = right - row.clientWidth + 12;
   }, [active]);
+
 
   if (present.length < 2) return null;
 
