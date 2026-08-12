@@ -69,7 +69,27 @@ export type SetupMatch = {
   thesis: string;
   /** Compact chart + timeline context for the match. */
   timeline: SetupTimeline;
+  /** Most recent confirmed RSI divergence, if any, and its effect on the score. */
+  divergence: SetupDivergence | null;
 };
+
+/** RSI divergence confluence attached to a setup match. */
+export type SetupDivergence = {
+  kind: "bullish" | "bearish";
+  /** Date of the first pivot in the divergence pair. */
+  fromDate: string;
+  /** Date of the confirming pivot. */
+  toDate: string;
+  /** Sessions since the confirming pivot. */
+  barsAgo: number;
+  pricePct: number;
+  rsiDelta: number;
+  /** Score points added (bullish) or removed (bearish) by the confluence. */
+  scoreAdjust: number;
+  /** Plain-language one-liner for the card and the watchlist thesis. */
+  summary: string;
+};
+
 
 /** One session in the compact match chart. */
 export type SetupSeriesPoint = {
