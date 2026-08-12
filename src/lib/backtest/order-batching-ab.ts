@@ -98,6 +98,8 @@ export type BatchingArmResult = {
   signalsSkipped: number;
   /** Parked slices that expired or drifted away unfilled (batched arm only). */
   parkedLost: number;
+  /** Tickets dropped because the per-day ticket cap was already used up. */
+  ticketsCapped: number;
   startingValue: number;
   finalValue: number;
   returnPct: number;
@@ -142,6 +144,12 @@ export type OrderBatchingAbInput = {
   minTicketBase: number;
   windowHours?: number;
   maxPriceDriftPct?: number;
+  /**
+   * Maximum tickets routed on any one bar. Mirrors the live daily buy cap:
+   * when more signals fire than the cap allows, the largest tickets go first
+   * and the rest are dropped. Undefined = no cap.
+   */
+  maxTicketsPerDay?: number;
   /** Drawdown deterioration (pp) still counted as "no worse". */
   drawdownTolerancePct?: number;
   /** Cost saving (bps of equity) below which the result is noise. */
@@ -224,6 +232,7 @@ export async function runBatchingArm(
   const trades: TradeRow[] = [];
   let signalsSkipped = 0;
   let parkedLost = 0;
+  let ticketsCapped = 0;
   // Parked window state carried across bars. Ids are synthetic and stable so
   // the planner's consume/drop bookkeeping behaves exactly as it does live.
   let parked: ParkedIntent[] = [];
@@ -326,8 +335,19 @@ export async function runBatchingArm(
       ];
     }
 
+    // Per-day ticket cap: largest tickets win the slots, the rest are lost.
+    const cap = Number(input.maxTicketsPerDay);
+    let admitted = routed;
+    if (Number.isFinite(cap) && cap > 0 && routed.length > cap) {
+      const ranked = [...routed].sort(
+        (a, b) => b.order.notionalBase - a.order.notionalBase,
+      );
+      admitted = ranked.slice(0, cap);
+      ticketsCapped += routed.length - admitted.length;
+    }
+
     const decisions: SimDecision[] = [];
-    for (const r of routed) {
+    for (const r of admitted) {
       const o = r.order;
       const side = o.side === "sell" ? "sell" : "buy";
       const baseCost = costFor({
@@ -415,6 +435,7 @@ export async function runBatchingArm(
     turnoverBase,
     signalsSkipped,
     parkedLost: parkedLost + stillParked,
+    ticketsCapped,
     startingValue,
     finalValue,
     returnPct: startingValue > 0 ? ((finalValue - startingValue) / startingValue) * 100 : 0,
