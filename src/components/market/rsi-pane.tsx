@@ -34,6 +34,8 @@ import {
   type HistoryPoint,
   type RsiZone,
 } from "@/lib/market-symbol-history";
+import { DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
+
 
 const ZONE_LABEL: Record<RsiZone, string> = {
   oversold: "Oversold",
@@ -59,9 +61,12 @@ export function RsiBadge({ value }: { value: number | null | undefined }) {
 
 export function RsiPane({
   points,
+  divergences = [],
   className,
 }: {
   points: HistoryPoint[];
+  /** Divergence legs to draw across the RSI line. */
+  divergences?: RsiDivergence[];
   className?: string;
 }) {
   const hasData = points.some((p) => p.rsi14 != null);
@@ -84,6 +89,7 @@ export function RsiPane({
       <ChartFrame className="h-36 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
+
             <CartesianGrid {...GRID_PROPS} />
             <XAxis
               dataKey="date"
@@ -119,6 +125,20 @@ export function RsiPane({
               connectNulls
               isAnimationActive={false}
             />
+            {divergences.map((d) => (
+              <ReferenceLine
+                key={`rsi-div-${d.kind}-${d.from.date}-${d.to.date}`}
+                segment={[
+                  { x: d.from.date, y: d.from.rsi },
+                  { x: d.to.date, y: d.to.rsi },
+                ]}
+                stroke={DIVERGENCE_TONE[d.kind]}
+                strokeWidth={1.6}
+                strokeDasharray="5 3"
+                ifOverflow="extendDomain"
+              />
+            ))}
+
           </LineChart>
         </ResponsiveContainer>
       </ChartFrame>

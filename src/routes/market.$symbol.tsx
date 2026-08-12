@@ -8,6 +8,8 @@ import {
   Line,
   LineChart,
   ReferenceDot,
+  ReferenceLine,
+
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -56,6 +58,9 @@ import {
 } from "@/lib/sma-display";
 import { SmaPeriodToggles } from "@/components/market/sma-period-toggles";
 import { RsiBadge, RsiPane } from "@/components/market/rsi-pane";
+import { detectRsiDivergences, divergenceSummary } from "@/lib/rsi-divergence";
+import { DIVERGENCE_LABEL, DIVERGENCE_TONE, type RsiDivergence } from "@/lib/rsi-divergence-style";
+
 import { TrendBasisSelect } from "@/components/market/trend-basis-select";
 import {
   buildComparison,
@@ -302,6 +307,50 @@ function AnnotationList({
   );
 }
 
+/** Plain-language read-out of the divergences drawn on the charts. */
+function DivergenceList({ divergences }: { divergences: RsiDivergence[] }) {
+  if (!divergences.length) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No RSI divergences in this window — price and momentum agree.
+      </p>
+    );
+  }
+  const recent = divergences.slice(-4).reverse();
+  return (
+    <section className="space-y-2">
+      <h2 className="text-xs font-medium text-muted-foreground">
+        RSI divergences ({divergences.length} in window)
+      </h2>
+      <ul className="space-y-1.5">
+        {recent.map((d) => (
+          <li key={`${d.kind}-${d.from.date}-${d.to.date}`} className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge
+              variant="outline"
+              className={
+                d.kind === "bullish"
+                  ? "border-emerald-500/40 text-emerald-500"
+                  : "border-destructive/40 text-destructive"
+              }
+            >
+              {DIVERGENCE_LABEL[d.kind]}
+            </Badge>
+            <span className="text-muted-foreground">
+              {formatUkDate(d.from.date)} → {formatUkDate(d.to.date)} · {divergenceSummary(d)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-muted-foreground">
+        Divergence flags waning momentum, not a trade signal: confirm with a reclaim of the
+        20-day average before acting. Not financial advice.
+      </p>
+    </section>
+  );
+}
+
+
+
 function MarketSymbolPage() {
   const { symbol } = Route.useParams();
   const { range, compare: compareParam, sma: smaParam } = Route.useSearch();
@@ -329,6 +378,36 @@ function MarketSymbolPage() {
       return next;
     });
   };
+  // Divergence overlay is its own toggle; enabling it opens the RSI pane too
+  // so the two legs of the signal are visible together.
+  const [showDiv, setShowDiv] = useState(false);
+  useEffect(() => {
+    try {
+      setShowDiv(window.localStorage.getItem("chart.rsiDivergence") === "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleDiv = () => {
+    setShowDiv((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("chart.rsiDivergence", next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      if (next) {
+        setShowRsi(true);
+        try {
+          window.localStorage.setItem("chart.rsi", "1");
+        } catch {
+          /* storage unavailable */
+        }
+      }
+      return next;
+    });
+  };
+
   const pickTrendBasis = (b: TrendBasis) => {
     setTrendBasis(b);
     storeTrendBasis(b);
@@ -403,6 +482,13 @@ function MarketSymbolPage() {
   const annotations = annotationQuery.data?.annotations ?? [];
   const up = (history?.changePct ?? 0) >= 0;
 
+  // Divergences are derived purely from the window on screen.
+  const divergences = useMemo(
+    () => (history ? detectRsiDivergences(history.points) : []),
+    [history],
+  );
+
+
   const compareLoading = compareQueries.some((q) => q.isLoading);
   const compareData = compareQueries
     .map((q) => q.data)
@@ -455,6 +541,17 @@ function MarketSymbolPage() {
             >
               RSI
             </Button>
+            <Button
+              size="sm"
+              variant={showDiv ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs"
+              aria-pressed={showDiv}
+              onClick={toggleDiv}
+              title="Highlight RSI/price divergences"
+            >
+              Divergence
+            </Button>
+
             {HISTORY_RANGES.map((r) => (
               <Button
                 key={r}
@@ -559,6 +656,22 @@ function MarketSymbolPage() {
                         isAnimationActive={false}
                       />
                     ))}
+                    {showDiv
+                      ? divergences.map((d) => (
+                          <ReferenceLine
+                            key={`price-div-${d.kind}-${d.from.date}-${d.to.date}`}
+                            segment={[
+                              { x: d.from.date, y: d.from.price },
+                              { x: d.to.date, y: d.to.price },
+                            ]}
+                            stroke={DIVERGENCE_TONE[d.kind]}
+                            strokeWidth={1.8}
+                            strokeDasharray="5 3"
+                            ifOverflow="extendDomain"
+                          />
+                        ))
+                      : null}
+
                     {annotations.map((a, i) => (
                       <ReferenceDot
                         key={a.id}
@@ -582,7 +695,12 @@ function MarketSymbolPage() {
                 </ResponsiveContainer>
               </ChartFrame>
 
-              {showRsi ? <RsiPane points={history.points} /> : null}
+              {showRsi ? (
+                <RsiPane points={history.points} divergences={showDiv ? divergences : []} />
+              ) : null}
+
+              {showDiv ? <DivergenceList divergences={divergences} /> : null}
+
 
               <AnnotationList
                 annotations={annotations}
