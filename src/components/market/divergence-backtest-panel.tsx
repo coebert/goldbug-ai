@@ -14,6 +14,7 @@ import {
   type DivergenceStats,
   type DivergenceTrade,
 } from "@/lib/rsi-divergence-backtest";
+import { divergenceTradeId } from "@/lib/backtest-trade-markers";
 import type { HistoryPoint } from "@/lib/market-symbol-history";
 import { formatUkDate } from "@/lib/uk-time";
 
@@ -95,11 +96,17 @@ export function DivergenceBacktestPanel({
   points,
   rangeLabel,
   onTrades,
+  selectedTradeId = null,
+  onSelectTrade,
 }: {
   points: HistoryPoint[];
   rangeLabel?: string;
   /** Reports the executed setups so the charts above can mark them. */
   onTrades?: (trades: DivergenceTrade[]) => void;
+  /** Currently highlighted setup, if any. */
+  selectedTradeId?: string | null;
+  /** Click-to-highlight: jump the charts to this setup's entry and exit. */
+  onSelectTrade?: (trade: DivergenceTrade | null) => void;
 }) {
   const [horizon, setHorizon] = useState(DEFAULT_DIVERGENCE_HORIZON);
   const [targetPct, setTargetPct] = useState(DEFAULT_DIVERGENCE_TARGET_PCT);
@@ -172,13 +179,29 @@ export function DivergenceBacktestPanel({
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-[11px] font-medium text-muted-foreground">Recent setups</p>
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Recent setups · click one to jump the charts to it
+            </p>
             <ul className="space-y-1">
               {result.trades
                 .slice(-5)
                 .reverse()
-                .map((t) => (
-                  <li key={`${t.pivotDate}-${t.entryDate}`} className="flex flex-wrap items-center gap-2 text-xs">
+                .map((t) => {
+                  const id = divergenceTradeId(t);
+                  const selected = id === selectedTradeId;
+                  return (
+                  <li key={`${t.pivotDate}-${t.entryDate}`}>
+                  <button
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => onSelectTrade?.(selected ? null : t)}
+                    title="Jump the charts to this setup's entry and exit"
+                    className={`flex w-full flex-wrap items-center gap-2 rounded-md border px-2 py-1 text-left text-xs transition-colors ${
+                      selected
+                        ? "border-primary/60 bg-primary/10"
+                        : "border-transparent hover:border-border hover:bg-muted/50"
+                    }`}
+                  >
                     <Badge
                       variant="outline"
                       className={
@@ -198,8 +221,10 @@ export function DivergenceBacktestPanel({
                         {pct(t.netReturn, 2)}
                       </span>
                     </span>
+                  </button>
                   </li>
-                ))}
+                  );
+                })}
             </ul>
           </div>
         </>
