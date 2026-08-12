@@ -33,6 +33,8 @@ import { CorrelationHeatmap } from "@/components/market/correlation-heatmap";
 import { RollingCorrelationPanel } from "@/components/market/rolling-correlation-panel";
 import {
   MAX_COMPARE_SYMBOLS,
+  comparePriceKey,
+  compareSmaPriceKey,
   type Comparison,
   type RollingWindow,
 } from "@/lib/market-compare";
@@ -82,6 +84,10 @@ export function CompareOverlay({
   onClear,
 }: CompareOverlayProps) {
   const [showSma, setShowSma] = useState(false);
+  // "rebased" = every series indexed to 100 at the window start (shared axis).
+  // "price" = each symbol drawn on its own true price scale (per-symbol axis).
+  const [scaleMode, setScaleMode] = useState<"rebased" | "price">("rebased");
+  const priceScale = scaleMode === "price";
   const [ticker, setTicker] = useState("");
   const [tickerError, setTickerError] = useState<string | null>(null);
   const [rollingWindow, setRollingWindow] = useState<RollingWindow>(() => {
@@ -188,7 +194,33 @@ export function CompareOverlay({
             {showSma ? "Hide" : "Show"} SMA {periods.join("/")}
           </Button>
         )}
+        {compare.length > 0 && (
+          <div className="inline-flex overflow-hidden rounded-md border border-border/60" role="group" aria-label="Chart scale">
+            {(["rebased", "price"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={scaleMode === m}
+                onClick={() => setScaleMode(m)}
+                className={`h-8 px-2 text-xs transition-colors ${
+                  scaleMode === m
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {m === "rebased" ? "Rebased 100" : "Price scale"}
+              </button>
+            ))}
+          </div>
+        )}
       </form>
+      {compare.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          {priceScale
+            ? "Each symbol is drawn on its own true price scale, so lines show actual levels rather than relative performance."
+            : "All symbols share a 100-based index at the window start, so lines compare performance directly."}
+        </p>
+      )}
       {tickerError && <p className="text-[11px] text-destructive">{tickerError}</p>}
 
       {full && (
@@ -222,25 +254,52 @@ export function CompareOverlay({
                   minTickGap={40}
                   tickFormatter={(d: string) => d.slice(2, 7)}
                 />
-                <YAxis
-                  tick={AXIS_TICK}
-                  axisLine={AXIS_LINE}
-                  tickLine={TICK_LINE}
-                  width={54}
-                  domain={["auto", "auto"]}
-                  tickFormatter={(v: number) => `${(v - 100).toFixed(0)}%`}
-                />
+                {priceScale ? (
+                  comparison.series.map((s, i) => (
+                    <YAxis
+                      key={s.symbol}
+                      yAxisId={s.symbol}
+                      orientation={i === 0 ? "left" : "right"}
+                      hide={i > 1}
+                      tick={AXIS_TICK}
+                      axisLine={AXIS_LINE}
+                      tickLine={TICK_LINE}
+                      width={54}
+                      domain={["auto", "auto"]}
+                      tickFormatter={(v: number) =>
+                        Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(2)
+                      }
+                    />
+                  ))
+                ) : (
+                  <YAxis
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={TICK_LINE}
+                    width={54}
+                    domain={["auto", "auto"]}
+                    tickFormatter={(v: number) => `${(v - 100).toFixed(0)}%`}
+                  />
+                )}
                 <Tooltip
                   contentStyle={TOOLTIP_CONTENT_STYLE}
                   labelStyle={TOOLTIP_LABEL_STYLE}
-                  formatter={(v: number, name: string) => [pct(v - 100), name]}
+                  formatter={(v: number, name: string) => [
+                    priceScale
+                      ? Math.abs(v) >= 1000
+                        ? v.toFixed(0)
+                        : v.toFixed(2)
+                      : pct(v - 100),
+                    name,
+                  ]}
                 />
                 <Legend wrapperStyle={LEGEND_STYLE} />
                 {comparison.series.map((s) => (
                   <Line
                     key={s.symbol}
                     type="monotone"
-                    dataKey={s.symbol}
+                    dataKey={priceScale ? comparePriceKey(s.symbol) : s.symbol}
+                    {...(priceScale ? { yAxisId: s.symbol } : {})}
                     name={s.label}
                     stroke={s.color}
                     strokeWidth={s.symbol === symbol ? 2.5 : 1.75}
@@ -254,7 +313,8 @@ export function CompareOverlay({
                     <Line
                       key={s.key}
                       type="monotone"
-                      dataKey={s.key}
+                      dataKey={priceScale ? compareSmaPriceKey(s.symbol, s.period) : s.key}
+                      {...(priceScale ? { yAxisId: s.symbol } : {})}
                       name={s.label}
                       stroke={s.color}
                       strokeWidth={1}
