@@ -59,9 +59,12 @@ export function RsiBadge({ value }: { value: number | null | undefined }) {
 
 export function RsiPane({
   points,
+  divergences = [],
   className,
 }: {
   points: HistoryPoint[];
+  /** Divergence legs to draw across the RSI line. */
+  divergences?: RsiDivergence[];
   className?: string;
 }) {
   const hasData = points.some((p) => p.rsi14 != null);
@@ -84,6 +87,7 @@ export function RsiPane({
       <ChartFrame className="h-36 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: -8 }}>
+
             <CartesianGrid {...GRID_PROPS} />
             <XAxis
               dataKey="date"
