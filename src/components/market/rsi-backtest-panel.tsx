@@ -55,16 +55,26 @@ export function RsiBacktestPanel({
   points,
   mode,
   rangeLabel,
+  onTrades,
 }: {
   points: HistoryPoint[];
   mode: RsiSignalMode;
   rangeLabel?: string;
+  /** Reports the executed trades so the charts above can mark them. */
+  onTrades?: (trades: RsiTrade[]) => void;
 }) {
   const [frictionBps, setFrictionBps] = useState(DEFAULT_RSI_BACKTEST_FRICTION_BPS);
   const result = useMemo(
     () => backtestRsiStrategy(points, mode, { frictionBps }),
     [points, mode, frictionBps],
   );
+
+  useEffect(() => {
+    onTrades?.(result.trades);
+  }, [result.trades, onTrades]);
+
+  useEffect(() => () => onTrades?.([]), [onTrades]);
+
 
   const beatsHold = result.totalReturn > result.buyHoldReturn;
 
