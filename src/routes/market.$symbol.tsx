@@ -702,6 +702,19 @@ function MarketSymbolPage() {
                   </Button>
                 ))
               : null}
+            {showSignals || showDiv ? (
+              <Button
+                size="sm"
+                variant={showFills ? "secondary" : "ghost"}
+                className="h-7 px-2 text-xs"
+                aria-pressed={showFills}
+                onClick={() => setShowFills((v) => !v)}
+                title="Mark the backtest's executed entries and exits on the price and RSI charts"
+              >
+                Fills
+              </Button>
+            ) : null}
+
 
             {HISTORY_RANGES.map((r) => (
               <Button
