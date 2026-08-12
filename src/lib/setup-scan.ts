@@ -219,6 +219,69 @@ function buildTimeline(clean: ScanCandle[], closes: number[], age: number): Setu
   };
 }
 
+/** Confirming pivots older than this are no longer treated as confluence. */
+export const DIVERGENCE_MAX_AGE_DAYS = 30;
+
+/**
+ * Most recent confirmed RSI divergence near the scan date.
+ *
+ * Bullish divergence into the reclaim says momentum was already turning up
+ * before price did — genuine confluence. Bearish divergence says the surge is
+ * running on fading momentum, which is exactly the froth the rules guard
+ * against, so it removes score instead of adding it.
+ */
+export function detectSetupDivergence(clean: ScanCandle[], closes: number[]): SetupDivergence | null {
+  const window = 180;
+  const start = Math.max(0, clean.length - window);
+  const slice = clean.slice(start);
+  if (slice.length < 40) return null;
+
+  const sliceCloses = slice.map((c) => c.close);
+  const rsi = computeRsiSeries(sliceCloses);
+  const points: HistoryPoint[] = slice.map((c, i) => ({
+    date: c.date,
+    close: c.close,
+    indexed: 100,
+    sma20: null,
+    sma50: null,
+    sma100: null,
+    sma200: null,
+    rsi14: rsi[i] ?? null,
+  }));
+
+  const found = detectRsiDivergences(points);
+  if (found.length === 0) return null;
+
+  const last = slice.length - 1;
+  const recent = found.filter((d) => last - d.to.index <= DIVERGENCE_MAX_AGE_DAYS);
+  if (recent.length === 0) return null;
+  const d: RsiDivergence = recent[recent.length - 1];
+
+  const barsAgo = last - d.to.index;
+  const recency = 1 - barsAgo / (DIVERGENCE_MAX_AGE_DAYS + 1);
+  const strength = Math.min(1, Math.abs(d.rsiDelta) / 12);
+  const magnitude = (0.5 + 0.5 * strength) * recency;
+  const scoreAdjust =
+    d.kind === "bullish" ? Math.round(10 * magnitude) : -Math.round(12 * magnitude);
+
+  const ago = barsAgo === 0 ? "today" : `${barsAgo} session${barsAgo === 1 ? "" : "s"} ago`;
+  const summary =
+    d.kind === "bullish"
+      ? `Bullish RSI divergence confirmed ${ago} (price ${d.pricePct.toFixed(1)}% into the low, RSI +${d.rsiDelta.toFixed(1)}) — momentum turned up before price did`
+      : `Bearish RSI divergence confirmed ${ago} (price +${d.pricePct.toFixed(1)}%, RSI ${d.rsiDelta.toFixed(1)}) — the surge is running on fading momentum`;
+
+  return {
+    kind: d.kind,
+    fromDate: d.from.date,
+    toDate: d.to.date,
+    barsAgo,
+    pricePct: d.pricePct,
+    rsiDelta: d.rsiDelta,
+    scoreAdjust,
+    summary,
+  };
+}
+
 
 /** Sessions since close crossed from below to above the 50d average, or null. */
 function reclaimAge(closes: number[], lookback: number): number | null {
