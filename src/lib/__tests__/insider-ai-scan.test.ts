@@ -108,14 +108,14 @@ describe("insiderSignalsWithAi", () => {
   it("excludes events the model rejected as noise", () => {
     const out = insiderSignalsWithAi([
       row({ headline: "Company launches buyback", ai_verdict: "noise", ai_nudge: 0 }),
+      row({ person: "Jane Doe", ai_verdict: "signal", ai_nudge: -0.05 }),
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0].nudge).toBe(0);
+    expect(out[0].events).toBe(1);
+    expect(out[0].nudge).toBeCloseTo(-0.05, 4);
   });
 
-  it("drops the symbol entirely when every event is noise-only", () => {
-    const out = insiderSignalsWithAi([row({ ai_verdict: "noise", ai_nudge: 0 })]);
-    expect(out[0].events).toBe(0);
+  it("drops the symbol entirely when every event is noise", () => {
+    expect(insiderSignalsWithAi([row({ ai_verdict: "noise", ai_nudge: 0 })])).toHaveLength(0);
   });
 
   it("applies a bounded cluster premium for multiple distinct insiders", () => {
