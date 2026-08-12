@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAxisLockedScroll } from "@/hooks/use-axis-locked-scroll";
 
 /**
  * Sticky in-page section index for long pages (Home, Portfolio detail).
@@ -25,7 +26,9 @@ export function SectionIndex({
 }) {
   const [present, setPresent] = useState<SectionIndexItem[]>([]);
   const [active, setActive] = useState<string | null>(null);
-  const rowRef = useRef<HTMLDivElement | null>(null);
+  // Dedicated gesture handling for the chip strip: locks each touch to one
+  // axis so a diagonal flick either scrolls the chips or the page, never both.
+  const { ref: rowRef, isGesturing } = useAxisLockedScroll<HTMLDivElement>();
 
   // Which targets actually exist right now. Only update state when the set
   // actually changes, so unrelated DOM churn can't re-render the row endlessly.
@@ -118,12 +121,13 @@ export function SectionIndex({
   // horizontally by hand — scrollIntoView() also scrolls ancestors, which
   // yanked the whole page back to the sticky row while scrolling.
   useEffect(() => {
-    if (touchingRef.current) {
+    if (touchingRef.current || isGesturing()) {
       pendingRef.current = true;
       return;
     }
     centreActive();
-  }, [active, centreActive]);
+  }, [active, centreActive, isGesturing]);
+
 
 
 
@@ -140,7 +144,8 @@ export function SectionIndex({
           resize the bar, or every sticky offset below it shifts mid-scroll. */}
       <div
         ref={rowRef}
-        className="flex h-full min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        data-chip-scroller
+        className="flex h-full min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [touch-action:pan-x_pan-y] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {present.map((i) => (
           <a
