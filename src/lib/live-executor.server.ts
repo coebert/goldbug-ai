@@ -541,6 +541,8 @@ export async function routeOrdersToBroker(params: {
       return v === "off" || v === "balanced" || v === "strong" ? v : "balanced";
     })();
 
+    const { expectedMovePct } = await import("./net-edge-gate");
+
     const candidates: Array<{
       symbol: string;
       side: "buy" | "sell";
@@ -548,6 +550,7 @@ export async function routeOrdersToBroker(params: {
       estCostBase: number;
       isAdd?: boolean;
       edgeScore?: number;
+      expectedMovePct?: number;
       stampLiable?: boolean;
     }> = [];
     const notionalBySymbol = new Map<string, number>();
@@ -568,6 +571,13 @@ export async function routeOrdersToBroker(params: {
         estCostBase: costs.oneWayCost * fx,
         isAdd: inputs.heldSymbols.has(o.symbol.toUpperCase()),
         edgeScore: Number.isFinite(o.conviction) ? Number(o.conviction) : undefined,
+        // Rank on the move this idea can realistically make (ATR- and
+        // conviction-scaled) rather than a flat 2% assumption, so the governor
+        // spends the day's cost budget where the edge outruns the friction.
+        expectedMovePct: expectedMovePct({
+          atrPct: (o as { atr_pct?: number | null }).atr_pct ?? null,
+          conviction: Number.isFinite(o.conviction) ? Number(o.conviction) : null,
+        }),
         stampLiable:
           side === "buy" &&
           attractsStampDuty(
@@ -576,6 +586,7 @@ export async function routeOrdersToBroker(params: {
           ),
       });
     }
+
 
     const plan = planAdmissions(candidates, {
       navBase: inputs.navBase,

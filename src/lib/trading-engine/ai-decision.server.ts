@@ -15,6 +15,7 @@ import {
   buildDiversificationTiltBlock,
 } from "../universe.server";
 import { tradingStylePrompt } from "../trading-style";
+import { buildTradingCostBlock } from "./trading-cost-prompt";
 import { regimeDescription, humanRegime, type PersistedRegime } from "../regime-detector.server";
 import { DecisionSchema, type DecisionOutput, type Portfolio, type Holding } from "./types";
 import { formatCandidateTable, activeAssetClasses } from "./features-prompt";
@@ -142,6 +143,12 @@ ${cfg.volatility_sizing ? `- Position sizing scales inversely to 20d volatility 
 - Only trade the provided symbols.
 
 ${tradingStylePrompt(cfg)}
+
+${buildTradingCostBlock({
+  currency: args.portfolio.currency,
+  stampExemptPreference: cfg.stamp_exempt_preference,
+})}
+
 
 ${regimeBlock}
 
