@@ -26,7 +26,9 @@ export function SectionIndex({
 }) {
   const [present, setPresent] = useState<SectionIndexItem[]>([]);
   const [active, setActive] = useState<string | null>(null);
-  const rowRef = useRef<HTMLDivElement | null>(null);
+  // Dedicated gesture handling for the chip strip: locks each touch to one
+  // axis so a diagonal flick either scrolls the chips or the page, never both.
+  const { ref: rowRef, isGesturing } = useAxisLockedScroll<HTMLDivElement>();
 
   // Which targets actually exist right now. Only update state when the set
   // actually changes, so unrelated DOM churn can't re-render the row endlessly.
