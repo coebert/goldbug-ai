@@ -150,7 +150,9 @@ function RootComponent() {
         className="pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
       >
         <MfaGate>
-          <Outlet />
+          <AppShell>
+            <Outlet />
+          </AppShell>
         </MfaGate>
 
       </div>
