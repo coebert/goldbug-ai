@@ -64,6 +64,35 @@ export type SetupMatch = {
   /** Position cap implied by the realised volatility. */
   maxWeightPct: number;
   thesis: string;
+  /** Compact chart + timeline context for the match. */
+  timeline: SetupTimeline;
+};
+
+/** One session in the compact match chart. */
+export type SetupSeriesPoint = {
+  date: string;
+  close: number;
+  sma50: number | null;
+  sma200: number | null;
+  volume: number;
+  /** Volume relative to the trailing 20-session average, when computable. */
+  relVolume: number | null;
+};
+
+export type SetupTimeline = {
+  /** Session on which the close crossed back above the 50d average. */
+  reclaimDate: string;
+  /** First session of the 5-session surge window. */
+  surgeStartDate: string;
+  /** Latest session in the window (the scan date). */
+  surgeEndDate: string;
+  latestDate: string;
+  todayVolume: number;
+  avgVolume20d: number;
+  /** Highest single-session relative volume inside the surge window. */
+  peakRelVolume: number;
+  /** Trailing sessions for the sparkline, oldest first. */
+  series: SetupSeriesPoint[];
 };
 
 export type SetupVerdict =
@@ -112,6 +141,61 @@ function wilderRsi(closes: number[], period = 14): number | null {
   if (loss === 0) return gain === 0 ? 50 : 100;
   return 100 - 100 / (1 + gain / loss);
 }
+/**
+ * Compact chart + event dates for the match card: the last ~45 sessions with
+ * their moving averages and relative volume, plus the reclaim/surge dates.
+ */
+function buildTimeline(clean: ScanCandle[], closes: number[], age: number): SetupTimeline {
+  const last = clean.length - 1;
+  const relVolumeAt = (i: number): number | null => {
+    if (i < 21) return null;
+    const window = clean
+      .slice(i - 20, i)
+      .map((c) => c.volume)
+      .filter((v) => Number.isFinite(v) && v > 0);
+    if (window.length < 10) return null;
+    const avg = mean(window);
+    return avg > 0 && clean[i].volume > 0 ? clean[i].volume / avg : null;
+  };
+
+  const start = Math.max(0, clean.length - 45);
+  const series: SetupSeriesPoint[] = [];
+  for (let i = start; i <= last; i += 1) {
+    series.push({
+      date: clean[i].date,
+      close: clean[i].close,
+      sma50: smaAt(closes, 50, i),
+      sma200: smaAt(closes, 200, i),
+      volume: clean[i].volume,
+      relVolume: relVolumeAt(i),
+    });
+  }
+
+  const surgeStartIndex = Math.max(0, last - 5);
+  const windowStart = Math.max(0, Math.min(surgeStartIndex, last - age));
+  let peakRelVolume = 0;
+  for (let i = windowStart; i <= last; i += 1) {
+    const rv = relVolumeAt(i);
+    if (rv != null && rv > peakRelVolume) peakRelVolume = rv;
+  }
+
+  const avgWindow = clean
+    .slice(-21, -1)
+    .map((c) => c.volume)
+    .filter((v) => Number.isFinite(v) && v > 0);
+
+  return {
+    reclaimDate: clean[Math.max(0, last - age)].date,
+    surgeStartDate: clean[surgeStartIndex].date,
+    surgeEndDate: clean[last].date,
+    latestDate: clean[last].date,
+    todayVolume: clean[last].volume,
+    avgVolume20d: avgWindow.length > 0 ? mean(avgWindow) : 0,
+    peakRelVolume,
+    series,
+  };
+}
+
 
 /** Sessions since close crossed from below to above the 50d average, or null. */
 function reclaimAge(closes: number[], lookback: number): number | null {
@@ -217,6 +301,8 @@ export function evaluateSetup(
     `Invalidated on a daily close below ${invalidationBelow.toFixed(2)} (surge gap filled).`,
   ].join(" ");
 
+  const timeline = buildTimeline(clean, closes, age);
+
   return {
     match: {
       symbol,
@@ -237,6 +323,7 @@ export function evaluateSetup(
       invalidationBelow,
       maxWeightPct,
       thesis,
+      timeline,
     },
     rejected: null,
   };

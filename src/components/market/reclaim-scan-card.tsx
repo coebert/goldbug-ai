@@ -12,6 +12,7 @@ import {
   scanReclaimSetups,
   type ReclaimScanResult,
 } from "@/lib/setup-scan.functions";
+import { SetupMatchChart } from "@/components/market/setup-match-chart";
 
 /**
  * Applies the CRWV-derived rules across the market: high-volatility names that
@@ -127,6 +128,7 @@ export function ReclaimScanCard() {
                     Invalidated below {m.invalidationBelow.toFixed(2)}
                   </span>
                 </div>
+                <SetupMatchChart match={m} />
               </div>
             ))}
 
