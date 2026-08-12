@@ -190,16 +190,17 @@ export function AppHeader({ email }: { email?: string | null }) {
 
         <Link
           to="/"
-          className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
+          className="flex min-w-0 shrink-0 items-center gap-2 overflow-hidden font-semibold tracking-tight"
         >
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 text-primary">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
             <TrendingUp className="h-4 w-4" />
           </span>
-          <span className="font-display text-lg leading-none">Aegis</span>
+          <span className="truncate font-display text-lg leading-none">Aegis</span>
           <EnvBadge />
         </Link>
 
-        <div className="flex flex-1 items-center justify-end gap-2">
+        <div className="flex min-w-0 items-center justify-end gap-2">
+
           <CommandPalette enabled={!!email} />
           <UkClock />
           <span data-coach="help-button">
