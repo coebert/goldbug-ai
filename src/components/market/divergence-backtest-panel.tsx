@@ -1,7 +1,7 @@
 // Divergence backtest panel: how often the divergences drawn on this chart
 // led to a real reversal versus a failed setup.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   backtestRsiDivergences,
   divergenceBacktestVerdict,
   type DivergenceStats,
+  type DivergenceTrade,
 } from "@/lib/rsi-divergence-backtest";
 import type { HistoryPoint } from "@/lib/market-symbol-history";
 import { formatUkDate } from "@/lib/uk-time";
