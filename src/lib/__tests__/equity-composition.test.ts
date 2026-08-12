@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildEquityComposition } from "@/lib/equity-composition";
+import { buildEquityComposition, validateComposition } from "@/lib/equity-composition";
 describe("composition", () => {
   it("stacks to total", () => {
     const r = buildEquityComposition({
