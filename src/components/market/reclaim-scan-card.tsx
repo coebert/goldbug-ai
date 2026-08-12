@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Radar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   addSetupMatchesToWatchlist,
+  getScheduledScan,
   scanReclaimSetups,
-  type ReclaimScanResult,
+  type ScheduledScanResult,
 } from "@/lib/setup-scan.functions";
 import { SetupMatchChart } from "@/components/market/setup-match-chart";
 
@@ -19,18 +20,45 @@ import { SetupMatchChart } from "@/components/market/setup-match-chart";
  * have just reclaimed their 50d/200d averages on thin relative volume. Matches
  * are watch candidates, never buy signals.
  */
+function freshnessLabel(r: ScheduledScanResult): string {
+  if (r.ranAt == null || r.ageMinutes == null) return "never run";
+  const mins = Math.round(r.ageMinutes);
+  const when =
+    mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
+  const how = r.source === "cron" ? "scheduled" : r.source === "manual" ? "manual" : "auto";
+  return `updated ${when} (${how})`;
+}
+
 export function ReclaimScanCard() {
   const runScan = useServerFn(scanReclaimSetups);
+  const loadScan = useServerFn(getScheduledScan);
   const addMatches = useServerFn(addSetupMatchesToWatchlist);
   const queryClient = useQueryClient();
-  const [result, setResult] = useState<ReclaimScanResult | null>(null);
+  const [override, setOverride] = useState<ScheduledScanResult | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+
+  // The scheduled job keeps the cached scan warm; the card just reads it and
+  // re-polls, so matches update without anyone clicking anything.
+  const cached = useQuery({
+    queryKey: ["reclaim-scan"],
+    queryFn: () => loadScan({ data: {} }),
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 60_000,
+  });
+
+  const result = override ?? cached.data ?? null;
+
+  useEffect(() => {
+    if (result) setSelected(result.matches.map((m) => m.symbol));
+  }, [result?.ranAt]);
 
   const scan = useMutation({
     mutationFn: () => runScan(),
     onSuccess: (r) => {
-      setResult(r);
-      setSelected(r.matches.map((m) => m.symbol));
+      setOverride(r);
+      queryClient.setQueryData(["reclaim-scan"], r);
+      if (r.note) toast.info(r.note);
       if (r.matches.length === 0) toast.info(`No matching setups across ${r.scanned} symbols.`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -61,10 +89,15 @@ export function ReclaimScanCard() {
           <Radar className="h-4 w-4 text-primary" />
           Post-reclaim setup scan
         </CardTitle>
-        <Button size="sm" onClick={() => scan.mutate()} disabled={scan.isPending}>
-          {scan.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-          Scan market
-        </Button>
+        <div className="flex items-center gap-2">
+          {cached.isFetching && !scan.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          ) : null}
+          <Button size="sm" onClick={() => scan.mutate()} disabled={scan.isPending}>
+            {scan.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+            Rescan now
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs leading-relaxed text-muted-foreground">
@@ -75,10 +108,22 @@ export function ReclaimScanCard() {
 
         {result ? (
           <>
-            <div className="text-xs text-muted-foreground">
-              Scanned {result.scanned} symbols · {result.matches.length} match
-              {result.matches.length === 1 ? "" : "es"}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span>
+                Scanned {result.scanned} symbols · {result.matches.length} match
+                {result.matches.length === 1 ? "" : "es"}
+              </span>
+              <span>·</span>
+              <span>{freshnessLabel(result)}</span>
+              {result.rateLimited ? (
+                <Badge variant="outline" className="text-[10px] text-amber-500">
+                  Rate-limited
+                </Badge>
+              ) : null}
             </div>
+            {result.note ? (
+              <p className="text-[11px] text-amber-500">{result.note}</p>
+            ) : null}
 
             {result.matches.map((m) => (
               <div key={m.symbol} className="space-y-2 rounded-xl border border-border/60 p-3">
@@ -157,7 +202,15 @@ export function ReclaimScanCard() {
               </details>
             ) : null}
           </>
-        ) : null}
+        ) : cached.isLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading the latest scheduled scan…
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No scan stored yet — the scheduled job will populate this shortly, or rescan now.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

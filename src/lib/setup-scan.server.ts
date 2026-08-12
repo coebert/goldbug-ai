@@ -55,6 +55,31 @@ export type ScanReport = {
   rules: typeof RECLAIM_SCAN_RULES;
 };
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function isRateLimit(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  return /429|rate.?limit|too many requests/i.test(msg);
+}
+
+/**
+ * Fetch candles with exponential backoff on provider rate limits so a busy
+ * upstream slows the scan down instead of failing it.
+ */
+async function candlesWithBackoff(symbol: string, days: number) {
+  let delay = 800;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await getDailyCandles(symbol, days);
+    } catch (err) {
+      if (!isRateLimit(err) || attempt === 2) throw err;
+      await sleep(delay + Math.random() * 250);
+      delay *= 2;
+    }
+  }
+  throw new Error(`${symbol}: rate limited`);
+}
+
 /** Run the post-reclaim archetype scan across the candidate list. */
 export async function runReclaimScan(limit = 40): Promise<ScanReport> {
   const candidates = scanCandidates().slice(0, limit);
@@ -70,7 +95,7 @@ export async function runReclaimScan(limit = 40): Promise<ScanReport> {
     await Promise.all(
       batch.map(async (c) => {
         try {
-          const candles = await getDailyCandles(c.symbol, 260);
+          const candles = await candlesWithBackoff(c.symbol, 260);
           scanned += 1;
           const verdict = evaluateSetup(
             c.symbol,
@@ -90,6 +115,8 @@ export async function runReclaimScan(limit = 40): Promise<ScanReport> {
         }
       }),
     );
+    // Pace batches so the upstream provider is not hammered.
+    if (i + batchSize < candidates.length) await sleep(250);
   }
 
   matches.sort((a, b) => b.score - a.score);

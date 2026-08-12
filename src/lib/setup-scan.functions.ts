@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { SetupMatch } from "@/lib/setup-scan";
+import type { StoredScanRun } from "@/lib/setup-scan-schedule.server";
 
 export type ReclaimScanResult = {
   scanned: number;
@@ -10,18 +11,63 @@ export type ReclaimScanResult = {
   errors: string[];
 };
 
-/** Scan the candidate list for post-reclaim, high-vol, thin-tape setups. */
+export type ScheduledScanResult = ReclaimScanResult & {
+  ranAt: string | null;
+  source: string | null;
+  ageMinutes: number | null;
+  stale: boolean;
+  rateLimited: boolean;
+  note: string | null;
+  refreshed: boolean;
+};
+
+function toResult(
+  run: StoredScanRun | null,
+  extras: { note: string | null; refreshed: boolean },
+): ScheduledScanResult {
+  return {
+    scanned: run?.scanned ?? 0,
+    matches: run?.matches ?? [],
+    nearMisses: (run?.nearMisses ?? []).slice(0, 12),
+    errors: (run?.errors ?? []).slice(0, 5),
+    ranAt: run?.ranAt ?? null,
+    source: run?.source ?? null,
+    ageMinutes: run?.ageMinutes ?? null,
+    stale: run?.stale ?? true,
+    rateLimited: run?.rateLimited ?? false,
+    note: extras.note,
+    refreshed: extras.refreshed,
+  };
+}
+
+/**
+ * Serve the cached scan, refreshing it in-line only when it has aged past the
+ * schedule window (the cron job normally keeps it warm).
+ */
+export const getScheduledScan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((v: unknown) =>
+    z.object({ refreshIfStale: z.boolean().optional() }).optional().parse(v) ?? {},
+  )
+  .handler(async ({ data }): Promise<ScheduledScanResult> => {
+    const { getOrRefreshScan, readLatestScanRun } = await import(
+      "@/lib/setup-scan-schedule.server"
+    );
+    if (data?.refreshIfStale === false) {
+      const run = await readLatestScanRun();
+      return toResult(run, { note: null, refreshed: false });
+    }
+    const { run, note, refreshed } = await getOrRefreshScan({ source: "auto" });
+    return toResult(run, { note, refreshed });
+  });
+
+/** Force a fresh scan now (manual "Scan market" button). */
 export const scanReclaimSetups = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<ReclaimScanResult> => {
-    const { runReclaimScan } = await import("@/lib/setup-scan.server");
-    const report = await runReclaimScan();
-    return {
-      scanned: report.scanned,
-      matches: report.matches,
-      nearMisses: report.nearMisses.slice(0, 12),
-      errors: report.errors.slice(0, 5),
-    };
+  .handler(async (): Promise<ScheduledScanResult> => {
+    const { getOrRefreshScan } = await import("@/lib/setup-scan-schedule.server");
+    const { run, note, refreshed } = await getOrRefreshScan({ source: "manual", force: true });
+    return toResult(run, { note, refreshed });
   });
 
 /** Add scan matches to the caller's watchlist with the rule-derived levels. */
