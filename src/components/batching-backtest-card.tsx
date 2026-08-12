@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -466,6 +466,9 @@ export function BatchingBacktestCard({
             <p className="text-[11px] text-muted-foreground">
               {result.bars} bars {result.from} → {result.to} · {result.symbols.join(", ")} · minimum
               ticket {formatMoney(result.minTicketBase, currency)} · {result.windowHours}h window ·{" "}
+              {result.maxTicketsPerDay > 0
+                ? `${result.maxTicketsPerDay} buys/day (${result.batched.ticketsCapped} dropped) · `
+                : "uncapped tickets · "}
               {result.signals} signals ·{" "}
               {result.marketImpact
                 ? "square-root market impact + latency charged per ticket"
