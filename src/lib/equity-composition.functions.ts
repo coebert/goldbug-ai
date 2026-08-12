@@ -44,7 +44,7 @@ export const getEquityComposition = createServerFn({ method: "GET" })
     const currency = String(portfolio?.currency ?? "GBP").toUpperCase();
     const snapRows = snapshots ?? [];
     const tradeRows = trades ?? [];
-    if (snapRows.length === 0) return { symbols: [], rows: [], currency };
+    if (snapRows.length === 0) return { symbols: [], rows: [], currency, gaps: [] };
 
     const symbols = Array.from(new Set(tradeRows.map((t) => String(t.symbol))));
     const prices: Record<string, CompositionPrice[]> = {};
