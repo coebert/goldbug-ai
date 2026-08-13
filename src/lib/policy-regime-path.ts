@@ -69,6 +69,34 @@ export type RegimeScaleDiagnostic = {
 const isFiniteNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 /**
+ * Coerce a JSONB value to a string without ever throwing. `String(x)` blows up
+ * on null-prototype objects and Symbols, both of which show up in dirty blobs.
+ */
+function safeString(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v == null) return "";
+  if (typeof v === "number" || typeof v === "boolean" || typeof v === "bigint") return String(v);
+  return "";
+}
+
+/** Coerce to a finite number, or null. Never NaN, never Infinity, never throws. */
+function safeNumber(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof v === "boolean" || typeof v === "bigint") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+
+/**
  * Resolve a persisted `policy_regime` blob into the multiplier the engine used,
  * and record which path got us there.
  */
