@@ -190,11 +190,13 @@ export function ArmMetricsPanel({ arms, className }: { arms: Arm[]; className?: 
             {rows.map((row) => {
               const scores = metrics.map((_, i) => row.score(i));
               const valid = scores.filter((s): s is number => s != null && Number.isFinite(s));
-              const best = valid.length
-                ? row.higherIsBetter
-                  ? Math.max(...valid)
-                  : Math.min(...valid)
-                : null;
+              const best =
+                valid.length && row.higherIsBetter != null
+                  ? row.higherIsBetter
+                    ? Math.max(...valid)
+                    : Math.min(...valid)
+                  : null;
+
               return (
                 <tr key={row.key} className="border-b border-border/40 last:border-0">
                   <th scope="row" className="py-1.5 pr-2 text-left font-normal text-muted-foreground">
