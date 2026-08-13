@@ -50,6 +50,9 @@ const NewsReel = lazy(() =>
 const ExecPostsCard = lazy(() =>
   import("@/components/exec-posts-card").then((m) => ({ default: m.ExecPostsCard })),
 );
+const PolicyMakersCard = lazy(() =>
+  import("@/components/policy-makers-card").then((m) => ({ default: m.PolicyMakersCard })),
+);
 const TickerWatchCard = lazy(() =>
   import("@/components/ticker-watch-card").then((m) => ({ default: m.TickerWatchCard })),
 );
@@ -409,6 +412,16 @@ function Home() {
             >
               <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
                 <ExecPostsCard />
+              </Suspense>
+            </AdvancedSection>
+
+            <AdvancedSection
+              title="Policy makers the AI is tracking"
+              summary="Central bank and finance-ministry remarks, scored hawkish to dovish, and the assets they affect."
+              defaultOpen={advanced}
+            >
+              <Suspense fallback={<div className="h-64 rounded-md border bg-card/50" aria-hidden="true" />}>
+                <PolicyMakersCard />
               </Suspense>
             </AdvancedSection>
 
