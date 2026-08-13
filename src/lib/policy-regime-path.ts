@@ -66,7 +66,37 @@ export type RegimeScaleDiagnostic = {
   notes: string[];
 };
 
-const isFiniteNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+/** Narrow to a usable finite number. */
+
+
+
+/**
+ * Coerce a JSONB value to a string without ever throwing. `String(x)` blows up
+ * on null-prototype objects and Symbols, both of which show up in dirty blobs.
+ */
+function safeString(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v == null) return "";
+  if (typeof v === "number" || typeof v === "boolean" || typeof v === "bigint") return String(v);
+  return "";
+}
+
+/** Coerce to a finite number, or null. Never NaN, never Infinity, never throws. */
+function safeNumber(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof v === "boolean" || typeof v === "bigint") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 
 /**
  * Resolve a persisted `policy_regime` blob into the multiplier the engine used,
@@ -97,8 +127,8 @@ export function resolveRegimeScalePath(blob: unknown, sign = 0): RegimeScaleDiag
     };
   }
 
-  const rawPosture = String(obj.posture ?? "");
-  const rawVol = String(obj.vol ?? "");
+  const rawPosture = safeString(obj.posture);
+  const rawVol = safeString(obj.vol);
   const postureOk = (POSTURES as string[]).includes(rawPosture);
   const volOk = (VOLS as string[]).includes(rawVol);
   const posture = (postureOk ? rawPosture : "neutral") as RegimePosture;
@@ -107,8 +137,8 @@ export function resolveRegimeScalePath(blob: unknown, sign = 0): RegimeScaleDiag
   if (!volOk) notes.push(`Volatility band ${rawVol ? `"${rawVol}"` : "missing"} — defaulted to normal.`);
 
   const storedRaw = obj.scale;
-  const storedNum = typeof storedRaw === "number" ? storedRaw : Number(storedRaw);
-  const stored = isFiniteNum(storedNum) ? storedNum : null;
+  const stored = safeNumber(storedRaw);
+
 
   let path: RegimeScalePath;
   let scale: number;
@@ -134,7 +164,7 @@ export function resolveRegimeScalePath(blob: unknown, sign = 0): RegimeScaleDiag
     path = "exact";
   }
 
-  const read: RegimeRead = { posture, vol, scale, confidence: 0, reason: String(obj.reason ?? "") };
+  const read: RegimeRead = { posture, vol, scale, confidence: 0, reason: safeString(obj.reason) };
   const appliedScale = sign === 0 ? scale : policyNudgeScaleForSign(read, sign);
   const untilted = sign === 0 ? scale : scale * tiltFor(posture, sign);
   const signClamped =
