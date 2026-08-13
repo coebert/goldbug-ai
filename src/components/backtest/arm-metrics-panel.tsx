@@ -10,6 +10,25 @@ function fmtPct(v: number | null, digits = 2) {
   return `${v > 0 ? "+" : ""}${s}%`;
 }
 
+/** Compact day count: sub-day holds read as hours, long ones as months. */
+function fmtDays(v: number) {
+  if (!Number.isFinite(v)) return "—";
+  if (v < 1) return `${Math.round(v * 24)}h`;
+  if (v < 60) return `${v.toFixed(v < 10 ? 1 : 0)}d`;
+  return `${(v / 30.44).toFixed(1)}mo`;
+}
+
+type MetricRow = {
+  key: string;
+  label: string;
+  hint: string;
+  value: (i: number) => string;
+  score: (i: number) => number | null;
+  /** null = neither direction is "better", so no row highlight. */
+  higherIsBetter: boolean | null;
+};
+
+
 /**
  * Per-arm headline metrics. Best value in each row is highlighted so the
  * comparison reads at a glance on a phone as well as a wide screen.
