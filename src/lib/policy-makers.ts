@@ -498,3 +498,177 @@ export function policyFeedQuery(maker: TrackedPolicyMaker): string {
   const name = encodeURIComponent(`"${maker.name}"`);
   return `https://news.google.com/rss/search?q=when:2d+${name}+(speech+OR+remarks+OR+testimony+OR+said+OR+statement+OR+%22rate+decision%22)&hl=en-GB&gl=GB&ceid=GB:en`;
 }
+
+// ---------------------------------------------------------------------------
+// Explainability
+//
+// `computePolicySignals` collapses every remark into one number per symbol.
+// That is what the engine wants, but it is useless when the operator asks
+// "why did the AI buy ISF.L this morning?". The functions below re-run the
+// exact same arithmetic and keep the working out: per-statement tone, LLM
+// sentiment blend, age, decay factor and the share of the final score each
+// remark is responsible for.
+// ---------------------------------------------------------------------------
+
+export type PolicyContribution = {
+  headline: string;
+  source: string | null;
+  url: string | null;
+  date: string | null;
+  maker_name: string;
+  maker_id: string;
+  role: string;
+  org: string;
+  ccy: string;
+  stance: PolicyStance;
+  /** Lexicon tone, -1 hawkish .. +1 dovish. */
+  tone: number;
+  /** LLM sentiment on the same row, if the scoring pass had run. */
+  sentiment: number | null;
+  /** Blended per-statement value the engine actually averages. */
+  value: number;
+  /** Maker's structural importance (0..1). */
+  maker_weight: number;
+  /** 1 for the maker's primary symbol, 0.5 for a secondary proxy. */
+  proximity: number;
+  age_hours: number;
+  /** 0.5 ** (age / halfLife) — how much of the remark survives today. */
+  decay: number;
+  /** maker_weight × decay × proximity. */
+  weight: number;
+  /** Signed share of the final symbol score attributable to this remark. */
+  share: number;
+};
+
+export type PolicyNudgeExplain = {
+  symbol: string;
+  /** Weighted mean tone for the symbol, -1..+1. */
+  score: number;
+  stance: PolicyStance;
+  statements: number;
+  /** min(1, 0.5 + 0.25×(n-1)) — grows with corroboration. */
+  confidence: number;
+  /** score × confidence × POLICY_MAX_NUDGE, clamped. */
+  nudge: number;
+  max_nudge: number;
+  half_life_hours: number;
+  contributions: PolicyContribution[];
+};
+
+/**
+ * Rebuilds the policy nudge for one symbol, statement by statement.
+ * Mirrors `computePolicySignals` + `policySentimentNudge` exactly; any change
+ * to those must be reflected here (the unit tests assert they agree).
+ */
+export function explainPolicyNudge(
+  symbol: string,
+  rows: PolicyRow[],
+  asOfISO: string,
+  opts?: { halfLifeHours?: number },
+): PolicyNudgeExplain {
+  const target = symbol.toUpperCase();
+  const halfLifeHours = opts?.halfLifeHours ?? 48;
+  const halfLifeMs = halfLifeHours * 3600 * 1000;
+  const asOfMs = toMs(asOfISO.length === 10 ? `${asOfISO}T23:59:59Z` : asOfISO) ?? Date.now();
+
+  const contributions: PolicyContribution[] = [];
+  let num = 0;
+  let denom = 0;
+
+  for (const s of detectPolicyStatements(rows)) {
+    const maker = TRACKED_POLICY_MAKERS.find((m) => m.id === s.maker_id);
+    if (!maker) continue;
+    const idx = s.symbols.findIndex((sym) => sym.toUpperCase() === target);
+    if (idx < 0) continue;
+
+    const sentiment = s.sentiment == null || !Number.isFinite(s.sentiment) ? 0 : Number(s.sentiment);
+    const value = s.tone !== 0 ? 0.7 * s.tone + 0.3 * sentiment : 0.5 * sentiment;
+    if (value === 0) continue;
+
+    const ms = toMs(s.date ?? null);
+    const ageMs = ms == null ? 0 : Math.max(0, asOfMs - ms);
+    if (ageMs > 7 * DAY_MS) continue;
+
+    const decay = Math.pow(0.5, ageMs / halfLifeMs);
+    const proximity = idx === 0 ? 1 : 0.5;
+    const weight = maker.weight * decay * proximity;
+    if (weight <= 0) continue;
+
+    num += value * weight;
+    denom += weight;
+    contributions.push({
+      headline: s.headline,
+      source: s.source ?? null,
+      url: s.url ?? null,
+      date: s.date ?? null,
+      maker_name: s.maker_name,
+      maker_id: s.maker_id,
+      role: s.role,
+      org: s.org,
+      ccy: s.ccy,
+      stance: s.stance,
+      tone: s.tone,
+      sentiment: s.sentiment == null ? null : Number(s.sentiment),
+      value: Number(value.toFixed(4)),
+      maker_weight: maker.weight,
+      proximity,
+      age_hours: Number((ageMs / 3_600_000).toFixed(1)),
+      decay: Number(decay.toFixed(4)),
+      weight: Number(weight.toFixed(4)),
+      share: 0,
+    });
+  }
+
+  const score = denom > 0 ? Number((num / denom).toFixed(3)) : 0;
+  for (const c of contributions) {
+    // Share of the weighted mean: value × weight / Σweight.
+    c.share = denom > 0 ? Number(((c.value * c.weight) / denom).toFixed(4)) : 0;
+  }
+  contributions.sort((a, b) => Math.abs(b.share) - Math.abs(a.share));
+
+  const statements = contributions.length;
+  const confidence = statements === 0 ? 0 : Math.min(1, 0.5 + 0.25 * (statements - 1));
+  const nudge =
+    statements === 0
+      ? 0
+      : Number(
+          Math.max(
+            -POLICY_MAX_NUDGE,
+            Math.min(POLICY_MAX_NUDGE, score * confidence * POLICY_MAX_NUDGE),
+          ).toFixed(4),
+        );
+
+  return {
+    symbol: target,
+    score,
+    stance: stanceOf(score),
+    statements,
+    confidence: Number(confidence.toFixed(2)),
+    nudge,
+    max_nudge: POLICY_MAX_NUDGE,
+    half_life_hours: halfLifeHours,
+    contributions,
+  };
+}
+
+/** Plain-English one-liner describing what the nudge did to a decision. */
+export function describePolicyNudge(x: PolicyNudgeExplain, side?: string | null): string {
+  if (x.statements === 0) return "No tracked policy remarks touched this symbol, so policy changed nothing.";
+  const dir = x.nudge > 0 ? "raised" : x.nudge < 0 ? "lowered" : "left unchanged";
+  const pts = `${x.nudge > 0 ? "+" : ""}${(x.nudge * 100).toFixed(1)}pts`;
+  const agree =
+    side === "buy"
+      ? x.nudge > 0
+        ? " — it argued for this buy"
+        : x.nudge < 0
+          ? " — it argued against this buy (the rest of the evidence won)"
+          : ""
+      : side === "sell"
+        ? x.nudge < 0
+          ? " — it supported trimming"
+          : x.nudge > 0
+            ? " — it argued against this sell"
+            : ""
+        : "";
+  return `${x.statements} ${x.stance} remark${x.statements === 1 ? "" : "s"} (${x.makersLine()}) ${dir} the news score by ${pts} of the ±${(x.max_nudge * 100).toFixed(0)}pt cap${agree}.`;
+}
