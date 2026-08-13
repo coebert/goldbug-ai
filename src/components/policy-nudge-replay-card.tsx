@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import type { PolicyNudgeReplayResult } from "@/lib/backtest/policy-nudge-replay";
+import { ArmMetricsPanel } from "@/components/backtest/arm-metrics-panel";
 import { runPolicyNudgeReplayFn } from "@/lib/backtest/policy-nudge-replay.functions";
 import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
 import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
@@ -316,6 +317,14 @@ export function PolicyNudgeReplayCard({
                 tone={result.delta.cvar95Pct >= 0 ? good : bad}
               />
             </div>
+
+            <ArmMetricsPanel
+              arms={ARMS.map((a2) => ({
+                result: result[a2.key],
+                label: a2.label,
+                color: a2.color,
+              }))}
+            />
 
             {/* Arm-by-arm table: the numbers a reviewer asks for next. */}
             <div className="overflow-x-auto">
