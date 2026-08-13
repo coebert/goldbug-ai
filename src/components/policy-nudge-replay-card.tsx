@@ -1,19 +1,23 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Area,
   AreaChart,
+  Brush,
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import {
+  AXIS_LABEL,
   AXIS_PROPS,
+  REFERENCE_LINE,
   CHART_ROLE,
   GRID_PROPS,
   TOOLTIP_CONTENT_STYLE,
@@ -55,6 +59,23 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   );
 }
 
+type ArmKey = "baseline" | "nudged" | "regime";
+
+const ARMS: { key: ArmKey; label: string; color: string; dash?: string }[] = [
+  { key: "baseline", label: "Policy muted", color: CHART_ROLE.neutral, dash: "4 3" },
+  { key: "nudged", label: "Fixed nudge", color: CHART_ROLE.positive },
+  { key: "regime", label: "Regime-aware nudge", color: CHART_ROLE.benchmark, dash: "6 3" },
+];
+
+/** Underwater series: % below the running peak, per arm. */
+function drawdownSeries(equity: readonly number[]): number[] {
+  let peak = -Infinity;
+  return equity.map((v) => {
+    peak = Math.max(peak, v);
+    return peak > 0 ? Number(((v / peak - 1) * 100).toFixed(3)) : 0;
+  });
+}
+
 const good = "text-primary";
 const bad = "text-destructive";
 
@@ -76,6 +97,12 @@ export function PolicyNudgeReplayCard({
   const [halfLifeHours, setHalfLifeHours] = useState(48);
   const [riskLevel, setRiskLevel] = useState(3);
   const [result, setResult] = useState<PolicyNudgeReplayResult | null>(null);
+  const [equityMode, setEquityMode] = useState<"money" | "pct">("money");
+  const [visibleArms, setVisibleArms] = useState<Record<ArmKey, boolean>>({
+    baseline: true,
+    nudged: true,
+    regime: true,
+  });
 
   const m = useMutation({
     mutationFn: () =>
@@ -85,15 +112,45 @@ export function PolicyNudgeReplayCard({
     onSuccess: (r) => setResult(r as PolicyNudgeReplayResult),
   });
 
-  const chart =
-    result?.baseline.curve.map((c, i) => ({
-      date: c.date,
-      baseline: c.equity,
-      nudged: result.nudged.curve[i]?.equity ?? null,
-      regime: result.regime.curve[i]?.equity ?? null,
-      spread: (result.nudged.curve[i]?.equity ?? c.equity) - c.equity,
-      regimeSpread: (result.regime.curve[i]?.equity ?? c.equity) - c.equity,
-    })) ?? [];
+  // Equity, normalised return and underwater drawdown for all three arms.
+  const chart = useMemo(() => {
+    if (!result) return [] as Record<string, string | number | null>[];
+    const start = result.baseline.curve[0]?.equity ?? 0;
+    const dd = {
+      baseline: drawdownSeries(result.baseline.curve.map((c) => c.equity)),
+      nudged: drawdownSeries(result.nudged.curve.map((c) => c.equity)),
+      regime: drawdownSeries(result.regime.curve.map((c) => c.equity)),
+    };
+    return result.baseline.curve.map((c, i) => {
+      const eq = {
+        baseline: c.equity,
+        nudged: result.nudged.curve[i]?.equity ?? null,
+        regime: result.regime.curve[i]?.equity ?? null,
+      };
+      const rel = (v: number | null) => (v == null || start <= 0 ? null : (v / start - 1) * 100);
+      return {
+        date: c.date,
+        baseline: eq.baseline,
+        nudged: eq.nudged,
+        regime: eq.regime,
+        baselinePct: rel(eq.baseline),
+        nudgedPct: rel(eq.nudged),
+        regimePct: rel(eq.regime),
+        baselineDd: dd.baseline[i] ?? null,
+        nudgedDd: dd.nudged[i] ?? null,
+        regimeDd: dd.regime[i] ?? null,
+        spread: (eq.nudged ?? c.equity) - c.equity,
+        regimeSpread: (eq.regime ?? c.equity) - c.equity,
+      };
+    });
+  }, [result]);
+
+  const toggleArm = (key: ArmKey) =>
+    setVisibleArms((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      // Never let the reader blank the chart entirely.
+      return Object.values(next).some(Boolean) ? next : prev;
+    });
 
   const a = result?.attribution;
 
@@ -227,42 +284,147 @@ export function PolicyNudgeReplayCard({
 
             {chart.length > 1 ? (
               <>
-                <div className="h-56 w-full">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {ARMS.map((arm) => (
+                    <button
+                      key={arm.key}
+                      type="button"
+                      onClick={() => toggleArm(arm.key)}
+                      aria-pressed={visibleArms[arm.key]}
+                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                        visibleArms[arm.key]
+                          ? "border-border bg-muted/60 text-foreground"
+                          : "border-border/50 text-muted-foreground opacity-60"
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className="inline-block h-2.5 w-2.5 rounded-[2px]"
+                        style={{ backgroundColor: arm.color }}
+                      />
+                      {arm.label}
+                    </button>
+                  ))}
+                  <div className="ml-auto flex gap-1">
+                    {(["money", "pct"] as const).map((mode) => (
+                      <Button
+                        key={mode}
+                        size="sm"
+                        variant={equityMode === mode ? "secondary" : "ghost"}
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setEquityMode(mode)}
+                      >
+                        {mode === "money" ? "Equity" : "Return %"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="h-60 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <LineChart
+                      data={chart}
+                      syncId="policy-nudge-replay"
+                      margin={{ top: 4, right: 8, left: 0, bottom: 18 }}
+                    >
                       <CartesianGrid {...GRID_PROPS} />
                       <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
-                      <YAxis {...AXIS_PROPS} width={52} domain={["auto", "auto"]} />
+                      <YAxis
+                        {...AXIS_PROPS}
+                        width={58}
+                        domain={["auto", "auto"]}
+                        tickFormatter={(v: number) =>
+                          equityMode === "money" ? Number(v).toFixed(0) : `${Number(v).toFixed(0)}%`
+                        }
+                        label={{
+                          value: equityMode === "money" ? "Equity (£)" : "Return (%)",
+                          angle: -90,
+                          position: "insideLeft",
+                          style: { ...AXIS_LABEL, textAnchor: "middle" },
+                        }}
+                      />
                       <Tooltip
                         contentStyle={TOOLTIP_CONTENT_STYLE}
                         labelStyle={TOOLTIP_LABEL_STYLE}
-                        formatter={(v: number | string) => Number(v).toFixed(0)}
+                        formatter={(v: number | string, name: string) => [
+                          equityMode === "money"
+                            ? Number(v).toFixed(0)
+                            : `${Number(v).toFixed(2)}%`,
+                          name,
+                        ]}
                       />
-                      <Line
-                        type="monotone"
-                        dataKey="baseline"
-                        name="Policy muted"
-                        stroke="hsl(var(--muted-foreground))"
-                        dot={false}
-                        strokeWidth={1.5}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="nudged"
-                        name="With policy nudge"
-                        stroke="hsl(var(--primary))"
-                        dot={false}
-                        strokeWidth={1.8}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="regime"
-                        name="Regime-aware nudge"
-                        stroke={CHART_ROLE.benchmark}
-                        dot={false}
-                        strokeWidth={1.8}
+                      {ARMS.filter((arm) => visibleArms[arm.key]).map((arm) => (
+                        <Line
+                          key={arm.key}
+                          type="monotone"
+                          dataKey={equityMode === "money" ? arm.key : `${arm.key}Pct`}
+                          name={arm.label}
+                          stroke={arm.color}
+                          strokeDasharray={arm.dash}
+                          dot={false}
+                          activeDot={{ r: 3 }}
+                          strokeWidth={1.8}
+                          isAnimationActive={false}
+                          connectNulls
+                        />
+                      ))}
+                      <Brush
+                        dataKey="date"
+                        height={18}
+                        travellerWidth={8}
+                        stroke={CHART_ROLE.neutral}
+                        fill="transparent"
                       />
                     </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Underwater curves: how deep each arm sat below its own peak. */}
+                <div className="h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={chart}
+                      syncId="policy-nudge-replay"
+                      margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid {...GRID_PROPS} />
+                      <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
+                      <YAxis
+                        {...AXIS_PROPS}
+                        width={58}
+                        tickFormatter={(v: number) => `${Number(v).toFixed(0)}%`}
+                        label={{
+                          value: "Drawdown (%)",
+                          angle: -90,
+                          position: "insideLeft",
+                          style: { ...AXIS_LABEL, textAnchor: "middle" },
+                        }}
+                      />
+                      <Tooltip
+                        contentStyle={TOOLTIP_CONTENT_STYLE}
+                        labelStyle={TOOLTIP_LABEL_STYLE}
+                        formatter={(v: number | string, name: string) => [
+                          `${Number(v).toFixed(2)}%`,
+                          name,
+                        ]}
+                      />
+                      <ReferenceLine y={0} {...REFERENCE_LINE} />
+                      {ARMS.filter((arm) => visibleArms[arm.key]).map((arm) => (
+                        <Area
+                          key={arm.key}
+                          type="monotone"
+                          dataKey={`${arm.key}Dd`}
+                          name={`${arm.label} drawdown`}
+                          stroke={arm.color}
+                          strokeDasharray={arm.dash}
+                          fill={arm.color}
+                          fillOpacity={0.12}
+                          strokeWidth={1.4}
+                          isAnimationActive={false}
+                          connectNulls
+                        />
+                      ))}
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
 
