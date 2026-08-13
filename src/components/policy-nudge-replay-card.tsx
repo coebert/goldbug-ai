@@ -103,7 +103,10 @@ export function PolicyNudgeReplayCard({
   const [halfLifeHours, setHalfLifeHours] = useState(48);
   const [riskLevel, setRiskLevel] = useState(3);
   const [result, setResult] = useState<PolicyNudgeReplayResult | null>(null);
-  const [equityMode, setEquityMode] = useState<"money" | "pct">("money");
+  // Overlay compare mode: absolute equity, normalised return, or every arm
+  // re-based against one chosen arm so the gaps between them read directly.
+  const [equityMode, setEquityMode] = useState<"money" | "pct" | "rel">("money");
+  const [compareBase, setCompareBase] = useState<ArmKey>("baseline");
   // Which arm's entries/exits and holding periods to annotate. Only one at a
   // time: three overlaid sets of markers is unreadable.
   const [markerArm, setMarkerArm] = useState<ArmKey | "none">("regime");
@@ -147,14 +150,29 @@ export function PolicyNudgeReplayCard({
         regime: result.regime.curve[i]?.equity ?? null,
       };
       const rel = (v: number | null) => (v == null || start <= 0 ? null : (v / start - 1) * 100);
+      const basePct = rel(eq[compareBase]);
+      const baseDd = dd[compareBase][i] ?? null;
+      // Re-based overlay: distance from the chosen arm, in percentage points.
+      const vs = (v: number | null) => {
+        const p2 = rel(v);
+        return p2 == null || basePct == null ? null : p2 - basePct;
+      };
+      const vsDd = (v: number | null) => (v == null || baseDd == null ? null : v - baseDd);
       const ev = armEvents.get(c.date) ?? null;
       const markY =
         markerArm === "none"
           ? null
           : equityMode === "money"
             ? eq[markerArm]
-            : rel(eq[markerArm]);
-      const markDd = markerArm === "none" ? null : (dd[markerArm][i] ?? null);
+            : equityMode === "pct"
+              ? rel(eq[markerArm])
+              : vs(eq[markerArm]);
+      const markDd =
+        markerArm === "none"
+          ? null
+          : equityMode === "rel"
+            ? vsDd(dd[markerArm][i] ?? null)
+            : (dd[markerArm][i] ?? null);
       return {
         date: c.date,
         buyMark: ev && ev.buys.length ? markY : null,
@@ -184,6 +202,12 @@ export function PolicyNudgeReplayCard({
         baselinePct: rel(eq.baseline),
         nudgedPct: rel(eq.nudged),
         regimePct: rel(eq.regime),
+        baselineRel: vs(eq.baseline),
+        nudgedRel: vs(eq.nudged),
+        regimeRel: vs(eq.regime),
+        baselineDdRel: vsDd(dd.baseline[i] ?? null),
+        nudgedDdRel: vsDd(dd.nudged[i] ?? null),
+        regimeDdRel: vsDd(dd.regime[i] ?? null),
         baselineDd: dd.baseline[i] ?? null,
         nudgedDd: dd.nudged[i] ?? null,
         regimeDd: dd.regime[i] ?? null,
@@ -191,7 +215,7 @@ export function PolicyNudgeReplayCard({
         regimeSpread: (eq.regime ?? c.equity) - c.equity,
       };
     });
-  }, [result, armEvents, markerArm, equityMode]);
+  }, [result, armEvents, markerArm, equityMode, compareBase]);
 
   // Holding periods of the annotated arm, clipped to the plotted window.
   const holdBands: EpisodeBand[] = useMemo(() => {
