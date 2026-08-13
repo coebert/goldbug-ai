@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Area,
+  AreaChart,
   Brush,
   CartesianGrid,
   ComposedChart,
@@ -438,7 +439,6 @@ export function PolicyNudgeReplayCard({
                         }}
                       />
                       <Tooltip
-                        contentStyle={TOOLTIP_CONTENT_STYLE}
                         labelStyle={TOOLTIP_LABEL_STYLE}
                         contentStyle={{ ...TOOLTIP_CONTENT_STYLE, whiteSpace: "pre-line" }}
                         formatter={(v: number | string, name: string, item) => {
@@ -527,7 +527,6 @@ export function PolicyNudgeReplayCard({
                         }}
                       />
                       <Tooltip
-                        contentStyle={TOOLTIP_CONTENT_STYLE}
                         labelStyle={TOOLTIP_LABEL_STYLE}
                         contentStyle={{ ...TOOLTIP_CONTENT_STYLE, whiteSpace: "pre-line" }}
                         formatter={(v: number | string, name: string, item) => {
