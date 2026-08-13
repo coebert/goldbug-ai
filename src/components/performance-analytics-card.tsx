@@ -313,6 +313,16 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
               )}
             </ChartBlock>
 
+            <ChartBlock title="Trades">
+              <TradeEpisodeList
+                bands={equityBands.length > 0 ? equityBands : drawdownBands}
+                selectedKey={selectedEpisode}
+                onSelect={setSelectedEpisode}
+                money={(v) => fmtCcyPrecise.format(v)}
+              />
+            </ChartBlock>
+
+
             <div className="grid gap-6 lg:grid-cols-2">
               <AttributionBlock
                 title="Regime attribution"
