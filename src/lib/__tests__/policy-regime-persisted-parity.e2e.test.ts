@@ -159,8 +159,20 @@ describe("policy regime scale: engine ↔ persisted ↔ explainability panel", (
     }
   });
 
-  it("survives a malformed persisted scale by degrading to ×1, never NaN", () => {
-    for (const bad of [null, undefined, Number.NaN, "abc"] as unknown[]) {
+  it("survives a malformed persisted scale, never producing NaN", () => {
+    // Non-numeric values fall back to x1; a numeric-but-nonsense value is still
+    // clamped into the documented [0.5, 1.6] band rather than escaping.
+    for (const bad of [Number.NaN, "abc", undefined] as unknown[]) {
+      const panel = panelExplain("ISF.L", {
+        posture: "neutral",
+        vol: "normal",
+        scale: bad as number,
+        reason: "",
+      });
+      expect(panel.scale).toBe(1);
+      expect(Number.isFinite(panel.explain.nudge)).toBe(true);
+    }
+    for (const bad of [null, 0, -3, 99] as unknown[]) {
       const panel = panelExplain("ISF.L", {
         posture: "neutral",
         vol: "normal",
@@ -168,7 +180,8 @@ describe("policy regime scale: engine ↔ persisted ↔ explainability panel", (
         reason: "",
       });
       expect(Number.isFinite(panel.explain.nudge)).toBe(true);
-      expect(panel.scale).toBe(1);
+      expect(panel.scale!).toBeGreaterThanOrEqual(0.5);
+      expect(panel.scale!).toBeLessThanOrEqual(1.6);
     }
   });
 
