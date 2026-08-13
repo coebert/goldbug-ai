@@ -279,6 +279,13 @@ export async function runMacroHistoryAnalysis(args: {
               .map((l) => l.trim().slice(0, 240))
           : [];
         if (ls.length > 0) lessons = ls.slice(0, 16);
+        const els = Array.isArray(parsed["event_reel_lessons"])
+          ? (parsed["event_reel_lessons"] as unknown[])
+              .filter((l): l is string => typeof l === "string" && l.trim().length > 0)
+              .map((l) => l.trim().slice(0, 280))
+          : [];
+        if (els.length > 0) eventLessons = els.slice(0, 12);
+
         playbook = mergePlaybookAdjustments(
           derivedPlaybook,
           Array.isArray(parsed["playbook_adjustments"])
