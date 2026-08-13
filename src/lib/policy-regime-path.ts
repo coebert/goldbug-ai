@@ -97,8 +97,8 @@ export function resolveRegimeScalePath(blob: unknown, sign = 0): RegimeScaleDiag
     };
   }
 
-  const rawPosture = String(obj.posture ?? "");
-  const rawVol = String(obj.vol ?? "");
+  const rawPosture = safeString(obj.posture);
+  const rawVol = safeString(obj.vol);
   const postureOk = (POSTURES as string[]).includes(rawPosture);
   const volOk = (VOLS as string[]).includes(rawVol);
   const posture = (postureOk ? rawPosture : "neutral") as RegimePosture;
@@ -107,8 +107,8 @@ export function resolveRegimeScalePath(blob: unknown, sign = 0): RegimeScaleDiag
   if (!volOk) notes.push(`Volatility band ${rawVol ? `"${rawVol}"` : "missing"} — defaulted to normal.`);
 
   const storedRaw = obj.scale;
-  const storedNum = typeof storedRaw === "number" ? storedRaw : Number(storedRaw);
-  const stored = isFiniteNum(storedNum) ? storedNum : null;
+  const stored = safeNumber(storedRaw);
+
 
   let path: RegimeScalePath;
   let scale: number;
