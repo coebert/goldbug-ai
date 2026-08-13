@@ -20,6 +20,14 @@ import { SaxoActiveDot, SaxoCrosshair } from "@/components/charts/saxo-crosshair
 import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
 import { attachTradeMarkers, describeMarkerCell, type TradeMarkerCell } from "@/lib/chart-trade-markers";
 import {
+  bandsAt,
+  buildPositionEpisodes,
+  describeEpisodes,
+  episodeBands,
+  type EpisodeBand,
+} from "@/lib/trade-episodes";
+import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
+import {
   ResponsiveContainer,
   Area,
   BarChart,
@@ -75,6 +83,23 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
     () => attachTradeMarkers(data?.drawdownCurve ?? [], "date", "drawdownPct", marks),
     [data?.drawdownCurve, marks],
   );
+  // Holding periods: one span per position, from opening fill to closing fill.
+  const episodes = useMemo(() => buildPositionEpisodes(marks), [marks]);
+  const equityBands = useMemo(
+    () => episodeBands(episodes, equityCurve.map((r) => String((r as { date: string }).date))),
+    [episodes, equityCurve],
+  );
+  const drawdownBands = useMemo(
+    () => episodeBands(episodes, drawdownCurve.map((r) => String((r as { date: string }).date))),
+    [episodes, drawdownCurve],
+  );
+  const holdTooltip = (
+    bands: readonly EpisodeBand[],
+    item: { payload?: { date?: string } } | undefined,
+  ) =>
+    describeEpisodes(bandsAt(bands, String(item?.payload?.date ?? "")), (v) =>
+      fmtCcyPrecise.format(v),
+    );
   const markerTooltip = (item: { payload?: { marker?: TradeMarkerCell | null } } | undefined) =>
     describeMarkerCell(item?.payload?.marker ?? null, (v) => fmtCcyPrecise.format(v), 4, {
       commission: true,
@@ -138,6 +163,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid {...SAXO_GRID} />
+                  {renderEpisodeBands(equityBands)}
                   <XAxis
                     {...SAXO_AXIS}
                     dataKey="date"
@@ -154,7 +180,10 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     cursor={<SaxoCrosshair />}
                     formatter={(v: number, name, item) => {
                       if (name === "buys" || name === "sells") return [] as unknown as [string, string];
-                      const lines = markerTooltip(item as never);
+                      const lines = [
+                        ...markerTooltip(item as never),
+                        ...holdTooltip(equityBands, item as never),
+                      ];
                       return [
                         `${fmtCcyPrecise.format(v)}${lines.length ? `\n${lines.join("\n")}` : ""}`,
                         "Equity",
@@ -195,6 +224,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
               {marks.length > 0 && (
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground">
                   <TradeMarkerLegend />
+                  {equityBands.length > 0 && <EpisodeBandLegend count={equityBands.length} />}
                 </div>
               )}
             </ChartBlock>
@@ -213,6 +243,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid {...SAXO_GRID} />
+                  {renderEpisodeBands(drawdownBands)}
                   <XAxis
                     {...SAXO_AXIS}
                     dataKey="date"
@@ -229,7 +260,10 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     cursor={<SaxoCrosshair />}
                     formatter={(v: number, name, item) => {
                       if (name === "buys" || name === "sells") return [] as unknown as [string, string];
-                      const lines = markerTooltip(item as never);
+                      const lines = [
+                        ...markerTooltip(item as never),
+                        ...holdTooltip(drawdownBands, item as never),
+                      ];
                       return [
                         `${v.toFixed(2)}%${lines.length ? `\n${lines.join("\n")}` : ""}`,
                         "Drawdown",
@@ -270,6 +304,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
               {marks.length > 0 && (
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground">
                   <TradeMarkerLegend />
+                  {drawdownBands.length > 0 && <EpisodeBandLegend count={drawdownBands.length} />}
                 </div>
               )}
             </ChartBlock>
