@@ -15,7 +15,13 @@ import {
   type PolicyNudgeExplain,
   type PolicyRow,
 } from "@/lib/policy-makers";
-import { policyNudgeScaleForSign, type RegimeRead } from "@/lib/policy-regime-scaling";
+import { type RegimeRead } from "@/lib/policy-regime-scaling";
+import {
+  resolveRegimeScalePath,
+  summariseRegimePaths,
+  type RegimeScaleDiagnostic,
+  type RegimeScalePath,
+} from "@/lib/policy-regime-path";
 
 export type PolicyOrderExplain = {
   symbol: string;
@@ -30,6 +36,8 @@ export type PolicyOrderExplain = {
   news_score: number | null;
   explain: PolicyNudgeExplain;
   summary: string;
+  /** How the persisted regime scale was resolved for this order. */
+  regime_path: RegimeScaleDiagnostic;
 };
 
 export type PolicyDecisionExplain = {
@@ -41,6 +49,8 @@ export type PolicyDecisionExplain = {
   /** Market regime the run detected, and the multiplier it applied. */
   regime: { posture: string; vol: string; scale: number; reason: string } | null;
   orders: PolicyOrderExplain[];
+  /** Counts of each resolution path across the run's orders. */
+  regime_path_summary: Array<{ path: RegimeScalePath; count: number }>;
   /** True when the run had orders but no tracked remark touched any of them. */
   no_policy_input: boolean;
 };
@@ -127,23 +137,13 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
       const symbol = String(o.symbol ?? "").toUpperCase();
       const side = String(o.side ?? "");
       const probe = explainPolicyNudge(symbol, rows, asOf);
+      // Same resolution the engine's multiplier went through, with the path
+      // recorded so the diagnostics panel can show why it landed where it did.
+      const diag = resolveRegimeScalePath(policyRegime, Math.sign(probe.nudge));
       const explain =
         probe.nudge === 0
           ? probe
-          : explainPolicyNudge(symbol, rows, asOf, {
-              regimeScale: policyRegime
-                ? policyNudgeScaleForSign(
-                    {
-                      posture: (policyRegime.posture as RegimeRead["posture"]) ?? "neutral",
-                      vol: (policyRegime.vol as RegimeRead["vol"]) ?? "normal",
-                      scale: regimeScale,
-                      confidence: 0,
-                      reason: policyRegime.reason ?? "",
-                    },
-                    Math.sign(probe.nudge),
-                  )
-                : regimeScale,
-            });
+          : explainPolicyNudge(symbol, rows, asOf, { regimeScale: diag.appliedScale });
       return {
         symbol,
         side,
@@ -156,6 +156,7 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
         news_score: newsScoreBySymbol.get(symbol) ?? null,
         explain,
         summary: describePolicyNudge(explain, side),
+        regime_path: diag,
       };
     });
 
@@ -179,6 +180,7 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
           }
         : null,
       orders: explained,
+      regime_path_summary: summariseRegimePaths(explained.map((o) => o.regime_path.path)),
       no_policy_input: explained.length > 0 && explained.every((o) => o.explain.statements === 0),
     };
   });

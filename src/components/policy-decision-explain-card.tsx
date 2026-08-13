@@ -11,6 +11,11 @@ import { Gavel, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  RegimePathBadge,
+  RegimePathDetail,
+  RegimePathSummary,
+} from "@/components/policy/regime-path-diagnostics";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -74,6 +79,7 @@ function OrderRow({ order, max }: { order: PolicyOrderExplain; max: number }) {
             </span>
           </div>
           <NudgeBar nudge={explain.nudge} max={max} />
+          <RegimePathBadge diagnostic={order.regime_path} className="w-fit" />
           <p className="text-xs font-normal text-muted-foreground">{order.summary}</p>
         </div>
       </AccordionTrigger>
@@ -105,6 +111,8 @@ function OrderRow({ order, max }: { order: PolicyOrderExplain; max: number }) {
             </dd>
           </div>
         </dl>
+
+        <RegimePathDetail diagnostic={order.regime_path} />
 
         {explain.contributions.length === 0 ? (
           <p className="text-xs text-muted-foreground">
@@ -184,6 +192,9 @@ export function PolicyDecisionExplainCard({ portfolioId }: { portfolioId: string
             </span>{" "}
             — policy guidance weighted ×{data.regime.scale.toFixed(2)}.
           </p>
+        ) : null}
+        {data?.regime_path_summary?.length ? (
+          <RegimePathSummary summary={data.regime_path_summary} className="mt-1" />
         ) : null}
 
       </CardHeader>
