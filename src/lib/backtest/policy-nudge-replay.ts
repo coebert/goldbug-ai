@@ -216,6 +216,185 @@ function ddOfReturns(rets: readonly number[]): number {
   return worst * 100;
 }
 
+export const EMPTY_DELTA: PolicyArmDelta = {
+  returnPct: 0,
+  maxDrawdownPct: 0,
+  sharpe: 0,
+  costPct: 0,
+  trades: 0,
+  var95Pct: 0,
+  cvar95Pct: 0,
+  volAnnPct: 0,
+};
+
+export const EMPTY_BAND: PolicyConfidenceBand = {
+  iterations: 0,
+  blockDays: 0,
+  returnDeltaLo: 0,
+  returnDeltaHi: 0,
+  drawdownDeltaLo: 0,
+  drawdownDeltaHi: 0,
+  probPositive: 0,
+  probDrawdownBetter: 0,
+};
+
+function emptyRegimeAttribution(): PolicyRegimeAttribution {
+  return {
+    scaledDays: 0,
+    avgScale: 1,
+    minScale: 1,
+    maxScale: 1,
+    amplifiedDays: 0,
+    dampenedDays: 0,
+    postureDays: { risk_on: 0, neutral: 0, risk_off: 0 },
+    volDays: { calm: 0, normal: 0, elevated: 0, stressed: 0 },
+  };
+}
+
+/** Point deltas of `a` measured against reference `b`. */
+function deltaOf(a: ArmResult, b: ArmResult, startEquity: number): PolicyArmDelta {
+  return {
+    returnPct: Number((a.totalReturnPct - b.totalReturnPct).toFixed(3)),
+    maxDrawdownPct: Number((a.maxDrawdownPct - b.maxDrawdownPct).toFixed(3)),
+    sharpe: Number((a.sharpe - b.sharpe).toFixed(2)),
+    costPct: Number((((a.totalCost - b.totalCost) / startEquity) * 100).toFixed(3)),
+    trades: a.trades - b.trades,
+    var95Pct: Number((a.var95Pct - b.var95Pct).toFixed(3)),
+    cvar95Pct: Number((a.cvar95Pct - b.cvar95Pct).toFixed(3)),
+    volAnnPct: Number((a.volAnnPct - b.volAnnPct).toFixed(3)),
+  };
+}
+
+/**
+ * Paired moving-block bootstrap on two daily return series: resample the SAME
+ * day indices in both arms so the interval measures the strategy difference,
+ * not the market. Returns the band plus the raw return samples.
+ */
+function pairedBootstrap(
+  refRets: readonly number[],
+  testRets: readonly number[],
+  iterations: number,
+  blockDays: number,
+  seed: number,
+): { band: PolicyConfidenceBand; retSamples: number[] } {
+  const n = Math.min(refRets.length, testRets.length);
+  const retSamples: number[] = [];
+  const ddSamples: number[] = [];
+  if (n >= 30) {
+    const rng = makeRng(seed);
+    const blocks = Math.ceil(n / blockDays);
+    for (let it = 0; it < iterations; it++) {
+      let rAcc = 1;
+      let tAcc = 1;
+      const rPath: number[] = [];
+      const tPath: number[] = [];
+      for (let b = 0; b < blocks; b++) {
+        const start = Math.floor(rng() * Math.max(1, n - blockDays));
+        for (let k = 0; k < blockDays; k++) {
+          const idx = start + k;
+          if (idx >= n) break;
+          const rr = refRets[idx] as number;
+          const tr = testRets[idx] as number;
+          rAcc *= 1 + rr;
+          tAcc *= 1 + tr;
+          rPath.push(rr);
+          tPath.push(tr);
+        }
+      }
+      retSamples.push((tAcc - rAcc) * 100);
+      ddSamples.push(ddOfReturns(tPath) - ddOfReturns(rPath));
+    }
+  }
+  const sortedRet = [...retSamples].sort((a, b) => a - b);
+  const sortedDd = [...ddSamples].sort((a, b) => a - b);
+  return {
+    retSamples,
+    band: {
+      iterations: retSamples.length ? iterations : 0,
+      blockDays,
+      returnDeltaLo: Number(quantile(sortedRet, 0.025).toFixed(3)),
+      returnDeltaHi: Number(quantile(sortedRet, 0.975).toFixed(3)),
+      drawdownDeltaLo: Number(quantile(sortedDd, 0.025).toFixed(3)),
+      drawdownDeltaHi: Number(quantile(sortedDd, 0.975).toFixed(3)),
+      probPositive: retSamples.length
+        ? Number((retSamples.filter((s) => s > 0).length / retSamples.length).toFixed(3))
+        : 0,
+      // Drawdowns are negative numbers; "better" means less negative or equal.
+      probDrawdownBetter: ddSamples.length
+        ? Number((ddSamples.filter((s) => s >= 0).length / ddSamples.length).toFixed(3))
+        : 0,
+    },
+  };
+}
+
+export const NEUTRAL_REGIME: RegimeRead = {
+  posture: "neutral",
+  vol: "normal",
+  scale: 1,
+  confidence: 0,
+  reason: "insufficient tape for a regime read",
+};
+
+/**
+ * Build a per-bar regime read from an equal-weight index of the replay
+ * universe. Only bars at or before `date` feed the read — no look-ahead.
+ */
+function buildRegimeTimeline(
+  prepared: ReadonlyArray<{ symbol: string; closes: number[]; index: Map<string, number> }>,
+  allDates: readonly string[],
+): Map<string, RegimeRead> {
+  const out = new Map<string, RegimeRead>();
+  // Equal-weight index level: mean of each symbol's close rebased to its first.
+  const level: number[] = [];
+  for (const date of allDates) {
+    let sum = 0;
+    let count = 0;
+    for (const p of prepared) {
+      const i = p.index.get(date);
+      if (i == null) continue;
+      const first = p.closes[0];
+      const c = p.closes[i];
+      if (!first || !c || first <= 0) continue;
+      sum += c / first;
+      count += 1;
+    }
+    level.push(count > 0 ? sum / count : (level[level.length - 1] ?? 1));
+  }
+
+  for (let i = 0; i < allDates.length; i++) {
+    const date = allDates[i] as string;
+    if (i < 30) {
+      out.set(date, NEUTRAL_REGIME);
+      continue;
+    }
+    const rets: number[] = [];
+    for (let k = Math.max(1, i - 19); k <= i; k++) {
+      const a = level[k - 1] as number;
+      const b = level[k] as number;
+      if (a > 0) rets.push(b / a - 1);
+    }
+    const mean = rets.reduce((a, b) => a + b, 0) / Math.max(1, rets.length);
+    const variance =
+      rets.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, rets.length - 1);
+    const realisedVol20d = rets.length > 2 ? Math.sqrt(variance) : null;
+
+    const lookback = Math.max(0, i - 251);
+    let high = 0;
+    for (let k = lookback; k <= i; k++) high = Math.max(high, level[k] as number);
+    const cur = level[i] as number;
+    const drawdownPctIdx = high > 0 ? cur / high - 1 : null;
+
+    const prev30 = level[Math.max(0, i - 30)] as number;
+    const index30dReturn = prev30 > 0 ? cur / prev30 - 1 : null;
+
+    out.set(
+      date,
+      detectPolicyRegime({ realisedVol20d, drawdownPct: drawdownPctIdx, index30dReturn }),
+    );
+  }
+  return out;
+}
+
 const DAY = 86_400_000;
 
 /**
