@@ -152,6 +152,38 @@ export function MacroLessonsCard() {
               </div>
             ) : null}
 
+            {(lessons.event_lessons?.length ?? 0) > 0 ? (
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Learned from the global events reel
+                  {lessons.event_reel ? (
+                    <span className="ml-1 font-normal normal-case tracking-normal">
+                      ({lessons.event_reel.events_measured}/{lessons.event_reel.events_total} events
+                      measured)
+                    </span>
+                  ) : null}
+                </h4>
+                <ul className="space-y-1.5">
+                  {lessons.event_lessons!.map((l) => (
+                    <li key={l} className="flex gap-2 text-sm">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500" />
+                      <span>{l}</span>
+                    </li>
+                  ))}
+                </ul>
+                {(lessons.event_reel?.categories.length ?? 0) > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {lessons.event_reel!.categories.map((c) => (
+                      <Badge key={c.category} variant="outline" className="text-[10px] capitalize">
+                        {c.category}: {c.stance.replace(/_/g, " ")}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+
             {notable.length > 0 ? (
               <div>
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
