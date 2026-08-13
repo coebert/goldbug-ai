@@ -33,7 +33,7 @@ import type { PolicyNudgeReplayResult } from "@/lib/backtest/policy-nudge-replay
 import { runPolicyNudgeReplayFn } from "@/lib/backtest/policy-nudge-replay.functions";
 import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
 import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
-import { formatHoldingDuration, spanBand, type EpisodeBand } from "@/lib/trade-episodes";
+import { spanBand, type EpisodeBand } from "@/lib/trade-episodes";
 import type { TradeMarkerCell } from "@/lib/chart-trade-markers";
 
 const pp = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}pp`;
