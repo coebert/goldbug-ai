@@ -1910,6 +1910,8 @@ export type Database = {
           created_at: string
           drawdown_rules: Json
           episodes: number
+          event_lessons: Json
+          event_reel: Json | null
           generated_at: string
           id: string
           lessons: Json
@@ -1926,6 +1928,8 @@ export type Database = {
           created_at?: string
           drawdown_rules?: Json
           episodes?: number
+          event_lessons?: Json
+          event_reel?: Json | null
           generated_at?: string
           id?: string
           lessons?: Json
@@ -1942,6 +1946,8 @@ export type Database = {
           created_at?: string
           drawdown_rules?: Json
           episodes?: number
+          event_lessons?: Json
+          event_reel?: Json | null
           generated_at?: string
           id?: string
           lessons?: Json
