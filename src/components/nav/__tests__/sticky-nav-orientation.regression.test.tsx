@@ -39,9 +39,11 @@ describe("sticky nav geometry is rotation-stable", () => {
     expect(nav.className).not.toMatch(/h-\[[^\]]*(vh|svh|dvh)\]/);
     // Offsets follow the header variable, which is republished on rotate.
     expect(nav.style.top).toBe("var(--app-header-h)");
-    // Opting out of scroll anchoring keeps the browser from "correcting"
-    // scroll position when the bar re-lays-out after a rotate.
-    expect(nav.style.overflowAnchor).toBe("none");
+    // data-sticky-nav carries the global `overflow-anchor: none` rule, which
+    // keeps the browser from "correcting" scroll position when the bar
+    // re-lays-out after a rotate.
+    expect(nav.getAttribute("data-sticky-nav")).not.toBeNull();
+
   });
 
   it("keeps chips at a fixed 44px touch target in both orientations", () => {
