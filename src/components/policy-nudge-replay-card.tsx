@@ -66,12 +66,13 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   );
 }
 
-type ArmKey = "baseline" | "nudged" | "regime";
+type ArmKey = "baseline" | "nudged" | "regime" | "benchmark";
 
 const ARMS: { key: ArmKey; label: string; color: string; dash?: string }[] = [
   { key: "baseline", label: "Policy muted", color: CHART_ROLE.neutral, dash: "4 3" },
   { key: "nudged", label: "Fixed nudge", color: CHART_ROLE.positive },
-  { key: "regime", label: "Regime-aware nudge", color: CHART_ROLE.benchmark, dash: "6 3" },
+  { key: "regime", label: "Regime-aware nudge", color: CHART_ROLE.highlight, dash: "6 3" },
+  { key: "benchmark", label: "Market baseline", color: CHART_ROLE.benchmark, dash: "2 3" },
 ];
 
 /** Underwater series: % below the running peak, per arm. */
@@ -117,6 +118,7 @@ export function PolicyNudgeReplayCard({
     baseline: true,
     nudged: true,
     regime: true,
+    benchmark: true,
   });
 
   const m = useMutation({
@@ -145,12 +147,14 @@ export function PolicyNudgeReplayCard({
       baseline: drawdownSeries(result.baseline.curve.map((c) => c.equity)),
       nudged: drawdownSeries(result.nudged.curve.map((c) => c.equity)),
       regime: drawdownSeries(result.regime.curve.map((c) => c.equity)),
+      benchmark: drawdownSeries(result.benchmark.curve.map((c) => c.equity)),
     };
     return result.baseline.curve.map((c, i) => {
       const eq = {
         baseline: c.equity,
         nudged: result.nudged.curve[i]?.equity ?? null,
         regime: result.regime.curve[i]?.equity ?? null,
+        benchmark: result.benchmark.curve[i]?.equity ?? null,
       };
       const rel = (v: number | null) => (v == null || start <= 0 ? null : (v / start - 1) * 100);
       const basePct = rel(eq[compareBase]);
@@ -202,18 +206,23 @@ export function PolicyNudgeReplayCard({
         baseline: eq.baseline,
         nudged: eq.nudged,
         regime: eq.regime,
+        benchmark: eq.benchmark,
         baselinePct: rel(eq.baseline),
         nudgedPct: rel(eq.nudged),
         regimePct: rel(eq.regime),
+        benchmarkPct: rel(eq.benchmark),
         baselineRel: vs(eq.baseline),
         nudgedRel: vs(eq.nudged),
         regimeRel: vs(eq.regime),
+        benchmarkRel: vs(eq.benchmark),
         baselineDdRel: vsDd(dd.baseline[i] ?? null),
         nudgedDdRel: vsDd(dd.nudged[i] ?? null),
         regimeDdRel: vsDd(dd.regime[i] ?? null),
+        benchmarkDdRel: vsDd(dd.benchmark[i] ?? null),
         baselineDd: dd.baseline[i] ?? null,
         nudgedDd: dd.nudged[i] ?? null,
         regimeDd: dd.regime[i] ?? null,
+        benchmarkDd: dd.benchmark[i] ?? null,
         spread: (eq.nudged ?? c.equity) - c.equity,
         regimeSpread: (eq.regime ?? c.equity) - c.equity,
       };
@@ -369,7 +378,7 @@ export function PolicyNudgeReplayCard({
                   </tr>
                 </thead>
                 <tbody className="tabular-nums">
-                  {[result.baseline, result.nudged, result.regime].map((arm) => (
+                  {[result.baseline, result.nudged, result.regime, result.benchmark].map((arm) => (
                     <tr key={arm.label} className="border-b border-border/40 last:border-0">
                       <td className="py-1.5 pr-2">{arm.label}</td>
                       <td className="py-1.5 text-right">{pct(arm.totalReturnPct)}</td>
