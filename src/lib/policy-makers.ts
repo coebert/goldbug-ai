@@ -576,10 +576,12 @@ export function explainPolicyNudge(
   symbol: string,
   rows: PolicyRow[],
   asOfISO: string,
-  opts?: { halfLifeHours?: number },
+  opts?: { halfLifeHours?: number; regimeScale?: number },
 ): PolicyNudgeExplain {
   const target = symbol.toUpperCase();
   const halfLifeHours = opts?.halfLifeHours ?? 48;
+  const regimeScale =
+    opts?.regimeScale != null && Number.isFinite(opts.regimeScale) ? opts.regimeScale : 1;
   const halfLifeMs = halfLifeHours * 3600 * 1000;
   const asOfMs = toMs(asOfISO.length === 10 ? `${asOfISO}T23:59:59Z` : asOfISO) ?? Date.now();
 
