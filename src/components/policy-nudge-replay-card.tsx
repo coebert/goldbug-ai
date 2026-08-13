@@ -6,10 +6,11 @@ import {
   AreaChart,
   Brush,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
+  Scatter,
   Tooltip,
   XAxis,
   YAxis,
@@ -30,6 +31,10 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import type { PolicyNudgeReplayResult } from "@/lib/backtest/policy-nudge-replay";
 import { runPolicyNudgeReplayFn } from "@/lib/backtest/policy-nudge-replay.functions";
+import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
+import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
+import { spanBand, type EpisodeBand } from "@/lib/trade-episodes";
+import type { TradeMarkerCell } from "@/lib/chart-trade-markers";
 
 const pp = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}pp`;
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
@@ -98,6 +103,9 @@ export function PolicyNudgeReplayCard({
   const [riskLevel, setRiskLevel] = useState(3);
   const [result, setResult] = useState<PolicyNudgeReplayResult | null>(null);
   const [equityMode, setEquityMode] = useState<"money" | "pct">("money");
+  // Which arm's entries/exits and holding periods to annotate. Only one at a
+  // time: three overlaid sets of markers is unreadable.
+  const [markerArm, setMarkerArm] = useState<ArmKey | "none">("regime");
   const [visibleArms, setVisibleArms] = useState<Record<ArmKey, boolean>>({
     baseline: true,
     nudged: true,
@@ -111,6 +119,16 @@ export function PolicyNudgeReplayCard({
       }),
     onSuccess: (r) => setResult(r as PolicyNudgeReplayResult),
   });
+
+  // Entries/exits of the annotated arm, keyed by curve date.
+  const armEvents = useMemo(() => {
+    const map = new Map<string, { buys: string[]; sells: string[] }>();
+    if (!result || markerArm === "none") return map;
+    for (const e of result[markerArm].events ?? []) {
+      map.set(e.date, { buys: e.buys, sells: e.sells });
+    }
+    return map;
+  }, [result, markerArm]);
 
   // Equity, normalised return and underwater drawdown for all three arms.
   const chart = useMemo(() => {
@@ -128,8 +146,37 @@ export function PolicyNudgeReplayCard({
         regime: result.regime.curve[i]?.equity ?? null,
       };
       const rel = (v: number | null) => (v == null || start <= 0 ? null : (v / start - 1) * 100);
+      const ev = armEvents.get(c.date) ?? null;
+      const markY =
+        markerArm === "none"
+          ? null
+          : equityMode === "money"
+            ? eq[markerArm]
+            : rel(eq[markerArm]);
+      const markDd = markerArm === "none" ? null : (dd[markerArm][i] ?? null);
       return {
         date: c.date,
+        buyMark: ev && ev.buys.length ? markY : null,
+        sellMark: ev && ev.sells.length ? markY : null,
+        buyMarkDd: ev && ev.buys.length ? markDd : null,
+        sellMarkDd: ev && ev.sells.length ? markDd : null,
+        marker: ev
+          ? ({
+              buys: ev.buys.length,
+              sells: ev.sells.length,
+              buyValue: 0,
+              sellValue: 0,
+              trades: [],
+            } as TradeMarkerCell)
+          : null,
+        eventLabel: ev
+          ? [
+              ev.buys.length ? `▲ in: ${ev.buys.slice(0, 4).join(", ")}` : "",
+              ev.sells.length ? `▼ out: ${ev.sells.slice(0, 4).join(", ")}` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : null,
         baseline: eq.baseline,
         nudged: eq.nudged,
         regime: eq.regime,
@@ -143,7 +190,27 @@ export function PolicyNudgeReplayCard({
         regimeSpread: (eq.regime ?? c.equity) - c.equity,
       };
     });
-  }, [result]);
+  }, [result, armEvents, markerArm, equityMode]);
+
+  // Holding periods of the annotated arm, clipped to the plotted window.
+  const holdBands: EpisodeBand[] = useMemo(() => {
+    if (!result || markerArm === "none" || chart.length < 2) return [];
+    const lastDate = String(chart[chart.length - 1]?.date ?? "");
+    const eps = result[markerArm].episodes ?? [];
+    return eps
+      // One-bar touches add noise without telling you anything about duration.
+      .filter((e) => e.days >= 2)
+      .slice(0, 60)
+      .map((e) =>
+        spanBand({
+          symbol: e.symbol,
+          x1: e.from,
+          x2: e.to ?? lastDate,
+          days: e.days,
+          open: e.open,
+        }),
+      );
+  }, [result, markerArm, chart]);
 
   const toggleArm = (key: ArmKey) =>
     setVisibleArms((prev) => {
@@ -320,14 +387,42 @@ export function PolicyNudgeReplayCard({
                   </div>
                 </div>
 
+                {/* Which arm's trades to annotate. Markers sit on that arm's own
+                    curve, and its holding periods shade both charts. */}
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span>Trade markers:</span>
+                  {([...ARMS.map((a2) => a2.key), "none"] as Array<ArmKey | "none">).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMarkerArm(key)}
+                      aria-pressed={markerArm === key}
+                      className={`rounded-full border px-2.5 py-1 transition-colors ${
+                        markerArm === key
+                          ? "border-border bg-muted/60 text-foreground"
+                          : "border-border/50 opacity-70 hover:text-foreground"
+                      }`}
+                    >
+                      {key === "none" ? "Off" : ARMS.find((a2) => a2.key === key)?.label}
+                    </button>
+                  ))}
+                  {markerArm !== "none" && (
+                    <span className="ml-auto flex flex-wrap items-center gap-x-3">
+                      <TradeMarkerLegend />
+                      {holdBands.length > 0 && <EpisodeBandLegend count={holdBands.length} />}
+                    </span>
+                  )}
+                </div>
+
                 <div className="h-60 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
+                    <ComposedChart
                       data={chart}
                       syncId="policy-nudge-replay"
                       margin={{ top: 4, right: 8, left: 0, bottom: 18 }}
                     >
                       <CartesianGrid {...GRID_PROPS} />
+                      {renderEpisodeBands(holdBands, { labels: holdBands.length <= 12 })}
                       <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
                       <YAxis
                         {...AXIS_PROPS}
@@ -344,14 +439,18 @@ export function PolicyNudgeReplayCard({
                         }}
                       />
                       <Tooltip
-                        contentStyle={TOOLTIP_CONTENT_STYLE}
                         labelStyle={TOOLTIP_LABEL_STYLE}
-                        formatter={(v: number | string, name: string) => [
-                          equityMode === "money"
-                            ? Number(v).toFixed(0)
-                            : `${Number(v).toFixed(2)}%`,
-                          name,
-                        ]}
+                        contentStyle={{ ...TOOLTIP_CONTENT_STYLE, whiteSpace: "pre-line" }}
+                        formatter={(v: number | string, name: string, item) => {
+                          if (name === "buys" || name === "sells")
+                            return [] as unknown as [string, string];
+                          const ev = (item?.payload as { eventLabel?: string | null })?.eventLabel;
+                          const head =
+                            equityMode === "money"
+                              ? Number(v).toFixed(0)
+                              : `${Number(v).toFixed(2)}%`;
+                          return [`${head}${ev ? `\n${ev}` : ""}`, name];
+                        }}
                       />
                       {ARMS.filter((arm) => visibleArms[arm.key]).map((arm) => (
                         <Line
@@ -368,6 +467,32 @@ export function PolicyNudgeReplayCard({
                           connectNulls
                         />
                       ))}
+                      {markerArm !== "none" && (
+                        <Scatter
+                          dataKey="buyMark"
+                          name="buys"
+                          isAnimationActive={false}
+                          shape={(props: unknown) => (
+                            <TradeMarkerShape
+                              {...(props as { cx?: number; cy?: number })}
+                              side="buy"
+                            />
+                          )}
+                        />
+                      )}
+                      {markerArm !== "none" && (
+                        <Scatter
+                          dataKey="sellMark"
+                          name="sells"
+                          isAnimationActive={false}
+                          shape={(props: unknown) => (
+                            <TradeMarkerShape
+                              {...(props as { cx?: number; cy?: number })}
+                              side="sell"
+                            />
+                          )}
+                        />
+                      )}
                       <Brush
                         dataKey="date"
                         height={18}
@@ -375,19 +500,20 @@ export function PolicyNudgeReplayCard({
                         stroke={CHART_ROLE.neutral}
                         fill="transparent"
                       />
-                    </LineChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 
                 {/* Underwater curves: how deep each arm sat below its own peak. */}
                 <div className="h-40 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
+                    <ComposedChart
                       data={chart}
                       syncId="policy-nudge-replay"
                       margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid {...GRID_PROPS} />
+                      {renderEpisodeBands(holdBands, { labels: false })}
                       <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
                       <YAxis
                         {...AXIS_PROPS}
@@ -401,12 +527,14 @@ export function PolicyNudgeReplayCard({
                         }}
                       />
                       <Tooltip
-                        contentStyle={TOOLTIP_CONTENT_STYLE}
                         labelStyle={TOOLTIP_LABEL_STYLE}
-                        formatter={(v: number | string, name: string) => [
-                          `${Number(v).toFixed(2)}%`,
-                          name,
-                        ]}
+                        contentStyle={{ ...TOOLTIP_CONTENT_STYLE, whiteSpace: "pre-line" }}
+                        formatter={(v: number | string, name: string, item) => {
+                          if (name === "buys" || name === "sells")
+                            return [] as unknown as [string, string];
+                          const ev = (item?.payload as { eventLabel?: string | null })?.eventLabel;
+                          return [`${Number(v).toFixed(2)}%${ev ? `\n${ev}` : ""}`, name];
+                        }}
                       />
                       <ReferenceLine y={0} {...REFERENCE_LINE} />
                       {ARMS.filter((arm) => visibleArms[arm.key]).map((arm) => (
@@ -424,7 +552,33 @@ export function PolicyNudgeReplayCard({
                           connectNulls
                         />
                       ))}
-                    </AreaChart>
+                      {markerArm !== "none" && (
+                        <Scatter
+                          dataKey="buyMarkDd"
+                          name="buys"
+                          isAnimationActive={false}
+                          shape={(props: unknown) => (
+                            <TradeMarkerShape
+                              {...(props as { cx?: number; cy?: number })}
+                              side="buy"
+                            />
+                          )}
+                        />
+                      )}
+                      {markerArm !== "none" && (
+                        <Scatter
+                          dataKey="sellMarkDd"
+                          name="sells"
+                          isAnimationActive={false}
+                          shape={(props: unknown) => (
+                            <TradeMarkerShape
+                              {...(props as { cx?: number; cy?: number })}
+                              side="sell"
+                            />
+                          )}
+                        />
+                      )}
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 

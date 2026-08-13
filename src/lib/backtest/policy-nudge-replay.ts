@@ -27,7 +27,14 @@ import {
   type RegimePosture,
   type VolRegime,
 } from "@/lib/policy-regime-scaling";
-import { trendScore, type ArmDay, type ArmResult, type Candlelike } from "./insider-nudge-replay";
+import {
+  trendScore,
+  type ArmDay,
+  type ArmEpisode,
+  type ArmResult,
+  type ArmTradeEvent,
+  type Candlelike,
+} from "./insider-nudge-replay";
 import {
   riskSizingFor,
   realisedVol,
@@ -528,6 +535,7 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     };
   }
 
+  type OpenPos = { from: string; days: number; peakWeight: number; growth: number };
   type ArmState = {
     weights: Map<string, number>;
     equity: number;
@@ -535,6 +543,10 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     trades: number;
     positions: number[];
     gross: number[];
+    /** Live positions, keyed by symbol, for holding-period annotations. */
+    open: Map<string, OpenPos>;
+    episodes: ArmEpisode[];
+    events: ArmTradeEvent[];
   };
   const mk = (): ArmState => ({
     weights: new Map(),
@@ -543,7 +555,25 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     trades: 0,
     positions: [],
     gross: [],
+    open: new Map(),
+    episodes: [],
+    events: [],
   });
+
+  const closeEpisode = (state: ArmState, symbol: string, to: string | null) => {
+    const pos = state.open.get(symbol);
+    if (!pos) return;
+    state.open.delete(symbol);
+    state.episodes.push({
+      symbol,
+      from: pos.from,
+      to,
+      days: pos.days,
+      peakWeight: Number(pos.peakWeight.toFixed(4)),
+      contributionPct: Number(((pos.growth - 1) * 100).toFixed(3)),
+      open: to == null,
+    });
+  };
   const base = mk();
   const nud = mk();
   const reg = mk();
@@ -596,13 +626,32 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     state: ArmState,
     target: Map<string, number>,
     dayReturn: (symbol: string) => number | null,
+    /** Curve date this rebalance is plotted at. */
+    dateKey: string,
   ) => {
     let turnover = 0;
+    const buys: string[] = [];
+    const sells: string[] = [];
     const keys = new Set([...state.weights.keys(), ...target.keys()]);
     for (const k of keys) {
-      const d = Math.abs((target.get(k) ?? 0) - (state.weights.get(k) ?? 0));
+      const before = state.weights.get(k) ?? 0;
+      const after = target.get(k) ?? 0;
+      const d = Math.abs(after - before);
       if (d > 1e-9) turnover += d;
-      if (d > 0.01) state.trades += 1;
+      if (d > 0.01) {
+        state.trades += 1;
+        if (after > before) buys.push(k);
+        else sells.push(k);
+      }
+      // Holding periods track presence, not size: a position opens the first
+      // day it carries weight and closes the day the weight goes to zero.
+      if (after <= 1e-9 && before > 1e-9) closeEpisode(state, k, dateKey);
+      else if (after > 1e-9 && !state.open.has(k)) {
+        state.open.set(k, { from: dateKey, days: 0, peakWeight: after, growth: 1 });
+      }
+    }
+    if (buys.length || sells.length) {
+      state.events.push({ date: dateKey, buys: buys.sort(), sells: sells.sort() });
     }
     const cost = state.equity * turnover * (params.costBps / 10_000);
     state.equity -= cost;
@@ -614,6 +663,12 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       gross += w;
       const r = dayReturn(sym);
       if (r != null) port += w * r;
+      const pos = state.open.get(sym);
+      if (pos) {
+        pos.days += 1;
+        pos.peakWeight = Math.max(pos.peakWeight, w);
+        pos.growth *= 1 + w * (r ?? 0);
+      }
     }
     state.equity *= 1 + port;
     state.weights = target;
@@ -710,9 +765,9 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     const beforeBase = base.equity;
     const beforeNud = nud.equity;
     const beforeReg = reg.equity;
-    const rb = applyDay(base, select(base, baseScores), dayReturn);
-    const rn = applyDay(nud, select(nud, nudScores), dayReturn);
-    const rr = applyDay(reg, select(reg, regScores), dayReturn);
+    const rb = applyDay(base, select(base, baseScores), dayReturn, next);
+    const rn = applyDay(nud, select(nud, nudScores), dayReturn, next);
+    const rr = applyDay(reg, select(reg, regScores), dayReturn, next);
 
     baseCurve.push({
       date: next,
@@ -739,6 +794,8 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
 
   const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => {
     const t = tailRisk(rets);
+    // Positions still held on the last bar stay open, flagged as such.
+    for (const symbol of [...state.open.keys()]) closeEpisode(state, symbol, null);
     return {
       label,
       curve,
@@ -757,6 +814,8 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       var95Pct: t.var95Pct,
       cvar95Pct: t.cvar95Pct,
       volAnnPct: t.volAnnPct,
+      episodes: state.episodes,
+      events: state.events,
     };
   };
 
