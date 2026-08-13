@@ -203,6 +203,12 @@ export type PolicyNudgeReplayResult = {
   nudged: ArmResult;
   /** Third arm: same raw nudge, scaled by the detected market regime. */
   regime: ArmResult;
+  /** Passive market baseline over the same bars, same cost model. */
+  benchmark: ArmResult;
+  /** Each strategy arm measured against that baseline. */
+  benchmarkComparisons: PolicyBenchmarkComparison[];
+  benchmarkSummary: string;
+
   delta: PolicyArmDelta;
   confidence: PolicyConfidenceBand;
   /** Regime arm measured against the policy-deaf baseline. */
