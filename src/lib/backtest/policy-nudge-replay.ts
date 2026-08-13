@@ -800,6 +800,34 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     baseRets.push(beforeBase > 0 ? base.equity / beforeBase - 1 : 0);
     nudRets.push(beforeNud > 0 ? nud.equity / beforeNud - 1 : 0);
     regRets.push(beforeReg > 0 ? reg.equity / beforeReg - 1 : 0);
+
+    // Equal-weight market baseline for the same bar.
+    let bmSum = 0;
+    let bmN = 0;
+    for (const p of prepared) {
+      const r = dayReturn(p.symbol);
+      if (r != null) {
+        bmSum += r;
+        bmN += 1;
+      }
+    }
+    const beforeBm = bmEquity;
+    let bmDayCost = 0;
+    if (!bmCharged && bmN > 0) {
+      bmDayCost = bmEquity * (params.costBps / 10_000);
+      bmEquity -= bmDayCost;
+      bmCost += bmDayCost;
+      bmCharged = true;
+    }
+    if (bmN > 0) bmEquity *= 1 + bmSum / bmN;
+    bmCurve.push({
+      date: next,
+      equity: Number(bmEquity.toFixed(2)),
+      cost: Number(bmDayCost.toFixed(4)),
+      positions: bmN,
+    });
+    bmRets.push(beforeBm > 0 ? bmEquity / beforeBm - 1 : 0);
+
   }
 
   const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => {
