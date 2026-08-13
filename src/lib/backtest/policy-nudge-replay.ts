@@ -52,6 +52,12 @@ export type PolicyReplayParams = {
   nudgeScale: number;
   /** Live risk dial (1..5) both arms size through. */
   riskLevel: number;
+  /**
+   * Gain on the regime arm's scaling: the detected multiplier's deviation from
+   * 1 is multiplied by this. 0 = regime arm collapses onto the fixed nudge,
+   * 1 = live behaviour, >1 = more aggressive regime response.
+   */
+  regimeGain: number;
 };
 
 export const DEFAULT_POLICY_REPLAY_PARAMS: PolicyReplayParams = {
@@ -61,6 +67,7 @@ export const DEFAULT_POLICY_REPLAY_PARAMS: PolicyReplayParams = {
   costBps: 25,
   nudgeScale: 1,
   riskLevel: 3,
+  regimeGain: 1,
 };
 
 /** How much of the tape the policy signal actually reached, and what it did. */
@@ -646,7 +653,9 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       nudScores.push({ symbol: p.symbol, score: adj, vol });
 
       // Regime arm: identical raw nudge, scaled by the sign-aware regime read.
-      const scale = n === 0 ? 1 : policyNudgeScaleForSign(read, Math.sign(n));
+      const rawScale = n === 0 ? 1 : policyNudgeScaleForSign(read, Math.sign(n));
+      // Gain dial: stretch or shrink how far the regime read moves the nudge.
+      const scale = Math.max(0, 1 + (rawScale - 1) * params.regimeGain);
       const rn = n * scale;
       regScores.push({ symbol: p.symbol, score: Math.max(0, Math.min(1, s + rn)), vol });
       if (n !== 0) {
