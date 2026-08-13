@@ -1,4 +1,4 @@
-import type { ArmResult } from "@/lib/backtest/insider-nudge-replay";
+import type { ArmEpisode, ArmResult } from "@/lib/backtest/insider-nudge-replay";
 
 export type ArmHeadlineMetrics = {
   label: string;
@@ -134,7 +134,7 @@ function median(xs: number[]): number | null {
  * the streak reflects the sequence the account actually lived through; flat
  * closes (exactly 0%) break neither run.
  */
-function consecutiveStreaks(closed: ArmResult["episodes"] extends Array<infer E> | undefined ? E[] : never): {
+function consecutiveStreaks(closed: ArmEpisode[]): {
   wins: number;
   losses: number;
 } {
