@@ -149,6 +149,7 @@ import { PolicyRegimeTimelineCard } from "@/components/policy-regime-timeline-ca
 import { InsiderEventStudyCard } from "@/components/insider-event-study-card";
 import { InsiderNudgeReplayCard } from "@/components/insider-nudge-replay-card";
 import { PolicyNudgeReplayCard } from "@/components/policy-nudge-replay-card";
+import { PolicyNudgeSweepCard } from "@/components/policy-nudge-sweep-card";
 
 import { PrecheckCashAlertBanner } from "@/components/precheck-cash-alert-banner";
 import { CostSyncAlertBanner } from "@/components/cost-sync-alert-banner";
@@ -1096,6 +1097,7 @@ function PortfolioPage() {
                 <InsiderEventStudyCard className="mb-4" />
                 <InsiderNudgeReplayCard className="mb-4" />
                 <PolicyNudgeReplayCard className="mb-4" />
+                <PolicyNudgeSweepCard className="mb-4" />
 
                 <PrecheckCashAlertBanner portfolioId={id} className="mb-4" />
                 <CostSyncAlertBanner portfolioId={id} className="mb-4" />
