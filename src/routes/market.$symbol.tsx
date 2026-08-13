@@ -114,12 +114,14 @@ import {
 import { CompareOverlay } from "@/components/market/compare-overlay";
 import { formatUkDate, formatUkDateTime } from "@/lib/uk-time";
 import { formatMoney } from "@/lib/format-money";
+import { marketQuoteCurrency } from "@/lib/market-price-units";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartFrame } from "@/components/chart-frame";
 import {
+  AXIS_LABEL,
   AXIS_LINE,
   AXIS_TICK,
   CHART_ROLE,
@@ -167,6 +169,21 @@ function pct(v: number | null | undefined, digits = 1) {
 function num(v: number | null | undefined, digits = 2) {
   if (v == null || !Number.isFinite(v)) return "—";
   return v.toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Aug '25" — and the full year on January ticks so the year change is obvious. */
+function axisDateLabel(iso: string) {
+  const [y, m] = iso.split("-");
+  const mon = MONTHS[Number(m) - 1] ?? m;
+  return m === "01" ? `${mon} ${y}` : `${mon} '${y.slice(2)}`;
+}
+
+/** "13 Aug 2026" for tooltips, so every point states its full date. */
+function fullDateLabel(iso: string) {
+  const [y, m, d] = iso.split("-");
+  return `${Number(d)} ${MONTHS[Number(m) - 1] ?? m} ${y}`;
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
@@ -441,6 +458,8 @@ function MarketSymbolPage() {
   const { symbol } = Route.useParams();
   const { range, compare: compareParam, sma: smaParam } = Route.useSearch();
   const yWidth = useYAxisWidth();
+  // LSE tickers quote in pence; everything else is in its own major unit.
+  const priceUnitLabel = marketQuoteCurrency(symbol) === "GBX" ? "pence" : "per share";
 
   // Averages default to whatever the home dashboard card is showing, so the
   // two views stay in sync; an explicit ?sma= wins (shareable links).
@@ -875,7 +894,7 @@ function MarketSymbolPage() {
               ) : null}
               <ChartFrame className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartPoints} syncId="symbol-price" margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+                  <LineChart data={chartPoints} syncId="symbol-price" margin={{ top: 8, right: 8, bottom: 22, left: 4 }}>
                     <CartesianGrid {...GRID_PROPS} />
                     {focus ? (
                       <ReferenceArea
@@ -891,8 +910,14 @@ function MarketSymbolPage() {
                       tick={AXIS_TICK}
                       axisLine={AXIS_LINE}
                       tickLine={TICK_LINE}
-                      minTickGap={40}
-                      tickFormatter={(d: string) => d.slice(2, 7)}
+                      minTickGap={56}
+                      tickFormatter={axisDateLabel}
+                      label={{
+                        value: "Date",
+                        position: "insideBottom",
+                        offset: -14,
+                        style: AXIS_LABEL,
+                      }}
                     />
                     <YAxis
                       tick={AXIS_TICK}
@@ -903,11 +928,18 @@ function MarketSymbolPage() {
                       tickFormatter={(v: number) =>
                         yWidth <= Y_AXIS_WIDTH_MOBILE ? compactTick(v) : num(v, 0)
                       }
+                      label={{
+                        value: `Price (${priceUnitLabel})`,
+                        angle: -90,
+                        position: "insideLeft",
+                        style: { ...AXIS_LABEL, textAnchor: "middle" },
+                      }}
                     />
                     <Tooltip
                       contentStyle={TOOLTIP_CONTENT_STYLE}
                       labelStyle={TOOLTIP_LABEL_STYLE}
                       formatter={(v: number, name: string) => [num(v), name]}
+                      labelFormatter={(d: string) => fullDateLabel(String(d))}
                     />
                     <Line
                       type="monotone"
