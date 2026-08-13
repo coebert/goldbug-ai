@@ -145,6 +145,7 @@ import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { ConcentrationAlertCard } from "@/components/concentration-alert-card";
 import { InsiderDealingsCard } from "@/components/insider-dealings-card";
 import { PolicyDecisionExplainCard } from "@/components/policy-decision-explain-card";
+import { PolicyRegimeTimelineCard } from "@/components/policy-regime-timeline-card";
 import { InsiderEventStudyCard } from "@/components/insider-event-study-card";
 import { InsiderNudgeReplayCard } from "@/components/insider-nudge-replay-card";
 import { PolicyNudgeReplayCard } from "@/components/policy-nudge-replay-card";
@@ -1082,6 +1083,7 @@ function PortfolioPage() {
                   mode={p.mode}
                   className="mb-4"
                 />
+                <PolicyRegimeTimelineCard portfolioId={id} className="mb-4" />
                 <div className="mb-4">
                   <PolicyDecisionExplainCard portfolioId={id} />
                 </div>
