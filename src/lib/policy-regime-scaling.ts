@@ -131,6 +131,13 @@ export function classifyPosture(input: RegimeRiskInputs): { posture: RegimePostu
   return { posture, confidence: Number(clamp(Math.abs(mean), 0, 1).toFixed(2)) };
 }
 
+/** Table multiplier for a (posture, vol) pair — the same arithmetic `detectPolicyRegime` uses. */
+export function policyScaleForRegime(posture: RegimePosture, vol: VolRegime): number {
+  return Number(
+    clamp(VOL_SCALE[vol] * POSTURE_SCALE[posture], POLICY_SCALE_MIN, POLICY_SCALE_MAX).toFixed(3),
+  );
+}
+
 /**
  * Detect the regime and derive the policy-nudge multiplier.
  * `scale` is symmetric (sign-agnostic); use `policyNudgeScaleForSign` when the
