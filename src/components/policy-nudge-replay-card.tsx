@@ -394,6 +394,61 @@ export function PolicyNudgeReplayCard({
               </table>
             </div>
 
+            {/* Hurdle rate: every arm measured against just owning the market. */}
+            {result.benchmarkComparisons.length > 0 ? (
+              <div className="rounded-lg border border-border/60 p-3">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <h4 className="text-xs font-medium">Versus market baseline</h4>
+                  <span className="text-[11px] text-muted-foreground">
+                    Equal-weight buy &amp; hold of the same {result.symbols.length} names ·{" "}
+                    {pct(result.benchmark.totalReturnPct)} · DD{" "}
+                    {result.benchmark.maxDrawdownPct.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px] text-xs">
+                    <thead className="text-muted-foreground">
+                      <tr className="border-b border-border/60">
+                        <th className="py-1.5 text-left font-medium">Arm</th>
+                        <th className="py-1.5 text-right font-medium">Excess return</th>
+                        <th className="py-1.5 text-right font-medium">Drawdown gap</th>
+                        <th className="py-1.5 text-right font-medium">Sharpe gap</th>
+                        <th className="py-1.5 text-right font-medium">Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody className="tabular-nums">
+                      {result.benchmarkComparisons.map((c) => (
+                        <tr key={c.label} className="border-b border-border/40 last:border-0">
+                          <td className="py-1.5 pr-2">{c.label}</td>
+                          <td
+                            className={`py-1.5 text-right ${c.returnDeltaPct >= 0 ? good : bad}`}
+                          >
+                            {c.returnDeltaPct >= 0 ? "+" : ""}
+                            {c.returnDeltaPct.toFixed(2)}pp
+                          </td>
+                          <td
+                            className={`py-1.5 text-right ${c.drawdownDeltaPct >= 0 ? good : bad}`}
+                          >
+                            {c.drawdownDeltaPct >= 0 ? "+" : ""}
+                            {c.drawdownDeltaPct.toFixed(2)}pp
+                          </td>
+                          <td className={`py-1.5 text-right ${c.sharpeDelta >= 0 ? good : bad}`}>
+                            {c.sharpeDelta >= 0 ? "+" : ""}
+                            {c.sharpeDelta.toFixed(2)}
+                          </td>
+                          <td className="py-1.5 text-right capitalize">{c.outcome}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  {result.benchmarkSummary}
+                </p>
+              </div>
+            ) : null}
+
+
             {chart.length > 1 ? (
               <>
                 <div className="flex flex-wrap items-center gap-1.5">
