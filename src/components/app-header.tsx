@@ -39,6 +39,8 @@ import { HelpDrawer } from "@/components/help-drawer";
 import { CommandPalette } from "@/components/command-palette";
 import { UkClock } from "@/components/uk-clock";
 import { EnvBadge } from "@/components/env-badge";
+import { useStickyHeaderHeight } from "@/hooks/use-sticky-header-height";
+
 import { PRIMARY } from "@/components/nav/destinations";
 
 /** Primary destinations, shared with the mobile tab bar and desktop rail. */
