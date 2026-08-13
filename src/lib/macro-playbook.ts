@@ -390,6 +390,24 @@ export function formatMacroPlaybookBlock(
     }
   }
 
+  const reelLessons = lessons.event_lessons ?? [];
+  if (reelLessons.length > 0) {
+    lines.push(
+      `Learned from the global event reel (${lessons.event_reel?.events_measured ?? 0}/${lessons.event_reel?.events_total ?? 0} events measured, ${lessons.event_reel?.from ?? ""} → ${lessons.event_reel?.to ?? ""}):`,
+    );
+    for (const l of reelLessons.slice(0, 8)) lines.push(`  - ${l}`);
+  }
+  const reelCats = lessons.event_reel?.categories ?? [];
+  if (reelCats.length > 0) {
+    lines.push(
+      `Event-category stance from the reel: ${reelCats
+        .map((c) => `${c.category}=${c.stance.replace(/_/g, " ")}`)
+        .join(", ")}.`,
+    );
+  }
+
+
+
   const dd = drawdownSizeScale(drawdownPct, lessons.drawdown_rules);
   if (dd.note) {
     lines.push(
