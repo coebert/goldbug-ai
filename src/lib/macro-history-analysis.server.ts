@@ -236,6 +236,7 @@ export async function runMacroHistoryAnalysis(args: {
   ]);
 
   const index = analyseIndexHistory(PRIMARY_INDEX, primary);
+  const globalEvents = studyGlobalEvents(primary);
   const study: MacroHistoryStudy = {
     generated_at: new Date().toISOString(),
     index,
@@ -244,6 +245,7 @@ export async function runMacroHistoryAnalysis(args: {
     episodes: MACRO_EPISODES,
     news_window_days: newsWindowDays,
     news_events: news.days.size,
+    global_events: globalEvents,
   };
 
   const derivedPlaybook = derivePlaybook(study);
@@ -251,6 +253,8 @@ export async function runMacroHistoryAnalysis(args: {
 
   let narrative = fallbackNarrative(study);
   let lessons = fallbackLessons(study);
+  let eventLessons = globalEvents.categories.map((c) => c.note);
+
   let playbook = derivedPlaybook;
   let drawdownRules = derivedRules;
   let model: string | null = null;
