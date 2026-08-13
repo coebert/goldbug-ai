@@ -153,7 +153,46 @@ export type PolicyRegimeAttribution = {
   volDays: Record<VolRegime, number>;
 };
 
+/** Label of the passive market baseline arm. */
+export const BENCHMARK_LABEL = "Market baseline (equal-weight buy & hold)";
+
+export type BenchmarkOutcome = "beats" | "lags" | "matches";
+
+/** One strategy arm measured against the passive market baseline. */
+export type PolicyBenchmarkComparison = {
+  label: string;
+  /** Positive = the arm returned more than the baseline. Percentage points. */
+  returnDeltaPct: number;
+  /** Positive = the arm drew down LESS than the baseline. Percentage points. */
+  drawdownDeltaPct: number;
+  sharpeDelta: number;
+  outcome: BenchmarkOutcome;
+};
+
+/** Return delta (pp) inside which an arm is called a tie with the baseline. */
+export const BENCHMARK_TIE_PCT = 1;
+
+export function benchmarkCompare(
+  armResult: ArmResult,
+  bm: ArmResult,
+): PolicyBenchmarkComparison {
+  const returnDeltaPct = Number((armResult.totalReturnPct - bm.totalReturnPct).toFixed(3));
+  return {
+    label: armResult.label,
+    returnDeltaPct,
+    drawdownDeltaPct: Number((armResult.maxDrawdownPct - bm.maxDrawdownPct).toFixed(3)),
+    sharpeDelta: Number((armResult.sharpe - bm.sharpe).toFixed(3)),
+    outcome:
+      Math.abs(returnDeltaPct) <= BENCHMARK_TIE_PCT
+        ? "matches"
+        : returnDeltaPct > 0
+          ? "beats"
+          : "lags",
+  };
+}
+
 export type PolicyNudgeReplayResult = {
+
   from: string;
   to: string;
   symbols: string[];
