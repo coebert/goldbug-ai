@@ -176,6 +176,16 @@ export function PolicyDecisionExplainCard({ portfolioId }: { portfolioId: string
           {((data?.max_nudge ?? 0.1) * 100).toFixed(0)} points of the news score. This is the working
           out behind the latest {data?.run_date ? `run (${data.run_date})` : "run"}.
         </p>
+        {data?.regime ? (
+          <p className="text-xs text-muted-foreground">
+            Market regime on this run:{" "}
+            <span className="font-medium text-foreground">
+              {data.regime.posture.replace("_", "-")} · {data.regime.vol} volatility
+            </span>{" "}
+            — policy guidance weighted ×{data.regime.scale.toFixed(2)}.
+          </p>
+        ) : null}
+
       </CardHeader>
       <CardContent>
         {isLoading ? (

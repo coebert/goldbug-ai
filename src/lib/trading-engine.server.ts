@@ -56,6 +56,11 @@ import {
   formatPolicyBlock,
   policySentimentNudge,
 } from "./policy-makers";
+import {
+  detectPolicyRegime,
+  formatPolicyRegimeLine,
+  policyNudgeScaleForSign,
+} from "./policy-regime-scaling";
 import { formatInsiderBlock } from "./insider-dealings";
 import { loadRecentInsiderSignals } from "./insider-dealings.server";
 import { learnedExecPostNudge, learnedHalfLifeHours } from "./exec-post-learning";
@@ -599,11 +604,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   ];
   const policySignals = computePolicySignals(policyRows, asOf);
   const policyCurrencyStances = computeCurrencyStances(policyRows, asOf);
-  const policyBlock = formatPolicyBlock(
+  // Regime read (risk-on/off + volatility band) that scales how loudly policy
+  // guidance speaks. Calm trending tape => discount it; stressed / de-risking
+  // tape => amplify it, asymmetrically by the sign of the guidance.
+  const policyRegime = detectPolicyRegime({
+    label: regime?.regime ?? null,
+    vix: crossAsset?.vix_level ?? regime?.signals.vix_level ?? null,
+    realisedVol20d: regime?.signals.spy_vol_20d ?? null,
+    drawdownPct: regime?.signals.spy_drawdown_pct ?? null,
+    index30dReturn: regime?.signals.spy_return_30d ?? null,
+    credit20dReturn: crossAsset?.hyg_change_20d ?? null,
+  });
+  const policyBlock = `${formatPolicyBlock(
     policySignals,
     policyCurrencyStances,
     detectPolicyStatements(policyRows),
-  );
+  )}\n${formatPolicyRegimeLine(policyRegime)}`;
+
 
   // Market-event ingestion: type today's + the rolling window's headlines into
   // dated events (earnings, guidance, M&A, rate decisions, tariffs, shocks) so
@@ -655,7 +672,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       macroPlaybook,
     );
     const insiderNudge = insiderBySymbol.get(f.symbol.toUpperCase())?.nudge ?? 0;
-    const policyNudge = policySentimentNudge(f.symbol, policySignals);
+    // Regime-adaptive: hawkish guidance bites harder in a risk-off tape,
+    // dovish guidance in a risk-on one; both are muted when vol is calm.
+    const policyNudgeRaw = policySentimentNudge(f.symbol, policySignals);
+    const policyNudge =
+      policyNudgeRaw === 0
+        ? 0
+        : policySentimentNudge(
+            f.symbol,
+            policySignals,
+            policyNudgeScaleForSign(policyRegime, Math.sign(policyNudgeRaw)),
+          );
     const base = agg.contributors > 0 ? agg.score : 0;
     const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt + insiderNudge + policyNudge));
     f.news_score =
@@ -3027,6 +3054,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         top_driver: a.top_driver,
       })),
       signals: features,
+      policy_regime: policyRegime,
       news: scoredNews.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,

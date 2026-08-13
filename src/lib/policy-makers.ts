@@ -452,14 +452,23 @@ export const POLICY_MAX_NUDGE = 0.1;
 /**
  * Bounded nudge applied on top of ordinary news sentiment for a symbol.
  * Confidence grows with statement count (1 => 50%, 3+ => 100%).
+ *
+ * `scale` (default 1) lets the caller adapt the strength to the detected market
+ * regime — see `policy-regime-scaling.ts`. The ±POLICY_MAX_NUDGE cap is applied
+ * AFTER scaling, so the regime can never widen the hard bound.
  */
-export function policySentimentNudge(symbol: string, signals: PolicySignal[]): number {
+export function policySentimentNudge(
+  symbol: string,
+  signals: PolicySignal[],
+  scale = 1,
+): number {
   const sig = signals.find((s) => s.symbol === symbol.toUpperCase());
   if (!sig || sig.statements === 0) return 0;
   const confidence = Math.min(1, 0.5 + 0.25 * (sig.statements - 1));
-  const raw = sig.score * confidence * POLICY_MAX_NUDGE;
+  const raw = sig.score * confidence * POLICY_MAX_NUDGE * (Number.isFinite(scale) ? scale : 1);
   return Number(Math.max(-POLICY_MAX_NUDGE, Math.min(POLICY_MAX_NUDGE, raw)).toFixed(4));
 }
+
 
 /** Preformatted prompt block describing what policy makers just said. */
 export function formatPolicyBlock(
@@ -552,6 +561,9 @@ export type PolicyNudgeExplain = {
   nudge: number;
   max_nudge: number;
   half_life_hours: number;
+  /** Regime multiplier applied to the nudge (1 = regime-neutral). */
+  regime_scale: number;
+
   contributions: PolicyContribution[];
 };
 
@@ -564,10 +576,12 @@ export function explainPolicyNudge(
   symbol: string,
   rows: PolicyRow[],
   asOfISO: string,
-  opts?: { halfLifeHours?: number },
+  opts?: { halfLifeHours?: number; regimeScale?: number },
 ): PolicyNudgeExplain {
   const target = symbol.toUpperCase();
   const halfLifeHours = opts?.halfLifeHours ?? 48;
+  const regimeScale =
+    opts?.regimeScale != null && Number.isFinite(opts.regimeScale) ? opts.regimeScale : 1;
   const halfLifeMs = halfLifeHours * 3600 * 1000;
   const asOfMs = toMs(asOfISO.length === 10 ? `${asOfISO}T23:59:59Z` : asOfISO) ?? Date.now();
 
@@ -634,7 +648,7 @@ export function explainPolicyNudge(
       : Number(
           Math.max(
             -POLICY_MAX_NUDGE,
-            Math.min(POLICY_MAX_NUDGE, score * confidence * POLICY_MAX_NUDGE),
+            Math.min(POLICY_MAX_NUDGE, score * confidence * POLICY_MAX_NUDGE * regimeScale),
           ).toFixed(4),
         );
 
@@ -647,6 +661,7 @@ export function explainPolicyNudge(
     nudge,
     max_nudge: POLICY_MAX_NUDGE,
     half_life_hours: halfLifeHours,
+    regime_scale: Number(regimeScale.toFixed(3)),
     contributions,
   };
 }
