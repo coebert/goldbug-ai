@@ -599,11 +599,23 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   ];
   const policySignals = computePolicySignals(policyRows, asOf);
   const policyCurrencyStances = computeCurrencyStances(policyRows, asOf);
-  const policyBlock = formatPolicyBlock(
+  // Regime read (risk-on/off + volatility band) that scales how loudly policy
+  // guidance speaks. Calm trending tape => discount it; stressed / de-risking
+  // tape => amplify it, asymmetrically by the sign of the guidance.
+  const policyRegime = detectPolicyRegime({
+    label: regime?.regime ?? null,
+    vix: crossAsset?.vix_level ?? regime?.signals.vix_level ?? null,
+    realisedVol20d: regime?.signals.spy_vol_20d ?? null,
+    drawdownPct: regime?.signals.spy_drawdown_pct ?? null,
+    index30dReturn: regime?.signals.spy_return_30d ?? null,
+    credit20dReturn: crossAsset?.hyg_change_20d ?? null,
+  });
+  const policyBlock = `${formatPolicyBlock(
     policySignals,
     policyCurrencyStances,
     detectPolicyStatements(policyRows),
-  );
+  )}\n${formatPolicyRegimeLine(policyRegime)}`;
+
 
   // Market-event ingestion: type today's + the rolling window's headlines into
   // dated events (earnings, guidance, M&A, rate decisions, tariffs, shocks) so
