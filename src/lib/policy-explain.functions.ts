@@ -38,6 +38,8 @@ export type PolicyDecisionExplain = {
   decided_at: string | null;
   max_nudge: number;
   half_life_hours: number;
+  /** Market regime the run detected, and the multiplier it applied. */
+  regime: { posture: string; vol: string; scale: number; reason: string } | null;
   orders: PolicyOrderExplain[];
   /** True when the run had orders but no tracked remark touched any of them. */
   no_policy_input: boolean;
@@ -168,6 +170,14 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
       decided_at: (decision?.created_at as string | null) ?? null,
       max_nudge: POLICY_MAX_NUDGE,
       half_life_hours: 48,
+      regime: policyRegime
+        ? {
+            posture: String(policyRegime.posture ?? "neutral"),
+            vol: String(policyRegime.vol ?? "normal"),
+            scale: regimeScale,
+            reason: String(policyRegime.reason ?? ""),
+          }
+        : null,
       orders: explained,
       no_policy_input: explained.length > 0 && explained.every((o) => o.explain.statements === 0),
     };
