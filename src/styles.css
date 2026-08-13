@@ -288,10 +288,16 @@
   }
 
   /* In-page anchor jumps and focus scrolls must clear the sticky chrome
-   * rather than land underneath it. */
+   * rather than land underneath it. Pages that stack more than one sticky bar
+   * (portfolio detail: tab bar + section index) raise --sticky-stack-h so the
+   * landing offset matches the real chrome height instead of trimming the top
+   * of the section. */
   html {
-    scroll-padding-top: calc(var(--app-header-h) + var(--subnav-h) + 0.5rem);
+    scroll-padding-top: calc(
+      var(--app-header-h) + var(--sticky-stack-h, var(--subnav-h)) + 0.75rem
+    );
   }
+
 
   /* Sticky nav chrome must never be chosen as the browser's scroll anchor.
    * When it is, any re-render inside the bar (scroll-spy active chip, live
@@ -343,6 +349,12 @@
 @keyframes skeleton-shimmer {
   0% { background-position: -150% 0; }
   100% { background-position: 250% 0; }
+}
+
+/* Anchor target that must land clear of ALL sticky chrome on the page.
+ * Pages set --sticky-stack-h to the combined height of their sticky bars. */
+@utility scroll-below-sticky {
+  scroll-margin-top: calc(var(--app-header-h) + var(--sticky-stack-h, var(--subnav-h)) + 0.75rem);
 }
 
 @utility skeleton-shimmer {
