@@ -319,6 +319,15 @@ export async function runMacroHistoryAnalysis(args: {
     lessons,
     playbook,
     drawdown_rules: drawdownRules,
+    event_lessons: eventLessons,
+    event_reel: {
+      events_total: globalEvents.events_total,
+      events_measured: globalEvents.events_measured,
+      from: globalEvents.from,
+      to: globalEvents.to,
+      categories: globalEvents.categories,
+      severe: globalEvents.severe,
+    },
   };
 
   await supabase.from("macro_lessons").update({ active: false }).eq("user_id", userId).eq("active", true);
@@ -334,6 +343,8 @@ export async function runMacroHistoryAnalysis(args: {
     lessons,
     playbook: playbook as unknown as Record<string, unknown>,
     drawdown_rules: drawdownRules as unknown as Record<string, unknown>,
+    event_lessons: eventLessons,
+    event_reel: lessonSet.event_reel as unknown as Record<string, unknown>,
     active: true,
   });
   if (insertError) {
@@ -351,7 +362,9 @@ export async function loadActiveMacroLessons(
 ): Promise<MacroLessonSet | null> {
   const { data } = await supabase
     .from("macro_lessons")
-    .select("generated_at, years_covered, episodes, model, narrative, lessons, playbook, drawdown_rules")
+    .select(
+      "generated_at, years_covered, episodes, model, narrative, lessons, playbook, drawdown_rules, event_lessons, event_reel",
+    )
     .eq("user_id", userId)
     .eq("active", true)
     .order("generated_at", { ascending: false })
@@ -360,6 +373,7 @@ export async function loadActiveMacroLessons(
 
   if (!data) return null;
   const row = data as Record<string, unknown>;
+  const reel = row["event_reel"];
   return {
     generated_at: String(row["generated_at"] ?? new Date().toISOString()),
     model: (row["model"] as string | null) ?? null,
@@ -371,5 +385,11 @@ export async function loadActiveMacroLessons(
     drawdown_rules: Array.isArray(row["drawdown_rules"])
       ? (row["drawdown_rules"] as MacroDrawdownRule[])
       : [],
+    event_lessons: Array.isArray(row["event_lessons"]) ? (row["event_lessons"] as string[]) : [],
+    event_reel:
+      reel && typeof reel === "object" && Array.isArray((reel as Record<string, unknown>)["categories"])
+        ? (reel as MacroLessonSet["event_reel"])
+        : null,
   };
+
 }
