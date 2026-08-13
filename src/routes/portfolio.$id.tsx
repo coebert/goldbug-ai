@@ -873,9 +873,12 @@ function PortfolioPage() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={email} />
-      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4 2xl:max-w-7xl"
-        // Two sticky bars stack on this page (tabs + section index).
-        style={{ "--sticky-stack-h": "calc(var(--subnav-h) * 2)" } as React.CSSProperties}>
+      {/* Two sticky bars stack on this page (tab bar + section index), so
+          anchor jumps must clear both, not just one. */}
+      <main
+        className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4 2xl:max-w-7xl"
+        style={{ "--sticky-stack-h": "calc(var(--subnav-h) * 2)" } as CSSProperties}
+      >
         <PortfolioTabs id={id} />
         <SectionIndex
           items={PORTFOLIO_SECTIONS}
