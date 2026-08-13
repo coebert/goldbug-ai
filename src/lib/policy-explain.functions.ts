@@ -71,9 +71,20 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
 
     const raw = (decision?.raw ?? {}) as {
       orders?: Array<Record<string, unknown>>;
+      executed?: Array<Record<string, unknown>>;
       signals?: Array<Record<string, unknown>>;
     };
-    const orders = Array.isArray(raw.orders) ? raw.orders : [];
+    // `orders` is what the engine proposed; `executed` is what actually happened
+    // (and is the only place a rejection reason is recorded). Overlay them so the
+    // panel explains the real outcome, not the intent.
+    const proposed = Array.isArray(raw.orders) ? raw.orders : [];
+    const executed = Array.isArray(raw.executed) ? raw.executed : [];
+    const key = (o: Record<string, unknown>) =>
+      `${String(o.symbol ?? "").toUpperCase()}|${String(o.side ?? "").toLowerCase()}`;
+    const proposedByKey = new Map(proposed.map((o) => [key(o), o]));
+    const orders = executed.length
+      ? executed.map((e) => ({ ...(proposedByKey.get(key(e)) ?? {}), ...e }))
+      : proposed;
     const signals = Array.isArray(raw.signals) ? raw.signals : [];
     const newsScoreBySymbol = new Map<string, number | null>(
       signals.map((s) => [String(s.symbol ?? "").toUpperCase(), num(s.news_score)]),
