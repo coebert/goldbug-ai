@@ -332,10 +332,29 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
   });
   const base = mk();
   const nud = mk();
+  const reg = mk();
   const baseCurve: ArmDay[] = [];
   const nudCurve: ArmDay[] = [];
+  const regCurve: ArmDay[] = [];
   const baseRets: number[] = [];
   const nudRets: number[] = [];
+  const regRets: number[] = [];
+
+  // Regime timeline, derived from an equal-weight index of the replay universe:
+  // realised vol, drawdown from the trailing 1y high and 30d momentum. No VIX
+  // on a pure tape, so `detectPolicyRegime` falls back to realised vol.
+  const regimeByDate = buildRegimeTimeline(prepared, allDates);
+  const regimeAttribution: PolicyRegimeAttribution = {
+    scaledDays: 0,
+    avgScale: 1,
+    minScale: Number.POSITIVE_INFINITY,
+    maxScale: Number.NEGATIVE_INFINITY,
+    amplifiedDays: 0,
+    dampenedDays: 0,
+    postureDays: { risk_on: 0, neutral: 0, risk_off: 0 },
+    volDays: { calm: 0, normal: 0, elevated: 0, stressed: 0 },
+  };
+  let scaleSum = 0;
 
   const touched = new Set<string>();
   const suppressedSyms = new Set<string>();
