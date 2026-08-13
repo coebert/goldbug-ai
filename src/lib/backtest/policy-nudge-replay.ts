@@ -584,6 +584,16 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
   const nudRets: number[] = [];
   const regRets: number[] = [];
 
+  // Market baseline: equal-weight buy-and-hold of the same universe over the
+  // same bars. One entry ticket of friction, then never trades again — the
+  // honest "did the strategy beat just owning the market?" hurdle.
+  const bmCurve: ArmDay[] = [];
+  const bmRets: number[] = [];
+  let bmEquity = startEquity;
+  let bmCost = 0;
+  let bmCharged = false;
+
+
   // Regime timeline, derived from an equal-weight index of the replay universe:
   // realised vol, drawdown from the trailing 1y high and 30d momentum. No VIX
   // on a pure tape, so `detectPolicyRegime` falls back to realised vol.
