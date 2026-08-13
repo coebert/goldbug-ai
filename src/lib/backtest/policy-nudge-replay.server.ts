@@ -9,6 +9,7 @@ import {
   type PolicyNudgeReplayResult,
   type PolicyReplayParams,
 } from "./policy-nudge-replay";
+import { runPolicyNudgeSweep, type PolicySweepResult } from "./policy-nudge-sweep";
 
 export type PolicyReplayRequest = {
   symbols?: string[];
@@ -57,10 +58,11 @@ async function loadNews(
   return rows;
 }
 
-export async function runPolicyReplay(
+/** Tape + headline archive for a replay window, shared by replay and sweep. */
+async function loadReplayInputs(
   supabase: { from: (t: string) => any },
-  req: PolicyReplayRequest = {},
-): Promise<PolicyNudgeReplayResult> {
+  req: PolicyReplayRequest,
+): Promise<{ prices: Map<string, Candle[]>; news: PolicyRow[] }> {
   const symbols = (req.symbols?.length ? req.symbols : POLICY_UNIVERSE).map((s) =>
     s.trim().toUpperCase(),
   );
@@ -85,6 +87,33 @@ export async function runPolicyReplay(
   }
 
   const news = await loadNews(supabase, newsFrom, to);
+  return { prices, news };
+}
 
+export async function runPolicyReplay(
+  supabase: { from: (t: string) => any },
+  req: PolicyReplayRequest = {},
+): Promise<PolicyNudgeReplayResult> {
+  const { prices, news } = await loadReplayInputs(supabase, req);
   return runPolicyNudgeReplay({ prices, news, params: req.params ?? {} });
+}
+
+export type PolicySweepRequest = PolicyReplayRequest & {
+  nudgeScales?: number[];
+  regimeGains?: number[];
+};
+
+/** Sensitivity grid over nudge strength × regime-scaling gain, one tape load. */
+export async function runPolicySweep(
+  supabase: { from: (t: string) => any },
+  req: PolicySweepRequest = {},
+): Promise<PolicySweepResult> {
+  const { prices, news } = await loadReplayInputs(supabase, req);
+  return runPolicyNudgeSweep({
+    prices,
+    news,
+    params: req.params ?? {},
+    nudgeScales: req.nudgeScales,
+    regimeGains: req.regimeGains,
+  });
 }
