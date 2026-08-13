@@ -537,15 +537,18 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     : null;
   const execCoefficients = execLessons?.coefficients ?? null;
 
-  // Learned macro playbook: `runMacroHistoryAnalysis` studies ~20 years of
-  // index history plus the documented episode catalogue and stores, per
-  // event kind, whether the first move historically extended (follow),
-  // round-tripped (fade), needed confirmation (wait) or preceded a slow bear
-  // (de_risk) — plus buy-size scaling by how deep the index already is.
+  // Learned macro playbook: `runMacroHistoryAnalysis` studies ~50 years of
+  // index history, the documented episode catalogue and the curated global
+  // event reel, and stores, per event kind, whether the first move
+  // historically extended (follow), round-tripped (fade), needed confirmation
+  // (wait) or preceded a slow bear (de_risk) — plus buy-size scaling by how
+  // deep the index already is. The study is re-run automatically when it is
+  // missing, older than 30 days, or predates the event-reel upgrade.
   // With no study on file every multiplier is 1 and the engine is unchanged.
   const macroLessons = portfolio.user_id
-    ? await loadActiveMacroLessons(supabaseAdmin as never, portfolio.user_id).catch(() => null)
+    ? await loadOrRefreshMacroLessons(supabaseAdmin as never, portfolio.user_id).catch(() => null)
     : null;
+
   const macroPlaybook = macroLessons?.playbook ?? null;
 
   const execPostSignals = computeExecPostSignals(
