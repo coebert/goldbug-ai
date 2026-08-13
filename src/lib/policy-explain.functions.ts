@@ -42,11 +42,6 @@ export type PolicyDecisionExplain = {
   no_policy_input: boolean;
 };
 
-const num = (v: unknown): number | null => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-
 export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -54,6 +49,10 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<PolicyDecisionExplain> => {
     const { supabase, userId } = context;
+    const num = (v: unknown): number | null => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
 
     const p = await supabase
       .from("portfolios")
