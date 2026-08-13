@@ -13,6 +13,7 @@
 import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { classifyHeadline } from "./market-events";
+import { formatGlobalEventBlock, studyGlobalEvents } from "./global-event-study";
 import {
   analyseIndexHistory,
   measureKindResponses,
@@ -30,6 +31,7 @@ import {
   type MacroPlaybookAdjustment,
   type MacroPlaybookEntry,
 } from "./macro-playbook";
+
 
 const MODEL = "google/gemini-2.5-pro";
 const PRIMARY_INDEX = "SPY";
