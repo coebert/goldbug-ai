@@ -84,6 +84,54 @@ export type PolicyAttribution = {
 
 export type PolicyReplayVerdict = "helps" | "neutral" | "hurts";
 
+/** How the regime-scaled arm compares with the fixed-strength nudge. */
+export type PolicyRegimeVerdict =
+  | "better_than_fixed"
+  | "worse_than_fixed"
+  | "safer_not_richer"
+  | "inconclusive"
+  | "inactive";
+
+export type PolicyArmDelta = {
+  returnPct: number;
+  /** Positive = the first arm drew down LESS (drawdowns are negative %). */
+  maxDrawdownPct: number;
+  sharpe: number;
+  costPct: number;
+  trades: number;
+  var95Pct: number;
+  cvar95Pct: number;
+  volAnnPct: number;
+};
+
+export type PolicyConfidenceBand = {
+  iterations: number;
+  blockDays: number;
+  /** 95% interval on the return delta, percentage points. */
+  returnDeltaLo: number;
+  returnDeltaHi: number;
+  /** 95% interval on the max-drawdown delta, percentage points. */
+  drawdownDeltaLo: number;
+  drawdownDeltaHi: number;
+  probPositive: number;
+  /** Probability the tested arm's drawdown is no worse than the reference. */
+  probDrawdownBetter: number;
+};
+
+/** What regime scaling actually did to the nudge across the replay. */
+export type PolicyRegimeAttribution = {
+  /** Symbol-days where a non-zero nudge was scaled. */
+  scaledDays: number;
+  avgScale: number;
+  minScale: number;
+  maxScale: number;
+  /** Symbol-days the regime amplified (>1.02x) or damped (<0.98x) the nudge. */
+  amplifiedDays: number;
+  dampenedDays: number;
+  postureDays: Record<RegimePosture, number>;
+  volDays: Record<VolRegime, number>;
+};
+
 export type PolicyNudgeReplayResult = {
   from: string;
   to: string;
@@ -93,30 +141,16 @@ export type PolicyNudgeReplayResult = {
   maxNudge: number;
   baseline: ArmResult;
   nudged: ArmResult;
-  delta: {
-    returnPct: number;
-    /** Positive = the nudge arm drew down more (drawdowns are negative %). */
-    maxDrawdownPct: number;
-    sharpe: number;
-    costPct: number;
-    trades: number;
-    var95Pct: number;
-    cvar95Pct: number;
-    volAnnPct: number;
-  };
-  confidence: {
-    iterations: number;
-    blockDays: number;
-    /** 95% interval on the return delta, percentage points. */
-    returnDeltaLo: number;
-    returnDeltaHi: number;
-    /** 95% interval on the max-drawdown delta, percentage points. */
-    drawdownDeltaLo: number;
-    drawdownDeltaHi: number;
-    probPositive: number;
-    /** Probability the nudge arm's drawdown is no worse than baseline. */
-    probDrawdownBetter: number;
-  };
+  /** Third arm: same raw nudge, scaled by the detected market regime. */
+  regime: ArmResult;
+  delta: PolicyArmDelta;
+  confidence: PolicyConfidenceBand;
+  /** Regime arm measured against the policy-deaf baseline. */
+  regimeVsBaseline: { delta: PolicyArmDelta; confidence: PolicyConfidenceBand };
+  /** The headline comparison: regime-aware scaling vs the fixed-strength nudge. */
+  regimeVsFixed: { delta: PolicyArmDelta; confidence: PolicyConfidenceBand };
+  regimeAttribution: PolicyRegimeAttribution;
+  regimeVerdict: PolicyRegimeVerdict;
   attribution: PolicyAttribution;
   sizing: RiskSizing;
   verdict: PolicyReplayVerdict;
