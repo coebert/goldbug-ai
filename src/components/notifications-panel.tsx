@@ -64,8 +64,8 @@ export function NotificationsPanel() {
   const empty = useMemo(() => rows.length === 0, [rows]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <CardHeader className="flex shrink-0 flex-col gap-2 space-y-0 px-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <CardTitle className="flex flex-wrap items-center gap-2 text-base min-w-0">
           <Bell className="h-4 w-4 text-primary shrink-0" />
           <span>Notifications</span>
@@ -73,7 +73,7 @@ export function NotificationsPanel() {
             <Badge variant="destructive">{unreadCount} unread</Badge>
           )}
         </CardTitle>
-        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 self-end sm:shrink-0 sm:self-auto">
           <Button variant="ghost" size="sm" onClick={() => q.refetch()} disabled={q.isFetching} aria-label="Refresh">
             <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
           </Button>
@@ -87,8 +87,8 @@ export function NotificationsPanel() {
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "unread")}>
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 space-y-0 px-3 pb-3 sm:px-6">
+        <Tabs className="shrink-0" value={tab} onValueChange={(v) => setTab(v as "all" | "unread")}>
           <TabsList>
             <TabsTrigger value="unread">Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}</TabsTrigger>
             <TabsTrigger value="all">All</TabsTrigger>
@@ -106,7 +106,7 @@ export function NotificationsPanel() {
             {tab === "unread" ? "No unread pending_slices alerts." : "No notifications yet."}
           </div>
         ) : (
-          <ScrollArea className="max-h-[420px] pr-2">
+          <ScrollArea className="min-h-0 flex-1 pr-2 [&>[data-radix-scroll-area-viewport]]:max-h-[min(60svh,420px)]">
             <ul className="space-y-2">
               {rows.map((n) => {
                 const unread = n.read_at == null;
@@ -117,9 +117,9 @@ export function NotificationsPanel() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <ShieldAlert className="h-4 w-4 text-primary shrink-0" />
-                          <span className="font-medium truncate">{n.title}</span>
+                          <span className="min-w-0 break-words font-medium">{n.title}</span>
                           <Badge className={severityTone(n.severity)}>{n.severity}</Badge>
                           {unread && <Badge variant="outline" className="border-primary/50 text-primary">new</Badge>}
                         </div>
@@ -156,7 +156,7 @@ export function NotificationsPanel() {
                           {n.slice_id && <span className="font-mono">slice {n.slice_id.slice(0, 8)}</span>}
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
+                      <div className="flex shrink-0 flex-col items-end gap-1">
                         {unread ? (
                           <Button variant="ghost" size="sm" disabled={isBusy}
                             onClick={() => mRead.mutate([n.id])}>
