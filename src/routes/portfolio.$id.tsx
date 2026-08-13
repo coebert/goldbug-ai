@@ -873,7 +873,9 @@ function PortfolioPage() {
   return (
     <div className="min-h-dvh">
       <AppHeader email={email} />
-      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4 2xl:max-w-7xl">
+      <main className="panels-responsive mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-3 py-6 sm:px-4 2xl:max-w-7xl"
+        // Two sticky bars stack on this page (tabs + section index).
+        style={{ "--sticky-stack-h": "calc(var(--subnav-h) * 2)" } as React.CSSProperties}>
         <PortfolioTabs id={id} />
         <SectionIndex
           items={PORTFOLIO_SECTIONS}
@@ -1002,7 +1004,7 @@ function PortfolioPage() {
                 </div>
               </div>
             )}
-            <div id="equity" className="scroll-mt-32" />
+            <div id="equity" className="scroll-below-sticky" />
             <EquityPctChart
               className="mb-4"
               portfolioId={id}
@@ -1015,7 +1017,7 @@ function PortfolioPage() {
             />
 
             <Suspense fallback={<div className="mb-4 h-64 animate-pulse rounded-md bg-muted/40" />}>
-              <div id="composition" className="mb-4 scroll-mt-32">
+              <div id="composition" className="mb-4 scroll-below-sticky">
                 <EquityCompositionCard portfolioId={id} />
               </div>
             </Suspense>
@@ -1100,7 +1102,7 @@ function PortfolioPage() {
                 <InstrumentCcyAlert portfolioId={id} className="mb-4" />
                 <ReconcileFillsCard portfolioId={id} className="mb-4" />
                 <PriceUnitAuditCard portfolioId={id} className="mb-4" />
-                <div id="holdings" className="mb-6 scroll-mt-32">
+                <div id="holdings" className="mb-6 scroll-below-sticky">
                   <LiveHoldingsCard
                     holdings={holdings}
                     currency={p.currency}
@@ -1125,7 +1127,7 @@ function PortfolioPage() {
                   </div>
                 )}
 
-                <Card id="actions" className="mb-6 scroll-mt-32">
+                <Card id="actions" className="mb-6 scroll-below-sticky">
                   <CardContent className="flex flex-wrap items-center gap-3 py-4">
                     <UITooltipProvider delayDuration={100}>
                       <UITooltip>

@@ -75,7 +75,7 @@ export function OverviewLookDeeperSection({
   ready: boolean;
 }) {
   return (
-      <div id="portfolio-look-deeper" className="mb-6 scroll-mt-32 space-y-3">
+      <div id="portfolio-look-deeper" className="mb-6 scroll-below-sticky space-y-3">
         <div>
           <h3 className="font-display text-base font-semibold tracking-tight">Look deeper</h3>
           <p className="text-xs text-muted-foreground">
@@ -129,7 +129,7 @@ export function OverviewLookDeeperSection({
       )}
       {p && (
         <div className="mb-4">
-          <div id="coverage-trend" className="scroll-mt-24">
+          <div id="coverage-trend" className="scroll-below-sticky">
             <CoverageTrendCard />
           </div>
         </div>

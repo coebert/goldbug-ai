@@ -351,6 +351,12 @@
   100% { background-position: 250% 0; }
 }
 
+/* Anchor target that must land clear of ALL sticky chrome on the page.
+ * Pages set --sticky-stack-h to the combined height of their sticky bars. */
+@utility scroll-below-sticky {
+  scroll-margin-top: calc(var(--app-header-h) + var(--sticky-stack-h, var(--subnav-h)) + 0.75rem);
+}
+
 @utility skeleton-shimmer {
   position: relative;
   overflow: hidden;
