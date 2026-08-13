@@ -11,6 +11,11 @@ import { Gavel, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  RegimePathBadge,
+  RegimePathDetail,
+  RegimePathSummary,
+} from "@/components/policy/regime-path-diagnostics";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -106,6 +111,8 @@ function OrderRow({ order, max }: { order: PolicyOrderExplain; max: number }) {
           </div>
         </dl>
 
+        <RegimePathDetail diagnostic={order.regime_path} />
+
         {explain.contributions.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             No tracked policy maker mentioned this symbol&apos;s market in the last 7 days.
@@ -184,6 +191,9 @@ export function PolicyDecisionExplainCard({ portfolioId }: { portfolioId: string
             </span>{" "}
             — policy guidance weighted ×{data.regime.scale.toFixed(2)}.
           </p>
+        ) : null}
+        {data?.regime_path_summary?.length ? (
+          <RegimePathSummary summary={data.regime_path_summary} className="mt-1" />
         ) : null}
 
       </CardHeader>
