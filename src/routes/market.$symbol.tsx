@@ -169,6 +169,21 @@ function num(v: number | null | undefined, digits = 2) {
   return v.toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Aug '25" — and the full year on January ticks so the year change is obvious. */
+function axisDateLabel(iso: string) {
+  const [y, m] = iso.split("-");
+  const mon = MONTHS[Number(m) - 1] ?? m;
+  return m === "01" ? `${mon} ${y}` : `${mon} '${y.slice(2)}`;
+}
+
+/** "13 Aug 2026" for tooltips, so every point states its full date. */
+function fullDateLabel(iso: string) {
+  const [y, m, d] = iso.split("-");
+  return `${Number(d)} ${MONTHS[Number(m) - 1] ?? m} ${y}`;
+}
+
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
   return (
     <div className="rounded-xl border border-border/60 bg-surface-2 px-3 py-2.5">
@@ -875,7 +890,7 @@ function MarketSymbolPage() {
               ) : null}
               <ChartFrame className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartPoints} syncId="symbol-price" margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+                  <LineChart data={chartPoints} syncId="symbol-price" margin={{ top: 8, right: 8, bottom: 22, left: 4 }}>
                     <CartesianGrid {...GRID_PROPS} />
                     {focus ? (
                       <ReferenceArea
@@ -891,8 +906,14 @@ function MarketSymbolPage() {
                       tick={AXIS_TICK}
                       axisLine={AXIS_LINE}
                       tickLine={TICK_LINE}
-                      minTickGap={40}
-                      tickFormatter={(d: string) => d.slice(2, 7)}
+                      minTickGap={56}
+                      tickFormatter={axisDateLabel}
+                      label={{
+                        value: "Date",
+                        position: "insideBottom",
+                        offset: -14,
+                        style: AXIS_LABEL,
+                      }}
                     />
                     <YAxis
                       tick={AXIS_TICK}
@@ -903,11 +924,18 @@ function MarketSymbolPage() {
                       tickFormatter={(v: number) =>
                         yWidth <= Y_AXIS_WIDTH_MOBILE ? compactTick(v) : num(v, 0)
                       }
+                      label={{
+                        value: `Price (${priceUnitLabel})`,
+                        angle: -90,
+                        position: "insideLeft",
+                        style: { ...AXIS_LABEL, textAnchor: "middle" },
+                      }}
                     />
                     <Tooltip
                       contentStyle={TOOLTIP_CONTENT_STYLE}
                       labelStyle={TOOLTIP_LABEL_STYLE}
                       formatter={(v: number, name: string) => [num(v), name]}
+                      labelFormatter={(d: string) => fullDateLabel(String(d))}
                     />
                     <Line
                       type="monotone"
