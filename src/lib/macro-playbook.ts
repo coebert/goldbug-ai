@@ -47,6 +47,15 @@ export type MacroDrawdownRule = {
   note: string;
 };
 
+export type MacroEventReelSummary = {
+  events_total: number;
+  events_measured: number;
+  from: string;
+  to: string;
+  categories: import("./global-event-study").EventCategoryStat[];
+  severe: { events: number; mean_drawdown_pct: number; mean_fwd_250d: number };
+};
+
 export type MacroLessonSet = {
   generated_at: string;
   model: string | null;
@@ -58,7 +67,12 @@ export type MacroLessonSet = {
   lessons: string[];
   playbook: MacroPlaybookEntry[];
   drawdown_rules: MacroDrawdownRule[];
+  /** Rules learned specifically from the curated global-events reel. */
+  event_lessons?: string[];
+  /** Measured summary of the reel, by category and severity. */
+  event_reel?: MacroEventReelSummary | null;
 };
+
 
 export const MACRO_TILT_MULTIPLIER_MAX = 2;
 export const MACRO_HALF_LIFE_MIN = 6;
