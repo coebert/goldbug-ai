@@ -122,60 +122,10 @@ export function AppHeader({ email }: { email?: string | null }) {
   const headerRef = useRef<HTMLElement | null>(null);
 
   // Publish the measured header height as --app-header-h so every sticky
-  // sub-nav (portfolio tabs, leaf back rows) lines up exactly beneath it,
-  // including on notched devices where the safe-area padding varies.
-  //
-  // The row itself is a fixed height, so this should only ever fire once (the
-  // safe-area inset settling). Guard it anyway: writing the variable while the
-  // user is scrolling would move every sticky offset under it and shift the
-  // page. Sub-pixel noise is ignored, and any real change during a touch
-  // gesture is deferred until the finger lifts.
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el || typeof window === "undefined") return;
-    const root = document.documentElement;
-    let applied = 0;
-    let pending: number | null = null;
-    let touching = false;
+  // sub-nav lines up beneath it. Rotation-safe: see the hook for the gesture
+  // and orientation-change guards.
+  useStickyHeaderHeight(headerRef);
 
-    const write = (h: number) => {
-      applied = h;
-      root.style.setProperty("--app-header-h", `${h}px`);
-    };
-    const apply = () => {
-      const h = Math.round(el.getBoundingClientRect().height);
-      if (!h || Math.abs(h - applied) < 1) return;
-      if (touching) {
-        pending = h;
-        return;
-      }
-      write(h);
-    };
-    const onTouchStart = () => {
-      touching = true;
-    };
-    const onTouchEnd = () => {
-      touching = false;
-      if (pending != null) {
-        write(pending);
-        pending = null;
-      }
-    };
-
-    apply();
-    const ro = new ResizeObserver(apply);
-    ro.observe(el);
-    const opts = { passive: true } as const;
-    window.addEventListener("touchstart", onTouchStart, opts);
-    window.addEventListener("touchend", onTouchEnd, opts);
-    window.addEventListener("touchcancel", onTouchEnd, opts);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("touchcancel", onTouchEnd);
-    };
-  }, []);
 
   return (
     <header
