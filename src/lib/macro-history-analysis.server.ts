@@ -124,6 +124,25 @@ export function buildMacroPrompt(study: MacroHistoryStudy, derived: MacroPlayboo
     "B. DOCUMENTED MACRO EPISODES SINCE 2005 (catalogue: drawdown, recovery time, origin, transferable lesson):",
     JSON.stringify(MACRO_EPISODES),
     "",
+    "B2. THE CURATED GLOBAL EVENT REEL (1975→today), each event measured event-by-event against this system's own index series — run-up into the event, fall inside the window, days back to the old high, and forward returns 20/60/250 sessions after the window closed. Study every row: this is the longest evidence base available and it covers episodes the 2005 catalogue does not (Black Monday, the Gulf War, the Asian crisis, LTCM, the dot-com bust, 9/11).",
+    JSON.stringify(
+      study.global_events
+        ? {
+            coverage: {
+              measured: study.global_events.events_measured,
+              total: study.global_events.events_total,
+              from: study.global_events.from,
+              to: study.global_events.to,
+            },
+            by_category: study.global_events.categories,
+            severe: study.global_events.severe,
+            events: study.global_events.measurements.filter((m) => m.covered),
+            uncovered: study.global_events.measurements.filter((m) => !m.covered).map((m) => m.id),
+          }
+        : null,
+    ),
+    "",
+
     `C. MEASURED INDEX RESPONSE TO TYPED NEWS EVENTS (only ${study.news_window_days} days of stored news, so this sample is thin):`,
     JSON.stringify(study.kind_responses),
     "",
