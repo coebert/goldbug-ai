@@ -499,62 +499,62 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
   const baseline = arm("Baseline (policy muted)", base, baseCurve, baseRets);
   const nudged = arm("With policy nudge", nud, nudCurve, nudRets);
 
+  const regime = arm("Regime-aware nudge", reg, regCurve, regRets);
+
   // Paired moving-block bootstrap: resample the SAME day indices in both arms so
   // the interval measures the nudge, not the market.
-  const n = Math.min(baseRets.length, nudRets.length);
   const iterations = Math.max(200, Math.min(4000, input.iterations ?? 1000));
-  const blockDays = Math.max(1, Math.min(n || 1, Math.round(Math.cbrt(Math.max(n, 1))) + 4));
-  const rng = makeRng(input.seed ?? 20260813);
-  const retSamples: number[] = [];
-  const ddSamples: number[] = [];
-  if (n >= 30) {
-    const blocks = Math.ceil(n / blockDays);
-    for (let it = 0; it < iterations; it++) {
-      let bAcc = 1;
-      let nAcc = 1;
-      const bPath: number[] = [];
-      const nPath: number[] = [];
-      for (let b = 0; b < blocks; b++) {
-        const start = Math.floor(rng() * Math.max(1, n - blockDays));
-        for (let k = 0; k < blockDays; k++) {
-          const idx = start + k;
-          if (idx >= n) break;
-          const br = baseRets[idx] as number;
-          const nr = nudRets[idx] as number;
-          bAcc *= 1 + br;
-          nAcc *= 1 + nr;
-          bPath.push(br);
-          nPath.push(nr);
-        }
-      }
-      retSamples.push((nAcc - bAcc) * 100);
-      ddSamples.push(ddOfReturns(nPath) - ddOfReturns(bPath));
-    }
-  }
-  const sortedRet = [...retSamples].sort((a, b) => a - b);
-  const sortedDd = [...ddSamples].sort((a, b) => a - b);
-  const lo = Number(quantile(sortedRet, 0.025).toFixed(3));
-  const hi = Number(quantile(sortedRet, 0.975).toFixed(3));
-  const ddLo = Number(quantile(sortedDd, 0.025).toFixed(3));
-  const ddHi = Number(quantile(sortedDd, 0.975).toFixed(3));
-  const probPositive = retSamples.length
-    ? Number((retSamples.filter((s) => s > 0).length / retSamples.length).toFixed(3))
-    : 0;
-  // Drawdowns are negative numbers; "better" means less negative or equal.
-  const probDrawdownBetter = ddSamples.length
-    ? Number((ddSamples.filter((s) => s >= 0).length / ddSamples.length).toFixed(3))
-    : 0;
+  const seed = input.seed ?? 20260813;
+  const nBars = Math.min(baseRets.length, nudRets.length);
+  const blockDays = Math.max(
+    1,
+    Math.min(nBars || 1, Math.round(Math.cbrt(Math.max(nBars, 1))) + 4),
+  );
 
-  const delta = {
-    returnPct: Number((nudged.totalReturnPct - baseline.totalReturnPct).toFixed(3)),
-    maxDrawdownPct: Number((nudged.maxDrawdownPct - baseline.maxDrawdownPct).toFixed(3)),
-    sharpe: Number((nudged.sharpe - baseline.sharpe).toFixed(2)),
-    costPct: Number((((nudged.totalCost - baseline.totalCost) / startEquity) * 100).toFixed(3)),
-    trades: nudged.trades - baseline.trades,
-    var95Pct: Number((nudged.var95Pct - baseline.var95Pct).toFixed(3)),
-    cvar95Pct: Number((nudged.cvar95Pct - baseline.cvar95Pct).toFixed(3)),
-    volAnnPct: Number((nudged.volAnnPct - baseline.volAnnPct).toFixed(3)),
+  const fixedVsBase = pairedBootstrap(baseRets, nudRets, iterations, blockDays, seed);
+  const regVsBase = pairedBootstrap(baseRets, regRets, iterations, blockDays, seed + 1);
+  const regVsFixed = pairedBootstrap(nudRets, regRets, iterations, blockDays, seed + 2);
+
+  const retSamples = fixedVsBase.retSamples;
+  const lo = fixedVsBase.band.returnDeltaLo;
+  const hi = fixedVsBase.band.returnDeltaHi;
+  const ddLo = fixedVsBase.band.drawdownDeltaLo;
+  const ddHi = fixedVsBase.band.drawdownDeltaHi;
+  const probPositive = fixedVsBase.band.probPositive;
+  const probDrawdownBetter = fixedVsBase.band.probDrawdownBetter;
+
+  const delta = deltaOf(nudged, baseline, startEquity);
+  const regimeVsBaseline = {
+    delta: deltaOf(regime, baseline, startEquity),
+    confidence: regVsBase.band,
   };
+  const regimeVsFixed = {
+    delta: deltaOf(regime, nudged, startEquity),
+    confidence: regVsFixed.band,
+  };
+
+  const regDays = Math.max(1, regimeAttribution.scaledDays);
+  regimeAttribution.avgScale = Number((scaleSum / regDays).toFixed(3));
+  if (regimeAttribution.scaledDays === 0) {
+    regimeAttribution.minScale = 1;
+    regimeAttribution.maxScale = 1;
+  }
+
+  const regSignificant =
+    regVsFixed.retSamples.length > 0 &&
+    (regimeVsFixed.confidence.returnDeltaLo > 0 || regimeVsFixed.confidence.returnDeltaHi < 0);
+  const regimeVerdict: PolicyRegimeVerdict =
+    regimeAttribution.scaledDays === 0
+      ? "inactive"
+      : regSignificant && regimeVsFixed.delta.returnPct > 0
+        ? "better_than_fixed"
+        : regSignificant && regimeVsFixed.delta.returnPct < 0
+          ? "worse_than_fixed"
+          : regimeVsFixed.delta.maxDrawdownPct > 0.5 &&
+              regimeVsFixed.confidence.probDrawdownBetter >= 0.7
+            ? "safer_not_richer"
+            : "inconclusive";
+
 
   const mean = (xs: number[]) =>
     xs.length ? Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(3)) : null;
