@@ -49,6 +49,13 @@ import {
 } from "./cross-sectional-ranking.server";
 import { getNewsForDate } from "./news.server";
 import { computeExecPostSignals } from "./exec-posts";
+import {
+  computeCurrencyStances,
+  computePolicySignals,
+  detectPolicyStatements,
+  formatPolicyBlock,
+  policySentimentNudge,
+} from "./policy-makers";
 import { formatInsiderBlock } from "./insider-dealings";
 import { loadRecentInsiderSignals } from "./insider-dealings.server";
 import { learnedExecPostNudge, learnedHalfLifeHours } from "./exec-post-learning";
@@ -572,6 +579,32 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       : undefined,
   );
 
+  // Policy-maker announcements (central bankers, finance ministers). Their
+  // guidance is scored hawkish..dovish and applied as a small bounded nudge on
+  // top of ordinary news sentiment, plus a prompt block so the AI reasons about
+  // the current policy stance explicitly.
+  const policyRows = [
+    ...scoredNews.map((n) => ({
+      headline: n.headline,
+      source: n.source,
+      sentiment: n.sentiment,
+      date: asOf,
+    })),
+    ...scoredWindow.map((n) => ({
+      headline: n.headline,
+      source: n.source,
+      sentiment: n.sentiment,
+      date: n.news_date,
+    })),
+  ];
+  const policySignals = computePolicySignals(policyRows, asOf);
+  const policyCurrencyStances = computeCurrencyStances(policyRows, asOf);
+  const policyBlock = formatPolicyBlock(
+    policySignals,
+    policyCurrencyStances,
+    detectPolicyStatements(policyRows),
+  );
+
   // Market-event ingestion: type today's + the rolling window's headlines into
   // dated events (earnings, guidance, M&A, rate decisions, tariffs, shocks) so
   // the decision layer sees explicit catalysts, not just an average sentiment.
@@ -622,10 +655,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       macroPlaybook,
     );
     const insiderNudge = insiderBySymbol.get(f.symbol.toUpperCase())?.nudge ?? 0;
+    const policyNudge = policySentimentNudge(f.symbol, policySignals);
     const base = agg.contributors > 0 ? agg.score : 0;
-    const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt + insiderNudge));
+    const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt + insiderNudge + policyNudge));
     f.news_score =
-      agg.contributors > 0 || execNudge !== 0 || evTilt !== 0 || insiderNudge !== 0
+      agg.contributors > 0 || execNudge !== 0 || evTilt !== 0 || insiderNudge !== 0 || policyNudge !== 0
         ? Number(blended.toFixed(3))
         : null;
     f.news_contributors = agg.contributors;
@@ -942,7 +976,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         crossSectional: formatCrossSectionalBlock(rankMap),
         marketEvents: `${
           macroPlaybookBlock ? `${marketEventsBlock}\n\n${macroPlaybookBlock}` : marketEventsBlock
-        }\n\n${insiderBlock}`,
+        }\n\n${insiderBlock}\n\n${policyBlock}`,
         events,
         cooling: coolingSymbols,
         asOf,
