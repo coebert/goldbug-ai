@@ -79,6 +79,7 @@ function OrderRow({ order, max }: { order: PolicyOrderExplain; max: number }) {
             </span>
           </div>
           <NudgeBar nudge={explain.nudge} max={max} />
+          <RegimePathBadge diagnostic={order.regime_path} className="w-fit" />
           <p className="text-xs font-normal text-muted-foreground">{order.summary}</p>
         </div>
       </AccordionTrigger>
