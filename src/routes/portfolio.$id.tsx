@@ -4,7 +4,7 @@ import { OverviewLookDeeperSection } from "@/components/portfolio-detail/section
 import { PortfolioTabs } from "@/components/portfolio-detail/portfolio-tabs";
 import { SymbolTicker } from "@/components/symbol-ticker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
