@@ -20,6 +20,13 @@ import {
   type PolicyRow,
   type PolicySignal,
 } from "@/lib/policy-makers";
+import {
+  detectPolicyRegime,
+  policyNudgeScaleForSign,
+  type RegimeRead,
+  type RegimePosture,
+  type VolRegime,
+} from "@/lib/policy-regime-scaling";
 import { trendScore, type ArmDay, type ArmResult, type Candlelike } from "./insider-nudge-replay";
 import {
   riskSizingFor,
