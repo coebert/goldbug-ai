@@ -561,6 +561,9 @@ export type PolicyNudgeExplain = {
   nudge: number;
   max_nudge: number;
   half_life_hours: number;
+  /** Regime multiplier applied to the nudge (1 = regime-neutral). */
+  regime_scale: number;
+
   contributions: PolicyContribution[];
 };
 
