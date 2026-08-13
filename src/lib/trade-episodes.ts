@@ -313,3 +313,42 @@ export function describeEpisodes(
   if (extra > 0) lines.push(`+${extra} more holding${extra === 1 ? "" : "s"}`);
   return lines;
 }
+
+/**
+ * Build a band directly from an already-computed span (backtest arms track
+ * holding periods themselves, in trading days, and never see fills).
+ */
+export function spanBand(input: {
+  symbol: string;
+  x1: string;
+  x2: string;
+  days: number;
+  open?: boolean;
+  realized?: number | null;
+}): EpisodeBand {
+  const open = input.open ?? false;
+  const episode: PositionEpisode = {
+    symbol: input.symbol,
+    openMs: MS(input.x1),
+    closeMs: open ? null : MS(input.x2),
+    openAt: input.x1,
+    closeAt: open ? null : input.x2,
+    peakQuantity: 0,
+    avgBuy: 0,
+    avgSell: null,
+    buys: 1,
+    sells: open ? 0 : 1,
+    realized: input.realized ?? null,
+    days: input.days,
+    open,
+  };
+  return {
+    key: `${input.symbol}:${input.x1}:${open ? "open" : input.x2}`,
+    symbol: input.symbol,
+    x1: input.x1,
+    x2: input.x2,
+    episode,
+    clippedLeft: false,
+    clippedRight: open,
+  };
+}
