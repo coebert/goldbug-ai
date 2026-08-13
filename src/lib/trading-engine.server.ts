@@ -66,7 +66,7 @@ import {
   formatMacroPlaybookBlock,
   drawdownSizeScale,
 } from "./macro-playbook";
-import { loadActiveMacroLessons } from "./macro-history-analysis.server";
+import { loadOrRefreshMacroLessons } from "./macro-history-analysis.server";
 import {
   ensureSentimentScored,
   aggregatedSentimentForSymbol,
