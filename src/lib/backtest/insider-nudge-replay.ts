@@ -153,6 +153,28 @@ export type ArmDay = {
   positions: number;
 };
 
+/** One position held by an arm, from the rebalance that opened it to the one that closed it. */
+export type ArmEpisode = {
+  symbol: string;
+  /** Chart x-values (curve dates) the position spans. */
+  from: string;
+  to: string | null;
+  /** Trading days held. */
+  days: number;
+  /** Largest target weight the position reached. */
+  peakWeight: number;
+  /** Compounded contribution to arm equity while held, in %. */
+  contributionPct: number;
+  open: boolean;
+};
+
+/** Buys/sells an arm executed on a curve date. */
+export type ArmTradeEvent = {
+  date: string;
+  buys: string[];
+  sells: string[];
+};
+
 export type ArmResult = {
   label: string;
   curve: ArmDay[];
@@ -171,6 +193,10 @@ export type ArmResult = {
   var95Pct: number;
   cvar95Pct: number;
   volAnnPct: number;
+  /** Holding periods, when the engine tracks them. */
+  episodes?: ArmEpisode[];
+  /** Per-date entries/exits, when the engine tracks them. */
+  events?: ArmTradeEvent[];
 };
 
 
