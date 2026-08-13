@@ -98,6 +98,7 @@ export function buildPositionEpisodes(
     const start = (t: MarkerTrade): Live => ({
       openMs: tradeTimestamp(t),
       openAt: isoOf(t),
+      side: t.side === "sell" ? "short" : "long",
       qty: 0,
       peak: 0,
       buys: 0,
@@ -119,6 +120,7 @@ export function buildPositionEpisodes(
       const endMs = closeMs ?? asOfMs;
       out.push({
         symbol,
+        side: l.side,
         openMs: l.openMs,
         closeMs,
         openAt: l.openAt,
@@ -133,6 +135,7 @@ export function buildPositionEpisodes(
         open: closeMs == null,
       });
     };
+
 
     for (const t of sorted) {
       const ts = tradeTimestamp(t);
