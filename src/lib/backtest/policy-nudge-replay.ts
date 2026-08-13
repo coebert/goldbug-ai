@@ -590,6 +590,15 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
 
   const detail = ` Policy signal was live on ${coveragePct}% of bars (${attribution.activeDays}/${allDates.length - 1}), touching ${attribution.touchedSymbols} symbol${attribution.touchedSymbols === 1 ? "" : "s"}. Drawdown ${baseline.maxDrawdownPct.toFixed(2)}% baseline vs ${nudged.maxDrawdownPct.toFixed(2)}% nudged (95% CI on the difference ${ddLo}..${ddHi}pp); 95% 1-day CVaR ${baseline.cvar95Pct.toFixed(2)}% vs ${nudged.cvar95Pct.toFixed(2)}%.`;
 
+  const regimeSummary =
+    regimeAttribution.scaledDays === 0
+      ? "Regime scaling never engaged on this tape — the regime arm is identical to the fixed-nudge arm."
+      : `Regime-aware scaling (×${regimeAttribution.avgScale.toFixed(2)} average, ${regimeAttribution.minScale.toFixed(2)}..${regimeAttribution.maxScale.toFixed(2)}) ${
+          regimeVsFixed.delta.returnPct >= 0 ? "added" : "cost"
+        } ${Math.abs(regimeVsFixed.delta.returnPct).toFixed(2)}pp versus the fixed nudge (95% CI ${regimeVsFixed.confidence.returnDeltaLo}..${regimeVsFixed.confidence.returnDeltaHi}pp, P(better) ${(regimeVsFixed.confidence.probPositive * 100).toFixed(0)}%), with drawdown ${
+          regimeVsFixed.delta.maxDrawdownPct >= 0 ? "shallower" : "deeper"
+        } by ${Math.abs(regimeVsFixed.delta.maxDrawdownPct).toFixed(2)}pp (95% CI ${regimeVsFixed.confidence.drawdownDeltaLo}..${regimeVsFixed.confidence.drawdownDeltaHi}pp). Verdict: ${regimeVerdict.replace("_", " ")}.`;
+
   return {
     from: allDates[0] as string,
     to: allDates[allDates.length - 1] as string,
@@ -599,6 +608,7 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     maxNudge: POLICY_MAX_NUDGE,
     baseline,
     nudged,
+    regime,
     delta,
     confidence: {
       iterations: retSamples.length ? iterations : 0,
@@ -610,9 +620,14 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       probPositive,
       probDrawdownBetter,
     },
+    regimeVsBaseline,
+    regimeVsFixed,
+    regimeAttribution,
+    regimeVerdict,
     attribution,
     sizing,
     verdict,
-    summary: summary + detail,
+    summary: `${summary}${detail} ${regimeSummary}`,
   };
+}
 }
