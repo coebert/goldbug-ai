@@ -164,7 +164,7 @@ export function resolveRegimeScalePath(blob: unknown, sign = 0): RegimeScaleDiag
     path = "exact";
   }
 
-  const read: RegimeRead = { posture, vol, scale, confidence: 0, reason: String(obj.reason ?? "") };
+  const read: RegimeRead = { posture, vol, scale, confidence: 0, reason: safeString(obj.reason) };
   const appliedScale = sign === 0 ? scale : policyNudgeScaleForSign(read, sign);
   const untilted = sign === 0 ? scale : scale * tiltFor(posture, sign);
   const signClamped =
