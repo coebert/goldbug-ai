@@ -144,6 +144,7 @@ import { clampDialLevel } from "@/lib/risk-aggressiveness";
 import { RiskHaltBanner } from "@/components/risk-halt-banner";
 import { ConcentrationAlertCard } from "@/components/concentration-alert-card";
 import { InsiderDealingsCard } from "@/components/insider-dealings-card";
+import { PolicyDecisionExplainCard } from "@/components/policy-decision-explain-card";
 import { InsiderEventStudyCard } from "@/components/insider-event-study-card";
 import { InsiderNudgeReplayCard } from "@/components/insider-nudge-replay-card";
 
@@ -1080,6 +1081,9 @@ function PortfolioPage() {
                   mode={p.mode}
                   className="mb-4"
                 />
+                <div className="mb-4">
+                  <PolicyDecisionExplainCard portfolioId={id} />
+                </div>
                 <InsiderDealingsCard className="mb-4" />
                 <InsiderEventStudyCard className="mb-4" />
                 <InsiderNudgeReplayCard className="mb-4" />
