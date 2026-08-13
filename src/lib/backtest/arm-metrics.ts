@@ -1,4 +1,4 @@
-import type { ArmResult } from "@/lib/backtest/insider-nudge-replay";
+import type { ArmEpisode, ArmResult } from "@/lib/backtest/insider-nudge-replay";
 
 export type ArmHeadlineMetrics = {
   label: string;
@@ -20,7 +20,24 @@ export type ArmHeadlineMetrics = {
   avgLossPct: number | null;
   /** Gross wins / gross losses on closed positions. */
   profitFactor: number | null;
+  /** Closed positions in the arm (0 when the engine tracks no episodes). */
+  closedTrades: number;
+  /** Positions still open at the end of the tape. */
+  openTrades: number;
+  /** Mean calendar days held per closed position. */
+  avgHoldDays: number | null;
+  /** Median calendar days held — resistant to one very long hold. */
+  medianHoldDays: number | null;
+  /** Longest single hold, in days. */
+  maxHoldDays: number | null;
+  /** Longest run of consecutive losing closes, ordered by exit date. */
+  maxConsecutiveLosses: number | null;
+  /** Longest run of consecutive winning closes. */
+  maxConsecutiveWins: number | null;
+  /** Mean contribution per closed position, % — win rate and size combined. */
+  expectancyPct: number | null;
 };
+
 
 const MS_YEAR = 365.25 * 24 * 3600 * 1000;
 
@@ -75,6 +92,10 @@ export function armHeadlineMetrics(arm: ArmResult): ArmHeadlineMetrics {
   const grossWin = winners.reduce((s, e) => s + e.contributionPct, 0);
   const grossLoss = Math.abs(losers.reduce((s, e) => s + e.contributionPct, 0));
 
+  const holds = closed.map((e) => e.days).filter((d) => Number.isFinite(d) && d >= 0);
+  const streaks = consecutiveStreaks(closed);
+  const round1 = (v: number | null) => (v == null ? null : Number(v.toFixed(1)));
+
   return {
     label: arm.label,
     years,
@@ -90,5 +111,53 @@ export function armHeadlineMetrics(arm: ArmResult): ArmHeadlineMetrics {
     avgWinPct: winRateFromDays ? null : mean(winners.map((e) => e.contributionPct)),
     avgLossPct: winRateFromDays ? null : mean(losers.map((e) => e.contributionPct)),
     profitFactor: !winRateFromDays && grossLoss > 0 ? grossWin / grossLoss : null,
+    closedTrades: closed.length,
+    openTrades: (arm.episodes ?? []).filter((e) => e.open).length,
+    avgHoldDays: round1(mean(holds)),
+    medianHoldDays: round1(median(holds)),
+    maxHoldDays: holds.length ? round1(Math.max(...holds)) : null,
+    maxConsecutiveLosses: closed.length ? streaks.losses : null,
+    maxConsecutiveWins: closed.length ? streaks.wins : null,
+    expectancyPct: closed.length ? mean(closed.map((e) => e.contributionPct)) : null,
   };
 }
+
+function median(xs: number[]): number | null {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
+}
+
+/**
+ * Longest runs of consecutive winning/losing closes. Ordered by exit date so
+ * the streak reflects the sequence the account actually lived through; flat
+ * closes (exactly 0%) break neither run.
+ */
+function consecutiveStreaks(closed: ArmEpisode[]): {
+  wins: number;
+  losses: number;
+} {
+  const ordered = [...closed].sort(
+    (a, b) => Date.parse(a.to ?? a.from) - Date.parse(b.to ?? b.from) || a.symbol.localeCompare(b.symbol),
+  );
+  let maxWin = 0;
+  let maxLoss = 0;
+  let win = 0;
+  let loss = 0;
+  for (const e of ordered) {
+    if (e.contributionPct > 0) {
+      win += 1;
+      loss = 0;
+    } else if (e.contributionPct < 0) {
+      loss += 1;
+      win = 0;
+    } else {
+      continue;
+    }
+    if (win > maxWin) maxWin = win;
+    if (loss > maxLoss) maxLoss = loss;
+  }
+  return { wins: maxWin, losses: maxLoss };
+}
+
