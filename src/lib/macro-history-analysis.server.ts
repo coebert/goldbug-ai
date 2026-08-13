@@ -393,3 +393,37 @@ export async function loadActiveMacroLessons(
   };
 
 }
+
+/** Days after which the stored playbook is considered stale and re-studied. */
+export const MACRO_STUDY_MAX_AGE_DAYS = 30;
+
+/**
+ * Playbook the engine should use: returns the active study, and re-runs it in
+ * place when there is none, when it is older than `MACRO_STUDY_MAX_AGE_DAYS`,
+ * or when it predates the global-event-reel study (no `event_reel` stored).
+ * Failures are swallowed — a stale playbook is better than a blocked run.
+ */
+export async function loadOrRefreshMacroLessons(
+  supabase: Sb,
+  userId: string,
+  opts?: { maxAgeDays?: number },
+): Promise<MacroLessonSet | null> {
+  const existing = await loadActiveMacroLessons(supabase, userId).catch(() => null);
+  const maxAge = Math.max(1, opts?.maxAgeDays ?? MACRO_STUDY_MAX_AGE_DAYS);
+  const ageDays = existing
+    ? (Date.now() - Date.parse(existing.generated_at)) / 86_400_000
+    : Number.POSITIVE_INFINITY;
+  const missingReel = !existing?.event_reel || (existing.event_reel.events_measured ?? 0) === 0;
+  if (existing && ageDays <= maxAge && !missingReel) return existing;
+
+  try {
+    const result = await runMacroHistoryAnalysis({ supabase, userId });
+    return result.lessons;
+  } catch (err) {
+    console.error(
+      "[macro-history-analysis] auto-refresh failed",
+      err instanceof Error ? err.message : String(err),
+    );
+    return existing;
+  }
+}
