@@ -405,8 +405,8 @@ export function PolicyNudgeReplayCard({
                       {arm.label}
                     </button>
                   ))}
-                  <div className="ml-auto flex gap-1">
-                    {(["money", "pct"] as const).map((mode) => (
+                  <div className="ml-auto flex flex-wrap gap-1">
+                    {(["money", "pct", "rel"] as const).map((mode) => (
                       <Button
                         key={mode}
                         size="sm"
@@ -414,11 +414,36 @@ export function PolicyNudgeReplayCard({
                         className="h-7 px-2 text-xs"
                         onClick={() => setEquityMode(mode)}
                       >
-                        {mode === "money" ? "Equity" : "Return %"}
+                        {mode === "money" ? "Equity" : mode === "pct" ? "Return %" : "Compare"}
                       </Button>
                     ))}
                   </div>
                 </div>
+
+                {equityMode === "rel" ? (
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span>Compare against:</span>
+                    {ARMS.map((arm) => (
+                      <button
+                        key={arm.key}
+                        type="button"
+                        onClick={() => setCompareBase(arm.key)}
+                        aria-pressed={compareBase === arm.key}
+                        className={`rounded-full border px-2.5 py-1 transition-colors ${
+                          compareBase === arm.key
+                            ? "border-border bg-muted/60 text-foreground"
+                            : "border-border/50 opacity-70 hover:text-foreground"
+                        }`}
+                      >
+                        {arm.label}
+                      </button>
+                    ))}
+                    <span className="ml-auto">
+                      Both charts show the gap versus{" "}
+                      {ARMS.find((a2) => a2.key === compareBase)?.label}; above zero is ahead.
+                    </span>
+                  </div>
+                ) : null}
 
                 {/* Which arm's trades to annotate. Markers sit on that arm's own
                     curve, and its holding periods shade both charts. */}
@@ -462,10 +487,19 @@ export function PolicyNudgeReplayCard({
                         width={58}
                         domain={["auto", "auto"]}
                         tickFormatter={(v: number) =>
-                          equityMode === "money" ? Number(v).toFixed(0) : `${Number(v).toFixed(0)}%`
+                          equityMode === "money"
+                            ? Number(v).toFixed(0)
+                            : equityMode === "pct"
+                              ? `${Number(v).toFixed(0)}%`
+                              : `${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(0)}pp`
                         }
                         label={{
-                          value: equityMode === "money" ? "Equity (£)" : "Return (%)",
+                          value:
+                            equityMode === "money"
+                              ? "Equity (£)"
+                              : equityMode === "pct"
+                                ? "Return (%)"
+                                : `Gap vs ${ARMS.find((a2) => a2.key === compareBase)?.label} (pp)`,
                           angle: -90,
                           position: "insideLeft",
                           style: { ...AXIS_LABEL, textAnchor: "middle" },
@@ -481,7 +515,9 @@ export function PolicyNudgeReplayCard({
                           const head =
                             equityMode === "money"
                               ? Number(v).toFixed(0)
-                              : `${Number(v).toFixed(2)}%`;
+                              : equityMode === "pct"
+                                ? `${Number(v).toFixed(2)}%`
+                                : `${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(2)}pp`;
                           return [`${head}${ev ? `\n${ev}` : ""}`, name];
                         }}
                       />
@@ -489,7 +525,13 @@ export function PolicyNudgeReplayCard({
                         <Line
                           key={arm.key}
                           type="monotone"
-                          dataKey={equityMode === "money" ? arm.key : `${arm.key}Pct`}
+                          dataKey={
+                            equityMode === "money"
+                              ? arm.key
+                              : equityMode === "pct"
+                                ? `${arm.key}Pct`
+                                : `${arm.key}Rel`
+                          }
                           name={arm.label}
                           stroke={arm.color}
                           strokeDasharray={arm.dash}
@@ -500,6 +542,7 @@ export function PolicyNudgeReplayCard({
                           connectNulls
                         />
                       ))}
+                      {equityMode === "rel" ? <ReferenceLine y={0} {...REFERENCE_LINE} /> : null}
                       {markerArm !== "none" && (
                         <Scatter
                           dataKey="buyMark"
@@ -551,9 +594,16 @@ export function PolicyNudgeReplayCard({
                       <YAxis
                         {...AXIS_PROPS}
                         width={58}
-                        tickFormatter={(v: number) => `${Number(v).toFixed(0)}%`}
+                        tickFormatter={(v: number) =>
+                          equityMode === "rel"
+                            ? `${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(0)}pp`
+                            : `${Number(v).toFixed(0)}%`
+                        }
                         label={{
-                          value: "Drawdown (%)",
+                          value:
+                            equityMode === "rel"
+                              ? `Drawdown gap vs ${ARMS.find((a2) => a2.key === compareBase)?.label} (pp)`
+                              : "Drawdown (%)",
                           angle: -90,
                           position: "insideLeft",
                           style: { ...AXIS_LABEL, textAnchor: "middle" },
@@ -566,7 +616,11 @@ export function PolicyNudgeReplayCard({
                           if (name === "buys" || name === "sells")
                             return [] as unknown as [string, string];
                           const ev = (item?.payload as { eventLabel?: string | null })?.eventLabel;
-                          return [`${Number(v).toFixed(2)}%${ev ? `\n${ev}` : ""}`, name];
+                          const head =
+                            equityMode === "rel"
+                              ? `${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(2)}pp`
+                              : `${Number(v).toFixed(2)}%`;
+                          return [`${head}${ev ? `\n${ev}` : ""}`, name];
                         }}
                       />
                       <ReferenceLine y={0} {...REFERENCE_LINE} />
@@ -574,8 +628,12 @@ export function PolicyNudgeReplayCard({
                         <Area
                           key={arm.key}
                           type="monotone"
-                          dataKey={`${arm.key}Dd`}
-                          name={`${arm.label} drawdown`}
+                          dataKey={equityMode === "rel" ? `${arm.key}DdRel` : `${arm.key}Dd`}
+                          name={
+                            equityMode === "rel"
+                              ? `${arm.label} drawdown gap`
+                              : `${arm.label} drawdown`
+                          }
                           stroke={arm.color}
                           strokeDasharray={arm.dash}
                           fill={arm.color}
