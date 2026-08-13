@@ -502,4 +502,7 @@ export type MacroHistoryStudy = {
   episodes: MacroEpisode[];
   news_window_days: number;
   news_events: number;
+  /** Curated global-events reel measured against the index (may be absent on old rows). */
+  global_events?: import("./global-event-study").GlobalEventStudy | null;
 };
+
