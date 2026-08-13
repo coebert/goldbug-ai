@@ -862,6 +862,40 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
 
   const regime = arm("Regime-aware nudge", reg, regCurve, regRets);
 
+  const bmTail = tailRisk(bmRets);
+  const benchmark: ArmResult = {
+    label: BENCHMARK_LABEL,
+    curve: bmCurve,
+    finalEquity: Number(bmEquity.toFixed(2)),
+    totalReturnPct: Number(((bmEquity / startEquity - 1) * 100).toFixed(3)),
+    maxDrawdownPct: drawdownPct(bmCurve.map((c) => c.equity)),
+    sharpe: sharpeOf(bmRets),
+    totalCost: Number(bmCost.toFixed(2)),
+    trades: bmCharged ? prepared.length : 0,
+    avgPositions: prepared.length,
+    avgGross: 1,
+    var95Pct: bmTail.var95Pct,
+    cvar95Pct: bmTail.cvar95Pct,
+    volAnnPct: bmTail.volAnnPct,
+    episodes: [],
+    events: bmCurve.length
+      ? [{ date: bmCurve[0]!.date, buys: symbols.slice().sort(), sells: [] }]
+      : [],
+  };
+  const benchmarkComparisons: PolicyBenchmarkComparison[] = [
+    benchmarkCompare(baseline, benchmark),
+    benchmarkCompare(nudged, benchmark),
+    benchmarkCompare(regime, benchmark),
+  ];
+  const bestVsBm = benchmarkComparisons.reduce((a, b) =>
+    b.returnDeltaPct > a.returnDeltaPct ? b : a,
+  );
+  const benchmarkSummary =
+    bmCurve.length === 0
+      ? "No market baseline available for this tape."
+      : `Market baseline (equal-weight buy & hold of the same ${symbols.length} names) returned ${benchmark.totalReturnPct.toFixed(2)}% with ${benchmark.maxDrawdownPct.toFixed(2)}% max drawdown. Best arm versus it: ${bestVsBm.label} ${bestVsBm.returnDeltaPct >= 0 ? "+" : ""}${bestVsBm.returnDeltaPct.toFixed(2)}pp (${bestVsBm.outcome}).`;
+
+
   // Paired moving-block bootstrap: resample the SAME day indices in both arms so
   // the interval measures the nudge, not the market.
   const iterations = Math.max(200, Math.min(4000, input.iterations ?? 1000));
