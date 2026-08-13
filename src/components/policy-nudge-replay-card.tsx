@@ -34,6 +34,7 @@ import { ArmMetricsPanel } from "@/components/backtest/arm-metrics-panel";
 import { runPolicyNudgeReplayFn } from "@/lib/backtest/policy-nudge-replay.functions";
 import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
 import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
+import { TradeEpisodeList } from "@/components/charts/trade-episode-list";
 import { spanBand, type EpisodeBand } from "@/lib/trade-episodes";
 import type { TradeMarkerCell } from "@/lib/chart-trade-markers";
 
@@ -110,6 +111,8 @@ export function PolicyNudgeReplayCard({
   // Which arm's entries/exits and holding periods to annotate. Only one at a
   // time: three overlaid sets of markers is unreadable.
   const [markerArm, setMarkerArm] = useState<ArmKey | "none">("regime");
+  // Trade row spotlighted on the equity and drawdown charts.
+  const [selectedEpisode, setSelectedEpisode] = useState<string | null>(null);
   const [visibleArms, setVisibleArms] = useState<Record<ArmKey, boolean>>({
     baseline: true,
     nudged: true,
@@ -480,7 +483,10 @@ export function PolicyNudgeReplayCard({
                       margin={{ top: 4, right: 8, left: 0, bottom: 18 }}
                     >
                       <CartesianGrid {...GRID_PROPS} />
-                      {renderEpisodeBands(holdBands, { labels: holdBands.length <= 12 })}
+                      {renderEpisodeBands(holdBands, {
+                        labels: holdBands.length <= 12,
+                        selectedKey: selectedEpisode,
+                      })}
                       <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
                       <YAxis
                         {...AXIS_PROPS}
@@ -589,7 +595,7 @@ export function PolicyNudgeReplayCard({
                       margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid {...GRID_PROPS} />
-                      {renderEpisodeBands(holdBands, { labels: false })}
+                      {renderEpisodeBands(holdBands, { labels: false, selectedKey: selectedEpisode })}
                       <XAxis dataKey="date" {...AXIS_PROPS} minTickGap={40} />
                       <YAxis
                         {...AXIS_PROPS}
@@ -672,6 +678,16 @@ export function PolicyNudgeReplayCard({
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
+
+                {/* Every position the annotated arm held, clickable to spotlight. */}
+                {markerArm !== "none" && holdBands.length > 0 ? (
+                  <TradeEpisodeList
+                    bands={holdBands}
+                    selectedKey={selectedEpisode}
+                    onSelect={setSelectedEpisode}
+                    money={(v) => `£${v.toFixed(2)}`}
+                  />
+                ) : null}
 
                 {/* Cumulative edge: above zero means the nudge is ahead. */}
                 <div className="h-28 w-full">
