@@ -33,9 +33,6 @@ export type PolicyRegimeTimeline = {
   missing: number;
 };
 
-const POSTURES: RegimePosture[] = ["risk_on", "neutral", "risk_off"];
-const VOLS: VolRegime[] = ["calm", "normal", "elevated", "stressed"];
-
 export const getPolicyRegimeTimeline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -48,6 +45,8 @@ export const getPolicyRegimeTimeline = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<PolicyRegimeTimeline> => {
     const { supabase, userId } = context;
+    const POSTURES: RegimePosture[] = ["risk_on", "neutral", "risk_off"];
+    const VOLS: VolRegime[] = ["calm", "normal", "elevated", "stressed"];
 
     const p = await supabase
       .from("portfolios")
