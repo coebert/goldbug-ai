@@ -73,7 +73,13 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
       orders?: Array<Record<string, unknown>>;
       executed?: Array<Record<string, unknown>>;
       signals?: Array<Record<string, unknown>>;
+      policy_regime?: { posture?: string; vol?: string; scale?: number; reason?: string } | null;
     };
+    // The engine scales the policy nudge by the market regime it detected on
+    // the run; replay that same multiplier so the panel's arithmetic matches.
+    const policyRegime = raw.policy_regime ?? null;
+    const regimeScale =
+      policyRegime && Number.isFinite(Number(policyRegime.scale)) ? Number(policyRegime.scale) : 1;
     // `orders` is what the engine proposed; `executed` is what actually happened
     // (and is the only place a rejection reason is recorded). Overlay them so the
     // panel explains the real outcome, not the intent.
@@ -117,7 +123,7 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
     const explained: PolicyOrderExplain[] = orders.map((o) => {
       const symbol = String(o.symbol ?? "").toUpperCase();
       const side = String(o.side ?? "");
-      const explain = explainPolicyNudge(symbol, rows, asOf);
+      const explain = explainPolicyNudge(symbol, rows, asOf, { regimeScale });
       return {
         symbol,
         side,
