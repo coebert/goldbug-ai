@@ -64,7 +64,76 @@ export function ArmMetricsPanel({ arms, className }: { arms: Arm[]; className?: 
       score: (i: number) => metrics[i]!.m.winRatePct,
       higherIsBetter: true,
     },
-  ];
+    {
+      key: "pf",
+      label: "Profit factor",
+      hint: "Gross profit divided by gross loss on closed positions. Above 1 means winners outweigh losers.",
+      value: (i: number) => {
+        const v = metrics[i]!.m.profitFactor;
+        return v == null || !Number.isFinite(v) ? "—" : v.toFixed(2);
+      },
+      score: (i: number) => metrics[i]!.m.profitFactor,
+      higherIsBetter: true,
+    },
+    {
+      key: "expectancy",
+      label: "Expectancy / trade",
+      hint: "Average equity contribution per closed position.",
+      value: (i: number) => fmtPct(metrics[i]!.m.expectancyPct),
+      score: (i: number) => metrics[i]!.m.expectancyPct,
+      higherIsBetter: true,
+    },
+    {
+      key: "hold",
+      label: "Avg holding time",
+      hint: "Mean calendar days held per closed position, with the median in brackets.",
+      value: (i: number) => {
+        const m = metrics[i]!.m;
+        if (m.avgHoldDays == null) return "—";
+        const med = m.medianHoldDays == null ? "" : ` (med ${fmtDays(m.medianHoldDays)})`;
+        return `${fmtDays(m.avgHoldDays)}${med}`;
+      },
+      score: (i: number) => metrics[i]!.m.avgHoldDays,
+      higherIsBetter: null,
+    },
+    {
+      key: "maxhold",
+      label: "Longest hold",
+      hint: "Calendar days of the single longest closed position.",
+      value: (i: number) => {
+        const v = metrics[i]!.m.maxHoldDays;
+        return v == null ? "—" : fmtDays(v);
+      },
+      score: (i: number) => metrics[i]!.m.maxHoldDays,
+      higherIsBetter: null,
+    },
+    {
+      key: "streak",
+      label: "Max consecutive losses",
+      hint: "Longest run of losing exits in a row — the psychological worst case.",
+      value: (i: number) => {
+        const m = metrics[i]!.m;
+        if (m.maxConsecutiveLosses == null) return "—";
+        const wins = m.maxConsecutiveWins == null ? "" : ` (best run ${m.maxConsecutiveWins})`;
+        return `${m.maxConsecutiveLosses}${wins}`;
+      },
+      score: (i: number) => metrics[i]!.m.maxConsecutiveLosses,
+      higherIsBetter: false,
+    },
+    {
+      key: "trades",
+      label: "Positions",
+      hint: "Closed positions, plus any still open at the end of the tape.",
+      value: (i: number) => {
+        const m = metrics[i]!.m;
+        if (!m.closedTrades && !m.openTrades) return "—";
+        return `${m.closedTrades} closed${m.openTrades ? ` · ${m.openTrades} open` : ""}`;
+      },
+      score: () => null,
+      higherIsBetter: null,
+    },
+  ] satisfies MetricRow[];
+
 
   return (
     <div className={className}>
