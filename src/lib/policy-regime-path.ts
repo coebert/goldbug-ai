@@ -67,6 +67,8 @@ export type RegimeScaleDiagnostic = {
 };
 
 const isFiniteNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+void isFiniteNum;
+
 
 /**
  * Coerce a JSONB value to a string without ever throwing. `String(x)` blows up
