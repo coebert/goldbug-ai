@@ -207,6 +207,10 @@ const DOVISH = [
   "soft landing",
 ];
 
+/** Phrases that negate an otherwise dovish-sounding cut reference. */
+const NEGATED_EASING =
+  /\b(premature|too early|not? (yet )?time to cut|rule[sd]? out|no rush|pushed back on|resist(ed|s)? (calls for )?(a )?cut)\b/i;
+
 export type PolicyStance = "hawkish" | "dovish" | "neutral";
 
 /**
@@ -220,6 +224,12 @@ export function scorePolicyTone(text: string | null | undefined): number {
   let dove = 0;
   for (const p of HAWKISH) if (lower.includes(p)) hawk += 1;
   for (const p of DOVISH) if (lower.includes(p)) dove += 1;
+  // Negated easing ("cuts are premature", "ruled out a rate cut") reads as
+  // dovish to a naive keyword count, so flip those credits to the hawkish side.
+  if (NEGATED_EASING.test(lower) && dove > 0) {
+    hawk += dove;
+    dove = 0;
+  }
   if (hawk === 0 && dove === 0) return 0;
   const raw = (dove - hawk) / (dove + hawk);
   return Number(Math.max(-1, Math.min(1, raw)).toFixed(3));
