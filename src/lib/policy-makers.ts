@@ -651,6 +651,10 @@ export function explainPolicyNudge(
   };
 }
 
+function makersOf(x: PolicyNudgeExplain): string {
+  return Array.from(new Set(x.contributions.map((c) => c.maker_name))).join(", ");
+}
+
 /** Plain-English one-liner describing what the nudge did to a decision. */
 export function describePolicyNudge(x: PolicyNudgeExplain, side?: string | null): string {
   if (x.statements === 0) return "No tracked policy remarks touched this symbol, so policy changed nothing.";
@@ -670,5 +674,5 @@ export function describePolicyNudge(x: PolicyNudgeExplain, side?: string | null)
             ? " — it argued against this sell"
             : ""
         : "";
-  return `${x.statements} ${x.stance} remark${x.statements === 1 ? "" : "s"} (${x.makersLine()}) ${dir} the news score by ${pts} of the ±${(x.max_nudge * 100).toFixed(0)}pt cap${agree}.`;
+  return `${x.statements} ${x.stance} remark${x.statements === 1 ? "" : "s"} (${makersOf(x)}) ${dir} the news score by ${pts} of the ±${(x.max_nudge * 100).toFixed(0)}pt cap${agree}.`;
 }
