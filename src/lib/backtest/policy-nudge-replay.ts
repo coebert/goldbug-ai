@@ -153,7 +153,46 @@ export type PolicyRegimeAttribution = {
   volDays: Record<VolRegime, number>;
 };
 
+/** Label of the passive market baseline arm. */
+export const BENCHMARK_LABEL = "Market baseline (equal-weight buy & hold)";
+
+export type BenchmarkOutcome = "beats" | "lags" | "matches";
+
+/** One strategy arm measured against the passive market baseline. */
+export type PolicyBenchmarkComparison = {
+  label: string;
+  /** Positive = the arm returned more than the baseline. Percentage points. */
+  returnDeltaPct: number;
+  /** Positive = the arm drew down LESS than the baseline. Percentage points. */
+  drawdownDeltaPct: number;
+  sharpeDelta: number;
+  outcome: BenchmarkOutcome;
+};
+
+/** Return delta (pp) inside which an arm is called a tie with the baseline. */
+export const BENCHMARK_TIE_PCT = 1;
+
+export function benchmarkCompare(
+  armResult: ArmResult,
+  bm: ArmResult,
+): PolicyBenchmarkComparison {
+  const returnDeltaPct = Number((armResult.totalReturnPct - bm.totalReturnPct).toFixed(3));
+  return {
+    label: armResult.label,
+    returnDeltaPct,
+    drawdownDeltaPct: Number((armResult.maxDrawdownPct - bm.maxDrawdownPct).toFixed(3)),
+    sharpeDelta: Number((armResult.sharpe - bm.sharpe).toFixed(3)),
+    outcome:
+      Math.abs(returnDeltaPct) <= BENCHMARK_TIE_PCT
+        ? "matches"
+        : returnDeltaPct > 0
+          ? "beats"
+          : "lags",
+  };
+}
+
 export type PolicyNudgeReplayResult = {
+
   from: string;
   to: string;
   symbols: string[];
@@ -164,6 +203,12 @@ export type PolicyNudgeReplayResult = {
   nudged: ArmResult;
   /** Third arm: same raw nudge, scaled by the detected market regime. */
   regime: ArmResult;
+  /** Passive market baseline over the same bars, same cost model. */
+  benchmark: ArmResult;
+  /** Each strategy arm measured against that baseline. */
+  benchmarkComparisons: PolicyBenchmarkComparison[];
+  benchmarkSummary: string;
+
   delta: PolicyArmDelta;
   confidence: PolicyConfidenceBand;
   /** Regime arm measured against the policy-deaf baseline. */
@@ -522,6 +567,9 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       baseline: emptyArm("Baseline (policy muted)"),
       nudged: emptyArm("With policy nudge"),
       regime: emptyArm("Regime-aware nudge"),
+      benchmark: emptyArm(BENCHMARK_LABEL),
+      benchmarkComparisons: [],
+      benchmarkSummary: "No market baseline available for this tape.",
       delta: EMPTY_DELTA,
       confidence: EMPTY_BAND,
       regimeVsBaseline: { delta: EMPTY_DELTA, confidence: EMPTY_BAND },
@@ -583,6 +631,16 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
   const baseRets: number[] = [];
   const nudRets: number[] = [];
   const regRets: number[] = [];
+
+  // Market baseline: equal-weight buy-and-hold of the same universe over the
+  // same bars. One entry ticket of friction, then never trades again — the
+  // honest "did the strategy beat just owning the market?" hurdle.
+  const bmCurve: ArmDay[] = [];
+  const bmRets: number[] = [];
+  let bmEquity = startEquity;
+  let bmCost = 0;
+  let bmCharged = false;
+
 
   // Regime timeline, derived from an equal-weight index of the replay universe:
   // realised vol, drawdown from the trailing 1y high and 30d momentum. No VIX
@@ -790,6 +848,34 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     baseRets.push(beforeBase > 0 ? base.equity / beforeBase - 1 : 0);
     nudRets.push(beforeNud > 0 ? nud.equity / beforeNud - 1 : 0);
     regRets.push(beforeReg > 0 ? reg.equity / beforeReg - 1 : 0);
+
+    // Equal-weight market baseline for the same bar.
+    let bmSum = 0;
+    let bmN = 0;
+    for (const p of prepared) {
+      const r = dayReturn(p.symbol);
+      if (r != null) {
+        bmSum += r;
+        bmN += 1;
+      }
+    }
+    const beforeBm = bmEquity;
+    let bmDayCost = 0;
+    if (!bmCharged && bmN > 0) {
+      bmDayCost = bmEquity * (params.costBps / 10_000);
+      bmEquity -= bmDayCost;
+      bmCost += bmDayCost;
+      bmCharged = true;
+    }
+    if (bmN > 0) bmEquity *= 1 + bmSum / bmN;
+    bmCurve.push({
+      date: next,
+      equity: Number(bmEquity.toFixed(2)),
+      cost: Number(bmDayCost.toFixed(4)),
+      positions: bmN,
+    });
+    bmRets.push(beforeBm > 0 ? bmEquity / beforeBm - 1 : 0);
+
   }
 
   const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => {
@@ -823,6 +909,40 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
   const nudged = arm("With policy nudge", nud, nudCurve, nudRets);
 
   const regime = arm("Regime-aware nudge", reg, regCurve, regRets);
+
+  const bmTail = tailRisk(bmRets);
+  const benchmark: ArmResult = {
+    label: BENCHMARK_LABEL,
+    curve: bmCurve,
+    finalEquity: Number(bmEquity.toFixed(2)),
+    totalReturnPct: Number(((bmEquity / startEquity - 1) * 100).toFixed(3)),
+    maxDrawdownPct: drawdownPct(bmCurve.map((c) => c.equity)),
+    sharpe: sharpeOf(bmRets),
+    totalCost: Number(bmCost.toFixed(2)),
+    trades: bmCharged ? prepared.length : 0,
+    avgPositions: prepared.length,
+    avgGross: 1,
+    var95Pct: bmTail.var95Pct,
+    cvar95Pct: bmTail.cvar95Pct,
+    volAnnPct: bmTail.volAnnPct,
+    episodes: [],
+    events: bmCurve.length
+      ? [{ date: bmCurve[0]!.date, buys: symbols.slice().sort(), sells: [] }]
+      : [],
+  };
+  const benchmarkComparisons: PolicyBenchmarkComparison[] = [
+    benchmarkCompare(baseline, benchmark),
+    benchmarkCompare(nudged, benchmark),
+    benchmarkCompare(regime, benchmark),
+  ];
+  const bestVsBm = benchmarkComparisons.reduce((a, b) =>
+    b.returnDeltaPct > a.returnDeltaPct ? b : a,
+  );
+  const benchmarkSummary =
+    bmCurve.length === 0
+      ? "No market baseline available for this tape."
+      : `Market baseline (equal-weight buy & hold of the same ${symbols.length} names) returned ${benchmark.totalReturnPct.toFixed(2)}% with ${benchmark.maxDrawdownPct.toFixed(2)}% max drawdown. Best arm versus it: ${bestVsBm.label} ${bestVsBm.returnDeltaPct >= 0 ? "+" : ""}${bestVsBm.returnDeltaPct.toFixed(2)}pp (${bestVsBm.outcome}).`;
+
 
   // Paired moving-block bootstrap: resample the SAME day indices in both arms so
   // the interval measures the nudge, not the market.
@@ -932,6 +1052,9 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     baseline,
     nudged,
     regime,
+    benchmark,
+    benchmarkComparisons,
+    benchmarkSummary,
     delta,
     confidence: {
       iterations: retSamples.length ? iterations : 0,
