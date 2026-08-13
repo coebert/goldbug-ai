@@ -648,7 +648,7 @@ export function explainPolicyNudge(
       : Number(
           Math.max(
             -POLICY_MAX_NUDGE,
-            Math.min(POLICY_MAX_NUDGE, score * confidence * POLICY_MAX_NUDGE),
+            Math.min(POLICY_MAX_NUDGE, score * confidence * POLICY_MAX_NUDGE * regimeScale),
           ).toFixed(4),
         );
 
@@ -661,6 +661,7 @@ export function explainPolicyNudge(
     nudge,
     max_nudge: POLICY_MAX_NUDGE,
     half_life_hours: halfLifeHours,
+    regime_scale: Number(regimeScale.toFixed(3)),
     contributions,
   };
 }
