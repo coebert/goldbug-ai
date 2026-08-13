@@ -20,6 +20,13 @@ import {
   type PolicyRow,
   type PolicySignal,
 } from "@/lib/policy-makers";
+import {
+  detectPolicyRegime,
+  policyNudgeScaleForSign,
+  type RegimeRead,
+  type RegimePosture,
+  type VolRegime,
+} from "@/lib/policy-regime-scaling";
 import { trendScore, type ArmDay, type ArmResult, type Candlelike } from "./insider-nudge-replay";
 import {
   riskSizingFor,
@@ -84,6 +91,54 @@ export type PolicyAttribution = {
 
 export type PolicyReplayVerdict = "helps" | "neutral" | "hurts";
 
+/** How the regime-scaled arm compares with the fixed-strength nudge. */
+export type PolicyRegimeVerdict =
+  | "better_than_fixed"
+  | "worse_than_fixed"
+  | "safer_not_richer"
+  | "inconclusive"
+  | "inactive";
+
+export type PolicyArmDelta = {
+  returnPct: number;
+  /** Positive = the first arm drew down LESS (drawdowns are negative %). */
+  maxDrawdownPct: number;
+  sharpe: number;
+  costPct: number;
+  trades: number;
+  var95Pct: number;
+  cvar95Pct: number;
+  volAnnPct: number;
+};
+
+export type PolicyConfidenceBand = {
+  iterations: number;
+  blockDays: number;
+  /** 95% interval on the return delta, percentage points. */
+  returnDeltaLo: number;
+  returnDeltaHi: number;
+  /** 95% interval on the max-drawdown delta, percentage points. */
+  drawdownDeltaLo: number;
+  drawdownDeltaHi: number;
+  probPositive: number;
+  /** Probability the tested arm's drawdown is no worse than the reference. */
+  probDrawdownBetter: number;
+};
+
+/** What regime scaling actually did to the nudge across the replay. */
+export type PolicyRegimeAttribution = {
+  /** Symbol-days where a non-zero nudge was scaled. */
+  scaledDays: number;
+  avgScale: number;
+  minScale: number;
+  maxScale: number;
+  /** Symbol-days the regime amplified (>1.02x) or damped (<0.98x) the nudge. */
+  amplifiedDays: number;
+  dampenedDays: number;
+  postureDays: Record<RegimePosture, number>;
+  volDays: Record<VolRegime, number>;
+};
+
 export type PolicyNudgeReplayResult = {
   from: string;
   to: string;
@@ -93,30 +148,16 @@ export type PolicyNudgeReplayResult = {
   maxNudge: number;
   baseline: ArmResult;
   nudged: ArmResult;
-  delta: {
-    returnPct: number;
-    /** Positive = the nudge arm drew down more (drawdowns are negative %). */
-    maxDrawdownPct: number;
-    sharpe: number;
-    costPct: number;
-    trades: number;
-    var95Pct: number;
-    cvar95Pct: number;
-    volAnnPct: number;
-  };
-  confidence: {
-    iterations: number;
-    blockDays: number;
-    /** 95% interval on the return delta, percentage points. */
-    returnDeltaLo: number;
-    returnDeltaHi: number;
-    /** 95% interval on the max-drawdown delta, percentage points. */
-    drawdownDeltaLo: number;
-    drawdownDeltaHi: number;
-    probPositive: number;
-    /** Probability the nudge arm's drawdown is no worse than baseline. */
-    probDrawdownBetter: number;
-  };
+  /** Third arm: same raw nudge, scaled by the detected market regime. */
+  regime: ArmResult;
+  delta: PolicyArmDelta;
+  confidence: PolicyConfidenceBand;
+  /** Regime arm measured against the policy-deaf baseline. */
+  regimeVsBaseline: { delta: PolicyArmDelta; confidence: PolicyConfidenceBand };
+  /** The headline comparison: regime-aware scaling vs the fixed-strength nudge. */
+  regimeVsFixed: { delta: PolicyArmDelta; confidence: PolicyConfidenceBand };
+  regimeAttribution: PolicyRegimeAttribution;
+  regimeVerdict: PolicyRegimeVerdict;
   attribution: PolicyAttribution;
   sizing: RiskSizing;
   verdict: PolicyReplayVerdict;
@@ -180,6 +221,185 @@ function ddOfReturns(rets: readonly number[]): number {
     worst = Math.min(worst, eq / peak - 1);
   }
   return worst * 100;
+}
+
+export const EMPTY_DELTA: PolicyArmDelta = {
+  returnPct: 0,
+  maxDrawdownPct: 0,
+  sharpe: 0,
+  costPct: 0,
+  trades: 0,
+  var95Pct: 0,
+  cvar95Pct: 0,
+  volAnnPct: 0,
+};
+
+export const EMPTY_BAND: PolicyConfidenceBand = {
+  iterations: 0,
+  blockDays: 0,
+  returnDeltaLo: 0,
+  returnDeltaHi: 0,
+  drawdownDeltaLo: 0,
+  drawdownDeltaHi: 0,
+  probPositive: 0,
+  probDrawdownBetter: 0,
+};
+
+function emptyRegimeAttribution(): PolicyRegimeAttribution {
+  return {
+    scaledDays: 0,
+    avgScale: 1,
+    minScale: 1,
+    maxScale: 1,
+    amplifiedDays: 0,
+    dampenedDays: 0,
+    postureDays: { risk_on: 0, neutral: 0, risk_off: 0 },
+    volDays: { calm: 0, normal: 0, elevated: 0, stressed: 0 },
+  };
+}
+
+/** Point deltas of `a` measured against reference `b`. */
+function deltaOf(a: ArmResult, b: ArmResult, startEquity: number): PolicyArmDelta {
+  return {
+    returnPct: Number((a.totalReturnPct - b.totalReturnPct).toFixed(3)),
+    maxDrawdownPct: Number((a.maxDrawdownPct - b.maxDrawdownPct).toFixed(3)),
+    sharpe: Number((a.sharpe - b.sharpe).toFixed(2)),
+    costPct: Number((((a.totalCost - b.totalCost) / startEquity) * 100).toFixed(3)),
+    trades: a.trades - b.trades,
+    var95Pct: Number((a.var95Pct - b.var95Pct).toFixed(3)),
+    cvar95Pct: Number((a.cvar95Pct - b.cvar95Pct).toFixed(3)),
+    volAnnPct: Number((a.volAnnPct - b.volAnnPct).toFixed(3)),
+  };
+}
+
+/**
+ * Paired moving-block bootstrap on two daily return series: resample the SAME
+ * day indices in both arms so the interval measures the strategy difference,
+ * not the market. Returns the band plus the raw return samples.
+ */
+function pairedBootstrap(
+  refRets: readonly number[],
+  testRets: readonly number[],
+  iterations: number,
+  blockDays: number,
+  seed: number,
+): { band: PolicyConfidenceBand; retSamples: number[] } {
+  const n = Math.min(refRets.length, testRets.length);
+  const retSamples: number[] = [];
+  const ddSamples: number[] = [];
+  if (n >= 30) {
+    const rng = makeRng(seed);
+    const blocks = Math.ceil(n / blockDays);
+    for (let it = 0; it < iterations; it++) {
+      let rAcc = 1;
+      let tAcc = 1;
+      const rPath: number[] = [];
+      const tPath: number[] = [];
+      for (let b = 0; b < blocks; b++) {
+        const start = Math.floor(rng() * Math.max(1, n - blockDays));
+        for (let k = 0; k < blockDays; k++) {
+          const idx = start + k;
+          if (idx >= n) break;
+          const rr = refRets[idx] as number;
+          const tr = testRets[idx] as number;
+          rAcc *= 1 + rr;
+          tAcc *= 1 + tr;
+          rPath.push(rr);
+          tPath.push(tr);
+        }
+      }
+      retSamples.push((tAcc - rAcc) * 100);
+      ddSamples.push(ddOfReturns(tPath) - ddOfReturns(rPath));
+    }
+  }
+  const sortedRet = [...retSamples].sort((a, b) => a - b);
+  const sortedDd = [...ddSamples].sort((a, b) => a - b);
+  return {
+    retSamples,
+    band: {
+      iterations: retSamples.length ? iterations : 0,
+      blockDays,
+      returnDeltaLo: Number(quantile(sortedRet, 0.025).toFixed(3)),
+      returnDeltaHi: Number(quantile(sortedRet, 0.975).toFixed(3)),
+      drawdownDeltaLo: Number(quantile(sortedDd, 0.025).toFixed(3)),
+      drawdownDeltaHi: Number(quantile(sortedDd, 0.975).toFixed(3)),
+      probPositive: retSamples.length
+        ? Number((retSamples.filter((s) => s > 0).length / retSamples.length).toFixed(3))
+        : 0,
+      // Drawdowns are negative numbers; "better" means less negative or equal.
+      probDrawdownBetter: ddSamples.length
+        ? Number((ddSamples.filter((s) => s >= 0).length / ddSamples.length).toFixed(3))
+        : 0,
+    },
+  };
+}
+
+export const NEUTRAL_REGIME: RegimeRead = {
+  posture: "neutral",
+  vol: "normal",
+  scale: 1,
+  confidence: 0,
+  reason: "insufficient tape for a regime read",
+};
+
+/**
+ * Build a per-bar regime read from an equal-weight index of the replay
+ * universe. Only bars at or before `date` feed the read — no look-ahead.
+ */
+function buildRegimeTimeline(
+  prepared: ReadonlyArray<{ symbol: string; closes: number[]; index: Map<string, number> }>,
+  allDates: readonly string[],
+): Map<string, RegimeRead> {
+  const out = new Map<string, RegimeRead>();
+  // Equal-weight index level: mean of each symbol's close rebased to its first.
+  const level: number[] = [];
+  for (const date of allDates) {
+    let sum = 0;
+    let count = 0;
+    for (const p of prepared) {
+      const i = p.index.get(date);
+      if (i == null) continue;
+      const first = p.closes[0];
+      const c = p.closes[i];
+      if (!first || !c || first <= 0) continue;
+      sum += c / first;
+      count += 1;
+    }
+    level.push(count > 0 ? sum / count : (level[level.length - 1] ?? 1));
+  }
+
+  for (let i = 0; i < allDates.length; i++) {
+    const date = allDates[i] as string;
+    if (i < 30) {
+      out.set(date, NEUTRAL_REGIME);
+      continue;
+    }
+    const rets: number[] = [];
+    for (let k = Math.max(1, i - 19); k <= i; k++) {
+      const a = level[k - 1] as number;
+      const b = level[k] as number;
+      if (a > 0) rets.push(b / a - 1);
+    }
+    const mean = rets.reduce((a, b) => a + b, 0) / Math.max(1, rets.length);
+    const variance =
+      rets.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, rets.length - 1);
+    const realisedVol20d = rets.length > 2 ? Math.sqrt(variance) : null;
+
+    const lookback = Math.max(0, i - 251);
+    let high = 0;
+    for (let k = lookback; k <= i; k++) high = Math.max(high, level[k] as number);
+    const cur = level[i] as number;
+    const drawdownPctIdx = high > 0 ? cur / high - 1 : null;
+
+    const prev30 = level[Math.max(0, i - 30)] as number;
+    const index30dReturn = prev30 > 0 ? cur / prev30 - 1 : null;
+
+    out.set(
+      date,
+      detectPolicyRegime({ realisedVol20d, drawdownPct: drawdownPctIdx, index30dReturn }),
+    );
+  }
+  return out;
 }
 
 const DAY = 86_400_000;
@@ -287,26 +507,13 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       maxNudge: POLICY_MAX_NUDGE,
       baseline: emptyArm("Baseline (policy muted)"),
       nudged: emptyArm("With policy nudge"),
-      delta: {
-        returnPct: 0,
-        maxDrawdownPct: 0,
-        sharpe: 0,
-        costPct: 0,
-        trades: 0,
-        var95Pct: 0,
-        cvar95Pct: 0,
-        volAnnPct: 0,
-      },
-      confidence: {
-        iterations: 0,
-        blockDays: 0,
-        returnDeltaLo: 0,
-        returnDeltaHi: 0,
-        drawdownDeltaLo: 0,
-        drawdownDeltaHi: 0,
-        probPositive: 0,
-        probDrawdownBetter: 0,
-      },
+      regime: emptyArm("Regime-aware nudge"),
+      delta: EMPTY_DELTA,
+      confidence: EMPTY_BAND,
+      regimeVsBaseline: { delta: EMPTY_DELTA, confidence: EMPTY_BAND },
+      regimeVsFixed: { delta: EMPTY_DELTA, confidence: EMPTY_BAND },
+      regimeAttribution: emptyRegimeAttribution(),
+      regimeVerdict: "inactive",
       attribution,
       sizing,
       verdict: "neutral",
@@ -332,10 +539,29 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
   });
   const base = mk();
   const nud = mk();
+  const reg = mk();
   const baseCurve: ArmDay[] = [];
   const nudCurve: ArmDay[] = [];
+  const regCurve: ArmDay[] = [];
   const baseRets: number[] = [];
   const nudRets: number[] = [];
+  const regRets: number[] = [];
+
+  // Regime timeline, derived from an equal-weight index of the replay universe:
+  // realised vol, drawdown from the trailing 1y high and 30d momentum. No VIX
+  // on a pure tape, so `detectPolicyRegime` falls back to realised vol.
+  const regimeByDate = buildRegimeTimeline(prepared, allDates);
+  const regimeAttribution: PolicyRegimeAttribution = {
+    scaledDays: 0,
+    avgScale: 1,
+    minScale: Number.POSITIVE_INFINITY,
+    maxScale: Number.NEGATIVE_INFINITY,
+    amplifiedDays: 0,
+    dampenedDays: 0,
+    postureDays: { risk_on: 0, neutral: 0, risk_off: 0 },
+    volDays: { calm: 0, normal: 0, elevated: 0, stressed: 0 },
+  };
+  let scaleSum = 0;
 
   const touched = new Set<string>();
   const suppressedSyms = new Set<string>();
@@ -397,8 +623,15 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     let dayActive = false;
     let dayTone = 0;
 
+    const read = regimeByDate.get(date) ?? NEUTRAL_REGIME;
+    if (signals.length) {
+      regimeAttribution.postureDays[read.posture] += 1;
+      regimeAttribution.volDays[read.vol] += 1;
+    }
+
     const baseScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
     const nudScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
+    const regScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
 
     for (const p of prepared) {
       const i = p.index.get(date);
@@ -411,6 +644,19 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       const n = signals.length ? policySentimentNudge(p.symbol, signals) * params.nudgeScale : 0;
       const adj = Math.max(0, Math.min(1, s + n));
       nudScores.push({ symbol: p.symbol, score: adj, vol });
+
+      // Regime arm: identical raw nudge, scaled by the sign-aware regime read.
+      const scale = n === 0 ? 1 : policyNudgeScaleForSign(read, Math.sign(n));
+      const rn = n * scale;
+      regScores.push({ symbol: p.symbol, score: Math.max(0, Math.min(1, s + rn)), vol });
+      if (n !== 0) {
+        regimeAttribution.scaledDays += 1;
+        scaleSum += scale;
+        regimeAttribution.minScale = Math.min(regimeAttribution.minScale, scale);
+        regimeAttribution.maxScale = Math.max(regimeAttribution.maxScale, scale);
+        if (scale > 1.02) regimeAttribution.amplifiedDays += 1;
+        else if (scale < 0.98) regimeAttribution.dampenedDays += 1;
+      }
 
       if (n !== 0) {
         dayActive = true;
@@ -454,8 +700,10 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
 
     const beforeBase = base.equity;
     const beforeNud = nud.equity;
+    const beforeReg = reg.equity;
     const rb = applyDay(base, select(base, baseScores), dayReturn);
     const rn = applyDay(nud, select(nud, nudScores), dayReturn);
+    const rr = applyDay(reg, select(reg, regScores), dayReturn);
 
     baseCurve.push({
       date: next,
@@ -469,8 +717,15 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       cost: Number(rn.cost.toFixed(4)),
       positions: nud.weights.size,
     });
+    regCurve.push({
+      date: next,
+      equity: Number(reg.equity.toFixed(2)),
+      cost: Number(rr.cost.toFixed(4)),
+      positions: reg.weights.size,
+    });
     baseRets.push(beforeBase > 0 ? base.equity / beforeBase - 1 : 0);
     nudRets.push(beforeNud > 0 ? nud.equity / beforeNud - 1 : 0);
+    regRets.push(beforeReg > 0 ? reg.equity / beforeReg - 1 : 0);
   }
 
   const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => {
@@ -499,62 +754,62 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
   const baseline = arm("Baseline (policy muted)", base, baseCurve, baseRets);
   const nudged = arm("With policy nudge", nud, nudCurve, nudRets);
 
+  const regime = arm("Regime-aware nudge", reg, regCurve, regRets);
+
   // Paired moving-block bootstrap: resample the SAME day indices in both arms so
   // the interval measures the nudge, not the market.
-  const n = Math.min(baseRets.length, nudRets.length);
   const iterations = Math.max(200, Math.min(4000, input.iterations ?? 1000));
-  const blockDays = Math.max(1, Math.min(n || 1, Math.round(Math.cbrt(Math.max(n, 1))) + 4));
-  const rng = makeRng(input.seed ?? 20260813);
-  const retSamples: number[] = [];
-  const ddSamples: number[] = [];
-  if (n >= 30) {
-    const blocks = Math.ceil(n / blockDays);
-    for (let it = 0; it < iterations; it++) {
-      let bAcc = 1;
-      let nAcc = 1;
-      const bPath: number[] = [];
-      const nPath: number[] = [];
-      for (let b = 0; b < blocks; b++) {
-        const start = Math.floor(rng() * Math.max(1, n - blockDays));
-        for (let k = 0; k < blockDays; k++) {
-          const idx = start + k;
-          if (idx >= n) break;
-          const br = baseRets[idx] as number;
-          const nr = nudRets[idx] as number;
-          bAcc *= 1 + br;
-          nAcc *= 1 + nr;
-          bPath.push(br);
-          nPath.push(nr);
-        }
-      }
-      retSamples.push((nAcc - bAcc) * 100);
-      ddSamples.push(ddOfReturns(nPath) - ddOfReturns(bPath));
-    }
-  }
-  const sortedRet = [...retSamples].sort((a, b) => a - b);
-  const sortedDd = [...ddSamples].sort((a, b) => a - b);
-  const lo = Number(quantile(sortedRet, 0.025).toFixed(3));
-  const hi = Number(quantile(sortedRet, 0.975).toFixed(3));
-  const ddLo = Number(quantile(sortedDd, 0.025).toFixed(3));
-  const ddHi = Number(quantile(sortedDd, 0.975).toFixed(3));
-  const probPositive = retSamples.length
-    ? Number((retSamples.filter((s) => s > 0).length / retSamples.length).toFixed(3))
-    : 0;
-  // Drawdowns are negative numbers; "better" means less negative or equal.
-  const probDrawdownBetter = ddSamples.length
-    ? Number((ddSamples.filter((s) => s >= 0).length / ddSamples.length).toFixed(3))
-    : 0;
+  const seed = input.seed ?? 20260813;
+  const nBars = Math.min(baseRets.length, nudRets.length);
+  const blockDays = Math.max(
+    1,
+    Math.min(nBars || 1, Math.round(Math.cbrt(Math.max(nBars, 1))) + 4),
+  );
 
-  const delta = {
-    returnPct: Number((nudged.totalReturnPct - baseline.totalReturnPct).toFixed(3)),
-    maxDrawdownPct: Number((nudged.maxDrawdownPct - baseline.maxDrawdownPct).toFixed(3)),
-    sharpe: Number((nudged.sharpe - baseline.sharpe).toFixed(2)),
-    costPct: Number((((nudged.totalCost - baseline.totalCost) / startEquity) * 100).toFixed(3)),
-    trades: nudged.trades - baseline.trades,
-    var95Pct: Number((nudged.var95Pct - baseline.var95Pct).toFixed(3)),
-    cvar95Pct: Number((nudged.cvar95Pct - baseline.cvar95Pct).toFixed(3)),
-    volAnnPct: Number((nudged.volAnnPct - baseline.volAnnPct).toFixed(3)),
+  const fixedVsBase = pairedBootstrap(baseRets, nudRets, iterations, blockDays, seed);
+  const regVsBase = pairedBootstrap(baseRets, regRets, iterations, blockDays, seed + 1);
+  const regVsFixed = pairedBootstrap(nudRets, regRets, iterations, blockDays, seed + 2);
+
+  const retSamples = fixedVsBase.retSamples;
+  const lo = fixedVsBase.band.returnDeltaLo;
+  const hi = fixedVsBase.band.returnDeltaHi;
+  const ddLo = fixedVsBase.band.drawdownDeltaLo;
+  const ddHi = fixedVsBase.band.drawdownDeltaHi;
+  const probPositive = fixedVsBase.band.probPositive;
+  const probDrawdownBetter = fixedVsBase.band.probDrawdownBetter;
+
+  const delta = deltaOf(nudged, baseline, startEquity);
+  const regimeVsBaseline = {
+    delta: deltaOf(regime, baseline, startEquity),
+    confidence: regVsBase.band,
   };
+  const regimeVsFixed = {
+    delta: deltaOf(regime, nudged, startEquity),
+    confidence: regVsFixed.band,
+  };
+
+  const regDays = Math.max(1, regimeAttribution.scaledDays);
+  regimeAttribution.avgScale = Number((scaleSum / regDays).toFixed(3));
+  if (regimeAttribution.scaledDays === 0) {
+    regimeAttribution.minScale = 1;
+    regimeAttribution.maxScale = 1;
+  }
+
+  const regSignificant =
+    regVsFixed.retSamples.length > 0 &&
+    (regimeVsFixed.confidence.returnDeltaLo > 0 || regimeVsFixed.confidence.returnDeltaHi < 0);
+  const regimeVerdict: PolicyRegimeVerdict =
+    regimeAttribution.scaledDays === 0
+      ? "inactive"
+      : regSignificant && regimeVsFixed.delta.returnPct > 0
+        ? "better_than_fixed"
+        : regSignificant && regimeVsFixed.delta.returnPct < 0
+          ? "worse_than_fixed"
+          : regimeVsFixed.delta.maxDrawdownPct > 0.5 &&
+              regimeVsFixed.confidence.probDrawdownBetter >= 0.7
+            ? "safer_not_richer"
+            : "inconclusive";
+
 
   const mean = (xs: number[]) =>
     xs.length ? Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(3)) : null;
@@ -590,6 +845,15 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
 
   const detail = ` Policy signal was live on ${coveragePct}% of bars (${attribution.activeDays}/${allDates.length - 1}), touching ${attribution.touchedSymbols} symbol${attribution.touchedSymbols === 1 ? "" : "s"}. Drawdown ${baseline.maxDrawdownPct.toFixed(2)}% baseline vs ${nudged.maxDrawdownPct.toFixed(2)}% nudged (95% CI on the difference ${ddLo}..${ddHi}pp); 95% 1-day CVaR ${baseline.cvar95Pct.toFixed(2)}% vs ${nudged.cvar95Pct.toFixed(2)}%.`;
 
+  const regimeSummary =
+    regimeAttribution.scaledDays === 0
+      ? "Regime scaling never engaged on this tape — the regime arm is identical to the fixed-nudge arm."
+      : `Regime-aware scaling (×${regimeAttribution.avgScale.toFixed(2)} average, ${regimeAttribution.minScale.toFixed(2)}..${regimeAttribution.maxScale.toFixed(2)}) ${
+          regimeVsFixed.delta.returnPct >= 0 ? "added" : "cost"
+        } ${Math.abs(regimeVsFixed.delta.returnPct).toFixed(2)}pp versus the fixed nudge (95% CI ${regimeVsFixed.confidence.returnDeltaLo}..${regimeVsFixed.confidence.returnDeltaHi}pp, P(better) ${(regimeVsFixed.confidence.probPositive * 100).toFixed(0)}%), with drawdown ${
+          regimeVsFixed.delta.maxDrawdownPct >= 0 ? "shallower" : "deeper"
+        } by ${Math.abs(regimeVsFixed.delta.maxDrawdownPct).toFixed(2)}pp (95% CI ${regimeVsFixed.confidence.drawdownDeltaLo}..${regimeVsFixed.confidence.drawdownDeltaHi}pp). Verdict: ${regimeVerdict.replace("_", " ")}.`;
+
   return {
     from: allDates[0] as string,
     to: allDates[allDates.length - 1] as string,
@@ -599,6 +863,7 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     maxNudge: POLICY_MAX_NUDGE,
     baseline,
     nudged,
+    regime,
     delta,
     confidence: {
       iterations: retSamples.length ? iterations : 0,
@@ -610,9 +875,13 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       probPositive,
       probDrawdownBetter,
     },
+    regimeVsBaseline,
+    regimeVsFixed,
+    regimeAttribution,
+    regimeVerdict,
     attribution,
     sizing,
     verdict,
-    summary: summary + detail,
+    summary: `${summary}${detail} ${regimeSummary}`,
   };
 }
