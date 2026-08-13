@@ -142,6 +142,9 @@ export function EquityCompositionCard({
     return ["cash", ...symbols];
   }, [q.data]);
 
+  const colors = useMemo(() => buildColorMap(keys), [keys]);
+  const colorFor = (key: string) => colors[key] ?? OTHER_COLOR;
+
   const rows = q.data?.rows ?? [];
   const latest = (rows[rows.length - 1] ?? {}) as Record<string, unknown>;
 
