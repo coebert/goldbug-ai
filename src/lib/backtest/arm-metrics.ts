@@ -20,7 +20,24 @@ export type ArmHeadlineMetrics = {
   avgLossPct: number | null;
   /** Gross wins / gross losses on closed positions. */
   profitFactor: number | null;
+  /** Closed positions in the arm (0 when the engine tracks no episodes). */
+  closedTrades: number;
+  /** Positions still open at the end of the tape. */
+  openTrades: number;
+  /** Mean calendar days held per closed position. */
+  avgHoldDays: number | null;
+  /** Median calendar days held — resistant to one very long hold. */
+  medianHoldDays: number | null;
+  /** Longest single hold, in days. */
+  maxHoldDays: number | null;
+  /** Longest run of consecutive losing closes, ordered by exit date. */
+  maxConsecutiveLosses: number | null;
+  /** Longest run of consecutive winning closes. */
+  maxConsecutiveWins: number | null;
+  /** Mean contribution per closed position, % — win rate and size combined. */
+  expectancyPct: number | null;
 };
+
 
 const MS_YEAR = 365.25 * 24 * 3600 * 1000;
 
