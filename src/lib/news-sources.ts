@@ -8,6 +8,7 @@
 // like Reuters/AP/BBC anchor above regional or single-topic feeds.
 
 import { TRACKED_EXECUTIVES, execPostFeedQuery } from "@/lib/exec-posts";
+import { TRACKED_POLICY_MAKERS, policyFeedQuery } from "@/lib/policy-makers";
 
 export type NewsSource =
   | {
@@ -135,6 +136,16 @@ export const RSS_SOURCES: Extract<NewsSource, { kind: "rss" }>[] = [
     region: "Global",
     topic: "exec-posts",
   })),
+  // --- Policy-maker remarks (central bankers, finance ministers; see src/lib/policy-makers.ts) ---
+  ...TRACKED_POLICY_MAKERS.map((maker) => ({
+    kind: "rss" as const,
+    id: `policy-${maker.id}`,
+    label: `${maker.name} remarks (via Google News)`,
+    url: policyFeedQuery(maker),
+    weight: Number((0.6 + 0.3 * maker.weight).toFixed(2)),
+    region: maker.region,
+    topic: "policy-makers",
+  })),
 ];
 
 
@@ -171,6 +182,8 @@ export const GDELT_SOURCES: Extract<NewsSource, { kind: "gdelt" }>[] = [
     query: "(hurricane OR drought OR flooding OR \"extreme weather\" OR \"climate policy\" OR \"carbon price\")" },
   { kind: "gdelt", id: "gdelt-em",        label: "GDELT · Emerging markets", weight: 0.6, topic: "macro",
     query: "(\"emerging markets\" OR India economy OR China economy OR Brazil economy OR \"currency crisis\" OR IMF bailout)" },
+  { kind: "gdelt", id: "gdelt-policy",    label: "GDELT · Policy makers", weight: 0.8, topic: "policy-makers",
+    query: "((Powell OR FOMC OR Lagarde OR Bailey OR Ueda OR \"Treasury Secretary\" OR Chancellor) AND (speech OR remarks OR testimony OR \"rate decision\" OR statement))" },
   { kind: "gdelt", id: "gdelt-execposts", label: "GDELT · CEO posts",    weight: 0.7, topic: "exec-posts",
     query: "((\"Elon Musk\" OR \"Jensen Huang\" OR \"Tim Cook\" OR \"Sam Altman\" OR \"Michael Saylor\" OR \"Jamie Dimon\") AND (post OR posted OR tweet OR \"on X\" OR \"Truth Social\"))" },
 ];
