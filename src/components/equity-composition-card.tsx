@@ -32,36 +32,64 @@ import {
   TOOLTIP_CONTENT_STYLE,
 } from "@/lib/chart-palette";
 
+// Hues are spread far apart AND alternate in lightness/saturation, so adjacent
+// bands differ in both colour and brightness (readable on mobile and for
+// colour-vision deficiencies).
 const BAND_COLORS = [
-  "hsl(160, 62%, 55%)",
-  "hsl(217, 91%, 62%)",
-  "hsl(38, 92%, 58%)",
-  "hsl(280, 65%, 65%)",
-  "hsl(190, 75%, 52%)",
-  "hsl(0, 72%, 60%)",
-  "hsl(95, 55%, 55%)",
-  "hsl(330, 70%, 62%)",
+  "hsl(150, 70%, 62%)", // mint
+  "hsl(265, 75%, 68%)", // violet
+  "hsl(38, 95%, 58%)", // amber
+  "hsl(205, 90%, 55%)", // azure
+  "hsl(345, 78%, 63%)", // rose
+  "hsl(90, 55%, 65%)", // lime
+  "hsl(255, 40%, 45%)", // deep indigo
+  "hsl(20, 85%, 55%)", // orange
+  "hsl(185, 70%, 45%)", // teal
+  "hsl(310, 65%, 72%)", // orchid
+  "hsl(60, 60%, 50%)", // olive
+  "hsl(220, 55%, 38%)", // navy
+  "hsl(0, 60%, 45%)", // brick
+  "hsl(170, 45%, 80%)", // pale aqua
 ];
 const CASH_COLOR = "hsl(215, 16%, 55%)";
 const OTHER_COLOR = "hsl(250, 20%, 60%)";
 const UNPRICED_COLOR = "hsl(30, 12%, 45%)";
 
-// Colour is derived from the symbol itself (not its position in the stack), so
-// a given holding keeps the same shade across portfolios and time windows.
+// Colour preference is derived from the symbol itself, so a holding tends to
+// keep the same shade across portfolios and windows — but if two visible
+// holdings hash to the same slot we walk to the next free colour so no two
+// bands in one chart ever share a shade.
 const hashKey = (key: string) => {
   let h = 0;
   for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) >>> 0;
   return h;
 };
 
-const colorFor = (key: string) =>
-  key === "cash"
-    ? CASH_COLOR
-    : key === "other"
-      ? OTHER_COLOR
-      : key === "unpriced"
-        ? UNPRICED_COLOR
-        : BAND_COLORS[hashKey(key) % BAND_COLORS.length];
+const FIXED_COLORS: Record<string, string> = {
+  cash: CASH_COLOR,
+  other: OTHER_COLOR,
+  unpriced: UNPRICED_COLOR,
+};
+
+export function buildColorMap(keys: readonly string[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  const taken = new Set<number>();
+  for (const key of keys) {
+    if (FIXED_COLORS[key]) {
+      map[key] = FIXED_COLORS[key];
+      continue;
+    }
+    const start = hashKey(key) % BAND_COLORS.length;
+    let idx = start;
+    for (let step = 0; step < BAND_COLORS.length && taken.has(idx); step += 1) {
+      idx = (start + step + 1) % BAND_COLORS.length;
+    }
+    taken.add(idx);
+    map[key] = BAND_COLORS[idx];
+  }
+  return map;
+}
+
 
 const labelFor = (key: string) =>
   key === "cash"
@@ -113,6 +141,9 @@ export function EquityCompositionCard({
     );
     return ["cash", ...symbols];
   }, [q.data]);
+
+  const colors = useMemo(() => buildColorMap(keys), [keys]);
+  const colorFor = (key: string) => colors[key] ?? OTHER_COLOR;
 
   const rows = q.data?.rows ?? [];
   const latest = (rows[rows.length - 1] ?? {}) as Record<string, unknown>;
