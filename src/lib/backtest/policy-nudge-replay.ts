@@ -397,8 +397,15 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
     let dayActive = false;
     let dayTone = 0;
 
+    const read = regimeByDate.get(date) ?? NEUTRAL_REGIME;
+    if (signals.length) {
+      regimeAttribution.postureDays[read.posture] += 1;
+      regimeAttribution.volDays[read.vol] += 1;
+    }
+
     const baseScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
     const nudScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
+    const regScores: Array<{ symbol: string; score: number; vol: number | null }> = [];
 
     for (const p of prepared) {
       const i = p.index.get(date);
@@ -411,6 +418,19 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       const n = signals.length ? policySentimentNudge(p.symbol, signals) * params.nudgeScale : 0;
       const adj = Math.max(0, Math.min(1, s + n));
       nudScores.push({ symbol: p.symbol, score: adj, vol });
+
+      // Regime arm: identical raw nudge, scaled by the sign-aware regime read.
+      const scale = n === 0 ? 1 : policyNudgeScaleForSign(read, Math.sign(n));
+      const rn = n * scale;
+      regScores.push({ symbol: p.symbol, score: Math.max(0, Math.min(1, s + rn)), vol });
+      if (n !== 0) {
+        regimeAttribution.scaledDays += 1;
+        scaleSum += scale;
+        regimeAttribution.minScale = Math.min(regimeAttribution.minScale, scale);
+        regimeAttribution.maxScale = Math.max(regimeAttribution.maxScale, scale);
+        if (scale > 1.02) regimeAttribution.amplifiedDays += 1;
+        else if (scale < 0.98) regimeAttribution.dampenedDays += 1;
+      }
 
       if (n !== 0) {
         dayActive = true;
@@ -454,8 +474,10 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
 
     const beforeBase = base.equity;
     const beforeNud = nud.equity;
+    const beforeReg = reg.equity;
     const rb = applyDay(base, select(base, baseScores), dayReturn);
     const rn = applyDay(nud, select(nud, nudScores), dayReturn);
+    const rr = applyDay(reg, select(reg, regScores), dayReturn);
 
     baseCurve.push({
       date: next,
@@ -469,8 +491,15 @@ export function runPolicyNudgeReplay(input: PolicyReplayInput): PolicyNudgeRepla
       cost: Number(rn.cost.toFixed(4)),
       positions: nud.weights.size,
     });
+    regCurve.push({
+      date: next,
+      equity: Number(reg.equity.toFixed(2)),
+      cost: Number(rr.cost.toFixed(4)),
+      positions: reg.weights.size,
+    });
     baseRets.push(beforeBase > 0 ? base.equity / beforeBase - 1 : 0);
     nudRets.push(beforeNud > 0 ? nud.equity / beforeNud - 1 : 0);
+    regRets.push(beforeReg > 0 ? reg.equity / beforeReg - 1 : 0);
   }
 
   const arm = (label: string, state: ArmState, curve: ArmDay[], rets: number[]): ArmResult => {
