@@ -13,6 +13,7 @@
 import { generateText } from "ai";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 import { classifyHeadline } from "./market-events";
+import { formatGlobalEventBlock, studyGlobalEvents } from "./global-event-study";
 import {
   analyseIndexHistory,
   measureKindResponses,
@@ -30,6 +31,7 @@ import {
   type MacroPlaybookAdjustment,
   type MacroPlaybookEntry,
 } from "./macro-playbook";
+
 
 const MODEL = "google/gemini-2.5-pro";
 const PRIMARY_INDEX = "SPY";
@@ -122,23 +124,45 @@ export function buildMacroPrompt(study: MacroHistoryStudy, derived: MacroPlayboo
     "B. DOCUMENTED MACRO EPISODES SINCE 2005 (catalogue: drawdown, recovery time, origin, transferable lesson):",
     JSON.stringify(MACRO_EPISODES),
     "",
+    "B2. THE CURATED GLOBAL EVENT REEL (1975→today), each event measured event-by-event against this system's own index series — run-up into the event, fall inside the window, days back to the old high, and forward returns 20/60/250 sessions after the window closed. Study every row: this is the longest evidence base available and it covers episodes the 2005 catalogue does not (Black Monday, the Gulf War, the Asian crisis, LTCM, the dot-com bust, 9/11).",
+    JSON.stringify(
+      study.global_events
+        ? {
+            coverage: {
+              measured: study.global_events.events_measured,
+              total: study.global_events.events_total,
+              from: study.global_events.from,
+              to: study.global_events.to,
+            },
+            by_category: study.global_events.categories,
+            severe: study.global_events.severe,
+            events: study.global_events.measurements.filter((m) => m.covered),
+            uncovered: study.global_events.measurements.filter((m) => !m.covered).map((m) => m.id),
+          }
+        : null,
+    ),
+    "",
+
     `C. MEASURED INDEX RESPONSE TO TYPED NEWS EVENTS (only ${study.news_window_days} days of stored news, so this sample is thin):`,
     JSON.stringify(study.kind_responses),
     "",
-    "D. THE PLAYBOOK DERIVED DETERMINISTICALLY FROM A+B+C (your starting point):",
+    "D. THE PLAYBOOK DERIVED DETERMINISTICALLY FROM A+B+B2+C (your starting point):",
     JSON.stringify(derived),
     "",
     "E. DRAWDOWN SIZING RULES DERIVED FROM THE FORWARD-RETURN BUCKETS:",
     JSON.stringify(rules),
     "",
-    "Reason across the whole 20-year record, not just the measured sample: which news categories were genuine repricings that extended (rate cuts and inflation surprises into a trend), which were noise that round-tripped inside weeks (single geopolitical headlines, liquidity air-pockets, most political shocks), and which were the early tell of a slow credit-origin bear where capital preservation beat dip-buying (2008, 2022). Note explicitly how the recovery time differed by origin — exogenous shocks met with policy support recovered in months (2020: 33.9% in 33 days, recovered in ~5 months), credit-origin bears took years (2008: 56.8%, ~4 years).",
+    "Reason across the whole 50-year record, not just the measured sample: which news categories were genuine repricings that extended (rate cuts and inflation surprises into a trend), which were noise that round-tripped inside weeks (single geopolitical headlines, liquidity air-pockets, most political shocks), and which were the early tell of a slow credit-origin bear where capital preservation beat dip-buying (2008, 2022). Note explicitly how the recovery time differed by origin — exogenous shocks met with policy support recovered in months (2020: 33.9% in 33 days, recovered in ~5 months), credit-origin bears took years (2008: 56.8%, ~4 years).",
     "",
-    "IMPORTANT: section C is a very small sample. Do not overfit to it. Where it disagrees with the 20-year record, prefer the record and say so.",
+    "Work through section B2 event by event before you answer. For every event with data, state to yourself what the run-up, the in-window fall, the recovery time and the 60/250-session forward return imply, then generalise by category (crisis, recession, policy, geopolitics, pandemic, bubble, shock) and by severity. Where an event is listed as uncovered, say so rather than inventing numbers for it.",
+    "",
+    "IMPORTANT: section C is a very small sample. Do not overfit to it. Where it disagrees with the long record in A/B/B2, prefer the record and say so.",
     "",
     "Return STRICT JSON only, no markdown fence, shaped as:",
     "{",
     '  "narrative": "<350-600 words of plain-English analysis the portfolio owner can read: what news actually predicted, what it did not, and how this changes the engine\'s behaviour>",',
     '  "lessons": ["<10-14 short imperative rules the engine should follow>"],',
+    '  "event_reel_lessons": ["<6-10 rules drawn specifically from section B2, each naming the event(s) or category behind it and the measured numbers>"],',
     '  "playbook_adjustments": [',
     '    {"kind":"rate_cut","response":"follow|fade|wait|de_risk","tilt_multiplier":0.0-2.0,"half_life_hours":6-336,"confirm_sessions":0-5,"note":"<one sentence of evidence>"}',
     "  ],",
@@ -148,6 +172,7 @@ export function buildMacroPrompt(study: MacroHistoryStudy, derived: MacroPlayboo
     "}",
     "",
     'Rules: only use "kind" values that already appear in section D; keep tilt_multiplier ≤ 2.0 and size_scale ≤ 1.5 (hard caps, larger values are clamped away); prefer a shorter half-life for kinds that historically round-tripped; be explicit about which categories are tradable and which are noise.',
+
   ].join("\n");
 }
 
@@ -211,6 +236,7 @@ export async function runMacroHistoryAnalysis(args: {
   ]);
 
   const index = analyseIndexHistory(PRIMARY_INDEX, primary);
+  const globalEvents = studyGlobalEvents(primary);
   const study: MacroHistoryStudy = {
     generated_at: new Date().toISOString(),
     index,
@@ -219,6 +245,7 @@ export async function runMacroHistoryAnalysis(args: {
     episodes: MACRO_EPISODES,
     news_window_days: newsWindowDays,
     news_events: news.days.size,
+    global_events: globalEvents,
   };
 
   const derivedPlaybook = derivePlaybook(study);
@@ -226,6 +253,8 @@ export async function runMacroHistoryAnalysis(args: {
 
   let narrative = fallbackNarrative(study);
   let lessons = fallbackLessons(study);
+  let eventLessons = globalEvents.categories.map((c) => c.note);
+
   let playbook = derivedPlaybook;
   let drawdownRules = derivedRules;
   let model: string | null = null;
@@ -250,6 +279,13 @@ export async function runMacroHistoryAnalysis(args: {
               .map((l) => l.trim().slice(0, 240))
           : [];
         if (ls.length > 0) lessons = ls.slice(0, 16);
+        const els = Array.isArray(parsed["event_reel_lessons"])
+          ? (parsed["event_reel_lessons"] as unknown[])
+              .filter((l): l is string => typeof l === "string" && l.trim().length > 0)
+              .map((l) => l.trim().slice(0, 280))
+          : [];
+        if (els.length > 0) eventLessons = els.slice(0, 12);
+
         playbook = mergePlaybookAdjustments(
           derivedPlaybook,
           Array.isArray(parsed["playbook_adjustments"])
@@ -283,6 +319,15 @@ export async function runMacroHistoryAnalysis(args: {
     lessons,
     playbook,
     drawdown_rules: drawdownRules,
+    event_lessons: eventLessons,
+    event_reel: {
+      events_total: globalEvents.events_total,
+      events_measured: globalEvents.events_measured,
+      from: globalEvents.from,
+      to: globalEvents.to,
+      categories: globalEvents.categories,
+      severe: globalEvents.severe,
+    },
   };
 
   await supabase.from("macro_lessons").update({ active: false }).eq("user_id", userId).eq("active", true);
@@ -298,6 +343,8 @@ export async function runMacroHistoryAnalysis(args: {
     lessons,
     playbook: playbook as unknown as Record<string, unknown>,
     drawdown_rules: drawdownRules as unknown as Record<string, unknown>,
+    event_lessons: eventLessons,
+    event_reel: lessonSet.event_reel as unknown as Record<string, unknown>,
     active: true,
   });
   if (insertError) {
@@ -315,7 +362,9 @@ export async function loadActiveMacroLessons(
 ): Promise<MacroLessonSet | null> {
   const { data } = await supabase
     .from("macro_lessons")
-    .select("generated_at, years_covered, episodes, model, narrative, lessons, playbook, drawdown_rules")
+    .select(
+      "generated_at, years_covered, episodes, model, narrative, lessons, playbook, drawdown_rules, event_lessons, event_reel",
+    )
     .eq("user_id", userId)
     .eq("active", true)
     .order("generated_at", { ascending: false })
@@ -324,6 +373,7 @@ export async function loadActiveMacroLessons(
 
   if (!data) return null;
   const row = data as Record<string, unknown>;
+  const reel = row["event_reel"];
   return {
     generated_at: String(row["generated_at"] ?? new Date().toISOString()),
     model: (row["model"] as string | null) ?? null,
@@ -335,5 +385,45 @@ export async function loadActiveMacroLessons(
     drawdown_rules: Array.isArray(row["drawdown_rules"])
       ? (row["drawdown_rules"] as MacroDrawdownRule[])
       : [],
+    event_lessons: Array.isArray(row["event_lessons"]) ? (row["event_lessons"] as string[]) : [],
+    event_reel:
+      reel && typeof reel === "object" && Array.isArray((reel as Record<string, unknown>)["categories"])
+        ? (reel as MacroLessonSet["event_reel"])
+        : null,
   };
+
+}
+
+/** Days after which the stored playbook is considered stale and re-studied. */
+export const MACRO_STUDY_MAX_AGE_DAYS = 30;
+
+/**
+ * Playbook the engine should use: returns the active study, and re-runs it in
+ * place when there is none, when it is older than `MACRO_STUDY_MAX_AGE_DAYS`,
+ * or when it predates the global-event-reel study (no `event_reel` stored).
+ * Failures are swallowed — a stale playbook is better than a blocked run.
+ */
+export async function loadOrRefreshMacroLessons(
+  supabase: Sb,
+  userId: string,
+  opts?: { maxAgeDays?: number },
+): Promise<MacroLessonSet | null> {
+  const existing = await loadActiveMacroLessons(supabase, userId).catch(() => null);
+  const maxAge = Math.max(1, opts?.maxAgeDays ?? MACRO_STUDY_MAX_AGE_DAYS);
+  const ageDays = existing
+    ? (Date.now() - Date.parse(existing.generated_at)) / 86_400_000
+    : Number.POSITIVE_INFINITY;
+  const missingReel = !existing?.event_reel || (existing.event_reel.events_measured ?? 0) === 0;
+  if (existing && ageDays <= maxAge && !missingReel) return existing;
+
+  try {
+    const result = await runMacroHistoryAnalysis({ supabase, userId });
+    return result.lessons;
+  } catch (err) {
+    console.error(
+      "[macro-history-analysis] auto-refresh failed",
+      err instanceof Error ? err.message : String(err),
+    );
+    return existing;
+  }
 }

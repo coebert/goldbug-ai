@@ -47,6 +47,15 @@ export type MacroDrawdownRule = {
   note: string;
 };
 
+export type MacroEventReelSummary = {
+  events_total: number;
+  events_measured: number;
+  from: string;
+  to: string;
+  categories: import("./global-event-study").EventCategoryStat[];
+  severe: { events: number; mean_drawdown_pct: number; mean_fwd_250d: number };
+};
+
 export type MacroLessonSet = {
   generated_at: string;
   model: string | null;
@@ -58,7 +67,12 @@ export type MacroLessonSet = {
   lessons: string[];
   playbook: MacroPlaybookEntry[];
   drawdown_rules: MacroDrawdownRule[];
+  /** Rules learned specifically from the curated global-events reel. */
+  event_lessons?: string[];
+  /** Measured summary of the reel, by category and severity. */
+  event_reel?: MacroEventReelSummary | null;
 };
+
 
 export const MACRO_TILT_MULTIPLIER_MAX = 2;
 export const MACRO_HALF_LIFE_MIN = 6;
@@ -375,6 +389,24 @@ export function formatMacroPlaybookBlock(
       );
     }
   }
+
+  const reelLessons = lessons.event_lessons ?? [];
+  if (reelLessons.length > 0) {
+    lines.push(
+      `Learned from the global event reel (${lessons.event_reel?.events_measured ?? 0}/${lessons.event_reel?.events_total ?? 0} events measured, ${lessons.event_reel?.from ?? ""} → ${lessons.event_reel?.to ?? ""}):`,
+    );
+    for (const l of reelLessons.slice(0, 8)) lines.push(`  - ${l}`);
+  }
+  const reelCats = lessons.event_reel?.categories ?? [];
+  if (reelCats.length > 0) {
+    lines.push(
+      `Event-category stance from the reel: ${reelCats
+        .map((c) => `${c.category}=${c.stance.replace(/_/g, " ")}`)
+        .join(", ")}.`,
+    );
+  }
+
+
 
   const dd = drawdownSizeScale(drawdownPct, lessons.drawdown_rules);
   if (dd.note) {
