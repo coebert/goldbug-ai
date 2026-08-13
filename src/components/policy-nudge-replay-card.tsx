@@ -291,6 +291,63 @@ export function PolicyNudgeReplayCard({
               />
             </div>
 
+            {/* Regime-aware scaling vs the fixed-strength nudge. */}
+            <div className="space-y-2 rounded-lg border border-border/60 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium">Regime-aware scaling vs fixed nudge</div>
+                {regimeBadge(result.regimeVerdict)}
+              </div>
+              <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+                <Stat
+                  label="Return delta"
+                  value={pp(result.regimeVsFixed.delta.returnPct)}
+                  tone={result.regimeVsFixed.delta.returnPct >= 0 ? good : bad}
+                />
+                <Stat
+                  label="Drawdown delta"
+                  value={pp(result.regimeVsFixed.delta.maxDrawdownPct)}
+                  tone={result.regimeVsFixed.delta.maxDrawdownPct >= 0 ? good : bad}
+                />
+                <Stat
+                  label="95% CI on return delta"
+                  value={`${result.regimeVsFixed.confidence.returnDeltaLo}..${result.regimeVsFixed.confidence.returnDeltaHi}pp`}
+                />
+                <Stat
+                  label="95% CI on drawdown delta"
+                  value={`${result.regimeVsFixed.confidence.drawdownDeltaLo}..${result.regimeVsFixed.confidence.drawdownDeltaHi}pp`}
+                />
+                <Stat
+                  label="P(regime ahead of fixed)"
+                  value={`${(result.regimeVsFixed.confidence.probPositive * 100).toFixed(0)}%`}
+                />
+                <Stat
+                  label="P(drawdown no worse)"
+                  value={`${(result.regimeVsFixed.confidence.probDrawdownBetter * 100).toFixed(0)}%`}
+                />
+                <Stat
+                  label="Scaling applied"
+                  value={`×${result.regimeAttribution.avgScale.toFixed(2)} avg (${result.regimeAttribution.minScale.toFixed(2)}–${result.regimeAttribution.maxScale.toFixed(2)})`}
+                />
+                <Stat
+                  label="Amplified / damped"
+                  value={`${result.regimeAttribution.amplifiedDays} / ${result.regimeAttribution.dampenedDays}`}
+                />
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                Regime bars — risk-on {result.regimeAttribution.postureDays.risk_on}, neutral{" "}
+                {result.regimeAttribution.postureDays.neutral}, risk-off{" "}
+                {result.regimeAttribution.postureDays.risk_off}; volatility calm{" "}
+                {result.regimeAttribution.volDays.calm}, normal{" "}
+                {result.regimeAttribution.volDays.normal}, elevated{" "}
+                {result.regimeAttribution.volDays.elevated}, stressed{" "}
+                {result.regimeAttribution.volDays.stressed}. Versus the policy-deaf baseline the
+                regime arm is {pp(result.regimeVsBaseline.delta.returnPct)} (95% CI{" "}
+                {result.regimeVsBaseline.confidence.returnDeltaLo}..
+                {result.regimeVsBaseline.confidence.returnDeltaHi}pp).
+              </div>
+            </div>
+
+
             {a ? (
               <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
                 <Stat
