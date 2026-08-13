@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Area,
   AreaChart,
+  Brush,
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -55,6 +57,23 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   );
 }
 
+type ArmKey = "baseline" | "nudged" | "regime";
+
+const ARMS: { key: ArmKey; label: string; color: string; dash?: string }[] = [
+  { key: "baseline", label: "Policy muted", color: CHART_ROLE.neutral, dash: "4 3" },
+  { key: "nudged", label: "Fixed nudge", color: CHART_ROLE.positive },
+  { key: "regime", label: "Regime-aware nudge", color: CHART_ROLE.benchmark, dash: "6 3" },
+];
+
+/** Underwater series: % below the running peak, per arm. */
+function drawdownSeries(equity: readonly number[]): number[] {
+  let peak = -Infinity;
+  return equity.map((v) => {
+    peak = Math.max(peak, v);
+    return peak > 0 ? Number(((v / peak - 1) * 100).toFixed(3)) : 0;
+  });
+}
+
 const good = "text-primary";
 const bad = "text-destructive";
 
@@ -76,6 +95,12 @@ export function PolicyNudgeReplayCard({
   const [halfLifeHours, setHalfLifeHours] = useState(48);
   const [riskLevel, setRiskLevel] = useState(3);
   const [result, setResult] = useState<PolicyNudgeReplayResult | null>(null);
+  const [equityMode, setEquityMode] = useState<"money" | "pct">("money");
+  const [visibleArms, setVisibleArms] = useState<Record<ArmKey, boolean>>({
+    baseline: true,
+    nudged: true,
+    regime: true,
+  });
 
   const m = useMutation({
     mutationFn: () =>
@@ -85,15 +110,45 @@ export function PolicyNudgeReplayCard({
     onSuccess: (r) => setResult(r as PolicyNudgeReplayResult),
   });
 
-  const chart =
-    result?.baseline.curve.map((c, i) => ({
-      date: c.date,
-      baseline: c.equity,
-      nudged: result.nudged.curve[i]?.equity ?? null,
-      regime: result.regime.curve[i]?.equity ?? null,
-      spread: (result.nudged.curve[i]?.equity ?? c.equity) - c.equity,
-      regimeSpread: (result.regime.curve[i]?.equity ?? c.equity) - c.equity,
-    })) ?? [];
+  // Equity, normalised return and underwater drawdown for all three arms.
+  const chart = useMemo(() => {
+    if (!result) return [] as Record<string, string | number | null>[];
+    const start = result.baseline.curve[0]?.equity ?? 0;
+    const dd = {
+      baseline: drawdownSeries(result.baseline.curve.map((c) => c.equity)),
+      nudged: drawdownSeries(result.nudged.curve.map((c) => c.equity)),
+      regime: drawdownSeries(result.regime.curve.map((c) => c.equity)),
+    };
+    return result.baseline.curve.map((c, i) => {
+      const eq = {
+        baseline: c.equity,
+        nudged: result.nudged.curve[i]?.equity ?? null,
+        regime: result.regime.curve[i]?.equity ?? null,
+      };
+      const rel = (v: number | null) => (v == null || start <= 0 ? null : (v / start - 1) * 100);
+      return {
+        date: c.date,
+        baseline: eq.baseline,
+        nudged: eq.nudged,
+        regime: eq.regime,
+        baselinePct: rel(eq.baseline),
+        nudgedPct: rel(eq.nudged),
+        regimePct: rel(eq.regime),
+        baselineDd: dd.baseline[i] ?? null,
+        nudgedDd: dd.nudged[i] ?? null,
+        regimeDd: dd.regime[i] ?? null,
+        spread: (eq.nudged ?? c.equity) - c.equity,
+        regimeSpread: (eq.regime ?? c.equity) - c.equity,
+      };
+    });
+  }, [result]);
+
+  const toggleArm = (key: ArmKey) =>
+    setVisibleArms((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      // Never let the reader blank the chart entirely.
+      return Object.values(next).some(Boolean) ? next : prev;
+    });
 
   const a = result?.attribution;
 
