@@ -34,6 +34,7 @@ import {
   episodeBands,
 } from "@/lib/trade-episodes";
 import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
+import { TradeEpisodeList } from "@/components/charts/trade-episode-list";
 
 import {
   Area,
@@ -303,6 +304,8 @@ export function EquityPctChart({
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
   const [showHolds, setShowHolds] = useState(true);
+  // Trade row spotlighted on the chart (see the trade list below it).
+  const [selectedEpisode, setSelectedEpisode] = useState<string | null>(null);
   const intradayFn = useServerFn(getIntradayEquity);
   // Ask for the portfolio's whole life, not a rolling month: the Hourly view
   // should be a higher-resolution version of the all-time chart, not a
@@ -547,7 +550,11 @@ export function EquityPctChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid {...SAXO_GRID} />
-                {renderEpisodeBands(bands, { yAxisId: "pct", labels: data.length > 12 })}
+                {renderEpisodeBands(bands, {
+                  yAxisId: "pct",
+                  labels: data.length > 12,
+                  selectedKey: selectedEpisode,
+                })}
                 <XAxis
                   {...SAXO_AXIS}
                   dataKey="at"
@@ -712,6 +719,23 @@ export function EquityPctChart({
             </span>
           )}
         </div>
+
+        {bands.length > 0 && (
+          <div className="mt-3 border-t pt-3">
+            <TradeEpisodeList
+              bands={bands}
+              selectedKey={selectedEpisode}
+              onSelect={setSelectedEpisode}
+              money={(v) =>
+                new Intl.NumberFormat("en-GB", {
+                  style: "currency",
+                  currency: currency || "GBP",
+                  maximumFractionDigits: 2,
+                }).format(v)
+              }
+            />
+          </div>
+        )}
       </div>
     </div>
   );
