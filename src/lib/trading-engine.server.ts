@@ -672,7 +672,17 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       macroPlaybook,
     );
     const insiderNudge = insiderBySymbol.get(f.symbol.toUpperCase())?.nudge ?? 0;
-    const policyNudge = policySentimentNudge(f.symbol, policySignals);
+    // Regime-adaptive: hawkish guidance bites harder in a risk-off tape,
+    // dovish guidance in a risk-on one; both are muted when vol is calm.
+    const policyNudgeRaw = policySentimentNudge(f.symbol, policySignals);
+    const policyNudge =
+      policyNudgeRaw === 0
+        ? 0
+        : policySentimentNudge(
+            f.symbol,
+            policySignals,
+            policyNudgeScaleForSign(policyRegime, Math.sign(policyNudgeRaw)),
+          );
     const base = agg.contributors > 0 ? agg.score : 0;
     const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt + insiderNudge + policyNudge));
     f.news_score =
