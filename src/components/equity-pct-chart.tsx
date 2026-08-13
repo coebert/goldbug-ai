@@ -27,6 +27,13 @@ import {
   type MarkerTrade,
   type TradeMarkerCell,
 } from "@/lib/chart-trade-markers";
+import {
+  bandsAt,
+  buildPositionEpisodes,
+  describeEpisodes,
+  episodeBands,
+} from "@/lib/trade-episodes";
+import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
 
 import {
   Area,
@@ -295,6 +302,7 @@ export function EquityPctChart({
   className?: string;
 }) {
   const [resolution, setResolution] = useState<Resolution>("daily");
+  const [showHolds, setShowHolds] = useState(true);
   const intradayFn = useServerFn(getIntradayEquity);
   // Ask for the portfolio's whole life, not a rolling month: the Hourly view
   // should be a higher-resolution version of the all-time chart, not a
@@ -408,6 +416,16 @@ export function EquityPctChart({
     };
   }, [equity, hourlyPoints, deposits, startingCash, resolution, inceptionDate, trades]);
 
+  // Holding periods: every position from the fill that opened it to the fill
+  // that closed it, snapped onto the plotted x-values.
+  const bands = useMemo(() => {
+    if (!showHolds || trades.length === 0 || data.length < 2) return [];
+    return episodeBands(
+      buildPositionEpisodes(trades),
+      data.map((d) => String((d as { at: string }).at)),
+    );
+  }, [trades, data, showHolds]);
+
   const hasDaily = equity.length >= 2;
   if (!hasDaily) return null;
 
@@ -464,6 +482,20 @@ export function EquityPctChart({
                 ))}
               </div>
             )}
+            {trades.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowHolds((v) => !v)}
+                aria-pressed={showHolds}
+                className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors ${
+                  showHolds
+                    ? "bg-secondary text-secondary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Holds
+              </button>
+            )}
             <span className="flex flex-col items-end leading-tight">
               <span
                 className={`text-sm font-semibold tabular-nums ${up ? "text-primary" : "text-destructive"}`}
@@ -515,6 +547,7 @@ export function EquityPctChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid {...SAXO_GRID} />
+                {renderEpisodeBands(bands, { yAxisId: "pct", labels: data.length > 12 })}
                 <XAxis
                   {...SAXO_AXIS}
                   dataKey="at"
@@ -551,12 +584,21 @@ export function EquityPctChart({
                       4,
                       { commission: true },
                     );
+                    const holdLines = describeEpisodes(
+                      bandsAt(bands, String(item?.payload?.at ?? "")),
+                      (x) =>
+                        new Intl.NumberFormat("en-GB", {
+                          style: "currency",
+                          currency: currency || "GBP",
+                          maximumFractionDigits: 2,
+                        }).format(x),
+                    );
                     const delta = Number(item?.payload?.deltaPct ?? 0);
                     const money_ = money(Number(item?.payload?.deltaValue ?? 0));
                     return [
                       `${Number(v).toFixed(2)}% · ${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(2)} pp ${money_}${
                         tradeLines.length ? `\n${tradeLines.join("\n")}` : ""
-                      }`,
+                      }${holdLines.length ? `\n${holdLines.join("\n")}` : ""}`,
                       state === "settled"
                         ? "vs capital (settled close)"
                         : state === "intraday"
@@ -646,6 +688,7 @@ export function EquityPctChart({
             {resolution === "hourly" ? "Intraday marks" : "Provisional (not settled)"}
           </span>
           {trades.length > 0 && <TradeMarkerLegend />}
+          {bands.length > 0 && <EpisodeBandLegend count={bands.length} />}
           {resolution === "daily" && settlement.latestIsProvisional && (
             <span>
               {settlement.provisionalDate
