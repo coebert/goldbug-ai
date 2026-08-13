@@ -32,16 +32,26 @@ export type EpisodeBandOptions = {
   labels?: boolean;
   /** Base fill opacity; overlaps naturally read darker. */
   opacity?: number;
+  /**
+   * Band key to spotlight (see `EpisodeBand.key`). The selected band keeps its
+   * colour and gains a solid outline; every other band fades back so the
+   * highlighted holding period is unmistakable.
+   */
+  selectedKey?: string | null;
 };
 
 export function renderEpisodeBands(
   bands: readonly EpisodeBand[],
   options: EpisodeBandOptions = {},
 ): ReactElement[] {
-  const { yAxisId, labels = true, opacity = 0.1 } = options;
+  const { yAxisId, labels = true, opacity = 0.1, selectedKey = null } = options;
+  const hasSelection = selectedKey != null && bands.some((b) => b.key === selectedKey);
   return bands.map((b) => {
     const hue = episodeBandHue(b.symbol);
     const colour = `hsl(${hue} 80% 60%)`;
+    const selected = hasSelection && b.key === selectedKey;
+    const dim = hasSelection && !selected;
+    const baseOpacity = b.episode.open ? opacity * 0.7 : opacity;
     return (
       <ReferenceArea
         key={`ep-${b.key}`}
@@ -50,17 +60,18 @@ export function renderEpisodeBands(
         x2={b.x2}
         ifOverflow="hidden"
         fill={colour}
-        fillOpacity={b.episode.open ? opacity * 0.7 : opacity}
+        fillOpacity={selected ? Math.min(0.42, baseOpacity * 3.2) : dim ? baseOpacity * 0.35 : baseOpacity}
         stroke={colour}
-        strokeOpacity={0.35}
-        strokeDasharray={b.episode.open ? "3 3" : undefined}
-        {...(labels
+        strokeOpacity={selected ? 0.95 : dim ? 0.12 : 0.35}
+        strokeWidth={selected ? 1.5 : 1}
+        strokeDasharray={b.episode.open && !selected ? "3 3" : undefined}
+        {...(labels || selected
           ? {
               label: {
                 value: `${b.symbol} ${formatHoldingDuration(b.episode.days)}`,
                 position: "insideTopLeft" as const,
                 fill: colour,
-                fontSize: 9,
+                fontSize: selected ? 10 : 9,
                 offset: 4,
               },
             }

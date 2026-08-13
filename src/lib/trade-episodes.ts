@@ -17,6 +17,8 @@ import { tradeTimestamp } from "./chart-trade-markers";
 
 export type PositionEpisode = {
   symbol: string;
+  /** Direction of the position, taken from the fill that opened it. */
+  side: "long" | "short";
   /** Timestamp of the opening fill (ms). */
   openMs: number;
   /** Timestamp of the flattening fill (ms), or null while still open. */
@@ -68,6 +70,7 @@ export function buildPositionEpisodes(
   type Live = {
     openMs: number;
     openAt: string;
+    side: "long" | "short";
     qty: number;
     peak: number;
     buys: number;
@@ -98,6 +101,7 @@ export function buildPositionEpisodes(
     const start = (t: MarkerTrade): Live => ({
       openMs: tradeTimestamp(t),
       openAt: isoOf(t),
+      side: t.side === "sell" ? "short" : "long",
       qty: 0,
       peak: 0,
       buys: 0,
@@ -119,6 +123,7 @@ export function buildPositionEpisodes(
       const endMs = closeMs ?? asOfMs;
       out.push({
         symbol,
+        side: l.side,
         openMs: l.openMs,
         closeMs,
         openAt: l.openAt,
@@ -133,6 +138,7 @@ export function buildPositionEpisodes(
         open: closeMs == null,
       });
     };
+
 
     for (const t of sorted) {
       const ts = tradeTimestamp(t);
@@ -329,6 +335,7 @@ export function spanBand(input: {
   const open = input.open ?? false;
   const episode: PositionEpisode = {
     symbol: input.symbol,
+    side: "long",
     openMs: MS(input.x1),
     closeMs: open ? null : MS(input.x2),
     openAt: input.x1,

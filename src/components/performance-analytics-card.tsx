@@ -27,6 +27,7 @@ import {
   type EpisodeBand,
 } from "@/lib/trade-episodes";
 import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
+import { TradeEpisodeList } from "@/components/charts/trade-episode-list";
 import {
   ResponsiveContainer,
   Area,
@@ -55,6 +56,9 @@ interface Props {
 
 export function PerformanceAnalyticsCard({ portfolioId }: Props) {
   const [windowDays, setWindowDays] = useState(90);
+  // Trade row spotlighted on both charts. Bands are keyed by episode, so one
+  // selection lights up the same position on equity and drawdown.
+  const [selectedEpisode, setSelectedEpisode] = useState<string | null>(null);
   const fetchFn = useServerFn(getPerformanceAnalytics);
   const q = useQuery({
     queryKey: ["performance-analytics", portfolioId, windowDays],
@@ -163,7 +167,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid {...SAXO_GRID} />
-                  {renderEpisodeBands(equityBands)}
+                  {renderEpisodeBands(equityBands, { selectedKey: selectedEpisode })}
                   <XAxis
                     {...SAXO_AXIS}
                     dataKey="date"
@@ -243,7 +247,7 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid {...SAXO_GRID} />
-                  {renderEpisodeBands(drawdownBands)}
+                  {renderEpisodeBands(drawdownBands, { selectedKey: selectedEpisode, labels: false })}
                   <XAxis
                     {...SAXO_AXIS}
                     dataKey="date"
@@ -308,6 +312,16 @@ export function PerformanceAnalyticsCard({ portfolioId }: Props) {
                 </div>
               )}
             </ChartBlock>
+
+            <ChartBlock title="Trades">
+              <TradeEpisodeList
+                bands={equityBands.length > 0 ? equityBands : drawdownBands}
+                selectedKey={selectedEpisode}
+                onSelect={setSelectedEpisode}
+                money={(v) => fmtCcyPrecise.format(v)}
+              />
+            </ChartBlock>
+
 
             <div className="grid gap-6 lg:grid-cols-2">
               <AttributionBlock
