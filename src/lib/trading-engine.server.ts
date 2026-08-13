@@ -3054,6 +3054,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         top_driver: a.top_driver,
       })),
       signals: features,
+      policy_regime: policyRegime,
       news: scoredNews.slice(0, 12),
       guardrails: {
         risk_level: portfolio.risk_level,
