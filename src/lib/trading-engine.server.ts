@@ -56,6 +56,11 @@ import {
   formatPolicyBlock,
   policySentimentNudge,
 } from "./policy-makers";
+import {
+  detectPolicyRegime,
+  formatPolicyRegimeLine,
+  policyNudgeScaleForSign,
+} from "./policy-regime-scaling";
 import { formatInsiderBlock } from "./insider-dealings";
 import { loadRecentInsiderSignals } from "./insider-dealings.server";
 import { learnedExecPostNudge, learnedHalfLifeHours } from "./exec-post-learning";
