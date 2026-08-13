@@ -15,6 +15,7 @@ import {
   type PolicyNudgeExplain,
   type PolicyRow,
 } from "@/lib/policy-makers";
+import { policyNudgeScaleForSign, type RegimeRead } from "@/lib/policy-regime-scaling";
 
 export type PolicyOrderExplain = {
   symbol: string;
@@ -123,7 +124,24 @@ export const getPolicyDecisionExplain = createServerFn({ method: "POST" })
     const explained: PolicyOrderExplain[] = orders.map((o) => {
       const symbol = String(o.symbol ?? "").toUpperCase();
       const side = String(o.side ?? "");
-      const explain = explainPolicyNudge(symbol, rows, asOf, { regimeScale });
+      const probe = explainPolicyNudge(symbol, rows, asOf);
+      const explain =
+        probe.nudge === 0
+          ? probe
+          : explainPolicyNudge(symbol, rows, asOf, {
+              regimeScale: policyRegime
+                ? policyNudgeScaleForSign(
+                    {
+                      posture: (policyRegime.posture as RegimeRead["posture"]) ?? "neutral",
+                      vol: (policyRegime.vol as RegimeRead["vol"]) ?? "normal",
+                      scale: regimeScale,
+                      confidence: 0,
+                      reason: policyRegime.reason ?? "",
+                    },
+                    Math.sign(probe.nudge),
+                  )
+                : regimeScale,
+            });
       return {
         symbol,
         side,
