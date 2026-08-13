@@ -34,7 +34,11 @@ export function NotificationsBell({ className = "" }: { className?: string }) {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(92vw,380px)] p-0">
+      <PopoverContent
+        align="end"
+        collisionPadding={8}
+        className="flex max-h-[var(--radix-popover-content-available-height)] w-[min(92vw,380px)] flex-col overflow-hidden p-0"
+      >
         <NotificationsPanel />
       </PopoverContent>
     </Popover>
