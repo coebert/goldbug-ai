@@ -170,6 +170,8 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
       qty: number;
       /** Size at entry, so trims can be expressed as a fraction of it. */
       qty0: number;
+      /** Cash already banked from thesis-break trims on this position. */
+      banked: number;
       actions: ThesisBreakEvent[];
     } | null
   > = Object.fromEntries(symbols.map((s) => [s, null]));
@@ -254,7 +256,9 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
               } else {
                 // Half trim: bank the slice, keep the rest of the position.
                 const sellQty = pos.qty * tb.sellFraction;
-                cash[sym] = cash[sym]! + sellQty * price * (1 - cost);
+                const proceeds = sellQty * price * (1 - cost);
+                cash[sym] = cash[sym]! + proceeds;
+                pos.banked += proceeds;
                 pos.qty -= sellQty;
               }
             }
@@ -263,7 +267,12 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
 
         if (reason) {
           const gross = pos.qty * price;
-          cash[sym] = gross * (1 - cost);
+          cash[sym] = cash[sym]! + gross * (1 - cost);
+          // Size-weighted realised return: trimmed slices exited at their own
+          // price, so a trim that dodged a further fall shows up here.
+          const basis = pos.qty0 * pos.entryPrice;
+          const realised =
+            basis > 0 ? (pos.banked + gross * (1 - cost)) / basis - 1 - cost : unrealised - cost * 2;
           const priorLosses = trades.filter((t) => t.symbol === sym && t.returnPct < 0).length;
           trades.push({
             symbol: sym,
@@ -271,7 +280,7 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
             exitDate: date,
             entryPrice: pos.entryPrice,
             exitPrice: price,
-            returnPct: unrealised - cost * 2,
+            returnPct: realised,
             holdDays: daysBetween(pos.entryDate, date),
             exitReason: reason,
             priorLosses,
@@ -298,6 +307,7 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
               entryPrice: price,
               qty: spend / price,
               qty0: spend / price,
+              banked: 0,
               actions: [],
             };
             cash[sym] = 0;
@@ -350,6 +360,9 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
     avgLossPct: losses.length ? (losses.reduce((a, b) => a + b.returnPct, 0) / losses.length) * 100 : 0,
     trades,
     exitMix,
+    thesisEvents,
+    signalCounts,
+    actionMix,
   };
 }
 
