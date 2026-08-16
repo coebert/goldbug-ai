@@ -1288,8 +1288,11 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
     // 1. Hard stop-loss / take-profit. The hard stop is ATR-scaled: quiet,
     // gappy names get a tighter stop automatically, and it can never be wider
     // than the configured fixed stop.
+    // Names with a bad realised record carry a tighter initial stop.
+    const lossMem = lossMemory.get(sym.toUpperCase()) ?? null;
+    const stopTighten = lossMem?.stopTightenMult ?? 1;
     const hardStop = atrScaledStopPct({
-      fixedStopPct: cfg.stop_loss_pct,
+      fixedStopPct: cfg.stop_loss_pct * stopTighten,
       atrPct,
       atrMult: cfg.initial_stop_atr_mult,
       floorPct: cfg.atr_scaled_stop_floor_pct,
@@ -1370,6 +1373,31 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         trigger = eb.reason!;
         triggerKind = "trail"; // partial defensive exit; treat as stop-like for cooldown
         sellFraction = eb.sellFraction;
+      }
+    }
+
+    // 4b. Thesis break — cut a loser early when independent evidence streams
+    // (news, insider dealing, trend, fundamentals, failed breakout) agree the
+    // reason for holding has gone, instead of waiting for the wide ATR stop.
+    if (!trigger) {
+      const tf = featureBySymbol.get(sym);
+      const tb = evaluateThesisBreak({
+        unrealisedPct: change,
+        effectiveStopPct: hardStop.effectiveStopPct,
+        evidence: {
+          newsScore: tf?.news_score ?? null,
+          newsMomentum: tf?.news_momentum?.delta_7d ?? null,
+          insiderNudge: insiderBySymbol.get(sym.toUpperCase())?.nudge ?? null,
+          fundamentalsScore: tf?.fundamentals_score?.score ?? null,
+          trendBroken:
+            tf?.sma_cross?.regime === "death" || tf?.sma_cross?.fastCross === "bear",
+          breakoutFailed: tf?.breakout?.state === "failed",
+        },
+      });
+      if (tb.fire) {
+        trigger = tb.reason;
+        triggerKind = "stop";
+        sellFraction = tb.sellFraction;
       }
     }
 
