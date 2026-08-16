@@ -135,8 +135,9 @@ describe("thesis-break action logging", () => {
   const day = (i: number) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
   // Fall first so SMA20 sits below SMA50, then rise (entry cross), then grind down.
   for (let i = 0; i < 60; i++) bars.push({ date: day(i), close: 130 - i * 0.4 });
-  for (let i = 0; i < 60; i++) bars.push({ date: day(60 + i), close: 106 + i * 0.6 });
-  for (let i = 0; i < 40; i++) bars.push({ date: day(120 + i), close: 142 - i * 0.3 });
+  // Rise stays under the 15% take-profit so the exit path is the thesis layer.
+  for (let i = 0; i < 45; i++) bars.push({ date: day(60 + i), close: 106 + i * 0.25 });
+  for (let i = 0; i < 45; i++) bars.push({ date: day(105 + i), close: 117.25 - i * 0.18 });
 
   it("records trim and close actions with the agreeing signals", async () => {
     const { replayArm } = await import("@/lib/backtest/thesis-break-replay");
