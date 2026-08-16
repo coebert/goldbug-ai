@@ -103,7 +103,7 @@ describe("loss post-mortem memory", () => {
     const recent = buildLossPostmortems([trip({ exitDate: "2026-08-10" })], asOf).get("AAPL")!;
     const stale = buildLossPostmortems([trip({ exitDate: "2025-10-01" })], asOf).get("AAPL");
     expect(recent.penalty).toBeLessThan(0);
-    expect(stale?.penalty ?? 0).toBe(0);
+    expect(Math.abs(stale?.penalty ?? 0)).toBeLessThan(Math.abs(recent.penalty) / 5);
   });
 
   it("attributes held-too-long exits and tightens the stop", () => {

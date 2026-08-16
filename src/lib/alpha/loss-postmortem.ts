@@ -115,7 +115,10 @@ export function summariseSymbolLosses(
   if (weightedAvgReturnPct < 0) {
     const severity = clamp(Math.abs(weightedAvgReturnPct) / 0.10, 0, 1);
     const repetition = clamp(losses / 3, 0.34, 1);
-    penalty = -MAX_LOSS_PENALTY * severity * repetition;
+    // Recency mass: a single stale round-trip carries almost no weight, so
+    // the memory fades with time instead of just re-normalising.
+    const recency = clamp(wSum, 0, 1);
+    penalty = -MAX_LOSS_PENALTY * severity * repetition * recency;
   }
 
   // Tighten the stop when the record says we sat through big adverse moves.
