@@ -13,6 +13,11 @@ import {
   type ArmResult,
 } from "../src/lib/backtest/thesis-break-replay";
 import { thesisArmReport } from "../src/lib/backtest/thesis-break-report";
+import {
+  compareArmToIndex,
+  indexComparisonReport,
+  type IndexComparison,
+} from "../src/lib/backtest/index-benchmark";
 
 const argv = process.argv.slice(2);
 const arg = (n: string, d: string) => {
@@ -23,6 +28,7 @@ const arg = (n: string, d: string) => {
 const DEFAULT = ["AAPL", "MKS.L", "MSFT", "NVDA", "JPM", "XOM", "KO", "SPY", "GLD", "TSLA"];
 const from = arg("from", "2018-01-01");
 const to = arg("to", new Date().toISOString().slice(0, 10));
+const indexSymbol = arg("index", "SPY"); // S&P 500 proxy
 const symbols = arg("symbols", DEFAULT.join(",")).split(",").map((s) => s.trim());
 
 const pad = (s: string | number, n: number) => String(s).padStart(n);
@@ -104,4 +110,23 @@ for (const s of loaded) {
   const x = a[s] ?? 0;
   const y = b[s] ?? 0;
   console.log([pad(s, 8), pad(x.toFixed(2), 11), pad(y.toFixed(2), 11), pad((y - x >= 0 ? "+" : "") + (y - x).toFixed(2), 9)].join(" "));
+}
+
+// --- real index benchmark ---------------------------------------------------
+const [indexHistory] = await fetchUniverseHistory([indexSymbol], { from, to });
+const indexBars = (indexHistory?.bars ?? [])
+  .filter((b) => Number.isFinite(b.close) && b.close > 0)
+  .map((b) => ({ date: b.date, close: (b.adjClose ?? b.close) as number }));
+
+console.log(`\nBenchmark vs ${indexSymbol} (real index, same window):`);
+if (indexBars.length < 3) {
+  console.log(`  no usable ${indexSymbol} history loaded`);
+} else {
+  const idx = { symbol: indexSymbol, bars: indexBars };
+  const rows = [base, tb]
+    .map((a) => compareArmToIndex(a, idx))
+    .filter((r): r is IndexComparison => r !== null);
+  for (const line of indexComparisonReport(rows)) console.log(line);
+  console.log("");
+  for (const r of rows) console.log(`  ${r.summary}`);
 }
