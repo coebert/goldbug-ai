@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import type { PolicyNudgeReplayResult } from "@/lib/backtest/policy-nudge-replay";
 import { ArmMetricsPanel } from "@/components/backtest/arm-metrics-panel";
+import { ThesisBreakImpactRow } from "@/components/backtest/thesis-break-impact-row";
 import { runPolicyNudgeReplayFn } from "@/lib/backtest/policy-nudge-replay.functions";
 import { TradeMarkerLegend, TradeMarkerShape } from "@/components/charts/trade-markers";
 import { EpisodeBandLegend, renderEpisodeBands } from "@/components/charts/trade-episode-bands";
@@ -353,6 +354,8 @@ export function PolicyNudgeReplayCard({
                 tone={result.delta.cvar95Pct >= 0 ? good : bad}
               />
             </div>
+
+            <ThesisBreakImpactRow />
 
             <ArmMetricsPanel
               arms={ARMS.map((a2) => ({
