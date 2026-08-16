@@ -18,6 +18,7 @@
 
 import { evaluateThesisBreak } from "../exits/thesis-break";
 import { buildLossPostmortems, type RoundTrip } from "../alpha/loss-postmortem";
+import { evidenceFor, type EvidenceTape } from "./thesis-break-evidence";
 
 export type ReplayBar = { date: string; close: number };
 export type ReplayTape = Record<string, ReplayBar[]>;
@@ -63,6 +64,12 @@ export type ReplayOptions = {
   costPct?: number;
   /** Enable the thesis-break layer (arm B). */
   thesisBreak: boolean;
+  /**
+   * Real news / insider / fundamentals evidence. When supplied it replaces the
+   * price-derived stand-ins for those three streams (trend and failed breakout
+   * stay price facts). When omitted the harness falls back to the proxies.
+   */
+  evidence?: EvidenceTape | null;
 };
 
 const sma = (xs: readonly number[], i: number, n: number): number | null => {
@@ -158,10 +165,21 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
         if (unrealised <= -stop) reason = "stop-loss triggered";
         else if (unrealised >= tp) reason = "take-profit";
         else if (opts.thesisBreak) {
+          const priced = evidenceAt(closes, i, pos.entryIdx);
+          const ext = opts.evidence ? evidenceFor(opts.evidence, sym, date) : null;
           const tb = evaluateThesisBreak({
             unrealisedPct: unrealised,
             effectiveStopPct: stop,
-            evidence: evidenceAt(closes, i, pos.entryIdx),
+            evidence: ext
+              ? {
+                  newsScore: ext.newsScore,
+                  newsMomentum: ext.newsMomentum,
+                  insiderNudge: ext.insiderNudge,
+                  fundamentalsScore: ext.fundamentalsScore,
+                  trendBroken: priced.trendBroken,
+                  breakoutFailed: priced.breakoutFailed,
+                }
+              : priced,
           });
           if (tb.fire && tb.sellFraction >= 1) {
             reason = tb.reason ?? "thesis break";
