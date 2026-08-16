@@ -22,3 +22,9 @@ export {
   type BlackoutEvent,
 } from "./event-blackout";
 export { reentryLockoutDays, type ReentryInputs } from "./reentry";
+export {
+  evaluateThesisBreak,
+  type ThesisBreakInputs,
+  type ThesisBreakResult,
+  type ThesisEvidence,
+} from "./thesis-break";
