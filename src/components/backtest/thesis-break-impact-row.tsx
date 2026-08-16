@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { runThesisBreakImpactFn } from "@/lib/backtest/thesis-break-impact.functions";
-import type { ThesisImpactResult } from "@/lib/backtest/thesis-break-impact.server";
+import type { ThesisImpactResult } from "@/lib/backtest/thesis-break-impact";
 
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
 const pp = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}pp`;

@@ -73,3 +73,11 @@ export function computeThesisBreakImpact(
     verdict,
   };
 }
+
+export type ThesisImpactResult = ThesisBreakImpact & {
+  symbols: string[];
+  from: string;
+  to: string;
+  evidenceFrom: string | null;
+  evidenceTo: string | null;
+};

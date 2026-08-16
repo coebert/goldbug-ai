@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { ThesisImpactResult } from "./thesis-break-impact.server";
+import type { ThesisImpactResult } from "./thesis-break-impact";
 
 /** Replays the tape with the thesis-break exit layer off and on. */
 export const runThesisBreakImpactFn = createServerFn({ method: "POST" })

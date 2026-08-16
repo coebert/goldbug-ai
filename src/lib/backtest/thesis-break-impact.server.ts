@@ -6,7 +6,9 @@ import { fetchUniverseHistory } from "@/lib/real-market-tape.server";
 import { loadRealEvidenceTape } from "./thesis-break-evidence.server";
 import type { EvidenceNewsRow } from "./thesis-break-evidence";
 import { replayArm, splitFiringsByHistory, type ReplayTape } from "./thesis-break-replay";
-import { computeThesisBreakImpact, type ThesisBreakImpact } from "./thesis-break-impact";
+import { computeThesisBreakImpact, type ThesisImpactResult } from "./thesis-break-impact";
+
+export type { ThesisImpactResult };
 
 export const THESIS_IMPACT_UNIVERSE = [
   "AAPL",
@@ -56,14 +58,6 @@ export type ThesisImpactRequest = {
   symbols?: string[];
   /** Calendar days of price history to replay (warm-up included). */
   lookbackDays?: number;
-};
-
-export type ThesisImpactResult = ThesisBreakImpact & {
-  symbols: string[];
-  from: string;
-  to: string;
-  evidenceFrom: string | null;
-  evidenceTo: string | null;
 };
 
 export async function runThesisBreakImpact(
