@@ -40,6 +40,28 @@ export type ReplayTrade = {
   thesisBreak: boolean;
   /** Agreeing evidence streams at the moment of the cut. */
   signals: string[];
+  /** Thesis-break actions taken while the position was open, in order. */
+  thesisActions: ThesisBreakEvent[];
+  /** Fraction of the original size the thesis layer took off before the exit. */
+  trimmedFraction: number;
+};
+
+/** One thesis-break action: a half trim, or the full close. */
+export type ThesisBreakEvent = {
+  symbol: string;
+  date: string;
+  entryDate: string;
+  action: "trim" | "close";
+  /** Fraction of the *remaining* position sold by this action. */
+  sellFraction: number;
+  /** Unrealised return at the moment the layer fired. */
+  unrealisedPct: number;
+  effectiveStopPct: number;
+  /** Losing round-trips already booked on this symbol before the trade. */
+  priorLosses: number;
+  /** Every evidence stream that agreed at that moment. */
+  signals: string[];
+  reason: string;
 };
 
 export type ArmResult = {
@@ -51,7 +73,18 @@ export type ArmResult = {
   avgLossPct: number;
   trades: ReplayTrade[];
   exitMix: Record<string, number>;
+  /** Every thesis-break action, trims included (empty on the stop-only arm). */
+  thesisEvents: ThesisBreakEvent[];
+  /** How often each evidence stream agreed, across all firings. */
+  signalCounts: Record<string, number>;
+  /** Trim vs close split of the thesis-break firings. */
+  actionMix: { trim: number; close: number };
 };
+
+/** Collapse "news hostile (-0.32)" to "news hostile" for tallying. */
+export function signalKind(signal: string): string {
+  return signal.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
 
 export type ReplayOptions = {
   /** Cash allocated to each symbol sleeve. */
@@ -128,8 +161,19 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
 
   const trades: ReplayTrade[] = [];
   const cash: Record<string, number> = Object.fromEntries(symbols.map((s) => [s, sleeve]));
-  const open: Record<string, { entryIdx: number; entryDate: string; entryPrice: number; qty: number } | null> =
-    Object.fromEntries(symbols.map((s) => [s, null]));
+  const open: Record<
+    string,
+    {
+      entryIdx: number;
+      entryDate: string;
+      entryPrice: number;
+      qty: number;
+      /** Size at entry, so trims can be expressed as a fraction of it. */
+      qty0: number;
+      actions: ThesisBreakEvent[];
+    } | null
+  > = Object.fromEntries(symbols.map((s) => [s, null]));
+  const thesisEvents: ThesisBreakEvent[] = [];
   const equity: Array<{ date: string; value: number }> = [];
 
   for (const date of dates) {
@@ -181,10 +225,39 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
                 }
               : priced,
           });
-          if (tb.fire && tb.sellFraction >= 1) {
-            reason = tb.reason ?? "thesis break";
-            signals = tb.signals;
-            viaThesis = true;
+          if (tb.fire) {
+            const priorLosses = trades.filter((t) => t.symbol === sym && t.returnPct < 0).length;
+            const full = tb.sellFraction >= 1;
+            // One trim per position: a half trim is a warning shot, not a
+            // ratchet that bleeds the sleeve out a slice at a time.
+            const alreadyTrimmed = pos.actions.some((a) => a.action === "trim");
+            if (full || !alreadyTrimmed) {
+              const event: ThesisBreakEvent = {
+                symbol: sym,
+                date,
+                entryDate: pos.entryDate,
+                action: full ? "close" : "trim",
+                sellFraction: full ? 1 : tb.sellFraction,
+                unrealisedPct: unrealised,
+                effectiveStopPct: stop,
+                priorLosses,
+                signals: tb.signals,
+                reason: tb.reason ?? "thesis break",
+              };
+              pos.actions.push(event);
+              thesisEvents.push(event);
+
+              if (full) {
+                reason = tb.reason ?? "thesis break";
+                signals = tb.signals;
+                viaThesis = true;
+              } else {
+                // Half trim: bank the slice, keep the rest of the position.
+                const sellQty = pos.qty * tb.sellFraction;
+                cash[sym] = cash[sym]! + sellQty * price * (1 - cost);
+                pos.qty -= sellQty;
+              }
+            }
           }
         }
 
@@ -204,6 +277,9 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
             priorLosses,
             thesisBreak: viaThesis,
             signals,
+            thesisActions: pos.actions,
+            trimmedFraction:
+              pos.qty0 > 0 ? Math.max(0, Math.min(1, 1 - pos.qty / pos.qty0)) : 0,
           });
           open[sym] = null;
         }
@@ -216,7 +292,14 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
         if (s20 != null && s50 != null && p20 != null && p50 != null && p20 <= p50 && s20 > s50) {
           const spend = cash[sym]! * (1 - cost);
           if (spend > 0 && price > 0) {
-            open[sym] = { entryIdx: i, entryDate: date, entryPrice: price, qty: spend / price };
+            open[sym] = {
+              entryIdx: i,
+              entryDate: date,
+              entryPrice: price,
+              qty: spend / price,
+              qty0: spend / price,
+              actions: [],
+            };
             cash[sym] = 0;
           }
         }
@@ -247,6 +330,15 @@ export function replayArm(tape: ReplayTape, opts: ReplayOptions): ArmResult {
   for (const t of trades) {
     const k = t.thesisBreak ? "thesis-break" : t.exitReason.split("(")[0]!.trim();
     exitMix[k] = (exitMix[k] ?? 0) + 1;
+  }
+  const signalCounts: Record<string, number> = {};
+  const actionMix = { trim: 0, close: 0 };
+  for (const e of thesisEvents) {
+    actionMix[e.action] += 1;
+    for (const s of e.signals) {
+      const k = signalKind(s);
+      signalCounts[k] = (signalCounts[k] ?? 0) + 1;
+    }
   }
 
   return {
