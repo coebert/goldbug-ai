@@ -23,6 +23,11 @@ import {
   type ReplayTape,
 } from "../src/lib/backtest/thesis-break-replay";
 import { thesisArmReport } from "../src/lib/backtest/thesis-break-report";
+import {
+  compareArmToIndex,
+  indexComparisonReport,
+  type IndexComparison,
+} from "../src/lib/backtest/index-benchmark";
 
 const argv = process.argv.slice(2);
 const arg = (n: string, d: string) => {
@@ -34,6 +39,7 @@ const DEFAULT = ["AAPL", "MKS.L", "MSFT", "NVDA", "JPM", "TSCO.L", "BP.L", "TSLA
 const evidenceFrom = arg("from", "2026-05-01");
 const to = arg("to", new Date().toISOString().slice(0, 10));
 const priceFrom = arg("price-from", "2025-09-01"); // SMA20/50 warm-up
+const indexSymbol = arg("index", "SPY"); // S&P 500 proxy
 const symbols = arg("symbols", DEFAULT.join(",")).split(",").map((s) => s.trim().toUpperCase());
 
 const pad = (s: string | number, n: number) => String(s).padStart(n);
@@ -164,4 +170,25 @@ for (const t of fires.slice(0, 40)) {
       t.signals.join("; "),
     ].join(" "),
   );
+}
+
+// --- real index benchmark ---------------------------------------------------
+// The arms are scored against a live market index over exactly the sessions
+// they were running, rather than a synthetic buy-and-hold of the universe.
+const [indexHistory] = await fetchUniverseHistory([indexSymbol], { from: priceFrom, to });
+const indexBars = (indexHistory?.bars ?? [])
+  .filter((b) => Number.isFinite(b.close) && b.close > 0)
+  .map((b) => ({ date: b.date, close: (b.adjClose ?? b.close) as number }));
+
+console.log(`\nBenchmark vs ${indexSymbol} (real index, same window):`);
+if (indexBars.length < 3) {
+  console.log(`  no usable ${indexSymbol} history loaded`);
+} else {
+  const idx = { symbol: indexSymbol, bars: indexBars };
+  const rows = [base, tb, proxy]
+    .map((a) => compareArmToIndex(a, idx))
+    .filter((r): r is IndexComparison => r !== null);
+  for (const line of indexComparisonReport(rows)) console.log(line);
+  console.log("");
+  for (const r of rows) console.log(`  ${r.summary}`);
 }
