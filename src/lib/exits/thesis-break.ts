@@ -25,7 +25,7 @@ export type ThesisEvidence = {
   newsMomentum: number | null;
   /** Insider nudge already computed by the engine, −1..1. */
   insiderNudge: number | null;
-  /** Fundamentals health 0..1 (null = unknown); below 0.35 counts as weak. */
+  /** Fundamentals score −1..1 (null = unknown); at/below −0.2 counts as weak. */
   fundamentalsScore: number | null;
   /** True when SMA20 is below SMA50 (trend has rolled over). */
   trendBroken: boolean;
@@ -58,7 +58,7 @@ export type ThesisBreakResult = {
 const NEWS_HOSTILE = -0.2;
 const MOMENTUM_FADING = -0.1;
 const INSIDER_BEARISH = -0.05;
-const FUNDAMENTALS_WEAK = 0.35;
+const FUNDAMENTALS_WEAK = -0.2;
 
 export function evaluateThesisBreak(i: ThesisBreakInputs): ThesisBreakResult {
   const none: ThesisBreakResult = { fire: false, sellFraction: 0, signals: [], reason: null };
@@ -79,7 +79,7 @@ export function evaluateThesisBreak(i: ThesisBreakInputs): ThesisBreakResult {
   if (e.insiderNudge != null && e.insiderNudge <= INSIDER_BEARISH) {
     signals.push(`insider selling (${e.insiderNudge.toFixed(2)})`);
   }
-  if (e.fundamentalsScore != null && e.fundamentalsScore < FUNDAMENTALS_WEAK) {
+  if (e.fundamentalsScore != null && e.fundamentalsScore <= FUNDAMENTALS_WEAK) {
     signals.push(`weak fundamentals (${e.fundamentalsScore.toFixed(2)})`);
   }
   if (e.trendBroken) signals.push("trend broken (SMA20<SMA50)");
