@@ -127,3 +127,64 @@ describe("buildEvidenceTape", () => {
     expect(e.fundamentalsScore).toBe(0.4);
   });
 });
+
+describe("thesis-break action logging", () => {
+  // Long slow rise (so SMA20 crosses SMA50 and a position opens), then a
+  // grinding fall that arms the layer without hitting the 8% stop at once.
+  const bars: Array<{ date: string; close: number }> = [];
+  const day = (i: number) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+  for (let i = 0; i < 80; i++) bars.push({ date: day(i), close: 100 + i * 0.6 });
+  for (let i = 0; i < 30; i++) bars.push({ date: day(80 + i), close: 148 - i * 0.35 });
+
+  it("records trim and close actions with the agreeing signals", async () => {
+    const { replayArm } = await import("@/lib/backtest/thesis-break-replay");
+    const { buildEvidenceTape } = await import("@/lib/backtest/thesis-break-evidence");
+    const dates = bars.map((b) => b.date);
+    const evidence = buildEvidenceTape({
+      symbols: ["ACME"],
+      news: [],
+      insider: dates
+        .filter((_, i) => i % 10 === 0)
+        .map((d) => ({ symbol: "ACME", date: d, direction: "sell" as const, value: 800_000 })),
+      fundamentals: { ACME: -0.5 },
+      dates,
+    });
+
+    const arm = replayArm({ ACME: bars }, { thesisBreak: true, evidence });
+    expect(arm.thesisEvents.length).toBeGreaterThan(0);
+    expect(arm.actionMix.trim + arm.actionMix.close).toBe(arm.thesisEvents.length);
+    for (const e of arm.thesisEvents) {
+      expect(e.signals.length).toBeGreaterThanOrEqual(2);
+      expect(e.action === "trim" ? e.sellFraction < 1 : e.sellFraction === 1).toBe(true);
+      expect(e.unrealisedPct).toBeLessThan(0);
+    }
+    expect(Object.keys(arm.signalCounts).length).toBeGreaterThan(0);
+  });
+
+  it("trims at most once per position and reports the trimmed fraction", async () => {
+    const { replayArm } = await import("@/lib/backtest/thesis-break-replay");
+    const { buildEvidenceTape } = await import("@/lib/backtest/thesis-break-evidence");
+    const dates = bars.map((b) => b.date);
+    const evidence = buildEvidenceTape({
+      symbols: ["ACME"],
+      news: [],
+      insider: dates.map((d) => ({ symbol: "ACME", date: d, direction: "sell" as const, value: 800_000 })),
+      fundamentals: { ACME: -0.5 },
+      dates,
+    });
+    const arm = replayArm({ ACME: bars }, { thesisBreak: true, evidence });
+    for (const t of arm.trades) {
+      expect(t.thesisActions.filter((a) => a.action === "trim").length).toBeLessThanOrEqual(1);
+      expect(t.trimmedFraction).toBeGreaterThanOrEqual(0);
+      expect(t.trimmedFraction).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("logs nothing on the stop-only arm", async () => {
+    const { replayArm } = await import("@/lib/backtest/thesis-break-replay");
+    const arm = replayArm({ ACME: bars }, { thesisBreak: false });
+    expect(arm.thesisEvents).toEqual([]);
+    expect(arm.actionMix).toEqual({ trim: 0, close: 0 });
+    expect(arm.trades.every((t) => t.thesisActions.length === 0)).toBe(true);
+  });
+});
