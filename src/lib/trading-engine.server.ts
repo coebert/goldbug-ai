@@ -185,6 +185,9 @@ import {
   evaluateEventBlackout,
   reentryLockoutDays,
 } from "./exits";
+import { evaluateThesisBreak } from "./exits/thesis-break";
+import { formatLossPostmortemBlock } from "./alpha/loss-postmortem";
+import { loadLossPostmortems } from "./loss-postmortem.server";
 import { scoreUniverseWithDiagnostics, formatAlphaPriorsForPrompt, formatBreakoutBlock, breakoutRegimeAction } from "./alpha";
 import { unifiedVolSize } from "./sizing/unified-vol-size";
 import { alphaConvictionBonus } from "./alpha/sizing";
@@ -658,6 +661,13 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   );
   const insiderBlock = formatInsiderBlock(insiderSignals);
 
+  // Decaying memory of how this book actually lost money, per symbol. Feeds a
+  // bounded score penalty, a tighter stop, and its own prompt block.
+  const lossMemory = await loadLossPostmortems(portfolioId, asOf).catch(
+    () => new Map<string, import("./alpha/loss-postmortem").SymbolPostmortem>(),
+  );
+  const lossMemoryBlock = formatLossPostmortemBlock(lossMemory);
+
   for (const f of features) {
     const agg = aggregatedSentimentForSymbol(f.symbol, f.name, scoredNews, asOf);
     const execNudge = learnedExecPostNudge(f.symbol, execPostSignals, execCoefficients).nudge;
@@ -684,9 +694,14 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
             policyNudgeScaleForSign(policyRegime, Math.sign(policyNudgeRaw)),
           );
     const base = agg.contributors > 0 ? agg.score : 0;
-    const blended = Math.max(-1, Math.min(1, base + execNudge + evTilt + insiderNudge + policyNudge));
+    // Bounded penalty from this symbol's own realised-loss record (decays).
+    const lossPenalty = lossMemory.get(f.symbol.toUpperCase())?.penalty ?? 0;
+    const blended = Math.max(
+      -1,
+      Math.min(1, base + execNudge + evTilt + insiderNudge + policyNudge + lossPenalty),
+    );
     f.news_score =
-      agg.contributors > 0 || execNudge !== 0 || evTilt !== 0 || insiderNudge !== 0 || policyNudge !== 0
+      agg.contributors > 0 || execNudge !== 0 || evTilt !== 0 || insiderNudge !== 0 || policyNudge !== 0 || lossPenalty !== 0
         ? Number(blended.toFixed(3))
         : null;
     f.news_contributors = agg.contributors;
@@ -1003,7 +1018,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
         crossSectional: formatCrossSectionalBlock(rankMap),
         marketEvents: `${
           macroPlaybookBlock ? `${marketEventsBlock}\n\n${macroPlaybookBlock}` : marketEventsBlock
-        }\n\n${insiderBlock}\n\n${policyBlock}`,
+        }\n\n${insiderBlock}\n\n${policyBlock}\n\n${lossMemoryBlock}`,
         events,
         cooling: coolingSymbols,
         asOf,
