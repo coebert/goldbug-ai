@@ -126,7 +126,7 @@ describe("round-trip reconstruction", () => {
     ]);
     expect(trips).toHaveLength(2);
     expect(trips[0].returnPct).toBeCloseTo(-0.1, 6);
-    expect(trips[1].returnPct).toBeCloseTo(-90 / 110 + 1 - 2 * (1 - 90 / 110) + (1 - 90 / 110), 6);
+    expect(trips[1].returnPct).toBeCloseTo((90 - 110) / 110, 6);
     expect(trips[0].holdDays).toBe(30);
   });
 });
