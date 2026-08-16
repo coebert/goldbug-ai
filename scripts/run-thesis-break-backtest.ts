@@ -12,6 +12,7 @@ import {
   type ReplayTape,
   type ArmResult,
 } from "../src/lib/backtest/thesis-break-replay";
+import { thesisArmReport } from "../src/lib/backtest/thesis-break-report";
 
 const argv = process.argv.slice(2);
 const arg = (n: string, d: string) => {
@@ -53,6 +54,10 @@ console.log([pad("Arm", 13), pad("Ret%", 9), pad("MaxDD%", 9), pad("Win%", 7), p
 console.log("-".repeat(58));
 console.log(row(base));
 console.log(row(tb));
+
+console.log("\nThesis-break action log (trims and closes, with agreeing signals):");
+for (const line of thesisArmReport(base, "stop-only arm")) console.log(line);
+for (const line of thesisArmReport(tb, "thesis-break arm")) console.log(line);
 
 console.log("\nExit mix (thesis-break arm):");
 for (const [k, v] of Object.entries(tb.exitMix).sort((a, b) => b[1] - a[1])) {
