@@ -107,4 +107,25 @@ export function denormalizePriceToQuoteUnits(symbol: string, price: number): num
   return isLseGbxDisplayQuoted(symbol) ? price * 100 : price;
 }
 
+/**
+ * Broker-bound price in the instrument's native quote units, using both the
+ * symbol rule and the broker's own quote currency.
+ *
+ * Saxo reports `GBX` on many LSE listings, including ones our symbol rule
+ * can't classify (a bare `MKS` with no venue suffix, secondary listings).
+ * Either signal saying "pence" is enough; a GBP-quoted LSE ETF passes
+ * through untouched because neither signal fires.
+ */
+export function nativeQuotePrice(
+  symbol: string,
+  price: number,
+  brokerCurrency?: string | null,
+): number {
+  if (!Number.isFinite(price)) return 0;
+  const bySymbol = denormalizePriceToQuoteUnits(symbol, price);
+  if (bySymbol !== price) return bySymbol;
+  const ccy = String(brokerCurrency ?? "").trim().toUpperCase();
+  return ccy === "GBX" ? price * 100 : price;
+}
+
 
