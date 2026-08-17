@@ -92,3 +92,19 @@ export function holdingAvgCostBase(
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * Inverse of `normalizeMarketPriceForTrading`: take a price already
+ * normalised into the base currency (GBP) and express it back in the
+ * instrument's **native quote units** before sending it to the broker.
+ *
+ * Saxo quotes LSE common stocks in GBX, so a limit price of 4.05 (GBP) on
+ * MKS:xlon sits ~100x below the ~404p market and the venue rejects the
+ * order with "Price exceeds aggressive tolerance". Every broker-bound
+ * price must pass through here.
+ */
+export function denormalizePriceToQuoteUnits(symbol: string, price: number): number {
+  if (!Number.isFinite(price)) return 0;
+  return isLseGbxDisplayQuoted(symbol) ? price * 100 : price;
+}
+
+
