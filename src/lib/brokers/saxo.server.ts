@@ -18,6 +18,12 @@ import type {
 import { asJson } from "@/lib/_server/db-json";
 import { redactedError } from "@/lib/_server/redact";
 import { nativeQuotePrice } from "@/lib/market-price-units";
+import {
+  roundPriceToTick,
+  tickSizeForPrice,
+  type SaxoTickSizeScheme,
+} from "@/lib/broker-tick-size";
+
 import type { ZodTypeAny } from "zod";
 import {
   parseSaxo,
@@ -681,6 +687,36 @@ export class SaxoAdapter implements BrokerAdapter {
     };
   }
 
+  /**
+   * Instrument tick-size scheme, memoised per adapter instance. Best-effort:
+   * a failed lookup falls back to the LSE pence ladder rather than blocking
+   * the order.
+   */
+  private tickSchemeCache = new Map<string, SaxoTickSizeScheme | null>();
+
+  private async fetchTickScheme(
+    uic: number,
+    assetType: string,
+  ): Promise<SaxoTickSizeScheme | null> {
+    const key = `${uic}:${assetType}`;
+    const cached = this.tickSchemeCache.get(key);
+    if (cached !== undefined) return cached;
+    let scheme: SaxoTickSizeScheme | null = null;
+    try {
+      const det = await this.req<{
+        TickSizeScheme?: SaxoTickSizeScheme;
+        TickSize?: number;
+      }>("GET", `/ref/v1/instruments/details/${uic}/${assetType}`);
+      scheme =
+        det.TickSizeScheme ??
+        (Number.isFinite(det.TickSize) ? { DefaultTickSize: det.TickSize } : null);
+    } catch {
+      scheme = null;
+    }
+    this.tickSchemeCache.set(key, scheme);
+    return scheme;
+  }
+
 
   async placeOrder(req: BrokerOrderRequest): Promise<BrokerOrderResult> {
     const inst = await this.lookupUic(req.symbol);
@@ -723,14 +759,29 @@ export class SaxoAdapter implements BrokerAdapter {
     //     `MKS` with no venue suffix, depositary lines, secondary listings).
     // Either one is enough; a symbol we can't classify is still routed in
     // pence when Saxo says the instrument is pence-quoted.
-    const toQuote = (p: number) =>
-      Math.round(nativeQuotePrice(req.symbol, p, inst.currency) * 100) / 100;
+    //
+    // The native price must ALSO sit exactly on the instrument's tick grid,
+    // or Saxo rejects with "The order price is not in tick size increments."
+    // (404.75p on a 0.20p tick — the second MKS rejection). Fetch the tick
+    // scheme from instrument details, snapping sells down / buys up so the
+    // rounding can only make the order more marketable.
+    const tickScheme = await this.fetchTickScheme(inst.uic, inst.assetType);
+    const toQuote = (p: number) => {
+      const native = nativeQuotePrice(req.symbol, p, inst.currency);
+      const penceQuoted = native !== p || String(inst.currency).toUpperCase() === "GBX";
+      const tick =
+        (Number.isFinite(inst.tickSize) && (inst.tickSize ?? 0) > 0 && !tickScheme
+          ? inst.tickSize!
+          : null) ?? tickSizeForPrice(native, tickScheme, { penceQuoted });
+      return roundPriceToTick(native, tick, req.side);
+    };
     if (req.orderType === "limit" && req.limitPrice != null) {
       body.OrderPrice = toQuote(req.limitPrice);
     }
     if (req.orderType === "stop" && req.stopPrice != null) {
       body.OrderPrice = toQuote(req.stopPrice);
     }
+
 
     // Pre-flight against Saxo's precheck endpoint. This validates the order
     // against the *broker's* cash balance and position rules without actually
