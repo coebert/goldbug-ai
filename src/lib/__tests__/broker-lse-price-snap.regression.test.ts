@@ -52,17 +52,22 @@ describe("LSE broker price snap (MKS + TSCO)", () => {
     expect(brokerPrice("TSCO.L", 4.19893, "sell")).toBeCloseTo(419.8, 6);
   });
 
-  it("leaves GBP-quoted LSE ETFs in pounds and only rounds to their tick", () => {
-    expect(brokerPrice("VUSA.L", 91.237, "sell", "GBP")).toBeCloseTo(91.23, 6);
+  it("leaves GBP-quoted LSE ETFs in pounds", () => {
+    const native = nativeQuotePrice("VUSA.L", 91.237, "GBP");
+    expect(native).toBe(91.237);
+    // No pence ladder applies; the price only gets Saxo's 2dp rounding.
+    expect(roundPriceToTick(native, null, "sell")).toBe(91.24);
   });
 
-  it("every snapped price is an exact multiple of its tick", () => {
+  it("every snapped price is an exact multiple of its own band tick", () => {
     for (const base of [4.047531, 4.564059, 3.7237, 9.9999]) {
       for (const side of ["buy", "sell"] as const) {
-        const p = brokerPrice("MKS:xlon", base, side);
-        const tick = tickSizeForPrice(p, LSE_SETS_SCHEME, { penceQuoted: true })!;
+        const native = nativeQuotePrice("MKS:xlon", base, "GBX");
+        const tick = tickSizeForPrice(native, LSE_SETS_SCHEME, { penceQuoted: true })!;
+        const p = roundPriceToTick(native, tick, side);
         expect(Math.abs(Math.round(p / tick) - p / tick)).toBeLessThan(1e-6);
       }
     }
   });
+
 });
