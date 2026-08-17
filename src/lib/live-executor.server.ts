@@ -13,6 +13,7 @@ import { assessTradeViability, modelledFillFee } from "@/lib/trade-viability-gat
 import { resolveFillRecord } from "@/lib/fill-record";
 import { planMarketableLimit } from "@/lib/marketable-limit";
 import { placeProtectiveStopAfterBuyFill } from "@/lib/protective-stop-placement.server";
+import { shouldRetrySellAsMarket } from "@/lib/broker-sell-recovery";
 
 
 export interface ExecutedOrderLike {
@@ -1923,6 +1924,50 @@ export async function routeOrdersToBroker(params: {
           : { orderType: "market" as const }),
         clientOrderId,
       });
+      // A malformed limit price must never strand an exit. If Saxo accepts
+      // the instrument/quantity but rejects only the tick or tolerance, retry
+      // the SELL once as a market order. BUYs never use this escape hatch.
+      if (
+        limitPlan &&
+        shouldRetrySellAsMarket({
+          side: order.side,
+          status: brokerRes.status,
+          reason: brokerRes.reason,
+        })
+      ) {
+        const firstReason = brokerRes.reason ?? brokerRes.status;
+        brokerRes = await adapter.placeOrder({
+          symbol: order.symbol,
+          side: "sell",
+          quantity: qty,
+          orderType: "market",
+          clientOrderId: `${clientOrderId}-mkt`.slice(0, 50),
+        });
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: adapter.env,
+          method: "SELL_PRICE_REJECTION_MARKET_RETRY",
+          path: "live_orders",
+          status: null,
+          request: asJson({
+            symbol: order.symbol,
+            quantity: qty,
+            rejectedLimit: limitPlan.limitPrice,
+            firstReason,
+          }),
+          response: asJson({
+            status: brokerRes.status,
+            brokerOrderId: brokerRes.brokerOrderId,
+            reason: brokerRes.reason ?? null,
+          }),
+          error:
+            brokerRes.status === "rejected" || brokerRes.status === "error"
+              ? (brokerRes.reason ?? brokerRes.status)
+              : null,
+        });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await supabaseAdmin
