@@ -723,14 +723,29 @@ export class SaxoAdapter implements BrokerAdapter {
     //     `MKS` with no venue suffix, depositary lines, secondary listings).
     // Either one is enough; a symbol we can't classify is still routed in
     // pence when Saxo says the instrument is pence-quoted.
-    const toQuote = (p: number) =>
-      Math.round(nativeQuotePrice(req.symbol, p, inst.currency) * 100) / 100;
+    //
+    // The native price must ALSO sit exactly on the instrument's tick grid,
+    // or Saxo rejects with "The order price is not in tick size increments."
+    // (404.75p on a 0.20p tick — the second MKS rejection). Fetch the tick
+    // scheme from instrument details, snapping sells down / buys up so the
+    // rounding can only make the order more marketable.
+    const tickScheme = await this.fetchTickScheme(inst.uic, inst.assetType);
+    const toQuote = (p: number) => {
+      const native = nativeQuotePrice(req.symbol, p, inst.currency);
+      const penceQuoted = native !== p || String(inst.currency).toUpperCase() === "GBX";
+      const tick =
+        (Number.isFinite(inst.tickSize) && (inst.tickSize ?? 0) > 0 && !tickScheme
+          ? inst.tickSize!
+          : null) ?? tickSizeForPrice(native, tickScheme, { penceQuoted });
+      return roundPriceToTick(native, tick, req.side);
+    };
     if (req.orderType === "limit" && req.limitPrice != null) {
       body.OrderPrice = toQuote(req.limitPrice);
     }
     if (req.orderType === "stop" && req.stopPrice != null) {
       body.OrderPrice = toQuote(req.stopPrice);
     }
+
 
     // Pre-flight against Saxo's precheck endpoint. This validates the order
     // against the *broker's* cash balance and position rules without actually
