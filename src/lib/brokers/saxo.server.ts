@@ -687,6 +687,36 @@ export class SaxoAdapter implements BrokerAdapter {
     };
   }
 
+  /**
+   * Instrument tick-size scheme, memoised per adapter instance. Best-effort:
+   * a failed lookup falls back to the LSE pence ladder rather than blocking
+   * the order.
+   */
+  private tickSchemeCache = new Map<string, SaxoTickSizeScheme | null>();
+
+  private async fetchTickScheme(
+    uic: number,
+    assetType: string,
+  ): Promise<SaxoTickSizeScheme | null> {
+    const key = `${uic}:${assetType}`;
+    const cached = this.tickSchemeCache.get(key);
+    if (cached !== undefined) return cached;
+    let scheme: SaxoTickSizeScheme | null = null;
+    try {
+      const det = await this.req<{
+        TickSizeScheme?: SaxoTickSizeScheme;
+        TickSize?: number;
+      }>("GET", `/ref/v1/instruments/details/${uic}/${assetType}`);
+      scheme =
+        det.TickSizeScheme ??
+        (Number.isFinite(det.TickSize) ? { DefaultTickSize: det.TickSize } : null);
+    } catch {
+      scheme = null;
+    }
+    this.tickSchemeCache.set(key, scheme);
+    return scheme;
+  }
+
 
   async placeOrder(req: BrokerOrderRequest): Promise<BrokerOrderResult> {
     const inst = await this.lookupUic(req.symbol);
