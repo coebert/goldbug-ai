@@ -17,6 +17,7 @@ import { decideSimFill } from "./sim-fill-rules";
 import { getMarketStatusForSymbol, inferVenue, marketHadOpenPeriod } from "./market-hours";
 import { resolveFillRecord, type FillPriceCandidate } from "./fill-record";
 import { modelledFillFee } from "./trade-viability-gate";
+import { placeProtectiveStopAfterBuyFill } from "./protective-stop-placement.server";
 
 export type OrderReconcileOutcome =
   | "filled"
@@ -397,6 +398,13 @@ export async function reconcileOrderStatusesForPortfolio(params: {
               source: "reconciler:position",
             });
           }
+          if (!ins.error) {
+            await placeProtectiveStopAfterBuyFill({
+              adapter, portfolioId, userId, orderId: row.id as string,
+              symbol: row.symbol as string, side: row.side as string,
+              quantity: qty, fillPrice, source: "reconciler:position",
+            });
+          }
           summary.filled++;
           summary.rows.push({
             orderId: row.id as string, brokerOrderId, symbol: row.symbol as string,
@@ -534,6 +542,13 @@ export async function reconcileOrderStatusesForPortfolio(params: {
               path: "live_fills", status: null,
               request: asJson({ orderId: row.id, brokerOrderId }),
               error: ins.error.message,
+            });
+          }
+          if (!ins.error) {
+            await placeProtectiveStopAfterBuyFill({
+              adapter, portfolioId, userId, orderId: row.id as string,
+              symbol: row.symbol as string, side: row.side as string,
+              quantity: qty, fillPrice: resolved.fillPrice, source: "reconciler:presumed",
             });
           }
         }
@@ -772,6 +787,14 @@ export async function reconcileOrderStatusesForPortfolio(params: {
             avgFillPrice: histFill.fillPrice,
             saxoStatus: hist.status,
             saxoResponse: hist,
+          });
+        }
+        if (!ins.error) {
+          await placeProtectiveStopAfterBuyFill({
+            adapter, portfolioId, userId, orderId: row.id as string,
+            symbol: row.symbol as string, side: row.side as string,
+            quantity: hist.filledAmount, fillPrice: histFill.fillPrice,
+            source: "reconciler:history",
           });
         }
       }
