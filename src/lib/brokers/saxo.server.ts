@@ -710,8 +710,19 @@ export class SaxoAdapter implements BrokerAdapter {
     };
 
     if (accountKey) body.AccountKey = accountKey;
-    if (req.orderType === "limit" && req.limitPrice != null) body.OrderPrice = req.limitPrice;
-    if (req.orderType === "stop" && req.stopPrice != null) body.OrderPrice = req.stopPrice;
+    // Prices upstream are normalised into the portfolio's base currency
+    // (GBP). Saxo expects the instrument's NATIVE quote units — pence for
+    // LSE common stocks — so a GBP-scaled limit is ~100x too low and the
+    // venue rejects it with "Price exceeds aggressive tolerance". Convert
+    // back, then round to the 2dp Saxo accepts on LSE quotes.
+    const toQuote = (p: number) =>
+      Math.round(denormalizePriceToQuoteUnits(req.symbol, p) * 100) / 100;
+    if (req.orderType === "limit" && req.limitPrice != null) {
+      body.OrderPrice = toQuote(req.limitPrice);
+    }
+    if (req.orderType === "stop" && req.stopPrice != null) {
+      body.OrderPrice = toQuote(req.stopPrice);
+    }
 
     // Pre-flight against Saxo's precheck endpoint. This validates the order
     // against the *broker's* cash balance and position rules without actually
