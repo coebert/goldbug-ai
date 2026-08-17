@@ -723,12 +723,8 @@ export class SaxoAdapter implements BrokerAdapter {
     //     `MKS` with no venue suffix, depositary lines, secondary listings).
     // Either one is enough; a symbol we can't classify is still routed in
     // pence when Saxo says the instrument is pence-quoted.
-    const brokerSaysPence = String(inst.currency ?? "").trim().toUpperCase() === "GBX";
-    const toQuote = (p: number) => {
-      const bySymbol = denormalizePriceToQuoteUnits(req.symbol, p);
-      const native = bySymbol !== p ? bySymbol : brokerSaysPence ? p * 100 : p;
-      return Math.round(native * 100) / 100;
-    };
+    const toQuote = (p: number) =>
+      Math.round(nativeQuotePrice(req.symbol, p, inst.currency) * 100) / 100;
     if (req.orderType === "limit" && req.limitPrice != null) {
       body.OrderPrice = toQuote(req.limitPrice);
     }
