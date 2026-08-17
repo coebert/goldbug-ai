@@ -18,6 +18,12 @@ import type {
 import { asJson } from "@/lib/_server/db-json";
 import { redactedError } from "@/lib/_server/redact";
 import { nativeQuotePrice } from "@/lib/market-price-units";
+import {
+  roundPriceToTick,
+  tickSizeForPrice,
+  type SaxoTickSizeScheme,
+} from "@/lib/broker-tick-size";
+
 import type { ZodTypeAny } from "zod";
 import {
   parseSaxo,
