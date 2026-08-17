@@ -17,6 +17,7 @@ import type {
 } from "./adapter";
 import { asJson } from "@/lib/_server/db-json";
 import { redactedError } from "@/lib/_server/redact";
+import { denormalizePriceToQuoteUnits } from "@/lib/market-price-units";
 import type { ZodTypeAny } from "zod";
 import {
   parseSaxo,
