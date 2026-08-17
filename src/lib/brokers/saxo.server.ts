@@ -712,11 +712,23 @@ export class SaxoAdapter implements BrokerAdapter {
     if (accountKey) body.AccountKey = accountKey;
     // Prices upstream are normalised into the portfolio's base currency
     // (GBP). Saxo expects the instrument's NATIVE quote units — pence for
-    // LSE common stocks — so a GBP-scaled limit is ~100x too low and the
-    // venue rejects it with "Price exceeds aggressive tolerance". Convert
-    // back, then round to the 2dp Saxo accepts on LSE quotes.
-    const toQuote = (p: number) =>
-      Math.round(denormalizePriceToQuoteUnits(req.symbol, p) * 100) / 100;
+    // LSE common stocks — so a GBP-scaled limit or stop is ~100x below the
+    // market and the venue rejects it with "Price exceeds aggressive
+    // tolerance". Convert back, then round to the 2dp Saxo accepts.
+    //
+    // Two independent signals decide "this instrument quotes in pence":
+    //  1. the symbol rule (`MKS.L` / `MKS:xlon`, minus the GBP allowlist),
+    //  2. the broker's own CurrencyCode, which is literally `GBX` for many
+    //     LSE listings — including ones whose ticker we'd never guess (bare
+    //     `MKS` with no venue suffix, depositary lines, secondary listings).
+    // Either one is enough; a symbol we can't classify is still routed in
+    // pence when Saxo says the instrument is pence-quoted.
+    const brokerSaysPence = String(inst.currency ?? "").trim().toUpperCase() === "GBX";
+    const toQuote = (p: number) => {
+      const bySymbol = denormalizePriceToQuoteUnits(req.symbol, p);
+      const native = bySymbol !== p ? bySymbol : brokerSaysPence ? p * 100 : p;
+      return Math.round(native * 100) / 100;
+    };
     if (req.orderType === "limit" && req.limitPrice != null) {
       body.OrderPrice = toQuote(req.limitPrice);
     }
