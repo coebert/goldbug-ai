@@ -37,6 +37,24 @@ describe("thesis-break exit", () => {
     expect(r.fire).toBe(false);
   });
 
+  it("fully exits a deep loser even when evidence tapes are quiet or missing", () => {
+    const quietResult = evaluateThesisBreak({
+      unrealisedPct: -0.076,
+      effectiveStopPct: 0.1,
+      evidence: quiet,
+    });
+    expect(quietResult.fire).toBe(true);
+    expect(quietResult.sellFraction).toBe(1);
+    expect(quietResult.reason).toContain("loss containment");
+
+    const beforeBackstop = evaluateThesisBreak({
+      unrealisedPct: -0.074,
+      effectiveStopPct: 0.1,
+      evidence: quiet,
+    });
+    expect(beforeBackstop.fire).toBe(false);
+  });
+
   it("trims early when two streams agree on a shallow loss", () => {
     const r = evaluateThesisBreak({
       unrealisedPct: -0.03,

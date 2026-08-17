@@ -12,7 +12,8 @@ import { createHash } from "node:crypto";
 import { assessTradeViability, modelledFillFee } from "@/lib/trade-viability-gate";
 import { resolveFillRecord } from "@/lib/fill-record";
 import { planMarketableLimit } from "@/lib/marketable-limit";
-import { planProtectiveStop } from "@/lib/protective-stops";
+import { placeProtectiveStopAfterBuyFill } from "@/lib/protective-stop-placement.server";
+import { shouldRetrySellAsMarket } from "@/lib/broker-sell-recovery";
 
 
 export interface ExecutedOrderLike {
@@ -1923,6 +1924,50 @@ export async function routeOrdersToBroker(params: {
           : { orderType: "market" as const }),
         clientOrderId,
       });
+      // A malformed limit price must never strand an exit. If Saxo accepts
+      // the instrument/quantity but rejects only the tick or tolerance, retry
+      // the SELL once as a market order. BUYs never use this escape hatch.
+      if (
+        limitPlan &&
+        shouldRetrySellAsMarket({
+          side: order.side,
+          status: brokerRes.status,
+          reason: brokerRes.reason,
+        })
+      ) {
+        const firstReason = brokerRes.reason ?? brokerRes.status;
+        brokerRes = await adapter.placeOrder({
+          symbol: order.symbol,
+          side: "sell",
+          quantity: qty,
+          orderType: "market",
+          clientOrderId: `${clientOrderId}-mkt`.slice(0, 50),
+        });
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: adapter.env,
+          method: "SELL_PRICE_REJECTION_MARKET_RETRY",
+          path: "live_orders",
+          status: null,
+          request: asJson({
+            symbol: order.symbol,
+            quantity: qty,
+            rejectedLimit: limitPlan.limitPrice,
+            firstReason,
+          }),
+          response: asJson({
+            status: brokerRes.status,
+            brokerOrderId: brokerRes.brokerOrderId,
+            reason: brokerRes.reason ?? null,
+          }),
+          error:
+            brokerRes.status === "rejected" || brokerRes.status === "error"
+              ? (brokerRes.reason ?? brokerRes.status)
+              : null,
+        });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await supabaseAdmin
@@ -2006,50 +2051,19 @@ export async function routeOrdersToBroker(params: {
           broker_fill_id: brokerRes.brokerOrderId || null,
           filled_at: new Date().toISOString(),
         });
-        // Phase 2 — rest a protective stop at the broker so the exit
-        // survives outages, weekends and overnight gaps. Best-effort: a
-        // failed stop must never invalidate the fill we just booked.
-        if (order.side === "buy") {
-          try {
-            const stop = planProtectiveStop({
-              side: "buy",
-              fillPrice: resolved.fillPrice,
-            });
-            if (stop && brokerRes.filledQuantity >= 1) {
-              const stopQty = Math.floor(brokerRes.filledQuantity);
-              const stopClientId = `${clientOrderId}-stp`.slice(0, 50);
-              const stopRes = await adapter.placeOrder({
-                symbol: order.symbol,
-                side: stop.side,
-                quantity: stopQty,
-                orderType: "stop",
-                stopPrice: stop.stopPrice,
-                duration: "gtc",
-                clientOrderId: stopClientId,
-              });
-              await supabaseAdmin.from("live_broker_log").insert({
-                portfolio_id: portfolio.id,
-                user_id: userId,
-                broker: "saxo",
-                env: adapter.env,
-                method: "PROTECTIVE_STOP",
-                path: "live_orders",
-                status: null,
-                request: asJson({
-                  symbol: order.symbol,
-                  quantity: stopQty,
-                  stopPrice: stop.stopPrice,
-                  stopPct: stop.stopPct,
-                  reason: stop.reason,
-                }),
-                response: asJson({ status: stopRes.status, brokerOrderId: stopRes.brokerOrderId }),
-                error: stopRes.status === "rejected" ? (stopRes.reason ?? "rejected") : null,
-              });
-            }
-          } catch (e) {
-            console.warn("[live-executor] protective stop failed:", e);
-          }
-        }
+        // Rest a protective stop for an immediate fill. Submitted orders get
+        // the same protection when reconciliation later confirms the fill.
+        await placeProtectiveStopAfterBuyFill({
+          adapter,
+          portfolioId: portfolio.id,
+          userId,
+          orderId: liveOrderId,
+          symbol: order.symbol,
+          side: order.side,
+          quantity: brokerRes.filledQuantity,
+          fillPrice: resolved.fillPrice,
+          source: "live_executor:immediate",
+        });
 
         const { notifyTradeFilled } = await import("./trade-fill-notify.server");
         notifyTradeFilled({

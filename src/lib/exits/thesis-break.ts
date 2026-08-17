@@ -45,6 +45,12 @@ export type ThesisBreakInputs = {
   minSignals?: number;
   /** Loss needed before the layer arms, as a fraction of the stop (default 0.35). */
   armFractionOfStop?: number;
+  /**
+   * Evidence-independent loss-containment backstop. Once a loss consumes this
+   * fraction of the hard-stop budget, close rather than waiting for slow or
+   * missing news/fundamental tapes. Default 0.75.
+   */
+  containmentFractionOfStop?: number;
 };
 
 export type ThesisBreakResult = {
@@ -65,6 +71,21 @@ export function evaluateThesisBreak(i: ThesisBreakInputs): ThesisBreakResult {
   if (i.enabled === false) return none;
 
   const stop = i.effectiveStopPct > 0 ? i.effectiveStopPct : 0.08;
+  const containmentFraction = Math.min(
+    1,
+    Math.max(0.5, i.containmentFractionOfStop ?? 0.75),
+  );
+  if (i.unrealisedPct <= -stop * containmentFraction) {
+    return {
+      fire: true,
+      sellFraction: 1,
+      signals: ["loss-containment backstop"],
+      reason:
+        `loss containment at ${(i.unrealisedPct * 100).toFixed(2)}% ` +
+        `(used ≥ ${(containmentFraction * 100).toFixed(0)}% of the ` +
+        `${(stop * 100).toFixed(2)}% stop budget) — full exit`,
+    };
+  }
   const armAt = -stop * (i.armFractionOfStop ?? 0.35);
   if (!(i.unrealisedPct < 0) || i.unrealisedPct > armAt) return none;
 
