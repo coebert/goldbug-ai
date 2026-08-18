@@ -140,6 +140,16 @@ export const DESTINATIONS: ReadonlyArray<Destination> = [
     primary: true,
     keywords: "orders fills executions",
   },
+  {
+    to: "/daily-report",
+    label: "Daily AI report",
+    tabLabel: "Report",
+    hint: "What the AI considered today, why it traded, and why it passed.",
+    icon: FileText,
+    area: "trades",
+    keywords: "daily report decisions rationale considered passed",
+  },
+
 
   // --- System -----------------------------------------------------
   {
