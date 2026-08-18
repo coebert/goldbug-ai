@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, ExternalLink, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,38 @@ import {
   listBrokerInstrumentBlocks,
   type BrokerBlockDTO,
 } from "@/lib/broker-instrument-blocks.functions";
+import { Progress } from "@/components/ui/progress";
 import { buildSaxoChecklist } from "@/lib/saxo-product-categories";
+import { computeUnblockProgress } from "@/lib/saxo-unblock-progress";
+
+const DONE_STORAGE_KEY = "saxo-unblock-progress";
+
+/** Persisted so ticking a section survives a reload while you sit in Saxo. */
+function useCompletedCategories() {
+  const [done, setDone] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DONE_STORAGE_KEY);
+      if (raw) setDone(JSON.parse(raw) as Record<string, boolean>);
+    } catch {
+      /* ignore unreadable storage */
+    }
+  }, []);
+
+  const toggle = (id: string, value: boolean) =>
+    setDone((prev) => {
+      const next = { ...prev, [id]: value };
+      try {
+        window.localStorage.setItem(DONE_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore unwritable storage */
+      }
+      return next;
+    });
+
+  return { done, toggle };
+}
 
 const REASON_COPY: Record<
   string,
@@ -118,46 +149,97 @@ function BlockRow({
   );
 }
 
-function SaxoChecklist({ blocks }: { blocks: BrokerBlockDTO[] }) {
+function SaxoChecklist({
+  blocks,
+  onUnblockSymbols,
+  clearing,
+}: {
+  blocks: BrokerBlockDTO[];
+  onUnblockSymbols: (symbols: string[]) => void;
+  clearing: boolean;
+}) {
   const items = buildSaxoChecklist(blocks);
-  const [done, setDone] = useState<Record<string, boolean>>({});
+  const { done, toggle } = useCompletedCategories();
+  const progress = computeUnblockProgress(items, done);
   if (items.length === 0) return null;
 
   return (
     <div className="min-w-0 rounded-lg border border-border bg-muted/30 p-3">
       <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <ClipboardList className="h-4 w-4 shrink-0 text-amber-500" />
-        Saxo sections to complete ({items.length})
+        Saxo sections to complete ({progress.completedCategories}/{progress.totalCategories})
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Complete these product categories in one sitting, then clear the blocks below.
+        Tick a section once you have completed it at Saxo, then unblock its symbols here.
       </p>
+
+      <Progress value={progress.percent} className="mt-2.5 h-2" />
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        {progress.symbolsWaiting.length === 0
+          ? "All sections ticked — unblock the symbols below."
+          : `${progress.symbolsWaiting.length} symbol${
+              progress.symbolsWaiting.length === 1 ? "" : "s"
+            } still waiting on a Saxo test: `}
+        {progress.symbolsWaiting.length > 0 && (
+          <span className="break-all font-mono">{progress.symbolsWaiting.join(" · ")}</span>
+        )}
+      </p>
+
       <ul className="mt-3 space-y-2.5">
-        {items.map((item) => (
+        {progress.categories.map((item) => (
           <li key={item.id} className="flex min-w-0 items-start gap-2.5">
             <Checkbox
               id={`saxo-cat-${item.id}`}
-              checked={!!done[item.id]}
-              onCheckedChange={(v) =>
-                setDone((prev) => ({ ...prev, [item.id]: v === true }))
-              }
+              checked={item.completed}
+              onCheckedChange={(v) => toggle(item.id, v === true)}
               className="mt-0.5 shrink-0"
             />
-            <label htmlFor={`saxo-cat-${item.id}`} className="min-w-0 cursor-pointer">
-              <span
-                className={
-                  done[item.id]
-                    ? "text-sm font-medium text-muted-foreground line-through"
-                    : "text-sm font-medium text-foreground"
-                }
-              >
-                {item.title}
-              </span>
-              <span className="block text-xs text-muted-foreground">{item.where}</span>
-              <span className="mt-0.5 block break-all font-mono text-[11px] text-muted-foreground">
-                {item.symbols.join(" · ")}
-              </span>
-            </label>
+            <div className="min-w-0 flex-1">
+              <label htmlFor={`saxo-cat-${item.id}`} className="block min-w-0 cursor-pointer">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span
+                    className={
+                      item.completed
+                        ? "text-sm font-medium text-muted-foreground line-through"
+                        : "text-sm font-medium text-foreground"
+                    }
+                  >
+                    {item.title}
+                  </span>
+                  {item.completed ? (
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-500/40 text-emerald-500"
+                    >
+                      Test done
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-amber-500/40 text-amber-500">
+                      Waiting
+                    </Badge>
+                  )}
+                </span>
+                <span className="block text-xs text-muted-foreground">{item.where}</span>
+                <span className="mt-0.5 block break-all font-mono text-[11px] text-muted-foreground">
+                  {item.symbols.join(" · ")}
+                </span>
+              </label>
+              {item.completed && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={clearing}
+                  className="mt-1.5 h-auto w-full whitespace-normal py-1.5 text-xs sm:w-auto"
+                  onClick={() => onUnblockSymbols(item.symbols)}
+                >
+                  {clearing
+                    ? "Unblocking…"
+                    : `Unblock ${item.symbols.length} symbol${
+                        item.symbols.length === 1 ? "" : "s"
+                      }`}
+                </Button>
+              )}
+            </div>
           </li>
         ))}
       </ul>
@@ -214,7 +296,18 @@ export function BrokerSuitabilityBlocksCard() {
           </p>
         )}
 
-        {blocks.length > 0 && <SaxoChecklist blocks={blocks} />}
+        {blocks.length > 0 && (
+          <SaxoChecklist
+            blocks={blocks}
+            clearing={mut.isPending}
+            onUnblockSymbols={(symbols) => {
+              for (const symbol of symbols) {
+                const match = blocks.find((b) => b.symbol === symbol);
+                if (match) mut.mutate(match.symbolKey);
+              }
+            }}
+          />
+        )}
 
         {blocks.map((b) => (
           <BlockRow
