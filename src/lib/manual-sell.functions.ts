@@ -149,9 +149,6 @@ export const manualSellHolding = createServerFn({ method: "POST" })
     // Paper / backtest / live_sim-paper-only path — apply locally.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { applySellExecution } = await import("@/lib/execution-realism.server");
-    const { normalizeLseDisplayPriceToBase } = await import(
-      "@/lib/market-price-units"
-    );
     const { readWallet, applyDelta, writeWalletFields } = await import(
       "@/lib/portfolio-wallet"
     );
@@ -170,14 +167,10 @@ export const manualSellHolding = createServerFn({ method: "POST" })
       currency: instrumentCcy,
     });
 
-    // Fold GBX pence into GBP for cash proceeds when the instrument is
-    // an LSE common stock (its native quote is pence even though
-    // instrument_ccy is "GBP"). Non-GBP instruments already report in
-    // their native major unit.
-    const proceedsInInstrumentCcy =
-      instrumentCcy === "GBP"
-        ? normalizeLseDisplayPriceToBase(h.symbol, sell.proceedsNet, h.asset_class)
-        : sell.proceedsNet;
+    // `price` is already the instrument's base unit (pence were folded into
+    // GBP above), so proceeds need no further conversion.
+    const proceedsInInstrumentCcy = sell.proceedsNet;
+
 
     const baseCcy = String(p.currency || "GBP").toUpperCase();
     const wallet = readWallet({
