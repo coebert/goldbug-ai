@@ -14,6 +14,7 @@ import { resolveFillRecord } from "@/lib/fill-record";
 import { planMarketableLimit } from "@/lib/marketable-limit";
 import { placeProtectiveStopAfterBuyFill } from "@/lib/protective-stop-placement.server";
 import { shouldRetrySellAsMarket } from "@/lib/broker-sell-recovery";
+import { findStaleWorkingSell } from "@/lib/stale-sell-order";
 
 
 export interface ExecutedOrderLike {
@@ -1858,6 +1859,65 @@ export async function routeOrdersToBroker(params: {
       referencePrice: order.price,
       currency: routeSymToCcy.get(order.symbol) ?? portfolioCurrency,
     });
+
+    // A marketable limit is only marketable against the quote used to create
+    // it. Replace an aged sell before submitting the current exit; otherwise
+    // Saxo rejects the new order as a duplicate while the old limit can sit
+    // above a falling market indefinitely. Never place the replacement unless
+    // the broker confirms cancellation, preventing two live sells.
+    if (order.side === "sell" && typeof adapter.listWorkingOrders === "function") {
+      try {
+        const working = await adapter.listWorkingOrders();
+        const stale = findStaleWorkingSell({ working, symbol: order.symbol });
+        if (stale) {
+          const cancelled = await adapter.cancelOrder(stale.brokerOrderId);
+          await supabaseAdmin.from("live_broker_log").insert({
+            portfolio_id: portfolio.id,
+            user_id: userId,
+            broker: "saxo",
+            env: adapter.env,
+            method: "STALE_SELL_REPLACE",
+            path: `/trade/v2/orders/${stale.brokerOrderId}`,
+            status: cancelled.ok ? 200 : 409,
+            request: asJson({
+              symbol: order.symbol,
+              quantity: qty,
+              staleBrokerOrderId: stale.brokerOrderId,
+              staleOrderTime: stale.orderTime ?? null,
+              replacementLimit: limitPlan?.limitPrice ?? null,
+            }),
+            response: asJson({ cancelled: cancelled.ok }),
+            error: cancelled.reason ?? null,
+          });
+          if (!cancelled.ok) {
+            results.push({
+              symbol: order.symbol,
+              side: order.side,
+              quantity: qty,
+              status: "skipped",
+              brokerOrderId: stale.brokerOrderId,
+              skipped: "stale sell remains open; replacement withheld to prevent duplicate sale",
+            });
+            continue;
+          }
+          await supabaseAdmin
+            .from("live_orders")
+            .update({ status: "cancelled", reject_reason: "replaced after stale marketable limit" })
+            .eq("portfolio_id", portfolio.id)
+            .eq("broker_order_id", stale.brokerOrderId);
+        }
+      } catch (err) {
+        results.push({
+          symbol: order.symbol,
+          side: order.side,
+          quantity: qty,
+          status: "skipped",
+          skipped: "could not verify stale sell orders; replacement withheld",
+          reason: err instanceof Error ? err.message : String(err),
+        });
+        continue;
+      }
+    }
 
     // Insert-first: DB unique index on client_order_id is the source of truth
     // for idempotency. On unique violation (23505) we look up the winner and

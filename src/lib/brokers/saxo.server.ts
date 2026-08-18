@@ -1055,6 +1055,7 @@ export class SaxoAdapter implements BrokerAdapter {
       price?: number;
       currency?: string;
       assetType?: string;
+      orderTime?: string;
     }>
   > {
     const res = await this.req<{
@@ -1067,6 +1068,7 @@ export class SaxoAdapter implements BrokerAdapter {
         Price?: number;
         OrderPrice?: number;
         AssetType?: string;
+        OrderTime?: string;
         DisplayAndFormat?: { Symbol?: string; Currency?: string };
       }>;
     }>("GET", "/port/v1/orders/me", { query: { FieldGroups: "DisplayAndFormat" }, schema: SaxoWorkingOrdersSchema });
@@ -1083,6 +1085,7 @@ export class SaxoAdapter implements BrokerAdapter {
         price: Number.isFinite(p) && p > 0 ? p : undefined,
         currency: o.DisplayAndFormat?.Currency ?? undefined,
         assetType: o.AssetType ?? undefined,
+        orderTime: o.OrderTime ?? undefined,
       };
     }).filter((o) => o.brokerOrderId);
   }
@@ -1297,8 +1300,9 @@ export class SaxoAdapter implements BrokerAdapter {
 
   async cancelOrder(brokerOrderId: string): Promise<{ ok: boolean; reason?: string }> {
     try {
+      const accountKey = await this.getDefaultAccountKey();
       await this.req("DELETE", `/trade/v2/orders/${encodeURIComponent(brokerOrderId)}`, {
-        query: this.accountKey ? { AccountKey: this.accountKey } : undefined,
+        query: accountKey ? { AccountKey: accountKey } : undefined,
       });
       return { ok: true };
     } catch (e) {
