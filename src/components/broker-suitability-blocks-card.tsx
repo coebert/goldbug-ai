@@ -1,14 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, CheckCircle2, ExternalLink, ShieldAlert } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardList, ExternalLink, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   clearBrokerInstrumentBlock,
   listBrokerInstrumentBlocks,
   type BrokerBlockDTO,
 } from "@/lib/broker-instrument-blocks.functions";
+import { buildSaxoChecklist } from "@/lib/saxo-product-categories";
 
 const REASON_COPY: Record<
   string,
