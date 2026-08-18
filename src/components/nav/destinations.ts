@@ -234,7 +234,7 @@ export function areaForPath(pathname: string): AreaId {
   ) {
     return "research";
   }
-  if (pathname.startsWith("/trades")) return "trades";
+  if (pathname.startsWith("/trades") || pathname.startsWith("/daily-report")) return "trades";
   if (
     pathname.startsWith("/saxo") ||
     pathname.startsWith("/admin") ||
