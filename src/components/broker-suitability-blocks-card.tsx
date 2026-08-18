@@ -1,14 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, CheckCircle2, ExternalLink, ShieldAlert } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardList, ExternalLink, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   clearBrokerInstrumentBlock,
   listBrokerInstrumentBlocks,
   type BrokerBlockDTO,
 } from "@/lib/broker-instrument-blocks.functions";
+import { buildSaxoChecklist } from "@/lib/saxo-product-categories";
 
 const REASON_COPY: Record<
   string,
@@ -115,6 +118,53 @@ function BlockRow({
   );
 }
 
+function SaxoChecklist({ blocks }: { blocks: BrokerBlockDTO[] }) {
+  const items = buildSaxoChecklist(blocks);
+  const [done, setDone] = useState<Record<string, boolean>>({});
+  if (items.length === 0) return null;
+
+  return (
+    <div className="min-w-0 rounded-lg border border-border bg-muted/30 p-3">
+      <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <ClipboardList className="h-4 w-4 shrink-0 text-amber-500" />
+        Saxo sections to complete ({items.length})
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Complete these product categories in one sitting, then clear the blocks below.
+      </p>
+      <ul className="mt-3 space-y-2.5">
+        {items.map((item) => (
+          <li key={item.id} className="flex min-w-0 items-start gap-2.5">
+            <Checkbox
+              id={`saxo-cat-${item.id}`}
+              checked={!!done[item.id]}
+              onCheckedChange={(v) =>
+                setDone((prev) => ({ ...prev, [item.id]: v === true }))
+              }
+              className="mt-0.5 shrink-0"
+            />
+            <label htmlFor={`saxo-cat-${item.id}`} className="min-w-0 cursor-pointer">
+              <span
+                className={
+                  done[item.id]
+                    ? "text-sm font-medium text-muted-foreground line-through"
+                    : "text-sm font-medium text-foreground"
+                }
+              >
+                {item.title}
+              </span>
+              <span className="block text-xs text-muted-foreground">{item.where}</span>
+              <span className="mt-0.5 block break-all font-mono text-[11px] text-muted-foreground">
+                {item.symbols.join(" · ")}
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function BrokerSuitabilityBlocksCard() {
   const qc = useQueryClient();
   const list = useServerFn(listBrokerInstrumentBlocks);
@@ -163,6 +213,8 @@ export function BrokerSuitabilityBlocksCard() {
             No suitability or permission checks are blocking trades right now.
           </p>
         )}
+
+        {blocks.length > 0 && <SaxoChecklist blocks={blocks} />}
 
         {blocks.map((b) => (
           <BlockRow
