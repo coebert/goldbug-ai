@@ -84,22 +84,33 @@ export const manualSellHolding = createServerFn({ method: "POST" })
     }
     if (qty > qtyOwned) qty = qtyOwned;
 
-    // Latest close from cache; fall back to broker average cost when the
-    // cache has no fresh quote so we still emit a sensible reference price.
+    // Latest close from cache. Holdings are broker-native ("MKS:xlon") while
+    // price_cache is keyed on the universe symbol ("MKS.L"), so match on every
+    // variant — an exact-symbol lookup silently missed and fell back to avg
+    // cost, repricing exits above the market so they could never fill.
+    const { priceSymbolVariants } = await import("@/lib/price-symbol");
+    const { normalizeLseDisplayPriceToBase: toBase } = await import(
+      "@/lib/market-price-units"
+    );
     const { data: pc } = await supabase
       .from("price_cache")
       .select("close, price_date")
-      .eq("symbol", h.symbol)
+      .in("symbol", priceSymbolVariants(h.symbol))
       .order("price_date", { ascending: false })
       .limit(1);
     const cachedClose = pc && pc[0] ? Number(pc[0].close) : NaN;
-    const price =
+    // price_cache quotes LSE stocks in pence; the engine and broker paths work
+    // in the instrument's base unit.
+    const cachedBase =
       Number.isFinite(cachedClose) && cachedClose > 0
-        ? cachedClose
-        : Number(h.avg_cost);
+        ? toBase(h.symbol, cachedClose, h.asset_class)
+        : NaN;
+    const price =
+      Number.isFinite(cachedBase) && cachedBase > 0 ? cachedBase : Number(h.avg_cost);
 
     const instrumentCcy = (h.instrument_ccy || p.currency || "GBP").toUpperCase();
     const asOf = new Date().toISOString().slice(0, 10);
+
 
     // Live routing — reuse the same broker adapter, adaptive caps, and
     // reconciliation the AI already exercises.
