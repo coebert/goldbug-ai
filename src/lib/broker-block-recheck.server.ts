@@ -66,6 +66,11 @@ export async function recheckBrokerBlocks(args: {
       symbolKey: b.symbolKey,
       outcome: "unknown",
       note: "No Saxo-linked portfolio available to run the check.",
+      brokerCode: null,
+      brokerMessage: null,
+      brokerPreCheckResult: null,
+      brokerDetails: [],
+      reason: null,
     }));
     return { ...summariseRecheck(results), results };
   }
@@ -85,6 +90,11 @@ export async function recheckBrokerBlocks(args: {
       symbolKey: b.symbolKey,
       outcome: "unknown",
       note: "Saxo connection unavailable — reconnect the broker and try again.",
+      brokerCode: null,
+      brokerMessage: null,
+      brokerPreCheckResult: null,
+      brokerDetails: [],
+      reason: null,
     }));
     return { ...summariseRecheck(results), results };
   }
@@ -94,9 +104,21 @@ export async function recheckBrokerBlocks(args: {
     let decision: RecheckDecision;
     try {
       const probe = await adapter.precheckSymbol(block.symbol, { quantity: 1 });
-      decision = decideRecheck(probe);
-    } catch {
-      decision = decideRecheck({ ok: false, failed: true });
+      decision = decideRecheck({
+        ok: probe.ok,
+        errorCode: probe.errorCode,
+        message: probe.message,
+        preCheckResult: probe.preCheckResult,
+        detailMessages: probe.estimatedMessages,
+      });
+    } catch (err) {
+      // Keep the raw broker/transport error text: it is often the refusal
+      // itself (HTTP 4xx body from Saxo) rather than a network fault.
+      decision = decideRecheck({
+        ok: false,
+        failed: true,
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
 
     if (decision.outcome === "cleared") {
@@ -106,7 +128,7 @@ export async function recheckBrokerBlocks(args: {
         broker,
       });
       if (cleared === 0) {
-        decision = { outcome: "unknown", note: "Block could not be cleared — try again." };
+        decision = { ...decision, outcome: "unknown", note: "Block could not be cleared — try again." };
       }
     }
 
