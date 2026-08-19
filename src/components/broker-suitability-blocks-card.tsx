@@ -15,8 +15,8 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { buildSaxoChecklist } from "@/lib/saxo-product-categories";
 import { computeUnblockProgress } from "@/lib/saxo-unblock-progress";
-import {
 import { publishRationaleRefresh } from "@/lib/rationale-refresh";
+import {
   decideAutoRecheck,
   readLastAutoRecheck,
   writeLastAutoRecheck,
