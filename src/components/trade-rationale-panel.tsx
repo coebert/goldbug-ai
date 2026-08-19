@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, AlertTriangle, ExternalLink, Newspaper, Target } from "lucide-react";
+import { Activity, AlertTriangle, ExternalLink, Gauge, Newspaper, ShieldCheck, Target } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -102,6 +102,88 @@ function TradeLevelsSection({ levels }: { levels: NonNullable<TradeRationale["le
   );
 }
 
+const BAND_TONE: Record<string, string> = {
+  high: "border-emerald-500/40 text-emerald-400",
+  moderate: "border-amber-500/40 text-amber-400",
+  low: "border-rose-500/40 text-rose-400",
+};
+
+function ConfidenceSection({ confidence }: { confidence: TradeRationale["confidence"] }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <Gauge className="h-3.5 w-3.5" />
+        AI confidence
+      </div>
+      <div className="rounded-md border bg-muted/20 p-2">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
+          <span className="text-sm font-semibold tabular-nums">{confidence.score}/100</span>
+          <div className="flex items-center gap-1.5">
+            <Badge variant="outline" className={cn("text-[10px] capitalize", BAND_TONE[confidence.band])}>
+              {confidence.band} confidence
+            </Badge>
+            <Badge variant="outline" className="text-[10px]">
+              Evidence coverage {Math.round(confidence.coverage * 100)}%
+            </Badge>
+          </div>
+        </div>
+        <Progress value={confidence.score} className="mt-1.5 h-1.5" />
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{confidence.summary}</p>
+        {confidence.components.length > 0 && (
+          <ul className="mt-1.5 space-y-1">
+            {confidence.components.map((c) => (
+              <li key={c.key}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] font-medium">{c.label}</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground">
+                    {Math.round(c.value * 100)}% · weight {c.weight.toFixed(1)}
+                  </span>
+                </div>
+                <Progress value={Math.round(c.value * 100)} className="mt-0.5 h-1" />
+                <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">{c.detail}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RiskLimitsSection({ limits }: { limits: NonNullable<TradeRationale["riskLimits"]> }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        Risk limits — {limits.levelName}
+        {limits.level != null && <span className="normal-case">(level {limits.level}/5)</span>}
+      </div>
+      <ul className="grid gap-1.5 sm:grid-cols-2">
+        {limits.items.map((i) => (
+          <li key={i.key} className="rounded-md border bg-muted/20 p-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[11px] font-medium">{i.label}</span>
+              <span className="text-xs font-semibold tabular-nums">{i.value}</span>
+            </div>
+            {i.utilisation != null && (
+              <Progress
+                value={Math.round(i.utilisation * 100)}
+                className={cn("mt-1 h-1", i.utilisation >= 1 && "[&>div]:bg-rose-500")}
+              />
+            )}
+            <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">{i.detail}</p>
+          </li>
+        ))}
+      </ul>
+      {limits.notes.map((n) => (
+        <p key={n} className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+          {n}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function TradeRationaleView({ rationale }: { rationale: TradeRationale }) {
   return (
     <div className="space-y-3">
@@ -109,6 +191,12 @@ export function TradeRationaleView({ rationale }: { rationale: TradeRationale })
 
       {rationale.aiRationale && (
         <p className="text-xs leading-relaxed text-muted-foreground">{rationale.aiRationale}</p>
+      )}
+
+      <ConfidenceSection confidence={rationale.confidence} />
+
+      {rationale.riskLimits && rationale.riskLimits.items.length > 0 && (
+        <RiskLimitsSection limits={rationale.riskLimits} />
       )}
 
       {rationale.levels && <TradeLevelsSection levels={rationale.levels} />}
