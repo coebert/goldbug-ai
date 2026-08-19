@@ -154,14 +154,22 @@ function SaxoChecklist({
   blocks,
   onUnblockSymbols,
   clearing,
+  onCompletedCountChange,
 }: {
   blocks: BrokerBlockDTO[];
   onUnblockSymbols: (symbols: string[]) => void;
   clearing: boolean;
+  onCompletedCountChange?: (count: number) => void;
 }) {
   const items = buildSaxoChecklist(blocks);
   const { done, toggle } = useCompletedCategories();
   const progress = computeUnblockProgress(items, done);
+
+  const completedCount = progress.completedCategories;
+  useEffect(() => {
+    onCompletedCountChange?.(completedCount);
+  }, [completedCount, onCompletedCountChange]);
+
   if (items.length === 0) return null;
 
   return (
