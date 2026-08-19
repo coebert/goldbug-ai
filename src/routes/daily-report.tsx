@@ -259,10 +259,24 @@ function DailyReportPage() {
 
               {p.considered > 0 && <Separator />}
 
-              <Section title="Bought" items={p.bought} currency={p.currency} tone="buy" />
-              <Section title="Sold" items={p.sold} currency={p.currency} tone="sell" />
-              <Section title="Held" items={p.held} currency={p.currency} tone="hold" />
-              <Section title="Passed on" items={p.passed} currency={p.currency} tone="pass" />
+              {(
+                [
+                  ["Bought", p.bought, "buy"],
+                  ["Sold", p.sold, "sell"],
+                  ["Held", p.held, "hold"],
+                  ["Passed on", p.passed, "pass"],
+                ] as const
+              ).map(([title, items, tone]) => (
+                <Section
+                  key={tone}
+                  title={title}
+                  items={items}
+                  currency={p.currency}
+                  tone={tone}
+                  portfolioId={p.portfolioId}
+                  date={date}
+                />
+              ))}
             </CardContent>
           </Card>
         ))}
