@@ -10,7 +10,7 @@ import {
   type TradeRationale,
 } from "./trade-rationale";
 import { priceSymbolVariants } from "./price-symbol";
-import { riskPresetConfig } from "./risk-presets";
+import { riskPresetConfig, riskPresetName } from "./risk-presets";
 import type { TradeLevelRiskConfig } from "./trade-levels";
 
 /**
@@ -23,6 +23,26 @@ function resolveRiskConfig(raw: unknown, level: number | null): TradeLevelRiskCo
   const stored = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   return { ...preset, ...stored } as TradeLevelRiskConfig;
 }
+
+/**
+ * The dial is a 1..5 number kept inside `risk_config`; the DB column only
+ * carries the coarse conservative/balanced/aggressive band. Prefer the dial.
+ */
+function dialLevelOf(raw: unknown, band: string | null): number {
+  const cfg = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const n = Number(cfg["risk_level"]);
+  if (Number.isFinite(n) && n >= 1 && n <= 5) return Math.round(n);
+  if (band === "conservative") return 2;
+  if (band === "aggressive") return 4;
+  return 3;
+}
+
+/** Mirrors `riskProfile()` in universe.server without pulling engine code in. */
+const RISK_PROFILE: Record<string, { maxPositionPct: number; maxNewPositionsPerDay: number }> = {
+  conservative: { maxPositionPct: 0.1, maxNewPositionsPerDay: 2 },
+  balanced: { maxPositionPct: 0.15, maxNewPositionsPerDay: 3 },
+  aggressive: { maxPositionPct: 0.25, maxNewPositionsPerDay: 5 },
+};
 
 function shiftIso(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -56,7 +76,7 @@ export async function loadTradeRationale(
   const anchor = (row.run_date as string | null) ?? new Date().toISOString().slice(0, 10);
   const from = shiftIso(anchor, -lookback);
 
-  const [newsRes, eventsRes, portfolioRes, holdingRes] = await Promise.all([
+  const [newsRes, eventsRes, portfolioRes, equityRes, holdingRes] = await Promise.all([
     db
       .from("news_cache")
       .select("id, news_date, headline, summary, source, url, sentiment, relevance_score, entities")
@@ -73,6 +93,12 @@ export async function loadTradeRationale(
       .limit(100),
     db.from("portfolios").select("risk_config, risk_level").eq("id", args.portfolioId).maybeSingle(),
     db
+      .from("equity_snapshots")
+      .select("total_value, snapshot_date")
+      .eq("portfolio_id", args.portfolioId)
+      .order("snapshot_date", { ascending: false })
+      .limit(1),
+    db
       .from("holdings")
       .select("symbol, avg_cost")
       .eq("portfolio_id", args.portfolioId)
@@ -80,10 +106,10 @@ export async function loadTradeRationale(
       .limit(1),
   ]);
 
-  const riskConfig = resolveRiskConfig(
-    portfolioRes.data?.risk_config,
-    portfolioRes.data?.risk_level ?? null,
-  );
+  const dialLevel = dialLevelOf(portfolioRes.data?.risk_config, portfolioRes.data?.risk_level ?? null);
+  const riskConfig = resolveRiskConfig(portfolioRes.data?.risk_config, dialLevel);
+  const equity = Number((equityRes.data?.[0] as { total_value?: number } | undefined)?.total_value);
+  const profile = RISK_PROFILE[String(portfolioRes.data?.risk_level ?? "balanced")] ?? RISK_PROFILE["balanced"]!;
 
   return buildTradeRationale({
     decision: {
@@ -101,5 +127,9 @@ export async function loadTradeRationale(
     news: (newsRes.data ?? []) as unknown as NewsInput[],
     events: (eventsRes.data ?? []) as unknown as MarketEventInput[],
     riskConfig,
+    riskLevel: { level: dialLevel, name: riskPresetName(dialLevel) },
+    equity: Number.isFinite(equity) ? equity : null,
+    maxPositionPct: profile.maxPositionPct,
+    maxNewPositionsPerDay: profile.maxNewPositionsPerDay,
   });
 }
