@@ -726,7 +726,13 @@ export class SaxoAdapter implements BrokerAdapter {
   async precheckSymbol(
     symbol: string,
     opts?: { quantity?: number; side?: "buy" | "sell" },
-  ): Promise<{ ok: boolean; errorCode: string | null; message: string | null }> {
+  ): Promise<{
+    ok: boolean;
+    errorCode: string | null;
+    message: string | null;
+    preCheckResult: string | null;
+    estimatedMessages: string[];
+  }> {
     const inst = await this.lookupUic(symbol);
     const accountKey = await this.getDefaultAccountKey();
     const body: Record<string, unknown> = {
@@ -744,14 +750,27 @@ export class SaxoAdapter implements BrokerAdapter {
     const pre = await this.req<{
       PreCheckResult?: string;
       ErrorInfo?: { ErrorCode?: string; Message?: string };
-
+      PreCheckDetails?: Array<{ ErrorCode?: string; Message?: string }>;
+      EstimatedCashRequired?: number;
     }>("POST", "/trade/v2/orders/precheck", { body, maxAttempts: 2 });
 
     const outcome = String(pre.PreCheckResult ?? "").toLowerCase();
     const errorCode = pre.ErrorInfo?.ErrorCode ?? null;
     const message = pre.ErrorInfo?.Message ?? null;
     const ok = !errorCode && (!outcome || outcome === "ok");
-    return { ok, errorCode, message };
+    // Saxo returns per-check detail rows alongside the top-level ErrorInfo.
+    // Surface them verbatim so the user sees exactly what the broker objected
+    // to (e.g. "Appropriateness test for Leveraged ETFs not passed").
+    const estimatedMessages = (pre.PreCheckDetails ?? [])
+      .map((d) => [d.ErrorCode, d.Message].filter(Boolean).join(": "))
+      .filter((t) => t.length > 0);
+    return {
+      ok,
+      errorCode,
+      message,
+      preCheckResult: pre.PreCheckResult ?? null,
+      estimatedMessages,
+    };
   }
 
   async placeOrder(req: BrokerOrderRequest): Promise<BrokerOrderResult> {
