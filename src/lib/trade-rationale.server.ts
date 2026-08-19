@@ -11,6 +11,17 @@ import {
 } from "./trade-rationale";
 import { priceSymbolVariants } from "./price-symbol";
 
+/**
+ * The stored `risk_config` only carries fields the user has touched, so fall
+ * back to the dial preset for the portfolio's risk level. That keeps the
+ * displayed stop/target identical to the one the engine applied.
+ */
+function resolveRiskConfig(raw: unknown, level: number | null): TradeLevelRiskConfig {
+  const preset = riskPresetConfig(Number(level ?? 3));
+  const stored = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return { ...preset, ...stored } as TradeLevelRiskConfig;
+}
+
 function shiftIso(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
