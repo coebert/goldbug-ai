@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, AlertTriangle, ExternalLink, Newspaper } from "lucide-react";
+import { Activity, AlertTriangle, ExternalLink, Newspaper, Target } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
