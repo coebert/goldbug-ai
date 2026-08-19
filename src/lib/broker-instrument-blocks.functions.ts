@@ -78,3 +78,24 @@ export const clearBrokerInstrumentBlock = createServerFn({ method: "POST" })
     return { cleared: cleared > 0 };
   });
 
+export interface RecheckBlocksResultDTO {
+  checked: number;
+  cleared: number;
+  stillBlocked: number;
+  unknown: number;
+  message: string;
+  results: Array<{ symbol: string; symbolKey: string; outcome: string; note: string }>;
+}
+
+/**
+ * Force a resync of broker approvals: dry-run a precheck per blocked symbol
+ * and lift the ones Saxo no longer refuses. Same second-factor gate as
+ * manual unblocking, since it can put instruments back in the live universe.
+ */
+export const recheckBrokerInstrumentBlocks = createServerFn({ method: "POST" })
+  .middleware([requireAal2])
+  .handler(async ({ context }): Promise<RecheckBlocksResultDTO> => {
+    const { recheckBrokerBlocks } = await import("@/lib/broker-block-recheck.server");
+    return await recheckBrokerBlocks({ userId: context.userId });
+  });
+
