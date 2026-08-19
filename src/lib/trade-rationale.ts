@@ -263,6 +263,20 @@ export function buildTradeRationale(input: {
       ? `${decision.symbol} was ${verb} on ${drivers.join(" and ")}.`
       : `${decision.symbol} was ${verb}; no structured signal detail was recorded.`;
 
+  const feat = obj(mi["features"]) ?? {};
+  const levels = buildTradeLevels({
+    action,
+    decisionPrice: num(decision.price) ?? num(feat["price"]),
+    featurePrice: num(feat["price"]) ?? num(feat["close"]),
+    atrPct: num(feat["atr_pct"]) ?? num(feat["atrPct"]),
+    avgCost: num(decision.avgCost),
+    currency: decision.currency ?? null,
+    assetClass: decision.assetClass ?? (str(feat["asset_class"]) as string | null),
+    notional: num(decision.notional),
+    tickSize: num(decision.tickSize),
+    config: input.riskConfig ?? null,
+  });
+
   return {
     symbol: decision.symbol,
     action,
@@ -272,6 +286,7 @@ export function buildTradeRationale(input: {
     runRationale: str(mi["run_rationale"]),
     signals,
     events: events.slice(0, maxEvents),
-    sparse: signals.length === 0 && events.length === 0,
+    levels,
+    sparse: signals.length === 0 && events.length === 0 && levels === null,
   };
 }
