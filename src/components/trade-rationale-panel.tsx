@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { getTradeRationale, type TradeRationale } from "@/lib/trade-rationale.functions";
 import { formatUkDate } from "@/lib/uk-time";
 import { cn } from "@/lib/utils";
+import { RationaleRefreshStatus } from "@/components/rationale-refresh-status";
 
 function stanceClass(stance: string): string {
   if (stance === "supporting") return "border-emerald-500/40 text-emerald-400";
@@ -325,5 +326,10 @@ export function TradeRationalePanel({
   if (!query.data)
     return <p className="text-xs text-muted-foreground">No recorded decision for {symbol} on this day.</p>;
 
-  return <TradeRationaleView rationale={query.data} portfolioId={portfolioId} />;
+  return (
+    <div className="space-y-2">
+      <RationaleRefreshStatus />
+      <TradeRationaleView rationale={query.data} portfolioId={portfolioId} />
+    </div>
+  );
 }

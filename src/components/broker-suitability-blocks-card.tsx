@@ -16,6 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { buildSaxoChecklist } from "@/lib/saxo-product-categories";
 import { computeUnblockProgress } from "@/lib/saxo-unblock-progress";
 import {
+import { publishRationaleRefresh } from "@/lib/rationale-refresh";
   decideAutoRecheck,
   readLastAutoRecheck,
   writeLastAutoRecheck,
@@ -274,12 +275,18 @@ export function BrokerSuitabilityBlocksCard() {
 
   const mut = useMutation({
     mutationFn: (symbolKey: string) => clear({ data: { symbolKey } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["broker-instrument-blocks"] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["broker-instrument-blocks"] });
+      publishRationaleRefresh("broker-assessments", "instrument block cleared");
+    },
   });
 
   const recheckMut = useMutation({
     mutationFn: () => recheck(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["broker-instrument-blocks"] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["broker-instrument-blocks"] });
+      publishRationaleRefresh("broker-assessments", "broker re-check complete");
+    },
   });
 
   const blocks = q.data?.blocks ?? [];
