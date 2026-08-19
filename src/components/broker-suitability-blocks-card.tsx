@@ -343,6 +343,16 @@ export function BrokerSuitabilityBlocksCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {autoRan && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <RefreshCw
+              className={`h-3.5 w-3.5 shrink-0 ${recheckMut.isPending ? "animate-spin" : ""}`}
+            />
+            {recheckMut.isPending
+              ? "Saxo assessment ticked — re-checking your blocked list automatically…"
+              : "Auto re-check ran after your Saxo assessment update."}
+          </p>
+        )}
         {recheckMut.isError && (
           <p className="text-sm text-destructive">
             Re-check failed. Confirm two-factor and the Saxo connection, then try again.
