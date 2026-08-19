@@ -15,6 +15,11 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { buildSaxoChecklist } from "@/lib/saxo-product-categories";
 import { computeUnblockProgress } from "@/lib/saxo-unblock-progress";
+import {
+  decideAutoRecheck,
+  readLastAutoRecheck,
+  writeLastAutoRecheck,
+} from "@/lib/saxo-auto-recheck";
 
 const DONE_STORAGE_KEY = "saxo-unblock-progress";
 
