@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, ChevronRight, RefreshCw, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListTree, RefreshCw, Sparkles } from "lucide-react";
+import { TradeRationalePanel } from "@/components/trade-rationale-panel";
 import { formatUkDate } from "@/lib/uk-time";
 import { getDailyAiReport, type DailyReportItem } from "@/lib/daily-report.functions";
 import { cn } from "@/lib/utils";
@@ -57,11 +58,16 @@ function ItemRow({
   item,
   currency,
   tone,
+  portfolioId,
+  date,
 }: {
   item: DailyReportItem;
   currency: string;
   tone: "buy" | "sell" | "hold" | "pass";
+  portfolioId: string;
+  date: string;
 }) {
+  const [open, setOpen] = useState(false);
   const toneClass =
     tone === "buy"
       ? "border-emerald-500/30 bg-emerald-500/5"
@@ -94,6 +100,21 @@ function ItemRow({
       <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
         {why || "No reason recorded for this decision."}
       </p>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="mt-1 h-7 px-2 text-[11px]"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <ListTree className="mr-1 h-3.5 w-3.5" />
+        {open ? "Hide rationale" : "Signals & events"}
+      </Button>
+      {open && (
+        <div className="mt-2 rounded-md border bg-background/60 p-2">
+          <TradeRationalePanel portfolioId={portfolioId} symbol={item.symbol} date={date} />
+        </div>
+      )}
     </li>
   );
 }
@@ -103,11 +124,15 @@ function Section({
   items,
   currency,
   tone,
+  portfolioId,
+  date,
 }: {
   title: string;
   items: DailyReportItem[];
   currency: string;
   tone: "buy" | "sell" | "hold" | "pass";
+  portfolioId: string;
+  date: string;
 }) {
   if (items.length === 0) return null;
   return (
@@ -117,7 +142,14 @@ function Section({
       </h3>
       <ul className="space-y-2">
         {items.slice(0, 40).map((i, idx) => (
-          <ItemRow key={`${i.symbol}-${idx}`} item={i} currency={currency} tone={tone} />
+          <ItemRow
+            key={`${i.symbol}-${idx}`}
+            item={i}
+            currency={currency}
+            tone={tone}
+            portfolioId={portfolioId}
+            date={date}
+          />
         ))}
       </ul>
       {items.length > 40 && (
@@ -228,10 +260,24 @@ function DailyReportPage() {
 
               {p.considered > 0 && <Separator />}
 
-              <Section title="Bought" items={p.bought} currency={p.currency} tone="buy" />
-              <Section title="Sold" items={p.sold} currency={p.currency} tone="sell" />
-              <Section title="Held" items={p.held} currency={p.currency} tone="hold" />
-              <Section title="Passed on" items={p.passed} currency={p.currency} tone="pass" />
+              {(
+                [
+                  ["Bought", p.bought, "buy"],
+                  ["Sold", p.sold, "sell"],
+                  ["Held", p.held, "hold"],
+                  ["Passed on", p.passed, "pass"],
+                ] as const
+              ).map(([title, items, tone]) => (
+                <Section
+                  key={tone}
+                  title={title}
+                  items={items}
+                  currency={p.currency}
+                  tone={tone}
+                  portfolioId={p.portfolioId}
+                  date={date}
+                />
+              ))}
             </CardContent>
           </Card>
         ))}
