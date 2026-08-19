@@ -5,9 +5,16 @@
 // the panel renders instantly and is unit-testable.
 
 import { baseSymbol } from "./news-relevance";
+import {
+  buildRiskLimitSummary,
+  computeDecisionConfidence,
+  type DecisionConfidence,
+  type RiskLimitConfig,
+  type RiskLimitSummary,
+} from "./decision-confidence";
 import { buildTradeLevels, type TradeLevelPlan, type TradeLevelRiskConfig } from "./trade-levels";
 
-export type { TradeLevelPlan };
+export type { TradeLevelPlan, DecisionConfidence, RiskLimitSummary };
 
 export type RationaleSignal = {
   key: string;
@@ -43,6 +50,10 @@ export type TradeRationale = {
   events: RationaleEvent[];
   /** Trigger / limit / stop / target price levels behind the decision. */
   levels: TradeLevelPlan | null;
+  /** How much corroborating evidence the AI had, 0..100. */
+  confidence: DecisionConfidence;
+  /** Guardrails the selected risk level applied to this decision. */
+  riskLimits: RiskLimitSummary | null;
   /** True when we found nothing beyond the raw rationale text. */
   sparse: boolean;
 };
@@ -205,7 +216,14 @@ export function buildTradeRationale(input: {
   /** Cap the events list (default 8). */
   maxEvents?: number;
   /** Portfolio risk config, so stops/targets match what the engine applied. */
-  riskConfig?: TradeLevelRiskConfig | null;
+  riskConfig?: (TradeLevelRiskConfig & RiskLimitConfig) | null;
+  /** Selected risk level, for the risk-limit summary. */
+  riskLevel?: { level: number | null; name: string } | null;
+  /** Portfolio equity so position size can be shown against the caps. */
+  equity?: number | null;
+  /** Mode profile fallbacks for caps the dial does not set. */
+  maxPositionPct?: number | null;
+  maxNewPositionsPerDay?: number | null;
 }): TradeRationale {
   const { decision } = input;
   const mi = obj(decision.marketInputs) ?? {};
@@ -277,6 +295,26 @@ export function buildTradeRationale(input: {
     config: input.riskConfig ?? null,
   });
 
+  const confidence = computeDecisionConfidence({
+    action,
+    marketInputs: decision.marketInputs,
+    riskReward: levels?.riskReward ?? null,
+    eventCount: events.length,
+  });
+
+  const riskLimits = input.riskLevel
+    ? buildRiskLimitSummary({
+        level: input.riskLevel.level,
+        levelName: input.riskLevel.name,
+        config: (input.riskConfig ?? null) as RiskLimitConfig | null,
+        assetClass: decision.assetClass ?? (str(feat["asset_class"]) as string | null),
+        notional: num(decision.notional),
+        equity: input.equity ?? null,
+        maxPositionPct: input.maxPositionPct ?? null,
+        maxNewPositionsPerDay: input.maxNewPositionsPerDay ?? null,
+      })
+    : null;
+
   return {
     symbol: decision.symbol,
     action,
@@ -287,6 +325,8 @@ export function buildTradeRationale(input: {
     signals,
     events: events.slice(0, maxEvents),
     levels,
+    confidence,
+    riskLimits,
     sparse: signals.length === 0 && events.length === 0 && levels === null,
   };
 }
