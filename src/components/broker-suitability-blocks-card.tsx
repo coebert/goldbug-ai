@@ -423,6 +423,7 @@ export function BrokerSuitabilityBlocksCard() {
                 if (match) mut.mutate(match.symbolKey);
               }
             }}
+            onCompletedCountChange={handleCompletedCountChange}
           />
         )}
 
