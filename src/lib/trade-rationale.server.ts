@@ -43,7 +43,7 @@ export async function loadTradeRationale(
   const anchor = (row.run_date as string | null) ?? new Date().toISOString().slice(0, 10);
   const from = shiftIso(anchor, -lookback);
 
-  const [newsRes, eventsRes] = await Promise.all([
+  const [newsRes, eventsRes, portfolioRes, holdingRes] = await Promise.all([
     db
       .from("news_cache")
       .select("id, news_date, headline, summary, source, url, sentiment, relevance_score, entities")
