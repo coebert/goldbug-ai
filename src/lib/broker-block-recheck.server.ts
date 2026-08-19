@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   decideRecheck,
   summariseRecheck,
+  type RecheckDecision,
   type RecheckSymbolResult,
 } from "@/lib/broker-block-recheck";
 import {
@@ -90,7 +91,7 @@ export async function recheckBrokerBlocks(args: {
 
   const results: RecheckSymbolResult[] = [];
   for (const block of blocks) {
-    let decision;
+    let decision: RecheckDecision;
     try {
       const probe = await adapter.precheckSymbol(block.symbol, { quantity: 1 });
       decision = decideRecheck(probe);
