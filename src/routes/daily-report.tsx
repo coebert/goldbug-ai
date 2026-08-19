@@ -99,6 +99,21 @@ function ItemRow({
       <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
         {why || "No reason recorded for this decision."}
       </p>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="mt-1 h-7 px-2 text-[11px]"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <ListTree className="mr-1 h-3.5 w-3.5" />
+        {open ? "Hide rationale" : "Signals & events"}
+      </Button>
+      {open && (
+        <div className="mt-2 rounded-md border bg-background/60 p-2">
+          <TradeRationalePanel portfolioId={portfolioId} symbol={item.symbol} date={date} />
+        </div>
+      )}
     </li>
   );
 }
@@ -108,11 +123,15 @@ function Section({
   items,
   currency,
   tone,
+  portfolioId,
+  date,
 }: {
   title: string;
   items: DailyReportItem[];
   currency: string;
   tone: "buy" | "sell" | "hold" | "pass";
+  portfolioId: string;
+  date: string;
 }) {
   if (items.length === 0) return null;
   return (
@@ -122,7 +141,14 @@ function Section({
       </h3>
       <ul className="space-y-2">
         {items.slice(0, 40).map((i, idx) => (
-          <ItemRow key={`${i.symbol}-${idx}`} item={i} currency={currency} tone={tone} />
+          <ItemRow
+            key={`${i.symbol}-${idx}`}
+            item={i}
+            currency={currency}
+            tone={tone}
+            portfolioId={portfolioId}
+            date={date}
+          />
         ))}
       </ul>
       {items.length > 40 && (
