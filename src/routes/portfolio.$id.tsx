@@ -896,7 +896,7 @@ function PortfolioPage() {
         {q.isLoading && <p className="text-muted-foreground">Loading…</p>}
         {p && (
           <>
-            <div className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:flex-wrap sm:justify-between sm:gap-4">
+            <div className="scroll-below-sticky mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 pt-1 sm:flex sm:flex-wrap sm:justify-between sm:gap-4">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="truncate text-lg font-semibold tracking-tight sm:text-2xl">
