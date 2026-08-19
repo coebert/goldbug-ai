@@ -111,6 +111,8 @@ export function TradeRationaleView({ rationale }: { rationale: TradeRationale })
         <p className="text-xs leading-relaxed text-muted-foreground">{rationale.aiRationale}</p>
       )}
 
+      {rationale.levels && <TradeLevelsSection levels={rationale.levels} />}
+
       <div>
         <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
           <Activity className="h-3.5 w-3.5" />
