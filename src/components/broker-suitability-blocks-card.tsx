@@ -279,6 +279,38 @@ export function BrokerSuitabilityBlocksCard() {
 
   const blocks = q.data?.blocks ?? [];
 
+  // Auto re-check: ticking a Saxo section off the checklist is the closest
+  // signal we get that an assessment was just updated, so re-probe the broker
+  // straight away instead of waiting for a manual tap.
+  const [autoRan, setAutoRan] = useState(false);
+  const prevCompleted = useRef<number | null>(null);
+  const recheckRef = useRef(recheckMut);
+  recheckRef.current = recheckMut;
+
+  const handleCompletedCountChange = useCallback(
+    (count: number) => {
+      const prev = prevCompleted.current;
+      prevCompleted.current = count;
+      if (prev === null || count <= prev) return;
+
+      const decision = decideAutoRecheck({
+        lastRunAt: readLastAutoRecheck(),
+        now: Date.now(),
+        blockCount: blocks.length,
+        completedCategories: count,
+        busy: recheckRef.current.isPending,
+      });
+      if (!decision.run) return;
+
+      writeLastAutoRecheck(Date.now());
+      setAutoRan(true);
+      recheckRef.current.mutate();
+    },
+    [blocks.length],
+  );
+
+
+
   return (
     <Card>
       <CardHeader className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
