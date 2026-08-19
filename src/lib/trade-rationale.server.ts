@@ -10,6 +10,8 @@ import {
   type TradeRationale,
 } from "./trade-rationale";
 import { priceSymbolVariants } from "./price-symbol";
+import { riskPresetConfig } from "./risk-presets";
+import type { TradeLevelRiskConfig } from "./trade-levels";
 
 /**
  * The stored `risk_config` only carries fields the user has touched, so fall
