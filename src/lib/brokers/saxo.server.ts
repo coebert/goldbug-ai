@@ -718,6 +718,42 @@ export class SaxoAdapter implements BrokerAdapter {
   }
 
 
+  /**
+   * Dry-run an order against Saxo's precheck endpoint WITHOUT placing it.
+   * Used by the "re-check blocks" flow to test whether an account-level
+   * refusal (suitability / permission / tradability) still applies.
+   */
+  async precheckSymbol(
+    symbol: string,
+    opts?: { quantity?: number; side?: "buy" | "sell" },
+  ): Promise<{ ok: boolean; errorCode: string | null; message: string | null }> {
+    const inst = await this.lookupUic(symbol);
+    const accountKey = await this.getDefaultAccountKey();
+    const body: Record<string, unknown> = {
+      Uic: inst.uic,
+      AssetType: inst.assetType,
+      BuySell: opts?.side === "sell" ? "Sell" : "Buy",
+      Amount: Math.max(1, Math.round(opts?.quantity ?? 1)),
+      AmountType: "Quantity",
+      OrderType: "Market",
+      OrderDuration: { DurationType: "DayOrder" },
+      ManualOrder: true,
+    };
+    if (accountKey) body.AccountKey = accountKey;
+
+    const pre = await this.req<{
+      PreCheckResult?: string;
+      ErrorInfo?: { ErrorCode?: string; Message?: string };
+
+    }>("POST", "/trade/v2/orders/precheck", { body, maxAttempts: 2 });
+
+    const outcome = String(pre.PreCheckResult ?? "").toLowerCase();
+    const errorCode = pre.ErrorInfo?.ErrorCode ?? null;
+    const message = pre.ErrorInfo?.Message ?? null;
+    const ok = !errorCode && (!outcome || outcome === "ok");
+    return { ok, errorCode, message };
+  }
+
   async placeOrder(req: BrokerOrderRequest): Promise<BrokerOrderResult> {
     const inst = await this.lookupUic(req.symbol);
     const accountKey = await this.getDefaultAccountKey();
