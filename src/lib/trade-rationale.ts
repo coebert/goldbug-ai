@@ -204,6 +204,8 @@ export function buildTradeRationale(input: {
   events?: MarketEventInput[];
   /** Cap the events list (default 8). */
   maxEvents?: number;
+  /** Portfolio risk config, so stops/targets match what the engine applied. */
+  riskConfig?: TradeLevelRiskConfig | null;
 }): TradeRationale {
   const { decision } = input;
   const mi = obj(decision.marketInputs) ?? {};
