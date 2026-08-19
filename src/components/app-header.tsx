@@ -133,7 +133,7 @@ export function AppHeader({ email }: { email?: string | null }) {
     <header
       ref={headerRef}
       data-sticky-nav
-      className="sticky top-0 z-30 border-b border-border bg-surface-2/85 pt-[env(safe-area-inset-top)] backdrop-blur"
+      className="sticky top-0 z-30 border-b border-border bg-surface-2 pt-[env(safe-area-inset-top)]"
     >
       {/* Row 1 — Brand / global controls. Height is pinned to
           --app-header-row-h so late-arriving widgets (env badge, clock,
