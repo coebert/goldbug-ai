@@ -1,0 +1,1 @@
+UPDATE public.broker_instrument_blocks SET cleared_at = now() WHERE cleared_at IS NULL AND symbol_key = 'SGLN';
