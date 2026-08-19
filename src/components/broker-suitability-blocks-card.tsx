@@ -307,14 +307,46 @@ export function BrokerSuitabilityBlocksCard() {
           <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
             <p className="font-medium text-foreground">{recheckMut.data.message}</p>
             {recheckMut.data.results.length > 0 && (
-              <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
-                {recheckMut.data.results.map((r) => (
-                  <li key={r.symbolKey} className="break-words">
-                    <span className="font-mono">{r.symbol}</span> — {r.note}
-                  </li>
-                ))}
+              <ul className="mt-2 space-y-2 text-xs">
+                {recheckMut.data.results.map((r) => {
+                  const tone =
+                    r.outcome === "cleared"
+                      ? "text-emerald-500"
+                      : r.outcome === "blocked"
+                        ? "text-amber-500"
+                        : "text-muted-foreground";
+                  const detail = [
+                    r.brokerCode,
+                    r.brokerMessage,
+                    ...(r.brokerDetails ?? []),
+                  ].filter(Boolean) as string[];
+                  return (
+                    <li
+                      key={r.symbolKey}
+                      className="break-words rounded-md border border-border/60 bg-background/40 p-2"
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono text-foreground">{r.symbol}</span>
+                        <span className={`font-medium uppercase ${tone}`}>{r.outcome}</span>
+                        {r.reason && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {r.reason.replace(/_/g, " ")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-muted-foreground">{r.note}</p>
+                      {detail.length > 0 && (
+                        <p className="mt-1 font-mono text-[11px] leading-snug text-muted-foreground/90">
+                          Saxo said: {detail.join(" · ")}
+                          {r.brokerPreCheckResult ? ` (precheck: ${r.brokerPreCheckResult})` : ""}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
+
           </div>
         )}
 
