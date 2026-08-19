@@ -33,6 +33,7 @@ import { NEWS_TOPICS, classifyNewsTopic } from "@/lib/news-topics";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChevronDown, ChevronRight, ExternalLink, Info, Newspaper, Pause, Play, RefreshCw, Sparkles, Target } from "lucide-react";
+import { publishRationaleRefresh } from "@/lib/rationale-refresh";
 
 // Absolute sentiment threshold treated as a "strong" market-moving signal.
 const STRONG_SENTIMENT_THRESHOLD = 0.4;
@@ -459,7 +460,10 @@ export function NewsReel() {
                     // otherwise "Refresh now" only re-shows stale rows.
                     const res = await refreshSource({ data: { max: 30 } });
                     if (res.skipped && res.reason) toast.info(res.reason);
-                    else toast.success(`Pulled ${res.headlines} headlines (${res.scored} scored).`);
+                    else {
+                      toast.success(`Pulled ${res.headlines} headlines (${res.scored} scored).`);
+                      publishRationaleRefresh("news", `${res.headlines} new headlines`);
+                    }
                   } catch (err) {
                     toast.error(`Could not fetch new headlines: ${String(err)}`);
                   } finally {

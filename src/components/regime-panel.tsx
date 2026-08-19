@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Radar, RefreshCw, TrendingUp, TrendingDown, ShieldAlert, Waves, Sunrise, CircleDot } from "lucide-react";
 import { toast } from "sonner";
+import { publishRationaleRefresh } from "@/lib/rationale-refresh";
 
 type RegimeLabel =
   | "bull_quiet" | "bull_volatile" | "correction" | "bear" | "crisis" | "recovery";
@@ -69,6 +70,7 @@ export function RegimePanel() {
     try {
       await refresh();
       await Promise.all([cur.refetch(), hist.refetch()]);
+      publishRationaleRefresh("regime");
       toast.success("Regime refreshed");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Refresh failed");
