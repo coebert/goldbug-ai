@@ -32,9 +32,9 @@ describe("summariseRecheck", () => {
       brokerCode: null,
       brokerMessage: null,
       brokerPreCheckResult: null,
-      brokerDetails: [],
       reason: null,
-    } as const;
+      brokerDetails: [] as string[],
+    };
     const s = summariseRecheck([
       { symbol: "SGLN.L", symbolKey: "SGLN", outcome: "cleared", ...evidence },
       { symbol: "XUKS.L", symbolKey: "XUKS", outcome: "blocked", ...evidence },
