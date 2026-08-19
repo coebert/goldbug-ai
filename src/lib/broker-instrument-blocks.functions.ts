@@ -84,7 +84,18 @@ export interface RecheckBlocksResultDTO {
   stillBlocked: number;
   unknown: number;
   message: string;
-  results: Array<{ symbol: string; symbolKey: string; outcome: string; note: string }>;
+  results: Array<{
+    symbol: string;
+    symbolKey: string;
+    outcome: string;
+    note: string;
+    /** Verbatim broker evidence so the user knows what to fix in Saxo. */
+    brokerCode: string | null;
+    brokerMessage: string | null;
+    brokerPreCheckResult: string | null;
+    brokerDetails: string[];
+    reason: string | null;
+  }>;
 }
 
 /**

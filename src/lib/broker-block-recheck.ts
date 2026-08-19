@@ -24,6 +24,10 @@ export type RecheckProbe = {
   ok: boolean;
   errorCode?: string | null;
   message?: string | null;
+  /** Raw PreCheckResult string from the broker, when present. */
+  preCheckResult?: string | null;
+  /** Extra per-check detail rows returned alongside the main error. */
+  detailMessages?: string[];
   /** Set when the probe could not be run at all. */
   failed?: boolean;
 };
@@ -32,18 +36,41 @@ export type RecheckDecision = {
   outcome: RecheckOutcome;
   /** Short, user-facing explanation of the outcome. */
   note: string;
+  /** What the broker actually said, verbatim — so the user knows what to fix. */
+  brokerCode: string | null;
+  brokerMessage: string | null;
+  brokerPreCheckResult: string | null;
+  brokerDetails: string[];
+  /** Classified refusal category (suitability / not_tradable / not_permitted). */
+  reason: string | null;
 };
+
+function evidence(probe: RecheckProbe) {
+  return {
+    brokerCode: probe.errorCode?.trim() || null,
+    brokerMessage: probe.message?.trim() || null,
+    brokerPreCheckResult: probe.preCheckResult?.trim() || null,
+    brokerDetails: (probe.detailMessages ?? []).filter((d) => d.trim().length > 0),
+  };
+}
 
 export function decideRecheck(probe: RecheckProbe): RecheckDecision {
   if (probe.failed) {
     return {
       outcome: "unknown",
       note: "Could not reach the broker to re-check — block left in place.",
+      ...evidence(probe),
+      reason: null,
     };
   }
 
   if (probe.ok) {
-    return { outcome: "cleared", note: "Saxo accepted a test order check — unblocked." };
+    return {
+      outcome: "cleared",
+      note: "Saxo accepted a test order check — unblocked.",
+      ...evidence(probe),
+      reason: null,
+    };
   }
 
   const verdict = classifyBrokerBlock(probe.message ?? null, probe.errorCode ?? null);
@@ -51,6 +78,8 @@ export function decideRecheck(probe: RecheckProbe): RecheckDecision {
     return {
       outcome: "blocked",
       note: verdict.detail ?? "Saxo still refuses this instrument on this account.",
+      ...evidence(probe),
+      reason: verdict.reason ?? null,
     };
   }
 
@@ -60,6 +89,8 @@ export function decideRecheck(probe: RecheckProbe): RecheckDecision {
   return {
     outcome: "cleared",
     note: "No account restriction left (rejection was order-specific) — unblocked.",
+    ...evidence(probe),
+    reason: null,
   };
 }
 
