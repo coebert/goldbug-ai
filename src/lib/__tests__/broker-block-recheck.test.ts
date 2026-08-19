@@ -27,11 +27,20 @@ describe("decideRecheck", () => {
 
 describe("summariseRecheck", () => {
   it("summarises mixed outcomes", () => {
+    const evidence = {
+      note: "",
+      brokerCode: null,
+      brokerMessage: null,
+      brokerPreCheckResult: null,
+      brokerDetails: [],
+      reason: null,
+    } as const;
     const s = summariseRecheck([
-      { symbol: "SGLN.L", symbolKey: "SGLN", outcome: "cleared", note: "" },
-      { symbol: "XUKS.L", symbolKey: "XUKS", outcome: "blocked", note: "" },
-      { symbol: "XSPS.L", symbolKey: "XSPS", outcome: "unknown", note: "" },
+      { symbol: "SGLN.L", symbolKey: "SGLN", outcome: "cleared", ...evidence },
+      { symbol: "XUKS.L", symbolKey: "XUKS", outcome: "blocked", ...evidence },
+      { symbol: "XSPS.L", symbolKey: "XSPS", outcome: "unknown", ...evidence },
     ]);
+
     expect(s).toMatchObject({ checked: 3, cleared: 1, stillBlocked: 1, unknown: 1 });
     expect(s.message).toContain("1 unblocked");
   });
