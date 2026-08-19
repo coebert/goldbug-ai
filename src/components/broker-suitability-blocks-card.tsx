@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardList, ExternalLink, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   clearBrokerInstrumentBlock,
   listBrokerInstrumentBlocks,
+  recheckBrokerInstrumentBlocks,
   type BrokerBlockDTO,
 } from "@/lib/broker-instrument-blocks.functions";
 import { Progress } from "@/components/ui/progress";
@@ -251,6 +252,7 @@ export function BrokerSuitabilityBlocksCard() {
   const qc = useQueryClient();
   const list = useServerFn(listBrokerInstrumentBlocks);
   const clear = useServerFn(clearBrokerInstrumentBlock);
+  const recheck = useServerFn(recheckBrokerInstrumentBlocks);
 
   const q = useQuery({
     queryKey: ["broker-instrument-blocks"],
@@ -259,6 +261,11 @@ export function BrokerSuitabilityBlocksCard() {
 
   const mut = useMutation({
     mutationFn: (symbolKey: string) => clear({ data: { symbolKey } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["broker-instrument-blocks"] }),
+  });
+
+  const recheckMut = useMutation({
+    mutationFn: () => recheck(),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["broker-instrument-blocks"] }),
   });
 
@@ -271,13 +278,46 @@ export function BrokerSuitabilityBlocksCard() {
           <ShieldAlert className="h-4 w-4 shrink-0 text-amber-500" />
           <span className="min-w-0 break-words">Broker checks blocking trades</span>
         </CardTitle>
-        {blocks.length > 0 && (
-          <Badge variant="outline" className="w-fit shrink-0 border-amber-500/40 text-amber-500">
-            {blocks.length} blocked
-          </Badge>
-        )}
+        <div className="flex w-fit shrink-0 flex-wrap items-center gap-2">
+          {blocks.length > 0 && (
+            <Badge variant="outline" className="border-amber-500/40 text-amber-500">
+              {blocks.length} blocked
+            </Badge>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => recheckMut.mutate()}
+            disabled={recheckMut.isPending}
+          >
+            <RefreshCw
+              className={`mr-1.5 h-3.5 w-3.5 ${recheckMut.isPending ? "animate-spin" : ""}`}
+            />
+            {recheckMut.isPending ? "Re-checking…" : "Re-check Saxo blocks"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {recheckMut.isError && (
+          <p className="text-sm text-destructive">
+            Re-check failed. Confirm two-factor and the Saxo connection, then try again.
+          </p>
+        )}
+        {recheckMut.data && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+            <p className="font-medium text-foreground">{recheckMut.data.message}</p>
+            {recheckMut.data.results.length > 0 && (
+              <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+                {recheckMut.data.results.map((r) => (
+                  <li key={r.symbolKey} className="break-words">
+                    <span className="font-mono">{r.symbol}</span> — {r.note}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {q.isLoading && (
           <p className="text-sm text-muted-foreground">Loading broker blocks…</p>
         )}
