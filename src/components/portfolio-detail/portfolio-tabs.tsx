@@ -19,7 +19,7 @@ export function PortfolioTabs({ id }: { id: string }) {
     <nav
       aria-label="Portfolio sections"
       data-sticky-nav
-      className="sticky top-[var(--app-header-h)] z-20 -mx-4 mb-4 h-[var(--subnav-h,3.25rem)] border-b border-border bg-surface-1/90 px-4 backdrop-blur"
+      className="sticky top-[var(--app-header-h)] z-20 -mx-4 mb-4 h-[var(--subnav-h,3.25rem)] border-b border-border bg-surface-1 px-4"
     >
       <ul className="flex h-full min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => (

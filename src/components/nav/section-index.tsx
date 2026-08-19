@@ -138,7 +138,7 @@ export function SectionIndex({
       aria-label="Sections on this page"
       data-sticky-nav
       style={{ top }}
-      className={`sticky z-20 -mx-4 mb-4 h-[var(--subnav-h,3.25rem)] border-b border-border bg-surface-1/90 px-4 backdrop-blur ${className}`}
+      className={`sticky z-20 -mx-4 mb-4 h-[var(--subnav-h,3.25rem)] border-b border-border bg-surface-1 px-4 ${className}`}
     >
       {/* Fixed row height: chips wrapping or a longer label appearing must not
           resize the bar, or every sticky offset below it shifts mid-scroll. */}
