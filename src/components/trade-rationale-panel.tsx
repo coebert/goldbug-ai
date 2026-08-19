@@ -14,6 +14,94 @@ function stanceClass(stance: string): string {
   return "border-border text-muted-foreground";
 }
 
+const LEVEL_TONE: Record<string, string> = {
+  trigger: "text-foreground",
+  limit: "text-sky-400",
+  stop: "text-rose-400",
+  target: "text-emerald-400",
+  trailing: "text-amber-400",
+  cost_basis: "text-muted-foreground",
+};
+
+function fmtPrice(price: number, currency: string | null): string {
+  const digits = price >= 100 ? 2 : price >= 1 ? 3 : 5;
+  const value = price.toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: digits,
+  });
+  return currency ? `${value} ${currency}` : value;
+}
+
+function fmtSignedPct(p: number | null): string | null {
+  if (p == null) return null;
+  if (Math.abs(p) < 0.00005) return "at trigger";
+  return `${p > 0 ? "+" : ""}${(p * 100).toFixed(2)}%`;
+}
+
+function TradeLevelsSection({ levels }: { levels: NonNullable<TradeRationale["levels"]> }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <Target className="h-3.5 w-3.5" />
+        Price levels used
+      </div>
+
+      <ul className="space-y-1.5">
+        {levels.levels.map((l) => (
+          <li key={l.key} className="rounded-md border bg-muted/20 p-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-1.5">
+              <span className="text-xs font-medium">{l.label}</span>
+              <span className={cn("text-xs font-semibold tabular-nums", LEVEL_TONE[l.key] ?? "")}>
+                {fmtPrice(l.price, levels.currency)}
+                {fmtSignedPct(l.distancePct) && (
+                  <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                    {fmtSignedPct(l.distancePct)}
+                  </span>
+                )}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{l.basis}</p>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {levels.riskPct != null && (
+          <Badge variant="outline" className="text-[10px]">
+            Risk {(levels.riskPct * 100).toFixed(1)}%
+          </Badge>
+        )}
+        {levels.rewardPct != null && (
+          <Badge variant="outline" className="text-[10px]">
+            Reward {(levels.rewardPct * 100).toFixed(1)}%
+          </Badge>
+        )}
+        {levels.riskReward != null && (
+          <Badge variant="outline" className="text-[10px]">
+            R:R {levels.riskReward.toFixed(2)}×
+          </Badge>
+        )}
+        {levels.atrPct != null && (
+          <Badge variant="outline" className="text-[10px]">
+            ATR {(levels.atrPct * 100).toFixed(2)}%
+          </Badge>
+        )}
+        {levels.maxHoldDays != null && levels.maxHoldDays > 0 && (
+          <Badge variant="outline" className="text-[10px]">
+            Max hold {levels.maxHoldDays}d
+          </Badge>
+        )}
+      </div>
+
+      {levels.notes.map((note) => (
+        <p key={note} className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          {note}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function TradeRationaleView({ rationale }: { rationale: TradeRationale }) {
   return (
     <div className="space-y-3">
