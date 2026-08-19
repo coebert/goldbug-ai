@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { buildSaxoChecklist } from "@/lib/saxo-product-categories";
 import { computeUnblockProgress } from "@/lib/saxo-unblock-progress";
+import {
+  decideAutoRecheck,
+  readLastAutoRecheck,
+  writeLastAutoRecheck,
+} from "@/lib/saxo-auto-recheck";
 
 const DONE_STORAGE_KEY = "saxo-unblock-progress";
 
@@ -154,14 +159,22 @@ function SaxoChecklist({
   blocks,
   onUnblockSymbols,
   clearing,
+  onCompletedCountChange,
 }: {
   blocks: BrokerBlockDTO[];
   onUnblockSymbols: (symbols: string[]) => void;
   clearing: boolean;
+  onCompletedCountChange?: (count: number) => void;
 }) {
   const items = buildSaxoChecklist(blocks);
   const { done, toggle } = useCompletedCategories();
   const progress = computeUnblockProgress(items, done);
+
+  const completedCount = progress.completedCategories;
+  useEffect(() => {
+    onCompletedCountChange?.(completedCount);
+  }, [completedCount, onCompletedCountChange]);
+
   if (items.length === 0) return null;
 
   return (
@@ -271,6 +284,38 @@ export function BrokerSuitabilityBlocksCard() {
 
   const blocks = q.data?.blocks ?? [];
 
+  // Auto re-check: ticking a Saxo section off the checklist is the closest
+  // signal we get that an assessment was just updated, so re-probe the broker
+  // straight away instead of waiting for a manual tap.
+  const [autoRan, setAutoRan] = useState(false);
+  const prevCompleted = useRef<number | null>(null);
+  const recheckRef = useRef(recheckMut);
+  recheckRef.current = recheckMut;
+
+  const handleCompletedCountChange = useCallback(
+    (count: number) => {
+      const prev = prevCompleted.current;
+      prevCompleted.current = count;
+      if (prev === null || count <= prev) return;
+
+      const decision = decideAutoRecheck({
+        lastRunAt: readLastAutoRecheck(),
+        now: Date.now(),
+        blockCount: blocks.length,
+        completedCategories: count,
+        busy: recheckRef.current.isPending,
+      });
+      if (!decision.run) return;
+
+      writeLastAutoRecheck(Date.now());
+      setAutoRan(true);
+      recheckRef.current.mutate();
+    },
+    [blocks.length],
+  );
+
+
+
   return (
     <Card>
       <CardHeader className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -298,6 +343,16 @@ export function BrokerSuitabilityBlocksCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {autoRan && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <RefreshCw
+              className={`h-3.5 w-3.5 shrink-0 ${recheckMut.isPending ? "animate-spin" : ""}`}
+            />
+            {recheckMut.isPending
+              ? "Saxo assessment ticked — re-checking your blocked list automatically…"
+              : "Auto re-check ran after your Saxo assessment update."}
+          </p>
+        )}
         {recheckMut.isError && (
           <p className="text-sm text-destructive">
             Re-check failed. Confirm two-factor and the Saxo connection, then try again.
@@ -378,6 +433,7 @@ export function BrokerSuitabilityBlocksCard() {
                 if (match) mut.mutate(match.symbolKey);
               }
             }}
+            onCompletedCountChange={handleCompletedCountChange}
           />
         )}
 
