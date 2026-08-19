@@ -41,6 +41,8 @@ export type TradeRationale = {
   runRationale: string | null;
   signals: RationaleSignal[];
   events: RationaleEvent[];
+  /** Trigger / limit / stop / target price levels behind the decision. */
+  levels: TradeLevelPlan | null;
   /** True when we found nothing beyond the raw rationale text. */
   sparse: boolean;
 };
@@ -51,6 +53,14 @@ export type DecisionInput = {
   decidedAt?: string | null;
   rationale?: string | null;
   marketInputs?: unknown;
+  /** Executed / quoted price recorded on the decision row. */
+  price?: number | null;
+  /** Average cost of the position the decision applied to. */
+  avgCost?: number | null;
+  currency?: string | null;
+  assetClass?: string | null;
+  notional?: number | null;
+  tickSize?: number | null;
 };
 
 export type NewsInput = {
