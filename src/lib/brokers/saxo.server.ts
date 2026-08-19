@@ -744,7 +744,7 @@ export class SaxoAdapter implements BrokerAdapter {
     const pre = await this.req<{
       PreCheckResult?: string;
       ErrorInfo?: { ErrorCode?: string; Message?: string };
-usePlaceholder
+
     }>("POST", "/trade/v2/orders/precheck", { body, maxAttempts: 2 });
 
     const outcome = String(pre.PreCheckResult ?? "").toLowerCase();
