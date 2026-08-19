@@ -26,7 +26,9 @@ export async function loadTradeRationale(
 
   let q = db
     .from("ai_decision_audit")
-    .select("symbol, action, decided_at, rationale, market_inputs, run_date")
+    .select(
+      "symbol, action, decided_at, rationale, market_inputs, run_date, price, notional, asset_class, instrument_ccy",
+    )
     .eq("portfolio_id", args.portfolioId)
     .in("symbol", variants)
     .order("decided_at", { ascending: false })
