@@ -10,6 +10,19 @@ import {
   type TradeRationale,
 } from "./trade-rationale";
 import { priceSymbolVariants } from "./price-symbol";
+import { riskPresetConfig } from "./risk-presets";
+import type { TradeLevelRiskConfig } from "./trade-levels";
+
+/**
+ * The stored `risk_config` only carries fields the user has touched, so fall
+ * back to the dial preset for the portfolio's risk level. That keeps the
+ * displayed stop/target identical to the one the engine applied.
+ */
+function resolveRiskConfig(raw: unknown, level: number | null): TradeLevelRiskConfig {
+  const preset = riskPresetConfig(Number(level ?? 3));
+  const stored = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return { ...preset, ...stored } as TradeLevelRiskConfig;
+}
 
 function shiftIso(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -26,7 +39,9 @@ export async function loadTradeRationale(
 
   let q = db
     .from("ai_decision_audit")
-    .select("symbol, action, decided_at, rationale, market_inputs, run_date")
+    .select(
+      "symbol, action, decided_at, rationale, market_inputs, run_date, price, notional, asset_class, instrument_ccy",
+    )
     .eq("portfolio_id", args.portfolioId)
     .in("symbol", variants)
     .order("decided_at", { ascending: false })
@@ -41,7 +56,7 @@ export async function loadTradeRationale(
   const anchor = (row.run_date as string | null) ?? new Date().toISOString().slice(0, 10);
   const from = shiftIso(anchor, -lookback);
 
-  const [newsRes, eventsRes] = await Promise.all([
+  const [newsRes, eventsRes, portfolioRes, holdingRes] = await Promise.all([
     db
       .from("news_cache")
       .select("id, news_date, headline, summary, source, url, sentiment, relevance_score, entities")
@@ -56,7 +71,19 @@ export async function loadTradeRationale(
       .lte("event_date", anchor)
       .order("event_date", { ascending: false })
       .limit(100),
+    db.from("portfolios").select("risk_config, risk_level").eq("id", args.portfolioId).maybeSingle(),
+    db
+      .from("holdings")
+      .select("symbol, avg_cost")
+      .eq("portfolio_id", args.portfolioId)
+      .in("symbol", variants)
+      .limit(1),
   ]);
+
+  const riskConfig = resolveRiskConfig(
+    portfolioRes.data?.risk_config,
+    portfolioRes.data?.risk_level ?? null,
+  );
 
   return buildTradeRationale({
     decision: {
@@ -65,8 +92,14 @@ export async function loadTradeRationale(
       decidedAt: row.decided_at as string | null,
       rationale: row.rationale as string | null,
       marketInputs: row.market_inputs,
+      price: (row as { price?: number | null }).price ?? null,
+      notional: (row as { notional?: number | null }).notional ?? null,
+      assetClass: (row as { asset_class?: string | null }).asset_class ?? null,
+      currency: (row as { instrument_ccy?: string | null }).instrument_ccy ?? null,
+      avgCost: (holdingRes.data?.[0] as { avg_cost?: number | null } | undefined)?.avg_cost ?? null,
     },
     news: (newsRes.data ?? []) as unknown as NewsInput[],
     events: (eventsRes.data ?? []) as unknown as MarketEventInput[],
+    riskConfig,
   });
 }

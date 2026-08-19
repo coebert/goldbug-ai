@@ -5,6 +5,9 @@
 // the panel renders instantly and is unit-testable.
 
 import { baseSymbol } from "./news-relevance";
+import { buildTradeLevels, type TradeLevelPlan, type TradeLevelRiskConfig } from "./trade-levels";
+
+export type { TradeLevelPlan };
 
 export type RationaleSignal = {
   key: string;
@@ -38,6 +41,8 @@ export type TradeRationale = {
   runRationale: string | null;
   signals: RationaleSignal[];
   events: RationaleEvent[];
+  /** Trigger / limit / stop / target price levels behind the decision. */
+  levels: TradeLevelPlan | null;
   /** True when we found nothing beyond the raw rationale text. */
   sparse: boolean;
 };
@@ -48,6 +53,14 @@ export type DecisionInput = {
   decidedAt?: string | null;
   rationale?: string | null;
   marketInputs?: unknown;
+  /** Executed / quoted price recorded on the decision row. */
+  price?: number | null;
+  /** Average cost of the position the decision applied to. */
+  avgCost?: number | null;
+  currency?: string | null;
+  assetClass?: string | null;
+  notional?: number | null;
+  tickSize?: number | null;
 };
 
 export type NewsInput = {
@@ -191,6 +204,8 @@ export function buildTradeRationale(input: {
   events?: MarketEventInput[];
   /** Cap the events list (default 8). */
   maxEvents?: number;
+  /** Portfolio risk config, so stops/targets match what the engine applied. */
+  riskConfig?: TradeLevelRiskConfig | null;
 }): TradeRationale {
   const { decision } = input;
   const mi = obj(decision.marketInputs) ?? {};
@@ -248,6 +263,20 @@ export function buildTradeRationale(input: {
       ? `${decision.symbol} was ${verb} on ${drivers.join(" and ")}.`
       : `${decision.symbol} was ${verb}; no structured signal detail was recorded.`;
 
+  const feat = obj(mi["features"]) ?? {};
+  const levels = buildTradeLevels({
+    action,
+    decisionPrice: num(decision.price) ?? num(feat["price"]),
+    featurePrice: num(feat["price"]) ?? num(feat["close"]),
+    atrPct: num(feat["atr_pct"]) ?? num(feat["atrPct"]),
+    avgCost: num(decision.avgCost),
+    currency: decision.currency ?? null,
+    assetClass: decision.assetClass ?? (str(feat["asset_class"]) as string | null),
+    notional: num(decision.notional),
+    tickSize: num(decision.tickSize),
+    config: input.riskConfig ?? null,
+  });
+
   return {
     symbol: decision.symbol,
     action,
@@ -257,6 +286,7 @@ export function buildTradeRationale(input: {
     runRationale: str(mi["run_rationale"]),
     signals,
     events: events.slice(0, maxEvents),
-    sparse: signals.length === 0 && events.length === 0,
+    levels,
+    sparse: signals.length === 0 && events.length === 0 && levels === null,
   };
 }

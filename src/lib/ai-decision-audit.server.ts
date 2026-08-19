@@ -141,7 +141,20 @@ export async function recordAiDecisionAudit(ctx: AuditContext): Promise<void> {
   }
 
   const now = new Date().toISOString();
-  const features = ctx.features ?? {};
+  // The engine passes its candidate-feature ARRAY here; older callers pass a
+  // symbol map. Normalise to a map or every per-symbol feature block (and the
+  // price levels derived from it) comes out null.
+  const rawFeatures = ctx.features ?? {};
+  const features: Record<string, unknown> = Array.isArray(rawFeatures)
+    ? Object.fromEntries(
+        (rawFeatures as unknown[])
+          .map((f) => {
+            const sym = String((f as Record<string, unknown> | null)?.["symbol"] ?? "").toUpperCase();
+            return sym ? ([sym, f] as const) : null;
+          })
+          .filter((e): e is readonly [string, unknown] => e !== null),
+      )
+    : (rawFeatures as Record<string, unknown>);
   const regimeSlim = ctx.regime ?? null;
 
   const sectorMap = ctx.sectorBySymbol ?? {};
