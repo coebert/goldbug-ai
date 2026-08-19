@@ -57,11 +57,16 @@ function ItemRow({
   item,
   currency,
   tone,
+  portfolioId,
+  date,
 }: {
   item: DailyReportItem;
   currency: string;
   tone: "buy" | "sell" | "hold" | "pass";
+  portfolioId: string;
+  date: string;
 }) {
+  const [open, setOpen] = useState(false);
   const toneClass =
     tone === "buy"
       ? "border-emerald-500/30 bg-emerald-500/5"
