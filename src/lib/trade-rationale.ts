@@ -5,6 +5,9 @@
 // the panel renders instantly and is unit-testable.
 
 import { baseSymbol } from "./news-relevance";
+import { buildTradeLevels, type TradeLevelPlan, type TradeLevelRiskConfig } from "./trade-levels";
+
+export type { TradeLevelPlan };
 
 export type RationaleSignal = {
   key: string;
