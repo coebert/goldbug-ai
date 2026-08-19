@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Activity, AlertTriangle, ExternalLink, Gauge, Newspaper, ShieldCheck, Target } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { RuleWhatIfPanel } from "@/components/backtest/rule-what-if-card";
 import { Progress } from "@/components/ui/progress";
 import { getTradeRationale, type TradeRationale } from "@/lib/trade-rationale.functions";
 import { formatUkDate } from "@/lib/uk-time";
@@ -184,7 +185,13 @@ function RiskLimitsSection({ limits }: { limits: NonNullable<TradeRationale["ris
   );
 }
 
-export function TradeRationaleView({ rationale }: { rationale: TradeRationale }) {
+export function TradeRationaleView({
+  rationale,
+  portfolioId,
+}: {
+  rationale: TradeRationale;
+  portfolioId?: string;
+}) {
   return (
     <div className="space-y-3">
       <p className="text-xs font-medium">{rationale.headline}</p>
@@ -200,6 +207,8 @@ export function TradeRationaleView({ rationale }: { rationale: TradeRationale })
       )}
 
       {rationale.levels && <TradeLevelsSection levels={rationale.levels} />}
+
+      {portfolioId && <RuleWhatIfPanel portfolioId={portfolioId} symbol={rationale.symbol} />}
 
       <div>
         <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -316,5 +325,5 @@ export function TradeRationalePanel({
   if (!query.data)
     return <p className="text-xs text-muted-foreground">No recorded decision for {symbol} on this day.</p>;
 
-  return <TradeRationaleView rationale={query.data} />;
+  return <TradeRationaleView rationale={query.data} portfolioId={portfolioId} />;
 }
