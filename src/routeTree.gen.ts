@@ -44,6 +44,7 @@ import { Route as ApiPublicHooksValuationDriftRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksTranslationRefreshRouteImport } from './routes/api/public/hooks/translation-refresh'
 import { Route as ApiPublicHooksTickerWatchRouteImport } from './routes/api/public/hooks/ticker-watch'
 import { Route as ApiPublicHooksSaxoRefreshRouteImport } from './routes/api/public/hooks/saxo-refresh'
+import { Route as ApiPublicHooksSaxoAccountKeyAuditRouteImport } from './routes/api/public/hooks/saxo-account-key-audit'
 import { Route as ApiPublicHooksNewsRefreshRouteImport } from './routes/api/public/hooks/news-refresh'
 import { Route as ApiPublicHooksNewsBackfillRouteImport } from './routes/api/public/hooks/news-backfill'
 import { Route as ApiPublicHooksMarketOpenAlertsRouteImport } from './routes/api/public/hooks/market-open-alerts'
@@ -240,6 +241,12 @@ const ApiPublicHooksSaxoRefreshRoute =
     path: '/api/public/hooks/saxo-refresh',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksSaxoAccountKeyAuditRoute =
+  ApiPublicHooksSaxoAccountKeyAuditRouteImport.update({
+    id: '/api/public/hooks/saxo-account-key-audit',
+    path: '/api/public/hooks/saxo-account-key-audit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksNewsRefreshRoute =
   ApiPublicHooksNewsRefreshRouteImport.update({
     id: '/api/public/hooks/news-refresh',
@@ -375,6 +382,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
+  '/api/public/hooks/saxo-account-key-audit': typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
@@ -427,6 +435,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
+  '/api/public/hooks/saxo-account-key-audit': typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
@@ -480,6 +489,7 @@ export interface FileRoutesById {
   '/api/public/hooks/market-open-alerts': typeof ApiPublicHooksMarketOpenAlertsRoute
   '/api/public/hooks/news-backfill': typeof ApiPublicHooksNewsBackfillRoute
   '/api/public/hooks/news-refresh': typeof ApiPublicHooksNewsRefreshRoute
+  '/api/public/hooks/saxo-account-key-audit': typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   '/api/public/hooks/saxo-refresh': typeof ApiPublicHooksSaxoRefreshRoute
   '/api/public/hooks/ticker-watch': typeof ApiPublicHooksTickerWatchRoute
   '/api/public/hooks/translation-refresh': typeof ApiPublicHooksTranslationRefreshRoute
@@ -534,6 +544,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
+    | '/api/public/hooks/saxo-account-key-audit'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
@@ -586,6 +597,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
+    | '/api/public/hooks/saxo-account-key-audit'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
@@ -638,6 +650,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/market-open-alerts'
     | '/api/public/hooks/news-backfill'
     | '/api/public/hooks/news-refresh'
+    | '/api/public/hooks/saxo-account-key-audit'
     | '/api/public/hooks/saxo-refresh'
     | '/api/public/hooks/ticker-watch'
     | '/api/public/hooks/translation-refresh'
@@ -686,6 +699,7 @@ export interface RootRouteChildren {
   ApiPublicHooksMarketOpenAlertsRoute: typeof ApiPublicHooksMarketOpenAlertsRoute
   ApiPublicHooksNewsBackfillRoute: typeof ApiPublicHooksNewsBackfillRoute
   ApiPublicHooksNewsRefreshRoute: typeof ApiPublicHooksNewsRefreshRoute
+  ApiPublicHooksSaxoAccountKeyAuditRoute: typeof ApiPublicHooksSaxoAccountKeyAuditRoute
   ApiPublicHooksSaxoRefreshRoute: typeof ApiPublicHooksSaxoRefreshRoute
   ApiPublicHooksTickerWatchRoute: typeof ApiPublicHooksTickerWatchRoute
   ApiPublicHooksTranslationRefreshRoute: typeof ApiPublicHooksTranslationRefreshRoute
@@ -940,6 +954,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSaxoRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/saxo-account-key-audit': {
+      id: '/api/public/hooks/saxo-account-key-audit'
+      path: '/api/public/hooks/saxo-account-key-audit'
+      fullPath: '/api/public/hooks/saxo-account-key-audit'
+      preLoaderRoute: typeof ApiPublicHooksSaxoAccountKeyAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/news-refresh': {
       id: '/api/public/hooks/news-refresh'
       path: '/api/public/hooks/news-refresh'
@@ -1112,6 +1133,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksMarketOpenAlertsRoute: ApiPublicHooksMarketOpenAlertsRoute,
   ApiPublicHooksNewsBackfillRoute: ApiPublicHooksNewsBackfillRoute,
   ApiPublicHooksNewsRefreshRoute: ApiPublicHooksNewsRefreshRoute,
+  ApiPublicHooksSaxoAccountKeyAuditRoute:
+    ApiPublicHooksSaxoAccountKeyAuditRoute,
   ApiPublicHooksSaxoRefreshRoute: ApiPublicHooksSaxoRefreshRoute,
   ApiPublicHooksTickerWatchRoute: ApiPublicHooksTickerWatchRoute,
   ApiPublicHooksTranslationRefreshRoute: ApiPublicHooksTranslationRefreshRoute,
