@@ -1535,17 +1535,28 @@ export async function buildSaxoAdapter(opts: {
    * probes may omit it.
    */
   accountKey?: string | null;
+  /**
+   * Throw instead of silently substituting a discovered account when the
+   * supplied key does not validate against this environment. Defaults to true
+   * whenever an explicit portfolio account key is supplied.
+   */
+  strictAccountKey?: boolean;
 }): Promise<SaxoAdapter> {
   const env = (opts.envOverride ?? (process.env.SAXO_ENV as BrokerEnv) ?? "sim");
   if (env !== "sim" && env !== "live") throw new Error(`Invalid SAXO_ENV=${env}`);
   const { getAccessToken } = await import("./saxo-oauth.server");
   const token = await getAccessToken(env);
+  const explicitKey = (opts.accountKey ?? "").trim() || undefined;
   return new SaxoAdapter({
     env, token, userId: opts.userId, portfolioId: opts.portfolioId ?? null,
-    accountKey: opts.accountKey ?? process.env.SAXO_ACCOUNT_KEY,
+    // A process-wide SAXO_ACCOUNT_KEY is only a hint; it is validated against
+    // the environment's account list before any call uses it.
+    accountKey: explicitKey ?? process.env.SAXO_ACCOUNT_KEY,
     clientKey: process.env.SAXO_CLIENT_KEY,
+    strictAccountKey: opts.strictAccountKey ?? !!explicitKey,
   });
 }
+
 
 // ---------------------------------------------------------------------------
 // Pure helpers for Yahoo → Saxo symbol resolution. Exported for unit tests.
