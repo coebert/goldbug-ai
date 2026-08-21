@@ -25,6 +25,7 @@ import {
   type AssumptionPresetId,
   type ExecutionAssumptions,
 } from "./execution-assumptions";
+import type { FeeScheduleDefaults } from "./fee-schedule-import";
 
 /** One symbol's calibrated full quoted spread, in bps of mid. */
 export type SpreadSample = {
@@ -191,6 +192,16 @@ export function deriveAutoAssumptions(
       note: `invoiced £${round(invoiced, 2)} vs modelled £${round(modelled, 2)} over ${fees.length} tickets`,
     });
   } else {
+  } else if (input.feeSchedule) {
+    commissionMult = clamp(input.feeSchedule.commissionMult, CLAMPS.commissionMult);
+    basis.push({
+      field: "commissionMult",
+      value: commissionMult,
+      origin: "derived",
+      samples: 0,
+      note: `imported fee schedule — ${input.feeSchedule.note}`,
+    });
+  } else {
     basis.push({
       field: "commissionMult",
       value: commissionMult,
@@ -214,6 +225,16 @@ export function deriveAutoAssumptions(
       origin: "derived",
       samples: stampable.length,
       note: `invoiced tax £${round(invoiced, 2)} vs modelled stamp £${round(modelled, 2)}`,
+    });
+  } else {
+  } else if (input.feeSchedule) {
+    stampMult = clamp(input.feeSchedule.stampMult, CLAMPS.stampMult);
+    basis.push({
+      field: "stampMult",
+      value: stampMult,
+      origin: "derived",
+      samples: 0,
+      note: `imported fee schedule stamp/levy rates (${input.feeSchedule.note})`,
     });
   } else {
     basis.push({
@@ -272,6 +293,16 @@ export function deriveAutoAssumptions(
       note: `median observed funding-leg spread over ${fx.length} conversions`,
     });
   } else {
+  } else if (input.feeSchedule?.fxSpreadBps != null) {
+    fxSpreadBps = clamp(input.feeSchedule.fxSpreadBps, CLAMPS.fxSpreadBps);
+    basis.push({
+      field: "fxSpreadBps",
+      value: fxSpreadBps,
+      origin: "derived",
+      samples: 0,
+      note: "imported fee schedule funding-leg spread",
+    });
+  } else {
     basis.push({
       field: "fxSpreadBps",
       value: fxSpreadBps,
@@ -306,6 +337,12 @@ export function deriveAutoAssumptions(
       spreadBpsBySymbol,
       slippageBps,
       fxSpreadBps,
+      ...(input.feeSchedule
+        ? {
+            commissionFloorBase: input.feeSchedule.commissionFloorBase,
+            ptmLevy: input.feeSchedule.ptmLevy,
+          }
+        : {}),
     },
     fallbackId,
   );
