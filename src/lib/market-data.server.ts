@@ -334,10 +334,11 @@ export async function getPriceOn(symbol: string, date: string): Promise<number |
 // Fetch a long historical window (up to Yahoo's max) and cache it.
 // Returns candles between `from` and `to` inclusive (ISO YYYY-MM-DD).
 export async function getDailyCandlesRange(
-  symbol: string,
+  rawSymbol: string,
   from: string,
   to: string,
 ): Promise<Candle[]> {
+  const symbol = resolvePriceSymbol(rawSymbol);
   const { data: cached } = await supabaseAdmin
     .from("price_cache")
     .select("price_date, open, high, low, close, volume")
