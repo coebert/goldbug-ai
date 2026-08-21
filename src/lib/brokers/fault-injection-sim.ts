@@ -181,6 +181,9 @@ export class FaultInjectingBroker implements BrokerAdapter {
   private takeRule(req: BrokerOrderRequest): (FaultRule & { remaining: number }) | null {
     for (const rule of this.rules) {
       if (rule.remaining <= 0) continue;
+      // duplicate_ack only fires on a replay of a known client order id, which
+      // is handled before we get here — never consume it on a first placement.
+      if (rule.kind === "duplicate_ack") continue;
       if (rule.symbol && rule.symbol !== req.symbol) continue;
       if (rule.side && rule.side !== req.side) continue;
       rule.remaining -= 1;
@@ -188,6 +191,7 @@ export class FaultInjectingBroker implements BrokerAdapter {
     }
     return null;
   }
+
 
   private nextTimestamp(): string {
     this.clock += 1_000;
