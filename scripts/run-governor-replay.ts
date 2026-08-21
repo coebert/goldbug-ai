@@ -5,7 +5,7 @@
 //   bun run scripts/run-governor-replay.ts --symbols AAPL,MSFT,SPY --nav 10300
 //
 // Execution assumptions (fees / spread / slippage) are configurable:
-//   --assumptions optimistic|live|realistic|pessimistic|frictionless
+//   --assumptions auto|optimistic|live|realistic|pessimistic|frictionless (default: realistic)
 //   --spread-bps 20 --slippage-bps 5 --impact-bps 8 --impact-ref 10000
 //   --delay-bps 2 --commission-mult 1.25 --commission-floor 3 --fx-spread-bps 6
 //   --no-stamp --no-ptm
@@ -41,7 +41,16 @@ const symbols = arg("symbols", DEFAULT.join(",")).split(",").map((s) => s.trim()
 // an FX funding leg — the exact path that was silently killing USD buys.
 const foreign = arg("foreign", symbols.join(",")).split(",").map((s) => s.trim());
 const seed = Number(arg("seed-friction", "0"));
-const assumptions = assumptionsFromFlags(argv);
+let assumptions = assumptionsFromFlags(argv);
+// `--assumptions auto` calibrates fees/spread/slippage from our own bars,
+// invoiced fills and realised slippage instead of a hand-picked preset.
+if (argv.includes("--assumptions") && argv[argv.indexOf("--assumptions") + 1] === "auto") {
+  const { loadAutoAssumptions } = await import("../src/lib/backtest/auto-assumptions.server");
+  const { describeAutoAssumptions } = await import("../src/lib/backtest/auto-assumptions");
+  const auto = await loadAutoAssumptions();
+  assumptions = auto.assumptions;
+  console.log(describeAutoAssumptions(auto));
+}
 const signal = (arg("signal", "cross") === "churn" ? "churn" : "cross") as "cross" | "churn";
 
 const histories = await fetchUniverseHistory(symbols, { from, to });

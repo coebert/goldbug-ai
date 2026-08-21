@@ -113,8 +113,11 @@ describe("CLI flags", () => {
     expect(a.impactBps).toBe(ASSUMPTION_PRESETS.realistic.impactBps);
   });
 
-  it("falls back to the live model on an unknown preset", () => {
-    expect(assumptionsFromFlags(["--assumptions", "nonsense"])).toEqual(LIVE_MODEL_ASSUMPTIONS);
+  it("falls back to the realistic default on an unknown or absent preset", () => {
+    expect(assumptionsFromFlags(["--assumptions", "nonsense"])).toEqual(
+      ASSUMPTION_PRESETS.realistic,
+    );
+    expect(assumptionsFromFlags([])).toEqual(ASSUMPTION_PRESETS.realistic);
   });
 
   it("describes itself in one readable line", () => {
