@@ -33,7 +33,16 @@ const foreign = arg("foreign", symbols.join(",")).split(",").map((s) => s.trim()
 const nav = Number(arg("nav", "10300"));
 const seed = Number(arg("seed-friction", "0"));
 const signal = (arg("signal", "cross") === "churn" ? "churn" : "cross") as "cross" | "churn";
-const assumptions = assumptionsFromFlags(argv);
+let assumptions = assumptionsFromFlags(argv);
+// `--assumptions auto` calibrates fees/spread/slippage from our own bars,
+// invoiced fills and realised slippage instead of a hand-picked preset.
+if (argv.includes("--assumptions") && argv[argv.indexOf("--assumptions") + 1] === "auto") {
+  const { loadAutoAssumptions } = await import("../src/lib/backtest/auto-assumptions.server");
+  const { describeAutoAssumptions } = await import("../src/lib/backtest/auto-assumptions");
+  const auto = await loadAutoAssumptions();
+  assumptions = auto.assumptions;
+  console.log(describeAutoAssumptions(auto));
+}
 const only = arg("windows", "").split(",").map((s) => s.trim()).filter(Boolean);
 const reference = arg("reference", "SPY");
 
