@@ -8,6 +8,7 @@
 // Never throws: if the database is unavailable the caller still gets a sane
 // `realistic` assumption set with a basis note saying why.
 
+import type { FeeScheduleDefaults } from "./fee-schedule-import";
 import { calibrateSymbolExecution } from "../execution-calibration-from-bars";
 import { estimateTradeCosts } from "../trade-viability-gate";
 import { priceSymbolVariants } from "../price-symbol";
@@ -30,6 +31,12 @@ export type LoadAutoAssumptionsOptions = {
   barLookbackDays?: number;
   /** Skip the cache. */
   fresh?: boolean;
+  /**
+   * Optional imported broker fee schedule (raw JSON/CSV paste or already
+   * parsed defaults). Sets fees, stamp duty and levies when we lack invoiced
+   * tickets to measure them from.
+   */
+  feeSchedule?: unknown;
 };
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -50,6 +57,7 @@ export async function loadAutoAssumptions(
     [...(opts.symbols ?? [])].sort(),
     opts.fillLookbackDays ?? 365,
     opts.barLookbackDays ?? 400,
+    opts.feeSchedule ? JSON.stringify(opts.feeSchedule) : null,
   ]);
   if (!opts.fresh && cache && cache.key === key && Date.now() - cache.at < CACHE_TTL_MS) {
     return cache.value;
@@ -164,7 +172,17 @@ export async function loadAutoAssumptions(
     spreads = [];
   }
 
-  const value = deriveAutoAssumptions({ spreads, fees, slippage });
+  let feeScheduleDefaults: FeeScheduleDefaults | null = null;
+  if (opts.feeSchedule) {
+    const { importFeeSchedule } = await import("./fee-schedule-import");
+    feeScheduleDefaults = importFeeSchedule(opts.feeSchedule).defaults;
+  }
+  const value = deriveAutoAssumptions({
+    spreads,
+    fees,
+    slippage,
+    feeSchedule: feeScheduleDefaults,
+  });
   cache = { key, at: Date.now(), value };
   return value;
 }
