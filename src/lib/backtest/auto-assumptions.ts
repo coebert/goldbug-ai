@@ -63,6 +63,13 @@ export type AutoAssumptionInput = {
   fxSpreadBpsSamples?: readonly number[];
   /** Preset used for any field without enough evidence. Default `realistic`. */
   fallbackPreset?: AssumptionPresetId;
+  /**
+   * Optional imported broker fee schedule (see `fee-schedule-import`). Used
+   * for commission, the per-ticket floor, stamp duty and the PTM levy when we
+   * do not have enough invoiced tickets to measure them directly. Real
+   * invoices always win over a published tariff.
+   */
+  feeSchedule?: FeeScheduleDefaults | null;
 };
 
 export type FieldBasis = {
