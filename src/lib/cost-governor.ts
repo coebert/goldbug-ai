@@ -123,6 +123,22 @@ export type GovernorConfig = {
    * budget degrades into a throttle rather than a stop.
    */
   daysSinceLastBuyFill?: number;
+  /**
+   * BUY fills that actually happened in the last `churnWindowDays`. Feeds the
+   * adaptive reserve cap: the stall breaker exists so a quiet book can still
+   * trade, not so a book already firing tickets every session can keep firing
+   * through an exhausted budget.
+   */
+  recentBuyFills?: number;
+  /** Lookback for `recentBuyFills`. Default `CHURN_WINDOW_DAYS`. */
+  churnWindowDays?: number;
+  /**
+   * Realised-volatility z-score of the tape (0 = normal, >= 2 = violent).
+   * Stress-window backtests found the friction decay safe on a cross cadence
+   * but loss-making under churn in high vol — this is the input that lets the
+   * governor tell the two apart.
+   */
+  tapeVolZ?: number;
 };
 
 /** Exceptional tickets allowed past an exhausted budget per tick. */
@@ -136,12 +152,93 @@ export const STALL_DAYS = 5;
 /** Relaxed reserve bar once the book has stalled. */
 export const STALL_RESERVE_EDGE_MULTIPLE = 2;
 export const STALL_RESERVE_MIN_CONVICTION = 0.5;
+/** Lookback used to measure recent BUY cadence. */
+export const CHURN_WINDOW_DAYS = 5;
+/** BUY fills per churn window treated as a normal cadence in a calm tape. */
+export const CHURN_CALM_FILLS = 4;
+/** Vol z at (or above) which the tape counts as fully violent. */
+export const VIOLENT_VOL_Z = 2;
+/** Fraction of the calm cadence still allowed on a fully violent tape. */
+export const VIOLENT_CADENCE_FLOOR = 0.5;
 /**
  * The window budget can never be smaller than this many typical tickets'
  * friction. On a £10k book 40bps is ~£40 — less than four UK tickets — so a
  * single de-risking sequence exhausts a whole month of buying.
  */
 export const MIN_BUDGET_TICKETS = 3;
+
+export type ReserveCap = {
+  /** Reserve tickets allowed on this tick after the adaptive cap. */
+  tickets: number;
+  /** Reserve tickets before the cap (baseline + stall bonus). */
+  baseTickets: number;
+  /** Allowed BUY fills over the churn window given the tape's violence. */
+  allowedFills: number;
+  /** True when recent cadence exceeds what the tape allows. */
+  churning: boolean;
+  /** True when the stall relaxation is withdrawn (churning on a violent tape). */
+  suppressStallRelief: boolean;
+  reason: string | null;
+};
+
+/**
+ * Adaptive cap on how many reserve tickets a tick may draw when the trailing
+ * friction budget is exhausted.
+ *
+ * The reserve is a stall breaker. Its failure mode is the opposite of a stall:
+ * a violent tape throws off a strong-looking signal every session, and a book
+ * already filling at a churn cadence keeps drawing the reserve to chase it —
+ * paying full friction on each leg. So the allowed cadence shrinks with the
+ * tape's realised-vol z-score, and each fill over that allowance burns one
+ * reserve ticket. On a fully violent tape (z >= 2) the allowance halves, and a
+ * churning book also loses the relaxed stall bar.
+ */
+export function adaptiveReserveCap(args: {
+  baseTickets: number;
+  recentBuyFills?: number;
+  churnWindowDays?: number;
+  tapeVolZ?: number;
+  stalled?: boolean;
+}): ReserveCap {
+  const baseTickets = Math.max(0, Math.floor(args.baseTickets));
+  const windowDays = Math.max(1, args.churnWindowDays ?? CHURN_WINDOW_DAYS);
+  const fills = Number.isFinite(args.recentBuyFills)
+    ? Math.max(0, Number(args.recentBuyFills))
+    : 0;
+  const z = Number.isFinite(args.tapeVolZ) ? Math.max(0, Number(args.tapeVolZ)) : 0;
+  const violence = Math.min(1, z / VIOLENT_VOL_Z);
+  // Cadence allowance scales with the window so a longer lookback is not
+  // mechanically "churny".
+  const calmFills = (CHURN_CALM_FILLS * windowDays) / CHURN_WINDOW_DAYS;
+  const allowedFills = calmFills * (1 - (1 - VIOLENT_CADENCE_FLOOR) * violence);
+  const overshoot = fills - allowedFills;
+  if (!(overshoot > 0)) {
+    return {
+      tickets: baseTickets,
+      baseTickets,
+      allowedFills,
+      churning: false,
+      suppressStallRelief: false,
+      reason: null,
+    };
+  }
+  const burned = Math.ceil(overshoot);
+  const tickets = Math.max(0, baseTickets - burned);
+  const suppressStallRelief = Boolean(args.stalled) && violence > 0;
+  return {
+    tickets,
+    baseTickets,
+    allowedFills,
+    churning: true,
+    suppressStallRelief,
+    reason:
+      `churn cadence ${fills} BUY fill${fills === 1 ? "" : "s"} in ${windowDays}d vs ` +
+      `${allowedFills.toFixed(1)} allowed at vol z ${z.toFixed(2)} — ` +
+      `high-edge reserve cut ${baseTickets}→${tickets}` +
+      (suppressStallRelief ? " and the relaxed stall bar withdrawn" : ""),
+  };
+}
+
 
 
 
@@ -247,12 +344,21 @@ export function planAdmissions(
   let buysAdmitted = 0;
 
   const stalled = (cfg.daysSinceLastBuyFill ?? 0) >= STALL_DAYS;
-  const reserveEdgeMultiple = stalled ? STALL_RESERVE_EDGE_MULTIPLE : RESERVE_EDGE_MULTIPLE;
-  const reserveMinConviction = stalled ? STALL_RESERVE_MIN_CONVICTION : RESERVE_MIN_CONVICTION;
-  let reserveLeft = Math.max(
-    0,
-    (cfg.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS) + (stalled ? 1 : 0),
-  );
+  const reserveCap = adaptiveReserveCap({
+    baseTickets: Math.max(
+      0,
+      (cfg.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS) + (stalled ? 1 : 0),
+    ),
+    recentBuyFills: cfg.recentBuyFills,
+    churnWindowDays: cfg.churnWindowDays,
+    tapeVolZ: cfg.tapeVolZ,
+    stalled,
+  });
+  const stallRelief = stalled && !reserveCap.suppressStallRelief;
+  const reserveEdgeMultiple = stallRelief ? STALL_RESERVE_EDGE_MULTIPLE : RESERVE_EDGE_MULTIPLE;
+  const reserveMinConviction = stallRelief ? STALL_RESERVE_MIN_CONVICTION : RESERVE_MIN_CONVICTION;
+  let reserveLeft = reserveCap.tickets;
+
 
 
   const roomToday = Math.max(0, cfg.maxBuysPerDay - Math.max(0, cfg.buysAlreadyToday));
@@ -364,7 +470,8 @@ export function planAdmissions(
           `trailing cost budget exhausted: ${cfg.trailingCostBase.toFixed(2)} of ` +
           `${budgetTotal.toFixed(2)} (${(cfg.costBudgetPctOfNav * 100).toFixed(2)}% of NAV) spent; ` +
           `this ticket needs ${c.estCostBase.toFixed(2)}` +
-          (stalled ? ` [stalled ${Math.round(cfg.daysSinceLastBuyFill ?? 0)}d: relaxed reserve bar]` : "") +
+          (stallRelief ? ` [stalled ${Math.round(cfg.daysSinceLastBuyFill ?? 0)}d: relaxed reserve bar]` : "") +
+          (reserveCap.reason ? ` [${reserveCap.reason}]` : "") +
           (reserveLeft > 0
             ? ` (high-edge reserve needs conviction ≥ ${reserveMinConviction} and ` +
               `${reserveEdgeMultiple}x edge cover; this idea has ${grossEdge.toFixed(2)})`
