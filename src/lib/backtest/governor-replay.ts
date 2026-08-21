@@ -55,6 +55,15 @@ export type ReplayOptions = {
    * that exhausted the 40bps window and then blocked buying for eleven days.
    */
   signal?: "cross" | "churn";
+  /**
+   * Friction (base ccy) already spent when the replay starts, as if the tape
+   * opened the morning after a churn burst. This is the live 21 Aug 2026
+   * state: £175 of modelled friction against a £41 window budget. Under the
+   * legacy step-function accounting that blocks every buy until the whole
+   * burst falls out of the window at once; under the decaying bucket the
+   * headroom refills a little each day.
+   */
+  seedFrictionBase?: number;
 };
 
 export type ReplayTrade = {
@@ -91,6 +100,8 @@ export type ArmOutcome = {
   fxLegsRejected: number;
   /** Longest run of days with candidates but zero admissions. */
   longestIdleStreakDays: number;
+  /** Bars until the first admitted buy (null = never traded). */
+  barsToFirstBuy: number | null;
   frictionPaid: number;
   trades: ReplayTrade[];
   blocked: BlockedBuy[];
@@ -187,6 +198,8 @@ export function runGovernorReplay(
   const equityCurve: Array<{ date: string; equity: number }> = [];
   // Cost ledger: fills as { index, cost } so the arms can account differently.
   const costLedger: Array<{ index: number; cost: number }> = [];
+  const seed = Math.max(0, opts.seedFrictionBase ?? 0);
+  if (seed > 0) costLedger.push({ index: 0, cost: seed });
   const lastBuyIndex = new Map<string, number>();
 
   let buysProposed = 0;
@@ -197,6 +210,7 @@ export function runGovernorReplay(
   let frictionPaid = 0;
   let idleStreak = 0;
   let longestIdleStreakDays = 0;
+  let firstBuyIndex: number | null = null;
   let peakEquity = startingCash;
   let maxDrawdownPct = 0;
 
@@ -406,6 +420,7 @@ export function runGovernorReplay(
       });
       buysAdmitted += 1;
       admittedToday += 1;
+      if (firstBuyIndex === null) firstBuyIndex = i;
     }
 
     if (admittedToday === 0) {
@@ -432,6 +447,7 @@ export function runGovernorReplay(
     fxLegsAttempted,
     fxLegsRejected,
     longestIdleStreakDays,
+    barsToFirstBuy: firstBuyIndex,
     frictionPaid,
     trades,
     blocked,
@@ -473,10 +489,11 @@ export function governorReplayReport(cmp: GovernorReplayComparison): string {
       `£${o.profitableBlockedPnl.toFixed(0)}`.padStart(11),
       `${o.fxLegsRejected}/${o.fxLegsAttempted}`.padStart(9),
       String(o.longestIdleStreakDays).padStart(6),
+      String(o.barsToFirstBuy ?? "never").padStart(7),
       `£${o.frictionPaid.toFixed(0)}`.padStart(9),
     ].join(" ");
   return [
-    "arm         return  maxDD   admitted  blocked  profBlkd  missedPnL  fxRej/att  idle  friction",
+    "arm         return  maxDD   admitted  blocked  profBlkd  missedPnL  fxRej/att  idle   1stBuy  friction",
     row(cmp.legacy),
     row(cmp.revised),
     `verdict: ${cmp.verdict}`,

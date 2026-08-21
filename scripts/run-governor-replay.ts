@@ -29,6 +29,7 @@ const symbols = arg("symbols", DEFAULT.join(",")).split(",").map((s) => s.trim()
 // Everything on this list is USD-quoted for a GBP account, so each buy needs
 // an FX funding leg — the exact path that was silently killing USD buys.
 const foreign = arg("foreign", symbols.join(",")).split(",").map((s) => s.trim());
+const seed = Number(arg("seed-friction", "0"));
 const signal = (arg("signal", "cross") === "churn" ? "churn" : "cross") as "cross" | "churn";
 
 const histories = await fetchUniverseHistory(symbols, { from, to });
@@ -71,6 +72,7 @@ for (const w of windows) {
     startingCash: nav,
     foreignSymbols: foreign,
     signal,
+    seedFrictionBase: seed,
   });
   console.log(`── ${w.label} (${w.slice.length} bars)`);
   console.log(governorReplayReport(cmp));
