@@ -241,10 +241,14 @@ function rowToCandle(r: PriceRow | Record<string, unknown>): Candle {
  * Uses cache; refetches from Yahoo when cache is missing / stale.
  */
 export async function getDailyCandles(
-  symbol: string,
+  rawSymbol: string,
   days: number,
   asOf?: string,
 ): Promise<Candle[]> {
+  // Broker-native spellings ("MKS:XLON", "V:XNYS") are not Yahoo symbols: they
+  // 404 on every fetch and silently fall back to a stale cache. Canonicalise
+  // once here so the fetch, the cache key and the upsert all agree.
+  const symbol = resolvePriceSymbol(rawSymbol);
   const asOfDate = asOf ?? new Date().toISOString().slice(0, 10);
   const key = memoKey(symbol, days, asOfDate);
   const memoised = readMemo(key);
