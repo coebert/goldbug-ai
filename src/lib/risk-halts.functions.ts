@@ -7,6 +7,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evaluateRiskHalts, loadEquityStats } from "./risk-halts.server";
+import { requireAal2 } from "@/lib/_server/require-aal2";
+import {
+  clampOverrideHours,
+  loadActiveRiskHaltOverride,
+  MAX_OVERRIDE_HOURS,
+} from "./risk-halt-override.server";
 import { parseRiskConfig } from "./universe.server";
 import { formatUk } from "./uk-time";
 
