@@ -10,12 +10,29 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import {
+  discrepancyAlertKey,
   reconcileTradeLegs,
   type ExecutedOrder,
   type IntendedLeg,
   type LegDiscrepancy,
   type LegReconResult,
 } from "./trade-leg-reconciliation";
+import { blockSymbolKey } from "./broker-instrument-blocks";
+
+function numOrNull(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function severityRank(sev: LegDiscrepancy["severity"]): number {
+  return sev === "critical" ? 2 : sev === "warning" ? 1 : 0;
+}
+
+/** Recover a symbol key from an older notification payload. */
+function legacySymbolKey(det: Record<string, unknown>): string {
+  const sym = typeof det["symbol"] === "string" ? det["symbol"] : "";
+  return blockSymbolKey(sym);
+}
 
 /** How far back to look for the decision this tick produced. */
 const DECISION_LOOKBACK_MIN = 90;
@@ -168,29 +185,82 @@ export function maybeReconcileTradeLegs(params: {
       });
       if (!result || result.discrepancies.length === 0) return;
 
+      const nowIso = new Date(params.nowMs ?? Date.now()).toISOString();
       const cooldownSince = new Date(
         (params.nowMs ?? Date.now()) - COOLDOWN_HOURS * 3600_000,
       ).toISOString();
       const { data: recent } = await supabaseAdmin
         .from("notifications")
-        .select("details")
+        .select("id, details, created_at")
         .eq("user_id", userId)
         .eq("category", "trade_leg_recon")
         .eq("portfolio_id", portfolioId)
         .gte("created_at", cooldownSince)
-        .limit(200);
-      const seen = new Set<string>();
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      // Index existing alerts by condition identity, not by per-order key: the
+      // same stuck leg gets a new decision/order id every tick.
+      const seen = new Map<string, { id: string; details: Record<string, unknown> }>();
       for (const n of recent ?? []) {
-        const k = (n.details as { key?: unknown } | null)?.key;
-        if (typeof k === "string") seen.add(k);
+        const det = (n.details ?? {}) as Record<string, unknown>;
+        const alertKey =
+          typeof det["alert_key"] === "string"
+            ? (det["alert_key"] as string)
+            : typeof det["code"] === "string" && typeof det["symbol"] === "string"
+              ? discrepancyAlertKey({
+                  code: det["code"] as LegDiscrepancy["code"],
+                  symbolKey: legacySymbolKey(det),
+                  side: det["side"] === "sell" ? "sell" : "buy",
+                  intendedQuantity: numOrNull(det["intended_quantity"]),
+                  executedQuantity: numOrNull(det["executed_quantity"]),
+                  priceDeviationBps: numOrNull(det["price_deviation_bps"]),
+                })
+              : null;
+        if (!alertKey || seen.has(alertKey)) continue;
+        seen.set(alertKey, { id: n.id as string, details: det });
       }
 
-      const fresh = result.discrepancies
-        .filter((d) => !seen.has(d.key))
-        .slice(0, MAX_NOTIFICATIONS);
-      if (fresh.length === 0) return;
+      // Collapse duplicates inside this batch too (two legs on the same symbol
+      // and side in one tick are one problem, not two notifications).
+      const byAlertKey = new Map<string, LegDiscrepancy>();
+      for (const d of result.discrepancies) {
+        const ak = discrepancyAlertKey(d);
+        const prev = byAlertKey.get(ak);
+        if (!prev || severityRank(d.severity) > severityRank(prev.severity)) {
+          byAlertKey.set(ak, d);
+        }
+      }
 
-      const inserts = fresh.map((d) => ({
+      const fresh: Array<{ alertKey: string; d: LegDiscrepancy }> = [];
+      const repeats: Array<{ id: string; details: Record<string, unknown> }> = [];
+      for (const [alertKey, d] of byAlertKey) {
+        const existing = seen.get(alertKey);
+        if (existing) repeats.push(existing);
+        else fresh.push({ alertKey, d });
+      }
+
+      // Suppressed repeats: quietly record that the condition is still live so
+      // the notification stays truthful without generating a second alert.
+      for (const r of repeats) {
+        const prior = Number(r.details["occurrences"] ?? 1);
+        await supabaseAdmin
+          .from("notifications")
+          .update({
+            details: {
+              ...r.details,
+              occurrences: (Number.isFinite(prior) ? prior : 1) + 1,
+              last_seen_at: nowIso,
+            } as unknown as Json,
+            updated_at: nowIso,
+          })
+          .eq("id", r.id);
+      }
+
+      const toInsert = fresh.slice(0, MAX_NOTIFICATIONS);
+      if (toInsert.length === 0) return;
+
+      const inserts = toInsert.map(({ alertKey, d }) => ({
         user_id: userId,
         category: "trade_leg_recon",
         severity: d.severity,
@@ -199,6 +269,10 @@ export function maybeReconcileTradeLegs(params: {
         portfolio_id: portfolioId,
         details: {
           key: d.key,
+          alert_key: alertKey,
+          occurrences: 1,
+          first_seen_at: nowIso,
+          last_seen_at: nowIso,
           code: d.code,
           symbol: d.symbol,
           side: d.side,
