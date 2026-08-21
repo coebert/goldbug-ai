@@ -437,6 +437,68 @@ export type Database = {
         }
         Relationships: []
       }
+      broker_account_key_audits: {
+        Row: {
+          account_count: number
+          changed: boolean
+          checked_at: string
+          configured_key_masked: string | null
+          created_at: string
+          env: string
+          id: string
+          message: string | null
+          mismatch: boolean
+          portfolio_id: string | null
+          portfolio_name: string | null
+          previous_status: string | null
+          resolved_key_masked: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_count?: number
+          changed?: boolean
+          checked_at?: string
+          configured_key_masked?: string | null
+          created_at?: string
+          env: string
+          id?: string
+          message?: string | null
+          mismatch?: boolean
+          portfolio_id?: string | null
+          portfolio_name?: string | null
+          previous_status?: string | null
+          resolved_key_masked?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          account_count?: number
+          changed?: boolean
+          checked_at?: string
+          configured_key_masked?: string | null
+          created_at?: string
+          env?: string
+          id?: string
+          message?: string | null
+          mismatch?: boolean
+          portfolio_id?: string | null
+          portfolio_name?: string | null
+          previous_status?: string | null
+          resolved_key_masked?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_account_key_audits_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broker_block_events: {
         Row: {
           broker: string
