@@ -10,12 +10,29 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import {
+  discrepancyAlertKey,
   reconcileTradeLegs,
   type ExecutedOrder,
   type IntendedLeg,
   type LegDiscrepancy,
   type LegReconResult,
 } from "./trade-leg-reconciliation";
+import { blockSymbolKey } from "./broker-instrument-blocks";
+
+function numOrNull(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function severityRank(sev: LegDiscrepancy["severity"]): number {
+  return sev === "critical" ? 2 : sev === "warning" ? 1 : 0;
+}
+
+/** Recover a symbol key from an older notification payload. */
+function legacySymbolKey(det: Record<string, unknown>): string {
+  const sym = typeof det["symbol"] === "string" ? det["symbol"] : "";
+  return blockSymbolKey(sym);
+}
 
 /** How far back to look for the decision this tick produced. */
 const DECISION_LOOKBACK_MIN = 90;
