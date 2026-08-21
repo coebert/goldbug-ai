@@ -269,6 +269,10 @@ export function maybeReconcileTradeLegs(params: {
         portfolio_id: portfolioId,
         details: {
           key: d.key,
+          alert_key: alertKey,
+          occurrences: 1,
+          first_seen_at: nowIso,
+          last_seen_at: nowIso,
           code: d.code,
           symbol: d.symbol,
           side: d.side,
