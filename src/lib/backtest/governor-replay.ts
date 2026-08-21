@@ -541,9 +541,10 @@ export function governorReplayReport(cmp: GovernorReplayComparison): string {
       String(o.longestIdleStreakDays).padStart(6),
       String(o.barsToFirstBuy ?? "never").padStart(7),
       `£${o.frictionPaid.toFixed(0)}`.padStart(9),
+      `${o.frictionBpsOfEquity.toFixed(0)}bps`.padStart(8),
     ].join(" ");
   return [
-    "arm         return  maxDD   admitted  blocked  profBlkd  missedPnL  fxRej/att  idle   1stBuy  friction",
+    "arm         return  maxDD   admitted  blocked  profBlkd  missedPnL  fxRej/att  idle   1stBuy  friction   bps/eq",
     row(cmp.legacy),
     row(cmp.revised),
     `verdict: ${cmp.verdict}`,
