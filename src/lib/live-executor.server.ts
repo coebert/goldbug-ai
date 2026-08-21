@@ -224,12 +224,21 @@ export async function routeOrdersToBroker(params: {
   };
 
   if (!gate.enabled) {
+    // A controls-row read failure fails closed for BUYs only. Stranding exits
+    // behind an infrastructure hiccup is how a losing position bleeds out, so
+    // SELLs keep routing unless an operator explicitly halted trading.
+    const sellsOnly = gate.sellsEnabled ? routable.filter((e) => e.side === "sell") : [];
     await logGuard(
       "ROUTE_SKIPPED_KILL_SWITCH",
-      { count: routable.length, haltReason: gate.haltReason },
+      {
+        count: routable.length - sellsOnly.length,
+        sellsStillRouting: sellsOnly.length,
+        haltReason: gate.haltReason,
+      },
       gate.haltReason ?? "trading_controls.trading_enabled = false",
     );
-    return results;
+    if (sellsOnly.length === 0) return results;
+    routable = sellsOnly;
   }
 
   // Daily ceiling: SELLs always route (they reduce risk); BUYs are admitted in
@@ -595,6 +604,7 @@ export async function routeOrdersToBroker(params: {
       buysAlreadyToday: inputs.buysAlreadyToday,
       trailingCostBase: inputs.trailingCostBase,
       lastBuyDaysAgo: inputs.lastBuyDaysAgo,
+      daysSinceLastBuyFill: inputs.daysSinceLastBuyFill,
       positionExposureBase: inputs.positionExposureBase,
       ...navProfile,
       addCooldownDays: churn.cooldownDays,
@@ -1907,16 +1917,48 @@ export async function routeOrdersToBroker(params: {
             .eq("broker_order_id", stale.brokerOrderId);
         }
       } catch (err) {
-        results.push({
-          symbol: order.symbol,
-          side: order.side,
-          quantity: qty,
-          status: "skipped",
-          skipped: "could not verify stale sell orders; replacement withheld",
-          reason: err instanceof Error ? err.message : String(err),
+        // The broker's working-order listing is a *diagnostic*. When it fails
+        // (network/auth blip) we must not strand the exit — fall back to our
+        // own order book: if we have no open sell recorded for this symbol,
+        // there is nothing to duplicate and the sell goes through.
+        let openSells = 0;
+        try {
+          const { data: openRows } = await supabaseAdmin
+            .from("live_orders")
+            .select("id")
+            .eq("portfolio_id", portfolio.id)
+            .eq("symbol", order.symbol)
+            .eq("side", "sell")
+            .in("status", ["pending", "submitted", "working", "partially_filled"]);
+          openSells = (openRows ?? []).length;
+        } catch {
+          openSells = 0;
+        }
+        await supabaseAdmin.from("live_broker_log").insert({
+          portfolio_id: portfolio.id,
+          user_id: userId,
+          broker: "saxo",
+          env: adapter.env,
+          method: "STALE_SELL_VERIFY_FAILED",
+          path: `/trade/v2/orders/working/${order.symbol}`,
+          status: openSells > 0 ? 409 : 200,
+          request: asJson({ symbol: order.symbol, quantity: qty }),
+          response: asJson({ openSellsInLedger: openSells, proceeded: openSells === 0 }),
+          error: err instanceof Error ? err.message : String(err),
         });
-        continue;
+        if (openSells > 0) {
+          results.push({
+            symbol: order.symbol,
+            side: order.side,
+            quantity: qty,
+            status: "skipped",
+            skipped: "could not verify stale sell orders and an open sell exists in the ledger",
+            reason: err instanceof Error ? err.message : String(err),
+          });
+          continue;
+        }
       }
+
     }
 
     // Insert-first: DB unique index on client_order_id is the source of truth

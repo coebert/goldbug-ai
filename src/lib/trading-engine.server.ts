@@ -346,9 +346,15 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       srvLog.warn("[trading-engine] could not load broker blocks:", e);
     }
     const { isSymbolBlocked } = await import("./broker-instrument-blocks");
+    // Held names are never dropped: a block only means "cannot BUY this".
+    // Filtering a held position out of the universe hid it from the exit and
+    // stop logic entirely, so a position could be blocked *into* a permanent
+    // hold if the broker later revoked suitability.
+    const blockHeldSet = new Set((holdings ?? []).map((h) => String(h.symbol).toUpperCase()));
 
     fullUniverse = fullUniverse.filter((u) => {
       const s = u.symbol.toUpperCase();
+      if (blockHeldSet.has(s)) return true;
       const untradeable =
         s.endsWith("=X") ||
         s.endsWith("=F") ||
@@ -357,6 +363,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       if (untradeable) brokerBlockedSymbols.push(u.symbol);
       return !untradeable;
     });
+
     if (brokerBlockedSymbols.length > 0) {
       srvLog.info(
         `[trading-engine] live_prod broker filter dropped ${brokerBlockedSymbols.length}/${originalCount} untradeable symbols: ${brokerBlockedSymbols.join(", ")}`,

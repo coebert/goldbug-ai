@@ -28,6 +28,13 @@ import { ukDayKey } from "@/lib/uk-time";
 export interface TradingGate {
   enabled: boolean;
   haltReason: string | null;
+  /**
+   * Whether SELLs may still route while `enabled` is false. A transient
+   * failure to read the controls row must never strand a stop-loss or exit:
+   * only an explicit operator kill switch (`trading_enabled = false`) stops
+   * risk-reducing orders too.
+   */
+  sellsEnabled: boolean;
   dailyLimit: number;
   spentToday: number;
   /** Remaining BUY notional allowed today (>= 0). */
@@ -49,6 +56,7 @@ export async function loadTradingGate(): Promise<TradingGate> {
     return {
       enabled: false,
       haltReason: "trading_controls unreadable",
+      sellsEnabled: true,
       dailyLimit: 0,
       spentToday: 0,
       remaining: 0,
@@ -88,6 +96,7 @@ export async function loadTradingGate(): Promise<TradingGate> {
 
   return {
     enabled: Boolean(controls.trading_enabled),
+    sellsEnabled: Boolean(controls.trading_enabled),
     haltReason: controls.halt_reason ?? null,
     dailyLimit,
     spentToday,

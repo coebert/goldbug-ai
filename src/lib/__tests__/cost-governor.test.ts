@@ -86,14 +86,40 @@ describe("cost governor", () => {
   });
 
   it("keeps the budget denominated in NAV, so it scales with the account", () => {
-    const small = planAdmissions([buy("X", 900, 20)], { ...base, trailingCostBase: 30 });
+    // 70 spent clears both the 40bps NAV budget and the 3-ticket floor (3x20).
+    const small = planAdmissions([buy("X", 900, 20)], { ...base, trailingCostBase: 70 });
     expect(small.decisions[0]!.kind).toBe("skip");
     const large = planAdmissions([buy("X", 9_000, 20)], {
       ...base,
       navBase: 100_000,
-      trailingCostBase: 30,
+      trailingCostBase: 70,
       ...governorForNav(100_000),
     });
     expect(large.decisions[0]!.kind).toBe("admit");
   });
+
+  it("floors the window budget at three typical tickets on a small book", () => {
+    // 40bps of a £10k book is £40 — under two UK tickets. The floor keeps a
+    // handful of tickets a month reachable instead of one rebalance day
+    // locking buying out for the rest of the window.
+    const plan = planAdmissions([buy("X", 900, 20)], { ...base, trailingCostBase: 38 });
+    expect(plan.decisions[0]!.kind).toBe("admit");
+  });
+
+  it("relaxes the reserve bar once no BUY has filled for days", () => {
+    const candidate = { ...buy("X", 900, 20), edgeScore: 0.55, expectedMovePct: 0.12 };
+    const fresh = planAdmissions([candidate], {
+      ...base,
+      trailingCostBase: 500,
+      daysSinceLastBuyFill: 1,
+    });
+    expect(fresh.decisions[0]!.kind).toBe("skip");
+    const stalled = planAdmissions([candidate], {
+      ...base,
+      trailingCostBase: 500,
+      daysSinceLastBuyFill: 12,
+    });
+    expect(stalled.decisions[0]!.kind).toBe("admit");
+  });
 });
+
