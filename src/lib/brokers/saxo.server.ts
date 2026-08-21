@@ -16,6 +16,12 @@ import type {
   BrokerPosition,
 } from "./adapter";
 import { asJson } from "@/lib/_server/db-json";
+import {
+  resolveSaxoAccountKey,
+  shouldReportAccountKeyIssue,
+  type SaxoAccountKeyResolution,
+  type SaxoAccountSummary,
+} from "./saxo-account-key";
 import { redactedError } from "@/lib/_server/redact";
 import { nativeQuotePrice } from "@/lib/market-price-units";
 import {
