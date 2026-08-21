@@ -628,6 +628,8 @@ function AdminPage() {
         </CardContent>
       </Card>
 
+      <SaxoAccountKeyWizard />
+
       <CreditBudgetCard />
 
       <PushNotificationsCard />
