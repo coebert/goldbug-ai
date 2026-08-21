@@ -55,6 +55,8 @@ function BrokerBlocksPage() {
 
         <BrokerSuitabilityBlocksCard />
 
+        <ReconMetricsCard windowDays={14} />
+
         <TradeReconciliationReportCard days={14} />
 
         <HoldingsFillsReconCard />
