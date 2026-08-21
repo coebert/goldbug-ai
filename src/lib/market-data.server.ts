@@ -2,6 +2,7 @@
 // Uses the public chart endpoint — no key required.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { resolvePriceSymbol } from "@/lib/price-symbol";
 
 export type Candle = {
   date: string; // YYYY-MM-DD
@@ -240,10 +241,14 @@ function rowToCandle(r: PriceRow | Record<string, unknown>): Candle {
  * Uses cache; refetches from Yahoo when cache is missing / stale.
  */
 export async function getDailyCandles(
-  symbol: string,
+  rawSymbol: string,
   days: number,
   asOf?: string,
 ): Promise<Candle[]> {
+  // Broker-native spellings ("MKS:XLON", "V:XNYS") are not Yahoo symbols: they
+  // 404 on every fetch and silently fall back to a stale cache. Canonicalise
+  // once here so the fetch, the cache key and the upsert all agree.
+  const symbol = resolvePriceSymbol(rawSymbol);
   const asOfDate = asOf ?? new Date().toISOString().slice(0, 10);
   const key = memoKey(symbol, days, asOfDate);
   const memoised = readMemo(key);
@@ -329,10 +334,11 @@ export async function getPriceOn(symbol: string, date: string): Promise<number |
 // Fetch a long historical window (up to Yahoo's max) and cache it.
 // Returns candles between `from` and `to` inclusive (ISO YYYY-MM-DD).
 export async function getDailyCandlesRange(
-  symbol: string,
+  rawSymbol: string,
   from: string,
   to: string,
 ): Promise<Candle[]> {
+  const symbol = resolvePriceSymbol(rawSymbol);
   const { data: cached } = await supabaseAdmin
     .from("price_cache")
     .select("price_date, open, high, low, close, volume")
@@ -494,7 +500,8 @@ export function dailyVolatility(closes: number[], period = 20): number | null {
 export async function refreshLatestCandles(symbols: string[]): Promise<{ refreshed: number; errors: number }> {
   let refreshed = 0;
   let errors = 0;
-  for (const symbol of symbols.slice(0, 36)) {
+  for (const raw of symbols.slice(0, 36)) {
+    const symbol = resolvePriceSymbol(raw);
     try {
       const fresh = await fetchYahooDaily(symbol, 5);
       if (fresh.length === 0) continue;
