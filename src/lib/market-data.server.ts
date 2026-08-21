@@ -500,7 +500,8 @@ export function dailyVolatility(closes: number[], period = 20): number | null {
 export async function refreshLatestCandles(symbols: string[]): Promise<{ refreshed: number; errors: number }> {
   let refreshed = 0;
   let errors = 0;
-  for (const symbol of symbols.slice(0, 36)) {
+  for (const raw of symbols.slice(0, 36)) {
+    const symbol = resolvePriceSymbol(raw);
     try {
       const fresh = await fetchYahooDaily(symbol, 5);
       if (fresh.length === 0) continue;
