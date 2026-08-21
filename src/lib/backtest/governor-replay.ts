@@ -278,7 +278,7 @@ export function runGovernorReplay(
         symbol: s,
         side: "buy",
         notionalBase: realNotional,
-        estCostBase: costs.oneWayCost + costs.exitCost,
+        estCostBase: (costs.roundTripBps / 10_000) * realNotional,
         edgeScore: 0.55 + 0.4 * strength,
         expectedMovePct: 0.04,
       });
