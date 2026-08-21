@@ -3,6 +3,7 @@ import { AppHeader } from "@/components/app-header";
 import { BrokerSuitabilityBlocksCard } from "@/components/broker-suitability-blocks-card";
 import { BrokerBlockAuditLogCard } from "@/components/broker-block-audit-log-card";
 import { TradeReconciliationReportCard } from "@/components/trade-reconciliation-report-card";
+import { ReconMetricsCard } from "@/components/recon-metrics-card";
 import { HoldingsFillsReconCard } from "@/components/holdings-fills-recon-card";
 import { DataQualityReportCard } from "@/components/data-quality-report-card";
 
@@ -53,6 +54,8 @@ function BrokerBlocksPage() {
         </div>
 
         <BrokerSuitabilityBlocksCard />
+
+        <ReconMetricsCard windowDays={14} />
 
         <TradeReconciliationReportCard days={14} />
 
