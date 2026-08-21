@@ -68,7 +68,7 @@ function bands<K extends string>(points: PolicyRegimePoint[], pick: (p: PolicyRe
   return out;
 }
 
-function Legend({ items }: { items: Array<{ color: string; text: string }> }) {
+function SwatchLegend({ items }: { items: Array<{ color: string; text: string }> }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
       {items.map((i) => (
@@ -192,14 +192,14 @@ export function PolicyRegimeTimelineCard({
                 ))}
               </div>
               <div className="mt-2 grid gap-1.5">
-                <Legend
+                <SwatchLegend
                   items={[
                     { color: POSTURE_COLOR.risk_on, text: "Risk-on" },
                     { color: POSTURE_COLOR.neutral, text: "Neutral" },
                     { color: POSTURE_COLOR.risk_off, text: "Risk-off" },
                   ]}
                 />
-                <Legend
+                <SwatchLegend
                   items={(Object.keys(VOL_COLOR) as VolRegime[]).map((v) => ({
                     color: VOL_COLOR[v],
                     text: `${v[0]!.toUpperCase()}${v.slice(1)} vol`,

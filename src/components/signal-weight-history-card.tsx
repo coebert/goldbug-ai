@@ -113,7 +113,7 @@ export function SignalWeightHistoryCard({
                 <AreaChart data={chartData} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
                   <CartesianGrid {...GRID_PROPS} />
                   <XAxis {...AXIS_PROPS} dataKey="date" tickFormatter={shortDate} minTickGap={18} />
-                  <YAxis {...AXIS_PROPS} domain={[0, 1]} tickFormatter={pct} width={44} />
+                  <YAxis {...AXIS_PROPS} domain={[0, 1]} tickFormatter={pct} width={46} />
                   <Tooltip
                     contentStyle={TOOLTIP_CONTENT_STYLE}
                     labelStyle={TOOLTIP_LABEL_STYLE}

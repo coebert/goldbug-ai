@@ -6,6 +6,15 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  CHART_ROLE,
+  GRID_PROPS,
+  TICK_LINE,
+  TOOLTIP_CONTENT_STYLE,
+  TOOLTIP_LABEL_STYLE,
+} from "@/lib/chart-palette";
 import { FlaskConical } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -79,27 +88,36 @@ function WhatIfBody({ result }: { result: WhatIfResult }) {
             <AreaChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
               <defs>
                 <linearGradient id="whatif-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.45} />
-                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor={CHART_ROLE.positive} stopOpacity={0.45} />
+                  <stop offset="100%" stopColor={CHART_ROLE.positive} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
+              <CartesianGrid {...GRID_PROPS} vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 10 }}
+                tick={AXIS_TICK}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
                 tickFormatter={(d: string) => formatUkDate(d)}
                 minTickGap={24}
               />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v.toFixed(0)}%`} width={40} />
+              <YAxis
+                tick={AXIS_TICK}
+                axisLine={AXIS_LINE}
+                tickLine={TICK_LINE}
+                tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                width={56}
+              />
               <Tooltip
-                contentStyle={{ fontSize: 11 }}
+                contentStyle={TOOLTIP_CONTENT_STYLE}
+                labelStyle={TOOLTIP_LABEL_STYLE}
                 labelFormatter={(d) => formatUkDate(String(d))}
                 formatter={(v: number) => [`${v.toFixed(2)}%`, "Cumulative"]}
               />
               <Area
                 type="monotone"
                 dataKey="cum"
-                stroke="hsl(var(--primary))"
+                stroke={CHART_ROLE.positive}
                 strokeWidth={2}
                 fill="url(#whatif-fill)"
                 isAnimationActive={false}

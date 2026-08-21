@@ -575,6 +575,7 @@ export function PolicyNudgeReplayCard({
                                 : `Gap vs ${ARMS.find((a2) => a2.key === compareBase)?.label} (pp)`,
                           angle: -90,
                           position: "insideLeft",
+                          fill: AXIS_LABEL.fill,
                           style: { ...AXIS_LABEL, textAnchor: "middle" },
                         }}
                       />
@@ -679,6 +680,7 @@ export function PolicyNudgeReplayCard({
                               : "Drawdown (%)",
                           angle: -90,
                           position: "insideLeft",
+                          fill: AXIS_LABEL.fill,
                           style: { ...AXIS_LABEL, textAnchor: "middle" },
                         }}
                       />
@@ -772,8 +774,9 @@ export function PolicyNudgeReplayCard({
                         type="monotone"
                         dataKey="spread"
                         name="Nudge edge"
-                        stroke="hsl(var(--primary))"
-                        fill="hsl(var(--primary) / 0.18)"
+                        stroke={CHART_ROLE.benchmark}
+                        fill={CHART_ROLE.benchmark}
+                        fillOpacity={0.18}
                         strokeWidth={1.4}
                       />
                       <Area

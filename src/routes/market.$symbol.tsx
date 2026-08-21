@@ -916,6 +916,7 @@ function MarketSymbolPage() {
                         value: "Date",
                         position: "insideBottom",
                         offset: -14,
+                        fill: AXIS_LABEL.fill,
                         style: AXIS_LABEL,
                       }}
                     />
@@ -932,6 +933,7 @@ function MarketSymbolPage() {
                         value: `Price (${priceUnitLabel})`,
                         angle: -90,
                         position: "insideLeft",
+                        fill: AXIS_LABEL.fill,
                         style: { ...AXIS_LABEL, textAnchor: "middle" },
                       }}
                     />
