@@ -1500,6 +1500,18 @@ export class SaxoAdapter implements BrokerAdapter {
     await this.getDefaultAccountKey();
     return this.accountKeyResolution;
   }
+
+  /**
+   * Every account this token can see in THIS environment. Used by the
+   * account-key setup flow so the user picks a real key instead of pasting one
+   * that may belong to the other environment.
+   */
+  async listAccounts(): Promise<SaxoAccountSummary[]> {
+    const res = await this.req<{ Data?: SaxoAccountSummary[] }>("GET", "/port/v1/accounts/me", {
+      schema: SaxoAccountsSchema,
+    });
+    return (res.Data ?? []).filter((a) => !!a?.AccountKey);
+  }
 }
 
 
