@@ -96,6 +96,7 @@ export class SaxoAdapter implements BrokerAdapter {
   private readonly accountKey: string | undefined;
   private readonly clientKey: string | undefined;
   private resolvedAccountKey: string | undefined;
+  private accountKeyResolution: SaxoAccountKeyResolution | undefined;
   // Saxo throttles /trade/v2/orders at roughly 1 req/sec per app. Track the
   // last POST time so back-to-back placeOrder calls space themselves out
   // instead of racing into a 429 storm.
