@@ -210,7 +210,7 @@ export function maybeReconcileTradeLegs(params: {
           avg_fill_price: d.avgFillPrice,
           price_deviation_bps: d.priceDeviationBps,
           broker_status: d.brokerStatus,
-          summary: result.summary,
+          summary: { ...result.summary },
           portfolio_name: params.portfolioName ?? null,
         },
       }));
