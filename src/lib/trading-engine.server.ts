@@ -1204,7 +1204,7 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
   const equityStats = await loadEquityStats(supabaseAdmin, portfolioId, asOf).catch(
     () => ({ priorCloseEquity: null, peakEquity: null, netExternalFlow: 0 }),
   );
-  const halts = evaluateRiskHalts({
+  const haltsRaw = evaluateRiskHalts({
     startingEquity: Number(portfolio.starting_cash) || totalValue,
     currentEquity: totalValue,
     unpricedHoldingsValue,
@@ -1216,11 +1216,25 @@ export async function runDailyTick(portfolioId: string, asOf: string, opts?: { s
       max_drawdown_halt_pct: cfg.max_drawdown_halt_pct,
     },
   });
+  // A user may deliberately trade through a halt for a bounded window.
+  const { loadActiveRiskHaltOverride } = await import("./risk-halt-override.server");
+  const haltOverride = haltsRaw.any_halt
+    ? await loadActiveRiskHaltOverride(supabaseAdmin, portfolioId).catch(() => null)
+    : null;
+  if (haltOverride) {
+    srvLog.warn(
+      `[trading-engine] risk halt manually overridden for ${portfolioId} until ${haltOverride.expiresAt} (${haltsRaw.reason ?? "no reason"})`,
+    );
+  }
+  const halts = haltOverride
+    ? { ...haltsRaw, daily_loss_halt: false, drawdown_halt: false, any_halt: false }
+    : haltsRaw;
   if (halts.valuation_suspect) {
     srvLog.warn(
       `[trading-engine] risk halts suppressed for ${portfolioId}: valuation unreliable (unpriced ${unpricedHoldingsValue.toFixed(2)} of ${totalValue.toFixed(2)})`,
     );
   }
+
 
 
   // ---- Auto-liquidation: multi-layer exits BEFORE the AI runs ----
