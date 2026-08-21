@@ -994,6 +994,41 @@ export class SaxoAdapter implements BrokerAdapter {
     return null;
   }
 
+  /** Cached per-UIC FX spot amount rules (decimals + minimum ticket). */
+  private static readonly fxRulesCache = new Map<number, { decimals: number; minAmount: number }>();
+
+  /**
+   * Amount rules for an FX spot pair. Saxo enforces both a decimal precision
+   * and a minimum ticket size; posting a raw float (e.g. 812.3456789) is
+   * rejected with "Number of decimals for fractional amount exceeds the
+   * configured value". Falls back to whole currency units and a 1,000-unit
+   * minimum, which every major pair accepts.
+   */
+  private async fxSpotAmountRules(uic: number): Promise<{ decimals: number; minAmount: number }> {
+    const hit = SaxoAdapter.fxRulesCache.get(uic);
+    if (hit) return hit;
+    let rules = { decimals: 0, minAmount: 1_000 };
+    try {
+      const det = await this.req<{
+        AmountDecimals?: number;
+        OrderDecimals?: number;
+        MinimumTradeSize?: number;
+        MinimumOrderValue?: number;
+        LotSize?: number;
+      }>("GET", `/ref/v1/instruments/details/${uic}/FxSpot`);
+      const dec = Number(det.AmountDecimals ?? det.OrderDecimals);
+      const min = Number(det.MinimumTradeSize ?? det.LotSize ?? det.MinimumOrderValue);
+      rules = {
+        decimals: Number.isFinite(dec) && dec >= 0 && dec <= 6 ? Math.floor(dec) : 0,
+        minAmount: Number.isFinite(min) && min > 0 ? min : 1_000,
+      };
+    } catch {
+      /* keep the conservative defaults */
+    }
+    SaxoAdapter.fxRulesCache.set(uic, rules);
+    return rules;
+  }
+
   /**
    * Place a real spot FX conversion. `amountFrom` is expressed in `fromCcy`.
    * We choose Buy/Sell so the net effect debits `fromCcy` and credits `toCcy`
@@ -1032,12 +1067,40 @@ export class SaxoAdapter implements BrokerAdapter {
         reason: `FX pair only tradable as ${pair.pairFirstCcy}${pair.pairSecondCcy}; cannot size a ${from}->${to} spot order safely without pre-trade rate`,
       };
     }
+    // Saxo rejects FX spot amounts that carry more decimals than the pair
+    // allows ("Number of decimals for fractional amount exceeds the
+    // configured value") and anything under the pair's minimum ticket. Both
+    // were silently killing every USD buy, because a failed FX leg drops the
+    // dependent order. Normalise the amount to the pair's own rules instead
+    // of posting the raw float.
+    const rules = await this.fxSpotAmountRules(pair.uic);
+    const factor = 10 ** rules.decimals;
+    const amount = Math.floor(req.amountFrom * factor + 1e-9) / factor;
+    if (!(amount > 0)) {
+      return {
+        brokerOrderId: "",
+        status: "rejected",
+        reason: `FX ${from}->${to}: amount ${req.amountFrom} rounds to zero at ${rules.decimals} decimals`,
+        pairSymbol: pair.pair,
+      };
+    }
+    if (amount < rules.minAmount) {
+      return {
+        brokerOrderId: "",
+        status: "rejected",
+        reason:
+          `FX ${from}->${to}: ${amount} is below the ${rules.minAmount} ${from} minimum ` +
+          `ticket for ${pair.pair}; size the buy up or fund ${to} directly`,
+        pairSymbol: pair.pair,
+      };
+    }
+
     const accountKey = await this.getDefaultAccountKey();
     const body: Record<string, unknown> = {
       Uic: pair.uic,
       AssetType: "FxSpot",
       BuySell: "Sell",
-      Amount: req.amountFrom,
+      Amount: amount,
       AmountType: "Quantity",
       OrderType: "Market",
       OrderDuration: { DurationType: "DayOrder" },
@@ -1045,6 +1108,7 @@ export class SaxoAdapter implements BrokerAdapter {
       ManualOrder: true,
     };
     if (accountKey) body.AccountKey = accountKey;
+
 
     const { getSaxoErrorPolicy, classifySaxoError, extractSaxoErrorInfo } = await import(
       "./saxo-error-policy"
@@ -1073,7 +1137,7 @@ export class SaxoAdapter implements BrokerAdapter {
         return { brokerOrderId: "", status: outcome === "error" ? "error" : "rejected", reason, raw: res, pairSymbol: pair.pair };
       }
       const fillRate = Number(res.Price ?? 0);
-      const amountTo = fillRate > 0 ? req.amountFrom * fillRate : undefined;
+      const amountTo = fillRate > 0 ? amount * fillRate : undefined;
       return {
         brokerOrderId: res.OrderId ?? "",
         status: "submitted",
