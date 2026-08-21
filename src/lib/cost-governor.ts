@@ -102,7 +102,27 @@ export type GovernorConfig = {
    * when ranking, and break near-ties in favour of the exempt instrument.
    */
   stampExemptPreference?: StampExemptPreference;
+  /**
+   * Escape valve for the rolling friction budget. A burst of churn (or a
+   * forced de-risking sequence, whose SELL costs also land in the trailing
+   * total) can exhaust the window's budget and then block EVERY buy for the
+   * rest of the window — an unintended full stop that left a live account
+   * idle for eleven trading days with cash on hand. At most this many
+   * exceptional tickets per tick may draw on the reserve, and only when the
+   * idea's expected gross edge clears its own friction by
+   * `RESERVE_EDGE_MULTIPLE` and conviction is at least
+   * `RESERVE_MIN_CONVICTION`. Set to 0 to restore a hard budget.
+   */
+  highEdgeReserveTickets?: number;
 };
+
+/** Exceptional tickets allowed past an exhausted budget per tick. */
+export const DEFAULT_HIGH_EDGE_RESERVE_TICKETS = 1;
+/** Expected gross edge must be this multiple of the ticket's friction. */
+export const RESERVE_EDGE_MULTIPLE = 5;
+/** …and the idea must be a genuinely strong one. */
+export const RESERVE_MIN_CONVICTION = 0.6;
+
 
 
 
@@ -192,6 +212,11 @@ export function planAdmissions(
   const budgetTotal = Math.max(0, cfg.navBase) * Math.max(0, cfg.costBudgetPctOfNav);
   let budgetLeft = Math.max(0, budgetTotal - Math.max(0, cfg.trailingCostBase));
   let buysAdmitted = 0;
+  let reserveLeft = Math.max(
+    0,
+    cfg.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS,
+  );
+
   const roomToday = Math.max(0, cfg.maxBuysPerDay - Math.max(0, cfg.buysAlreadyToday));
 
   const stampPref = cfg.stampExemptPreference ?? "off";
@@ -281,16 +306,34 @@ export function planAdmissions(
     }
 
     if (c.estCostBase > budgetLeft) {
+      // Reserve: an exceptional idea may still go, so an exhausted window can
+      // never mean "no trading at all" while the signal is strong.
+      const conviction = Number.isFinite(c.edgeScore) ? Number(c.edgeScore) : 0;
+      const move = Number.isFinite(c.expectedMovePct) ? Number(c.expectedMovePct) : 0.02;
+      const grossEdge = conviction * move * Math.max(0, c.notionalBase);
+      const clears = grossEdge >= RESERVE_EDGE_MULTIPLE * Math.max(0.01, c.estCostBase);
+      if (reserveLeft > 0 && conviction >= RESERVE_MIN_CONVICTION && clears) {
+        reserveLeft -= 1;
+        buysAdmitted += 1;
+        exposure.set(symKey, held + c.notionalBase);
+        decisions.push({ kind: "admit", candidate: c });
+        continue;
+      }
       decisions.push({
         kind: "skip",
         candidate: c,
         reason:
           `trailing cost budget exhausted: ${cfg.trailingCostBase.toFixed(2)} of ` +
           `${budgetTotal.toFixed(2)} (${(cfg.costBudgetPctOfNav * 100).toFixed(2)}% of NAV) spent; ` +
-          `this ticket needs ${c.estCostBase.toFixed(2)}`,
+          `this ticket needs ${c.estCostBase.toFixed(2)}` +
+          (reserveLeft > 0
+            ? ` (high-edge reserve needs conviction ≥ ${RESERVE_MIN_CONVICTION} and ` +
+              `${RESERVE_EDGE_MULTIPLE}x edge cover; this idea has ${grossEdge.toFixed(2)})`
+            : ""),
       });
       continue;
     }
+
 
     budgetLeft -= c.estCostBase;
     buysAdmitted += 1;

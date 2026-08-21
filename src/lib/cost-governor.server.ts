@@ -119,11 +119,20 @@ export async function loadGovernorInputs(args: {
       const modelled = costs.oneWayCost;
       const reported = Number(f["fee"] ?? 0);
       const oneWay = Math.max(modelled, Number.isFinite(reported) ? reported : 0);
-      trailingCostBase += await toBase(oneWay, ccy);
+
+      // Leaky bucket, not a step function. A flat "sum of the last 30 days"
+      // means one churn burst (or a forced de-risking sequence, whose SELL
+      // costs land here too) blocks every buy until the whole burst falls out
+      // of the window at once — a live account sat on cash for eleven trading
+      // days that way. Weighting each fill by how much of the window it has
+      // left refills headroom continuously as the burst ages.
+      const t = Date.parse(filledAt);
+      const ageDays = Number.isFinite(t) ? Math.max(0, (now - t) / 86_400_000) : 0;
+      const weight = Math.max(0, Math.min(1, 1 - ageDays / windowDays));
+      trailingCostBase += (await toBase(oneWay, ccy)) * weight;
 
       if (side === "buy") {
         if (filledAt && ukDayKey(filledAt) === today) buysAlreadyToday += 1;
-        const t = Date.parse(filledAt);
         if (Number.isFinite(t)) {
           const days = Math.floor((now - t) / 86_400_000);
           const key = engineSymbolKey(symbol);
@@ -133,6 +142,7 @@ export async function loadGovernorInputs(args: {
       }
 
     }
+
   } catch {
     /* degrade to no memory */
   }
