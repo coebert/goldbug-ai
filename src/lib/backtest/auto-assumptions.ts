@@ -25,6 +25,7 @@ import {
   type AssumptionPresetId,
   type ExecutionAssumptions,
 } from "./execution-assumptions";
+import type { FeeScheduleDefaults } from "./fee-schedule-import";
 
 /** One symbol's calibrated full quoted spread, in bps of mid. */
 export type SpreadSample = {
@@ -63,6 +64,13 @@ export type AutoAssumptionInput = {
   fxSpreadBpsSamples?: readonly number[];
   /** Preset used for any field without enough evidence. Default `realistic`. */
   fallbackPreset?: AssumptionPresetId;
+  /**
+   * Optional imported broker fee schedule (see `fee-schedule-import`). Used
+   * for commission, the per-ticket floor, stamp duty and the PTM levy when we
+   * do not have enough invoiced tickets to measure them directly. Real
+   * invoices always win over a published tariff.
+   */
+  feeSchedule?: FeeScheduleDefaults | null;
 };
 
 export type FieldBasis = {
@@ -183,6 +191,15 @@ export function deriveAutoAssumptions(
       samples: fees.length,
       note: `invoiced £${round(invoiced, 2)} vs modelled £${round(modelled, 2)} over ${fees.length} tickets`,
     });
+  } else if (input.feeSchedule) {
+    commissionMult = clamp(input.feeSchedule.commissionMult, CLAMPS.commissionMult);
+    basis.push({
+      field: "commissionMult",
+      value: commissionMult,
+      origin: "derived",
+      samples: 0,
+      note: `imported fee schedule — ${input.feeSchedule.note}`,
+    });
   } else {
     basis.push({
       field: "commissionMult",
@@ -207,6 +224,15 @@ export function deriveAutoAssumptions(
       origin: "derived",
       samples: stampable.length,
       note: `invoiced tax £${round(invoiced, 2)} vs modelled stamp £${round(modelled, 2)}`,
+    });
+  } else if (input.feeSchedule) {
+    stampMult = clamp(input.feeSchedule.stampMult, CLAMPS.stampMult);
+    basis.push({
+      field: "stampMult",
+      value: stampMult,
+      origin: "derived",
+      samples: 0,
+      note: `imported fee schedule stamp/levy rates (${input.feeSchedule.note})`,
     });
   } else {
     basis.push({
@@ -264,6 +290,15 @@ export function deriveAutoAssumptions(
       samples: fx.length,
       note: `median observed funding-leg spread over ${fx.length} conversions`,
     });
+  } else if (input.feeSchedule?.fxSpreadBps != null) {
+    fxSpreadBps = clamp(input.feeSchedule.fxSpreadBps, CLAMPS.fxSpreadBps);
+    basis.push({
+      field: "fxSpreadBps",
+      value: fxSpreadBps,
+      origin: "derived",
+      samples: 0,
+      note: "imported fee schedule funding-leg spread",
+    });
   } else {
     basis.push({
       field: "fxSpreadBps",
@@ -299,6 +334,12 @@ export function deriveAutoAssumptions(
       spreadBpsBySymbol,
       slippageBps,
       fxSpreadBps,
+      ...(input.feeSchedule
+        ? {
+            commissionFloorBase: input.feeSchedule.commissionFloorBase,
+            ptmLevy: input.feeSchedule.ptmLevy,
+          }
+        : {}),
     },
     fallbackId,
   );
