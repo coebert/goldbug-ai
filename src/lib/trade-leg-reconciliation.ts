@@ -123,6 +123,45 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Condition-level identity used to deduplicate *notifications*.
+ *
+ * `key` is per-decision / per-order, so the same unresolved problem produces a
+ * brand-new `key` on every tick (new decision id, new replacement order) and
+ * would alert hourly. The alert key instead describes the condition itself —
+ * code + symbol + side — plus a coarse magnitude bucket so that a materially
+ * worse version of the same problem can still escalate once.
+ */
+export function discrepancyAlertKey(d: {
+  code: LegDiscrepancyCode;
+  symbolKey: string;
+  side: "buy" | "sell";
+  intendedQuantity?: number | null;
+  executedQuantity?: number | null;
+  priceDeviationBps?: number | null;
+}): string {
+  const base = `${d.code}|${d.symbolKey}|${d.side}`;
+  switch (d.code) {
+    case "quantity_short":
+    case "quantity_over": {
+      const intended = Number(d.intendedQuantity ?? 0);
+      const executed = Number(d.executedQuantity ?? 0);
+      const gap = intended > 0 ? Math.abs(executed - intended) / intended : 0;
+      // 25-point buckets: 5% and 12% short are "the same" alert; 5% and 60% aren't.
+      const bucket = Math.min(4, Math.floor(gap * 4));
+      return `${base}|g${bucket}`;
+    }
+    case "price_deviation": {
+      const bps = Math.abs(Number(d.priceDeviationBps ?? 0));
+      // 100bps buckets, capped so extreme prints collapse together.
+      const bucket = Math.min(10, Math.floor(bps / 100));
+      return `${base}|d${bucket}`;
+    }
+    default:
+      return base;
+  }
+}
+
 /** Does this veto text explain, on its own, why nothing was routed? */
 export function hasEngineVeto(text: string | null): boolean {
   return typeof text === "string" && text.trim().length > 0;
