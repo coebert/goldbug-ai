@@ -41,7 +41,7 @@ export type SaxoAccountKeyResolution = {
   message: string;
 };
 
-function maskKey(key: string | undefined): string {
+export function maskKey(key: string | undefined): string {
   if (!key) return "(none)";
   return key.length <= 8 ? `${key.slice(0, 2)}…` : `${key.slice(0, 6)}…${key.slice(-2)}`;
 }
