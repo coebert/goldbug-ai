@@ -649,6 +649,18 @@ async function runHourlyCycleInner(
             userId: p.user_id as string,
             portfolioName: p.name ?? null,
           });
+          // Per-leg automatic reconciliation: pairs every intended leg from
+          // this tick's decision with the broker order/fills that followed and
+          // flags dropped legs, side/quantity mismatches, adverse fill prices,
+          // stuck orders and phantom orders.
+          const { maybeReconcileTradeLegs } = await import(
+            "@/lib/trade-leg-reconciliation.server"
+          );
+          maybeReconcileTradeLegs({
+            portfolioId: p.id,
+            userId: p.user_id as string,
+            portfolioName: p.name ?? null,
+          });
         }
 
 
