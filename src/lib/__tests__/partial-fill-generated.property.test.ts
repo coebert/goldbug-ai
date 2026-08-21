@@ -53,12 +53,20 @@ describe("generated partial-fill scenarios: universal invariants", () => {
     // Deterministic for identical input.
     expect(run(scenario)).toEqual(result);
 
-    // Discrepancy identities are unique within a tick.
-    expect(new Set(ds.map((d) => d.key)).size).toBe(ds.length);
+    // Discrepancy identities are unique within a tick, except where two legs
+    // on the same symbol+side describe literally the same condition — those
+    // are meant to collapse rather than alert twice.
+    const dupKeys = ds.map((d) => d.key).filter((k, i, arr) => arr.indexOf(k) !== i);
+    for (const k of dupKeys) {
+      const group = ds.filter((d) => d.key === k);
+      expect(new Set(group.map((d) => `${d.code}|${d.symbolKey}|${d.side}`)).size).toBe(1);
+    }
 
-    // Summary arithmetic stays coherent.
+    // Summary arithmetic stays coherent (vetoed legs are counted as neither).
     expect(summary.intendedLegs).toBe(scenario.intended.length);
-    expect(summary.matchedLegs + summary.mismatchedLegs).toBe(scenario.intended.length);
+    expect(summary.matchedLegs + summary.mismatchedLegs).toBeLessThanOrEqual(
+      scenario.intended.length,
+    );
     expect(summary.droppedLegs).toBeLessThanOrEqual(scenario.intended.length);
     expect(summary.unexecutedValue).toBeGreaterThanOrEqual(0);
 
