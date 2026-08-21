@@ -48,6 +48,13 @@ export type ReplayOptions = {
   stopPct?: number;
   /** Forward horizon (bars) used to label a blocked buy as "would have paid". */
   edgeHorizonBars?: number;
+  /**
+   * Candidate cadence. "cross" only proposes on a fresh SMA20/50 cross (a
+   * calm tape where the friction budget rarely binds); "churn" proposes on
+   * every bar the trend is up, reproducing the live July/August churn burst
+   * that exhausted the 40bps window and then blocked buying for eleven days.
+   */
+  signal?: "cross" | "churn";
 };
 
 export type ReplayTrade = {
@@ -164,6 +171,7 @@ export function runGovernorReplay(
   const stopPct = opts.stopPct ?? 0.08;
   const horizon = opts.edgeHorizonBars ?? 20;
   const fxRule = opts.fxRule ?? DEFAULT_FX_RULE;
+  const signalMode = opts.signal ?? "cross";
   const foreign = new Set((opts.foreignSymbols ?? []).map((s) => s.toUpperCase()));
 
   const symbols = Array.from(
@@ -264,7 +272,8 @@ export function runGovernorReplay(
       const long = sma(closes, i, 200);
       if (fast === null || slow === null || prevFast === null || prevSlow === null) continue;
       const crossedUp = prevFast <= prevSlow && fast > slow;
-      if (!crossedUp) continue;
+      const trendUp = fast > slow;
+      if (!(signalMode === "churn" ? trendUp : crossedUp)) continue;
       if (long !== null && px < long) continue; // regime filter
 
       const notional = Math.min(nav * targetWeight, cash);

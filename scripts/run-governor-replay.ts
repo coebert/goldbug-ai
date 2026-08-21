@@ -29,6 +29,7 @@ const symbols = arg("symbols", DEFAULT.join(",")).split(",").map((s) => s.trim()
 // Everything on this list is USD-quoted for a GBP account, so each buy needs
 // an FX funding leg — the exact path that was silently killing USD buys.
 const foreign = arg("foreign", symbols.join(",")).split(",").map((s) => s.trim());
+const signal = (arg("signal", "cross") === "churn" ? "churn" : "cross") as "cross" | "churn";
 
 const histories = await fetchUniverseHistory(symbols, { from, to });
 const byDate = new Map<string, Record<string, number>>();
@@ -50,7 +51,7 @@ if (bars.length < 220) {
   process.exit(1);
 }
 
-console.log(`\n${symbols.length} symbols, ${bars.length} bars, ${bars[0]!.date} → ${bars.at(-1)!.date}, NAV £${nav}\n`);
+console.log(`\n${symbols.length} symbols, ${bars.length} bars, ${bars[0]!.date} → ${bars.at(-1)!.date}, NAV £${nav}, signal=${signal}\n`);
 
 const windows: Array<{ label: string; slice: ReplayBar[] }> = [
   { label: "full period", slice: bars },
@@ -69,6 +70,7 @@ for (const w of windows) {
   const cmp = compareGovernorArms(w.slice, {
     startingCash: nav,
     foreignSymbols: foreign,
+    signal,
   });
   console.log(`── ${w.label} (${w.slice.length} bars)`);
   console.log(governorReplayReport(cmp));
