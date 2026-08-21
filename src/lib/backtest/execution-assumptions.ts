@@ -120,6 +120,16 @@ export const ASSUMPTION_PRESETS = {
 
 export type AssumptionPresetId = keyof typeof ASSUMPTION_PRESETS;
 
+/**
+ * What a backtest gets when the caller expresses no opinion. Nobody should
+ * have to pick a preset to get an honest answer, and `live` (no slippage, no
+ * impact, no FX spread) flatters every result — so unspecified runs price
+ * against `realistic`. Server-side callers can do better still by awaiting
+ * `loadAutoAssumptions()`, which calibrates these fields from our own bars,
+ * invoiced fees and realised fills.
+ */
+export const DEFAULT_BACKTEST_PRESET: AssumptionPresetId = "realistic";
+
 export const ASSUMPTION_PRESET_IDS = Object.keys(
   ASSUMPTION_PRESETS,
 ) as AssumptionPresetId[];
@@ -316,10 +326,12 @@ export function assumptionsFromFlags(argv: string[]): ExecutionAssumptions {
     return Number.isFinite(n) ? n : undefined;
   };
   const presetRaw = val("assumptions");
+  // `auto` is resolved against live data by the caller; without that data it
+  // degrades to the same realistic baseline every unflagged run gets.
   const preset: AssumptionPresetId =
     presetRaw && (ASSUMPTION_PRESET_IDS as string[]).includes(presetRaw)
       ? (presetRaw as AssumptionPresetId)
-      : "live";
+      : DEFAULT_BACKTEST_PRESET;
 
   return resolveAssumptions(
     {

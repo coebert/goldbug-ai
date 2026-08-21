@@ -23,6 +23,7 @@ import { planAdmissions, governorForNav, type GovernorCandidate } from "../cost-
 import {
   priceTicket,
   resolveAssumptions,
+  DEFAULT_BACKTEST_PRESET,
   describeAssumptions,
   type ExecutionAssumptions,
   type ExecutionAssumptionsInput,
@@ -209,7 +210,7 @@ export function runGovernorReplay(
   const horizon = opts.edgeHorizonBars ?? 20;
   const fxRule = opts.fxRule ?? DEFAULT_FX_RULE;
   const signalMode = opts.signal ?? "cross";
-  const assumptions = resolveAssumptions(opts.assumptions);
+  const assumptions = resolveAssumptions(opts.assumptions, DEFAULT_BACKTEST_PRESET);
   const tradeFrom = Math.max(0, Math.floor(opts.tradeFromIndex ?? 0));
   const foreign = new Set((opts.foreignSymbols ?? []).map((s) => s.toUpperCase()));
 
