@@ -16,6 +16,7 @@ import { estimateTradeCosts } from "./trade-viability-gate";
 import { convertAmount } from "./fx.server";
 import { ukDayKey } from "./uk-time";
 import { engineSymbolKey } from "./price-symbol";
+import { CHURN_WINDOW_DAYS } from "./cost-governor";
 
 export type GovernorInputs = {
   navBase: number;
@@ -35,6 +36,15 @@ export type GovernorInputs = {
   heldSymbols: Set<string>;
   /** Days since the last BUY filled anywhere in the book (windowDays if none). */
   daysSinceLastBuyFill: number;
+  /** BUY fills in the last `churnWindowDays` — recent trading cadence. */
+  recentBuyFills: number;
+  /** Lookback used for `recentBuyFills`. */
+  churnWindowDays: number;
+  /**
+   * Realised-volatility z-score of the book's own tape (recent daily equity
+   * vol vs its longer baseline). 0 when there is not enough history.
+   */
+  tapeVolZ: number;
 };
 
 
@@ -91,6 +101,7 @@ export async function loadGovernorInputs(args: {
 
   let trailingCostBase = 0;
   let buysAlreadyToday = 0;
+  let recentBuyFills = 0;
   const lastBuyDaysAgo: Record<string, number> = {};
 
   try {
@@ -135,6 +146,7 @@ export async function loadGovernorInputs(args: {
 
       if (side === "buy") {
         if (filledAt && ukDayKey(filledAt) === today) buysAlreadyToday += 1;
+        if (Number.isFinite(t) && ageDays <= CHURN_WINDOW_DAYS) recentBuyFills += 1;
         if (Number.isFinite(t)) {
           const days = Math.floor((now - t) / 86_400_000);
           const key = engineSymbolKey(symbol);
@@ -179,8 +191,16 @@ export async function loadGovernorInputs(args: {
     /* concentration budget degrades to "no existing exposure" */
   }
 
+  // Realised-volatility z of the book's own tape. Recent daily equity return
+  // vol against its longer baseline: a cheap, always-available read on how
+  // violent the tape the portfolio actually trades is.
+  const tapeVolZ = await loadTapeVolZ(args.supabaseAdmin, args.portfolioId);
+
   return {
     navBase,
+    recentBuyFills,
+    churnWindowDays: CHURN_WINDOW_DAYS,
+    tapeVolZ,
     trailingCostBase,
     buysAlreadyToday,
     lastBuyDaysAgo,
@@ -194,4 +214,60 @@ export async function loadGovernorInputs(args: {
   };
 
 
+}
+
+const VOL_RECENT_DAYS = 10;
+const VOL_BASELINE_DAYS = 60;
+
+function stdev(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const v = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (xs.length - 1);
+  return Math.sqrt(Math.max(0, v));
+}
+
+/**
+ * Realised-vol z-score of the portfolio's daily equity returns: how far the
+ * last ~two weeks' volatility sits above its own multi-month distribution.
+ * Returns 0 (i.e. "normal tape") whenever there is too little history.
+ */
+export async function loadTapeVolZ(
+  supabaseAdmin: { from: (t: string) => any },
+  portfolioId: string,
+): Promise<number> {
+  try {
+    const res = await supabaseAdmin
+      .from("equity_snapshots")
+      .select("snapshot_date, total_value")
+      .eq("portfolio_id", portfolioId)
+      .order("snapshot_date", { ascending: false })
+      .limit(VOL_BASELINE_DAYS + VOL_RECENT_DAYS + 2);
+    const rows = ((res?.data ?? []) as Array<Record<string, unknown>>)
+      .map((r) => Number(r["total_value"] ?? 0))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .reverse();
+    if (rows.length < VOL_RECENT_DAYS + 20) return 0;
+    const rets: number[] = [];
+    for (let i = 1; i < rows.length; i += 1) {
+      const prev = rows[i - 1]!;
+      const cur = rows[i]!;
+      if (prev > 0) rets.push(cur / prev - 1);
+    }
+    if (rets.length < VOL_RECENT_DAYS + 19) return 0;
+    const recent = stdev(rets.slice(-VOL_RECENT_DAYS));
+    // Rolling window of past realised vols, so the z-score is against the
+    // book's own distribution rather than an arbitrary constant.
+    const history: number[] = [];
+    for (let end = rets.length - VOL_RECENT_DAYS; end >= VOL_RECENT_DAYS; end -= 1) {
+      history.push(stdev(rets.slice(end - VOL_RECENT_DAYS, end)));
+    }
+    if (history.length < 10) return 0;
+    const mean = history.reduce((a, b) => a + b, 0) / history.length;
+    const sd = stdev(history);
+    if (!(sd > 0)) return 0;
+    const z = (recent - mean) / sd;
+    return Number.isFinite(z) ? Math.max(0, Math.min(5, z)) : 0;
+  } catch {
+    return 0;
+  }
 }
