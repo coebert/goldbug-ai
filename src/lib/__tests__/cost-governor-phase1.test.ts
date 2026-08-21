@@ -19,22 +19,24 @@ describe("order aggregation", () => {
     expect(res.ticketsSaved).toBe(1);
   });
 
-  it("nets opposing intents in the same symbol instead of paying both legs", () => {
+  it("keeps the exit whole and drops the opposing buy leg", () => {
     const res = aggregateOrders([
       { symbol: "VOD.L", side: "buy", quantity: 500, price: 1 },
       { symbol: "VOD.L", side: "sell", quantity: 200, price: 1 },
     ]);
     expect(res.orders).toHaveLength(1);
-    expect(res.orders[0]!.side).toBe("buy");
-    expect(res.orders[0]!.quantity).toBe(300);
+    expect(res.orders[0]!.side).toBe("sell");
+    expect(res.orders[0]!.quantity).toBe(200);
   });
 
-  it("drops the symbol entirely when the legs are equal", () => {
+  it("never nets a protective sell away, even when the legs are equal", () => {
     const res = aggregateOrders([
       { symbol: "VOD.L", side: "buy", quantity: 200, price: 1 },
       { symbol: "VOD.L", side: "sell", quantity: 200, price: 1 },
     ]);
-    expect(res.orders).toHaveLength(0);
+    expect(res.orders).toHaveLength(1);
+    expect(res.orders[0]!.side).toBe("sell");
+    expect(res.orders[0]!.quantity).toBe(200);
   });
 
   it("preserves other order fields from the first ticket", () => {
@@ -57,10 +59,11 @@ describe("edge per cost ranking", () => {
     const cfg = {
       navBase: 10_000,
       buysAlreadyToday: 0,
-      trailingCostBase: 0,
+      // 20 already spent against a 30 floor (3 x 10 typical ticket) leaves
+      // room for exactly one ticket.
+      trailingCostBase: 20,
       lastBuyDaysAgo: {},
       ...governorForNav(10_000),
-      // Budget only fits one ticket.
       costBudgetPctOfNav: 0.0015,
     };
     const plan = planAdmissions(

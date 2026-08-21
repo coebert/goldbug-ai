@@ -81,26 +81,22 @@ export function aggregateOrders<T extends AggregatableOrder>(
     }
   }
 
-  // Net opposing sides per symbol.
+  // Opposing sides in the same symbol on the same tick are a signal-vs-exit
+  // disagreement. Risk reduction wins outright: the SELL routes in full and
+  // the BUY is dropped. Symmetric netting used to shrink — or entirely cancel
+  // — a stop-loss/thesis-break exit whenever an unrelated buy signal fired for
+  // the same name, which is precisely how a losing position keeps bleeding.
   const netted = new Set<string>();
   const symbols = new Set(order.map((k) => k.split("|")[0] as string));
   for (const symbol of symbols) {
     const buy = buckets.get(`${symbol}|buy`);
     const sell = buckets.get(`${symbol}|sell`);
     if (!buy || !sell) continue;
-    const overlap = Math.min(buy.qty, sell.qty);
-    if (!(overlap > 0)) continue;
-    for (const [bucket, key] of [
-      [buy, `${symbol}|buy`],
-      [sell, `${symbol}|sell`],
-    ] as const) {
-      const avg = bucket.notional / bucket.qty;
-      bucket.qty -= overlap;
-      bucket.notional = bucket.qty * avg;
-      netted.add(key);
-      if (bucket.qty <= 0) buckets.delete(key);
-    }
+    if (!(buy.qty > 0) || !(sell.qty > 0)) continue;
+    buckets.delete(`${symbol}|buy`);
+    netted.add(`${symbol}|buy`);
   }
+
 
   const out: T[] = [];
   const notes: AggregationNote[] = [];

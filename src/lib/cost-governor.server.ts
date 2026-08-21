@@ -33,6 +33,8 @@ export type GovernorInputs = {
   positionExposureBase: Record<string, number>;
   /** Symbols currently held (upper-cased), so adds can be told apart from new entries. */
   heldSymbols: Set<string>;
+  /** Days since the last BUY filled anywhere in the book (windowDays if none). */
+  daysSinceLastBuyFill: number;
 };
 
 
@@ -183,6 +185,9 @@ export async function loadGovernorInputs(args: {
     buysAlreadyToday,
     lastBuyDaysAgo,
     windowDays,
+    daysSinceLastBuyFill: Object.values(lastBuyDaysAgo).length
+      ? Math.min(...Object.values(lastBuyDaysAgo))
+      : windowDays,
     sectorExposureBase,
     positionExposureBase,
     heldSymbols,

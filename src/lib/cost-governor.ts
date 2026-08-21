@@ -114,6 +114,15 @@ export type GovernorConfig = {
    * `RESERVE_MIN_CONVICTION`. Set to 0 to restore a hard budget.
    */
   highEdgeReserveTickets?: number;
+  /**
+   * Days since the last BUY actually filled anywhere in the book (any symbol).
+   * A small account whose 40bps window is spent by one rebalance day cannot
+   * buy again for weeks — observed live: fourteen calendar days with cash on
+   * hand and every candidate skipped with "trailing cost budget exhausted".
+   * Once this crosses `STALL_DAYS` the reserve relaxes to a lower bar so the
+   * budget degrades into a throttle rather than a stop.
+   */
+  daysSinceLastBuyFill?: number;
 };
 
 /** Exceptional tickets allowed past an exhausted budget per tick. */
@@ -122,6 +131,18 @@ export const DEFAULT_HIGH_EDGE_RESERVE_TICKETS = 1;
 export const RESERVE_EDGE_MULTIPLE = 5;
 /** …and the idea must be a genuinely strong one. */
 export const RESERVE_MIN_CONVICTION = 0.6;
+/** No BUY fill for this many days ⇒ the reserve bar drops (stall breaker). */
+export const STALL_DAYS = 5;
+/** Relaxed reserve bar once the book has stalled. */
+export const STALL_RESERVE_EDGE_MULTIPLE = 2;
+export const STALL_RESERVE_MIN_CONVICTION = 0.5;
+/**
+ * The window budget can never be smaller than this many typical tickets'
+ * friction. On a £10k book 40bps is ~£40 — less than four UK tickets — so a
+ * single de-risking sequence exhausts a whole month of buying.
+ */
+export const MIN_BUDGET_TICKETS = 3;
+
 
 
 
@@ -209,13 +230,30 @@ export function planAdmissions(
   cfg: GovernorConfig,
 ): GovernorPlan {
   const minTicket = minTicketBase(cfg);
-  const budgetTotal = Math.max(0, cfg.navBase) * Math.max(0, cfg.costBudgetPctOfNav);
+  // Typical ticket friction on this tick, used to floor the window budget so
+  // a small account always has room for a few tickets a month.
+  const buyCosts = candidates
+    .filter((c) => c.side === "buy" && Number.isFinite(c.estCostBase) && c.estCostBase > 0)
+    .map((c) => c.estCostBase)
+    .sort((a, b) => a - b);
+  const typicalTicketCost = buyCosts.length
+    ? buyCosts[Math.floor(buyCosts.length / 2)]!
+    : 0;
+  const budgetTotal = Math.max(
+    Math.max(0, cfg.navBase) * Math.max(0, cfg.costBudgetPctOfNav),
+    MIN_BUDGET_TICKETS * typicalTicketCost,
+  );
   let budgetLeft = Math.max(0, budgetTotal - Math.max(0, cfg.trailingCostBase));
   let buysAdmitted = 0;
+
+  const stalled = (cfg.daysSinceLastBuyFill ?? 0) >= STALL_DAYS;
+  const reserveEdgeMultiple = stalled ? STALL_RESERVE_EDGE_MULTIPLE : RESERVE_EDGE_MULTIPLE;
+  const reserveMinConviction = stalled ? STALL_RESERVE_MIN_CONVICTION : RESERVE_MIN_CONVICTION;
   let reserveLeft = Math.max(
     0,
-    cfg.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS,
+    (cfg.highEdgeReserveTickets ?? DEFAULT_HIGH_EDGE_RESERVE_TICKETS) + (stalled ? 1 : 0),
   );
+
 
   const roomToday = Math.max(0, cfg.maxBuysPerDay - Math.max(0, cfg.buysAlreadyToday));
 
@@ -311,8 +349,8 @@ export function planAdmissions(
       const conviction = Number.isFinite(c.edgeScore) ? Number(c.edgeScore) : 0;
       const move = Number.isFinite(c.expectedMovePct) ? Number(c.expectedMovePct) : 0.02;
       const grossEdge = conviction * move * Math.max(0, c.notionalBase);
-      const clears = grossEdge >= RESERVE_EDGE_MULTIPLE * Math.max(0.01, c.estCostBase);
-      if (reserveLeft > 0 && conviction >= RESERVE_MIN_CONVICTION && clears) {
+      const clears = grossEdge >= reserveEdgeMultiple * Math.max(0.01, c.estCostBase);
+      if (reserveLeft > 0 && conviction >= reserveMinConviction && clears) {
         reserveLeft -= 1;
         buysAdmitted += 1;
         exposure.set(symKey, held + c.notionalBase);
@@ -326,10 +364,12 @@ export function planAdmissions(
           `trailing cost budget exhausted: ${cfg.trailingCostBase.toFixed(2)} of ` +
           `${budgetTotal.toFixed(2)} (${(cfg.costBudgetPctOfNav * 100).toFixed(2)}% of NAV) spent; ` +
           `this ticket needs ${c.estCostBase.toFixed(2)}` +
+          (stalled ? ` [stalled ${Math.round(cfg.daysSinceLastBuyFill ?? 0)}d: relaxed reserve bar]` : "") +
           (reserveLeft > 0
-            ? ` (high-edge reserve needs conviction ≥ ${RESERVE_MIN_CONVICTION} and ` +
-              `${RESERVE_EDGE_MULTIPLE}x edge cover; this idea has ${grossEdge.toFixed(2)})`
+            ? ` (high-edge reserve needs conviction ≥ ${reserveMinConviction} and ` +
+              `${reserveEdgeMultiple}x edge cover; this idea has ${grossEdge.toFixed(2)})`
             : ""),
+
       });
       continue;
     }
