@@ -191,7 +191,6 @@ export function deriveAutoAssumptions(
       samples: fees.length,
       note: `invoiced £${round(invoiced, 2)} vs modelled £${round(modelled, 2)} over ${fees.length} tickets`,
     });
-  } else {
   } else if (input.feeSchedule) {
     commissionMult = clamp(input.feeSchedule.commissionMult, CLAMPS.commissionMult);
     basis.push({
@@ -226,7 +225,6 @@ export function deriveAutoAssumptions(
       samples: stampable.length,
       note: `invoiced tax £${round(invoiced, 2)} vs modelled stamp £${round(modelled, 2)}`,
     });
-  } else {
   } else if (input.feeSchedule) {
     stampMult = clamp(input.feeSchedule.stampMult, CLAMPS.stampMult);
     basis.push({
@@ -292,7 +290,6 @@ export function deriveAutoAssumptions(
       samples: fx.length,
       note: `median observed funding-leg spread over ${fx.length} conversions`,
     });
-  } else {
   } else if (input.feeSchedule?.fxSpreadBps != null) {
     fxSpreadBps = clamp(input.feeSchedule.fxSpreadBps, CLAMPS.fxSpreadBps);
     basis.push({
