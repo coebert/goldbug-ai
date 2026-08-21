@@ -1467,7 +1467,13 @@ export class SaxoAdapter implements BrokerAdapter {
           error: resolution.message,
         });
       }
+      // Portfolio-scoped callers must never silently trade a different
+      // account than the one they were bound to: fail loudly instead.
+      if (this.strictAccountKey && resolution.mismatch) {
+        throw new Error(`Saxo account key mismatch: ${resolution.message}`);
+      }
       return this.resolvedAccountKey;
+
     } catch (e) {
       await log({
         portfolioId: this.portfolioId,
