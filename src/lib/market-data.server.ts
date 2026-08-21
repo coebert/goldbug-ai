@@ -2,6 +2,7 @@
 // Uses the public chart endpoint — no key required.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { resolvePriceSymbol } from "@/lib/price-symbol";
 
 export type Candle = {
   date: string; // YYYY-MM-DD
