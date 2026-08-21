@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`intended-vs-executed order graph snapshots > broker faults: dropped leg, partial fill, rejection and an adverse print 1`] = `
+"INTENTS
+  D1     sell MKS.L 900             kept
+  D2     sell AAPL 10               kept
+  D3     sell VMID.L 60             kept
+  D4     sell XUKS.L 40             kept
+ROUTED
+  sell MKS.L 900             governor=admit   executed=none flags=[dropped_leg/critical]
+  sell AAPL 10               governor=admit   executed=pending 4
+  sell VMID.L 60             governor=admit   executed=rejected 0
+  sell XUKS.L 40             governor=admit   executed=filled 40 flags=[price_deviation/warning]
+SUMMARY
+  ticketsSaved=0 intended=4 matched=2 dropped=1 mismatched=1 phantom=0 unexecuted=1800"
+`;
+
+exports[`intended-vs-executed order graph snapshots > clean tick: merges, nets the exit over the add, and fills everything 1`] = `
+"INTENTS
+  D1     buy AAPL 3                 merged(2)->5
+  D2     buy AAPL 2                 merged(2)->5
+  D3     buy MKS.L 400              cancelled-by-netting
+  D4     sell MKS.L 250             kept
+ROUTED
+  buy AAPL 5                 governor=admit   executed=filled 5
+  sell MKS.L 250             governor=admit   executed=filled 250
+SUMMARY
+  ticketsSaved=2 intended=2 matched=2 dropped=0 mismatched=0 phantom=0 unexecuted=0"
+`;
+
+exports[`intended-vs-executed order graph snapshots > equal opposing legs drop out of the graph entirely 1`] = `
+"INTENTS
+  D1     buy MKS.L 300              cancelled-by-netting
+  D2     sell MKS.L 300             kept
+  D3     sell AAPL 6                kept
+ROUTED
+  sell MKS.L 300             governor=admit   executed=none flags=[dropped_leg/critical]
+  sell AAPL 6                governor=admit   executed=filled 6
+SUMMARY
+  ticketsSaved=1 intended=2 matched=1 dropped=1 mismatched=0 phantom=0 unexecuted=600"
+`;
+
+exports[`intended-vs-executed order graph snapshots > governor-gated tick: exits admitted, adds skipped with budget exhausted 1`] = `
+"INTENTS
+  D1     sell SGLN.L 40             kept
+  D2     buy AAPL 8                 kept
+  D3     buy VMID.L 2               kept
+ROUTED
+  sell SGLN.L 40             governor=admit   executed=filled 40
+  buy AAPL 8                 governor=skip    executed=none
+  buy VMID.L 2               governor=skip    executed=none
+SUMMARY
+  ticketsSaved=0 intended=3 matched=1 dropped=0 mismatched=0 phantom=0 unexecuted=0"
+`;
+
+exports[`intended-vs-executed order graph snapshots > stale pending exit is surfaced rather than silently waiting 1`] = `
+"INTENTS
+  D1     sell MKS.L 900             kept
+ROUTED
+  sell MKS.L 900             governor=admit   executed=pending 0 flags=[stale_pending/warning]
+SUMMARY
+  ticketsSaved=0 intended=1 matched=0 dropped=0 mismatched=1 phantom=0 unexecuted=1800"
+`;
