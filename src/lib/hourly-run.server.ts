@@ -661,6 +661,14 @@ async function runHourlyCycleInner(
             userId: p.user_id as string,
             portfolioName: p.name ?? null,
           });
+          // Rolling outcome metrics on top of those discrepancies: alerts when
+          // dropped legs spike, inventory nearly strands, or adverse prints drag.
+          const { maybeRaiseReconMetricAlerts } = await import("@/lib/recon-metrics.server");
+          maybeRaiseReconMetricAlerts({
+            portfolioId: p.id,
+            userId: p.user_id as string,
+            portfolioName: p.name ?? null,
+          });
         }
 
 
