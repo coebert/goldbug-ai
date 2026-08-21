@@ -357,7 +357,7 @@ describe("fault injection: combined storms stay reconcilable", () => {
     // MKS.L timed out but was booked → clean once we read the broker's book.
     expect(bySymbol["MKS.L"]).toBeUndefined();
     expect(bySymbol["VMID.L"]).toBe("dropped_leg");
-    expect(bySymbol["AAPL:xnas"]).toBe("quantity_short");
+    expect(bySymbol["AAPL:XNAS"]).toBe("quantity_short");
     expect(res.summary.intendedLegs).toBe(3);
     expect(res.summary.matchedLegs + res.summary.mismatchedLegs + res.summary.droppedLegs).toBe(3);
     expect(res.summary.phantomLegs).toBe(0);
@@ -431,15 +431,10 @@ describe("fault injection: combined storms stay reconcilable", () => {
       intent("VMID.L", "sell", 50, "dec-2"),
       intent("AAPL:xnas", "buy", 10, "dec-3"),
     ];
-    for (const l of legs) await placeTolerant(sim_(clean), l);
+    for (const l of legs) await placeTolerant(clean, l);
     for (const [symbol, qty] of Object.entries(clean.netExecuted())) {
       const intended = legs.find((l) => l.symbol === symbol)!;
       expect(Math.abs(qty)).toBeLessThanOrEqual(intended.quantity);
     }
   });
 });
-
-/** Identity helper — keeps the loop above readable. */
-function sim_(b: FaultInjectingBroker): FaultInjectingBroker {
-  return b;
-}
