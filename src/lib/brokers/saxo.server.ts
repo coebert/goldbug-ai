@@ -16,6 +16,12 @@ import type {
   BrokerPosition,
 } from "./adapter";
 import { asJson } from "@/lib/_server/db-json";
+import {
+  resolveSaxoAccountKey,
+  shouldReportAccountKeyIssue,
+  type SaxoAccountKeyResolution,
+  type SaxoAccountSummary,
+} from "./saxo-account-key";
 import { redactedError } from "@/lib/_server/redact";
 import { nativeQuotePrice } from "@/lib/market-price-units";
 import {
@@ -90,6 +96,7 @@ export class SaxoAdapter implements BrokerAdapter {
   private readonly accountKey: string | undefined;
   private readonly clientKey: string | undefined;
   private resolvedAccountKey: string | undefined;
+  private accountKeyResolution: SaxoAccountKeyResolution | undefined;
   // Saxo throttles /trade/v2/orders at roughly 1 req/sec per app. Track the
   // last POST time so back-to-back placeOrder calls space themselves out
   // instead of racing into a 429 storm.
@@ -1432,33 +1439,32 @@ export class SaxoAdapter implements BrokerAdapter {
   private async getDefaultAccountKey(): Promise<string | undefined> {
     if (this.resolvedAccountKey) return this.resolvedAccountKey;
     try {
-      const res = await this.req<{
-        Data?: Array<{
-          AccountKey?: string;
-          Active?: boolean;
-          Currency?: string;
-          LegalAssetTypes?: string[];
-        }>;
-      }>("GET", "/port/v1/accounts/me", { schema: SaxoAccountsSchema });
-      const accounts = res.Data ?? [];
-      const configured = this.accountKey
-        ? accounts.find((a) => a.AccountKey === this.accountKey && a.Active !== false)
-        : undefined;
-      const tradable = accounts.find(
-        (a) => a.Active !== false && a.AccountKey && a.LegalAssetTypes?.some((t) => t === "Stock" || t === "Etf"),
-      ) ?? accounts.find((a) => a.Active !== false && a.AccountKey) ?? accounts.find((a) => a.AccountKey);
-      this.resolvedAccountKey = configured?.AccountKey ?? tradable?.AccountKey;
-      if (this.accountKey && !configured) {
+      const res = await this.req<{ Data?: SaxoAccountSummary[] }>("GET", "/port/v1/accounts/me", {
+        schema: SaxoAccountsSchema,
+      });
+      // Validate the configured key against THIS environment before trusting it.
+      const resolution = resolveSaxoAccountKey({
+        env: this.env,
+        configured: this.accountKey,
+        accounts: res.Data ?? [],
+      });
+      this.resolvedAccountKey = resolution.accountKey;
+      this.accountKeyResolution = resolution;
+      if (shouldReportAccountKeyIssue(this.env, resolution)) {
         await log({
           portfolioId: this.portfolioId,
           userId: this.userId,
           env: this.env,
-          method: "ACCOUNT_KEY_DISCOVERED",
+          method: "ACCOUNT_KEY_VALIDATION",
           path: "/port/v1/accounts/me",
           status: 200,
-          request: asJson({ configuredProvided: true }),
-          response: asJson({ selected: !!this.resolvedAccountKey, accountCount: accounts.length }),
-          error: "Configured SAXO_ACCOUNT_KEY did not match this broker environment; using discovered active account.",
+          request: asJson({ configuredProvided: !!this.accountKey }),
+          response: asJson({
+            status: resolution.status,
+            selected: !!resolution.accountKey,
+            accountCount: resolution.accountCount,
+          }),
+          error: resolution.message,
         });
       }
       return this.resolvedAccountKey;
@@ -1472,11 +1478,19 @@ export class SaxoAdapter implements BrokerAdapter {
         status: null,
         error: e instanceof Error ? e.message : String(e),
       });
-      this.resolvedAccountKey = this.accountKey;
-      return this.resolvedAccountKey;
+      // Account list unavailable: fall back to the configured key unvalidated
+      // rather than blocking the run, but do not cache it as validated.
+      return this.accountKey;
     }
   }
+
+  /** Last validation outcome for the configured account key (undefined until resolved). */
+  async validateAccountKey(): Promise<SaxoAccountKeyResolution | undefined> {
+    await this.getDefaultAccountKey();
+    return this.accountKeyResolution;
+  }
 }
+
 
 function safeJson(text: string): unknown {
   try { return JSON.parse(text); } catch { return { raw: text.slice(0, 500) }; }
