@@ -198,8 +198,11 @@ export function runGovernorReplay(
   const equityCurve: Array<{ date: string; equity: number }> = [];
   // Cost ledger: fills as { index, cost } so the arms can account differently.
   const costLedger: Array<{ index: number; cost: number }> = [];
+  // Seeded friction is injected on the first bar that actually produces a
+  // candidate, so the "morning after a churn burst" state is exercised rather
+  // than decaying away during the SMA warm-up.
   const seed = Math.max(0, opts.seedFrictionBase ?? 0);
-  if (seed > 0) costLedger.push({ index: 0, cost: seed });
+  let seedPending = seed > 0;
   const lastBuyIndex = new Map<string, number>();
 
   let buysProposed = 0;
@@ -312,6 +315,11 @@ export function runGovernorReplay(
       if (idleStreak > 0) longestIdleStreakDays = Math.max(longestIdleStreakDays, idleStreak);
       idleStreak = 0;
       continue;
+    }
+
+    if (seedPending) {
+      costLedger.push({ index: i, cost: seed });
+      seedPending = false;
     }
 
     // ---- trailing friction, accounted per arm ----------------------------
